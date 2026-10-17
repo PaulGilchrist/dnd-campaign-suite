@@ -1,17 +1,16 @@
-//
-// Removed 7 redundant/low-value tests:
-//
-//   1. "enables the apply button when a target is selected" → redundant with
-//      "selects a target when its row is clicked" (same click → checkbox checked → button enabled path)
-//   2. "renders target count in apply button" → redundant with
-//      "updates target count in apply button when targets are selected" (already tests 0→1→2)
-//   3-7. Entire "metamagic heighten" section (5 tests) → covered by
-//        AOEConditionModal.integration.test.jsx "heighten radio button behavior"
-//   8-10. Entire "metamagic careful" section (3 tests) → covered by
-//         AOEConditionModal.integration.test.jsx (careful spell logic tested via full flow)
-//  11-12. Entire "edge cases" section (2 tests) → minimal assertions (just text presence),
-//         no unique behavioral coverage
-//
+// @maintained-by-ai
+// AOEConditionModal — non-overlay selection lane only (render + selection + skip).
+// Coverage split across the family (verified 2026-10):
+//   save/apply flow & Careful Spell ......... AOEConditionModal.save-flow.test.jsx
+//   Heightened Spell metamagic .............. AOEConditionModal.integration.test.jsx
+//   results & condition dedupe .............. AOEConditionModal.results.test.jsx
+//   SP-024 expiry clock ..................... AOEConditionModal.expiry.test.jsx
+//   overlay targeting lane .................. AOEConditionModal.overlay.test.jsx
+//   generic row/checkbox/count internals .... CreatureSelectionModal.test.jsx
+// What stays here is the wrapper's OWN wiring: eligible targets sourced from
+// getCombatSummary, spell-specific description/note composition, apply gating
+// with live count through the real CreatureSelectionModal, and Skip→onClose
+// (asserted nowhere else in the family).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AOEConditionModal from './AOEConditionModal.jsx';
@@ -97,6 +96,10 @@ function getApplyButton() {
     return screen.getByRole('button', { name: /Blinding Darkness/ });
 }
 
+function getRows() {
+    return Array.from(document.querySelectorAll('.secondary-target-row'));
+}
+
 // ── Tests ──
 
 describe('AOEConditionModal', () => {
@@ -106,93 +109,77 @@ describe('AOEConditionModal', () => {
         getAllyList.mockReturnValue(null);
     });
 
-    // ── Initial render ──
+    it('renders the selection UI from combat summary creatures, save data, and condition label', () => {
+        render(<AOEConditionModal {...makeProps()} />);
 
-    describe('initial render', () => {
-        it('renders the modal with action name as title', () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            expect(screen.getByText('Blinding Darkness')).toBeInTheDocument();
+        // Title and spell-specific instructions composed from props
+        expect(screen.getByText('Blinding Darkness')).toBeInTheDocument();
+        expect(screen.getByText(/Select creatures in the area of effect/)).toBeInTheDocument();
+        expect(screen.getByText('CON')).toBeInTheDocument();
+        expect(screen.getByText(/DC 12/)).toBeInTheDocument();
+        const noteEl = document.querySelector('.sp-note');
+        expect(noteEl).toHaveTextContent(/On a failed save/);
+        expect(noteEl).toHaveTextContent('Blinded');
+
+        // Every combat-summary creature is offered as a selectable row
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+        expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
+        expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+
+        // Nothing selected yet: apply gated off, skip offered
+        expect(getApplyButton()).toBeDisabled();
+        expect(getApplyButton()).toHaveTextContent('Blinding Darkness (0)');
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    });
+
+    it('enables apply with a live target count as rows are selected and deselected', async () => {
+        render(<AOEConditionModal {...makeProps()} />);
+        const rows = getRows();
+        const checkboxes = screen.getAllByRole('checkbox');
+
+        // Select Goblin → row checked/highlighted, apply enabled with count 1
+        await act(async () => { fireEvent.click(rows[0]); });
+        await waitFor(() => {
+            expect(checkboxes[0]).toBeChecked();
+            expect(rows[0]).toHaveClass('secondary-target-selected');
+            expect(checkboxes[1]).not.toBeChecked();
+            expect(rows[1]).not.toHaveClass('secondary-target-selected');
+            expect(getApplyButton()).toBeEnabled();
+            expect(getApplyButton()).toHaveTextContent('Blinding Darkness (1)');
         });
 
-        it('renders all eligible creatures in the target list', () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            expect(screen.getByText('Goblin')).toBeInTheDocument();
-            expect(screen.getByText('Orc')).toBeInTheDocument();
-            expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
+        // Select Orc too → count 2, both highlighted
+        await act(async () => { fireEvent.click(rows[1]); });
+        await waitFor(() => {
+            expect(checkboxes[1]).toBeChecked();
+            expect(rows[1]).toHaveClass('secondary-target-selected');
+            expect(getApplyButton()).toHaveTextContent('Blinding Darkness (2)');
         });
 
-        it('renders the description with save type and DC', () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            expect(screen.getByText(/Select creatures in the area of effect/)).toBeInTheDocument();
-            expect(screen.getByText(/CON/)).toBeInTheDocument();
-            expect(screen.getByText(/DC 12/)).toBeInTheDocument();
+        // Deselect Goblin → count drops to 1, highlight and check removed, still enabled
+        await act(async () => { fireEvent.click(rows[0]); });
+        await waitFor(() => {
+            expect(checkboxes[0]).not.toBeChecked();
+            expect(rows[0]).not.toHaveClass('secondary-target-selected');
+            expect(getApplyButton()).toHaveTextContent('Blinding Darkness (1)');
+            expect(getApplyButton()).toBeEnabled();
         });
 
-        it('renders the note about failed save condition', () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            const noteEl = document.querySelector('.sp-note');
-            expect(noteEl).toHaveTextContent(/On a failed save/);
-            expect(noteEl).toHaveTextContent('Blinded');
-        });
-
-        it('disables the apply button when no target is selected', () => {
-            render(<AOEConditionModal {...makeProps()} />);
+        // Back to zero selection → apply disabled again
+        await act(async () => { fireEvent.click(rows[1]); });
+        await waitFor(() => {
+            expect(getApplyButton()).toHaveTextContent('Blinding Darkness (0)');
             expect(getApplyButton()).toBeDisabled();
-        });
-
-        it('renders the skip button', () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
         });
     });
 
-    // ── Target selection ──
+    it('Skip closes the modal without resolving anything', async () => {
+        const props = makeProps();
+        render(<AOEConditionModal {...props} />);
 
-    describe('target selection', () => {
-        it('selects a target when its row is clicked', async () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(labels[0]); });
-            await waitFor(() => {
-                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-                expect(checkboxes[0].checked).toBe(true);
-            });
-        });
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); });
 
-        it('updates target count in apply button when targets are selected', async () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(labels[0]); });
-            await waitFor(() => {
-                expect(getApplyButton()).toHaveTextContent('Blinding Darkness (1)');
-            });
-            await act(async () => { fireEvent.click(labels[1]); });
-            await waitFor(() => {
-                expect(getApplyButton()).toHaveTextContent('Blinding Darkness (2)');
-            });
-        });
-
-        it('toggles target selection off when row is clicked again', async () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(labels[0]); });
-            await waitFor(() => {
-                expect(getApplyButton()).toHaveTextContent('Blinding Darkness (1)');
-            });
-            await act(async () => { fireEvent.click(labels[0]); });
-            await waitFor(() => {
-                expect(getApplyButton()).toHaveTextContent('Blinding Darkness (0)');
-            });
-        });
-
-        it('highlights selected targets with the selected class', async () => {
-            render(<AOEConditionModal {...makeProps()} />);
-            const rows = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(rows[0]); });
-            await waitFor(() => {
-                expect(rows[0]).toHaveClass('secondary-target-selected');
-                expect(rows[1]).not.toHaveClass('secondary-target-selected');
-            });
-        });
+        expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 });

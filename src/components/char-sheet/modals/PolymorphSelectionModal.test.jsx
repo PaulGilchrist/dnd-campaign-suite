@@ -1,8 +1,24 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PolymorphSelectionModal from './PolymorphSelectionModal.jsx';
 
-// Mock dataLoader.loadMonsters to return controlled creature data
+// Core lane: loading, list filtering/sorting, search, selection, confirm/cancel,
+// and CLA-391 load-effect dep stability. Customization props (title/actionLabel),
+// allowAnyCreature / object_into_creature modes, excludeTypes display, CR display,
+// and class-feature fallbacks live in PolymorphSelectionModal.features.test.jsx.
+//
+// Fixture is deliberately local: the features lane suggested a shared fixture module,
+// but that would require a new helper file (out of scope here), and the two fixtures
+// intentionally differ (this one needs Rat for the maxCR-0 path and both Eagle and
+// Ghast for the exclusion smoke assertion). classFeatures is NOT mocked here —
+// real 5e druid level 4 yields 'walk only (no swim or fly)' limitations.
+//
+// NOTE: beast-row speed display is intentionally not asserted — source filtering of
+// climb/burrow/swim via limitation substrings is a known defect in the bug ledger
+// ('walk only (no swim or fly)'.includes('fly') === true). Row retention keys only
+// off walk speed, so the name-list assertions below are stable.
+
 const mockMonsters = [
     {
         index: 'wolf',
@@ -90,268 +106,183 @@ const baseProps = {
     onCancel: vi.fn(),
 };
 
-function makeProps(overrides) {
-    return { ...baseProps, ...(overrides || {}) };
+// Mirrors the wild_shape_select caller (CharSheet.modals.jsx) which omits
+// excludeTypes and maxCR — the fresh `[]` default in the effect deps used to
+// refire loadBeasts every render (infinite loop, tab crash, CLA-391).
+const druidStats2024 = {
+    rules: '2024',
+    level: 20,
+    class: { name: 'Druid', class_levels: [{ level: 20, beast_max_cr: 1, wild_shape: 4 }] },
+};
+
+function getBeastItems() {
+    return Array.from(document.querySelectorAll('.wild-shape-beast-item'));
 }
 
-function findBeastItem(beastName) {
-    for (const item of document.querySelectorAll('.wild-shape-beast-item')) {
-        const nameEl = item.querySelector('.wild-shape-beast-name');
-        if (nameEl && nameEl.textContent.includes(beastName)) {
-            return item;
-        }
-    }
-    return null;
+function beastNameOf(item) {
+    const clone = item.querySelector('.wild-shape-beast-name').cloneNode(true);
+    clone.querySelector('.wild-shape-beast-cr')?.remove();
+    return clone.textContent.replace(/\s+/g, ' ').trim();
 }
 
 function getBeastNames() {
-    const items = document.querySelectorAll('.wild-shape-beast-item');
-    return Array.from(items).map(item => {
-        const nameEl = item.querySelector('.wild-shape-beast-name');
-        if (!nameEl) return '';
-        const clone = nameEl.cloneNode(true);
-        const crSpan = clone.querySelector('.wild-shape-beast-cr');
-        if (crSpan) crSpan.remove();
-        return clone.textContent.replace(/\s+/g, ' ').trim();
-    });
+    return getBeastItems().map(beastNameOf);
+}
+
+function findBeastItem(beastName) {
+    return getBeastItems().find(item =>
+        item.querySelector('.wild-shape-beast-name').textContent.includes(beastName)) || null;
+}
+
+function getSelectedItemNames() {
+    return Array.from(document.querySelectorAll('.wild-shape-beast-item.selected')).map(beastNameOf);
 }
 
 function waitForBeastsLoaded() {
     return waitFor(() => {
-        const items = document.querySelectorAll('.wild-shape-beast-item');
-        expect(items.length).toBeGreaterThan(0);
+        expect(document.querySelectorAll('.wild-shape-beast-item').length).toBeGreaterThan(0);
     });
 }
 
-describe('PolymorphSelectionModal', () => {
+describe('PolymorphSelectionModal (core)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('loading state', () => {
-        it('shows loading text while data is loading', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-            const originalImpl = loadMonsters.getMockImplementation();
-            loadMonsters.mockReturnValue(new Promise(() => { /* never resolves */ }));
+    it('shows a loading message and no list while creature data is in flight', async () => {
+        const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+        loadMonsters.mockImplementationOnce(() => new Promise(() => { /* never resolves */ }));
 
-            render(<PolymorphSelectionModal {...baseProps} />);
+        render(<PolymorphSelectionModal {...baseProps} />);
 
-            expect(screen.getByText('Loading available creatures...')).toBeInTheDocument();
+        expect(screen.getByText('Loading available creatures...')).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search beasts...')).not.toBeInTheDocument();
+    });
 
-            loadMonsters.mockImplementation(originalImpl);
+    it('lists exactly the CR<=1 walking beasts, sorted by CR then name, with wild shape copy', async () => {
+        render(<PolymorphSelectionModal {...baseProps} />);
+        await waitForBeastsLoaded();
+
+        expect(screen.getByText('Choose a beast form (CR 1 or lower)')).toBeInTheDocument();
+        // Type filter (no Ghast), CR filter, and no-walk filter (no Eagle) in one
+        // exact-list assertion, plus CR-then-name sort order.
+        expect(getBeastNames()).toEqual([
+            'Rat', 'Panther', 'Wolf', 'Brown Bear', 'Crocodile', 'Giant Spider',
+        ]);
+
+        const movement = Array.from(document.querySelectorAll('.wild-shape-info'))
+            .find(d => d.textContent.startsWith('Movement:'));
+        expect(movement).toHaveTextContent('walk only');
+    });
+
+    it('honors the maxCR prop when listing beasts', async () => {
+        render(<PolymorphSelectionModal {...baseProps} maxCR={0} />);
+        await waitForBeastsLoaded();
+
+        expect(screen.getByText('Choose a beast form (CR 0 or lower)')).toBeInTheDocument();
+        expect(getBeastNames()).toEqual(['Rat']);
+    });
+
+    it('search filters by name case-insensitively, shows no-results copy, and restores on clear', async () => {
+        render(<PolymorphSelectionModal {...baseProps} />);
+        await waitForBeastsLoaded();
+
+        const input = screen.getByPlaceholderText('Search beasts...');
+
+        fireEvent.change(input, { target: { value: 'cro' } });
+        await waitFor(() => {
+            expect(getBeastNames()).toEqual(['Crocodile']);
+        });
+
+        fireEvent.change(input, { target: { value: 'WOLF' } });
+        await waitFor(() => {
+            expect(getBeastNames()).toEqual(['Wolf']);
+        });
+
+        fireEvent.change(input, { target: { value: 'xyznonexistent' } });
+        await waitFor(() => {
+            expect(screen.getByText(/No beasts match/)).toBeInTheDocument();
+            expect(document.querySelectorAll('.wild-shape-beast-item')).toHaveLength(0);
+        });
+
+        fireEvent.change(input, { target: { value: '' } });
+        await waitFor(() => {
+            expect(getBeastNames()).toEqual([
+                'Rat', 'Panther', 'Wolf', 'Brown Bear', 'Crocodile', 'Giant Spider',
+            ]);
         });
     });
 
-    describe('filtering', () => {
-        it('renders the modal with header, instruction text, and filtered beasts', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            expect(screen.getByText('Choose a beast form (CR 1 or lower)')).toBeInTheDocument();
-            expect(screen.getByText('Wolf')).toBeInTheDocument();
-        });
+    it('single-selects a beast (switchable), and confirms once with the chosen beast', async () => {
+        render(<PolymorphSelectionModal {...baseProps} />);
+        await waitForBeastsLoaded();
 
-        it('renders wild shape limitations info when not allowAnyCreature', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            const infoDivs = document.querySelectorAll('.wild-shape-info');
-            const movementText = Array.from(infoDivs).find(d => d.querySelector('strong')?.textContent === 'Movement:');
-            expect(movementText).toBeInTheDocument();
-            expect(movementText.textContent).toContain('walk only');
-        });
+        const confirmBtn = screen.getByRole('button', { name: 'Wild Shape' });
+        expect(confirmBtn).toBeDisabled();
 
-        it('filters out non-beast creatures when allowAnyCreature is false', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
-        });
+        fireEvent.click(findBeastItem('Wolf'));
+        await waitFor(() => expect(confirmBtn).toBeEnabled());
+        expect(getSelectedItemNames()).toEqual(['Wolf']);
 
-        it('filters out creatures with CR above effectiveMaxCR', async () => {
-            render(<PolymorphSelectionModal {...makeProps({ maxCR: 0 })} />);
-            await waitForBeastsLoaded();
-            expect(screen.getByText('Rat')).toBeInTheDocument();
-            expect(screen.queryByText('Wolf')).not.toBeInTheDocument();
-        });
+        // Selection switches and stays single
+        fireEvent.click(findBeastItem('Brown Bear'));
+        await waitFor(() => expect(getSelectedItemNames()).toEqual(['Brown Bear']));
 
-        it('filters beasts that lack walk speed per wild shape limitations', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            expect(screen.queryByText('Eagle')).not.toBeInTheDocument();
-            expect(screen.getByText('Crocodile')).toBeInTheDocument();
-        });
+        fireEvent.click(findBeastItem('Wolf'));
+        fireEvent.click(confirmBtn);
+
+        expect(baseProps.onConfirm).toHaveBeenCalledTimes(1);
+        expect(baseProps.onConfirm.mock.calls[0][0]).toMatchObject({ index: 'wolf', name: 'Wolf' });
     });
 
-    describe('search functionality', () => {
-        it('filters beasts by name, clears on empty input, and handles no results and case-insensitivity', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            expect(screen.getByText('Crocodile')).toBeInTheDocument();
-            expect(screen.getByText('Panther')).toBeInTheDocument();
+    it('calls onCancel from the Cancel button and the Escape key', async () => {
+        render(<PolymorphSelectionModal {...baseProps} />);
+        await waitForBeastsLoaded();
 
-            const input = screen.getByPlaceholderText('Search beasts...');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
 
-            // Filter by partial name
-            fireEvent.change(input, { target: { value: 'cro' } });
-            await waitFor(() => {
-                const names = getBeastNames();
-                expect(names).toContain('Crocodile');
-                expect(names).not.toContain('Panther');
-            });
-
-            // Case-insensitive search
-            fireEvent.change(input, { target: { value: 'WOLF' } });
-            await waitFor(() => {
-                const names = getBeastNames();
-                expect(names).toContain('Wolf');
-            });
-
-            // No results
-            fireEvent.change(input, { target: { value: 'xyznonexistent' } });
-            await waitFor(() => {
-                expect(screen.getByText(/No beasts match/)).toBeInTheDocument();
-            });
-
-            // Clear restores all
-            fireEvent.change(input, { target: { value: '' } });
-            await waitFor(() => {
-                const names = getBeastNames();
-                expect(names).toContain('Panther');
-                expect(names).toContain('Wolf');
-            });
-        });
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(baseProps.onCancel).toHaveBeenCalledTimes(2);
     });
 
-    describe('beast selection', () => {
-        it('selects a beast, enables confirm, and calls onConfirm with correct data', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-
-            const confirmBtn = screen.getByRole('button', { name: 'Wild Shape' });
-            expect(confirmBtn).toBeDisabled();
-
-            const wolfItem = findBeastItem('Wolf');
-            expect(wolfItem).toBeInTheDocument();
-            fireEvent.click(wolfItem);
-
-            await waitFor(() => {
-                expect(confirmBtn).toBeEnabled();
-            });
-
-            const selectedItem = document.querySelector('.wild-shape-beast-item.selected');
-            expect(selectedItem).toBeInTheDocument();
-            expect(selectedItem.querySelector('.wild-shape-beast-name').textContent).toContain('Wolf');
-
-            fireEvent.click(confirmBtn);
-
-            await waitFor(() => {
-                expect(baseProps.onConfirm).toHaveBeenCalled();
-                const selected = baseProps.onConfirm.mock.calls[0][0];
-                expect(selected.index).toBe('wolf');
-            });
-        });
-
-        it('switches selection to a different beast', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-
-            const wolfItem = findBeastItem('Wolf');
-            fireEvent.click(wolfItem);
-
-            const bearItem = findBeastItem('Brown Bear');
-            fireEvent.click(bearItem);
-
-            await waitFor(() => {
-                const selected = document.querySelector('.wild-shape-beast-item.selected');
-                const nameEl = selected.querySelector('.wild-shape-beast-name');
-                expect(nameEl.textContent).toContain('Brown Bear');
-            });
-        });
-
-        it('does not call onConfirm if no beast is selected', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            const confirmBtn = screen.getByRole('button', { name: 'Wild Shape' });
-            expect(confirmBtn).toBeDisabled();
-            fireEvent.click(confirmBtn);
-            expect(baseProps.onConfirm).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('CLA-391 unstable excludeTypes dep', () => {
-        // Mirrors the wild_shape_select caller (CharSheet.modals.jsx) which omits
-        // excludeTypes and maxCR — the fresh `[]` default in the effect deps used to
-        // refire loadBeasts every render (infinite loop, tab crash).
-        const druidStats = {
-            rules: '2024',
-            level: 20,
-            class: { name: 'Druid', class_levels: [{ level: 20, beast_max_cr: 1, wild_shape: 4 }] },
-        };
-
-        it('loads beasts exactly once when excludeTypes and maxCR are omitted', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-            render(<PolymorphSelectionModal
-                playerStats={druidStats}
+    it('loads monsters exactly once when maxCR and excludeTypes are omitted, even across rerenders (CLA-391)', async () => {
+        const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+        const renderModal = () => (
+            <PolymorphSelectionModal
+                playerStats={druidStats2024}
                 campaignName="test-campaign"
                 onConfirm={vi.fn()}
                 onCancel={vi.fn()}
-            />);
-            await waitForBeastsLoaded();
-            await new Promise(resolve => setTimeout(resolve, 250));
-            expect(loadMonsters).toHaveBeenCalledTimes(1);
-        });
+            />
+        );
 
-        it('honors caller-supplied excludeTypes by value without refiring the load effect', async () => {
-            const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
-            const { rerender } = render(<PolymorphSelectionModal
-                playerStats={druidStats}
+        const { rerender } = render(renderModal());
+        await waitForBeastsLoaded();
+        rerender(renderModal());
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(loadMonsters).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the load effect stable when given an inline excludeTypes array by value (CLA-391)', async () => {
+        const { loadMonsters } = await import('../../../services/ui/dataLoader.js');
+        const renderModal = () => (
+            <PolymorphSelectionModal
+                playerStats={druidStats2024}
                 maxCR={1}
                 campaignName="test-campaign"
                 excludeTypes={['undead']}
                 onConfirm={vi.fn()}
                 onCancel={vi.fn()}
-            />);
-            await waitForBeastsLoaded();
-            rerender(<PolymorphSelectionModal
-                playerStats={druidStats}
-                maxCR={1}
-                campaignName="test-campaign"
-                excludeTypes={['undead']}
-                onConfirm={vi.fn()}
-                onCancel={vi.fn()}
-            />);
-            await new Promise(resolve => setTimeout(resolve, 250));
-            expect(loadMonsters).toHaveBeenCalledTimes(1);
-            expect(screen.queryByText('Ghast')).not.toBeInTheDocument();
-        });
+            />
+        );
 
-        it('calls onConfirm with the chosen beast payload', async () => {
-            const onConfirm = vi.fn();
-            render(<PolymorphSelectionModal
-                playerStats={druidStats}
-                campaignName="test-campaign"
-                onConfirm={onConfirm}
-                onCancel={vi.fn()}
-            />);
-            await waitForBeastsLoaded();
-            fireEvent.click(findBeastItem('Wolf'));
-            fireEvent.click(screen.getByRole('button', { name: 'Wild Shape' }));
-            expect(onConfirm).toHaveBeenCalledTimes(1);
-            expect(onConfirm.mock.calls[0][0]).toMatchObject({ index: 'wolf', name: 'Wolf' });
-        });
-    });
+        const { rerender } = render(renderModal());
+        await waitForBeastsLoaded();
+        rerender(renderModal());
+        await new Promise(resolve => setTimeout(resolve, 50));
 
-    describe('close behavior', () => {
-        it('calls onCancel when Cancel button is clicked', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-            expect(baseProps.onCancel).toHaveBeenCalled();
-        });
-
-        it('closes when Escape key is pressed', async () => {
-            render(<PolymorphSelectionModal {...baseProps} />);
-            await waitForBeastsLoaded();
-            fireEvent.keyDown(document, { key: 'Escape' });
-            expect(baseProps.onCancel).toHaveBeenCalled();
-        });
+        expect(loadMonsters).toHaveBeenCalledTimes(1);
     });
 });

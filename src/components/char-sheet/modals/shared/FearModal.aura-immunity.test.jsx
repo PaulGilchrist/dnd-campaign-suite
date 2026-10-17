@@ -1,6 +1,12 @@
-// CLA-019: Aura of Courage — FearModal legs suppress frightened for aura-covered
-// targets (save still fails, condition never lands, suppression logged); unprotected
-// control targets keep the legacy apply path.
+// @maintained-by-ai
+// CLA-019: Aura of Courage — FearModal frightened-immunity lane.
+// Two differential A/B tests, one per aura-checked leg of FearModal:
+//   • player leg (save-result event): aura-covered PC suppressed, unprotected PC control still frightened
+//   • NPC leg (auto-roll at confirm): aura-covered NPC suppressed, unprotected NPC control still frightened
+// Suppression semantics: save still fails (save_result success:false), condition never lands
+// (no activeConditions write, no addExpiration), and the suppression is logged exactly once
+// via the condition_immunity_aura automation channel.
+// Legacy unprotected flows are pinned in FearModal.player-saves/npc-saves.test.jsx — not repeated here.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FearModal from './FearModal.jsx';
@@ -39,20 +45,21 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
-// ElderPaladin hosts the party aura: PlayerAlly covered, Goblin unprotected control.
+// ElderPaladin hosts the party aura. Covered: PlayerAlly (player leg) and Orc (NPC leg).
+// Uncovered controls: UnprotectedPC (player leg) and Goblin (NPC leg).
 vi.mock('../../../../services/combat/auras/auraConditionImmunity.js', async (importActual) => {
     const actual = await importActual();
     return {
         ...actual,
         getAuraConditionImmunities: vi.fn(async ({ targetName }) => (
-            targetName === 'PlayerAlly'
+            targetName === 'PlayerAlly' || targetName === 'Orc'
                 ? { immunities: ['frightened'], immunitySources: { frightened: 'ElderPaladin' } }
                 : { immunities: [], immunitySources: {} }
         )),
     };
 });
 
-import { getCombatSummary, } from '../../../../services/encounters/combatData.js';
+import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
@@ -73,14 +80,7 @@ const baseAction = {
     automation: { type: 'fear' },
 };
 
-const baseCombatSummary = {
-    creatures: [
-        { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { wis: 0 } },
-        { name: 'Orc', type: 'npc', currentHp: 15, maxHp: 22, saveBonuses: { wis: 1 } },
-        { name: 'PlayerAlly', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 2 } },
-    ],
-};
-
+// Aura host roster — the characters prop feeding the aura membership query.
 const characters = [
     {
         name: 'ElderPaladin',
@@ -106,33 +106,58 @@ function makeProps(overrides = {}) {
     };
 }
 
-async function selectRowAndConfirm(index) {
+// Select target rows by index, click confirm, return promptIds in row order.
+async function selectRowsAndConfirm(indices) {
     render(<FearModal {...makeProps()} />);
     const labels = document.querySelectorAll('.secondary-target-row');
-    await act(async () => { fireEvent.click(labels[index]); });
+    for (const i of indices) {
+        await act(async () => { fireEvent.click(labels[i]); });
+    }
     await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Fear \(1\)/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Fear \(2\)/ })).toBeInTheDocument();
     });
     await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Fear \(1\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Fear \(2\)/ }));
     });
-    const promptCall = vi.mocked(sendSavePrompt).mock.calls.at(-1);
-    return promptCall ? promptCall[1].promptId : null;
+    return vi.mocked(sendSavePrompt).mock.calls.map(c => c[1].promptId);
 }
 
-async function triggerSaveResult(promptId, success, overrides = {}) {
+async function triggerSaveResult(promptId, success) {
     await act(async () => {
-        const event = new CustomEvent('save-result', {
-            detail: {
-                promptId,
-                success,
-                roll: overrides.roll ?? 3,
-                total: overrides.total ?? 5,
-                saveBonus: overrides.saveBonus ?? 2,
-            },
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId, success, roll: 3, total: 5, saveBonus: 2 },
+        }));
     });
+}
+
+const entriesOf = (filter) => addEntry.mock.calls.map(c => c[1]).filter(filter);
+const immunityEntries = () => entriesOf(e => e.automationType === 'condition_immunity_aura');
+const conditionWritesFor = (name) =>
+    setRuntimeValue.mock.calls.filter(c => c[0] === name && c[1] === 'activeConditions');
+
+function expectSuppressed(name) {
+    expect(conditionWritesFor(name)).toHaveLength(0);
+    expect(addExpiration.mock.calls.filter(c => c[0]?.targetName === name)).toHaveLength(0);
+    // Save still fails and the failure is reported with no conditions attached.
+    expect(entriesOf(e => e.type === 'save_result' && e.targetName === name && e.success === false)).toHaveLength(1);
+    expect(addTargetResult.mock.calls.some(c =>
+        c[1].targetName === name && c[1].saveResult === 'failure' && c[1].conditions.length === 0)).toBe(true);
+}
+
+function expectApplied(name) {
+    const writes = conditionWritesFor(name);
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes[0][2]).toContain('frightened');
+    expect(addExpiration).toHaveBeenCalledWith({
+        attackerName: 'HexWarlock',
+        targetName: name,
+        effects: [{ type: 'condition', condition: 'frightened' }],
+        campaignName,
+    });
+    // Player leg logs one condition-applied entry; the NPC leg logs one via
+    // logConditionsFromSave plus the fail-summary note — assert the fact, not the count.
+    expect(entriesOf(e =>
+        e.type === 'condition' && e.action === 'applied' && e.characterName === name).length).toBeGreaterThan(0);
 }
 
 beforeEach(() => {
@@ -143,60 +168,55 @@ beforeEach(() => {
     addEntry.mockResolvedValue(undefined);
 });
 
+const baseCombatSummary = {
+    creatures: [
+        { name: 'PlayerAlly', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 2 } },
+        { name: 'UnprotectedPC', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 0 } },
+    ],
+};
+
 describe('FearModal — CLA-019 Aura of Courage', () => {
-    it('aura-covered PC save-fail: frightened suppressed, immunity logged, no applied log', async () => {
-        const promptId = await selectRowAndConfirm(2); // PlayerAlly
-        expect(promptId).toBeTruthy();
+    it('player leg: covered PC has frightened suppressed and logged, unprotected control still frightened', async () => {
+        const promptIds = await selectRowsAndConfirm([0, 1]); // PlayerAlly, UnprotectedPC
+        expect(promptIds).toHaveLength(2);
 
-        await triggerSaveResult(promptId, false);
+        for (const promptId of promptIds) {
+            await triggerSaveResult(promptId, false);
+        }
 
-        const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'PlayerAlly' && c[1] === 'activeConditions');
-        expect(conditionWrites).toHaveLength(0);
-        expect(addExpiration).not.toHaveBeenCalled();
+        expectSuppressed('PlayerAlly');
+        expectApplied('UnprotectedPC');
 
-        const immunity = addEntry.mock.calls.map(c => c[1]).filter(e => e.automationType === 'condition_immunity_aura');
+        // Suppression logged once, naming the aura and its host — and only for the covered target.
+        const immunity = immunityEntries();
         expect(immunity).toHaveLength(1);
         expect(immunity[0].type).toBe('automation');
         expect(immunity[0].characterName).toBe('PlayerAlly');
         expect(immunity[0].description).toContain('PlayerAlly is immune to Frightened (Aura of Courage from ElderPaladin)');
-
-        expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'condition' && e.action === 'applied')).toBe(false);
-
-        const targetResults = addTargetResult.mock.calls.map(c => c[1]);
-        expect(targetResults.some(r => r.targetName === 'PlayerAlly' && r.saveResult === 'failure' && r.conditions.length === 0)).toBe(true);
     });
 
-    it('unprotected PC control save-fail: frightened applied + condition-applied log (legacy path)', async () => {
+    it('NPC leg: covered NPC has frightened suppressed at confirm, unprotected control still frightened', async () => {
         getCombatSummary.mockReturnValue({
             creatures: [
-                ...baseCombatSummary.creatures,
-                { name: 'UnprotectedPC', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 0 } },
+                { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { wis: 0 } },
+                { name: 'Orc', type: 'npc', currentHp: 15, maxHp: 22, saveBonuses: { wis: 1 } },
             ],
         });
-        const promptId = await selectRowAndConfirm(3); // UnprotectedPC — outside the aura
-        expect(promptId).toBeTruthy();
-
-        await triggerSaveResult(promptId, false);
-
-        const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'UnprotectedPC' && c[1] === 'activeConditions');
-        expect(conditionWrites.length).toBeGreaterThan(0);
-        expect(conditionWrites[0][2]).toContain('frightened');
-        expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'condition_immunity_aura')).toBe(false);
-        expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'condition' && e.action === 'applied')).toBe(true);
-    });
-
-    it('unprotected NPC control failed save: frightened still applied', async () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.01); // force save fail
+        vi.spyOn(Math, 'random').mockReturnValue(0.01); // natural 1 — both NPC saves fail
         try {
-            await selectRowAndConfirm(0); // Goblin — outside the aura
+            await selectRowsAndConfirm([0, 1]); // Goblin control, Orc covered
 
             await waitFor(() => {
-                const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'Goblin' && c[1] === 'activeConditions');
-                expect(conditionWrites.length).toBeGreaterThan(0);
-                expect(conditionWrites[0][2]).toContain('frightened');
+                expect(immunityEntries().some(e => e.characterName === 'Orc')).toBe(true);
             });
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'HexWarlock', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
-            expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'condition_immunity_aura')).toBe(false);
+
+            expectSuppressed('Orc');
+            expectApplied('Goblin');
+
+            // No save prompts on the NPC leg, and immunity logged only for the covered NPC.
+            expect(sendSavePrompt).not.toHaveBeenCalled();
+            expect(immunityEntries().map(e => e.characterName)).toEqual(['Orc']);
+            expect(immunityEntries()[0].description).toContain('Orc is immune to Frightened (Aura of Courage from ElderPaladin)');
         } finally {
             Math.random.mockRestore();
         }

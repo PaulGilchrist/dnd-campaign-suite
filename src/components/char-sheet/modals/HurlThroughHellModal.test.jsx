@@ -1,5 +1,17 @@
+// @maintained-by-ai
+/**
+ * HurlThroughHellModal — base lane: info-screen rendering (all three ternary arms with
+ * their exact notes), overlay/Cancel/Done close contract, and confirm side effects
+ * (round latch, uses increment, trigger log row).
+ *
+ * Sibling ownership (do not duplicate here):
+ * - .saveResults.test.jsx — save resolution (conditions, damage routing, addExpiration, popups)
+ * - .resultScreen.test.jsx — result-screen copy + Done-on-result contract
+ * - -branches.test.jsx — byte-exact ledgers, needsPactSlot conjunct matrix, inline-style
+ *   flag, promptId guard, listener lifecycle, roll-vs-prop fallbacks
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import HurlThroughHellModal from './HurlThroughHellModal.jsx';
 
 // ── Mocked modules ──
@@ -25,7 +37,7 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Goblin1', type: 'npc' },
-      { name: 'Orc Warrior', type: 'fiend' },
+      { name: 'Orc Warrior', type: 'npc', monsterType: 'fiend' },
       { name: 'Elf Mage', type: 'player' },
     ],
   })),
@@ -44,18 +56,15 @@ vi.mock('../../../services/rules/effects/expirations.js', () => ({
 
 import * as logService from '../../../services/ui/logService.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
+import * as combatData from '../../../services/encounters/combatData.js';
 
-// ── Test fixtures ──
+// ── Fixtures ──
 
-const mockPlayerStats = { name: 'Throg', level: 15 };
-const mockCampaignName = 'test-campaign';
-const mockOnClose = vi.fn();
-
-function makeProps(overrides) {
+function makeProps(overrides = {}) {
   return {
     action: { name: 'Hurl Through Hell' },
-    playerStats: mockPlayerStats,
-    campaignName: mockCampaignName,
+    playerStats: { name: 'Throg', level: 15 },
+    campaignName: 'test-campaign',
     targetName: 'Goblin1',
     saveType: 'WIS',
     saveDc: 16,
@@ -67,201 +76,116 @@ function makeProps(overrides) {
     pactMagicRecharge: false,
     pactSlotLevel: 0,
     pactSlotsAvailable: 0,
-    onClose: mockOnClose,
-    ...(overrides || {}),
+    onClose: vi.fn(),
+    ...overrides,
   };
 }
 
 // ── Tests ──
 
+const LONG_NOTE = 'No uses remaining. Recharges on a Long Rest, or expend a Pact Magic spell slot to restore a use. No Pact Magic slots available.';
+const ARM_NOTES = [
+  'Uses available: 2 / 3 (Long Rest).',
+  'Cost: Expend a Pact Magic spell slot (level 2) to restore a use.',
+  LONG_NOTE,
+  'No uses remaining. Recharges on a Long Rest.',
+];
+
 describe('HurlThroughHellModal', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentTurn') return 'Turn5';
-      if (key === 'activeConditions') return [];
-      if (key === 'targetEffects') return [];
-      if (key === 'spell_slots_level_2') return '3';
-      return null;
+  // ── Info screen: every ternary arm renders its exact note, the wrong-note arm's
+  // absence, and the right close button — which then closes exactly once ──
+
+  it.each([
+    {
+      case: 'uses available',
+      props: { currentUses: 1, maxUses: 3 },
+      note: 'Uses available: 2 / 3 (Long Rest).',
+      actionable: true,
+    },
+    {
+      case: 'no uses, Pact slot available',
+      props: { currentUses: 3, maxUses: 3, pactMagicRecharge: true, pactSlotLevel: 2, pactSlotsAvailable: true },
+      note: 'Cost: Expend a Pact Magic spell slot (level 2) to restore a use.',
+      actionable: true,
+    },
+    {
+      case: 'exhausted, recharge feature but no Pact slots',
+      props: { currentUses: 3, maxUses: 3, pactMagicRecharge: true, pactSlotsAvailable: false },
+      note: LONG_NOTE,
+      actionable: false,
+    },
+    {
+      case: 'exhausted, non-recharge feature',
+      props: { currentUses: 3, maxUses: 3, pactMagicRecharge: false },
+      note: 'No uses remaining. Recharges on a Long Rest.',
+      actionable: false,
+    },
+  ])('$case: rules copy, exact note, $actionable arm buttons, close once', ({ props: overrides, note, actionable }) => {
+    const props = makeProps(overrides);
+    render(<HurlThroughHellModal {...props} />);
+
+    // Shared rules copy — present on every arm.
+    expect(screen.getByText(/disappears and hurtles through a nightmare landscape/)).toBeInTheDocument();
+    expect(screen.getByText(/At the end of your next turn.*returns/)).toBeInTheDocument();
+    expect(screen.getByText('Goblin1')).toBeInTheDocument();
+    expect(screen.getByText('WIS')).toBeInTheDocument();
+    expect(screen.getByText(/DC 16/)).toBeInTheDocument();
+    expect(screen.getByText('22 Psychic damage')).toBeInTheDocument();
+    expect(screen.getByText('Incapacitated')).toBeInTheDocument();
+
+    // Arm-specific note — every other arm's note must be provably absent.
+    ARM_NOTES.forEach((armNote) => {
+      expect(!!screen.queryByText(armNote)).toBe(armNote === note);
     });
-    logService.addEntry.mockImplementation(() => Promise.resolve());
-    runtimeState.setRuntimeValue.mockImplementation(() => Promise.resolve());
+
+    const rollBtn = screen.queryByRole('button', { name: /Hurl Through Hell/ });
+    const cancelBtn = screen.queryByRole('button', { name: 'Cancel' });
+    const doneBtn = screen.queryByRole('button', { name: 'Done' });
+    expect(!!rollBtn).toBe(actionable);
+    expect(!!cancelBtn).toBe(actionable);
+    expect(!!doneBtn).toBe(!actionable);
+
+    fireEvent.click(actionable ? cancelBtn : doneBtn);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  afterEach(() => {
-    document.body.innerHTML = '';
+  // ── Overlay ──
+
+  it('clicking the overlay does not close the modal', () => {
+    const props = makeProps();
+    render(<HurlThroughHellModal {...props} />);
+    fireEvent.click(document.querySelector('.sp-overlay'));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  // ── Info screen rendering ──
+  // ── Confirm: seam between info screen and save prompt ──
 
-  describe('info screen rendering', () => {
-    it('renders the modal overlay, header, and body with all info text', () => {
-      render(<HurlThroughHellModal {...makeProps()} />);
-      expect(screen.getByRole('button', { name: /Hurl Through Hell/ })).toBeInTheDocument();
-      expect(screen.getByText(/disappears and hurtles through a nightmare landscape/)).toBeInTheDocument();
-      expect(screen.getByText(/At the end of your next turn.*returns/)).toBeInTheDocument();
-      expect(screen.getByText('Goblin1')).toBeInTheDocument();
-      expect(screen.getByText('WIS')).toBeInTheDocument();
-      expect(screen.getByText(/DC 16/)).toBeInTheDocument();
-      expect(screen.getByText('22 Psychic damage')).toBeInTheDocument();
-      expect(screen.getByText('Incapacitated')).toBeInTheDocument();
+  it('confirm unmounts the info screen, stamps the round latch, increments uses, and logs the trigger row', async () => {
+    combatData.getCurrentCombatRound.mockReturnValue(7); // distinct from default 5 — the latch must read the live round
+    const props = makeProps({ currentUses: 1, maxUses: 3 });
+    render(<HurlThroughHellModal {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
+
+    // Info screen is gone synchronously — CTA cannot double-fire (own-result stage pending).
+    expect(screen.queryByText(/disappears and hurtles through a nightmare landscape/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Hurl Through Hell/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Throg', 'hurlThroughHellTurnUsed', 7, 'test-campaign');
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Throg', 'hurlThroughHellUses', 2, 'test-campaign');
+      expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Throg',
+        abilityName: 'Hurl Through Hell',
+        targetName: 'Goblin1',
+        promptId: 'test-prompt-id-123',
+      }));
     });
 
-    it('renders Hurl Through Hell and Cancel buttons when uses are available', () => {
-      render(<HurlThroughHellModal {...makeProps({ currentUses: 1, maxUses: 3 })} />);
-      expect(screen.getByRole('button', { name: /Hurl Through Hell/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-      expect(screen.getByText(/Uses available:.*2 \/ 3/)).toBeInTheDocument();
-    });
-
-    it('shows Pact Magic cost note when no uses but pact slot needed', () => {
-      render(<HurlThroughHellModal {...makeProps({
-        currentUses: 3,
-        maxUses: 3,
-        pactMagicRecharge: true,
-        pactSlotLevel: 2,
-        pactSlotsAvailable: true,
-      })} />);
-      expect(screen.getByText(/Cost:.*Pact Magic.*level 2/)).toBeInTheDocument();
-    });
-
-    it('shows error message when no uses and no pact slots available', () => {
-      render(<HurlThroughHellModal {...makeProps({
-        currentUses: 3,
-        maxUses: 3,
-        pactMagicRecharge: true,
-        pactSlotsAvailable: false,
-      })} />);
-      expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
-      expect(screen.getByText(/Long Rest/)).toBeInTheDocument();
-      expect(screen.getByText(/No Pact Magic slots available/)).toBeInTheDocument();
-    });
-
-    it('shows no pact magic message when pactMagicRecharge is false and no uses', () => {
-      render(<HurlThroughHellModal {...makeProps({
-        currentUses: 3,
-        maxUses: 3,
-        pactMagicRecharge: false,
-      })} />);
-      expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
-      expect(screen.getByText(/Long Rest/)).toBeInTheDocument();
-    });
-  });
-
-  // ── Overlay / close behavior ──
-
-  describe('overlay and close behavior', () => {
-    it('does not call onClose when overlay is clicked', () => {
-      render(<HurlThroughHellModal {...makeProps()} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(mockOnClose).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('calls onClose when Cancel button is clicked', () => {
-      const onClose = vi.fn();
-      render(<HurlThroughHellModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('calls onClose when Done button is clicked in the no-uses remaining branch', () => {
-      const onClose = vi.fn();
-      render(<HurlThroughHellModal {...makeProps({
-        currentUses: 3,
-        maxUses: 3,
-        pactMagicRecharge: true,
-        pactSlotsAvailable: false,
-        onClose,
-      })} />);
-      expect(screen.getByText(/No uses remaining/)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  // ── Confirm flow - info to result transition ──
-
-  describe('confirm flow', () => {
-    function setupConfirmWithTurn(turn) {
-      runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentTurn') return turn;
-        return null;
-      });
-    }
-
-    it('shows result screen after confirm is clicked (with uses available)', async () => {
-      setupConfirmWithTurn('Turn5');
-      render(<HurlThroughHellModal {...makeProps({ currentUses: 1, maxUses: 3 })} />);
-
-      fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-      });
-    });
-
-    it('does not show Hurl Through Hell button when no uses and no pact slots', async () => {
-      render(<HurlThroughHellModal {...makeProps({
-        currentUses: 3,
-        maxUses: 3,
-        pactMagicRecharge: true,
-        pactSlotsAvailable: false,
-      })} />);
-
-      expect(screen.queryByRole('button', { name: /Hurl Through Hell/ })).not.toBeInTheDocument();
-    });
-  });
-
-  // ── Confirm side effects ──
-
-  describe('confirm side effects', () => {
-    function setupConfirmWithTurn(turn) {
-      runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentTurn') return turn;
-        return null;
-      });
-    }
-
-    it('sets hurlThroughHellTurnUsed and increments hurlThroughHellUses on confirm', async () => {
-      setupConfirmWithTurn('Turn5');
-      render(<HurlThroughHellModal {...makeProps({ currentUses: 1, maxUses: 3 })} />);
-
-      fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Throg',
-          'hurlThroughHellTurnUsed',
-          5,
-          'test-campaign'
-        );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Throg',
-          'hurlThroughHellUses',
-          2,
-          'test-campaign'
-        );
-      });
-    });
-
-    it('logs ability_use entry for the feature trigger', async () => {
-      setupConfirmWithTurn('Turn5');
-      render(<HurlThroughHellModal {...makeProps()} />);
-
-      fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
-
-      await waitFor(() => {
-        expect(logService.addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'ability_use',
-            characterName: 'Throg',
-            abilityName: 'Hurl Through Hell',
-            targetName: 'Goblin1',
-          })
-        );
-      });
-    });
+    // Modal stays open until the player dismisses the result — nothing closed it yet.
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,19 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * HurlThroughHellModal — save-resolution behavior lane.
+ *
+ * Owns the three save outcomes as observable behavior (subset assertions, robust to copy
+ * tweaks): state writes, damage routing by monsterType, both log rows, popup, result screen.
+ * The exact addExpiration payload (:160-162) is pinned ONLY here — never re-pin elsewhere.
+ * Byte-exact ledgers, popup key shapes, flag pins, guards and listener lifecycle live in
+ * HurlThroughHellModal-branches.test.jsx; info-screen render and close behavior in
+ * HurlThroughHellModal.test.jsx.
+ *
+ * Negative assertions run AFTER the result screen renders (setResult at :211 is the last
+ * thing the handler does), so "nothing happened" claims have real teeth.
+ */
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HurlThroughHellModal from './HurlThroughHellModal.jsx';
 
 // ── Mocked modules ──
@@ -42,350 +56,208 @@ vi.mock('../../../services/rules/effects/expirations.js', () => ({
 
 // ── Re-import mocked modules ──
 
-import * as savePrompt from '../../../services/automation/common/savePrompt.js';
 import * as logService from '../../../services/ui/logService.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as applyDamage from '../../../services/rules/combat/applyDamage.js';
-import * as combatData from '../../../services/encounters/combatData.js';
 import * as diceRoller from '../../../services/dice/diceRoller.js';
 import * as expirations from '../../../services/rules/effects/expirations.js';
 
-// ── Test fixtures ──
+// ── Fixtures & helpers ──
 
-const mockPlayerStats = { name: 'Throg', level: 15 };
-const mockCampaignName = 'test-campaign';
-const mockOnClose = vi.fn();
+const CAMPAIGN = 'test-campaign';
+const PROMPT_ID = 'test-prompt-id-123';
+const makeProps = (overrides = {}) => ({
+  action: { name: 'Hurl Through Hell' },
+  playerStats: { name: 'Throg', level: 15 },
+  campaignName: CAMPAIGN,
+  targetName: 'Goblin1',
+  saveType: 'WIS',
+  saveDc: 16,
+  damageType: 'Psychic',
+  damageExpression: '4d10',
+  damageTotal: 22,
+  currentUses: 0,
+  maxUses: 3,
+  pactMagicRecharge: false,
+  pactSlotLevel: 0,
+  pactSlotsAvailable: 0,
+  onClose: vi.fn(),
+  ...overrides,
+});
 
-function makeProps(overrides) {
-  return {
-    action: { name: 'Hurl Through Hell' },
-    playerStats: mockPlayerStats,
-    campaignName: mockCampaignName,
-    targetName: 'Goblin1',
-    saveType: 'WIS',
-    saveDc: 16,
-    damageType: 'Psychic',
-    damageExpression: '4d10',
-    damageTotal: 22,
-    currentUses: 0,
-    maxUses: 3,
-    pactMagicRecharge: false,
-    pactSlotLevel: 0,
-    pactSlotsAvailable: 0,
-    onClose: mockOnClose,
-    ...(overrides || {}),
-  };
-}
+// Capture popups once per test (survives mid-test failure without leaking into siblings).
+let popups = [];
+const onPopup = (e) => popups.push(e.detail);
 
-// ── Helpers ──
-
-function dispatchSaveResult(detail) {
-  return act(async () => {
-    await new Promise(r => setTimeout(r, 15));
+// Macrotask flushes: the pre-dispatch tick lets handleConfirm's promise chain finish and
+// register the 'save-result' listener; the post tick drains the handler's awaited logging.
+const dispatchSaveResult = (detail) =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 15));
     window.dispatchEvent(new CustomEvent('save-result', { detail }));
-    await new Promise(r => setTimeout(r, 0));
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+const dispatchFail = () => dispatchSaveResult({ promptId: PROMPT_ID, roll: 8, total: 10, success: false });
+const dispatchSuccess = () => dispatchSaveResult({ promptId: PROMPT_ID, roll: 15, total: 17, success: true });
+
+async function confirmThenResolve(props, dispatch) {
+  render(<HurlThroughHellModal {...makeProps(props)} />);
+  fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
+  await dispatch();
+  // setResult() renders the result screen only after ALL handler work has completed —
+  // asserting after this point makes the mock assertions below terminal, not racy.
+  await waitFor(() => {
+    expect(screen.getByText(/(failed|succeeded).*save/)).toBeInTheDocument();
   });
 }
 
-function renderModal(propsOverride) {
-  return render(<HurlThroughHellModal {...makeProps(propsOverride)} />);
-}
+beforeEach(() => {
+  vi.clearAllMocks(); // keeps factory implementations — nothing needs re-arming
+  popups = [];
+  window.addEventListener('damage-popup', onPopup);
+});
 
-function triggerConfirm() {
-  fireEvent.click(screen.getByRole('button', { name: /Hurl Through Hell/ }));
-}
+afterEach(() => {
+  cleanup();
+  window.removeEventListener('damage-popup', onPopup);
+});
 
 // ── Tests ──
 
-describe('HurlThroughHellModal', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentTurn') return 'Turn5';
-      if (key === 'activeConditions') return [];
-      if (key === 'targetEffects') return [];
-      if (key === 'spell_slots_level_2') return '3';
-      return null;
-    });
-    diceRoller.rollExpression.mockImplementation((expr) => {
-      if (expr === '4d10-custom') return { total: 18, rolls: [10, 8] };
-      return { total: 22, rolls: [15, 7] };
-    });
-    combatData.getCombatSummary.mockImplementation(() => ({
-      creatures: [
-        { name: 'Goblin1', type: 'npc' },
-        { name: 'Orc Warrior', type: 'npc', monsterType: 'fiend' },
-        { name: 'Elf Mage', type: 'player' },
-      ],
+describe('HurlThroughHellModal save resolution', () => {
+  it('failed save (non-fiend): incapacitates, hurls, applies Psychic damage, logs both rows, queues return, pops up', async () => {
+    await confirmThenResolve({}, dispatchFail);
+
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('4d10');
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin1',
+      'activeConditions',
+      expect.arrayContaining(['incapacitated']),
+      CAMPAIGN
+    );
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'campaign',
+      'targetEffects',
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: 'Goblin1',
+          source: 'Hurl Through Hell',
+          effect: 'incapacitated',
+          condition: 'incapacitated',
+          duration: 'until_end_of_next_turn',
+          saveType: 'WIS',
+          saveDc: 16,
+          teleport: true,
+          returnToSpace: true,
+        }),
+      ]),
+      CAMPAIGN
+    );
+    // Rolled damage flows through the damage engine with ONLY players in the roster.
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
+      expect.any(Object),
+      'Goblin1',
+      22,
+      ['Psychic'],
+      { campaignName: CAMPAIGN, characters: [{ name: 'Elf Mage', type: 'player' }], ignoreResistance: false, attackerName: 'Throg' }
+    );
+    expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'save_result',
+      characterName: 'Throg',
+      targetName: 'Goblin1',
+      saveType: 'WIS',
+      saveDc: 16,
+      success: false,
+      saveRoll: 8,
+      saveTotal: 10,
     }));
-    applyDamage.applyDamageToTarget.mockImplementation(() => ({ finalDamage: 22 }));
-    logService.addEntry.mockImplementation(() => Promise.resolve());
-    runtimeState.setRuntimeValue.mockImplementation(() => Promise.resolve());
-    savePrompt.createSaveListener.mockImplementation(() => ({ promptId: 'test-prompt-id-123' }));
+    expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'roll',
+      characterName: 'Throg',
+      rollType: 'damage',
+      targetName: 'Goblin1',
+      damageType: 'Psychic',
+      formula: '4d10',
+      total: 22,
+    }));
+    // Owned pin: the return-to-space teleport expires at the end of the caster's next turn.
+    expect(expirations.addExpiration).toHaveBeenCalledWith({
+      attackerName: 'Throg',
+      targetName: 'Goblin1',
+      effects: [{ type: 'hurl_through_hell_return', target: 'Goblin1', source: 'Hurl Through Hell' }],
+      campaignName: CAMPAIGN,
+      rounds: 2,
+    });
+
+    expect(popups).toHaveLength(1);
+    expect(popups[0]).toEqual(expect.objectContaining({
+      targetName: 'Goblin1',
+      sourceName: 'Throg',
+      spellName: 'Hurl Through Hell',
+      damageType: 'Psychic',
+      rolls: [15, 7],
+      formula: '4d10',
+      popupText: expect.stringContaining('failed WIS save'),
+    }));
+    expect(popups[0].popupText).toContain('22 Psychic damage');
   });
 
-  // ── Failed save - non-fiend target ──
+  it('failed save (fiend): still incapacitated, hurled, and scheduled to return — but never damaged', async () => {
+    // 'Orc Warrior' is the monsterType:'fiend' creature in the combat summary fixture.
+    await confirmThenResolve({ targetName: 'Orc Warrior' }, dispatchFail);
 
-  describe('failed save - non-fiend target', () => {
-    it('applies incapacitated condition, target effect, damage, logging, and popup', async () => {
-      const handler = vi.fn();
-      window.addEventListener('damage-popup', handler);
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Orc Warrior',
+      'activeConditions',
+      expect.arrayContaining(['incapacitated']),
+      CAMPAIGN
+    );
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'campaign',
+      'targetEffects',
+      expect.arrayContaining([
+        expect.objectContaining({ target: 'Orc Warrior', effect: 'incapacitated', teleport: true, returnToSpace: true }),
+      ]),
+      CAMPAIGN
+    );
+    expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+      targetName: 'Orc Warrior',
+      campaignName: CAMPAIGN,
+    }));
 
-      renderModal();
-      triggerConfirm();
+    expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({ type: 'roll' }));
+    expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'save_result',
+      targetName: 'Orc Warrior',
+      success: false,
+      description: expect.stringContaining('(Fiend)'),
+    }));
 
-      await dispatchSaveResult({
-        promptId: 'test-prompt-id-123',
-        roll: 8,
-        total: 10,
-        success: false,
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Goblin1',
-          'activeConditions',
-          expect.arrayContaining(['incapacitated']),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'campaign',
-          'targetEffects',
-          expect.arrayContaining([
-            expect.objectContaining({
-              target: 'Goblin1',
-              source: 'Hurl Through Hell',
-              effect: 'incapacitated',
-              condition: 'incapacitated',
-              duration: 'until_end_of_next_turn',
-              saveType: 'WIS',
-              saveDc: 16,
-              teleport: true,
-              returnToSpace: true,
-            }),
-          ]),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Goblin1', 22, ['Psychic'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Throg' });
-      });
-
-      await waitFor(() => {
-        expect(logService.addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'save_result',
-            characterName: 'Throg',
-            targetName: 'Goblin1',
-            saveDc: 16,
-            saveType: 'WIS',
-            success: false,
-            saveRoll: 8,
-            saveTotal: 10,
-          })
-        );
-      });
-
-      await waitFor(() => {
-        expect(logService.addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'roll',
-            characterName: 'Throg',
-            rollType: 'damage',
-            name: 'Hurl Through Hell Damage',
-            targetName: 'Goblin1',
-            damageType: 'Psychic',
-            formula: '4d10',
-            total: 22,
-          })
-        );
-      });
-
-      await waitFor(() => {
-        expect(expirations.addExpiration).toHaveBeenCalledWith({ attackerName: 'Throg', targetName: 'Goblin1', effects: [{ type: 'hurl_through_hell_return', target: 'Goblin1', source: 'Hurl Through Hell' }], campaignName: 'test-campaign', rounds: 2 });
-      });
-
-      await waitFor(() => {
-        expect(handler).toHaveBeenCalledTimes(1);
-        const detail = handler.mock.calls[0][0].detail;
-        expect(detail.targetName).toBe('Goblin1');
-        expect(detail.sourceName).toBe('Throg');
-        expect(detail.spellName).toBe('Hurl Through Hell');
-        expect(detail.damageType).toBe('Psychic');
-        expect(detail.rolls).toEqual([15, 7]);
-        expect(detail.formula).toBe('4d10');
-        expect(detail.popupText).toContain('failed WIS save');
-      });
-
-      window.removeEventListener('damage-popup', handler);
-
-      await waitFor(() => {
-        expect(screen.getByText(/failed.*WIS save/)).toBeInTheDocument();
-      });
-    });
+    expect(popups).toHaveLength(1);
+    expect(popups[0].popupText).toContain('no Psychic damage');
   });
 
-  // ── Failed save - fiend target ──
+  it('successful save: fully inert — no conditions, effects, damage, or expiration; logs success and pops up', async () => {
+    await confirmThenResolve({}, dispatchSuccess);
 
-  describe('failed save - fiend target', () => {
-    function setupFiendTarget() {
-      runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'currentTurn') return 'Turn5';
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-      combatData.getCombatSummary.mockReturnValue({
-        creatures: [
-          { name: 'Orc Warrior', type: 'npc', monsterType: 'fiend' },
-          { name: 'Elf Mage', type: 'player' },
-        ],
-      });
-    }
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('Goblin1', 'activeConditions', expect.any(Array), CAMPAIGN);
+    expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), CAMPAIGN);
+    expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({ type: 'roll' }));
 
-    it('applies incapacitated and target effect but not damage for fiend', async () => {
-      const handler = vi.fn();
-      window.addEventListener('damage-popup', handler);
+    expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'save_result',
+      characterName: 'Throg',
+      targetName: 'Goblin1',
+      success: true,
+      saveRoll: 15,
+      saveTotal: 17,
+    }));
 
-      setupFiendTarget();
-      renderModal({ targetName: 'Orc Warrior' });
-      triggerConfirm();
-
-      await dispatchSaveResult({
-        promptId: 'test-prompt-id-123',
-        roll: 8,
-        total: 10,
-        success: false,
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'Orc Warrior',
-          'activeConditions',
-          expect.arrayContaining(['incapacitated']),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-          'campaign',
-          'targetEffects',
-          expect.arrayContaining([
-            expect.objectContaining({
-              target: 'Orc Warrior',
-              effect: 'incapacitated',
-              teleport: true,
-              returnToSpace: true,
-            }),
-          ]),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(logService.addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'save_result',
-            targetName: 'Orc Warrior',
-            success: false,
-            description: expect.stringContaining('Fiend'),
-          })
-        );
-      });
-
-      await waitFor(() => {
-        expect(handler).toHaveBeenCalledTimes(1);
-        const detail = handler.mock.calls[0][0].detail;
-        expect(detail.popupText).toContain('Fiend');
-        expect(detail.popupText).toContain('no Psychic damage');
-      });
-
-      window.removeEventListener('damage-popup', handler);
-
-      await waitFor(() => {
-        expect(screen.getByText(/failed.*WIS save/)).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ── Successful save ──
-
-  describe('successful save', () => {
-    it('applies no conditions, effects, or damage; logs success and shows popup', async () => {
-      const handler = vi.fn();
-      window.addEventListener('damage-popup', handler);
-
-      renderModal();
-      triggerConfirm();
-
-      await dispatchSaveResult({
-        promptId: 'test-prompt-id-123',
-        roll: 15,
-        total: 17,
-        success: true,
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-          'Goblin1',
-          'activeConditions',
-          expect.any(Array),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-          'campaign',
-          'targetEffects',
-          expect.any(Array),
-          'test-campaign'
-        );
-      });
-
-      await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).not.toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(expirations.addExpiration).not.toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(logService.addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'save_result',
-            targetName: 'Goblin1',
-            success: true,
-            saveRoll: 15,
-            saveTotal: 17,
-          })
-        );
-      });
-
-      await waitFor(() => {
-        expect(handler).toHaveBeenCalledTimes(1);
-        expect(handler.mock.calls[0][0].detail.popupText).toContain('succeeded');
-      });
-
-      window.removeEventListener('damage-popup', handler);
-
-      await waitFor(() => {
-        expect(screen.getByText(/succeeded.*WIS save/)).toBeInTheDocument();
-      });
-    });
+    expect(popups).toHaveLength(1);
+    expect(popups[0].popupText).toContain('succeeded on WIS save');
   });
 });

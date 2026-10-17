@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0303: Arch-hag Crackling Wave cone picker — DEX DC 22, 5d12 Lightning,
 // half on save. The authored "Failure or Success:" tail names cursed +
 // can't take Reactions, so SUCCESSFUL saves must land the cursed
@@ -5,9 +6,12 @@
 // no_reactions te (until_end_of_next_turn) drained by ONE rounds:2 clock
 // (MA-0073/MA-0087/MA-0146 shapes) with one named Cursed condition log —
 // the former fail-only grant seam left these inert. Failed saves keep the
-// existing fail legs byte-identical (applySaveFailConditions cursed +
-// slowedClauses no_reactions + one fail clock). bothOutcomesClause null
-// (every other row) is byte-inert on success.
+// fail legs (applySaveFailConditions cursed + slowedClauses no_reactions +
+// one fail clock whose effects carry NO condition entry). Mixed-confirm
+// seam (#206): two Math.random draws per NPC save, targets resolved in
+// selection order — one confirm pins both lanes. bothOutcomesClause-null
+// inertness (every other row) lives in the demilich-howl / kraken-toxic-ink
+// lanes against the same grant path and is not re-pinned here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -46,12 +50,14 @@ vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
 }));
 vi.mock('../../../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 
-const summaryCfg = vi.hoisted(() => ({ dexBonus: 5 }));
+// Both targets carry dex +5 (component reads the FULL-NAME key 'dexterity');
+// the draw pair per target decides success (raw 20 + 5 ≥ DC 22) vs fail.
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Arch-hag 1', type: 'npc', currentHp: 333, maxHp: 333, saveBonuses: {}, resistances: ['Cold', 'Fire', 'Psychic'], immunities: ['Charmed', 'Exhaustion', 'Frightened'] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { dexterity: summaryCfg.dexBonus }, resistances: [], immunities: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { dexterity: 5 }, resistances: [], immunities: [] },
+      { name: 'Thug 2', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { dexterity: 5 }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -100,7 +106,7 @@ function spyRandom(seq) {
 }
 afterEach(() => randomSpy?.mockRestore());
 
-function renderWave({ bothOutcomesClause = parseBothOutcomesClause(WAVE.save_effect), saveConditions = extractConditionsFromSaveEffect(WAVE.save_effect), slowedClauses = parseSlowedClauses(WAVE.save_effect) } = {}) {
+function renderWave() {
   return render(
     <SaveAttackAoeModal
       action={WAVE}
@@ -115,9 +121,9 @@ function renderWave({ bothOutcomesClause = parseBothOutcomesClause(WAVE.save_eff
       titleOverride="60-ft Cone (GM positions tokens; selection advisory)"
       excludeNames={['Arch-hag 1']}
       rangeGateFt={60}
-      saveConditions={saveConditions}
-      slowedClauses={slowedClauses}
-      bothOutcomesClause={bothOutcomesClause}
+      saveConditions={extractConditionsFromSaveEffect(WAVE.save_effect)}
+      slowedClauses={parseSlowedClauses(WAVE.save_effect)}
+      bothOutcomesClause={parseBothOutcomesClause(WAVE.save_effect)}
       storeLastAttack={false}
       onClose={vi.fn()}
     />
@@ -129,86 +135,68 @@ beforeEach(() => {
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
   expirations.current = [];
-  summaryCfg.dexBonus = 5;
 });
 
 describe('MA-0303 Arch-hag Crackling Wave picker', () => {
-  it('SUCCESSFUL NPC DEX save grants cursed condition + meta + no_reactions te + ONE rounds:2 clock + Cursed log + half damage', async () => {
-    summaryCfg.dexBonus = 5;
-    spyRandom([0.99, 0.99]);
+  it('mixed confirm resolves both lanes in target order — success: cursed + meta + no_reactions te + ONE rounds:2 clock WITH condition + Cursed log + half damage; fail: fail legs only (no condition in clock, no success writes) + full damage', async () => {
+    // Two RNG draws per NPC save, selection order: Thug 1 raw 20 (+5 ≥ DC 22)
+    // succeeds, Thug 2 raw 1 (+5 < DC 22) fails.
+    spyRandom([0.99, 0.99, 0.01, 0.01]);
     const { getByText } = renderWave();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']);
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
 
+    const tesFor = name => (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'no_reactions' && t.target === name);
+    const clocksFor = name => expirations.current.filter(e => e.targetName === name);
+    const condLogsFor = name => addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.characterName === name);
+
+    // ── Thug 1 SUCCESS leg (the MA-0303 fix): condition + te + one clock + log ──
     expect(runtime.store['Thug 1.activeConditions']).toEqual(['cursed']);
     expect(runtime.store['Thug 1.activeConditionMeta'].cursed).toMatchObject({ dc: 22, ability: 'dex', source: 'Arch-hag 1' });
 
-    const te = (runtime.store['campaign.targetEffects'] || []).find(t => t.effect === 'no_reactions' && t.target === 'Thug 1');
-    expect(te).toBeTruthy();
-    expect(te).toMatchObject({ source: 'Arch-hag 1', duration: 'until_end_of_next_turn', actionName: 'Crackling Wave' });
+    expect(tesFor('Thug 1')).toHaveLength(1);
+    expect(tesFor('Thug 1')[0]).toMatchObject({ source: 'Arch-hag 1', duration: 'until_end_of_next_turn', actionName: 'Crackling Wave' });
 
-    expect(expirations.current).toHaveLength(1);
-    expect(expirations.current[0]).toMatchObject({ attackerName: 'Arch-hag 1', targetName: 'Thug 1', rounds: 2 });
-    expect(expirations.current[0].effects).toEqual([
+    expect(clocksFor('Thug 1')).toHaveLength(1);
+    expect(clocksFor('Thug 1')[0]).toMatchObject({ attackerName: 'Arch-hag 1', rounds: 2 });
+    expect(clocksFor('Thug 1')[0].effects).toEqual([
       { type: 'remove_target_effect', effectKey: 'no_reactions', source: 'Arch-hag 1', target: 'Thug 1' },
       { type: 'condition', condition: 'cursed' },
     ]);
 
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'Cursed');
-    expect(log).toBeTruthy();
-    expect(log.characterName).toBe('Thug 1');
-    expect(log.sourceName).toBe('Arch-hag 1');
-    expect(log.description).toMatch(/succeeded the Dexterity save \(DC 22\) in Arch-hag 1's Crackling Wave — Cursed and can't take Reactions/);
-    expect(log.description).toMatch(/until the end of Arch-hag 1's next turn/);
+    expect(condLogsFor('Thug 1')).toHaveLength(1);
+    const successLog = condLogsFor('Thug 1')[0];
+    expect(successLog.condition).toBe('Cursed');
+    expect(successLog.sourceName).toBe('Arch-hag 1');
+    expect(successLog.description).toMatch(/succeeded the Dexterity save \(DC 22\) in Arch-hag 1's Crackling Wave — Cursed and can't take Reactions/);
+    expect(successLog.description).toMatch(/until the end of Arch-hag 1's next turn/);
 
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 5, expect.anything(), expect.anything());
-    const row = addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.saveResult === 'success' && e.finalDamage === 5);
-    expect(row).toBeTruthy();
-  });
+    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.targetName === 'Thug 1' && e.saveResult === 'success' && e.finalDamage === 5)).toBeTruthy();
 
-  it('FAILED NPC DEX save keeps fail legs byte-identical: cursed via saveConditions, no_reactions via slowedClauses, one fail clock, zero success-leg writes', async () => {
-    summaryCfg.dexBonus = -5;
-    spyRandom([0.01, 0.01]);
-    const { getByText } = renderWave();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    // ── Thug 2 FAIL leg: fail-only grants, byte-identical pre-MA-0303 shape ──
+    expect(runtime.store['Thug 2.activeConditions']).toEqual(['cursed']);
+    expect(runtime.store['Thug 2.activeConditionMeta'].cursed).toMatchObject({ dc: 22, ability: 'dex', source: 'Arch-hag 1' });
 
-    expect(runtime.store['Thug 1.activeConditions']).toEqual(['cursed']);
-    expect(runtime.store['Thug 1.activeConditionMeta'].cursed).toMatchObject({ dc: 22, ability: 'dex', source: 'Arch-hag 1' });
+    expect(tesFor('Thug 2')).toHaveLength(1);
+    expect(tesFor('Thug 2')[0]).toMatchObject({ source: 'Arch-hag 1', duration: 'until_end_of_next_turn' });
 
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    const te = tes.find(t => t.effect === 'no_reactions' && t.target === 'Thug 1');
-    expect(te).toBeTruthy();
-    expect(te.duration).toBe('until_end_of_next_turn');
-    expect(tes.filter(t => t.effect === 'no_reactions' && t.target === 'Thug 1')).toHaveLength(1);
-
-    expect(expirations.current).toHaveLength(1);
-    expect(expirations.current[0].rounds).toBe(2);
-    expect(expirations.current[0].effects).toEqual([
-      { type: 'remove_target_effect', effectKey: 'no_reactions', source: 'Arch-hag 1', target: 'Thug 1' },
+    expect(clocksFor('Thug 2')).toHaveLength(1);
+    expect(clocksFor('Thug 2')[0].effects).toEqual([
+      { type: 'remove_target_effect', effectKey: 'no_reactions', source: 'Arch-hag 1', target: 'Thug 2' },
     ]);
-    expect(expirations.current[0].effects.some(e => e.type === 'condition')).toBe(false);
 
-    const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition');
-    expect(logs.some(l => l.condition === 'Cursed' && /failed the Dexterity save/.test(l.description))).toBe(true);
-    expect(logs.some(l => l.condition === 'Slowed')).toBe(true);
-    expect(logs.some(l => /succeeded/.test(l.description))).toBe(false);
+    expect(condLogsFor('Thug 2').some(l => l.condition === 'Cursed' && /failed the Dexterity save/.test(l.description))).toBe(true);
+    expect(condLogsFor('Thug 2').some(l => l.condition === 'Slowed')).toBe(true);
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 1', 10, expect.anything(), expect.anything());
-  });
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Thug 2', 10, expect.anything(), expect.anything());
+    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage' && e.targetName === 'Thug 2' && e.saveResult === 'failure' && e.finalDamage === 10)).toBeTruthy();
 
-  it('guardrail: bothOutcomesClause null (every other row) + successful save grants nothing', async () => {
-    summaryCfg.dexBonus = 5;
-    spyRandom([0.99, 0.99]);
-    const { getByText } = renderWave({ bothOutcomesClause: null, saveConditions: [], slowedClauses: null });
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).length).toBe(0);
-    expect(runtime.store['Thug 1.activeConditions'] ?? null).toBeNull();
-    expect(expirations.current).toHaveLength(0);
-    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition')).toBeFalsy();
+    // ── Cross-lane negatives: neither target leaks into the other's lane ──
+    expect(expirations.current).toHaveLength(2);
+    expect(condLogsFor('Thug 1').some(l => /failed/.test(l.description) || l.condition === 'Slowed')).toBe(false);
+    expect(condLogsFor('Thug 2').some(l => /succeeded/.test(l.description))).toBe(false);
   });
 });

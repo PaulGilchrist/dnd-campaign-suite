@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Save-result event lane of MassSuggestionModal: how the modal resolves the
+// save-result events answering player save prompts (charmed on fail, record
+// via addTargetResult, close when all prompts resolve, ignore foreign events).
+// Confirm-path/NPC resolution lives in MassSuggestionModal.test.jsx; the
+// pay-at-confirm slot lane lives in MassSuggestionModal.pay-at-confirm.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MassSuggestionModal from './MassSuggestionModal.jsx';
@@ -75,20 +81,38 @@ function makeProps(overrides = {}) {
     };
 }
 
-// Helper: render modal and select a player target, then confirm
+// Helper: render modal, select the player target, confirm — returning the props
+// and the promptId the modal sent with its save prompt.
 async function selectAndConfirmPlayerTarget(renderedProps = {}) {
     const props = { ...makeProps(), ...renderedProps };
     render(<MassSuggestionModal {...props} />);
 
-    const labels = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(labels[2]); // PlayerAlly
+    fireEvent.click(screen.getByLabelText(/PlayerAlly/));
 
     await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
     });
 
-    const savePromptCall = sendSavePrompt.mock.calls[0];
-    return { ...props, promptId: savePromptCall[1].promptId };
+    const promptId = sendSavePrompt.mock.calls[0][1].promptId;
+    return { ...props, promptId };
+}
+
+function dispatchSaveResult(detail) {
+    return act(async () => {
+        window.dispatchEvent(new CustomEvent('save-result', { detail }));
+    });
+}
+
+function charmedConditionWrites() {
+    return setRuntimeValue.mock.calls.filter(
+        call => call[0] === 'PlayerAlly' && call[1] === 'activeConditions'
+    );
+}
+
+function targetResultCalls(saveResult) {
+    return addTargetResult.mock.calls.filter(
+        call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly' && call[1]?.saveResult === saveResult
+    );
 }
 
 beforeEach(() => {
@@ -100,115 +124,78 @@ beforeEach(() => {
     persistAndNotify.mockReturnValue(undefined);
 });
 
-describe('MassSuggestionModal - Save Results', () => {
-    describe('player save result handling', () => {
-        it('applies charmed condition and closes modal when player fails save', async () => {
-            const onClose = vi.fn();
-            const { promptId } = await selectAndConfirmPlayerTarget({ onClose });
+describe('MassSuggestionModal - save-result event resolution', () => {
+    it('failed player save: applies charmed once, records failure with roll, closes modal', async () => {
+        const onClose = vi.fn();
+        const { promptId } = await selectAndConfirmPlayerTarget({ onClose });
 
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: {
-                        promptId,
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                });
-                window.dispatchEvent(event);
-            });
+        await dispatchSaveResult({ promptId, success: false, roll: 5, total: 6, saveBonus: 1 });
 
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalledTimes(1);
-            });
-            await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
-            });
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalledTimes(1);
         });
-
-        it('closes modal when player passes save', async () => {
-            const onClose = vi.fn();
-            const { promptId } = await selectAndConfirmPlayerTarget({ onClose });
-
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: {
-                        promptId,
-                        success: true,
-                        roll: 18,
-                        total: 19,
-                        saveBonus: 1,
-                    },
-                });
-                window.dispatchEvent(event);
-            });
-
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalledTimes(1);
-            });
+        const charmedWrites = charmedConditionWrites();
+        expect(charmedWrites).toHaveLength(1);
+        expect(charmedWrites[0][2]).toEqual(['charmed']);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Wizard1',
+            targetName: 'PlayerAlly',
+            effects: [{ type: 'charmed', condition: 'charmed' }],
+            campaignName,
         });
-
-        it('records save result via addTargetResult on failure and success', async () => {
-            const { promptId } = await selectAndConfirmPlayerTarget();
-
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: {
-                        promptId,
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                });
-                window.dispatchEvent(event);
-            });
-
-            await waitFor(() => {
-                const failureResults = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly' && call[1]?.saveResult === 'failure'
-                );
-                expect(failureResults.length).toBeGreaterThan(0);
-                expect(failureResults[0][1].conditions).toEqual(['charmed']);
-            });
-        });
+        const failures = targetResultCalls('failure');
+        expect(failures).toHaveLength(1);
+        expect(failures[0][1]).toEqual(expect.objectContaining({
+            roll: 5,
+            total: 6,
+            conditions: ['charmed'],
+            appliedDamage: 0,
+        }));
     });
 
-    describe('save result event edge cases', () => {
-        it('ignores save-result event for unknown promptId', async () => {
-            const onClose = vi.fn();
-            await selectAndConfirmPlayerTarget({ onClose });
+    it('passed player save: nothing charmed, records success with roll, closes modal', async () => {
+        const onClose = vi.fn();
+        const { promptId } = await selectAndConfirmPlayerTarget({ onClose });
 
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: {
-                        promptId: 'non-existent-prompt-id',
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                });
-                window.dispatchEvent(event);
-            });
+        await dispatchSaveResult({ promptId, success: true, roll: 18, total: 19, saveBonus: 1 });
 
-            expect(onClose).not.toHaveBeenCalled();
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalledTimes(1);
         });
+        expect(charmedConditionWrites()).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        const successes = targetResultCalls('success');
+        expect(successes).toHaveLength(1);
+        expect(successes[0][1]).toEqual(expect.objectContaining({
+            roll: 18,
+            total: 19,
+            conditions: [],
+            appliedDamage: 0,
+        }));
+    });
 
-        it('handles save-result event with null or empty detail', async () => {
-            const onClose = vi.fn();
-            await selectAndConfirmPlayerTarget({ onClose });
+    it.each([
+        ['null detail', null],
+        ['detail without a promptId', {}],
+        ['a foreign promptId', { promptId: 'not-our-prompt-id', success: false, roll: 5, total: 6, saveBonus: 1 }],
+    ])('ignores save-result event with %s, yet still resolves its own pending prompt', async (_label, foreignDetail) => {
+        const onClose = vi.fn();
+        const { promptId } = await selectAndConfirmPlayerTarget({ onClose });
 
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: null,
-                });
-                window.dispatchEvent(event);
-            });
+        await dispatchSaveResult(foreignDetail);
 
-            expect(onClose).not.toHaveBeenCalled();
-            expect(addExpiration).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(charmedConditionWrites()).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(targetResultCalls('failure')).toHaveLength(0);
+        expect(targetResultCalls('success')).toHaveLength(0);
+
+        // The ignored event must not detach the listener — the real answer still resolves.
+        await dispatchSaveResult({ promptId, success: true, roll: 18, total: 19, saveBonus: 1 });
+
+        await waitFor(() => {
+            expect(onClose).toHaveBeenCalledTimes(1);
         });
+        expect(addExpiration).not.toHaveBeenCalled();
     });
 });

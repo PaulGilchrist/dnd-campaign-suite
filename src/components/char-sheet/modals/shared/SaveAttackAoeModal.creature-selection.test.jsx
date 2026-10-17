@@ -1,16 +1,25 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
-// ── Mocked modules ──
+// Picker-lane tests use the REAL CreatureSelectionModal: SaveAttackAoeModal
+// never passes campaignName/attackerName to it, so its overlay-lookup effect
+// early-returns and it renders deterministically without map/network mocks.
+// AreaEffectTargetModalBase is never mounted on this lane (no 'overlay-'
+// targetName) — its lane lives in SaveAttackAoeModal.overlay.test.jsx.
 
-vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20', maximized: true })),
-}));
+// ── Mocked modules (data seams only) ──
 
-vi.mock('../../../../services/combat/automation/automationExpressions.js', () => ({
-  resolveScaling: vi.fn(() => ({})),
+vi.mock('../../../../services/encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => ({
+    creatures: [
+      { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, resistances: [], immunities: [] },
+      { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, resistances: [], immunities: [] },
+      { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30 },
+    ],
+  })),
+  setCombatSummaryCache: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -18,190 +27,15 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
-  sendSavePrompt: vi.fn(),
-}));
-
-vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
-  computeDamageAfterSave: vi.fn((raw, _success, dcSuccess) => {
-    if (!_success) return raw;
-    return dcSuccess === 'half' ? Math.floor(raw / 2) : 0;
-  }),
-  computeDamageAfterEvasion: vi.fn((raw, _success, dcSuccess) => {
-    return dcSuccess === 'half' ? Math.floor(raw / 2) : raw;
-  }),
-  computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
-  hasEvasionForSave: vi.fn(() => false),
-  normalizeSaveType: vi.fn((t) => t),
-}));
-
-vi.mock('../../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => ({
-    creatures: [
-      { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { con: 4 } },
-    ],
-  })),
-  setCombatSummaryCache: vi.fn(),
-}));
-
 vi.mock('../../../../hooks/useAllySelection.js', () => ({
   getAllyList: vi.fn(() => null),
 }));
-
-vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
-  storeSpellLastAttack: vi.fn(),
-  addTargetResult: vi.fn(),
-}));
-
-vi.mock('./CreatureSelectionModal.jsx', () => {
-  const { useState, useCallback } = require('react');
-  function MockCreatureSelectionModal({
-    title, icon, targets, description, note, confirmLabel, confirmIcon, onConfirm, onSkip,
-    metamagicHeighten, heightenTarget, setHeightenTarget,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-    return (
-      <div className="sp-overlay" onClick={() => {}}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={`fa-solid ${icon}`}></i> {title}
-          </div>
-          <div className="sp-body">
-            <div dangerouslySetInnerHTML={{ __html: description }} />
-            {note && <p className="sp-note">{note}</p>}
-            <div className="secondary-target-list">
-              {targets.length === 0 && <p className="sp-note">No targets available.</p>}
-              {targets.map((t) => {
-                const obj = typeof t === 'object' ? t : { name: t };
-                return (
-                  <label key={obj.name} className={`secondary-target-row ${selected.has(obj.name) ? 'secondary-target-selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(obj.name)}
-                      onChange={() => toggleTarget(obj.name)}
-                    />
-                    {obj.name}
-                    {obj.carefulSpellProtected && <span className="careful-flag"> (Careful)</span>}
-                    {metamagicHeighten && (
-                      <span>
-                        <input
-                          type="radio"
-                          name="heightenTarget"
-                          checked={heightenTarget === obj.name}
-                          onChange={() => setHeightenTarget(heightenTarget === obj.name ? null : obj.name)}
-                        />
-                        Heighten
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div className="sp-actions">
-            <button
-              className="sp-roll-btn"
-              onClick={() => onConfirm(Array.from(selected))}
-              disabled={selected.size === 0}
-              type="button"
-            >
-              <i className={`fa-solid ${confirmIcon}`}></i> {confirmLabel} ({selected.size})
-            </button>
-            <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockCreatureSelectionModal };
-});
-
-vi.mock('./AreaEffectTargetModalBase.jsx', () => {
-  const { useState, useCallback, useMemo } = require('react');
-  function MockAreaEffectTargetModalBase({
-    combatSummary, _saveDc, campaignName: _campaignName, featureName, _saveType, _rangeFeet,
-    onClose, icon, _handleApplyOverride, _handleSaveResultOverride, extraState,
-    renderBody, renderActions,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const [processing, setProcessing] = useState(false);
-    const [pendingPrompts, setPendingPrompts] = useState([]);
-    const [heightenTarget, setHeightenTarget] = useState(null);
-
-    const eligibleTargets = useMemo(() => {
-      if (!combatSummary?.creatures) return [];
-      return combatSummary.creatures.filter(c => c.name !== 'Cleric1');
-    }, [combatSummary]);
-
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-
-    const ctx = {
-      processing,
-      allResolved: false,
-      selected,
-      eligibleTargets,
-      pendingPrompts,
-      toggleTarget,
-      setProcessing,
-      setPendingPrompts,
-      setSelected,
-      setHeightenTarget,
-      heightenTarget,
-    };
-
-    if (extraState?.setSelected) extraState.setSelected = setSelected;
-    if (extraState?.toggleTarget) extraState.toggleTarget = toggleTarget;
-    if (extraState?.heightenTarget !== undefined) extraState.heightenTarget = heightenTarget;
-    if (extraState?.setHeightenTarget) extraState.setHeightenTarget = setHeightenTarget;
-
-    return (
-      <div className="sp-overlay" onClick={onClose}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={icon}></i> {featureName}
-          </div>
-          <div className="sp-body">
-            {renderBody ? renderBody(ctx) : null}
-          </div>
-          <div className="sp-actions">
-            {renderActions ? renderActions(ctx) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockAreaEffectTargetModalBase };
-});
 
 // ── Re-import mocked modules ──
 
 import * as allySelection from '../../../../hooks/useAllySelection.js';
 
 // ── Test fixtures ──
-
-const mockOnClose = vi.fn();
-
-const mockPlayerStats = { name: 'Cleric1', level: 12 };
 
 const mockAction = {
   name: 'Fireball',
@@ -212,7 +46,7 @@ const mockAction = {
 
 const baseProps = {
   action: mockAction,
-  playerStats: mockPlayerStats,
+  playerStats: { name: 'Cleric1', level: 12 },
   campaignName: 'test-campaign',
   range: 20,
   damage: '8d6',
@@ -220,94 +54,78 @@ const baseProps = {
   saveType: 'DEX',
   saveDc: 15,
   dcSuccess: 'half',
-  onClose: mockOnClose,
+  onClose: vi.fn(),
 };
 
 function makeProps(overrides) {
   return { ...baseProps, ...overrides };
 }
 
-function getCheckboxByName(name) {
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  for (const cb of checkboxes) {
-    const label = cb.closest('label');
-    if (label && label.textContent.includes(name)) {
-      return cb;
-    }
-  }
-  return null;
+function rowFor(name) {
+  return [...document.querySelectorAll('.secondary-target-row')]
+    .find(row => row.textContent.includes(name));
+}
+
+function checkboxFor(name) {
+  return rowFor(name).querySelector('input[type="checkbox"]');
 }
 
 // ── Tests ──
 
-describe('SaveAttackAoeModal - CreatureSelectionModal path', () => {
+describe('SaveAttackAoeModal - CreatureSelectionModal picker lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('CreatureSelectionModal rendering', () => {
-    it('renders the modal with action name, save type, DC, damage description, and creature checkboxes', async () => {
-      render(<SaveAttackAoeModal {...makeProps({ saveType: 'CON', saveDc: 18 })} />);
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText(/CON/)).toBeInTheDocument();
-      expect(screen.getByText(/DC 18/)).toBeInTheDocument();
-      expect(screen.getByText(/On a failed save.*8d6.*Fire.*damage/)).toBeInTheDocument();
-      expect(screen.getByText(/On a successful save.*half damage/)).toBeInTheDocument();
-      expect(getCheckboxByName('Goblin A')).toBeInTheDocument();
-      expect(getCheckboxByName('Goblin B')).toBeInTheDocument();
-      expect(getCheckboxByName('Player One')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-    });
+  it('renders the picker with action title, save copy, damage note, and one row per combatant', () => {
+    render(<SaveAttackAoeModal {...makeProps({ saveType: 'CON', saveDc: 18 })} />);
+
+    expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(document.querySelector('.sp-header .fa-bomb')).toBeInTheDocument();
+    // buildPickerCopy: head + default half-damage note.
+    expect(screen.getByText('CON')).toBeInTheDocument();
+    expect(screen.getByText(/saving throw \(DC 18\)/)).toBeInTheDocument();
+    expect(screen.getByText(/On a failed save, target takes 8d6 Fire damage\. On a successful save, target takes half damage\./)).toBeInTheDocument();
+    // Every combatant selectable; confirm starts disabled with a zero count.
+    for (const name of ['Goblin A', 'Goblin B', 'Player One']) {
+      expect(rowFor(name)).toBeInTheDocument();
+      expect(checkboxFor(name)).not.toBeChecked();
+    }
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: /Fireball \(0\)/ })).toBeDisabled();
   });
 
-  describe('target selection', () => {
-    it('toggles a target checkbox on and off', () => {
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      const checkbox = getCheckboxByName('Goblin A');
-      expect(checkbox.checked).toBe(false);
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(true);
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(false);
-    });
+  it('tracks selection in the confirm button and Skip closes the modal', () => {
+    const onClose = vi.fn();
+    render(<SaveAttackAoeModal {...makeProps({ onClose })} />);
 
-    it('updates target count in confirm button when a target is selected', () => {
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      fireEvent.click(getCheckboxByName('Goblin A'));
-      expect(screen.getByRole('button', { name: /Fireball \(1\)/ })).toBeInTheDocument();
-    });
+    fireEvent.click(checkboxFor('Goblin A'));
+    expect(checkboxFor('Goblin A')).toBeChecked();
+    const confirmBtn = screen.getByRole('button', { name: /Fireball \(1\)/ });
+    expect(confirmBtn).not.toBeDisabled();
 
-    it('disables the confirm button when no targets are selected', () => {
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      const confirmBtn = screen.getByRole('button', { name: /Fireball/ });
-      expect(confirmBtn).toBeDisabled();
-    });
+    fireEvent.click(checkboxFor('Goblin A'));
+    expect(checkboxFor('Goblin A')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /Fireball \(0\)/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  describe('heightened spell metamagic', () => {
-    it('renders heighten radio buttons when metamagicHeighten is true', () => {
-      render(<SaveAttackAoeModal {...makeProps({ metamagicHeighten: true })} />);
-      const radios = document.querySelectorAll('input[type="radio"][name="heightenTarget"]');
-      expect(radios.length).toBeGreaterThan(0);
-    });
-  });
+  it('badges careful-protected allies and heighten radios only when the metamagics are armed', () => {
+    allySelection.getAllyList.mockReturnValue(['Goblin A']);
 
-  describe('careful spell metamagic', () => {
-    it('marks allies with carefulSpellProtected in the target list when metamagicCareful is enabled', () => {
-      allySelection.getAllyList.mockReturnValue(['Goblin A']);
-      render(<SaveAttackAoeModal {...makeProps({ metamagicCareful: true })} />);
-      expect(document.querySelector('.careful-flag')).toBeInTheDocument();
-      expect(screen.getByText('Goblin B')).toBeInTheDocument();
-    });
-  });
+    // Disarmed face: no badges, no radios — byte-inert default.
+    const { unmount } = render(<SaveAttackAoeModal {...makeProps()} />);
+    expect(screen.queryByText(/Careful Spell protected/)).not.toBeInTheDocument();
+    expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
+    unmount();
 
-  describe('skip behavior', () => {
-    it('calls onClose when Skip button is clicked', () => {
-      const onClose = vi.fn();
-      render(<SaveAttackAoeModal {...makeProps({ onClose })} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+    render(<SaveAttackAoeModal {...makeProps({ metamagicCareful: true, metamagicHeighten: true })} />);
+    expect(allySelection.getAllyList).toHaveBeenCalledWith('Cleric1');
+    expect(rowFor('Goblin A').textContent).toContain('Careful Spell protected');
+    expect(rowFor('Goblin B').textContent).not.toContain('Careful Spell protected');
+    expect(rowFor('Player One').textContent).not.toContain('Careful Spell protected');
+    expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(3);
   });
-
 });

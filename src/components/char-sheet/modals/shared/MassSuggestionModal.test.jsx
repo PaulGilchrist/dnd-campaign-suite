@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// Base render / NPC-resolution / dispatch lane of MassSuggestionModal: chooser rendering,
+// skip-to-close, the confirm dispatch trail (storeSpellLastAttack, ability_use log, local
+// NPC save resolution incl. charmed dedup, persistAndNotify), and player prompt dispatch.
+// The save-result event lane lives in MassSuggestionModal.saveResults.test.jsx; the
+// pay-at-confirm slot lane lives in MassSuggestionModal.pay-at-confirm.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MassSuggestionModal from './MassSuggestionModal.jsx';
@@ -21,7 +27,7 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
 
 vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
     storeSpellLastAttack: vi.fn(),
-    addTargetResult: vi.fn().mockResolvedValue(undefined),
+    addTargetResult: vi.fn(),
 }));
 
 vi.mock('../../../../services/rules/effects/expirations.js', () => ({
@@ -37,7 +43,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { storeSpellLastAttack } from '../../../../services/automation/common/damageRollback.js';
+import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
@@ -75,6 +81,29 @@ function makeProps(overrides = {}) {
     };
 }
 
+function confirmButton() {
+    return screen.getByRole('button', { name: /Mass Suggestion \(\d+\)/ });
+}
+
+function activeConditionWrites(targetName) {
+    return setRuntimeValue.mock.calls.filter(
+        call => call[0] === targetName && call[1] === 'activeConditions'
+    );
+}
+
+// Shared lane: check a target's row, wait for the confirm button to arm with the
+// selection count, then cast.
+async function selectAndConfirm(targetName) {
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(targetName) }));
+    await waitFor(() => {
+        expect(confirmButton()).toBeEnabled();
+        expect(confirmButton()).toHaveAccessibleName(expect.stringContaining('(1)'));
+    });
+    await act(async () => {
+        fireEvent.click(confirmButton());
+    });
+}
+
 beforeEach(() => {
     vi.resetAllMocks();
     getCombatSummary.mockReturnValue(baseCombatSummary);
@@ -85,163 +114,135 @@ beforeEach(() => {
 });
 
 describe('MassSuggestionModal', () => {
-    describe('NPC save resolution', () => {
-        it('calls storeSpellLastAttack and logs ability_use when targets are selected', async () => {
-            render(<MassSuggestionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(labels[0]); });
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ })).toBeInTheDocument();
-            });
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-            });
+    it('renders the chooser with every combat target; Skip closes without dispatching anything', async () => {
+        const onClose = vi.fn();
+        render(<MassSuggestionModal {...makeProps({ onClose })} />);
 
-            expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
-                casterName: 'Wizard1',
-                spellName: 'Mass Suggestion',
-                saveType: 'WIS',
-                saveDc: 14,
-                attackScope: 'aoe',
-            });
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Wizard1',
-                abilityName: 'Mass Suggestion',
-                description: 'Mass Suggestion: Selecting 1 target(s) for save (DC 14 WIS)',
-            }));
-        });
+        expect(screen.getByText('Mass Suggestion')).toBeInTheDocument();
+        for (const name of ['Goblin', 'Orc', 'PlayerAlly']) {
+            expect(screen.getByRole('checkbox', { name: new RegExp(name) })).toBeInTheDocument();
+        }
+        expect(confirmButton()).toBeDisabled();
 
-        it('applies charmed condition on failed NPC save', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.26);
-            try {
-                render(<MassSuggestionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
-                await waitFor(() => {
-                    expect(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ })).toBeInTheDocument();
-                });
-                await act(async () => {
-                    fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-                });
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-                await waitFor(() => {
-                    expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [{ type: 'charmed', condition: 'charmed' }], campaignName });
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-
-        it('does not apply charmed condition on successful NPC save', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.76);
-            try {
-                render(<MassSuggestionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
-                await waitFor(() => {
-                    expect(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ })).toBeInTheDocument();
-                });
-                await act(async () => {
-                    fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-                });
-
-                await waitFor(() => {
-                    expect(addExpiration).not.toHaveBeenCalled();
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(storeSpellLastAttack).not.toHaveBeenCalled();
+        expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(persistAndNotify).not.toHaveBeenCalled();
     });
 
-    describe('player save prompts', () => {
-        it('sends save prompt for player targets instead of resolving locally', async () => {
-            render(<MassSuggestionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            fireEvent.click(labels[2]);
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-            });
-
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'PlayerAlly',
-                saveType: 'WIS',
-                saveDc: 14,
-                sourceName: 'Wizard1',
-            }));
-        });
-
-        it('tracks pending prompts for player targets', async () => {
-            render(<MassSuggestionModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            fireEvent.click(labels[2]);
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'pendingSaveListenerPrompts',
-                expect.arrayContaining([expect.any(String)]),
-                campaignName,
-            );
-        });
-    });
-
-    describe('condition deduplication', () => {
-        it('does not add duplicate charmed condition', async () => {
-            getRuntimeValue.mockReturnValue(['charmed']);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    describe.each([
+        {
+            label: 'failed save applies charmed once',
+            random: 0.26, // roll 6 + 0 = 6 < DC 14
+            existingConditions: [],
+            expectedConditions: ['charmed'],
+        },
+        {
+            label: 'failed save dedupes an already-charmed target without dropping other conditions',
+            random: 0.01, // roll 1 < DC 14
+            existingConditions: ['charmed', 'frightened'],
+            expectedConditions: ['frightened', 'charmed'],
+        },
+        {
+            label: 'succeeded save applies nothing',
+            random: 0.76, // roll 16 + 0 >= DC 14
+            existingConditions: [],
+            expectedConditions: null,
+        },
+    ])('NPC save resolution — $label', ({ random, existingConditions, expectedConditions }) => {
+        it('runs the full confirm dispatch trail for an NPC target', async () => {
+            getRuntimeValue.mockImplementation((key, subKey) =>
+                key === 'Goblin' && subKey === 'activeConditions' ? existingConditions : []);
+            vi.spyOn(Math, 'random').mockReturnValue(random);
             try {
                 render(<MassSuggestionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
+                await selectAndConfirm('Goblin');
+
+                // persistAndNotify is the last call in the resolution chain — waiting on
+                // it means the whole trail has landed.
                 await waitFor(() => {
-                    expect(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ })).toBeInTheDocument();
-                });
-                await act(async () => {
-                    fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
+                    expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
                 });
 
-                await waitFor(() => {
-                    const conditionCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(conditionCalls.length).toBeGreaterThan(0);
-                    const conditions = conditionCalls[0][2];
-                    const charmedCount = conditions.filter(c => String(c).toLowerCase() === 'charmed').length;
-                    expect(charmedCount).toBe(1);
+                // Attack stamp + cast log happen regardless of save outcome.
+                expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
+                    casterName: 'Wizard1',
+                    spellName: 'Mass Suggestion',
+                    saveType: 'WIS',
+                    saveDc: 14,
+                    attackScope: 'aoe',
                 });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-    });
+                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                    type: 'ability_use',
+                    characterName: 'Wizard1',
+                    abilityName: 'Mass Suggestion',
+                    description: 'Mass Suggestion: Selecting 1 target(s) for save (DC 14 WIS)',
+                }));
+                // NPCs resolve locally — no player save prompt on this lane.
+                expect(sendSavePrompt).not.toHaveBeenCalled();
 
-    describe('persistAndNotify calls', () => {
-        it('calls persistAndNotify after NPC save resolution', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                render(<MassSuggestionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
-                await waitFor(() => {
-                    expect(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ })).toBeInTheDocument();
-                });
-                await act(async () => {
-                    fireEvent.click(screen.getByRole('button', { name: /Mass Suggestion \(1\)/ }));
-                });
-
-                await waitFor(() => {
-                    expect(persistAndNotify).toHaveBeenCalledWith(
-                        baseCombatSummary,
+                const charmedWrites = activeConditionWrites('Goblin');
+                if (expectedConditions) {
+                    expect(charmedWrites).toHaveLength(1);
+                    expect(charmedWrites[0][2]).toEqual(expectedConditions);
+                    expect(addExpiration).toHaveBeenCalledTimes(1);
+                    expect(addExpiration).toHaveBeenCalledWith({
+                        attackerName: 'Wizard1',
+                        targetName: 'Goblin',
+                        effects: [{ type: 'charmed', condition: 'charmed' }],
                         campaignName,
-                    );
-                });
+                    });
+                    expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                        targetName: 'Goblin',
+                        saveResult: 'failure',
+                        conditions: ['charmed'],
+                        appliedDamage: 0,
+                    }));
+                } else {
+                    expect(charmedWrites).toHaveLength(0);
+                    expect(addExpiration).not.toHaveBeenCalled();
+                    expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                        targetName: 'Goblin',
+                        saveResult: 'success',
+                        conditions: [],
+                        appliedDamage: 0,
+                    }));
+                }
             } finally {
                 vi.restoreAllMocks();
             }
         });
+    });
+
+    it('player targets get a save prompt: promptId is sent, tracked on the campaign, and nothing resolves locally', async () => {
+        render(<MassSuggestionModal {...makeProps()} />);
+        await selectAndConfirm('PlayerAlly');
+
+        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
+        const [promptCampaign, payload] = sendSavePrompt.mock.calls[0];
+        expect(promptCampaign).toBe(campaignName);
+        expect(payload).toEqual(expect.objectContaining({
+            targetName: 'PlayerAlly',
+            saveType: 'WIS',
+            saveDc: 14,
+            sourceName: 'Wizard1',
+        }));
+        expect(typeof payload.promptId).toBe('string');
+
+        // The exact dispatched promptId is the one tracked for the listener.
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'pendingSaveListenerPrompts',
+            [payload.promptId],
+            campaignName,
+        );
+
+        // The player's save answer belongs to the save-result lane, not the cast lane.
+        expect(activeConditionWrites('PlayerAlly')).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(addTargetResult).not.toHaveBeenCalled();
     });
 });

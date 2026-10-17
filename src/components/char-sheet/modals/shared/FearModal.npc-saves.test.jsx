@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// FearModal NPC save-resolution lane (auto-roll at confirm): failure, success,
+// Heightened Spell disadvantage, Careful Spell auto-success, and condition dedup.
+// Player save resolution lives in FearModal.player-saves.test.jsx, aura suppression
+// in FearModal.aura-immunity.test.jsx, rendering/selection in FearModal.test.jsx —
+// not repeated here.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FearModal from './FearModal.jsx';
@@ -40,6 +46,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { addEntry } from '../../../../services/ui/logService.js';
+import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 
 const campaignName = 'test-campaign';
@@ -76,17 +83,28 @@ function makeProps(overrides = {}) {
     };
 }
 
-async function selectAndConfirm(props = {}) {
-    const { container } = render(<FearModal {...makeProps(props)} />);
-    const labels = container.querySelectorAll('.secondary-target-row');
+const entriesOf = (filter) => addEntry.mock.calls.map(c => c[1]).filter(filter);
+const conditionWritesFor = (name) =>
+    setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions' && c[0] === name);
+const fearEffectWrites = () =>
+    setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects' && c[0] === 'campaign')
+        .flatMap(c => c[2]).filter(e => e?.effect === 'fear_end_on_los');
+
+// Select target row 0 (Goblin), optionally mark it Heightened, and click confirm.
+async function selectAndConfirm({ heighten = false, props = {} } = {}) {
+    render(<FearModal {...makeProps(props)} />);
+    const labels = document.querySelectorAll('.secondary-target-row');
     await act(async () => { fireEvent.click(labels[0]); });
+    if (heighten) {
+        const radio = labels[0].querySelector('input[name="heightenTarget"]');
+        await act(async () => { fireEvent.click(radio); });
+    }
     await waitFor(() => {
         expect(screen.getByRole('button', { name: /Bane \(1\)/ })).toBeInTheDocument();
     });
     await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Bane \(1\)/ }));
     });
-    return { container };
 }
 
 beforeEach(() => {
@@ -99,154 +117,145 @@ beforeEach(() => {
 });
 
 describe('FearModal NPC saves', () => {
-    describe('NPC failed save flow', () => {
-        it('applies frightened condition, expiration, and fear effect on failed NPC save', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                await selectAndConfirm();
+    it('failed NPC save applies frightened with expiration and fear tracking, and logs cast, failure, and target result', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.01); // natural 1 + 0 = 1 < DC 14
+        try {
+            await selectAndConfirm();
 
-                await waitFor(() => {
-                    const conditionCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(conditionCalls.length).toBeGreaterThan(0);
-                    expect(conditionCalls[0][2]).toContain('frightened');
-                });
-
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [{ type: 'condition', condition: 'frightened' }], campaignName });
-
-                await waitFor(() => {
-                    const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'targetEffects' && call[0] === 'campaign'
-                    );
-                    expect(targetEffectCalls.length).toBeGreaterThan(0);
-                    const effects = targetEffectCalls[0][2];
-                    const fearEffect = effects.find(e => e.effect === 'fear_end_on_los');
-                    expect(fearEffect).toBeDefined();
-                    expect(fearEffect.target).toBe('Goblin');
-                    expect(fearEffect.source).toBe('Wizard1');
-                    expect(fearEffect.condition).toBe('frightened');
-                    expect(fearEffect.duration).toBe('concentration');
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-
-        it('logs ability_use on NPC save confirm', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                await selectAndConfirm();
-
-                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'Wizard1',
-                    abilityName: 'Bane',
-                }));
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-    });
-
-    describe('NPC successful save', () => {
-        it('does not apply condition and logs success when NPC passes save', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            try {
-                await selectAndConfirm();
-
-                await waitFor(() => {
-                    const conditionCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(conditionCalls.length).toBe(0);
-                });
-
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.success === true && call[1]?.targetName === 'Goblin'
-                );
-                expect(saveEntries.length).toBeGreaterThan(0);
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-    });
-
-    describe('careful spell protection for NPCs', () => {
-        it('automatically succeeds and logs for careful spell protected NPCs', async () => {
-            getAllyList.mockReturnValue(['Goblin']);
-            getRuntimeValue.mockReturnValue([]);
-            await selectAndConfirm({ metamagicCareful: true });
-
+            // Save-result failure is logged last — once it lands, every
+            // state write and log in the failure branch has completed.
             await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                );
-                expect(conditionCalls.length).toBe(0);
+                expect(entriesOf(e =>
+                    e.type === 'save_result' && e.targetName === 'Goblin' && e.success === false
+                ).length).toBeGreaterThan(0);
             });
 
-            const saveEntries = addEntry.mock.calls.filter(
-                call => call[1]?.type === 'save_result' && call[1]?.targetName === 'Goblin'
-            );
-            expect(saveEntries.length).toBeGreaterThan(0);
-            expect(saveEntries[0][1].description).toContain('Careful Spell protected');
-        });
-    });
+            expect(conditionWritesFor('Goblin')[0][2]).toEqual(['frightened']);
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: 'Wizard1',
+                targetName: 'Goblin',
+                effects: [{ type: 'condition', condition: 'frightened' }],
+                campaignName,
+            });
 
-    describe('condition deduplication', () => {
-        it('does not add duplicate frightened condition when already present', async () => {
-            getRuntimeValue.mockReturnValue([{ name: 'frightened' }]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                await selectAndConfirm();
-
-                await waitFor(() => {
-                    const conditionCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(conditionCalls.length).toBeGreaterThan(0);
-                    const conditions = conditionCalls[0][2];
-                    const frightenedCount = conditions.filter(c => String(c).toLowerCase() === 'frightened').length;
-                    expect(frightenedCount).toBe(1);
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
-    });
-
-    describe('fear effect tracking', () => {
-        it('updates existing fear effect with new caster and DC', async () => {
-            const existingEffect = {
-                target: 'Goblin',
+            const fearEffect = fearEffectWrites().find(e => e.target === 'Goblin');
+            expect(fearEffect).toMatchObject({
+                source: 'Wizard1',
                 effect: 'fear_end_on_los',
-                source: 'OldCaster',
                 condition: 'frightened',
-                dc: 10,
-                duration: '1 minute',
-            };
-            getRuntimeValue.mockReturnValue([existingEffect]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                await selectAndConfirm();
+                dc: 14,
+                duration: 'concentration',
+            });
 
-                await waitFor(() => {
-                    const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'targetEffects' && call[0] === 'campaign'
-                    );
-                    expect(targetEffectCalls.length).toBeGreaterThan(0);
-                    const effects = targetEffectCalls[0][2];
-                    const fearEffects = effects.filter(e => e.effect === 'fear_end_on_los');
-                    expect(fearEffects.length).toBe(1);
-                    expect(fearEffects[0].source).toBe('Wizard1');
-                    expect(fearEffects[0].dc).toBe(14);
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
+            expect(entriesOf(e =>
+                e.type === 'ability_use' && e.characterName === 'Wizard1' && e.abilityName === 'Bane'
+            ).length).toBeGreaterThan(0);
+            expect(entriesOf(e =>
+                e.type === 'condition' && e.action === 'applied' && e.characterName === 'Goblin' && e.condition === 'Frightened'
+            ).length).toBeGreaterThan(0);
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'Goblin',
+                saveResult: 'failure',
+                conditions: ['frightened'],
+            }));
+        } finally {
+            Math.random.mockRestore();
+        }
+    });
+
+    it('heightened spell target NPC rolls with disadvantage — min of two d20s fails where the first roll would have succeeded', async () => {
+        // Disadvantage draws min(20, 2) = 2 + 0 < DC 14. Without the heighten
+        // flag reaching rollNpcSave, the single first draw (20) would succeed.
+        vi.spyOn(Math, 'random').mockReturnValueOnce(0.95).mockReturnValueOnce(0.05).mockReturnValue(0.95);
+        try {
+            await selectAndConfirm({ heighten: true, props: { metamagicHeighten: true } });
+
+            await waitFor(() => {
+                const entries = entriesOf(e =>
+                    e.type === 'save_result' && e.targetName === 'Goblin' && e.success === false
+                );
+                expect(entries.length).toBeGreaterThan(0);
+                expect(entries[0]).toMatchObject({ roll: 2, total: 2, saveBonus: 0 });
+            });
+
+            expect(conditionWritesFor('Goblin')[0][2]).toContain('frightened');
+            expect(fearEffectWrites().some(e => e.target === 'Goblin')).toBe(true);
+        } finally {
+            Math.random.mockRestore();
+        }
+    });
+
+    it('successful NPC save applies no frightened leg and logs the success', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.99); // natural 20 + 0 >= DC 14
+        try {
+            await selectAndConfirm();
+
+            await waitFor(() => {
+                expect(entriesOf(e =>
+                    e.type === 'save_result' && e.targetName === 'Goblin' && e.success === true
+                ).length).toBeGreaterThan(0);
+            });
+
+            expect(entriesOf(e =>
+                e.type === 'save_result' && e.targetName === 'Goblin'
+            )[0].description).toContain('succeeded on CHA save (DC 14, rolled 20 + 0 = 20)');
+            expect(conditionWritesFor('Goblin')).toHaveLength(0);
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(fearEffectWrites()).toHaveLength(0);
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'Goblin',
+                saveResult: 'success',
+                conditions: [],
+            }));
+        } finally {
+            Math.random.mockRestore();
+        }
+    });
+
+    it('careful spell protected NPC auto-succeeds despite rolling a natural 1', async () => {
+        getAllyList.mockReturnValue(['Goblin']);
+        vi.spyOn(Math, 'random').mockReturnValue(0.01); // natural 1 — unprotected would frighten
+        try {
+            await selectAndConfirm({ props: { metamagicCareful: true } });
+
+            await waitFor(() => {
+                expect(entriesOf(e =>
+                    e.type === 'save_result' && e.targetName === 'Goblin'
+                ).length).toBeGreaterThan(0);
+            });
+
+            const saveEntry = entriesOf(e =>
+                e.type === 'save_result' && e.targetName === 'Goblin'
+            )[0];
+            expect(saveEntry.success).toBe(true);
+            expect(saveEntry.description).toContain('Careful Spell protected');
+            expect(conditionWritesFor('Goblin')).toHaveLength(0);
+            expect(addExpiration).not.toHaveBeenCalled();
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'Goblin',
+                saveResult: 'success',
+                conditions: [],
+            }));
+        } finally {
+            Math.random.mockRestore();
+        }
+    });
+
+    it('failed save on an already-frightened NPC writes exactly one frightened entry', async () => {
+        // activeConditions canonically stores lowercase condition strings.
+        getRuntimeValue.mockImplementation((key, category) =>
+            category === 'activeConditions' && key === 'Goblin' ? ['frightened'] : []);
+        vi.spyOn(Math, 'random').mockReturnValue(0.01);
+        try {
+            await selectAndConfirm();
+
+            await waitFor(() => {
+                expect(conditionWritesFor('Goblin').length).toBeGreaterThan(0);
+            });
+
+            expect(conditionWritesFor('Goblin')[0][2]).toEqual(['frightened']);
+        } finally {
+            Math.random.mockRestore();
+        }
     });
 });

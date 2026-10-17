@@ -1,11 +1,13 @@
-// MA-0115: Adult Green Dragon Noxious Miasma sphere picker — CON DC 17,
-// 2d6 Poison, 20-ft radius. Confirming the picker grants the authored
-// "−2 penalty to AC until the end of its next turn" clause as the registered
-// ac_penalty te (value 2, sourced from the dragon, until_end_of_next_turn +
-// rounds:2 expiry clock, MA-0073/MA-0087 shape) with one named AC Penalty
-// condition log on each NPC failed save. Successful saves grant nothing;
-// acPenaltyClause null (every other row) is byte-inert.
-import { render, fireEvent, waitFor } from '@testing-library/react';
+// @maintained-by-ai
+// MA-0115 ac-penalty lane: Adult Green Dragon Noxious Miasma sphere picker
+// (CON DC 17, 2d6 Poison, dcSuccess none) grants the authored "−2 penalty to
+// AC until the end of its next turn" clause as the registered ac_penalty te
+// (MA-0073/MA-0087 shape: until_end_of_next_turn + rounds:2 expiry clock)
+// with one named AC Penalty condition log per failed NPC save. Successful
+// saves and a null acPenaltyClause (every other row) grant nothing.
+// Renders the REAL CreatureSelectionModal (no mock copy) — the real component
+// makes the picker's confirm button disabled until a target is checked.
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 import monstersData from '../../../../../public/data/monsters.json';
@@ -64,23 +66,6 @@ vi.mock('../../../../services/rules/effects/expirationQueue.js', () => ({
   addExpiration: vi.fn((arg) => { expirations.current.push(arg); }),
 }));
 
-const seenTargets = vi.hoisted(() => ({ current: [] }));
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, description, note, targets, onConfirm, onSkip }) => {
-    seenTargets.current = targets;
-    return (
-      <div className="sp-overlay">
-        <div className="sp-header">{title}</div>
-        <div className="sp-desc">{description}</div>
-        <div className="sp-note-copy">{note}</div>
-        {targets.map(t => (<label key={t.name} className="secondary-target-row"><input type="checkbox" />{t.name}</label>))}
-        <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
-
 import { addEntry } from '../../../../services/ui/logService.js';
 import { parseAcPenaltyClause } from '../../../encounter/MonsterCardHelpers.js';
 
@@ -106,7 +91,6 @@ function renderMiasma(acPenaltyClause = parseAcPenaltyClause(MIASMA.save_effect)
       saveType="Constitution"
       saveDc={17}
       dcSuccess="none"
-      titleOverride="20-ft Radius (GM positions tokens; selection advisory)"
       excludeNames={['Adult Green Dragon 1']}
       saveConditions={[]}
       acPenaltyClause={acPenaltyClause}
@@ -116,25 +100,37 @@ function renderMiasma(acPenaltyClause = parseAcPenaltyClause(MIASMA.save_effect)
   );
 }
 
+// Drive the real picker: exactly one eligible target row (the Thug), tick it,
+// then press the action-named confirm button (enabled once a target is chosen).
+async function confirmThugTarget() {
+  const thugCheckbox = await screen.findByRole('checkbox', { name: /Thug 1/ });
+  expect(screen.queryByRole('checkbox', { name: /Adult Green Dragon/ })).toBeNull();
+  fireEvent.click(thugCheckbox);
+  const confirmBtn = screen.getByRole('button', { name: /Noxious Miasma/ });
+  expect(confirmBtn).toBeEnabled();
+  fireEvent.click(confirmBtn);
+  await waitFor(() => expect(addEntry).toHaveBeenCalled());
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  seenTargets.current = [];
   expirations.current = [];
 });
 
-describe('MA-0115 Adult Green Noxious Miasma picker', () => {
-  it('failed NPC CON save grants ac_penalty te value 2 + rounds:2 clock + named AC Penalty log', async () => {
+describe('MA-0115 Noxious Miasma ac_penalty grant', () => {
+  it('failed NPC CON save grants ac_penalty te (value 2, until_end_of_next_turn) + rounds:2 expiry + named AC Penalty log', async () => {
     spyRandom([0.01, 0.01, 0.01, 0.01]);
-    const { getByText } = renderMiasma();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    renderMiasma();
+    await confirmThugTarget();
 
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    const te = tes.find(t => t.effect === 'ac_penalty' && t.target === 'Thug 1');
-    expect(te).toBeTruthy();
-    expect(te).toMatchObject({ source: 'Adult Green Dragon 1', duration: 'until_end_of_next_turn', value: 2, actionName: 'Noxious Miasma' });
+    const te = (runtime.store['campaign.targetEffects'] || []).find(t => t.effect === 'ac_penalty' && t.target === 'Thug 1');
+    expect(te).toMatchObject({
+      source: 'Adult Green Dragon 1',
+      duration: 'until_end_of_next_turn',
+      value: 2,
+      actionName: 'Noxious Miasma',
+    });
 
     expect(expirations.current.some(x =>
       x.rounds === 2
@@ -142,29 +138,19 @@ describe('MA-0115 Adult Green Noxious Miasma picker', () => {
       && x.effects.some(e => e.type === 'remove_target_effect' && e.effectKey === 'ac_penalty'))).toBe(true);
 
     const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'AC Penalty');
-    expect(log).toBeTruthy();
-    expect(log.characterName).toBe('Thug 1');
-    expect(log.description).toMatch(/\u22122 AC until the end of Thug 1's next turn/);
+    expect(log).toMatchObject({ characterName: 'Thug 1', sourceName: 'Adult Green Dragon 1' });
+    expect(log.description).toMatch(/Thug 1 failed the Constitution save \(DC 17\).*−2 AC until the end of Thug 1's next turn/s);
   });
 
-  it('successful NPC CON save grants nothing — no te, no expiry, no AC Penalty log', async () => {
-    spyRandom([0.99, 0.99, 0.99, 0.99]);
-    const { getByText } = renderMiasma();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+  it.each([
+    ['successful CON save with clause present', [0.99, 0.99, 0.99, 0.99], parseAcPenaltyClause(MIASMA.save_effect)],
+    ['failed save but null clause (every other row)', [0.01, 0.01, 0.01, 0.01], null],
+  ])('grants nothing on %s: no te, no expiry, no AC Penalty log', async (_label, rolls, clause) => {
+    spyRandom(rolls);
+    renderMiasma(clause);
+    await confirmThugTarget();
     expect((runtime.store['campaign.targetEffects'] || []).some(t => t.effect === 'ac_penalty')).toBe(false);
     expect(expirations.current.some(x => x.effects?.some(e => e.effectKey === 'ac_penalty'))).toBe(false);
     expect(addEntry.mock.calls.map(c => c[1]).find(e => e.condition === 'AC Penalty')).toBeFalsy();
-  });
-
-  it('acPenaltyClause null (every other row) is byte-inert: failed save grants no te', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
-    const { getByText } = renderMiasma(null);
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).some(t => t.effect === 'ac_penalty')).toBe(false);
-    expect(expirations.current.some(x => x.effects?.some(e => e.effectKey === 'ac_penalty'))).toBe(false);
   });
 });

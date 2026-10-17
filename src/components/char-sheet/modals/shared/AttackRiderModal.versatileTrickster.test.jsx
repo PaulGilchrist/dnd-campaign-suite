@@ -1,3 +1,7 @@
+// @maintained-by-ai
+// Versatile Trickster lane only — base selection/apply/result and Stalker's
+// Flurry flows live in AttackRiderModal.test.jsx; handler internals live in
+// services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.test.js.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AttackRiderModal from './AttackRiderModal.jsx';
@@ -27,23 +31,24 @@ import {
 } from './AttackRiderModal.test-utils.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-const mockSecondaryTargets = [
-  { name: 'Orc A', size: 'Medium' },
-  { name: 'Orc B', size: 'Medium' },
-];
+const vtTripResult = {
+  type: 'popup',
+  payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
+};
 
-const mockVtAction = { name: 'Trip' };
-
-// ── Helpers ──
-
-function selectSecondaryTarget(labelText) {
-  const labels = document.querySelectorAll('label.secondary-target-row');
-  const targetLabel = Array.from(labels).find(l => l.textContent.includes(labelText));
-  fireEvent.click(targetLabel);
-  return targetLabel;
+// Simulate a fresh Trip cast whose secondary-target scan found `targets`
+// (applyRiderOption writes these keys at entry, cleared first per CLA-376).
+function mockFreshTripScan(targets) {
+  getRuntimeValue.mockImplementation((charName, key) => {
+    if (key === 'versatileTricksterSecondaryTargets') return targets;
+    if (key === 'versatileTricksterAction') return { name: 'Trip' };
+    return null;
+  });
 }
 
-// ── Tests ──
+function selectRadioTarget(name) {
+  fireEvent.click(screen.getByRole('radio', { name: new RegExp(name) }));
+}
 
 describe('AttackRiderModal - Versatile Trickster', () => {
   beforeEach(() => {
@@ -52,119 +57,111 @@ describe('AttackRiderModal - Versatile Trickster', () => {
     applyRiderOption.mockResolvedValue(defaultResult);
   });
 
-  describe('versatile trickster flow', () => {
-    beforeEach(() => {
-      getRuntimeValue.mockImplementation((charName, key) => {
-        if (key === 'versatileTricksterSecondaryTargets') return mockSecondaryTargets;
-        if (key === 'versatileTricksterAction') return mockVtAction;
-        return null;
-      });
+  it('full VT flow: after applying, shows chooser for scanned targets, applies Trip to the picked target, shows the handler result, closes on Done', async () => {
+    const onClose = vi.fn();
+    applyVersatileTrickster.mockResolvedValue(vtTripResult);
+    mockFreshTripScan([
+      { name: 'Orc A', size: 'Medium' },
+      { name: 'Orc B', size: 'Medium' },
+    ]);
+
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
+
+    await waitFor(() => {
+      expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
     });
+    expect(screen.getByRole('radio', { name: /Orc A/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Orc B/ })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
 
-    it('completes the full Versatile Trickster flow: apply option → select target → confirm → result → close', async () => {
-      const onClose = vi.fn();
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
-      });
+    selectRadioTarget('Orc A');
+    fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
 
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
+    await waitFor(() => {
+      expect(applyRiderOption).toHaveBeenCalledWith(
+        expect.objectContaining({ automation: expect.objectContaining({ options: expect.any(Array) }) }),
+        expect.any(Object),
+        'test-campaign',
+        'Goblin A',
+        ['Burning Hands']
+      );
+      // Forwards the action persisted by the scan plus the picked target.
+      expect(applyVersatileTrickster).toHaveBeenCalledWith(
+        { name: 'Trip' },
+        expect.any(Object),
+        'test-campaign',
+        'Orc A'
+      );
+    });
+    // Chooser replaced by the handler's result overlay.
+    expect(screen.queryByText('Trip Secondary Target')).not.toBeInTheDocument();
+    expect(screen.getByText('Secondary target tripped.')).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
-        expect(screen.getByText('Orc A')).toBeInTheDocument();
-        expect(screen.getByText('Orc B')).toBeInTheDocument();
-      });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-      selectSecondaryTarget('Orc A');
-      fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
+  it('CLA-376: Trip save legs return null from applyRiderOption — chooser still opens off the freshly persisted keys', async () => {
+    const onClose = vi.fn();
+    applyRiderOption.mockResolvedValue(null);
+    applyVersatileTrickster.mockResolvedValue(vtTripResult);
+    mockFreshTripScan([{ name: 'Orc A', size: 'Medium' }]);
 
-      await waitFor(() => {
-        expect(applyRiderOption).toHaveBeenCalledWith(
-          expect.objectContaining({ automation: expect.objectContaining({ options: expect.any(Array) }) }),
-          expect.any(Object),
-          'test-campaign',
-          'Goblin A',
-          ['Burning Hands']
-        );
-        expect(applyVersatileTrickster).toHaveBeenCalledWith(
-          mockVtAction,
-          expect.any(Object),
-          'test-campaign',
-          'Orc A'
-        );
-        expect(screen.getByText('Done')).toBeInTheDocument();
-      });
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
 
-      fireEvent.click(screen.getByText('Done'));
+    await waitFor(() => {
+      expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /Orc A/ })).toBeInTheDocument();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('CLA-376: a null-result apply whose VT keys were cleared closes immediately without replaying the chooser', async () => {
+    const onClose = vi.fn();
+    applyRiderOption.mockResolvedValue(null);
+    getRuntimeValue.mockReturnValue(null);
+
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
+
+    await waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+    expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
+  });
 
-    it('CLA-376: shows the chooser on a single Trip save-leg (applyRiderOption resolves null)', async () => {
-      const onClose = vi.fn();
-      applyRiderOption.mockResolvedValue(null);
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
-      });
+  it('Skip closes the chooser without applying the trickster trip', async () => {
+    const onClose = vi.fn();
+    mockFreshTripScan([{ name: 'Orc A', size: 'Medium' }]);
 
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
+    render(<AttackRiderModal {...makeProps({ onClose })} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
 
-      await waitFor(() => {
-        expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
-        expect(screen.getByText('Orc A')).toBeInTheDocument();
-      });
-      expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
 
-    it('CLA-376: closes without replaying the chooser when persisted keys are cleared (non-Trip apply)', async () => {
-      const onClose = vi.fn();
-      applyRiderOption.mockResolvedValue(null);
-      getRuntimeValue.mockReturnValue(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(applyVersatileTrickster).not.toHaveBeenCalled();
+  });
 
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
+  it('shows the normal result overlay, not the chooser, when the Trip scan found no secondary targets', async () => {
+    mockFreshTripScan([]);
 
-      await waitFor(() => {
-        expect(onClose).toHaveBeenCalledTimes(1);
-      });
-      expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
+    render(<AttackRiderModal {...makeProps()} />);
+    selectSingleOption('Burning Hands');
+    clickApplySingle();
+
+    await waitFor(() => {
+      expect(screen.getByText('Effect applied successfully.')).toBeInTheDocument();
     });
-
-    it('skips Versatile Trickster when Skip is clicked without calling applyVersatileTrickster', async () => {
-      const onClose = vi.fn();
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.getByText('Skip')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Skip'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-      expect(applyVersatileTrickster).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      { description: 'no secondary targets exist', value: null },
-      { description: 'secondary targets array is empty', value: [] },
-    ])('does NOT show Versatile Trickster when %s', async ({ value }) => {
-      getRuntimeValue.mockReturnValue(value);
-
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.getByText('Effect applied successfully.')).toBeInTheDocument();
-        expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
-      });
-    });
+    expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
   });
 });

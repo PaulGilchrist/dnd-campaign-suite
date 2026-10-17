@@ -1,5 +1,11 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// HypnoticPatternModal metamagic lane: Heightened Spell (note + radio wiring and
+// the disadvantage roll on the marked target) and Careful Spell (ally badges,
+// NPC auto-success resolution, player prompt skip). Overlay guard + teardown live
+// in .advanced.test.jsx, plain NPC saves in .npc-saves.test.jsx, player saves in
+// .player-saves.test.jsx, SP-069 latch in .sp069.test.jsx.
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import HypnoticPatternModal from './HypnoticPatternModal.jsx';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -78,6 +84,22 @@ function makeProps(overrides = {}) {
     };
 }
 
+function rowFor(name) {
+    return [...document.querySelectorAll('.secondary-target-row')].find(row => row.textContent.includes(name));
+}
+
+function saveEntriesFor(name, success) {
+    return addEntry.mock.calls
+        .map(call => call[1])
+        .filter(entry => entry?.type === 'save_result'
+            && entry?.targetName === name
+            && (success === undefined || entry.success === success));
+}
+
+function conditionWritesFor(name) {
+    return setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions' && call[0] === name);
+}
+
 beforeEach(() => {
     vi.resetAllMocks();
     getCombatSummary.mockReturnValue(baseCombatSummary);
@@ -86,78 +108,84 @@ beforeEach(() => {
     getAllyList.mockReturnValue(null);
 });
 
+afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+});
+
 describe('HypnoticPatternModal - Metamagic', () => {
-    describe('metamagic heighten rendering', () => {
-        it('shows heighten note in description when metamagicHeighten is true', () => {
-            const { container } = render(<HypnoticPatternModal {...makeProps({ metamagicHeighten: true })} />);
-            const noteEl = container.querySelector('.sp-note');
-            expect(noteEl.textContent).toContain('Heightened Spell');
-            expect(noteEl.textContent).toContain('one target will have disadvantage');
-        });
-    });
+    describe('Heightened Spell', () => {
+        it('renders the heighten note and one Heighten radio per target only when metamagicHeighten is active', () => {
+            const { unmount } = render(<HypnoticPatternModal {...makeProps({ metamagicHeighten: true })} />);
+            expect(document.querySelector('.sp-note').textContent).toContain('Heightened Spell');
+            expect(document.querySelector('.sp-note').textContent).toContain('one target will have disadvantage');
+            expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(baseCombatSummary.creatures.length);
 
-    describe('metamagic careful rendering', () => {
-        it('shows careful spell protection badge on ally targets when metamagicCareful is true', () => {
-            getAllyList.mockReturnValue(['PlayerAlly']);
-            render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
-            const rows = document.querySelectorAll('.secondary-target-row');
-            const playerRow = [...rows].find(row => row.textContent.includes('PlayerAlly'));
-            expect(playerRow.textContent).toContain('Careful Spell protected');
+            unmount();
+            render(<HypnoticPatternModal {...makeProps()} />);
+            expect(document.querySelector('.sp-note').textContent).not.toContain('Heightened');
+            expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
         });
 
-        it('does not show careful spell protection badge for non-ally targets', () => {
-            getAllyList.mockReturnValue(['OtherAlly']);
-            render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
-            const rows = document.querySelectorAll('.secondary-target-row');
-            const playerRow = [...rows].find(row => row.textContent.includes('PlayerAlly'));
-            expect(playerRow.textContent).not.toContain('Careful Spell protected');
-        });
-    });
+        it('rolls the heighten-marked target with disadvantage — min of two d20s fails where the first draw alone would have succeeded', async () => {
+            // Disadvantage draws min(20, 2) = 2 + 0 < DC 14. If the heighten pick
+            // never reached rollNpcSave, the single first draw (20) would succeed.
+            vi.spyOn(Math, 'random').mockReturnValueOnce(0.95).mockReturnValueOnce(0.05).mockReturnValue(0.95);
+            render(<HypnoticPatternModal {...makeProps({ metamagicHeighten: true })} />);
 
-    describe('careful spell protection for NPCs', () => {
-        it('automatically succeeds for careful spell protected NPCs: no conditions, no expiration, logged success with Careful Spell message, and recorded in targetResult', async () => {
-            getAllyList.mockReturnValue(['Goblin']);
-            render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            fireEvent.click(labels[0]);
+            await act(async () => { fireEvent.click(rowFor('Goblin')); });
+            await act(async () => { fireEvent.click(rowFor('Goblin').querySelector('input[name="heightenTarget"]')); });
             await act(async () => {
                 fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
             });
 
             await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                );
-                expect(conditionCalls.length).toBe(0);
-                expect(addExpiration).not.toHaveBeenCalled();
-
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'Goblin'
-                );
-                expect(saveEntries.length).toBe(1);
-                expect(saveEntries[0][1].success).toBe(true);
-                expect(saveEntries[0][1].description).toContain('Careful Spell protected');
-
-                const targetResultCalls = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'Goblin'
-                );
-                expect(targetResultCalls.length).toBe(1);
-                expect(targetResultCalls[0][1].saveResult).toBe('success');
-                expect(targetResultCalls[0][1].conditions).toEqual([]);
+                const entries = saveEntriesFor('Goblin', false);
+                expect(entries.length).toBe(1);
+                expect(entries[0]).toMatchObject({ roll: 2, total: 2, saveBonus: 0, saveDc: 14, saveType: 'WIS' });
             });
+            expect(conditionWritesFor('Goblin')[0][2]).toEqual(expect.arrayContaining(['charmed', 'incapacitated', 'speed_zero']));
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'Goblin',
+                saveResult: 'failure',
+                conditions: ['charmed', 'incapacitated', 'speed_zero'],
+            }));
         });
     });
 
-    describe('careful spell protection for players', () => {
-        it('skips the entire save flow for careful spell protected player targets: no prompt, no pending prompts, no save_result log', async () => {
+    describe('Careful Spell', () => {
+        it('badges exactly the ally targets as protected when metamagicCareful is active', () => {
             getAllyList.mockReturnValue(['PlayerAlly']);
             render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            fireEvent.click(labels[2]);
+
+            expect(rowFor('PlayerAlly').textContent).toContain('Careful Spell protected');
+            expect(rowFor('Goblin').textContent).not.toContain('Careful Spell protected');
+            expect(rowFor('Orc').textContent).not.toContain('Careful Spell protected');
+        });
+
+        it('resolves careful-protected targets without touching the save lanes: NPC logs an auto-success and is recorded, player gets no prompt, neither gains conditions', async () => {
+            getAllyList.mockReturnValue(['Goblin', 'PlayerAlly']);
+            render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
+
+            await act(async () => { fireEvent.click(rowFor('Goblin')); });
+            await act(async () => { fireEvent.click(rowFor('PlayerAlly')); });
             await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
+                fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(2\)/ }));
             });
 
+            await waitFor(() => {
+                const npcEntries = saveEntriesFor('Goblin');
+                expect(npcEntries.length).toBe(1);
+                expect(npcEntries[0].success).toBe(true);
+                expect(npcEntries[0].description).toContain('Careful Spell protected');
+                expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                    targetName: 'Goblin',
+                    saveResult: 'success',
+                    conditions: [],
+                }));
+            });
+
+            // Careful-protected targets never enter the prompt/condition machinery.
             expect(sendSavePrompt).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 'campaign',
@@ -165,11 +193,10 @@ describe('HypnoticPatternModal - Metamagic', () => {
                 expect.any(Array),
                 campaignName,
             );
-            const saveEntries = addEntry.mock.calls.filter(
-                call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly'
-            );
-            expect(saveEntries.length).toBe(0);
+            expect(saveEntriesFor('PlayerAlly')).toHaveLength(0);
+            expect(conditionWritesFor('Goblin')).toHaveLength(0);
+            expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+            expect(addExpiration).not.toHaveBeenCalled();
         });
     });
-
 });

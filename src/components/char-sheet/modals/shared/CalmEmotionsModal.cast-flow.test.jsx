@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CalmEmotionsModal from './CalmEmotionsModal.jsx';
@@ -67,6 +68,8 @@ const baseAction = {
     automation: { type: 'calm_emotions' },
 };
 
+// Goblin fails saves on low rolls (cha +0), Orc fails only below 12 (cha +2),
+// so constant-random pins exercise both NPCs through the same roll.
 const baseCombatSummary = {
     creatures: [
         { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { cha: 0 } },
@@ -89,7 +92,7 @@ function makeProps(overrides = {}) {
 
 async function castAll() {
     await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Cast Calm Emotions \(3\)/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Cast Calm Emotions \(\d+\)/ }));
     });
 }
 
@@ -100,10 +103,24 @@ async function setChoice(name, index) {
     });
 }
 
+async function dispatchSaveResult(promptId, detail) {
+    await act(async () => {
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId, ...detail },
+        }));
+    });
+}
+
 function saveResultCalls(targetName) {
     return addEntry.mock.calls.filter(
         call => call[1]?.type === 'save_result' && call[1]?.targetName === targetName
     );
+}
+
+function promptIdFor(targetName) {
+    const call = sendSavePrompt.mock.calls.find(c => c[1]?.targetName === targetName);
+    expect(call, `save prompt sent for ${targetName}`).toBeDefined();
+    return call[1].promptId;
 }
 
 beforeEach(() => {
@@ -127,315 +144,171 @@ afterEach(() => {
 });
 
 describe('CalmEmotionsModal - Cast Flow', () => {
-    // ── Confirm / cast behavior (SP-020 B1) ──
+    it('cast with successful saves: logs use, stores rollback, registers duration, prompts players, applies nothing', async () => {
+        // Every roll is a natural 20 — SP-020 B1: everyone saves, no effects land.
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+        render(<CalmEmotionsModal {...makeProps()} />);
+        await castAll();
 
-    describe('confirm / cast behavior', () => {
-        it('B1: saves roll BEFORE any effect — successful NPC saves get no effect, players get prompts', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-            await castAll();
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Wizard1',
-                abilityName: 'Calm Emotions',
-                description: expect.stringContaining('Selecting 3 target'),
-            }));
-            expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
-                casterName: 'Wizard1',
-                spellName: 'Calm Emotions',
-                saveType: 'CHA',
-                saveDc: 14,
-                attackScope: 'aoe',
-            });
-            // Successful saves — no effect applied to anyone
-            expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
-            expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
-            // Players are prompted even with the default immunity choice
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'PlayerAlly',
-                saveType: 'CHA',
-                saveDc: 14,
-                sourceName: 'Wizard1',
-            }));
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'Wizard1',
+            abilityName: 'Calm Emotions',
+            description: expect.stringContaining('Selecting 3 target'),
+        }));
+        expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName, {
+            casterName: 'Wizard1',
+            spellName: 'Calm Emotions',
+            saveType: 'CHA',
+            saveDc: 14,
+            attackScope: 'aoe',
         });
-
-        it('B1/B6: failed NPC saves apply the chosen effect and log save_result', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            render(<CalmEmotionsModal {...makeProps()} />);
-            await castAll();
-
-            await waitFor(() => {
-                expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
-                    targetName: 'Goblin',
-                    casterName: 'Wizard1',
-                    campaignName,
-                    dc: 14,
-                }));
-                expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
-                    targetName: 'Orc',
-                }));
-            });
-            expect(saveResultCalls('Goblin').length).toBeGreaterThan(0);
-            expect(saveResultCalls('Orc').length).toBeGreaterThan(0);
-            expect(saveResultCalls('Goblin')[0][1].success).toBe(false);
-        });
-
-        it('B5: registers the concentration duration clock on cast', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-            await castAll();
-
-            expect(registerCalmEmotionsExpiration).toHaveBeenCalledWith({
-                casterName: 'Wizard1',
-                campaignName,
-            });
-        });
-
-        it('B2/B4: logs ineligible creatures and sphere advisories on cast', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-            await castAll();
-
-            expect(logCalmEmotionsEligibility).toHaveBeenCalledWith(expect.objectContaining({
-                casterName: 'Wizard1',
-                campaignName,
-            }));
-        });
+        // SP-020 B5/B2: duration clock registered and eligibility outcome recorded.
+        expect(registerCalmEmotionsExpiration).toHaveBeenCalledWith({ casterName: 'Wizard1', campaignName });
+        expect(logCalmEmotionsEligibility).toHaveBeenCalledWith(expect.objectContaining({
+            casterName: 'Wizard1',
+            campaignName,
+        }));
+        // Successful saves — no effect applied to anyone, but every NPC save is logged.
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
+        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
+        expect(saveResultCalls('Goblin')[0][1].success).toBe(true);
+        expect(saveResultCalls('Orc')[0][1].success).toBe(true);
+        // Players are prompted (even with the default immunity choice) instead of rolled here.
+        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'PlayerAlly',
+            saveType: 'CHA',
+            saveDc: 14,
+            sourceName: 'Wizard1',
+        }));
+        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
     });
 
-    // ── NPC save resolution (SP-020 B3) ──
+    it('failed NPC saves apply the per-target chosen effect and log failures', async () => {
+        // Constant low roll: Goblin (cha +0) and Orc (cha +2) both fail DC 14.
+        vi.spyOn(Math, 'random').mockReturnValue(0.01);
+        render(<CalmEmotionsModal {...makeProps()} />);
 
-    describe('NPC save resolution with indifferent choice', () => {
-        it('rolls save and applies indifference on failure for NPC with indifferent choice', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            render(<CalmEmotionsModal {...makeProps()} />);
+        await setChoice('Orc', 1); // Become Indifferent; Goblin keeps default immunity
+        await castAll();
 
-            await setChoice('Orc', 1);
-            await castAll();
-
-            await waitFor(() => {
-                expect(applyCalmEmotionsIndifferent).toHaveBeenCalledWith(expect.objectContaining({
-                    targetName: 'Orc',
-                    casterName: 'Wizard1',
-                    campaignName,
-                    dc: 14,
-                }));
-            });
-            expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
-        });
-
-        it('rolls save and applies nothing on success for NPC with indifferent choice', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-
-            await setChoice('Goblin', 1);
-            await castAll();
-
-            await waitFor(() => {
-                const goblinIndifferentCalls = applyCalmEmotionsIndifferent.mock.calls.filter(
-                    call => call[0]?.targetName === 'Goblin'
-                );
-                expect(goblinIndifferentCalls).toHaveLength(0);
-                expect(saveResultCalls('Goblin').length).toBeGreaterThan(0);
-            });
-        });
-    });
-
-    // ── Careful Spell protection ──
-
-    describe('careful spell protection', () => {
-        it('automatically succeeds for careful spell protected NPCs', async () => {
-            getAllyList.mockReturnValue(['Goblin']);
-            render(<CalmEmotionsModal {...makeProps({ metamagicCareful: true })} />);
-
-            await setChoice('Goblin', 1);
-            await castAll();
-
-            expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
-            expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
-
-            const entries = saveResultCalls('Goblin');
-            expect(entries.length).toBeGreaterThan(0);
-            expect(entries[0][1].description).toContain('Careful Spell protected');
-        });
-
-        it('does not send save prompt or apply effects for careful spell protected players', async () => {
-            getAllyList.mockReturnValue(['PlayerAlly']);
-            render(<CalmEmotionsModal {...makeProps({ metamagicCareful: true })} />);
-
-            await setChoice('PlayerAlly', 1);
-            await castAll();
-
-            const playerPrompts = sendSavePrompt.mock.calls.filter(
-                call => call[1]?.targetName === 'PlayerAlly'
-            );
-            expect(playerPrompts).toHaveLength(0);
-            expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
-        });
-    });
-
-    // ── Player save prompts (SP-020 B1) ──
-
-    describe('player save prompts', () => {
-        it('sends save prompt for player targets with indifferent choice', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-
-            await setChoice('PlayerAlly', 1);
-            await castAll();
-
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'PlayerAlly',
-                saveType: 'CHA',
-                saveDc: 14,
-                sourceName: 'Wizard1',
+        await waitFor(() => {
+            expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'Goblin', casterName: 'Wizard1', campaignName, dc: 14,
+            }));
+            expect(applyCalmEmotionsIndifferent).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'Orc', casterName: 'Wizard1', campaignName, dc: 14,
             }));
         });
-
-        it('sends save prompt for player with immunity choice too (no save-skipping)', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            render(<CalmEmotionsModal {...makeProps()} />);
-
-            await castAll();
-
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'PlayerAlly',
-            }));
-            expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({
-                targetName: 'PlayerAlly',
-            }));
-        });
+        // Each target receives only its own chosen effect.
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Orc' }));
+        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
+        expect(saveResultCalls('Goblin')[0][1].success).toBe(false);
+        expect(saveResultCalls('Orc')[0][1].success).toBe(false);
+        // Player lane waits for its own prompt response.
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'PlayerAlly' }));
+        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'PlayerAlly' }));
     });
 
-    // ── Player save result handling ──
+    it('heightened target saves at disadvantage and still fails on a high first draw', async () => {
+        // Draw order: Goblin +0 → 20 (succeeds); heightened Orc +2 draws twice →
+        // min(13, 1) = 1 + 2 = 3 < DC 14, so it fails even though its first
+        // draw alone (13 + 2 = 15) would have succeeded.
+        vi.spyOn(Math, 'random')
+            .mockReturnValueOnce(0.99)
+            .mockReturnValueOnce(0.6)
+            .mockReturnValue(0.01);
+        render(<CalmEmotionsModal {...makeProps({ metamagicHeighten: true })} />);
 
-    describe('player save result handling', () => {
-        it('applies indifference when player fails save via save-result event', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            const onClose = vi.fn();
-            render(<CalmEmotionsModal {...makeProps({ onClose })} />);
-
-            await setChoice('PlayerAlly', 1);
-            await castAll();
-
-            const savePromptCall = sendSavePrompt.mock.calls[0];
-            const actualPromptId = savePromptCall[1].promptId;
-
-            await act(async () => {
-                const event = new CustomEvent('save-result', {
-                    detail: {
-                        promptId: actualPromptId,
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                });
-                window.dispatchEvent(event);
-            });
-
-            await waitFor(() => {
-                expect(applyCalmEmotionsIndifferent).toHaveBeenCalledWith(expect.objectContaining({
-                    targetName: 'PlayerAlly',
-                    casterName: 'Wizard1',
-                    campaignName,
-                    dc: 14,
-                }));
-            });
+        await setChoice('Orc', 1);
+        await act(async () => {
+            const orcRow = [...document.querySelectorAll('.secondary-target-row')]
+                .find(row => row.textContent.includes('Orc'));
+            fireEvent.click(orcRow.querySelector('input[name="heightenTarget"]'));
         });
+        await castAll();
 
-        it('applies immunity when player with immunity choice fails save', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            const onClose = vi.fn();
-            render(<CalmEmotionsModal {...makeProps({ onClose })} />);
-
-            await castAll();
-
-            const savePromptCall = sendSavePrompt.mock.calls.find(
-                call => call[1]?.targetName === 'PlayerAlly'
-            );
-            const actualPromptId = savePromptCall[1].promptId;
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId: actualPromptId,
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                }));
-            });
-
-            await waitFor(() => {
-                expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
-                    targetName: 'PlayerAlly',
-                }));
-            });
+        await waitFor(() => {
+            expect(applyCalmEmotionsIndifferent).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'Orc', casterName: 'Wizard1', campaignName, dc: 14,
+            }));
         });
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
+        expect(saveResultCalls('Orc')[0][1].success).toBe(false);
+    });
 
-        it('applies nothing when player passes save', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            const onClose = vi.fn();
-            render(<CalmEmotionsModal {...makeProps({ onClose })} />);
+    it('Careful Spell auto-succeeds protected NPC and player while unprotected targets still suffer', async () => {
+        getAllyList.mockReturnValue(['Goblin', 'PlayerAlly']);
+        // Constant low roll: Goblin fails raw but Careful forces success; Orc (non-ally) fails.
+        vi.spyOn(Math, 'random').mockReturnValue(0.01);
+        render(<CalmEmotionsModal {...makeProps({ metamagicCareful: true })} />);
 
-            await setChoice('PlayerAlly', 1);
-            await castAll();
+        await setChoice('Goblin', 1);
+        await castAll();
 
-            const savePromptCall = sendSavePrompt.mock.calls[0];
-            const actualPromptId = savePromptCall[1].promptId;
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId: actualPromptId,
-                        success: true,
-                        roll: 18,
-                        total: 19,
-                        saveBonus: 1,
-                    },
-                }));
-            });
-
-            const playerIndifferentCalls = applyCalmEmotionsIndifferent.mock.calls.filter(
-                call => call[0]?.targetName === 'PlayerAlly'
-            );
-            expect(playerIndifferentCalls).toHaveLength(0);
-            const playerImmunityCalls = applyCalmEmotionsImmunity.mock.calls.filter(
-                call => call[0]?.targetName === 'PlayerAlly'
-            );
-            expect(playerImmunityCalls).toHaveLength(0);
+        await waitFor(() => {
+            // Unprotected Orc still takes its chosen/default effect — protection is per-ally.
+            expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Orc' }));
         });
+        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
+        const goblinEntries = saveResultCalls('Goblin');
+        expect(goblinEntries.length).toBeGreaterThan(0);
+        expect(goblinEntries[0][1].success).toBe(true);
+        expect(goblinEntries[0][1].description).toContain('Careful Spell protected');
+        // Protected players skip the save prompt entirely.
+        expect(sendSavePrompt).not.toHaveBeenCalled();
+    });
 
-        it('closes modal when all pending prompts are resolved', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
-            const onClose = vi.fn();
-            render(<CalmEmotionsModal {...makeProps({ onClose })} />);
+    it('player save prompts resolve per choice: failures apply the chosen effect, successes nothing, modal closes when all answered', async () => {
+        const playerSummary = {
+            creatures: [
+                { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { cha: 0 } },
+                { name: 'PlayerOne', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { cha: 1 } },
+                { name: 'PlayerTwo', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { cha: 1 } },
+                { name: 'PlayerThree', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { cha: 1 } },
+            ],
+        };
+        getCombatSummary.mockReturnValue(playerSummary);
+        // Deterministic rolls that all succeed (>= 15 + bonus) AND yield distinct
+        // promptIds per draw — a constant random would collide the players' promptIds.
+        let tick = 0;
+        vi.spyOn(Math, 'random').mockImplementation(() => 0.7 + (tick++ % 30) / 100);
+        const onClose = vi.fn();
+        render(<CalmEmotionsModal {...makeProps({ onClose })} />);
 
-            await castAll();
+        await setChoice('PlayerTwo', 1); // Become Indifferent; One and Three keep immunity
+        await castAll();
 
-            const savePromptCall = sendSavePrompt.mock.calls.find(
-                call => call[1]?.targetName === 'PlayerAlly'
-            );
-            const actualPromptId = savePromptCall[1].promptId;
+        // Every unprotected player is prompted; nothing is applied before they answer.
+        expect(['PlayerOne', 'PlayerTwo', 'PlayerThree'].map(n => promptIdFor(n)).every(Boolean)).toBe(true);
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalled();
+        expect(applyCalmEmotionsIndifferent).not.toHaveBeenCalled();
 
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId: actualPromptId,
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                }));
-            });
+        // Success — no effect, and the modal stays open while others are pending.
+        await dispatchSaveResult(promptIdFor('PlayerThree'), { success: true, roll: 18, total: 19, saveBonus: 1 });
+        await waitFor(() => expect(saveResultCalls('PlayerThree')[0][1].success).toBe(true));
+        expect(applyCalmEmotionsImmunity).not.toHaveBeenCalledWith(expect.objectContaining({ targetName: 'PlayerThree' }));
+        expect(onClose).not.toHaveBeenCalled();
 
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalledTimes(1);
-            });
+        // Failure with immunity choice — immunity applied, modal still open.
+        await dispatchSaveResult(promptIdFor('PlayerOne'), { success: false, roll: 5, total: 6, saveBonus: 1 });
+        await waitFor(() => {
+            expect(applyCalmEmotionsImmunity).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'PlayerOne', casterName: 'Wizard1', campaignName, dc: 14,
+            }));
+            expect(saveResultCalls('PlayerOne')[0][1].success).toBe(false);
         });
+        expect(onClose).not.toHaveBeenCalled();
+
+        // Failure with indifferent choice — indifference applied; last prompt resolved, modal closes.
+        await dispatchSaveResult(promptIdFor('PlayerTwo'), { success: false, roll: 5, total: 6, saveBonus: 1 });
+        await waitFor(() => {
+            expect(applyCalmEmotionsIndifferent).toHaveBeenCalledWith(expect.objectContaining({
+                targetName: 'PlayerTwo', casterName: 'Wizard1', campaignName, dc: 14,
+            }));
+            // Modal auto-closes ~500ms after the final prompt resolves.
+            expect(onClose).toHaveBeenCalledTimes(1);
+        }, { timeout: 2000 });
     });
 });

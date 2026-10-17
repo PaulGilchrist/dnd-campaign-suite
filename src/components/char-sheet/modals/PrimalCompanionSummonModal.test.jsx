@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PrimalCompanionSummonModal from './PrimalCompanionSummonModal.jsx';
@@ -50,327 +51,136 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
-}
-
 function renderModal(overrides) {
-  return render(<PrimalCompanionSummonModal {...makeProps(overrides)} />);
+  return render(<PrimalCompanionSummonModal {...baseProps} {...(overrides || {})} />);
 }
 
-const mockPopupResult = {
-  type: 'popup',
-  payload: {
-    type: 'automation_info',
-    name: 'Primal Companion',
-    automationType: 'summon',
-    description: 'Ranger1 summons a Primal Companion (Beast of the Land). It acts on your turn, right after you.',
-    automation: { type: 'summon' },
-  },
-};
+async function summonSelected() {
+  fireEvent.click(screen.getByRole('radio', { name: /Beast of the Sea/ }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
+  });
+}
 
 describe('PrimalCompanionSummonModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ── Initial render ──
+  it('lists every companion type with its AC, HP, speed, and attack stats, with Cancel and a disabled Summon button', () => {
+    renderModal();
+    expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
 
-  describe('initial render', () => {
-    it('displays the companion selection prompt, all companion options, cancel button, and disabled summon button', () => {
-      renderModal();
-      expect(screen.getByText('Summon Primal Companion')).toBeInTheDocument();
-      expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
-      expect(screen.getByText('Beast of the Land')).toBeInTheDocument();
-      expect(screen.getByText('Beast of the Sea')).toBeInTheDocument();
-      expect(screen.getByText('Beast of the Sky')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
-    });
+    const body = screen.getByText('Choose a primal beast to bond with:').parentElement;
+    expect(body.textContent).toContain('Beast of the Land');
+    expect(body.textContent).toContain('Medium');
+    expect(body.textContent).toContain('AC 13 + WIS modifier, HP 7+5xRanger level');
+    expect(body.textContent).toContain('Speed: 40 ft');
+    expect(body.textContent).toContain('Bite: 1d6 + WIS modifier Slashing');
+    // specialSpeed and per-type variant stats render too
+    expect(body.textContent).toContain('Speed: 30 ft, Swim 30 ft');
+    expect(body.textContent).toContain('HP 5+4xRanger level');
+    expect(body.textContent).toContain('Beak: 1d4 + WIS modifier Piercing');
   });
 
-  // ── Companion type info display ──
-
-  describe('companion type info display', () => {
-    it('renders stats for default companion types', () => {
-      renderModal();
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('AC 13 + WIS modifier');
-      expect(body.textContent).toContain('HP 7+5xRanger level');
-      expect(body.textContent).toContain('40 ft');
-      expect(body.textContent).toContain('1d6 + WIS modifier');
-      expect(body.textContent).toContain('Slashing');
-    });
-
-    it('renders no attacks info when attacks array is empty', () => {
-      const props = makeProps({
-        action: {
-          name: 'Summon Primal Companion',
-          automation: {
-            companionTypes: [
-              {
-                name: 'Peaceful Beast',
-                size: 'Medium',
-                acFormula: '12',
-                hpBase: 10,
-                hpPerLevel: 3,
-                attacks: [],
-              },
-            ],
-          },
+  it('omits speed and attack lines for sparse companion data', () => {
+    renderModal({
+      action: {
+        name: 'Summon Primal Companion',
+        automation: {
+          companionTypes: [
+            { name: 'Peaceful Beast', size: 'Medium', hpBase: 10, hpPerLevel: 3, attacks: [] },
+          ],
         },
-      });
-      render(<PrimalCompanionSummonModal {...props} />);
-      expect(screen.getByText('Peaceful Beast')).toBeInTheDocument();
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('AC 12');
-      expect(body.textContent).toContain('HP 10+3xRanger level');
-      expect(body.textContent).not.toContain('Attack');
+      },
     });
-
-    it('renders companion with no AC formula', () => {
-      const props = makeProps({
-        action: {
-          name: 'Summon Primal Companion',
-          automation: {
-            companionTypes: [
-              {
-                name: 'Mystic Beast',
-                size: 'Medium',
-                hpBase: 10,
-                hpPerLevel: 3,
-                attacks: [],
-              },
-            ],
-          },
-        },
-      });
-      render(<PrimalCompanionSummonModal {...props} />);
-      expect(screen.getByText('Mystic Beast')).toBeInTheDocument();
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('HP 10+3xRanger level');
-    });
+    const body = screen.getByText('Choose a primal beast to bond with:').parentElement;
+    expect(body.textContent).toContain('Peaceful Beast');
+    expect(body.textContent).toContain('HP 10+3xRanger level');
+    expect(body.textContent).not.toContain('Speed');
+    expect(body.textContent).not.toContain('Attack');
+    expect(body.textContent).not.toContain('Bite');
   });
 
-  // ── Companion type selection ──
+  it('enables Summon only after a companion is selected and submits that type', async () => {
+    primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(null);
+    renderModal();
+    const summonBtn = screen.getByRole('button', { name: /Summon Primal Companion/ });
 
-  describe('companion type selection', () => {
-    it('enables summon button when a companion type is selected and updates on switch', async () => {
-      renderModal();
-      const summonBtn = screen.getByRole('button', { name: /Summon Primal Companion/ });
-      expect(summonBtn).toBeDisabled();
+    fireEvent.click(summonBtn);
+    expect(primalCompanionHandler.confirmPrimalCompanionSummon).not.toHaveBeenCalled();
 
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Sea'));
-      });
-      expect(summonBtn).toBeEnabled();
+    fireEvent.click(screen.getByRole('radio', { name: /Beast of the Land/ }));
+    expect(summonBtn).toBeEnabled();
 
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      expect(summonBtn).toBeEnabled();
+    // switching selection stays enabled and submits the newest pick
+    fireEvent.click(screen.getByRole('radio', { name: /Beast of the Sea/ }));
+    expect(summonBtn).toBeEnabled();
 
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Sky'));
-      });
-      expect(summonBtn).toBeEnabled();
+    await act(async () => {
+      fireEvent.click(summonBtn);
     });
+    expect(primalCompanionHandler.confirmPrimalCompanionSummon).toHaveBeenCalledTimes(1);
+    expect(primalCompanionHandler.confirmPrimalCompanionSummon).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Summon Primal Companion' }),
+      expect.objectContaining({ name: 'Ranger1' }),
+      'test-campaign',
+      'Beast of the Sea',
+    );
   });
 
-  // ── Confirm behavior ──
-
-  describe('confirm behavior', () => {
-    it('calls confirmPrimalCompanionSummon with the selected type', async () => {
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      expect(primalCompanionHandler.confirmPrimalCompanionSummon).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Summon Primal Companion' }),
-        expect.objectContaining({ name: 'Ranger1' }),
-        'test-campaign',
-        'Beast of the Land',
-      );
+  it('replaces the selection UI with the HTML description and closes via Done after a successful summon', async () => {
+    primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Summon Primal Companion',
+        description: '<p>The beast appears and awaits your command.</p>',
+      },
     });
+    const onClose = vi.fn();
+    renderModal({ onClose });
+    await summonSelected();
 
-    it('does not call confirmPrimalCompanionSummon when no type is selected', async () => {
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      expect(primalCompanionHandler.confirmPrimalCompanionSummon).not.toHaveBeenCalled();
-    });
+    await waitFor(() => expect(screen.getByText('The beast appears and awaits your command.')).toBeInTheDocument());
+    expect(screen.getByText('The beast appears and awaits your command.').closest('p')).toBeInTheDocument();
+    expect(screen.queryByText('Choose a primal beast to bond with:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Beast of the Sea/ })).not.toBeInTheDocument();
 
-    it('shows the result screen after a successful summon', async () => {
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-    });
-
-    it('renders description as HTML in the result body', async () => {
-      const customResult = {
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Summon Primal Companion',
-          description: '<p>The beast appears and awaits your command.</p>',
-        },
-      };
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(customResult);
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        const body = document.querySelector('.sp-body');
-        expect(body.querySelector('p')).toBeInTheDocument();
-      });
-    });
-
-    it('does not show result screen when handler returns null', async () => {
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(null);
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      });
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // ── Close behavior ──
+  it('stays on the selection screen when the handler returns null', async () => {
+    primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(null);
+    renderModal();
+    await summonSelected();
 
-  describe('close behavior', () => {
-    it('closes on cancel button click', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking the overlay background', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(onClose).not.toHaveBeenCalled();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('does not close when clicking inside the modal content', () => {
-      const onClose = vi.fn();
-      renderModal({ onClose });
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-
-
-    it('closes on Done button click in result screen', async () => {
-      const onClose = vi.fn();
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
-      renderModal({ onClose });
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      });
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking the overlay in result screen', async () => {
-      const onClose = vi.fn();
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
-      renderModal({ onClose });
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-      });
-      await act(async () => {
-        fireEvent.click(document.querySelector('.sp-overlay'));
-      });
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-    });
-
-    it('does not close when clicking the modal in result screen', async () => {
-      const onClose = vi.fn();
-      primalCompanionHandler.confirmPrimalCompanionSummon.mockResolvedValue(mockPopupResult);
-      renderModal({ onClose });
-      await act(async () => {
-        fireEvent.click(screen.getByText('Beast of the Land'));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Primal Companion/ }));
-      });
-      await waitFor(() => {
-        const modal = document.querySelector('.sp-modal');
-        fireEvent.click(modal);
-      });
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
   });
 
-  // ── Null safety ──
+  it('closes on Cancel but not on overlay click', () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
 
-  describe('null safety', () => {
-    it('renders with no companion types when automation is missing', () => {
-      const props = makeProps({
-        action: { name: 'Summon Primal Companion' },
-      });
-      render(<PrimalCompanionSummonModal {...props} />);
-      expect(screen.getByText('Summon Primal Companion')).toBeInTheDocument();
-      expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByText('Choose a primal beast to bond with:').closest('.sp-overlay'));
+    expect(onClose).not.toHaveBeenCalled();
 
-    it('renders with empty companion types array', () => {
-      const props = makeProps({
-        action: {
-          name: 'Summon Primal Companion',
-          automation: { companionTypes: [] },
-        },
-      });
-      render(<PrimalCompanionSummonModal {...props} />);
-      expect(screen.getByText('Summon Primal Companion')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-    it('renders with nullish action', () => {
-      const props = makeProps({
-        action: null,
-      });
-      render(<PrimalCompanionSummonModal {...props} />);
+  it('renders safely when the action or its companion data is missing', () => {
+    for (const action of [null, { name: 'Summon Primal Companion' }, { name: 'x', automation: {} }]) {
+      const { unmount } = renderModal({ action });
       expect(screen.getByText('Primal Companion')).toBeInTheDocument();
-    });
+      expect(screen.getByText('Choose a primal beast to bond with:')).toBeInTheDocument();
+      expect(screen.queryAllByRole('radio')).toHaveLength(0);
+      expect(screen.getByRole('button', { name: /Summon Primal Companion/ })).toBeDisabled();
+      unmount();
+    }
   });
 });

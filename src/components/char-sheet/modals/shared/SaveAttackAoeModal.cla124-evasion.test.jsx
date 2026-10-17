@@ -1,11 +1,15 @@
-// CLA-124 + CLA-125 (twins): Evasion on the caster-AoE prompt lane must fold
-// 0-on-success / floor-half-on-failure for Monk (2024 lv7+) and Rogue lv14+
-// holders. The lane previously read combatSummary player STUBS' computedStats
-// (never populated, CLA-119 family) → evasionActive always false → success
-// still half, fail still full. Eligibility now sources from full PlayerStats
-// (characters prop), honors detail.evasionActive, exempts Incapacitated, and
-// emits rollType:'evasion' ledger entries. Combat-summary stubs keep their
-// CLA-124 real-data shape (no computedStats) throughout.
+// @maintained-by-ai
+// CLA-124/CLA-125 evasion lane for the caster-AoE prompt path (SaveAttackAoeModal).
+// Evasion folds 0-on-success / floor-half-on-fail. Eligibility is resolved by
+// resolveAoESaveEvasion from the full-stat `characters` prop (persisted
+// combatSummary player entries are MINIMAL STUBS with no computedStats —
+// CLA-119 family — the old stub read made the fold inert), honors the prompt
+// roller's detail.evasionActive, and exempts Incapacitated holders. Every
+// adjudicated evasion save emits one rollType:'evasion' ledger entry (both
+// outcomes). Twins (Monk lv7 / Rogue lv14) share one fold — these tests pin
+// the two eligibility SOURCES and outcomes, not each class.
+// Family lanes live elsewhere: ac-penalty, blocking-effects, circle-of-power,
+// cla120-empowered-evocation, damage-resolution, soulstitch, creature-selection.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -39,12 +43,6 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
 // evasion math under test is the real formula; only the apply seam is stubbed.
 vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn((cs, name, dmg) => ({ finalDamage: dmg, newHp: 100 - dmg })),
-  computeDamageAfterSave: vi.fn((raw, success, dcSuccess) => {
-    if (!success) return raw;
-    if (dcSuccess === 'half') return Math.floor(raw / 2);
-    if (dcSuccess === 'full') return raw;
-    return 0;
-  }),
   computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess, evasionActive) => {
     if (evasionActive && dcSuccess === 'half') {
       if (success) return 0;
@@ -67,16 +65,13 @@ vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-// CLA-124 real-data shape: persisted player entries are MINIMAL STUBS
-// {concentration,currentHp,initiative,maxHp,name,targetName,type} — NO
+// CLA-124 real-data shape: persisted player entries are MINIMAL STUBS — no
 // computedStats, ever.
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
-      { name: 'DivinationWizard', type: 'player', currentHp: 82, maxHp: 82 },
-      { name: 'AasimarTest', type: 'player', currentHp: 143, maxHp: 143 },
       { name: 'Disciplined_Monk', type: 'player', currentHp: 183, maxHp: 183 },
-      { name: 'DwarfTest', type: 'player', currentHp: 120, maxHp: 31 },
+      { name: 'DwarfTest', type: 'player', currentHp: 120, maxHp: 120 },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -91,6 +86,10 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
   addTargetResult: vi.fn(),
 }));
 
+// persistAndNotify is LIVE on every prompt resolution (no disk writes in tests);
+// renderTargetList only renders via AreaEffectTargetModalBase, which this lane
+// never mounts (caster has no 'overlay-' targetName) — export kept purely to
+// satisfy the module-scope named import.
 vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
   renderTargetList: vi.fn(() => null),
   persistAndNotify: vi.fn(),
@@ -147,8 +146,6 @@ const wizardCaster = { name: 'DivinationWizard', level: 20, automation: { action
 
 const EVASION = [{ source: 'Evasion', saveType: 'DEX', shareable: false, shareRange: 0 }];
 const fullCharacters = [
-  { name: 'DivinationWizard', type: 'player', computedStats: { evasionEffects: [] } },
-  { name: 'AasimarTest', type: 'player', computedStats: { evasionEffects: EVASION } },
   { name: 'Disciplined_Monk', type: 'player', computedStats: { evasionEffects: EVASION } },
   { name: 'DwarfTest', type: 'player', computedStats: { evasionEffects: [] } },
 ];
@@ -166,9 +163,9 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-async function castOn(targetName) {
+async function castOn(targetName, characters = fullCharacters) {
   await act(async () => {
-    render(<SaveAttackAoeModal {...baseProps} characters={fullCharacters} />);
+    render(<SaveAttackAoeModal {...baseProps} characters={characters} />);
   });
   await act(async () => {
     fireEvent.click(document.querySelector(`input[data-name="${targetName}"]`));
@@ -189,67 +186,16 @@ async function rollAndSubmit(detail) {
 
 const logs = (filterFn) => addEntry.mock.calls.map(c => c[1]).filter(e => e && filterFn(e));
 const appliedTo = (name) => applyDamageToTarget.mock.calls.filter(c => c[1] === name).map(c => c[2]);
+const evasionLogs = (name) => logs(e => e.rollType === 'evasion' && e.targetName === name);
+const saveDamageLog = (name, total) => logs(e => e.rollType === 'save-damage' && e.targetName === name).find(e => e.total === total);
 
-describe('SaveAttackAoeModal — CLA-124/CLA-125 evasion fold (monk + rogue twins)', () => {
+describe('SaveAttackAoeModal — CLA-124/CLA-125 evasion fold', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeRef.activeConditions = [];
   });
 
-  it('CLA-125 rogue NATURAL SUCCESS vs DC19: 0 damage applied + rollType:evasion ledger (success), was half pre-fix', async () => {
-    await castOn('AasimarTest');
-    await rollAndSubmit({
-      targetName: 'AasimarTest',
-      success: true,
-      roll: 19,
-      rawRolls: [19],
-      mode: 'normal',
-      saveBonus: 8,
-      saveType: 'DEX',
-      saveDc: 19,
-      dcSuccess: 'half',
-      rawDamage: 31,
-      total: 27,
-      evasionActive: true,
-    });
-
-    expect(appliedTo('AasimarTest')).toHaveLength(0);
-    const evasionLogs = logs(e => e.rollType === 'evasion' && e.targetName === 'AasimarTest');
-    expect(evasionLogs).toHaveLength(1);
-    expect(evasionLogs[0].name).toBe('Evasion');
-    expect(evasionLogs[0].saveResult).toBe('success');
-    expect(evasionLogs[0].dcSuccess).toBe('half');
-    expect(evasionLogs[0].finalDamage).toBe(0);
-    const damageLog = logs(e => e.rollType === 'save-damage' && e.targetName === 'AasimarTest').find(e => e.total === 31);
-    expect(damageLog.finalDamage).toBe(0);
-    expect(damageLog.note).toBe('Evasion');
-  });
-
-  it('CLA-125 rogue FAIL: floor(raw/2) applied + rollType:evasion ledger (failure), was FULL pre-fix', async () => {
-    await castOn('AasimarTest');
-    await rollAndSubmit({
-      targetName: 'AasimarTest',
-      success: false,
-      roll: 4,
-      rawRolls: [4],
-      mode: 'normal',
-      saveBonus: 8,
-      saveType: 'DEX',
-      saveDc: 19,
-      dcSuccess: 'half',
-      rawDamage: 31,
-      total: 12,
-      evasionActive: true,
-    });
-
-    expect(appliedTo('AasimarTest')).toEqual([15]);
-    const evasionLogs = logs(e => e.rollType === 'evasion' && e.targetName === 'AasimarTest');
-    expect(evasionLogs).toHaveLength(1);
-    expect(evasionLogs[0].saveResult).toBe('failure');
-    expect(evasionLogs[0].finalDamage).toBe(15);
-  });
-
-  it('CLA-124 monk NATURAL SUCCESS: 0 damage (was 18 "halved" pre-fix); remote-shape dispatch without evasionActive still folds from characters', async () => {
+  it('eligibility from characters (no detail flag) + success: 0 damage applied, evasion ledger + save-damage note both attribute Evasion', async () => {
     await castOn('Disciplined_Monk');
     await rollAndSubmit({
       targetName: 'Disciplined_Monk',
@@ -266,13 +212,39 @@ describe('SaveAttackAoeModal — CLA-124/CLA-125 evasion fold (monk + rogue twin
     });
 
     expect(appliedTo('Disciplined_Monk')).toHaveLength(0);
-    const evasionLogs = logs(e => e.rollType === 'evasion' && e.targetName === 'Disciplined_Monk');
-    expect(evasionLogs).toHaveLength(1);
-    expect(evasionLogs[0].name).toBe('Evasion');
-    expect(evasionLogs[0].finalDamage).toBe(0);
+    const ledger = evasionLogs('Disciplined_Monk');
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({ name: 'Evasion', saveResult: 'success', dcSuccess: 'half', finalDamage: 0 });
+    const damageLog = saveDamageLog('Disciplined_Monk', 35);
+    expect(damageLog.finalDamage).toBe(0);
+    expect(damageLog.note).toBe('Evasion');
   });
 
-  it('CLA-124 monk FAIL: floor(raw/2) applied (was FULL pre-fix)', async () => {
+  it('prompt roller detail.evasionActive alone folds success to 0 even when characters show no evasion (roller authority)', async () => {
+    await castOn('DwarfTest');
+    await rollAndSubmit({
+      targetName: 'DwarfTest',
+      success: true,
+      roll: 18,
+      rawRolls: [18],
+      mode: 'normal',
+      saveBonus: 1,
+      saveType: 'DEX',
+      saveDc: 19,
+      dcSuccess: 'half',
+      rawDamage: 35,
+      total: 19,
+      evasionActive: true,
+    });
+
+    expect(appliedTo('DwarfTest')).toHaveLength(0);
+    const ledger = evasionLogs('DwarfTest');
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({ saveResult: 'success', finalDamage: 0 });
+    expect(saveDamageLog('DwarfTest', 35).note).toBe('Evasion');
+  });
+
+  it('evasion FAIL pays floor(raw/2) and logs rollType:evasion failure', async () => {
     await castOn('Disciplined_Monk');
     await rollAndSubmit({
       targetName: 'Disciplined_Monk',
@@ -289,33 +261,12 @@ describe('SaveAttackAoeModal — CLA-124/CLA-125 evasion fold (monk + rogue twin
     });
 
     expect(appliedTo('Disciplined_Monk')).toEqual([17]);
-    const evasionLogs = logs(e => e.rollType === 'evasion' && e.targetName === 'Disciplined_Monk');
-    expect(evasionLogs).toHaveLength(1);
-    expect(evasionLogs[0].saveResult).toBe('failure');
-    expect(evasionLogs[0].finalDamage).toBe(17);
+    const ledger = evasionLogs('Disciplined_Monk');
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]).toMatchObject({ saveResult: 'failure', finalDamage: 17 });
   });
 
-  it('control DwarfTest lv3 (no Evasion): success still HALF, fail still FULL, zero evasion ledger', async () => {
-    await castOn('DwarfTest');
-    await rollAndSubmit({
-      targetName: 'DwarfTest',
-      success: true,
-      roll: 18,
-      rawRolls: [18],
-      mode: 'normal',
-      saveBonus: 1,
-      saveType: 'DEX',
-      saveDc: 19,
-      dcSuccess: 'half',
-      rawDamage: 35,
-      total: 19,
-    });
-
-    expect(appliedTo('DwarfTest')).toEqual([17]);
-    expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
-  });
-
-  it('Incapacitated exemption: monk with evasion is Incapacitated → success pays HALF (exempt), no evasion ledger', async () => {
+  it('Incapacitated evasion holder is exempt: success pays normal HALF, no evasion ledger', async () => {
     runtimeRef.activeConditions = ['Incapacitated'];
     await castOn('Disciplined_Monk');
     await rollAndSubmit({
@@ -333,32 +284,26 @@ describe('SaveAttackAoeModal — CLA-124/CLA-125 evasion fold (monk + rogue twin
     });
 
     expect(appliedTo('Disciplined_Monk')).toEqual([17]);
-    expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
+    expect(evasionLogs('Disciplined_Monk')).toHaveLength(0);
   });
 
-  it('no-computedStats stub still works: characters entry shaped like persisted change-data (no computedStats) → half-on-success, no crash, no evasion ledger', async () => {
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} characters={[{ name: 'Disciplined_Monk', type: 'player', currentHp: 183, maxHp: 183 }]} />);
-    });
-    await act(async () => {
-      fireEvent.click(document.querySelector('input[data-name="Disciplined_Monk"]'));
-      fireEvent.click(screen.getByRole('button', { name: /Fireball \(1\)/ }));
-    });
+  it('control — persisted change-data shape (no computedStats, no evasion): success pays HALF, no crash, no evasion ledger', async () => {
+    await castOn('DwarfTest', [{ name: 'DwarfTest', type: 'player', currentHp: 120, maxHp: 120 }]);
     await rollAndSubmit({
-      targetName: 'Disciplined_Monk',
+      targetName: 'DwarfTest',
       success: true,
-      roll: 19,
-      rawRolls: [19],
+      roll: 18,
+      rawRolls: [18],
       mode: 'normal',
-      saveBonus: 7,
+      saveBonus: 1,
       saveType: 'DEX',
       saveDc: 19,
       dcSuccess: 'half',
       rawDamage: 35,
-      total: 26,
+      total: 19,
     });
 
-    expect(appliedTo('Disciplined_Monk')).toEqual([17]);
-    expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
+    expect(appliedTo('DwarfTest')).toEqual([17]);
+    expect(evasionLogs('DwarfTest')).toHaveLength(0);
   });
 });

@@ -1,8 +1,16 @@
-import { render } from '@testing-library/react';
+// @maintained-by-ai
+// Blocking-effects lane for SaveAttackAoeModal: the component-local trap blocking truth
+// table (TRAP_BLOCKING_EFFECTS / trapEffectBlocksAttack applied via buildEligibleTargets,
+// SaveAttackAoeModal.jsx:523-541) driven through the REAL CreatureSelectionModal picker
+// (no component stub — overlay lane is inert here: no targetName on playerStats).
+// The base modal's own trap table is owned by AreaEffectTargetModalBase.targets.test.jsx
+// and AOEConditionModal.results.test.jsx; lane split noted in SaveAttackAoeModal.test.jsx.
+
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
-// ── Mocked modules ──
+// ── Mocked modules (services only — writes/network kept out of the harness) ──
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
@@ -41,13 +49,7 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => ({
-    creatures: [
-      { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { con: 4 } },
-    ],
-  })),
+  getCombatSummary: vi.fn(),
   setCombatSummaryCache: vi.fn(),
 }));
 
@@ -60,162 +62,27 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
   addTargetResult: vi.fn(),
 }));
 
-vi.mock('./CreatureSelectionModal.jsx', () => {
-  const { useState, useCallback } = require('react');
-  function MockCreatureSelectionModal({
-    title, icon, targets, description, note, confirmLabel, confirmIcon, onConfirm, onSkip,
-    metamagicHeighten, heightenTarget, setHeightenTarget,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-    return (
-      <div className="sp-overlay" onClick={() => {}}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={`fa-solid ${icon}`}></i> {title}
-          </div>
-          <div className="sp-body">
-            <div dangerouslySetInnerHTML={{ __html: description }} />
-            {note && <p className="sp-note">{note}</p>}
-            <div className="secondary-target-list">
-              {targets.length === 0 && <p className="sp-note">No targets available.</p>}
-              {targets.map((t) => {
-                const obj = typeof t === 'object' ? t : { name: t };
-                return (
-                  <label key={obj.name} className={`secondary-target-row ${selected.has(obj.name) ? 'secondary-target-selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(obj.name)}
-                      onChange={() => toggleTarget(obj.name)}
-                    />
-                    {obj.name}
-                    {metamagicHeighten && (
-                      <span>
-                        <input
-                          type="radio"
-                          name="heightenTarget"
-                          checked={heightenTarget === obj.name}
-                          onChange={() => setHeightenTarget(heightenTarget === obj.name ? null : obj.name)}
-                        />
-                        Heighten
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div className="sp-actions">
-            <button
-              className="sp-roll-btn"
-              onClick={() => onConfirm(Array.from(selected))}
-              disabled={selected.size === 0}
-              type="button"
-            >
-              <i className={`fa-solid ${confirmIcon}`}></i> {confirmLabel} ({selected.size})
-            </button>
-            <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockCreatureSelectionModal };
-});
-
-vi.mock('./AreaEffectTargetModalBase.jsx', () => {
-  const { useState, useCallback, useMemo } = require('react');
-  function MockAreaEffectTargetModalBase({
-    combatSummary, _saveDc, campaignName: _campaignName, featureName, _saveType, _rangeFeet,
-    onClose, icon, _handleApplyOverride, _handleSaveResultOverride, extraState,
-    renderBody, renderActions,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const [processing, setProcessing] = useState(false);
-    const [pendingPrompts, setPendingPrompts] = useState([]);
-    const [heightenTarget, setHeightenTarget] = useState(null);
-
-    const eligibleTargets = useMemo(() => {
-      if (!combatSummary?.creatures) return [];
-      return combatSummary.creatures.filter(c => c.name !== 'Cleric1');
-    }, [combatSummary]);
-
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-
-    const ctx = {
-      processing,
-      allResolved: false,
-      selected,
-      eligibleTargets,
-      pendingPrompts,
-      toggleTarget,
-      setProcessing,
-      setPendingPrompts,
-      setSelected,
-      setHeightenTarget,
-      heightenTarget,
-    };
-
-    if (extraState?.setSelected) extraState.setSelected = setSelected;
-    if (extraState?.toggleTarget) extraState.toggleTarget = toggleTarget;
-    if (extraState?.heightenTarget !== undefined) extraState.heightenTarget = heightenTarget;
-    if (extraState?.setHeightenTarget) extraState.setHeightenTarget = setHeightenTarget;
-
-    return (
-      <div className="sp-overlay" onClick={onClose}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={icon}></i> {featureName}
-          </div>
-          <div className="sp-body">
-            {renderBody ? renderBody(ctx) : null}
-          </div>
-          <div className="sp-actions">
-            {renderActions ? renderActions(ctx) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockAreaEffectTargetModalBase };
-});
-
 // ── Re-import mocked modules ──
 
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as combatData from '../../../../services/encounters/combatData.js';
-import * as diceRoller from '../../../../services/dice/diceRoller.js';
-import * as allySelection from '../../../../hooks/useAllySelection.js';
-import * as automationExpressions from '../../../../services/combat/automation/automationExpressions.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 
-// ── Test fixtures ──
+// ── Fixtures ──
 
-const mockOnClose = vi.fn();
-
-const mockPlayerStats = { name: 'Cleric1', level: 12 };
-
-const mockAction = {
-  name: 'Fireball',
-  automation: {
-    scaling: { damage: '8d6' },
-  },
+const combatSummary = {
+  creatures: [
+    { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10 },
+    { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10 },
+    { name: 'Orc', type: 'npc', currentHp: 7, maxHp: 15 },
+    { name: 'Ogre', type: 'npc', currentHp: 20, maxHp: 23 },
+    { name: 'Zombie', type: 'npc', currentHp: 11, maxHp: 22 },
+    { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30 },
+  ],
 };
 
 const baseProps = {
-  action: mockAction,
-  playerStats: mockPlayerStats,
+  action: { name: 'Fireball', automation: { scaling: { damage: '8d6' } } },
+  playerStats: { name: 'Cleric1', level: 12 },
   campaignName: 'test-campaign',
   range: 20,
   damage: '8d6',
@@ -223,22 +90,16 @@ const baseProps = {
   saveType: 'DEX',
   saveDc: 15,
   dcSuccess: 'half',
-  onClose: mockOnClose,
+  onClose: vi.fn(),
 };
 
-function makeProps(overrides) {
-  return { ...baseProps, ...overrides };
+// campaign targetEffects is the sole trap read on this lane; everything else stays null.
+function setTargetEffects(effects) {
+  getRuntimeValue.mockImplementation((_scope, key) => (key === 'targetEffects' ? effects : null));
 }
 
-function getCheckboxByName(name) {
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  for (const cb of checkboxes) {
-    const label = cb.closest('label');
-    if (label && label.textContent.includes(name)) {
-      return cb;
-    }
-  }
-  return null;
+function checkboxFor(name) {
+  return screen.queryByRole('checkbox', { name: new RegExp(name) });
 }
 
 // ── Tests ──
@@ -246,102 +107,52 @@ function getCheckboxByName(name) {
 describe('SaveAttackAoeModal - Blocking effects', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    diceRoller.rollExpression.mockReturnValue({ total: 12, rolls: [12], modifier: 0, formula: '1d20' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-    combatData.getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { con: 2, dex: 2 }, resistances: [], immunities: [] },
-        { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { con: 2, dex: 2 }, resistances: [], immunities: [] },
-        { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { con: 4, dex: 4 } },
-      ],
-    });
-    allySelection.getAllyList.mockReturnValue(null);
-    automationExpressions.resolveScaling.mockReturnValue({});
-  });
-  describe('target-only blocking', () => {
-    it('filters out target when only the target has a blocking effect', () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((scope, key) => {
-        if (scope === 'campaign' && key === 'targetEffects') {
-          return [{ effect: 'forcecage', target: 'Goblin A', source: 'Wizard1' }];
-        }
-        return null;
-      });
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      expect(getCheckboxByName('Goblin A')).toBeNull();
-      expect(getCheckboxByName('Goblin B')).toBeInTheDocument();
-      expect(getCheckboxByName('Player One')).toBeInTheDocument();
-    });
-
-    it('filters out all targets when only the attacker has a blocking effect', () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((scope, key) => {
-        if (scope === 'campaign' && key === 'targetEffects') {
-          return [{ effect: 'forcecage', target: 'Cleric1', source: 'Wizard1' }];
-        }
-        return null;
-      });
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      expect(getCheckboxByName('Goblin A')).toBeNull();
-      expect(getCheckboxByName('Goblin B')).toBeNull();
-      expect(getCheckboxByName('Player One')).toBeNull();
-    });
+    getRuntimeValue.mockReturnValue(null);
+    getCombatSummary.mockReturnValue(combatSummary);
   });
 
-  describe('blocking effect types', () => {
-    const blockingEffects = ['forcecage', 'maze', 'banishment', 'imprisonment'];
+  it('excludes every target trapped by any trap effect; untrapped and non-trap-effect creatures stay selectable', () => {
+    // One creature per TRAP_BLOCKING_EFFECTS entry (forcecage/maze/banishment/imprisonment)
+    // plus a non-trap effect holder and a free creature as selectable negatives.
+    setTargetEffects([
+      { effect: 'forcecage', target: 'Goblin A', source: 'Wizard2' },
+      { effect: 'maze', target: 'Goblin B', source: 'Wizard2' },
+      { effect: 'banishment', target: 'Orc', source: 'Wizard2' },
+      { effect: 'imprisonment', target: 'Ogre', source: 'Wizard2' },
+      { effect: 'restrained', target: 'Zombie', source: 'Wizard2' },
+    ]);
 
-    for (const effect of blockingEffects) {
-      it(`filters all targets when ${effect} effect is present on attacker`, () => {
-        useRuntimeState.getRuntimeValue.mockImplementation((scope, key) => {
-          if (scope === 'campaign' && key === 'targetEffects') {
-            return [{ effect, target: 'Cleric1', source: 'Wizard1' }];
-          }
-          return null;
-        });
-        render(<SaveAttackAoeModal {...makeProps()} />);
-        expect(getCheckboxByName('Goblin A')).toBeNull();
-        expect(getCheckboxByName('Goblin B')).toBeNull();
-        expect(getCheckboxByName('Player One')).toBeNull();
-      });
-    }
+    render(<SaveAttackAoeModal {...baseProps} />);
+
+    expect(checkboxFor('Goblin A')).toBeNull();
+    expect(checkboxFor('Goblin B')).toBeNull();
+    expect(checkboxFor('Orc')).toBeNull();
+    expect(checkboxFor('Ogre')).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(checkboxFor('Zombie')).toBeInTheDocument();
+    expect(checkboxFor('Player One')).toBeInTheDocument();
   });
 
-  describe('both attacker and target blocking - same source', () => {
-    it('allows target when both attacker and target share the same blocking effect source', () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((scope, key) => {
-        if (scope === 'campaign' && key === 'targetEffects') {
-          return [
-            { effect: 'forcecage', target: 'Cleric1', source: 'Wizard1' },
-            { effect: 'forcecage', target: 'Goblin A', source: 'Wizard1' },
-          ];
-        }
-        return null;
-      });
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      expect(getCheckboxByName('Goblin A')).toBeInTheDocument();
-    });
-  });
+  it('when the attacker is trapped, only a creature sharing the same trap effect AND source remains selectable', () => {
+    // Attacker Cleric1 is forcecaged by Wizard1.
+    // Goblin A: same effect + same source → shared cage, targetable.
+    // Goblin B: same effect, different source → blocked.
+    // Orc: same source, different effect → blocked.
+    // Everyone untrapped → blocked while the attacker is trapped.
+    setTargetEffects([
+      { effect: 'forcecage', target: 'Cleric1', source: 'Wizard1' },
+      { effect: 'forcecage', target: 'Goblin A', source: 'Wizard1' },
+      { effect: 'forcecage', target: 'Goblin B', source: 'Wizard2' },
+      { effect: 'maze', target: 'Orc', source: 'Wizard1' },
+    ]);
 
-  describe('multiple blocking effects', () => {
-    const mixedEffectScenarios = [
-      { attackerEffect: 'forcecage', targetEffect: 'maze', attackerSource: 'Wizard1', targetSource: 'Wizard2' },
-      { attackerEffect: 'maze', targetEffect: 'forcecage', attackerSource: 'Wizard1', targetSource: 'Wizard2' },
-      { attackerEffect: 'banishment', targetEffect: 'imprisonment', attackerSource: 'Wizard1', targetSource: 'Wizard3' },
-    ];
+    render(<SaveAttackAoeModal {...baseProps} />);
 
-    for (const { attackerEffect, targetEffect, attackerSource, targetSource } of mixedEffectScenarios) {
-      it(`filters target when attacker has ${attackerEffect} (${attackerSource}) and target has ${targetEffect} (${targetSource})`, () => {
-        useRuntimeState.getRuntimeValue.mockImplementation((scope, key) => {
-          if (scope === 'campaign' && key === 'targetEffects') {
-            return [
-              { effect: attackerEffect, target: 'Cleric1', source: attackerSource },
-              { effect: targetEffect, target: 'Goblin A', source: targetSource },
-            ];
-          }
-          return null;
-        });
-        render(<SaveAttackAoeModal {...makeProps()} />);
-        expect(getCheckboxByName('Goblin A')).toBeNull();
-      });
-    }
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(checkboxFor('Goblin A')).toBeInTheDocument();
+    expect(checkboxFor('Goblin B')).toBeNull();
+    expect(checkboxFor('Orc')).toBeNull();
+    expect(checkboxFor('Ogre')).toBeNull();
+    expect(checkboxFor('Player One')).toBeNull();
   });
 });

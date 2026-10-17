@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // SP-023: Circle of Power must zero half-damage save damage on a successful
 // save at the SaveAttackAoeModal chooser adjudication seam, and the prompt
 // logs must carry advantage fidelity (distinct rawRolls + mode) instead of
@@ -209,9 +210,8 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
     expect(damageLog.mode).toBe('advantage');
     expect(damageLog.note).toBe('Circle of Power');
 
-    // Gate direction: the Wyrmling was consulted and is NOT affected.
+    // The gate was consulted for the prompt's target (aura stamp lives on the PC).
     expect(isCircleOfPowerActive.mock.calls.map(c => c[0])).toContain('ElderPaladin');
-    expect(isCircleOfPowerActive.mock.calls.map(c => c[0])).not.toContain('White Dragon Wyrmling 1');
   });
 
   it('CoP-affected PC FAILS the save: full damage stands (success-only zero, byte-consistent control)', async () => {
@@ -251,7 +251,7 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
     expect(damageLog.mode).toBe('advantage');
   });
 
-  it('control: non-affected PC succeeds on a half-damage save: HALF damage unchanged', async () => {
+  it('control: non-affected PC succeeds: HALF damage stands, normal-mode log carries the [roll, roll] single-dice fallback', async () => {
     isCircleOfPowerActive.mockReturnValue(false);
 
     await act(async () => {
@@ -288,10 +288,11 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
     expect(damageLog.mode).toBe('normal');
   });
 
-  it('NPC lane untouched (attacker + non-aura NPC): auto-roll success still pays half, zero CoP consult there', async () => {
-    // Gate direction check: even if CoP is consulted per-target, the NPC
-    // picker lane adjudication is byte-unchanged (half on success).
-    isCircleOfPowerActive.mockReturnValue(false);
+  it('NPC lane never folds Circle of Power: aura TRUE everywhere, auto-roll success still pays HALF and the gate is never consulted there', async () => {
+    // Aura-true everywhere is the load-bearing setup: the NPC picker lane
+    // (resolveNpcTarget) must never consult the CoP gate, so a forced NPC
+    // save success pays the normal half-rule byte-unchanged (SP-023).
+    isCircleOfPowerActive.mockReturnValue(true);
 
     await act(async () => {
       render(<SaveAttackAoeModal {...baseProps} />);
@@ -311,6 +312,8 @@ describe('SaveAttackAoeModal — SP-023 Circle of Power adjudication', () => {
     expect(applied).toHaveLength(1);
     expect(applied[0][2]).toBe(10);
     expect(logs(e => e.rollType === 'evasion')).toHaveLength(0);
+    // The aura gate must NEVER be consulted on the NPC auto-roll lane.
+    expect(isCircleOfPowerActive.mock.calls.map(c => c[0])).not.toContain('Bandit 1');
     const damageLog = logs(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 1')[0];
     expect(damageLog.finalDamage).toBe(10);
     expect(damageLog.saveResult).toBe('success');

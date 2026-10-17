@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-237 regression: Nature's Ward (2024 Druid, Circle of the Land lv10)
 // resistance ignored on the PC save-damage prompt lane. Persisted combatSummary
 // player entries are minimal stubs (CLA-119 family — no automation/computedStats),
@@ -6,6 +7,10 @@
 // fired and failed saves paid FULL unhalved elemental damage. The lanes must
 // forward the full-stat characters prop (monster-attack/quick-roll seam twin,
 // useLoggedDiceRollSaves.js:367) to applyDamageToTarget instead.
+//
+// Scope: this file pins the MODAL forwarding contract only (primary leg,
+// secondary leg, missing-prop guard). The actual resistance halving lives at
+// the real applyDamage choke point — covered in applyDamage.natures-ward.test.js.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -13,7 +18,11 @@ import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 // ── Mocked modules ──
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 41, rolls: [6, 6, 6, 5, 5, 4, 3, 2, 1, 3], modifier: 0, formula: '10d6' })),
+  // Formula-aware so the secondary leg (2d6→7) can't masquerade as the
+  // primary (10d6→41) in apply-call assertions.
+  rollExpression: vi.fn((formula) => (formula === '2d6'
+    ? { total: 7, rolls: [2, 5], modifier: 0, formula }
+    : { total: 41, rolls: [6, 6, 6, 5, 5, 4, 3, 2, 1, 3], modifier: 0, formula: '10d6' })),
   rollExpressionMaximized: vi.fn(() => ({ total: 60, rolls: [], modifier: 0, formula: '10d6', maximized: true })),
 }));
 
@@ -194,6 +203,16 @@ async function castFailOnSelf(props = {}) {
   });
 }
 
+const selfApplies = () => applyDamageToTarget.mock.calls.filter(c => c[1] === 'Wild_Sage_Druid');
+
+// CLA-237 regression lock: the resolved character in the forwarded characters
+// array must carry the land_resistance passive (full stats, not cs stub).
+const carriesLandResistance = (characters) => {
+  const resolved = characters?.find(c => c.name === 'Wild_Sage_Druid');
+  const passives = resolved?.computedStats?.automation?.passives || resolved?.automation?.passives || [];
+  return passives.some(p => p.type === 'land_resistance');
+};
+
 describe('SaveAttackAoeModal — CLA-237 Nature\'s Ward save-damage lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -202,41 +221,45 @@ describe('SaveAttackAoeModal — CLA-237 Nature\'s Ward save-damage lane', () =>
   it('failed-save PC apply forwards FULL-STAT characters (automation.passives visible), not cs stubs', async () => {
     await castFailOnSelf();
 
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Wild_Sage_Druid');
+    const applied = selfApplies();
     expect(applied).toHaveLength(1);
+    const [cs, , damage, types, opts] = applied[0];
     // Raw 41 passes through the evasion/save adjudication uncut for the
     // RESISTANCE fold to halve inside applyDamageToTarget (real impl).
-    expect(applied[0][2]).toBe(41);
-    expect(applied[0][3]).toEqual(['Lightning']);
-    const opts = applied[0][4];
+    expect(damage).toBe(41);
+    expect(types).toEqual(['Lightning']);
     expect(opts.ignoreResistance).toBe(false);
-    const resolved = opts.characters.find(c => c.name === 'Wild_Sage_Druid');
-    expect(resolved).toBeTruthy();
-    // Regression lock: full stats (not the CLA-119 cs stub) must reach the choke point.
-    const passives = resolved.computedStats?.automation?.passives || resolved.automation?.passives || [];
-    expect(passives.some(p => p.type === 'land_resistance')).toBe(true);
+    expect(carriesLandResistance(opts.characters)).toBe(true);
+    // HP still rides the minimal cs player stub — the defense-vs-HP split
+    // the CLA-237 fix preserves (cs entry unchanged as first arg).
+    expect(cs.creatures.some(c => c.type === 'player' && !c.automation)).toBe(true);
   });
 
-  it('secondary save-damage leg forwards the SAME full-stat characters', async () => {
+  it('secondary save-damage leg rolls, pays, and forwards its own damage with the SAME full-stat characters', async () => {
     await castFailOnSelf({ secondaryDamage: '2d6', secondaryDamageType: 'Necrotic' });
 
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Wild_Sage_Druid');
-    expect(applied.length).toBe(2);
+    const applied = selfApplies();
+    expect(applied).toHaveLength(2);
+    const primary = applied.find(c => c[3][0] === 'Lightning');
     const secondary = applied.find(c => c[3][0] === 'Necrotic');
-    expect(secondary).toBeTruthy();
-    const resolved = secondary[4].characters.find(c => c.name === 'Wild_Sage_Druid');
-    const passives = resolved.computedStats?.automation?.passives || resolved.automation?.passives || [];
-    expect(passives.some(p => p.type === 'land_resistance')).toBe(true);
+    // Each leg pays its OWN rolled pool (2d6→7, not a replayed primary 41).
+    expect(primary?.[2]).toBe(41);
+    expect(secondary?.[2]).toBe(7);
+    expect(carriesLandResistance(primary?.[4].characters)).toBe(true);
+    expect(carriesLandResistance(secondary?.[4].characters)).toBe(true);
   });
 
   it('missing full-stat characters prop is loud (console.error), never silently falls back to cs stubs', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await castFailOnSelf({ characters: undefined });
 
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Wild_Sage_Druid');
+    const applied = selfApplies();
     expect(applied).toHaveLength(1);
     expect(applied[0][4].characters).toEqual([]);
-    expect(errSpy.mock.calls.some(c => String(c[0]).includes('CLA-237'))).toBe(true);
+    expect(errSpy.mock.calls.some(c => {
+      const msg = String(c[0]);
+      return msg.includes('CLA-237') && msg.includes('save-damage lane');
+    })).toBe(true);
     errSpy.mockRestore();
   });
 });

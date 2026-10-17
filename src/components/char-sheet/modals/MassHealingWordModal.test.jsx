@@ -1,139 +1,86 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MassHealingWordModal from './MassHealingWordModal.jsx';
 
-// ── Mock CreatureSelectionModal ──
+// MassHealingWordModal is a thin props adapter over CreatureSelectionModal.
+// The shared modal's own behavior (target rendering, string targets, empty
+// list, selection, maxTargets clamping, confirm/skip semantics) is covered
+// by shared/CreatureSelectionModal.test.jsx, and the confirm flow through
+// CharActionModals.healing-handlers.test.jsx — these tests pin only the
+// wrapper's contract: the fixed Mass Healing Word configuration it supplies
+// and the props it forwards unchanged.
+
+const { capturedProps } = vi.hoisted(() => ({ capturedProps: {} }));
 
 vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
   default: (props) => {
-    const selected = props.defaultSelected || [];
+    Object.assign(capturedProps, props);
     return (
       <div data-testid="creature-selection-modal">
         <div className="sp-header">
           <i className={`fa-solid ${props.icon}`}></i> {props.title}
         </div>
         {props.description && <p>{props.description}</p>}
-        <div className="secondary-target-list">
-          {props.targets.map((target, i) => {
-            const name = target.name || target;
-            const isSelected = selected.includes(name);
-            return (
-              <label
-                key={i}
-                className={`secondary-target-row ${isSelected ? 'secondary-target-selected' : ''}`}
-                data-testid={`target-${i}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => {}}
-                />
-                <span className="secondary-target-name">
-                  <strong>{name}</strong>
-                </span>
-              </label>
-            );
-          })}
-          {props.targets.length === 0 && (
-            <p className="sp-note">No targets available.</p>
-          )}
-        </div>
-        <div className="sp-actions">
-          <button
-            className="sp-roll-btn"
-            onClick={() => {}}
-            disabled={selected.length === 0}
-            type="button"
-          >
-            <i className={`fa-solid ${props.confirmIcon || 'fa-crosshairs'}`}></i> {props.confirmLabel || 'Confirm'} ({selected.length})
-          </button>
-          <button className="sp-dismiss-btn" onClick={props.onSkip} type="button">
-            Skip
-          </button>
-        </div>
+        <button type="button" onClick={() => props.onConfirm?.(['Ally1'])}>
+          <i className={`fa-solid ${props.confirmIcon || 'fa-crosshairs'}`}></i> {props.confirmLabel || 'Confirm'}
+        </button>
+        <button type="button" onClick={() => props.onSkip?.()}>Skip</button>
       </div>
     );
   },
 }));
 
-// ── Tests ──
+beforeEach(() => {
+  Object.keys(capturedProps).forEach((key) => delete capturedProps[key]);
+});
 
 describe('MassHealingWordModal', () => {
-  it('renders with correct title, icon, description, and buttons', () => {
+  it('supplies the Mass Healing Word spell configuration to CreatureSelectionModal', () => {
     render(<MassHealingWordModal
-      creatureTargets={[
-        { name: 'Ally1', type: 'player', currentHp: 15, maxHp: 30 },
-        { name: 'Ally2', type: 'player', currentHp: 30, maxHp: 30 },
-      ]}
-      maxTargets={3}
+      creatureTargets={[{ name: 'Ally1', type: 'player', currentHp: 15, maxHp: 30 }]}
+      maxTargets={6}
       onConfirm={() => {}}
       onSkip={() => {}}
     />);
+
+    expect(capturedProps).toMatchObject({
+      title: 'Mass Healing Word',
+      icon: 'fa-feather',
+      description: 'Choose up to 6 creatures to heal.',
+      confirmLabel: 'Heal',
+      confirmIcon: 'fa-feather',
+    });
+
+    // Rendered output sanity: the fixed config reaches the DOM.
     expect(screen.getByText('Mass Healing Word')).toBeInTheDocument();
     expect(document.querySelector('.fa-feather')).toBeInTheDocument();
     expect(screen.getByText('Choose up to 6 creatures to heal.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Heal \(0\)/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Heal/ })).toBeInTheDocument();
   });
 
-  it('renders creature targets', () => {
-    render(<MassHealingWordModal
-      creatureTargets={[
-        { name: 'Ally1', type: 'player' },
-        { name: 'Ally2', type: 'player' },
-        { name: 'Enemy1', type: 'npc' },
-      ]}
-      onConfirm={() => {}}
-      onSkip={() => {}}
-    />);
-    expect(screen.getByText('Ally1')).toBeInTheDocument();
-    expect(screen.getByText('Ally2')).toBeInTheDocument();
-    expect(screen.getByText('Enemy1')).toBeInTheDocument();
-  });
+  it('forwards targets, maxTargets, and callbacks to CreatureSelectionModal', () => {
+    const targets = [
+      { name: 'Ally1', type: 'player', currentHp: 15, maxHp: 30 },
+      'TargetB',
+    ];
+    const onConfirm = vi.fn();
+    const onSkip = vi.fn();
 
-  it('shows "No targets available." when creatureTargets is empty', () => {
     render(<MassHealingWordModal
-      creatureTargets={[]}
-      onConfirm={() => {}}
-      onSkip={() => {}}
+      creatureTargets={targets}
+      maxTargets={3}
+      onConfirm={onConfirm}
+      onSkip={onSkip}
     />);
-    expect(screen.getByText('No targets available.')).toBeInTheDocument();
-  });
 
-  it('calls onSkip when Skip button is clicked', () => {
-    const mockOnSkip = vi.fn();
-    render(<MassHealingWordModal
-      creatureTargets={[{ name: 'Ally1' }]}
-      onConfirm={() => {}}
-      onSkip={mockOnSkip}
-    />);
+    expect(capturedProps.targets).toBe(targets);
+    expect(capturedProps.maxTargets).toBe(3);
+
+    fireEvent.click(screen.getByRole('button', { name: /Heal/ }));
+    expect(onConfirm).toHaveBeenCalledWith(['Ally1']);
+
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    expect(mockOnSkip).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders with string targets', () => {
-    render(<MassHealingWordModal
-      creatureTargets={['TargetA', 'TargetB']}
-      onConfirm={() => {}}
-      onSkip={() => {}}
-    />);
-    expect(screen.getByText('TargetA')).toBeInTheDocument();
-    expect(screen.getByText('TargetB')).toBeInTheDocument();
-  });
-
-  it('renders without optional maxTargets prop', () => {
-    render(<MassHealingWordModal
-      creatureTargets={[{ name: 'Ally1' }]}
-      onConfirm={() => {}}
-      onSkip={() => {}}
-    />);
-    expect(screen.getByText('Mass Healing Word')).toBeInTheDocument();
-  });
-
-  it('renders without optional onConfirm and onSkip props', () => {
-    render(<MassHealingWordModal
-      creatureTargets={[{ name: 'Ally1' }]}
-    />);
-    expect(screen.getByText('Mass Healing Word')).toBeInTheDocument();
+    expect(onSkip).toHaveBeenCalled();
   });
 });

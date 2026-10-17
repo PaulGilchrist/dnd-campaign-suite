@@ -1,34 +1,17 @@
+// @maintained-by-ai
 //
-// Consolidation analysis (2026-08-19):
+// Overlay lane: the early-return render switch in AOEConditionModal.jsx
+// (targetName starts with 'overlay-' AND activeOverlay set → AreaEffectTargetModalBase)
+// and the overlay-only handler seam: handleApplyOverride / handleSaveResultOverride are
+// distinct functions from the normal-path handleCreatureSelectionConfirm / handleSaveResult.
+// The siblings (test.jsx, save-flow.test.jsx, results.test.jsx, expiry.test.jsx,
+// integration.test.jsx) all render the non-overlay path, so the ctx plumbing below —
+// the ONLY executable coverage of those two handlers — stays in this lane.
+// Business semantics of the save resolution they delegate to (logging, condition
+// application, careful spell, prompts) are covered by save-flow.test.jsx against the
+// shared resolveAllSaves and are not re-asserted here.
 //
-// Removed 7 redundant/brittle tests whose behavior is already covered by
-// AOEConditionModal.save-flow.test.jsx (same handler functions, same side effects):
-//
-//   1. "logs ability_use when handleApplyOverride is called via overlay"
-//      → covered by save-flow.test.jsx "logs ability_use entry when targets are selected"
-//   2. "calls storeSpellLastAttack when handleApplyOverride is invoked via overlay"
-//      → covered by save-flow.test.jsx "calls storeSpellLastAttack when targets are selected"
-//   3. "invokes handleApplyOverride with correct context from overlay"
-//      → brittle: asserts internal ctx.selected Set contents and function-typed props
-//         breaks on structural changes to the context object shape
-//      → covered by save-flow.test.jsx normal-path handler tests
-//   4. "invokes handleSaveResultOverride capture for success path"
-//      → covered by save-flow.test.jsx "applies blinded when player fails save via save-result event"
-//         (success path: save_result logged, addTargetResult called, persistAndNotify called)
-//   5. "invokes handleSaveResultOverride capture for failure path"
-//      → covered by save-flow.test.jsx "does not apply condition when player passes save"
-//         (failure path: condition applied, save_result logged, addTargetResult called)
-//   6. "handleSaveResultOverride does nothing with missing promptId"
-//      → covered by save-flow.test.jsx "handles save-result event with missing optional fields"
-//   7. "handleSaveResultOverride does nothing with non-matching promptId"
-//      → covered by save-flow.test.jsx "handles save-result event with missing optional fields"
-//
-// Kept 1 test (unique behavioral coverage):
-//   - "renders AreaEffectTargetModalBase when player is overlay targeted"
-//     → verifies the early-return render path (line 638-659 of AOEConditionModal.jsx)
-//        that switches to AreaEffectTargetModalBase when targetName starts with 'overlay-'
-//
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AOEConditionModal from './AOEConditionModal.jsx';
 
@@ -60,12 +43,26 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
     addTargetResult: vi.fn(),
 }));
 
+// Keep the real expirationQueue (needs getCurrentCombatRound) inert — clock CONTENT is
+// asserted by AOEConditionModal.expiry.test.jsx, not here.
+vi.mock('../../../../services/rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
+}));
+
 vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
+// The base renders inside a map/selection context far too heavy for this lane.
+// Stub it as the contract it is: forwarded display props plus the Apply button that
+// feeds the modal its selection context (exactly what the real base does on click).
+const { overlayHarness } = vi.hoisted(() => ({
+    overlayHarness: { props: null, ctx: null },
+}));
+
 vi.mock('./AreaEffectTargetModalBase.jsx', () => ({
     default: function MockAreaEffectTargetModalBase(props) {
+        overlayHarness.props = props;
         return (
             <div data-testid="area-effect-target-modal-base">
                 <div data-testid="feature-name">{props.featureName}</div>
@@ -73,15 +70,7 @@ vi.mock('./AreaEffectTargetModalBase.jsx', () => ({
                 <div data-testid="save-dc">{props.saveDc}</div>
                 <button
                     data-testid="apply-btn"
-                    onClick={() => {
-                        const ctx = {
-                            selected: new Set(['Goblin']),
-                            setProcessing: () => {},
-                            setResults: () => {},
-                            setPendingPrompts: () => {},
-                        };
-                        if (props.handleApplyOverride) props.handleApplyOverride(ctx);
-                    }}
+                    onClick={() => props.handleApplyOverride(overlayHarness.ctx)}
                     type="button"
                 >
                     Apply
@@ -95,7 +84,7 @@ vi.mock('./AreaEffectTargetModalBase.jsx', () => ({
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
 // ── Test fixtures ──
@@ -137,29 +126,129 @@ function makeProps(overrides = {}) {
     };
 }
 
+function overlayProps(overrides = {}) {
+    return makeProps({
+        playerStats: { ...basePlayerStats, targetName: 'overlay-123' },
+        activeOverlay: { name: 'TestOverlay' },
+        ...overrides,
+    });
+}
+
+// Minimal stand-in for the base's selection context (the ctx the real base builds and
+// passes into handleApplyOverride / handleSaveResultOverride).
+function makeCtx(selectedNames) {
+    const ctx = {
+        selected: new Set(selectedNames),
+        pendingPrompts: [],
+        results: [],
+        setProcessing: vi.fn(),
+        setResults: update => { ctx.results = typeof update === 'function' ? update(ctx.results) : update; },
+        setPendingPrompts: update => { ctx.pendingPrompts = typeof update === 'function' ? update(ctx.pendingPrompts) : update; },
+    };
+    return ctx;
+}
+
 // ── Tests ──
 
 describe('AOEConditionModal Overlay', () => {
     beforeEach(() => {
         vi.resetAllMocks();
+        overlayHarness.props = null;
+        overlayHarness.ctx = null;
         getCombatSummary.mockReturnValue(baseCombatSummary);
         getRuntimeValue.mockReturnValue([]);
         setRuntimeValue.mockReturnValue(undefined);
         addEntry.mockResolvedValue(undefined);
-        persistAndNotify.mockReturnValue(undefined);
         getAllyList.mockReturnValue(null);
     });
 
-    describe('overlay targeting path', () => {
-        it('renders AreaEffectTargetModalBase when player is overlay targeted with active overlay', () => {
-            render(<AOEConditionModal {...makeProps({
-                playerStats: { ...basePlayerStats, targetName: 'overlay-123' },
-                activeOverlay: { name: 'TestOverlay' },
-            })} />);
-            expect(screen.getByTestId('area-effect-target-modal-base')).toBeInTheDocument();
-            expect(screen.getByTestId('feature-name')).toHaveTextContent('Blinding Darkness');
-            expect(screen.getByTestId('save-type')).toHaveTextContent('CON');
-            expect(screen.getByTestId('save-dc')).toHaveTextContent('12');
-        });
+    it('renders AreaEffectTargetModalBase only for overlay targets with an active overlay, forwarding feature name, save type and DC', () => {
+        const { unmount } = render(<AOEConditionModal {...overlayProps()} />);
+        expect(screen.getByTestId('area-effect-target-modal-base')).toBeInTheDocument();
+        expect(screen.getByTestId('feature-name')).toHaveTextContent('Blinding Darkness');
+        expect(screen.getByTestId('save-type')).toHaveTextContent('CON');
+        expect(screen.getByTestId('save-dc')).toHaveTextContent('12');
+        unmount();
+
+        // 'overlay-' target WITHOUT an active overlay must fall back to the standard
+        // selection UI (second half of the && guard — the non-overlay default is
+        // test.jsx's lane, this half is unique here).
+        render(<AOEConditionModal {...makeProps({ playerStats: { ...basePlayerStats, targetName: 'overlay-123' } })} />);
+        expect(screen.queryByTestId('area-effect-target-modal-base')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Blinding Darkness/ })).toBeInTheDocument();
+    });
+
+    it('routes Apply through handleApplyOverride and the save-result round trip through handleSaveResultOverride, updating the base context', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.01); // NPC saves roll 1 → fail DC 12
+        try {
+            render(<AOEConditionModal {...overlayProps()} />);
+            const ctx = makeCtx(['Goblin', 'PlayerAlly']);
+            overlayHarness.ctx = ctx;
+
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('apply-btn'));
+            });
+
+            // Ability use logged once for the overlay lane...
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'Wizard1',
+                abilityName: 'Blinding Darkness',
+                description: expect.stringContaining('Selecting 2 target'),
+            }));
+            expect(ctx.setProcessing).toHaveBeenCalledWith(true);
+
+            // ...NPC save auto-resolved into the base ctx (failed → blinded applied)...
+            expect(ctx.results.map(r => r.targetName)).toEqual(['Goblin']);
+            expect(ctx.results[0].success).toBe(false);
+            const goblinWrites = setRuntimeValue.mock.calls.filter(
+                call => call[0] === 'Goblin' && call[1] === 'activeConditions'
+            );
+            expect(goblinWrites[0][2]).toContain('blinded');
+
+            // ...player target prompted and tracked in the base ctx, not resolved locally.
+            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'PlayerAlly',
+                saveType: 'CON',
+                saveDc: 12,
+            }));
+            expect(ctx.pendingPrompts.map(p => p.targetName)).toEqual(['PlayerAlly']);
+
+            const promptId = ctx.pendingPrompts[0].promptId;
+
+            // Non-matching promptId is ignored (guard unique to the override handler).
+            await act(async () => {
+                overlayHarness.props.handleSaveResultOverride(
+                    { detail: { promptId: 'someone-elses-prompt', success: false, roll: 1, total: 1 } },
+                    ctx
+                );
+            });
+            expect(setRuntimeValue.mock.calls.filter(
+                call => call[0] === 'PlayerAlly' && call[1] === 'activeConditions'
+            )).toHaveLength(0);
+            expect(ctx.pendingPrompts).toHaveLength(1);
+
+            // Matching promptId: condition applied to the ally, save_result logged,
+            // prompt cleared from the base ctx.
+            await act(async () => {
+                overlayHarness.props.handleSaveResultOverride(
+                    { detail: { promptId, success: false, roll: 3, total: 4, saveBonus: 1 } },
+                    ctx
+                );
+            });
+            const allyWrites = setRuntimeValue.mock.calls.filter(
+                call => call[0] === 'PlayerAlly' && call[1] === 'activeConditions'
+            );
+            expect(allyWrites.length).toBeGreaterThan(0);
+            expect(allyWrites[0][2]).toContain('blinded');
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'save_result',
+                targetName: 'PlayerAlly',
+                success: false,
+            }));
+            expect(ctx.pendingPrompts).toHaveLength(0);
+        } finally {
+            vi.restoreAllMocks();
+        }
     });
 });

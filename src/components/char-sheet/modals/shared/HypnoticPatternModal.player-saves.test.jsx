@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// HypnoticPatternModal player-save lane: prompt dispatch for player targets
+// (issuePlayerSavePrompt payload + pending bookkeeping, no local resolution) and
+// window 'save-result' event resolution (fail: conditions/expiry/logs/record/close;
+// pass: log/record/close; malformed/foreign events: ignored). NPC local resolution
+// lives in .npc-saves.test.jsx, careful/heighten metamagic in .metamagic.test.jsx,
+// overlay/unmount guard in .advanced.test.jsx, SP-069 latch in .sp069.test.jsx.
+// No dice roll here — player saves arrive pre-rolled via the save-result event.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HypnoticPatternModal from './HypnoticPatternModal.jsx';
@@ -78,36 +86,37 @@ function makeProps(overrides = {}) {
     };
 }
 
-function playerTargetIndex() {
-    const labels = document.querySelectorAll('.secondary-target-row');
-    for (let i = 0; i < labels.length; i++) {
-        if (labels[i].textContent.includes('PlayerAlly')) return i;
-    }
-    return 2;
+function rowFor(name) {
+    return [...document.querySelectorAll('.secondary-target-row')].find(row => row.textContent.includes(name));
 }
 
-function selectPlayerAndConfirm() {
-    const idx = playerTargetIndex();
-    const labels = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(labels[idx]);
-    return act(async () => {
+function conditionWritesFor(name) {
+    return setRuntimeValue.mock.calls.filter(call => call[0] === name && call[1] === 'activeConditions');
+}
+
+function saveResultLogs(name, success) {
+    return addEntry.mock.calls
+        .map(call => call[1])
+        .filter(entry => entry?.type === 'save_result'
+            && (name === undefined || entry.targetName === name)
+            && (success === undefined || entry.success === success));
+}
+
+// Select the player target and confirm — the modal dispatches a save prompt
+// and the 'save-result' listener becomes live.
+async function dispatchPlayerPrompt() {
+    render(<HypnoticPatternModal {...makeProps()} />);
+    await act(async () => { fireEvent.click(rowFor('PlayerAlly')); });
+    await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
     });
+    expect(sendSavePrompt).toHaveBeenCalledTimes(1);
+    return sendSavePrompt.mock.calls[0][1].promptId;
 }
 
-function triggerSaveResult(success, extra = {}) {
-    const savePromptCall = sendSavePrompt.mock.calls[0];
-    const promptId = savePromptCall[1].promptId;
-    return act(async () => {
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId,
-                success,
-                roll: extra.roll ?? 5,
-                total: extra.total ?? 6,
-                saveBonus: extra.saveBonus ?? 1,
-            },
-        }));
+async function triggerSaveResult(promptId, detail) {
+    await act(async () => {
+        window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId, ...detail } }));
     });
 }
 
@@ -121,205 +130,174 @@ beforeEach(() => {
 });
 
 describe('HypnoticPatternModal - Player Saves', () => {
-    describe('player save prompt dispatch', () => {
-        it('sends save prompt for player targets instead of resolving locally', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
+    it('dispatches a save prompt for a player target and resolves nothing locally', async () => {
+        render(<HypnoticPatternModal {...makeProps()} />);
+        await act(async () => { fireEvent.click(rowFor('PlayerAlly')); });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
+        });
 
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'PlayerAlly',
+            saveType: 'WIS',
+            saveDc: 14,
+            sourceName: 'Wizard1',
+        }));
+        const promptId = sendSavePrompt.mock.calls[0][1].promptId;
+        expect(promptId).toEqual(expect.any(String));
+        // The prompt is registered as pending so its reply stays routable.
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign', 'pendingSaveListenerPrompts',
+            expect.arrayContaining([promptId]), campaignName,
+        );
+        // "Prompt, don't resolve": no conditions, records, or save_result logs yet.
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(addTargetResult).not.toHaveBeenCalled();
+        expect(saveResultLogs()).toHaveLength(0);
+    });
+
+    it('failed save-result resolves the player: conditions, expiry, full audit log, failure record, close', async () => {
+        const onClose = vi.fn();
+        render(<HypnoticPatternModal {...makeProps({ onClose })} />);
+        await act(async () => { fireEvent.click(rowFor('PlayerAlly')); });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
+        });
+        const promptId = sendSavePrompt.mock.calls[0][1].promptId;
+        await triggerSaveResult(promptId, { success: false, roll: 7, total: 8, saveBonus: 1 });
+
+        await waitFor(() => {
+            const writes = conditionWritesFor('PlayerAlly');
+            expect(writes).toHaveLength(1);
+            expect(writes[0][2]).toEqual(['charmed', 'incapacitated', 'speed_zero']);
+
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: 'Wizard1',
                 targetName: 'PlayerAlly',
-                saveType: 'WIS',
+                effects: [
+                    { type: 'charmed', condition: 'charmed' },
+                    { type: 'incapacitated', condition: 'incapacitated' },
+                    { type: 'speed_zero', condition: 'speed_zero' },
+                ],
+                campaignName,
+            });
+
+            const entries = saveResultLogs('PlayerAlly');
+            expect(entries).toHaveLength(1);
+            expect(entries[0]).toEqual(expect.objectContaining({
+                characterName: 'Wizard1',
+                success: false,
+                roll: 7,
+                total: 8,
+                saveBonus: 1,
                 saveDc: 14,
-                sourceName: 'Wizard1',
+                saveType: 'WIS',
+                description: expect.stringContaining('PlayerAlly failed WIS save (DC 14, rolled 7 + 1 = 8)'),
+            }));
+
+            // Spell-effect audit trail (separate from the raw save_result entry).
+            const conditionLogs = addEntry.mock.calls
+                .map(call => call[1])
+                .filter(entry => entry?.type === 'condition' && entry?.action === 'applied'
+                    && entry.characterName === 'PlayerAlly');
+            expect(conditionLogs).toHaveLength(1);
+            expect(conditionLogs[0].condition).toBe('Charmed, Incapacitated, Speed 0');
+
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'PlayerAlly',
+                saveResult: 'failure',
+                roll: 7,
+                total: 8,
+                conditions: ['charmed', 'incapacitated', 'speed_zero'],
+                appliedDamage: 0,
+            }));
+
+            expect(persistAndNotify).toHaveBeenCalled();
+        });
+
+        // Last prompt resolved -> modal closes after its grace delay.
+        await waitFor(() => { expect(onClose).toHaveBeenCalled(); }, { timeout: 1500 });
+    });
+
+    it('successful save-result logs success, records no conditions, and closes', async () => {
+        const onClose = vi.fn();
+        render(<HypnoticPatternModal {...makeProps({ onClose })} />);
+        await act(async () => { fireEvent.click(rowFor('PlayerAlly')); });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(1\)/ }));
+        });
+        const promptId = sendSavePrompt.mock.calls[0][1].promptId;
+        await triggerSaveResult(promptId, { success: true, roll: 18, total: 19, saveBonus: 1 });
+
+        await waitFor(() => {
+            const entries = saveResultLogs('PlayerAlly');
+            expect(entries).toHaveLength(1);
+            expect(entries[0]).toEqual(expect.objectContaining({
+                characterName: 'Wizard1',
+                success: true,
+                roll: 18,
+                total: 19,
+                saveBonus: 1,
+                description: expect.stringContaining('PlayerAlly succeeded on WIS save (DC 14, rolled 18 + 1 = 19)'),
+            }));
+
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'PlayerAlly',
+                saveResult: 'success',
+                roll: 18,
+                total: 19,
+                conditions: [],
+                appliedDamage: 0,
+            }));
+
+            expect(persistAndNotify).toHaveBeenCalled();
+        });
+
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+
+        // Last prompt resolved -> modal closes after its grace delay.
+        await waitFor(() => { expect(onClose).toHaveBeenCalled(); }, { timeout: 1500 });
+    });
+
+    it('ignores save-result events with missing or foreign promptId — nothing resolves or closes', async () => {
+        const promptId = await dispatchPlayerPrompt();
+        expect(promptId).toBeTruthy();
+
+        await triggerSaveResult(undefined, { success: false });
+        await triggerSaveResult('non-existent-prompt-id', { success: false, roll: 5, total: 6, saveBonus: 1 });
+
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(addTargetResult).not.toHaveBeenCalled();
+        expect(saveResultLogs()).toHaveLength(0);
+    });
+
+    it('resolves save-result with missing roll fields using zero defaults', async () => {
+        const promptId = await dispatchPlayerPrompt();
+        await triggerSaveResult(promptId, { success: false });
+
+        await waitFor(() => {
+            const entries = saveResultLogs('PlayerAlly');
+            expect(entries).toHaveLength(1);
+            expect(entries[0]).toEqual(expect.objectContaining({
+                success: false,
+                roll: 0,
+                total: 0,
+                saveBonus: 0,
+                description: expect.stringContaining('PlayerAlly failed WIS save (DC 14, rolled 0 = 0)'),
+            }));
+
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                targetName: 'PlayerAlly',
+                saveResult: 'failure',
+                roll: 0,
+                total: 0,
+                conditions: ['charmed', 'incapacitated', 'speed_zero'],
             }));
         });
-    });
 
-    describe('player save failure handling', () => {
-        it('applies charmed, incapacitated, and speed_zero conditions on failed save', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBeGreaterThan(0);
-                expect(conditionCalls[0][2]).toContain('charmed');
-                expect(conditionCalls[0][2]).toContain('incapacitated');
-                expect(conditionCalls[0][2]).toContain('speed_zero');
-            });
-        });
-
-        it('calls addExpiration with all three conditions on failed save', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [
-                        { type: 'charmed', condition: 'charmed' },
-                        { type: 'incapacitated', condition: 'incapacitated' },
-                        { type: 'speed_zero', condition: 'speed_zero' },
-                    ], campaignName });
-            });
-        });
-
-        it('logs save_result failure entry with roll details and description', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false, { roll: 7, total: 8, saveBonus: 1 });
-
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === false,
-                );
-                expect(saveEntries.length).toBeGreaterThan(0);
-                expect(saveEntries[0][1].roll).toBe(7);
-                expect(saveEntries[0][1].total).toBe(8);
-                expect(saveEntries[0][1].saveBonus).toBe(1);
-                expect(saveEntries[0][1].description).toContain('PlayerAlly failed');
-                expect(saveEntries[0][1].description).toContain('rolled 7 + 1 = 8');
-            });
-        });
-
-        it('records addTargetResult with failure and conditions on failed save', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                const targetResultCalls = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly',
-                );
-                expect(targetResultCalls.length).toBe(1);
-                expect(targetResultCalls[0][1].saveResult).toBe('failure');
-                expect(targetResultCalls[0][1].conditions).toEqual(['charmed', 'incapacitated', 'speed_zero']);
-            });
-        });
-
-        it('closes modal after player save result is processed', async () => {
-            const onClose = vi.fn();
-            render(<HypnoticPatternModal {...makeProps({ onClose })} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalled();
-            });
-        });
-    });
-
-    describe('player save success handling', () => {
-        it('logs save_result success entry with description when player passes save', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true, { roll: 18, total: 19, saveBonus: 1 });
-
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === true,
-                );
-                expect(saveEntries.length).toBe(1);
-                expect(saveEntries[0][1].description).toContain('PlayerAlly succeeded');
-                expect(saveEntries[0][1].description).toContain('rolled 18 + 1 = 19');
-            });
-        });
-
-        it('records addTargetResult with success and empty conditions on save success', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                const targetResultCalls = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly',
-                );
-                expect(targetResultCalls.length).toBe(1);
-                expect(targetResultCalls[0][1].saveResult).toBe('success');
-                expect(targetResultCalls[0][1].conditions).toEqual([]);
-            });
-        });
-
-        it('does not apply conditions when player passes save', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBe(0);
-            });
-        });
-
-        it('closes modal after player save success is processed', async () => {
-            const onClose = vi.fn();
-            render(<HypnoticPatternModal {...makeProps({ onClose })} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalled();
-            });
-        });
-    });
-
-    describe('save result event edge cases', () => {
-        it('ignores save-result event with missing promptId', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: { success: false },
-                }));
-            });
-
-            expect(sendSavePrompt).not.toHaveBeenCalled();
-        });
-
-        it('ignores save-result event for unknown promptId', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId: 'non-existent-prompt-id',
-                        success: false,
-                        roll: 5,
-                        total: 6,
-                        saveBonus: 1,
-                    },
-                }));
-            });
-        });
-
-        it('handles save-result event with missing optional fields using defaults', async () => {
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-
-            const savePromptCall = sendSavePrompt.mock.calls[0];
-            const promptId = savePromptCall[1].promptId;
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId,
-                        success: false,
-                    },
-                }));
-            });
-
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === false,
-                );
-                expect(saveEntries.length).toBeGreaterThan(0);
-                expect(saveEntries[0][1].roll).toBe(0);
-            });
-        });
+        // Failure path still applies its conditions.
+        expect(conditionWritesFor('PlayerAlly')[0][2]).toEqual(['charmed', 'incapacitated', 'speed_zero']);
     });
 });

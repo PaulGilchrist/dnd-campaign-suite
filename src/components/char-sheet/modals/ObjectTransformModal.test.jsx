@@ -1,20 +1,10 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import ObjectTransformModal from './ObjectTransformModal.jsx';
 
-// ── Test fixtures ──
-
-const mockOnConfirm = vi.fn();
-const mockOnCancel = vi.fn();
-
-function makeProps(overrides) {
-  return {
-    onConfirm: mockOnConfirm,
-    onCancel: mockOnCancel,
-    ...(overrides || {}),
-  };
-}
-
+// Catalogue mirrored from OBJECT_TYPES in ObjectTransformModal.jsx — the contract
+// of what the modal renders and what each button emits through onConfirm.
 const OBJECT_TYPES = [
   { value: 'stone_block', label: 'Stone Block', icon: 'fa-cube' },
   { value: 'iron_chain', label: 'Iron Chain', icon: 'fa-link' },
@@ -26,149 +16,87 @@ const OBJECT_TYPES = [
   { value: 'other', label: 'Other Object', icon: 'fa-circle' },
 ];
 
-// ── Helpers ──
+function renderModal() {
+  const onConfirm = vi.fn();
+  const onCancel = vi.fn();
+  return { ...render(<ObjectTransformModal onConfirm={onConfirm} onCancel={onCancel} />), onConfirm, onCancel };
+}
 
-function renderModal(props) {
-  return render(<ObjectTransformModal {...makeProps(props)} />);
+function clickType(label) {
+  fireEvent.click(screen.getByText(label).closest('.object-type-btn'));
+}
+
+function clickTransform() {
+  fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
 }
 
 function getSelectedButton() {
   return document.querySelector('.object-type-btn.selected');
 }
 
-function clickButton(label) {
-  const btn = screen.getByText(label).closest('.object-type-btn');
-  fireEvent.click(btn);
-}
-
-// ── Tests ──
-
 describe('ObjectTransformModal', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // ── Initial render ──
-
-  describe('initial render', () => {
-    it('renders all 8 object type buttons with correct icons', () => {
-      renderModal();
-      OBJECT_TYPES.forEach(({ label, icon }) => {
-        const btn = screen.getByText(label).closest('.object-type-btn');
-        expect(btn).toBeInTheDocument();
-        expect(btn.querySelector(`i.fa-solid.${icon}`)).toBeInTheDocument();
-      });
+  it('renders all 8 object types with icons, Stone Block selected by default, no custom input', () => {
+    renderModal();
+    OBJECT_TYPES.forEach(({ label, icon }) => {
+      const btn = screen.getByText(label).closest('.object-type-btn');
+      expect(btn).toBeInTheDocument();
+      expect(btn.querySelector(`i.fa-solid.${icon}`)).toBeInTheDocument();
     });
+    expect(getSelectedButton()).toHaveTextContent('Stone Block');
+    expect(document.querySelector('.custom-object-input')).not.toBeInTheDocument();
   });
 
-  // ── Object type selection ──
-
-  describe('object type selection', () => {
-    it.each(OBJECT_TYPES.filter(t => t.value !== 'stone_block'))('selects $label when its button is clicked', ({ label }) => {
-      renderModal();
-      clickButton(label);
+  it.each(OBJECT_TYPES)(
+    'selecting $label then Transform confirms $value',
+    ({ label, value }) => {
+      const { onConfirm } = renderModal();
+      clickType(label);
       expect(getSelectedButton()).toHaveTextContent(label);
-    });
+      expect(onConfirm).not.toHaveBeenCalled();
+      clickTransform();
+      // 'other' with an empty custom input falls back to 'Stone Block'.
+      expect(onConfirm).toHaveBeenCalledWith(value === 'other' ? 'Stone Block' : value);
+    },
+  );
 
-    it('shows custom object input when Other Object is selected', () => {
-      renderModal();
-      clickButton('Other Object');
-      expect(document.querySelector('.custom-object-input input')).toBeInTheDocument();
-    });
-
-    it('hides custom object input when switching away from Other Object', () => {
-      renderModal();
-      clickButton('Other Object');
-      expect(document.querySelector('.custom-object-input input')).toBeInTheDocument();
-      clickButton('Stone Block');
-      expect(document.querySelector('.custom-object-input input')).not.toBeInTheDocument();
-    });
+  it('shows custom input when Other Object is selected and hides it when switching away', () => {
+    renderModal();
+    clickType('Other Object');
+    expect(document.querySelector('.custom-object-input input')).toBeInTheDocument();
+    clickType('Stone Block');
+    expect(document.querySelector('.custom-object-input')).not.toBeInTheDocument();
+    expect(getSelectedButton()).toHaveTextContent('Stone Block');
   });
 
-  // ── Confirm behavior ──
-
-  describe('confirm behavior', () => {
-    it.each(OBJECT_TYPES.filter(t => t.value !== 'other'))('calls onConfirm with $value when $label is selected', ({ value }) => {
-      renderModal();
-      clickButton(value === 'stone_block' ? 'Stone Block' : OBJECT_TYPES.find(t => t.value === value).label);
-      fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
-      expect(mockOnConfirm).toHaveBeenCalledWith(value);
+  it('confirms trimmed custom text (internal spaces kept) when Other Object has input', () => {
+    const { onConfirm } = renderModal();
+    clickType('Other Object');
+    fireEvent.change(document.querySelector('.custom-object-input input'), {
+      target: { value: '  Ancient Rune Stone  ' },
     });
-
-    it('calls onConfirm with custom type when Other is selected and input has text', () => {
-      renderModal();
-      clickButton('Other Object');
-      const input = document.querySelector('.custom-object-input input');
-      fireEvent.change(input, { target: { value: 'Ancient Rune Stone' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
-      expect(mockOnConfirm).toHaveBeenCalledWith('Ancient Rune Stone');
-    });
-
-    it('calls onConfirm with "Stone Block" fallback when Other is selected but input is empty', () => {
-      renderModal();
-      clickButton('Other Object');
-      fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
-      expect(mockOnConfirm).toHaveBeenCalledWith('Stone Block');
-    });
-
-    it('trims surrounding whitespace from custom input', () => {
-      renderModal();
-      clickButton('Other Object');
-      const input = document.querySelector('.custom-object-input input');
-      fireEvent.change(input, { target: { value: '  Magic Orb  ' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
-      expect(mockOnConfirm).toHaveBeenCalledWith('Magic Orb');
-    });
-
-    it('passes through custom type with internal spaces', () => {
-      renderModal();
-      clickButton('Other Object');
-      const input = document.querySelector('.custom-object-input input');
-      fireEvent.change(input, { target: { value: 'Iron Chain Link' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Transform' }));
-      expect(mockOnConfirm).toHaveBeenCalledWith('Iron Chain Link');
-    });
+    clickTransform();
+    expect(onConfirm).toHaveBeenCalledWith('Ancient Rune Stone');
   });
 
-  // ── Cancel behavior ──
-
-  describe('cancel behavior', () => {
-    it('calls onCancel when Cancel button is clicked', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(mockOnCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCancel when overlay is clicked', () => {
-      renderModal();
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(mockOnCancel).not.toHaveBeenCalled();
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('does not call onCancel when modal content is clicked', () => {
-      renderModal();
-      const modal = document.querySelector('.sp-modal');
-      fireEvent.click(modal);
-      expect(mockOnCancel).not.toHaveBeenCalled();
-    });
+  it('cancels when the Cancel button or Escape is pressed', () => {
+    const { onCancel } = renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
-  // ── Keyboard interaction ──
+  it('removes its Escape listener on unmount', () => {
+    const { onCancel, unmount } = renderModal();
+    unmount();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 
-  describe('keyboard interaction', () => {
-    it('calls onCancel when Escape key is pressed', () => {
-      renderModal();
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(mockOnCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCancel when Escape is pressed after unmount', () => {
-      const { unmount } = renderModal();
-      unmount();
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(mockOnCancel).not.toHaveBeenCalled();
-    });
+  it('stays open when the overlay or modal body is clicked', () => {
+    const { onCancel } = renderModal();
+    fireEvent.click(document.querySelector('.sp-overlay'));
+    fireEvent.click(document.querySelector('.sp-modal'));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
   });
 });

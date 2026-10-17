@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // CLA-120: Empowered Evocation save-AoE one-roll model — the picker rolls INT
 // onto the FIRST selected target's damage roll exactly once per cast (RAW: one
 // damage roll per spell); every other target rolls dice-only (CLA-279 shape).
@@ -14,6 +15,8 @@ vi.mock('../../../../services/combat/automation/automationExpressions.js', () =>
   resolveScaling: vi.fn(() => ({})),
 }));
 
+// Runtime store stand-in: the CLA-120 cast stamp lives here; reads are live so
+// stamp/consume ordering is observable through runtimeRef.
 const runtimeRef = { eePending: undefined };
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((name, key) => {
@@ -62,6 +65,8 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
   addTargetResult: vi.fn(),
 }));
 
+// Base never renders on this picker lane (no overlay- target), but its
+// persistAndNotify util runs unconditionally after every cast — keep mocked.
 vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
   renderTargetList: vi.fn(() => null),
   persistAndNotify: vi.fn(),
@@ -95,14 +100,12 @@ vi.mock('./CreatureSelectionModal.jsx', () => {
 });
 
 const runtime = await import('../../../../hooks/runtime/useRuntimeState.js');
+const diceRoller = await import('../../../../services/dice/diceRoller.js');
 const logService = await import('../../../../services/ui/logService.js');
 
-const mockPlayerStats = {
-  name: 'DivinationWizard',
-  level: 20,
-  abilities: [{ name: 'Intelligence', bonus: 5 }],
-  automation: { passives: [{ type: 'empowered_evocation' }], actions: [] },
-};
+// CLA-120 adder arrives via the empoweredEvocationIntMod prop — the modal
+// never re-detects the passive, so no automation payload is needed here.
+const mockPlayerStats = { name: 'DivinationWizard' };
 
 const baseProps = {
   action: { name: 'Fireball', automation: {} },
@@ -126,53 +129,49 @@ async function confirmTargets(names) {
   });
 }
 
-function damageLogFormulas() {
+function damageLogEntries() {
   return logService.addEntry.mock.calls
     .map(c => (c[1]?.rollType === 'save-damage' ? c[1] : c[0]?.rollType === 'save-damage' ? c[0] : null))
-    .filter(Boolean)
-    .map(e => e.formula);
+    .filter(Boolean);
 }
 
 describe('SaveAttackAoeModal — CLA-120 Empowered Evocation one-roll-per-cast', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeRef.eePending = undefined;
-    runtime.getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'pendingEmpoweredEvocationTarget') return runtimeRef.eePending;
-      if (name === 'campaign') return [];
-      return null;
-    });
-    runtime.setRuntimeValue.mockImplementation((name, key, value) => {
-      if (key === 'pendingEmpoweredEvocationTarget') runtimeRef.eePending = value;
-    });
   });
 
-  it('folds +INT onto the FIRST selected target roll only — one [Empowered Evocation] term across both rolls', async () => {
+  it('folds +INT onto the FIRST selected target roll exactly once per cast, then consumes the cast stamp', async () => {
     render(<SaveAttackAoeModal {...baseProps} empoweredEvocationIntMod={5} />);
     await confirmTargets(['NPC 1', 'NPC 2']);
 
-    const formulas = damageLogFormulas();
-    expect(formulas).toContain('8d6 + 5 [Empowered Evocation]');
-    expect(formulas.filter(f => f === '8d6')).toHaveLength(1);
-    expect(formulas.join(' ').match(/\[Empowered Evocation\]/g)).toHaveLength(1);
-  });
+    // Dice level: two rolls for two targets — the INT-folded formula is rolled ONCE.
+    const intRolls = diceRoller.rollExpression.mock.calls.filter(c => c[0] === '8d6 + 5 [Empowered Evocation]');
+    expect(intRolls).toHaveLength(1);
+    expect(diceRoller.rollExpression).toHaveBeenCalledTimes(2);
+    expect(diceRoller.rollExpression).toHaveBeenCalledWith('8d6');
 
-  it('stamps pendingEmpoweredEvocationTarget on the first target for the cast and consumes it at application', async () => {
-    render(<SaveAttackAoeModal {...baseProps} empoweredEvocationIntMod={5} />);
-    await confirmTargets(['NPC 1', 'NPC 2']);
+    // Log level: exactly one [Empowered Evocation] entry, and it belongs to the stamped first target.
+    const entries = damageLogEntries();
+    const empowered = entries.filter(e => String(e.formula).includes('[Empowered Evocation]'));
+    expect(empowered).toHaveLength(1);
+    expect(empowered[0]).toMatchObject({ formula: '8d6 + 5 [Empowered Evocation]', targetName: 'NPC 1' });
+    const diceOnly = entries.filter(e => e.formula === '8d6');
+    expect(diceOnly).toHaveLength(1);
+    expect(diceOnly[0].targetName).toBe('NPC 2');
 
+    // Stamp lifecycle: cast stamps NPC 1, application consumes it (null after).
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith('DivinationWizard', 'pendingEmpoweredEvocationTarget', 'NPC 1', 'test-campaign');
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith('DivinationWizard', 'pendingEmpoweredEvocationTarget', null, 'test-campaign');
     expect(runtimeRef.eePending).toBeNull();
   });
 
-  it('int mod 0 (non-holder / non-evocation control): dice-only formula on every target, stamp never written', async () => {
+  it('non-holder control (intMod 0): every target rolls dice-only and the stamp key is never written', async () => {
     render(<SaveAttackAoeModal {...baseProps} empoweredEvocationIntMod={0} />);
     await confirmTargets(['NPC 1', 'NPC 2']);
 
-    const formulas = damageLogFormulas();
-    expect(formulas.length).toBeGreaterThan(0);
-    expect(formulas.every(f => f === '8d6')).toBe(true);
+    expect(damageLogEntries().map(e => e.formula)).toEqual(['8d6', '8d6']);
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith('DivinationWizard', 'pendingEmpoweredEvocationTarget', expect.anything(), 'test-campaign');
     expect(runtimeRef.eePending).toBeUndefined();
   });
 });

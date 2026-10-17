@@ -1,35 +1,9 @@
-//
-// Removed 13 redundant/brittle/low-value tests:
-//
-// REMOVE — redundant with AOEConditionModal.save-flow.test.jsx (same full save flow, same assertions):
-//   1. "shows fail message when player fails save" → save-flow: "applies blinded when player fails save via save-result event"
-//   2. "shows success message when player passes save" → save-flow: "does not apply condition when player passes save"
-//   3. "uses default blinded effect when effects prop is null" → save-flow covers full apply flow with default effects
-//   4. "uses default blinded effect when effects prop is undefined" → save-flow covers full apply flow with default effects
-//
-// REMOVE — brittle UI text assertions (break on label changes, not behavioral):
-//   5. "shows fail message when player fails save" → asserts "Blinded!" text
-//   6. "shows success message when player passes save" → asserts "unaffected" text
-//   7. "shows HP percentage for non-player creatures" → regex on DOM text content
-//   8. "does not show HP percentage for player-type targets" → regex on DOM text content
-//
-// REMOVE — low-value standard React patterns (no unique component behavior):
-//   9. "closes when Close button is clicked in results summary" → standard onClose prop
-//  10. "closes when overlay background is clicked in results summary" → standard Spoke overlay behavior
-//  11. "does not close when clicking inside the modal content" → inverse of above, same low value
-//
-// CONSOLIDATE — 4 blocking effect tests into 1 parameterized test:
-//   12. "excludes creatures blocked by forcecage"
-//   13. "excludes creatures blocked by maze"
-//   14. "excludes creatures blocked by banishment"
-//   15. "excludes creatures blocked by imprisonment"
-//   → merged into single "blocking effects exclude creatures from eligible targets" parameterized test
-//
-// KEEP — unique behavioral coverage:
-//   - "does not add duplicate blinded condition when creature already has it"
-//     → tests applyConditionsToTarget deduplication logic, not covered elsewhere
-//   - "allows both attacker and target when same blocking effect source"
-//     → tests same-source exception in blocking logic, not covered elsewhere
+// @maintained-by-ai
+// Results lane for AOEConditionModal: (1) activeConditions deduplication on fail-apply,
+// (2) trap blocking exclusion of eligible targets (full source-distinguishing branch
+// matrix of the component-local isTargetExcludedByTraps). Save resolution/prompts/logging
+// lives in save-flow, overlay seams in overlay, SP-024 clocks in expiry, Heightened
+// Spell in integration, render/selection in test.jsx.
 
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -47,7 +21,7 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
 }));
 
 vi.mock('../../../../services/ui/logService.js', () => ({
-    addEntry: vi.fn().mockResolvedValue(undefined),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
@@ -67,16 +41,16 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
-// SP-024: mock the expirations barrel — fail grants stamp ONE addExpiration
-// clock per failing target; real expirationQueue stays inert in this harness.
+// SP-024: fail grants stamp ONE addExpiration clock per failing target;
+// the real expirationQueue stays inert in this harness.
 vi.mock('../../../../services/rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
 // Re-import mocked modules
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 
 // ── Test fixtures ──
@@ -118,8 +92,18 @@ function makeProps(overrides = {}) {
     };
 }
 
-function getApplyButton() {
-    return screen.getByRole('button', { name: /Blinding Darkness/ });
+// Route getRuntimeValue so only campaign targetEffects (trap lane) and per-target
+// activeConditions (dedup lane) return what each test needs; everything else []
+function mockRuntime({ targetEffects = [], activeConditions = [] } = {}) {
+    getRuntimeValue.mockImplementation((_scope, key) => {
+        if (key === 'targetEffects') return targetEffects;
+        if (key === 'activeConditions') return activeConditions;
+        return [];
+    });
+}
+
+function selectTarget(name) {
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(name) }));
 }
 
 // ── Tests ──
@@ -128,66 +112,88 @@ describe('AOEConditionModal - Results & Behavior', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getCombatSummary.mockReturnValue(baseCombatSummary);
-        getRuntimeValue.mockReturnValue([]);
-        setRuntimeValue.mockReturnValue(undefined);
-        persistAndNotify.mockReturnValue(undefined);
+        addEntry.mockResolvedValue(undefined);
         getAllyList.mockReturnValue(null);
+        mockRuntime();
     });
 
     // ── Condition deduplication ──
 
-    describe('condition deduplication', () => {
-        it('does not add duplicate blinded condition when creature already has it', async () => {
-            getRuntimeValue.mockReturnValue(['blinded']);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                render(<AOEConditionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
-                await act(async () => { fireEvent.click(getApplyButton()); });
+    it('does not duplicate an active condition and preserves unrelated conditions on a failed save', async () => {
+        mockRuntime({ activeConditions: ['blinded', 'restrained'] });
+        vi.spyOn(Math, 'random').mockReturnValue(0.01); // roll 1 + 0 < DC 12 → fail
+        try {
+            render(<AOEConditionModal {...makeProps()} />);
+            selectTarget('Goblin');
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: /Blinding Darkness/ }));
+            });
 
-                await waitFor(() => {
-                    const conditionCalls = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(conditionCalls.length).toBeGreaterThan(0);
-                    const conditions = conditionCalls[0][2];
-                    const blindedCount = conditions.filter(c => String(c).toLowerCase() === 'blinded').length;
-                    expect(blindedCount).toBe(1);
-                });
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
+            await waitFor(() => {
+                const writes = setRuntimeValue.mock.calls.filter(
+                    call => call[0] === 'Goblin' && call[1] === 'activeConditions'
+                );
+                expect(writes.length).toBe(1);
+                const conditions = writes[0][2];
+                expect(conditions.filter(c => String(c).toLowerCase() === 'blinded')).toHaveLength(1);
+                expect(conditions).toContain('restrained');
+            });
+        } finally {
+            vi.restoreAllMocks();
+        }
     });
 
-    // ── Blocking effects ──
+    // ── Trap blocking exclusion (component-local isTargetExcludedByTraps) ──
 
     describe('blocking effects exclude creatures from eligible targets', () => {
-        const blockingEffectTests = [
-            { effect: 'forcecage', description: 'forcecage' },
-            { effect: 'maze', description: 'maze' },
-            { effect: 'banishment', description: 'banishment' },
-            { effect: 'imprisonment', description: 'imprisonment' },
+        // Each TRAP_BLOCKING_EFFECTS entry blocks a trapped target, and the source
+        // field distinguishes allowed (same-source cage-mates) from blocked attacks.
+        const blockingCases = [
+            ...['forcecage', 'maze', 'banishment', 'imprisonment'].map(effect => ({
+                label: `${effect}: trapped target excluded, untrapped targets remain`,
+                targetEffects: [{ effect, target: 'Goblin', source: 'CasterA' }],
+                expectGoblin: false,
+                expectOrc: true,
+            })),
+            {
+                label: 'trapped attacker excludes every target',
+                targetEffects: [{ effect: 'forcecage', target: 'Wizard1', source: 'CasterA' }],
+                expectGoblin: false,
+                expectOrc: false,
+            },
+            {
+                label: 'same-source trap allows attack on cage-mate',
+                targetEffects: [
+                    { effect: 'forcecage', target: 'Wizard1', source: 'CasterA' },
+                    { effect: 'forcecage', target: 'Goblin', source: 'CasterA' },
+                ],
+                expectGoblin: true,
+                expectOrc: false,
+            },
+            {
+                label: 'different-source traps block the attack',
+                targetEffects: [
+                    { effect: 'forcecage', target: 'Wizard1', source: 'CasterA' },
+                    { effect: 'forcecage', target: 'Goblin', source: 'CasterB' },
+                ],
+                expectGoblin: false,
+                expectOrc: false,
+            },
         ];
 
-        for (const { effect, description } of blockingEffectTests) {
-            it(`excludes creatures blocked by ${description} from eligible targets`, () => {
-                getRuntimeValue.mockReturnValue([
-                    { effect, target: 'Goblin', source: 'CasterA' },
-                ]);
-                render(<AOEConditionModal {...makeProps()} />);
-                expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
-            });
-        }
-
-        it('allows both attacker and target when same blocking effect source', () => {
-            getRuntimeValue.mockReturnValue([
-                { effect: 'forcecage', target: 'Goblin', source: 'Wizard1' },
-                { effect: 'forcecage', target: 'Wizard1', source: 'Wizard1' },
-            ]);
+        it.each(blockingCases)('$label', ({ targetEffects, expectGoblin, expectOrc }) => {
+            mockRuntime({ targetEffects });
             render(<AOEConditionModal {...makeProps()} />);
-            expect(screen.getByText('Goblin')).toBeInTheDocument();
+            if (expectGoblin) {
+                expect(screen.getByText('Goblin')).toBeInTheDocument();
+            } else {
+                expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
+            }
+            if (expectOrc) {
+                expect(screen.getByText('Orc')).toBeInTheDocument();
+            } else {
+                expect(screen.queryByText('Orc')).not.toBeInTheDocument();
+            }
         });
     });
 });

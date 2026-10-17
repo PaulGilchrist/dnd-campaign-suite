@@ -1,11 +1,18 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { isApplyBusy, setApplyBusy as setApplyBusyInstance } from './areaEffectModalInstances.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('./areaEffectModalInstances.js', () => ({
   isApplyBusy: vi.fn(),
   setApplyBusy: vi.fn(),
+}));
+
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
 }));
 
 const campaignName = 'test-campaign';
@@ -36,77 +43,139 @@ const baseProps = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  getRuntimeValue.mockReturnValue([]);
 });
 
+// The base rebuilds its context object on every render, so capture the
+// ctx passed to renderActions and assert against the freshest one.
+function renderWithButtons(buttons, props = {}) {
+  let ctx = null;
+  const renderActions = (c) => {
+    ctx = c;
+    return <div>{buttons.map(({ label, onClick }) => (
+      <button key={label} onClick={() => onClick(ctx)}>{label}</button>
+    ))}</div>;
+  };
+  render(<AreaEffectTargetModalBase {...baseProps} {...props} renderActions={renderActions} />);
+  return () => ctx;
+}
+
 describe('AreaEffectTargetModalBase - Interactions', () => {
-  describe('handleApply', () => {
-    it('applies when isApplyBusy returns false and passes context to override', async () => {
-      isApplyBusy.mockReturnValue(false);
+  it('Apply click marks the modal busy and delegates to handleApplyOverride with live context', () => {
+    isApplyBusy.mockReturnValue(false);
+    const handleApplyOverride = vi.fn();
+    const getCtx = renderWithButtons([{ label: 'Apply', onClick: (c) => c.handleApply() }], { handleApplyOverride });
 
-      const handleApplyOverride = vi.fn();
-      let capturedCtx = null;
-      const renderActions = vi.fn(() => {
-        capturedCtx = renderActions.mock.calls[0][0];
-        return <button onClick={() => capturedCtx.handleApply()}>Apply</button>;
-      });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
-      render(<AreaEffectTargetModalBase {...baseProps} handleApplyOverride={handleApplyOverride} renderActions={renderActions} />);
+    expect(handleApplyOverride).toHaveBeenCalledTimes(1);
+    expect(getCtx()).toEqual(expect.objectContaining({
+      saveType: 'CHA',
+      saveDc: 14,
+      rangeFeet: 30,
+      featureName: 'Test Effect',
+      attackerName: 'Wizard1',
+      campaignName,
+      selected: expect.any(Set),
+      handleSaveResult: expect.any(Function),
+      setProcessing: expect.any(Function),
+      setResults: expect.any(Function),
+    }));
+    // Mount released the busy flag; the click must re-arm it (last call is true).
+    expect(setApplyBusyInstance).toHaveBeenLastCalledWith(true);
+  });
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-      });
+  it('Apply click is ignored while another apply is busy and is a safe no-op without an override', () => {
+    isApplyBusy.mockReturnValue(true);
+    renderWithButtons([{ label: 'Apply', onClick: (c) => c.handleApply() }]);
+    expect(setApplyBusyInstance).toHaveBeenCalledTimes(1); // mount release only
 
-      expect(setApplyBusyInstance).toHaveBeenCalledWith(true);
-      expect(handleApplyOverride).toHaveBeenCalledTimes(1);
-      expect(handleApplyOverride).toHaveBeenCalledWith(expect.objectContaining({
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(setApplyBusyInstance).toHaveBeenCalledTimes(1); // guard: never marked busy
+
+    // Once free, applying with no override must complete without throwing.
+    isApplyBusy.mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(setApplyBusyInstance).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+
+  it('routes save-result window events to handleSaveResultOverride only while processing, releasing apply-busy when done', () => {
+    isApplyBusy.mockReturnValue(false);
+    const handleSaveResultOverride = vi.fn();
+    renderWithButtons([
+      { label: 'Start', onClick: (c) => c.setProcessing(true) },
+      { label: 'Stop', onClick: (c) => c.setProcessing(false) },
+    ], { handleSaveResultOverride });
+
+    const dispatchSaveResult = () =>
+      fireEvent(window, new CustomEvent('save-result', { detail: { success: true } }));
+
+    dispatchSaveResult();
+    expect(handleSaveResultOverride).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    dispatchSaveResult();
+    expect(handleSaveResultOverride).toHaveBeenCalledTimes(1);
+    expect(handleSaveResultOverride).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { success: true } }),
+      expect.objectContaining({
         saveType: 'CHA',
         saveDc: 14,
         rangeFeet: 30,
         featureName: 'Test Effect',
-      }));
-    });
+        processing: true,
+      })
+    );
+    // Busy flag stays armed while processing (only the mount release so far).
+    expect(setApplyBusyInstance).toHaveBeenCalledTimes(1);
 
-    it('uses default no-op when handleApplyOverride is not provided', async () => {
-      isApplyBusy.mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(setApplyBusyInstance).toHaveBeenCalledTimes(2);
+    expect(setApplyBusyInstance).toHaveBeenLastCalledWith(false);
 
-      let capturedCtx = null;
-      const renderActions = vi.fn(() => {
-        capturedCtx = renderActions.mock.calls[0][0];
-        return <button onClick={() => capturedCtx.handleApply()}>Apply</button>;
-      });
+    dispatchSaveResult();
+    expect(handleSaveResultOverride).toHaveBeenCalledTimes(1); // listener detached
+  });
 
-      render(<AreaEffectTargetModalBase {...baseProps} renderActions={renderActions} />);
+  it('toggleTarget adds and removes selections and honours the maxTargets cap', () => {
+    const getCtx = renderWithButtons([
+      { label: 'Toggle Goblin', onClick: (c) => c.toggleTarget('Goblin') },
+      { label: 'Toggle Orc', onClick: (c) => c.toggleTarget('Orc') },
+    ], { maxTargets: 1 });
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-      });
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Goblin' }));
+    expect(getCtx().selected).toEqual(new Set(['Goblin']));
 
-      expect(setApplyBusyInstance).toHaveBeenCalledWith(true);
-    });
+    // maxTargets=1: a second selection is refused...
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Orc' }));
+    expect(getCtx().selected).toEqual(new Set(['Goblin']));
 
-    it('calls handleSaveResultOverride with event and context', () => {
-      const handleSaveResultOverride = vi.fn();
-      let capturedCtx = null;
-      const renderActions = vi.fn(() => {
-        capturedCtx = renderActions.mock.calls[0][0];
-        return <button onClick={() => capturedCtx.handleSaveResult({ detail: { success: true } })}>Save Result</button>;
-      });
+    // ...while deselecting still works.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Goblin' }));
+    expect(getCtx().selected).toEqual(new Set());
+  });
 
-      render(<AreaEffectTargetModalBase {...baseProps} handleSaveResultOverride={handleSaveResultOverride} renderActions={renderActions} />);
+  it('notifies onAllResolved once every selected target has a result', () => {
+    const onAllResolved = vi.fn();
+    let ctx;
+    const renderActions = (c) => {
+      ctx = c;
+      return null;
+    };
+    render(<AreaEffectTargetModalBase {...baseProps} renderActions={renderActions} onAllResolved={onAllResolved} />);
 
-      act(() => {
-        fireEvent.click(screen.getByRole('button', { name: 'Save Result' }));
-      });
+    act(() => { ctx.setSelected(new Set(['Goblin'])); });
+    expect(onAllResolved).not.toHaveBeenCalled(); // not processing yet
 
-      expect(handleSaveResultOverride).toHaveBeenCalledWith(
-        expect.objectContaining({ detail: { success: true } }),
-        expect.objectContaining({
-          saveType: 'CHA',
-          saveDc: 14,
-          rangeFeet: 30,
-          featureName: 'Test Effect',
-        })
-      );
-    });
+    act(() => { ctx.setProcessing(true); });
+    expect(onAllResolved).not.toHaveBeenCalled(); // 0 results < 1 selected
+
+    act(() => { ctx.setResults([{ targetName: 'Goblin', success: true }]); });
+    expect(onAllResolved).toHaveBeenCalledTimes(1);
+    expect(onAllResolved).toHaveBeenCalledWith(expect.objectContaining({
+      results: [{ targetName: 'Goblin', success: true }],
+      pendingPrompts: [],
+    }));
   });
 });

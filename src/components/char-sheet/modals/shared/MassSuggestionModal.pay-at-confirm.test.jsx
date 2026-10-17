@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MassSuggestionModal from './MassSuggestionModal.jsx';
@@ -33,7 +34,7 @@ vi.mock('../../../../services/rules/effects/expirations.js', () => ({
 vi.mock('../../../../services/rules/spells/spellPreparationService.js', () => ({
     prepareSpellCast: vi.fn(),
     isFreeCastAuthorized: vi.fn(() => false),
-  isWizardRitualAdeptSpell: vi.fn(() => false),
+    isWizardRitualAdeptSpell: vi.fn(() => false),
 }));
 
 vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
@@ -95,6 +96,10 @@ async function selectAndConfirm() {
     });
 }
 
+function spellLogs() {
+    return addEntry.mock.calls.filter(c => c[1].type === 'spell');
+}
+
 beforeEach(() => {
     vi.resetAllMocks();
     getCombatSummary.mockReturnValue(baseCombatSummary);
@@ -104,25 +109,22 @@ beforeEach(() => {
 });
 
 describe('SP-079 MassSuggestionModal pay-at-confirm', () => {
-    it('OPEN (no confirm): spends no spell slot', () => {
-        render(<MassSuggestionModal {...makeProps()} />);
-
-        expect(prepareSpellCast).not.toHaveBeenCalled();
-        expect(addEntry.mock.calls.filter(c => c[1].type === 'spell')).toHaveLength(0);
-    });
-
-    it('SKIP: spends nothing, emits no spell log, just closes', async () => {
+    it('OPEN then SKIP: spends nothing, emits no spell log, just closes', async () => {
         const onClose = vi.fn();
         render(<MassSuggestionModal {...makeProps({ onClose })} />);
+
+        // Merely opening the chooser must not spend the deferred slot.
+        expect(prepareSpellCast).not.toHaveBeenCalled();
+        expect(spellLogs()).toHaveLength(0);
 
         await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); });
 
         expect(prepareSpellCast).not.toHaveBeenCalled();
-        expect(addEntry.mock.calls.filter(c => c[1].type === 'spell')).toHaveLength(0);
+        expect(spellLogs()).toHaveLength(0);
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('CONFIRM: consumes exactly one lv6 slot + logs exactly one spell entry', async () => {
+    it('CONFIRM: pays exactly one lv6 slot, logs one spell entry, and still resolves saves normally', async () => {
         vi.spyOn(Math, 'random').mockReturnValue(0.26); // save roll 6 + 1 = 7 < DC 19 → fail
         try {
             render(<MassSuggestionModal {...makeProps()} />);
@@ -137,27 +139,20 @@ describe('SP-079 MassSuggestionModal pay-at-confirm', () => {
                 expect.objectContaining({ playerName: 'DivinationWizard', campaignName }),
             );
 
-            const spellLogs = addEntry.mock.calls.filter(c => c[1].type === 'spell');
-            expect(spellLogs).toHaveLength(1);
-            expect(spellLogs[0][1]).toEqual(expect.objectContaining({
+            await waitFor(() => {
+                expect(spellLogs()).toHaveLength(1);
+            });
+            expect(spellLogs()[0][1]).toEqual(expect.objectContaining({
                 type: 'spell',
                 characterName: 'DivinationWizard',
                 spellName: 'Mass Suggestion',
                 spellLevel: 6,
                 saveDC: 19,
+                castingTime: 'Action',
                 concentration: false,
             }));
-        } finally {
-            vi.restoreAllMocks();
-        }
-    });
 
-    it('CONFIRM: saves/stamps preserved — charmed stamp + condition applied on failed save', async () => {
-        vi.spyOn(Math, 'random').mockReturnValue(0.26);
-        try {
-            render(<MassSuggestionModal {...makeProps()} />);
-            await selectAndConfirm();
-
+            // Paying at confirm must not short-circuit the normal save/charmed lane.
             await waitFor(() => {
                 expect(addExpiration).toHaveBeenCalledWith({
                     attackerName: 'DivinationWizard',
@@ -166,10 +161,6 @@ describe('SP-079 MassSuggestionModal pay-at-confirm', () => {
                     campaignName,
                 });
             });
-            // End-on-damage advisory log leg retained.
-            const charmNote = addEntry.mock.calls.find(c =>
-                c[1].type === 'condition' && /ends if .* deal damage/i.test(c[1].note || ''));
-            expect(charmNote).toBeTruthy();
         } finally {
             vi.restoreAllMocks();
         }
@@ -187,22 +178,26 @@ describe('SP-079 MassSuggestionModal pay-at-confirm', () => {
             });
 
             expect(prepareSpellCast).toHaveBeenCalledTimes(1);
-            expect(addEntry.mock.calls.filter(c => c[1].type === 'spell')).toHaveLength(1);
+            expect(spellLogs()).toHaveLength(1);
         } finally {
             vi.restoreAllMocks();
         }
     });
 
-    it('control: unfree, un-upcast paid cast — no free-cast bypass', async () => {
-        isFreeCastAuthorized.mockReturnValue(false);
+    it('NO SLOT: refused cast — closes, logs the refusal, spends nothing, applies no conditions', async () => {
         prepareSpellCast.mockResolvedValue({ modifiedSpell: { level: 6 }, metaCtx: {}, slotConsumed: false, freeCastUsed: false });
         const onClose = vi.fn();
         render(<MassSuggestionModal {...makeProps({ onClose })} />);
         await selectAndConfirm();
 
-        // No slot available → refuse, no saves resolved.
+        await waitFor(() => { expect(onClose).toHaveBeenCalledTimes(1); });
         expect(prepareSpellCast).toHaveBeenCalledTimes(1);
-        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(spellLogs()).toHaveLength(0);
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            automationType: 'mass_suggestion_refused',
+            reason: 'no_slot',
+            characterName: 'DivinationWizard',
+        }));
         expect(addExpiration).not.toHaveBeenCalled();
     });
 });

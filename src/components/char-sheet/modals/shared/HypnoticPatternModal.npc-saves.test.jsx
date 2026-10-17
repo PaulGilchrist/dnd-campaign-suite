@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// HypnoticPatternModal NPC-save lane: local NPC save resolution (conditions,
+// expiry, result logging, persist), stubbing rollNpcSave at its seam so the
+// fail/pass branch is driven deterministically without Math.random games.
+// Overlay/unmount guard lives in .advanced.test.jsx, player save resolution in
+// .player-saves.test.jsx, careful/heighten metamagic in .metamagic.test.jsx
+// (incl. the heighten disadvantage A/B), SP-069 latch in .sp069.test.jsx,
+// empty-state disabled Confirm in CreatureSelectionModal.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HypnoticPatternModal from './HypnoticPatternModal.jsx';
@@ -36,11 +44,34 @@ vi.mock('../../../../hooks/useAllySelection.js', () => ({
     getAllyList: vi.fn(),
 }));
 
+// Stub rollNpcSave at its seam: NPC fail/pass branch driven explicitly, no
+// Math.random roulette. Everything else in the shared save flow stays real,
+// so condition application, logging, and result recording are verified.
+// Mutable shared config (not vi.fn state) so tests can arm outcomes AFTER
+// the beforeEach resetAllMocks.
+const npcSaveStub = vi.hoisted(() => ({ outcomes: [] }));
+vi.mock('./AreaEffectSaveFlow.utils.js', async () => {
+    const actual = await vi.importActual('./AreaEffectSaveFlow.utils.js');
+    return {
+        ...actual,
+        rollNpcSave: (target, _saveType, _saveDc) => {
+            const outcome = npcSaveStub.outcomes.shift();
+            if (!outcome) throw new Error(`unexpected NPC save roll for ${target?.name} (no outcome queued)`);
+            const { success, roll, bonus = 0 } = outcome;
+            const total = roll + bonus;
+            return { saveBonus: bonus, saveRoll: roll, saveTotal: total, success };
+        },
+    };
+});
+
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
+import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { getAllyList } from '../../../../hooks/useAllySelection.js';
-import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import { addEntry } from '../../../../services/ui/logService.js';
+import { addExpiration } from '../../../../services/rules/effects/expirations.js';
+import { getAllyList } from '../../../../hooks/useAllySelection.js';
+import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
 const campaignName = 'test-campaign';
 
@@ -76,13 +107,21 @@ function makeProps(overrides = {}) {
     };
 }
 
-function selectAndConfirm(targetIndex, targetCount) {
+async function selectAndConfirm(indices) {
     const labels = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(labels[targetIndex]);
-    return act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: new RegExp(`Hypnotic Pattern \\(${targetCount}\\)`) }));
+    for (const i of indices) {
+        await act(async () => { fireEvent.click(labels[i]); });
+    }
+    await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(`Hypnotic Pattern \\(${indices.length}\\)`) }));
     });
 }
+
+const conditionWritesFor = (name) =>
+    setRuntimeValue.mock.calls.filter(call => call[0] === name && call[1] === 'activeConditions');
+
+const saveResultLogs = () =>
+    addEntry.mock.calls.filter(call => call[1]?.type === 'save_result');
 
 beforeEach(() => {
     vi.resetAllMocks();
@@ -91,101 +130,105 @@ beforeEach(() => {
     setRuntimeValue.mockReturnValue(undefined);
     addEntry.mockResolvedValue(undefined);
     getAllyList.mockReturnValue(null);
+    npcSaveStub.outcomes = [];
 });
 
 describe('HypnoticPatternModal - NPC Saves', () => {
-    describe('NPC save resolution', () => {
-        function setupNpcSave() {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            render(<HypnoticPatternModal {...makeProps()} />);
-            return selectAndConfirm(0, 1);
-        }
+    it('resolves a failed NPC save locally: merges the exact conditions, schedules expiry, logs the roll, and persists without prompting', async () => {
+        // Goblin arrives already charmed plus an unrelated condition: re-cast must
+        // dedupe charmed and preserve unrelated conditions.
+        getRuntimeValue.mockReturnValue(['stunned', 'charmed']);
+        npcSaveStub.outcomes = [{ success: false, roll: 1, bonus: 0 }]; // 1 + 0 < DC 14
 
-        it('applies charmed, incapacitated, and speed_zero conditions on failed NPC save', async () => {
-            await setupNpcSave();
+        render(<HypnoticPatternModal {...makeProps()} />);
+        await selectAndConfirm([0]);
 
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                );
-                expect(conditionCalls.length).toBeGreaterThan(0);
-                expect(conditionCalls[0][2]).toContain('charmed');
-                expect(conditionCalls[0][2]).toContain('incapacitated');
-                expect(conditionCalls[0][2]).toContain('speed_zero');
-            });
+        await waitFor(() => {
+            expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
         });
 
-        it('calls addExpiration with all three conditions', async () => {
-            await setupNpcSave();
+        const writes = conditionWritesFor('Goblin');
+        expect(writes).toHaveLength(1);
+        expect(writes[0][2]).toEqual(['stunned', 'charmed', 'incapacitated', 'speed_zero']);
 
-            await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'Goblin', effects: [
-                        { type: 'charmed', condition: 'charmed' },
-                        { type: 'incapacitated', condition: 'incapacitated' },
-                        { type: 'speed_zero', condition: 'speed_zero' },
-                    ], campaignName });
-            });
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Wizard1',
+            targetName: 'Goblin',
+            effects: [
+                { type: 'charmed', condition: 'charmed' },
+                { type: 'incapacitated', condition: 'incapacitated' },
+                { type: 'speed_zero', condition: 'speed_zero' },
+            ],
+            campaignName,
         });
+
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'Goblin',
+            saveResult: 'failure',
+            roll: 1,
+            total: 1,
+            conditions: ['charmed', 'incapacitated', 'speed_zero'],
+        }));
+
+        expect(saveResultLogs()).toHaveLength(1);
+        expect(saveResultLogs()[0][1]).toEqual(expect.objectContaining({
+            characterName: 'Wizard1',
+            targetName: 'Goblin',
+            saveDc: 14,
+            saveType: 'WIS',
+            success: false,
+            roll: 1,
+            total: 1,
+            saveBonus: 0,
+            description: expect.stringContaining('failed WIS save (DC 14, rolled 1 + 0 = 1)'),
+        }));
+
+        // NPCs never receive save prompts — resolution is local.
+        expect(sendSavePrompt).not.toHaveBeenCalled();
     });
 
-    describe('successful NPC save', () => {
-        it('does not apply conditions when NPC passes save', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    it('resolves each NPC against its own roll: the failing target is charmed, the passing target is untouched', async () => {
+        npcSaveStub.outcomes = [
+            { success: false, roll: 1, bonus: 0 },  // Goblin: 1 + 0 = 1 < DC 14 → fails
+            { success: true, roll: 12, bonus: 2 },   // Orc: 12 + 2 = 14 = DC 14 → succeeds (bonus matters)
+        ];
 
-            render(<HypnoticPatternModal {...makeProps()} />);
-            await selectAndConfirm(0, 1);
+        render(<HypnoticPatternModal {...makeProps()} />);
+        await selectAndConfirm([0, 1]);
 
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                );
-                expect(conditionCalls.length).toBe(0);
-            });
+        await waitFor(() => {
+            expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
         });
-    });
 
-    describe('multiple targets', () => {
-        it('applies conditions to all selected NPC targets', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
+        const goblinWrites = conditionWritesFor('Goblin');
+        expect(goblinWrites).toHaveLength(1);
+        expect(goblinWrites[0][2]).toEqual(['charmed', 'incapacitated', 'speed_zero']);
 
-            render(<HypnoticPatternModal {...makeProps()} />);
-            const labels = document.querySelectorAll('.secondary-target-row');
-            await act(async () => { fireEvent.click(labels[0]); });
-            await act(async () => { fireEvent.click(labels[1]); });
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: /Hypnotic Pattern \(2\)/ })).toBeInTheDocument();
-            });
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: /Hypnotic Pattern \(2\)/ }));
-            });
+        expect(conditionWritesFor('Orc')).toHaveLength(0);
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ targetName: 'Goblin' }));
 
-            await waitFor(() => {
-                const goblinConditions = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                );
-                expect(goblinConditions.length).toBeGreaterThan(0);
-                expect(goblinConditions[0][2]).toContain('charmed');
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'Goblin',
+            saveResult: 'failure',
+        }));
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'Orc',
+            saveResult: 'success',
+            roll: 12,
+            total: 14,
+            conditions: [],
+        }));
 
-                const orcConditions = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'Orc'
-                );
-                expect(orcConditions.length).toBeGreaterThan(0);
-                expect(orcConditions[0][2]).toContain('charmed');
-            });
-        });
-    });
+        const logs = saveResultLogs();
+        expect(logs).toHaveLength(2);
+        expect(logs.map(call => [call[1].targetName, call[1].success])).toEqual([
+            ['Goblin', false],
+            ['Orc', true],
+        ]);
+        expect(logs[1][1].description).toContain('succeeded on WIS save (DC 14, rolled 12 + 2 = 14)');
 
-    describe('creature not found in combat summary', () => {
-        it('does not apply conditions when confirm button shows zero targets', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            getCombatSummary.mockReturnValue({ creatures: [] });
-
-            render(<HypnoticPatternModal {...makeProps()} />);
-            const confirmButton = screen.getByRole('button', { name: /Hypnotic Pattern \(0\)/ });
-            expect(confirmButton).toBeDisabled();
-        });
+        expect(sendSavePrompt).not.toHaveBeenCalled();
     });
 });

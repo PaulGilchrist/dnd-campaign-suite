@@ -1,21 +1,16 @@
+// @maintained-by-ai
+// Integration lane for AOEConditionModal: the Heightened Spell metamagic end-to-end
+// path — radio rendering and the disadvantaged save roll flowing through
+// resolveNpcTarget into conditions + log entries. Radio/heighten behavior is not
+// covered in any sibling lane.
 //
-// Removed redundant tests (covered by other AOEConditionModal test files):
-//   - "skip button" (×2) → covered in AOEConditionModal.test.jsx "initial render" (skip button rendering)
-//                          and AOEConditionModal.save-flow.test.jsx (condition application behavior)
-//   - "apply button count display" (×5) → covered in AOEConditionModal.test.jsx
-//                                         "target selection" (count 0→1→2, toggle)
-//   - "results summary after NPC resolution" (×1) → brittle UI text assertion ("targets saved");
-//                                                   save flow covered in AOEConditionModal.save-flow.test.jsx
-//   - "all creatures blocked by effects" (×2) → covered in AOEConditionModal.results.test.jsx
-//                                               "blocking effects" (all 4: forcecage, maze, banishment, imprisonment)
-//   - "single target scenario" (×2) → covered in AOEConditionModal.test.jsx "target selection"
-//   - "full apply flow with logging verification" (×2) → covered in AOEConditionModal.save-flow.test.jsx
-//                                                        (storeSpellLastAttack, ability_use, persistAndNotify
-//                                                         with precise assertions)
-//
-// Kept tests (unique behavioral coverage):
-//   - "heighten radio button behavior" (×3) → radio state management not tested in other files
-//   - "multiple creature types with mixed save outcomes" (×1) → mixed NPC/player apply path
+// Sibling lanes (do not duplicate here):
+//   - AOEConditionModal.test.jsx        → initial render, target selection UI
+//   - AOEConditionModal.save-flow.test.jsx → NPC/player save resolution, careful spell,
+//                                              storeSpellLastAttack, logging, mixed targets
+//   - AOEConditionModal.results.test.jsx   → dedup, blocking effects
+//   - AOEConditionModal.overlay.test.jsx   → overlay early-return render path
+//   - AOEConditionModal.expiry.test.jsx    → SP-024 fail-grant expiry clocks
 
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -53,8 +48,6 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
-// SP-024: mock the expirations barrel — fail grants now stamp ONE addExpiration
-// clock per failing target; assertable here, real expirationQueue stays inert.
 vi.mock('../../../../services/rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
@@ -63,8 +56,6 @@ vi.mock('../../../../services/rules/effects/expirations.js', () => ({
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
-import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
-import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
 // ── Test fixtures ──
@@ -110,75 +101,110 @@ function getApplyButton() {
     return screen.getByRole('button', { name: /Blinding Darkness/ });
 }
 
+function findSaveResult(targetName) {
+    const entry = addEntry.mock.calls
+        .map(call => call[1])
+        .find(e => e && e.type === 'save_result' && e.targetName === targetName);
+    return entry;
+}
+
+function activeConditionsCalls(targetName) {
+    return setRuntimeValue.mock.calls.filter(
+        call => call[0] === targetName && call[1] === 'activeConditions'
+    );
+}
+
 // ── Tests ──
 
-describe('AOEConditionModal - Integration', () => {
+describe('AOEConditionModal — Heightened Spell integration', () => {
     beforeEach(() => {
         vi.resetAllMocks();
         getCombatSummary.mockReturnValue(baseCombatSummary);
         getRuntimeValue.mockReturnValue([]);
         setRuntimeValue.mockReturnValue(undefined);
         addEntry.mockResolvedValue(undefined);
-        persistAndNotify.mockReturnValue(undefined);
         getAllyList.mockReturnValue(null);
     });
 
-    // ── Heighten radio button behavior ──
+    it('renders one heighten radio per eligible target only when metamagicHeighten is enabled', () => {
+        const view = render(<AOEConditionModal {...makeProps({ metamagicHeighten: true })} />);
+        expect(screen.getAllByRole('radio')).toHaveLength(baseCombatSummary.creatures.length);
+        view.unmount();
 
-    describe('heighten radio button behavior', () => {
-        it('renders one heighten radio button per eligible target when heighten is enabled', () => {
-            render(<AOEConditionModal {...makeProps({ metamagicHeighten: true })} />);
-            const radios = document.querySelectorAll('input[name="heightenTarget"]');
-            expect(radios).toHaveLength(3);
+        render(<AOEConditionModal {...makeProps({ metamagicHeighten: false })} />);
+        expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    });
+
+    it('rolls the heighten-selected target with disadvantage: two-roll minimum fails an otherwise-successful save and applies the condition', async () => {
+        // React dev internals consume Math.random during clicks, so roll values are
+        // engineered per-ordering: before apply every roll is 20; once apply starts
+        // the first roll is 20 and every later roll is 9. Whatever order the
+        // consumers run in, the heighten pair's minimum lands on 9 (< DC 12),
+        // while an unheightened single roll would take the first value (20, saved).
+        let applyClicked = false;
+        let postApplyCalls = 0;
+        const randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => {
+            if (!applyClicked) return 0.95;
+            return postApplyCalls++ === 0 ? 0.95 : 0.4;
         });
-
-        it('does not render heighten radio buttons when heighten is disabled', () => {
-            render(<AOEConditionModal {...makeProps({ metamagicHeighten: false })} />);
-            const radios = document.querySelectorAll('input[name="heightenTarget"]');
-            expect(radios).toHaveLength(0);
-        });
-
-        it('selects a heighten target when its radio is clicked', async () => {
+        try {
             render(<AOEConditionModal {...makeProps({ metamagicHeighten: true })} />);
-            const radios = document.querySelectorAll('input[name="heightenTarget"]');
+
+            // Select the Goblin target, then mark it for Heightened Spell disadvantage.
+            const radios = screen.getAllByRole('radio');
+            const goblinRow = radios[0].closest('.secondary-target-row');
+            await act(async () => { fireEvent.click(goblinRow); });
             await act(async () => { fireEvent.click(radios[0]); });
             await waitFor(() => {
                 expect(radios[0]).toBeChecked();
+                expect(goblinRow).toHaveClass('secondary-target-selected');
             });
-        });
+
+            applyClicked = true;
+            await act(async () => {
+                fireEvent.click(getApplyButton());
+            });
+
+            // The recorded save must be the disadvantage minimum (9), failing DC 12.
+            await waitFor(() => {
+                const saveResult = findSaveResult('Goblin');
+                expect(saveResult).toMatchObject({
+                    success: false,
+                    roll: 9,
+                    total: 9,
+                    saveBonus: 0,
+                    saveDc: 12,
+                    saveType: 'CON',
+                });
+            });
+            const conditionCalls = activeConditionsCalls('Goblin');
+            expect(conditionCalls).toHaveLength(1);
+            expect(conditionCalls[0][2]).toContain('blinded');
+        } finally {
+            randomSpy.mockRestore();
+        }
     });
 
-    // ── Multiple creature types with mixed save outcomes ──
+    it('rolls an unheightened target once and applies no condition on a successful save', async () => {
+        // Single roll 20 + 0 ≥ DC 12 → success. (Same mock value would also pass a
+        // buggy double-roll, so this pins the success/negative path, not roll count.)
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.95);
+        try {
+            render(<AOEConditionModal {...makeProps({ metamagicHeighten: true })} />);
 
-    describe('multiple creature types with mixed save outcomes', () => {
-        it('applies conditions to NPCs that fail and sends prompts for player targets in a single apply', async () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.01);
-            try {
-                getRuntimeValue.mockReturnValue([]);
-                render(<AOEConditionModal {...makeProps()} />);
-                const labels = document.querySelectorAll('.secondary-target-row');
-                await act(async () => { fireEvent.click(labels[0]); });
-                await act(async () => { fireEvent.click(labels[2]); });
-                await act(async () => {
-                    fireEvent.click(getApplyButton());
-                });
+            const rows = document.querySelectorAll('.secondary-target-row');
+            await act(async () => { fireEvent.click(rows[0]); });
+            await act(async () => {
+                fireEvent.click(getApplyButton());
+            });
 
-                // NPC should have condition applied
-                await waitFor(() => {
-                    const goblinConditions = setRuntimeValue.mock.calls.filter(
-                        call => call[1] === 'activeConditions' && call[0] === 'Goblin'
-                    );
-                    expect(goblinConditions.length).toBeGreaterThan(0);
-                });
-
-                // Player should have prompt sent (not condition applied yet)
-                expect(sendSavePrompt).toHaveBeenCalledWith(
-                    campaignName,
-                    expect.objectContaining({ targetName: 'PlayerAlly' })
-                );
-            } finally {
-                vi.restoreAllMocks();
-            }
-        });
+            await waitFor(() => {
+                const saveResult = findSaveResult('Goblin');
+                expect(saveResult).toMatchObject({ success: true, roll: 20, total: 20 });
+            });
+            expect(activeConditionsCalls('Goblin')).toHaveLength(0);
+        } finally {
+            randomSpy.mockRestore();
+        }
     });
 });

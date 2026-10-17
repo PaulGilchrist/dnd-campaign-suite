@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0138: Adult Silver Dragon Cold Gale legendary line picker — DEX DC 19,
 // 4d6 Cold half-on-success, push-only fail clause ("pushed up to 30 feet
 // straight away"). saveConditions is EMPTY (push is not a canonical
@@ -6,7 +7,10 @@
 // resolveSaveFailGrant registers the instant `push` marker te (value 30,
 // CLA-384/MA-0079 shape, token movement GM-enforced) with a named
 // condition-applied log on failed saves ONLY; successes take half damage and
-// grant zero push te / zero condition log.
+// grant zero push te / zero condition log. PC targets resolve at the
+// save-result listener seam.
+// Save-bonus lookup is NOT asserted here (the family pins raw-20 rolls);
+// numeric/uses data locks live in MonsterCardModal.legendary-uses.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -89,6 +93,9 @@ import { extractConditionsFromSaveEffect, parsePushFeetClause } from '../../../e
 const COLD_GALE = monstersData.find(m => m.index === 'adult-silver-dragon').legendary_actions.find(a => a.name === 'Cold Gale');
 
 let randomSpy;
+// Each NPC save consumes exactly two draws (raw1, raw2 — SaveAttackAoeModal
+// computeNpcSave); the PC prompt id consumes one more. Target order:
+// Thug 1, Guard 1, AberrantSorcerer.
 function spyRandom(seq) {
   let i = 0;
   randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
@@ -118,6 +125,8 @@ function renderGale() {
   );
 }
 
+const loggedEntries = () => addEntry.mock.calls.map(c => c[1]);
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
@@ -126,23 +135,23 @@ beforeEach(() => {
 });
 
 describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
-  it('data lock: DEX DC 19 4d6 Cold half + header uses:3 + push clause parses to 30', () => {
+  it('data lock: save_effect carries NO canonical conditions but parses a 30-ft push clause', () => {
     expect(COLD_GALE.save_dc).toBe(19);
     expect(COLD_GALE.save_type).toBe('Dexterity');
-    expect(COLD_GALE.damage_dice_primary).toBe('4d6');
-    expect(COLD_GALE.damage_type_primary).toBe('Cold');
-    expect(COLD_GALE.dc_success).toBeUndefined();
+    expect(COLD_GALE.dc_success).toBeUndefined(); // default half matches "Half damage only" prose
     expect(extractConditionsFromSaveEffect(COLD_GALE.save_effect)).toEqual([]);
     expect(parsePushFeetClause(COLD_GALE.save_effect)).toEqual({ feet: 30 });
-    const header = monstersData.find(m => m.index === 'adult-silver-dragon').legendary_actions[0];
-    expect(header.uses).toBe(3);
   });
 
-  it('NPC failed DEX save: FULL damage + push marker te (value 30, instant) + push advisory log', async () => {
-    spyRandom([0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
+  it('one confirm: NPC failed save takes FULL damage + instant push te (30) + push log; NPC successful save takes HALF, zero push, zero condition log', async () => {
+    // Draws: Thug raw1/2 low → roll 2 (<DC 19, fail); Guard raw1 high →
+    // roll 20 (success). Prompt id for AberrantSorcerer consumes the tail.
+    spyRandom([0.05, 0.05, 0.99, 0.99, 0.99]);
     const { getByText } = renderGale();
     await waitFor(() => expect(seenTargets.current.length).toBe(3));
     fireEvent.click(getByText('Confirm'));
+
+    // FAIL leg — Thug 1: push marker te, full damage, named push log.
     await waitFor(() => {
       const push = (runtime.store['campaign.targetEffects'] || []).find(te => te.effect === 'push' && te.target === 'Thug 1');
       expect(push).toBeTruthy();
@@ -151,32 +160,26 @@ describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
     expect(push.value).toBe(30);
     expect(push.duration).toBe('instant');
     expect(push.source).toBe('Adult Silver Dragon 1');
-    expect(runtime.store['Thug 1.activeConditions']).toBeFalsy();
-    const dmg = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'roll' && e.rollType === 'save-damage' && e.targetName === 'Thug 1');
-    expect(dmg.finalDamage).toBe(10);
-    expect(dmg.saveResult).toBe('failure');
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && (e.description || '').includes('pushed'));
-    expect(log.condition).toBe('Pushed');
-    expect(log.description).toMatch(/Thug 1 failed the Dexterity save \(DC 19\) in Adult Silver Dragon 1's Cold Gale — pushed up to 30 ft straight away/);
-  });
+    expect(runtime.store['Thug 1.activeConditions']).toBeFalsy(); // push is movement, not a condition
+    const thugDmg = loggedEntries().find(e => e.rollType === 'save-damage' && e.targetName === 'Thug 1');
+    expect(thugDmg.finalDamage).toBe(10);
+    expect(thugDmg.saveResult).toBe('failure');
+    const thugLog = loggedEntries().find(e => e.type === 'condition' && e.characterName === 'Thug 1');
+    expect(thugLog.condition).toBe('Pushed');
+    expect(thugLog.description).toMatch(/Thug 1 failed the Dexterity save \(DC 19\) in Adult Silver Dragon 1's Cold Gale — pushed up to 30 ft straight away/);
 
-  it('NPC successful DEX save: HALF damage, zero push te, zero condition log', async () => {
-    spyRandom([0.99, 0.99, 0.99, 0.99, 0.99, 0.99]);
-    const { getByText } = renderGale();
-    await waitFor(() => expect(seenTargets.current.length).toBe(3));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).find(te => te.effect === 'push' && te.target === 'Guard 1')).toBeFalsy();
-    expect(runtime.store['Guard 1.activeConditions']).toBeFalsy();
-    const guardLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.targetName === 'Guard 1' || (e.description || '').includes('Guard 1'));
-    expect(guardLogs.find(e => e.type === 'condition')).toBeFalsy();
-    const dmg = guardLogs.find(e => e.rollType === 'save-damage' && e.saveResult === 'success');
-    expect(dmg.finalDamage).toBe(5);
+    // SUCCESS leg — Guard 1: half damage, no push te, no condition log.
+    const guardDmg = loggedEntries().find(e => e.rollType === 'save-damage' && e.targetName === 'Guard 1');
+    expect(guardDmg.saveResult).toBe('success');
+    expect(guardDmg.finalDamage).toBe(5);
     expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Guard 1', 5, ['Cold'], expect.anything());
+    expect((runtime.store['campaign.targetEffects'] || []).some(te => te.effect === 'push' && te.target === 'Guard 1')).toBe(false);
+    expect(runtime.store['Guard 1.activeConditions']).toBeFalsy();
+    expect(loggedEntries().some(e => e.type === 'condition' && (e.characterName === 'Guard 1' || (e.description || '').includes('Guard 1')))).toBe(false);
   });
 
-  it('PC prompt fail: push marker te + advisory log land at the save-result listener seam', async () => {
-    spyRandom([0.05, 0.05, 0.05, 0.05]);
+  it('PC prompt: payload carries empty saveConditions + half, and a failed save-result lands push te + advisory log at the listener seam', async () => {
+    spyRandom([0.05, 0.05, 0.05, 0.05, 0.05]);
     const { getByText } = renderGale();
     await waitFor(() => expect(seenTargets.current.length).toBe(3));
     fireEvent.click(getByText('Confirm'));
@@ -184,13 +187,19 @@ describe('MA-0138 Cold Gale — push-only fail clause producer', () => {
     const prompt = promptsSent.current[0];
     expect(prompt.targetName).toBe('AberrantSorcerer');
     expect(prompt.saveConditions).toEqual([]);
+    expect(prompt.saveType).toBe('Dexterity');
+    expect(prompt.saveDc).toBe(19);
+    expect(prompt.rawDamage).toBe(10);
     expect(prompt.dcSuccess).toBe('half');
+    // No PC-side grant until the player answers: re-dispatch until the
+    // listener (registered once pendingPrompts state flushes) consumes it.
     await waitFor(() => {
       fireEvent(window, new CustomEvent('save-result', { detail: { promptId: prompt.promptId, success: false, roll: 11, total: 10, saveBonus: -1 } }));
-      const push = (runtime.store['campaign.targetEffects'] || []).find(te => te.effect === 'push' && te.target === 'AberrantSorcerer');
-      expect(push).toBeTruthy();
+      expect((runtime.store['campaign.targetEffects'] || []).some(te => te.effect === 'push' && te.target === 'AberrantSorcerer')).toBe(true);
     });
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && (e.description || '').includes('pushed'));
-    expect(log.description).toMatch(/Pushed|pushed up to 30 ft/);
+    expect(runtime.store['AberrantSorcerer.activeConditions']).toBeFalsy();
+    const log = loggedEntries().find(e => e.type === 'condition' && e.characterName === 'AberrantSorcerer');
+    expect(log.condition).toBe('Pushed');
+    expect(log.description).toMatch(/AberrantSorcerer failed the Dexterity save \(DC 19\) in Adult Silver Dragon 1's Cold Gale — pushed up to 30 ft straight away/);
   });
 });

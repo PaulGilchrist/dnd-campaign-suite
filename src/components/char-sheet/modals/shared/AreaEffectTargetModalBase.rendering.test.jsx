@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+// @maintained-by-ai
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -11,10 +12,6 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('./areaEffectModalInstances.js', () => ({
   isApplyBusy: vi.fn(),
   setApplyBusy: vi.fn(),
-}));
-
-vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
-  sendSavePrompt: vi.fn(),
 }));
 
 const campaignName = 'test-campaign';
@@ -45,140 +42,77 @@ const baseProps = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  getRuntimeValue.mockReturnValue([]);
 });
 
 describe('AreaEffectTargetModalBase - Rendering & Context', () => {
-  describe('initial render', () => {
-    it('renders the modal header with feature name and d20 icon', () => {
-      getRuntimeValue.mockReturnValue([]);
-      render(<AreaEffectTargetModalBase {...baseProps} />);
-      expect(screen.getByText('Test Effect')).toBeInTheDocument();
-      expect(document.querySelector('.sp-header .fa-solid.fa-dice-d20')).toBeInTheDocument();
-    });
+  it('renders shell, header icon and name, with empty body/actions when no renderers are given', () => {
+    const { container } = render(<AreaEffectTargetModalBase {...baseProps} />);
 
-    it('renders the modal shell (overlay, modal, body, actions)', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const { container } = render(<AreaEffectTargetModalBase {...baseProps} />);
-      expect(container.querySelector('.sp-overlay')).toBeInTheDocument();
-      expect(container.querySelector('.sp-modal')).toBeInTheDocument();
-      expect(container.querySelector('.sp-body')).toBeInTheDocument();
-      expect(container.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-
-    it('does not close on overlay or modal content click', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const onClose = vi.fn();
-      render(<AreaEffectTargetModalBase {...baseProps} onClose={onClose} />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(onClose).not.toHaveBeenCalled();
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('calls renderBody with context when provided', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const renderBody = vi.fn(() => 'Custom Body');
-      render(<AreaEffectTargetModalBase {...baseProps} renderBody={renderBody} />);
-      expect(renderBody).toHaveBeenCalledWith(expect.objectContaining({
-        saveType: 'CHA',
-        saveDc: 14,
-        rangeFeet: 30,
-        featureName: 'Test Effect',
-        combatSummary: baseCombatSummary,
-        attackerName: 'Wizard1',
-        campaignName,
-        onClose: baseProps.onClose,
-      }));
-      expect(screen.getByText('Custom Body')).toBeInTheDocument();
-    });
-
-    it('calls renderActions with context when provided', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const renderActions = vi.fn(() => 'Custom Actions');
-      render(<AreaEffectTargetModalBase {...baseProps} renderActions={renderActions} />);
-      expect(renderActions).toHaveBeenCalledWith(expect.objectContaining({
-        saveType: 'CHA',
-        saveDc: 14,
-        rangeFeet: 30,
-        featureName: 'Test Effect',
-        combatSummary: baseCombatSummary,
-        attackerName: 'Wizard1',
-        campaignName,
-        onClose: baseProps.onClose,
-      }));
-      expect(screen.getByText('Custom Actions')).toBeInTheDocument();
-    });
+    expect(container.querySelector('.sp-overlay')).toBeInTheDocument();
+    const header = container.querySelector('.sp-header');
+    expect(header).toHaveTextContent('Test Effect');
+    expect(header.querySelector('.fa-dice-d20')).toBeInTheDocument();
+    // Children slots are optional — with no renderers they stay empty.
+    expect(container.querySelector('.sp-body')).toBeEmptyDOMElement();
+    expect(container.querySelector('.sp-actions')).toBeEmptyDOMElement();
   });
 
-  describe('context object', () => {
-    it('context contains all expected properties', () => {
-      getRuntimeValue.mockReturnValue([]);
+  it('replaces the default d20 icon when a custom icon prop is given', () => {
+    const { container } = render(<AreaEffectTargetModalBase {...baseProps} icon="fa-solid fa-fire" />);
 
-      let capturedCtx = null;
-      const renderBody = vi.fn(() => {
-        capturedCtx = renderBody.mock.calls[0][0];
-        return (
-          <div>
-            <span id="saveType">{capturedCtx.saveType}</span>
-            <span id="saveDc">{capturedCtx.saveDc}</span>
-            <span id="rangeFeet">{capturedCtx.rangeFeet}</span>
-            <span id="attackerName">{capturedCtx.attackerName}</span>
-            <span id="campaignName">{capturedCtx.campaignName}</span>
-          </div>
-        );
-      });
-
-      render(<AreaEffectTargetModalBase {...baseProps} renderBody={renderBody} />);
-
-      expect(screen.getByText('CHA')).toBeInTheDocument();
-      expect(screen.getByText('14')).toBeInTheDocument();
-      expect(screen.getByText('30')).toBeInTheDocument();
-      expect(screen.getByText('Wizard1')).toBeInTheDocument();
-      expect(screen.getByText('test-campaign')).toBeInTheDocument();
-    });
-
-    it('context contains characters prop', () => {
-      getRuntimeValue.mockReturnValue([]);
-      const characters = [{ name: 'Player1' }, { name: 'Player2' }];
-      let capturedCtx = null;
-      const renderBody = vi.fn(() => {
-        capturedCtx = renderBody.mock.calls[0][0];
-        return <div>{capturedCtx.characters.length}</div>;
-      });
-
-      render(<AreaEffectTargetModalBase {...baseProps} characters={characters} renderBody={renderBody} />);
-
-      expect(screen.getByText('2')).toBeInTheDocument();
-      expect(capturedCtx.characters).toEqual(characters);
-    });
+    expect(container.querySelector('.sp-header .fa-fire')).toBeInTheDocument();
+    expect(container.querySelector('.sp-header .fa-dice-d20')).not.toBeInTheDocument();
   });
 
-  describe('extraState', () => {
-    it('spreads extraState properties into context', () => {
-      getRuntimeValue.mockReturnValue([]);
+  it('does not close on overlay or modal content click', () => {
+    const onClose = vi.fn();
+    const { container } = render(<AreaEffectTargetModalBase {...baseProps} onClose={onClose} />);
 
-      const renderBody = vi.fn(() => {
-        const ctx = renderBody.mock.calls[0][0];
-        return (
-          <div>
-            <span id="single">{ctx.customField}</span>
-            <span id="a">{ctx.fieldA}</span>
-            <span id="b">{ctx.fieldB}</span>
-          </div>
-        );
-      });
+    fireEvent.click(container.querySelector('.sp-overlay'));
+    fireEvent.click(container.querySelector('.sp-modal'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
-      render(
-        <AreaEffectTargetModalBase
-          {...baseProps}
-          extraState={{ customField: 'customValue', fieldA: 'alpha', fieldB: 'beta' }}
-          renderBody={renderBody}
-        />
-      );
+  it('invokes renderBody and renderActions with one shared context carrying props, characters, extraState, and live state', () => {
+    const characters = [{ name: 'Player1' }, { name: 'Player2' }];
+    const renderBody = vi.fn(() => <span>Custom Body</span>);
+    const renderActions = vi.fn(() => <span>Custom Actions</span>);
+    const { container } = render(
+      <AreaEffectTargetModalBase
+        {...baseProps}
+        characters={characters}
+        extraState={{ customField: 'customValue' }}
+        renderBody={renderBody}
+        renderActions={renderActions}
+      />
+    );
 
-      expect(screen.getByText('customValue')).toBeInTheDocument();
-      expect(screen.getByText('alpha')).toBeInTheDocument();
-      expect(screen.getByText('beta')).toBeInTheDocument();
+    expect(renderBody).toHaveBeenCalledTimes(1);
+    expect(renderActions).toHaveBeenCalledTimes(1);
+    const expectedContext = expect.objectContaining({
+      saveType: 'CHA',
+      saveDc: 14,
+      rangeFeet: 30,
+      featureName: 'Test Effect',
+      combatSummary: baseCombatSummary,
+      attackerName: 'Wizard1',
+      campaignName,
+      onClose: baseProps.onClose,
+      characters,
+      customField: 'customValue',
+      maxTargets: Infinity,
+      selected: expect.any(Set),
+      eligibleTargets: expect.any(Array),
+      handleApply: expect.any(Function),
+      handleSaveResult: expect.any(Function),
+      toggleTarget: expect.any(Function),
     });
+    expect(renderBody).toHaveBeenCalledWith(expectedContext);
+    expect(renderActions).toHaveBeenCalledWith(expectedContext);
+
+    // Output lands in the right slot.
+    expect(container.querySelector('.sp-body')).toHaveTextContent('Custom Body');
+    expect(container.querySelector('.sp-actions')).toHaveTextContent('Custom Actions');
   });
 });
