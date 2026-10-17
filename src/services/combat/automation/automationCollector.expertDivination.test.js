@@ -1,13 +1,25 @@
+// @maintained-by-ai
+// CLA-128 supply lane: real Diviner disk data → collector → exact passive row the
+// spellCast gate consumes. Consumer lives in spellCastService/execution/helpers.js
+// (gate predicate + trigger behavior covered in helpers-expertDivination.test.js and
+// spellCastService.featureTriggers.test.js — not re-pinned here). The collector runs
+// unmocked, so this also pins the info-builder DISPATCH entry and the router's
+// passives-bucket route for expert_divination. Regex machinery stays in
+// automationCollector.coverage.test.js.
 import { describe, it, expect } from 'vitest'
 import { collectAutomationFromFeatures } from './automationCollector.js'
-import { buildAttackInfo } from './automationInfoBuilder.js'
 import classes2024 from '../../../../public/data/2024/classes.json'
 
-// CLA-128: the supply side (info-builder DISPATCH + router) was missing an
-// entry for expert_divination, so the passive never reached
-// playerStats.automation.passives and the spellCast trigger gate
-// (spellCastService/execution/helpers.js) always fell through. These tests
-// run the REAL unmocked collector against the real Diviner feature data.
+// Verbatim envelope buildAttackInfo's expert_divination handler emits and
+// routeAutomation pushes into passives. effect is hardcoded (disk automation has
+// no effect field); casting_time falls back to 'passive' when absent.
+const EXPECTED_ROW = {
+    type: 'expert_divination',
+    name: 'Expert Divination',
+    effect: 'expert_divination',
+    casting_time: 'passive',
+    hasAutomation: true,
+}
 
 function findDivinerFeature() {
     const wizard = classes2024.find(c => c.name === 'Wizard')
@@ -15,35 +27,25 @@ function findDivinerFeature() {
     return (diviner.features || []).find(f => f.name === 'Expert Divination')
 }
 
-describe('CLA-128 expert_divination supply chain', () => {
+describe('CLA-128 expert_divination collector lane', () => {
     const feature = findDivinerFeature()
 
-    it('ground-truth 2024 classes.json declares Expert Divination automation', () => {
-        expect(feature).toBeTruthy()
-        expect(feature.level).toBe(6)
-        expect(feature.automation).toMatchObject({ type: 'expert_divination', casting_time: 'passive' })
+    it('ground-truth 2024 classes.json Diviner row authors expert_divination/passive verbatim', () => {
+        expect(feature.automation).toEqual({ type: 'expert_divination', casting_time: 'passive' })
     })
 
-    it('buildAttackInfo emits an info object (not null) for expert_divination', () => {
-        const info = buildAttackInfo({ ...feature, automation: feature.automation }, {})
-        expect(info).not.toBeNull()
-        expect(info).toMatchObject({
-            type: 'expert_divination',
-            name: 'Expert Divination',
-            casting_time: 'passive',
-            hasAutomation: true,
-        })
-    })
-
-    it('collectAutomationFromFeatures routes the passive into passives[]', () => {
+    it('collects the disk passive into passives only, with the exact envelope the spellCast gate matches on name+type', () => {
         const result = collectAutomationFromFeatures([feature], {})
-        const passive = result.passives.find(p => p.name === 'Expert Divination' && p.type === 'expert_divination')
-        expect(passive).toBeTruthy()
+        expect(result.passives).toEqual([EXPECTED_ROW])
+        const otherBuckets = Object.keys(result).filter(k => k !== 'passives')
+        for (const bucket of otherBuckets) {
+            expect(result[bucket], bucket).toEqual([])
+        }
     })
 
-    it('satisfies the spellCast trigger gate predicate in helpers.js', () => {
-        const { passives } = collectAutomationFromFeatures([feature], {})
-        const hasExpertDivination = passives.some(p => p.name === 'Expert Divination' && p.type === 'expert_divination')
-        expect(hasExpertDivination).toBe(true)
+    it('defaults casting_time to passive when the automation omits it (synthetic shape)', () => {
+        const noCastingTime = { name: 'Expert Divination', automation: { type: 'expert_divination' } }
+        const { passives } = collectAutomationFromFeatures([noCastingTime], {})
+        expect(passives).toEqual([EXPECTED_ROW])
     })
 })

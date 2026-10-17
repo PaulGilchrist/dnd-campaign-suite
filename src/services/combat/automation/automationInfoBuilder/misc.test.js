@@ -1,142 +1,48 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest'
 import { coreHandlers } from './core-handlers.js'
-import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'
+import { classFeatureHandlers } from './class-feature-handlers.js'
+import { elementalHandlers } from './elemental-handlers.js'
+import { utilityHandlers } from './utility-handlers.js'
+import { miscHandlers } from './misc.js'
 
-// ── defensive_tactics ────────────────────────────────────────────────
+// misc.js is a pure aggregator:
+//   miscHandlers = { ...coreHandlers, ...classFeatureHandlers, ...elementalHandlers, ...utilityHandlers }
+// These tests pin THAT merge contract only. Unit-handler envelopes are pinned by each
+// unit's own test file (core-handlers.test.js, class-feature-handlers.test.js,
+// elemental-handlers.test.js, utility-handlers.test.js); the full facade delegation
+// table is pinned by automationInfoBuilder.test.js. (Previous tests here re-pinned
+// coreHandlers envelopes — removed as duplicates of core-handlers.test.js.)
 
-describe('coreHandlers – defensive_tactics', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'defensive_tactics' })
-        const result = coreHandlers.defensive_tactics(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'defensive_tactics',
-            casting_time: 'passive',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
+// Spread order matters: a later map shadows an earlier one on key collision.
+const SOURCE_MAPS = [
+    ['coreHandlers', coreHandlers],
+    ['classFeatureHandlers', classFeatureHandlers],
+    ['elementalHandlers', elementalHandlers],
+    ['utilityHandlers', utilityHandlers],
+]
+
+describe('miscHandlers – aggregation contract', () => {
+    // Winner per key = last source map containing it (Object-spread semantics, same
+    // first-insert position rule as Map.set).
+    const winnerByKey = new Map()
+    for (const [, map] of SOURCE_MAPS) {
+        for (const key of Object.keys(map)) winnerByKey.set(key, map[key])
+    }
+
+    it('is exactly the union of the four unit maps — same keys, same order, same function references, nothing added', () => {
+        expect(Object.keys(miscHandlers)).toEqual([...winnerByKey.keys()])
+        for (const [key, winningFn] of winnerByKey) {
+            expect(miscHandlers[key]).toBe(winningFn)
+        }
     })
-})
 
-// ── superior_hunter_prey ─────────────────────────────────────────────
-
-describe('coreHandlers – superior_hunter_prey', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'superior_hunter_prey' })
-        const result = coreHandlers.superior_hunter_prey(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'superior_hunter_prey',
-            casting_time: 'passive',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── shadow_step_rider ────────────────────────────────────────────────
-
-describe('coreHandlers – shadow_step_rider', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'shadow_step_rider' })
-        const result = coreHandlers.shadow_step_rider(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'shadow_step_rider',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── moonlight_step_rider ─────────────────────────────────────────────
-
-describe('coreHandlers – moonlight_step_rider', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'moonlight_step_rider' })
-        const result = coreHandlers.moonlight_step_rider(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'moonlight_step_rider',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── illusory_reality ─────────────────────────────────────────────────
-
-describe('coreHandlers – illusory_reality', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'illusory_reality' })
-        const result = coreHandlers.illusory_reality(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'illusory_reality',
-            effect: 'illusory_reality',
-            casting_time: '1 bonus action',
-            objectDuration: '1 minute',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── memorize_spell ───────────────────────────────────────────────────
-
-describe('coreHandlers – memorize_spell', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'memorize_spell' })
-        const result = coreHandlers.memorize_spell(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'memorize_spell',
-            casting_time: 'passive',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── protection_from_poison ───────────────────────────────────────────
-
-describe('coreHandlers – protection_from_poison', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'protection_from_poison' })
-        const result = coreHandlers.protection_from_poison(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'protection_from_poison',
-            range: 'Touch',
-            duration: '1 hour',
-            casting_time: '1 action',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── remove_curse ─────────────────────────────────────────────────────
-
-describe('coreHandlers – remove_curse', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'remove_curse' })
-        const result = coreHandlers.remove_curse(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'remove_curse',
-            range: 'Touch',
-            casting_time: '1 action',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
-    })
-})
-
-// ── spare_the_dying ──────────────────────────────────────────────────
-
-describe('coreHandlers – spare_the_dying', () => {
-    it('returns defaults', () => {
-        const feature = makeFeature({ type: 'spare_the_dying' })
-        const result = coreHandlers.spare_the_dying(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'spare_the_dying',
-            range: '15 feet',
-            casting_time: 'action',
-            hasAutomation: true,
-            name: 'Test Feature'
-        })
+    it('has zero key collisions across the four unit maps (72 = 59+6+5+2)', () => {
+        const allKeys = SOURCE_MAPS.flatMap(([, map]) => Object.keys(map))
+        const uniqueKeys = new Set(allKeys)
+        // Detector: if a future key lands in two unit maps this fails, forcing a deliberate
+        // decision about the merge order above (later-map-wins) instead of a silent shadow.
+        expect(allKeys.length).toBe(72)
+        expect(uniqueKeys.size).toBe(72)
     })
 })

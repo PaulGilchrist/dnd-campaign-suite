@@ -1,103 +1,38 @@
+// @maintained-by-ai
+// Home of the automationRouter type→bucket breadth matrix — per the family map in
+// automationCollector.coverage.test.js ("router bucket tables → automationCollector.types.test.js").
+// Fixtures are synthetic shapes pinning dispatch machinery, not disk content from public/data.
+//
+// ATTACK_RIDER_OWNER-SPLIT-VERDICT (#2089): automationService.js:5 is a PURE re-export of
+// './automationCollector.js', so automationService.collection.test.js:196-210 executes the exact
+// same collectAutomationFromFeatures call chain as the attack_rider predicate table below — same
+// function, same code path, and that batch (trigger/chooseOne/maxEffects → passives) is a strict
+// subset of this matrix, which additionally pins oncePerTurn+passive → passives, plain → actions,
+// and per-row bucket exclusivity. Canonical import: direct './automationCollector.js' (here).
+// Removal of automationService.collection.test.js:196-210 is the reported rec for its queue turn.
 import { describe, it, expect } from 'vitest'
 import { collectAutomationFromFeatures } from './automationCollector.js'
 import { makePlayerStats, makeFeature } from './automationService.test-utils.js'
 
 const ps = makePlayerStats()
 
-// ── Null safety (consolidated) ──
+const ROUTED_BUCKETS = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
 
-describe('collectAutomationFromFeatures – null safety', () => {
-    it('returns empty result structure when features is null', () => {
-        const result = collectAutomationFromFeatures(null, ps)
-        expect(result).toEqual({
-            actions: [], bonusActions: [], reactions: [], specialActions: [],
-            passives: [], autoEffects: [], saveModifiers: [], primalKnowledge: [], ritualSpells: []
-        })
-    })
+// Full routing envelope: every bucket asserted at once — the row(s) appear in the expected
+// bucket(s) and NOWHERE ELSE. Catches the ROUTES fallback (specialActions), a double-push,
+// and a lost row, all in one assertion.
+function expectRouted(automation, expected = {}) {
+    const result = collectAutomationFromFeatures([makeFeature(automation)], ps)
+    const allBuckets = Object.fromEntries(ROUTED_BUCKETS.map(b => [b, []]))
+    expect(Object.fromEntries(ROUTED_BUCKETS.map(b => [b, result[b].map(r => r.type)])))
+        .toEqual({ ...allBuckets, ...expected })
+}
 
-    it('returns empty arrays when features is undefined', () => {
-        const result = collectAutomationFromFeatures(undefined, ps)
-        expect(result.actions).toEqual([])
-    })
+function expectRoutedAll(automationType) {
+    expectRouted({ type: automationType }, { actions: [automationType] })
+}
 
-    it('skips features with null, undefined, or missing automation', () => {
-        const result = collectAutomationFromFeatures([
-            { name: 'No Automation' },
-            { name: 'Null Automation', automation: null },
-            { name: 'Undefined Automation', automation: undefined },
-        ], ps)
-        expect(result.actions).toEqual([])
-        expect(result.passives).toEqual([])
-    })
-})
-
-// ── Automation object structure ──
-
-describe('collectAutomationFromFeatures – automation object structure', () => {
-    it('returns automation objects with type and name properties', () => {
-        const features = [makeFeature({ type: 'warding_bond' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        const automation = result.actions[0]
-        expect(automation).toHaveProperty('type', 'warding_bond')
-        expect(automation).toHaveProperty('name')
-    })
-
-    it('preserves the feature name in the automation object', () => {
-        const features = [makeFeature({ type: 'warding_bond' }, 'Shield Bond')]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions[0].name).toBe('Shield Bond')
-    })
-})
-
-// ── Actions group – spells and save types ──
-
-describe('collectAutomationFromFeatures – actions group (spells/save types)', () => {
-    const spellTypes = [
-        'flesh_to_stone', 'hold_monster', 'resilient_sphere',
-        'ottos_dance', 'power_word_stun', 'sleep',
-        'stinking_cloud', 'tashas_laughter',
-    ]
-
-    it.each(spellTypes)('categorizes %s as an action', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        expect(result.actions[0].type).toBe(type)
-    })
-
-    it('categorizes damage_bonus with crit trigger as passive instead of action', () => {
-        const features = [makeFeature({ type: 'damage_bonus', trigger: 'on_critical' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-        expect(result.actions).toHaveLength(0)
-    })
-})
-
-// ── Actions group – extra_action family ──
-
-describe('collectAutomationFromFeatures – actions group (extra_action family)', () => {
-    it('categorizes heroes_feast and fey_reinforcements as actions', () => {
-        const features = [makeFeature({ type: 'heroes_feast' }), makeFeature({ type: 'fey_reinforcements' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
-    })
-
-    it('categorizes buff_ally as bonus action when action is bonus_action', () => {
-        const features = [makeFeature({ type: 'buff_ally', action: 'bonus_action' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.bonusActions).toHaveLength(1)
-        expect(result.actions).toHaveLength(0)
-    })
-
-    it('categorizes extra_action and free_spell as actions', () => {
-        const features = [makeFeature({ type: 'extra_action' }), makeFeature({ type: 'free_spell' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
-    })
-})
-
-// ── Direct action types ──
+// ── pushTo('actions') direct types ──
 
 describe('collectAutomationFromFeatures – direct action types', () => {
     const actionTypes = [
@@ -107,60 +42,56 @@ describe('collectAutomationFromFeatures – direct action types', () => {
         'primal_companion_command', 'primal_companion_restore',
     ]
 
-    it.each(actionTypes)('categorizes %s as an action', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        expect(result.actions[0].type).toBe(type)
-    })
-
-    it('categorizes signature_spells as a special action', () => {
-        const features = [makeFeature({ type: 'signature_spells' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.specialActions).toHaveLength(1)
-        expect(result.specialActions[0].type).toBe('signature_spells')
-    })
+    it.each(actionTypes)('routes %s to actions only', expectRoutedAll)
 })
 
-// ── Action types ──
+// ── routeSaveStyle: save-based spells (plus critical-trigger → passives) ──
 
-describe('collectAutomationFromFeatures – action types', () => {
-    // CLA-357: the router used to push arcane_charge/telekinetic_movement rows
-    // TWICE (sheet name-dedupe hid the dupe) — one action per feature is truth.
-    it('categorizes arcane_charge and telekinetic_movement as one action each', () => {
-        const arcaneResult = collectAutomationFromFeatures([makeFeature({ type: 'arcane_charge' })], ps)
-        expect(arcaneResult.actions).toHaveLength(1)
-        expect(arcaneResult.actions.every(a => a.type === 'arcane_charge')).toBe(true)
-
-        const teleResult = collectAutomationFromFeatures([makeFeature({ type: 'telekinetic_movement' })], ps)
-        expect(teleResult.actions).toHaveLength(1)
-    })
-})
-
-// ── Conditional action/bonus action types ──
-
-describe('collectAutomationFromFeatures – conditional action/bonus action types', () => {
-    const conditionalTypes = [
-        { type: 'guarded_mind', defaultCat: 'actions', override: 'bonusActions', overrideVal: 'bonus_action' },
-        { type: 'concentration_bonus_attack', defaultCat: 'bonusActions', override: null, overrideVal: null },
-        { type: 'telekinetic_leap', defaultCat: 'bonusActions', override: 'actions', overrideVal: 'action' },
-        { type: 'primal_companion_summon', defaultCat: 'bonusActions', override: 'actions', overrideVal: 'action' },
-        { type: 'clockwork_cavalcade', defaultCat: 'actions', override: 'bonusActions', overrideVal: 'bonus_action' },
-        { type: 'telekinetic_shove', defaultCat: 'bonusActions', override: 'actions', overrideVal: 'action' },
+describe('collectAutomationFromFeatures – save-style routing', () => {
+    const spellTypes = [
+        'flesh_to_stone', 'hold_monster', 'resilient_sphere',
+        'ottos_dance', 'power_word_stun', 'sleep',
+        'stinking_cloud', 'tashas_laughter',
     ]
 
-    it.each(conditionalTypes)('categorizes $type: default → $defaultCat, override → $overrideCat', ({ type, defaultCat, override: overrideCat, overrideVal }) => {
-        const defaultResult = collectAutomationFromFeatures([makeFeature({ type })], ps)
-        expect(defaultResult[defaultCat]).toHaveLength(1)
-        if (overrideCat) {
-            const overrideResult = collectAutomationFromFeatures([makeFeature({ type, action: overrideVal })], ps)
-            expect(overrideResult[overrideCat]).toHaveLength(1)
-            expect(defaultResult[overrideCat]).toHaveLength(0)
-        }
+    it.each(spellTypes)('routes %s to actions only', expectRoutedAll)
+
+    it('routes damage_bonus with a critical trigger to passives, not actions', () => {
+        expectRouted({ type: 'damage_bonus', trigger: 'on_critical' }, { passives: ['damage_bonus'] })
     })
 })
 
-// ── Bonus action types ──
+// ── routeCtPassiveBonusOrAction: default branch → actions ──
+
+describe('collectAutomationFromFeatures – casting_time bonus-or-action family', () => {
+    const types = ['extra_action', 'free_spell', 'heroes_feast', 'fey_reinforcements']
+
+    it.each(types)('routes %s (no casting_time) to actions only', expectRoutedAll)
+})
+
+// ── routeBonusByAction: action-field conditional ──
+
+describe('collectAutomationFromFeatures – action-field conditional types', () => {
+    it.each([
+        { type: 'guarded_mind', defaultBucket: 'actions', overrideVal: 'bonus_action', overrideBucket: 'bonusActions' },
+        { type: 'concentration_bonus_attack', defaultBucket: 'bonusActions', overrideVal: null, overrideBucket: null },
+        { type: 'telekinetic_leap', defaultBucket: 'bonusActions', overrideVal: 'action', overrideBucket: 'actions' },
+        { type: 'primal_companion_summon', defaultBucket: 'bonusActions', overrideVal: 'action', overrideBucket: 'actions' },
+        { type: 'clockwork_cavalcade', defaultBucket: 'actions', overrideVal: 'bonus_action', overrideBucket: 'bonusActions' },
+        { type: 'telekinetic_shove', defaultBucket: 'bonusActions', overrideVal: 'action', overrideBucket: 'actions' },
+    ])('routes $type: default → $defaultBucket, action:$overrideVal → $overrideBucket', ({ type, defaultBucket, overrideVal, overrideBucket }) => {
+        expectRouted({ type }, { [defaultBucket]: [type] })
+        if (overrideBucket) {
+            expectRouted({ type, action: overrideVal }, { [overrideBucket]: [type] })
+        }
+    })
+
+    it('routes trance_of_order with action bonus_action to bonusActions only', () => {
+        expectRouted({ type: 'trance_of_order', action: 'bonus_action' }, { bonusActions: ['trance_of_order'] })
+    })
+})
+
+// ── pushTo('bonusActions') types ──
 
 describe('collectAutomationFromFeatures – bonus action types', () => {
     const bonusActionTypes = [
@@ -169,328 +100,190 @@ describe('collectAutomationFromFeatures – bonus action types', () => {
         'fast_hands', 'steps_of_the_fey', 'primal_companion_bonus_action_command',
     ]
 
-    it.each(bonusActionTypes)('categorizes %s as a bonus action', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.bonusActions).toHaveLength(1)
-        expect(result.bonusActions[0].type).toBe(type)
+    it.each(bonusActionTypes)('routes %s to bonusActions only', (type) => {
+        expectRouted({ type }, { bonusActions: [type] })
     })
 })
 
-// ── Reaction types ──
+// ── pushTo('reactions') types ──
 
 describe('collectAutomationFromFeatures – reaction types', () => {
     const reactionTypes = [
         'psionic_strike', 'telekinetic_thrust', 'glorious_defense',
         'relentless_avenger', 'soul_of_vengeance', 'sentinel_guardian',
-        'reaction_save', 'reaction_spell', 'shadowy_dodge', 'misty_escape',
+        'reaction_save', 'reaction_spell', 'reaction_damage', 'shadowy_dodge',
         'beguiling_defenses', 'searing_vengeance', 'illusory_self',
         'superior_hunter_defense', 'lucky_point', 'spell_thief', 'restore_balance',
     ]
 
-    it.each(reactionTypes)('categorizes %s as a reaction', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.reactions).toHaveLength(1)
-        expect(result.reactions[0].type).toBe(type)
-    })
-
-    it('categorizes reaction_damage with psychic_damage_received trigger as reaction', () => {
-        const features = [makeFeature({ type: 'reaction_damage', trigger: 'psychic_damage_received' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(0)
-        expect(result.reactions).toHaveLength(1)
+    it.each(reactionTypes)('routes %s to reactions only', (type) => {
+        expectRouted({ type }, { reactions: [type] })
     })
 })
 
-// ── Special action types ──
+// ── pushTo('specialActions') types ──
 
 describe('collectAutomationFromFeatures – special action types', () => {
     const specialActionTypes = [
-        'starry_form', 'twinkling_constellations', 'tactical_mind',
-        'living_legend', 'cloak_of_shadows', 'holy_nimbus', 'holy_aura',
-        'avenging_angel', 'elder_champion', 'large_form',
-        'celestial_resilience', 'revelation_in_flesh', 'peerless_athlete',
-        'dragon_wings', 'clairvoyant_combatant', 'create_thrall',
-        'celestial_revelation', 'elfish_lineage', 'gnomish_lineage',
-        'fiendish_legacy', 'portent',
+        // avenging_angel's info builder normalizes the row type to temp_buff —
+        // pin the routed row's actual builder fingerprint, not the authoring type.
+        { type: 'starry_form', rowType: 'starry_form' }, { type: 'twinkling_constellations', rowType: 'twinkling_constellations' }, { type: 'tactical_mind', rowType: 'tactical_mind' },
+        { type: 'living_legend', rowType: 'living_legend' }, { type: 'cloak_of_shadows', rowType: 'cloak_of_shadows' }, { type: 'holy_nimbus', rowType: 'holy_nimbus' }, { type: 'holy_aura', rowType: 'holy_aura' },
+        { type: 'avenging_angel', rowType: 'temp_buff' }, { type: 'elder_champion', rowType: 'elder_champion' }, { type: 'large_form', rowType: 'large_form' },
+        { type: 'celestial_resilience', rowType: 'celestial_resilience' }, { type: 'revelation_in_flesh', rowType: 'revelation_in_flesh' }, { type: 'peerless_athlete', rowType: 'peerless_athlete' },
+        { type: 'dragon_wings', rowType: 'dragon_wings' }, { type: 'clairvoyant_combatant', rowType: 'clairvoyant_combatant' }, { type: 'create_thrall', rowType: 'create_thrall' },
+        { type: 'celestial_revelation', rowType: 'celestial_revelation' }, { type: 'elfish_lineage', rowType: 'elfish_lineage' }, { type: 'gnomish_lineage', rowType: 'gnomish_lineage' },
+        { type: 'fiendish_legacy', rowType: 'fiendish_legacy' }, { type: 'portent', rowType: 'portent' }, { type: 'signature_spells', rowType: 'signature_spells' },
     ]
 
-    it.each(specialActionTypes)('categorizes %s as a special action', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.specialActions).toHaveLength(1)
+    it.each(specialActionTypes)('routes %s to specialActions only', ({ type, rowType }) => {
+        expectRouted({ type }, { specialActions: [rowType] })
     })
 })
 
-// ── Passive types ──
+// ── passive routes: exclusive, dual-bucket, and effect-conditional ──
 
 describe('collectAutomationFromFeatures – passive types', () => {
     const passiveTypes = [
         'land_resistance', 'psionic_sorcery', 'psionic_spells_list', 'psychic_spells',
-        'healing_bonus', 'survive_and_heal', 'post_cast_ally_heal',
-        'post_cast_smite_cover', 'post_cast_inspiring_smite',
-        'moonlight_step_rider', 'damage_type_modifier', 'weapon_mastery_choice',
-        'shadow_step_rider', 'holy_nimbus_radiant_damage', 'umbral_sight',
-        'naturally_stealthy', 'cantrip_spellcasting_ability',
+        'survive_and_heal',
+        'shadow_step_rider',
+        'cantrip_spellcasting_ability',
         'dark_ones_blessing', 'dark_ones_luck',
         'superior_hunter_prey', 'stroke_of_luck',
-        'supreme_sneak', 'save_proficiency',
+        'save_proficiency',
         'damage_type_choice', 'radiant_soul', 'hurl_through_hell',
         'create_thrall_temp_hp', 'sentinel', 'potent_cantrip',
         'soulstitch_spells', 'empowered_evocation', 'improved_illusions',
         'overchannel', 'pass_without_trace', 'phantasmal_creatures',
         'primal_companion_double_strike', 'primal_companion_spell_share',
-        'primal_companion_dodge',
+        'primal_companion_dodge', 'auto_effect',
     ]
 
-    it.each(passiveTypes)('categorizes %s as a passive', (type) => {
-        const features = [makeFeature({ type })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
+    it.each(passiveTypes)('routes %s to passives only', (type) => {
+        expectRouted({ type }, { passives: [type] })
+    })
+
+    // These builders normalize the info row type to 'passive_rule' — the author
+    // type→bucket dispatch is still pinned (removing the route would fall through
+    // to the specialActions default and change the buckets).
+    it.each([
+        ['umbral_sight', { passives: ['passive_rule'] }],
+        ['naturally_stealthy', { passives: ['passive_rule'] }],
+        ['supreme_sneak', { passives: ['passive_rule'] }],
+        // builder emits effect 'bonus_healing' → routePassiveRule double-pushes
+        ['healing_bonus', { passives: ['passive_rule'], specialActions: ['passive_rule'] }],
+    ])('routes %s (builder-normalized row) to $expected', (type, expected) => {
+        expectRouted({ type }, expected)
+    })
+
+    // routePassiveSpecial members land in BOTH buckets — pinned per row.
+    it.each([
+        'post_cast_ally_heal', 'post_cast_smite_cover', 'post_cast_inspiring_smite',
+        'moonlight_step_rider', 'damage_type_modifier', 'weapon_mastery_choice',
+        'use_magic_device',
+    ])('routes %s to passives AND specialActions', (type) => {
+        expectRouted({ type }, { passives: [type], specialActions: [type] })
+    })
+
+    it('routes auto_effect psychic_teleportation to bonusActions instead of passives', () => {
+        expectRouted({ type: 'auto_effect', effect: 'psychic_teleportation' }, { bonusActions: ['auto_effect'] })
     })
 })
 
-// ── Casting-time-conditional types ──
+// ── passive_rule effect-conditional routing (routePassiveRule branches) ──
 
-describe('collectAutomationFromFeatures – casting_time-conditional types', () => {
-    it('categorizes modify_d20_roll with reaction casting_time as reaction', () => {
-        const features = [makeFeature({ type: 'modify_d20_roll', casting_time: '1 reaction' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.reactions).toHaveLength(1)
+describe('collectAutomationFromFeatures – passive_rule effect routing', () => {
+    it.each([
+        { effect: 'ritual_spells', expected: { ritualSpells: ['passive_rule'] } },
+        { effect: 'superior_defense', expected: { specialActions: ['passive_rule'] } },
+        { effect: 'bonus_healing', expected: { specialActions: ['passive_rule'], passives: ['passive_rule'] } },
+    ])('routes passive_rule effect $effect', ({ effect, expected }) => {
+        expectRouted({ type: 'passive_rule', effect }, expected)
     })
 
-    it('categorizes modify_d20_roll with bonus_action casting_time as bonus action', () => {
-        const features = [makeFeature({ type: 'modify_d20_roll', casting_time: '1 bonus action' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.bonusActions).toHaveLength(1)
-    })
-
-    it('categorizes modify_d20_roll without casting_time as reaction (default)', () => {
-        const features = [makeFeature({ type: 'modify_d20_roll' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.reactions).toHaveLength(1)
-    })
-})
-
-// ── Passive rule sub-types ──
-
-describe('collectAutomationFromFeatures – passive_rule sub-types', () => {
-    it('categorizes passive_rule with superior_defense effect as special action', () => {
-        const features = [makeFeature({ type: 'supreme_sneak', effect: 'supreme_sneak' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes passive_rule with ritual_spells effect in ritualSpells', () => {
-        const features = [makeFeature({ type: 'passive_rule', effect: 'ritual_spells' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.ritualSpells).toHaveLength(1)
-    })
-
-    it('categorizes passive_rule with tavern_brawler_reroll_ones as passive', () => {
-        const features = [makeFeature({ type: 'passive_rule', effect: 'tavern_brawler_reroll_ones' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes Arcane Apotheosis passive_rule as passive', () => {
-        const feature = {
+    it('pre-router SPECIAL_AUTOMATIONS: arcane_apotheosis emits its exact passive row and nothing else', () => {
+        const result = collectAutomationFromFeatures([{
             name: 'Arcane Apotheosis',
-            automation: {
-                type: 'passive_rule',
-                effect: 'arcane_apotheosis',
-                condition: 'innate_sorcery_active',
-                casting_time: 'passive',
-            },
-        }
-        const result = collectAutomationFromFeatures([feature], ps)
-        expect(result.passives).toHaveLength(1)
-        expect(result.passives[0].name).toBe('Arcane Apotheosis')
-        expect(result.passives[0].type).toBe('passive_rule')
-        expect(result.passives[0].effect).toBe('arcane_apotheosis')
+            automation: { type: 'passive_rule', effect: 'arcane_apotheosis', condition: 'innate_sorcery_active', casting_time: 'passive' },
+        }], ps)
+        expect(result.passives).toEqual([{
+            type: 'passive_rule',
+            name: 'Arcane Apotheosis',
+            effect: 'arcane_apotheosis',
+            hasAutomation: true,
+        }])
+        expect(result.actions).toEqual([])
+        expect(result.specialActions).toEqual([])
     })
 })
 
-// ── Multi-category types ──
+// ── casting_time-conditional routes: full branch coverage per helper ──
 
-describe('collectAutomationFromFeatures – multi-category types', () => {
-    it('categorizes use_magic_device as both passive and special action', () => {
-        const features = [makeFeature({ type: 'use_magic_device' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-        expect(result.specialActions).toHaveLength(1)
+describe('collectAutomationFromFeatures – casting_time conditional routing', () => {
+    it.each([
+        // routeModifyD20Roll: reaction / bonus / passive / builder default is '1 reaction'
+        { automation: { type: 'modify_d20_roll', casting_time: '1 reaction' }, expected: { reactions: ['modify_d20_roll'] } },
+        { automation: { type: 'modify_d20_roll', casting_time: '1 bonus action' }, expected: { bonusActions: ['modify_d20_roll'] } },
+        { automation: { type: 'modify_d20_roll', casting_time: 'passive' }, expected: { passives: ['modify_d20_roll'] } },
+        { automation: { type: 'modify_d20_roll' }, expected: { reactions: ['modify_d20_roll'] } },
+        // routeMistyWanderer: passive / bonus / action
+        { automation: { type: 'misty_wanderer', casting_time: 'passive' }, expected: { specialActions: ['misty_wanderer'] } },
+        { automation: { type: 'misty_wanderer', casting_time: '1 bonus action' }, expected: { bonusActions: ['misty_wanderer'] } },
+        { automation: { type: 'misty_wanderer', casting_time: '1 action' }, expected: { actions: ['misty_wanderer'] } },
+        // routeCosmicOmen: bonus / reaction / action (raw authoring strings, un-sanitized)
+        { automation: { type: 'cosmic_omen', casting_time: '1 bonus_action' }, expected: { bonusActions: ['cosmic_omen'] } },
+        { automation: { type: 'cosmic_omen', casting_time: '1 reaction' }, expected: { reactions: ['cosmic_omen'] } },
+        { automation: { type: 'cosmic_omen', casting_time: '1 action' }, expected: { actions: ['cosmic_omen'] } },
+        // routeBonusByCt family: bonus vs action/default
+        { automation: { type: 'illusory_reality', casting_time: '1 bonus_action' }, expected: { bonusActions: ['illusory_reality'] } },
+        { automation: { type: 'illusory_reality', casting_time: '1 action' }, expected: { actions: ['illusory_reality'] } },
+        { automation: { type: 'lesser_restoration', casting_time: '1 bonus_action' }, expected: { bonusActions: ['lesser_restoration'] } },
+        { automation: { type: 'lesser_restoration', casting_time: '1 action' }, expected: { actions: ['lesser_restoration'] } },
+        { automation: { type: 'protection_from_poison', casting_time: '1 bonus_action' }, expected: { bonusActions: ['protection_from_poison'] } },
+        { automation: { type: 'protection_from_poison' }, expected: { actions: ['protection_from_poison'] } },
+    ])('$automation.type $automation.casting_time → $expected', ({ automation, expected }) => {
+        expectRouted(automation, expected)
     })
 })
 
-// ── Auto effect with effect property ──
+// ── routeAttackRider predicate: one row per disjunct, distinct fingerprints ──
 
-describe('collectAutomationFromFeatures – auto_effect with effect property', () => {
-    it('categorizes auto_effect with psychic_teleportation as bonus action', () => {
-        const features = [makeFeature({ type: 'auto_effect', effect: 'psychic_teleportation' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.bonusActions).toHaveLength(1)
-        expect(result.passives).toHaveLength(0)
+describe('collectAutomationFromFeatures – attack_rider predicate routing', () => {
+    it.each([
+        { automation: { type: 'attack_rider', chooseOne: true } },
+        { automation: { type: 'attack_rider', maxEffects: 2 } },
+        { automation: { type: 'attack_rider', oncePerTurn: true, casting_time: 'passive' } },
+        { automation: { type: 'attack_rider', trigger: 'after_hit' } },
+    ])('routes attack_rider $automation to passives only', ({ automation }) => {
+        expectRouted(automation, { passives: ['attack_rider'] })
+    })
+
+    it('routes plain attack_rider (no predicate hit) to actions only', () => {
+        expectRouted({ type: 'attack_rider' }, { actions: ['attack_rider'] })
     })
 })
 
-// ── Conditional flags (combat_superiority) ──
+// ── routeCombatSuperiority: oncePerTurn seam ──
 
-describe('collectAutomationFromFeatures – combat_superiority conditional', () => {
-    it('categorizes combat_superiority with oncePerTurn as action', () => {
-        const features = [makeFeature({ type: 'combat_superiority', oncePerTurn: true })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        expect(result.specialActions).toHaveLength(0)
+describe('collectAutomationFromFeatures – combat_superiority oncePerTurn routing', () => {
+    it('routes oncePerTurn combat_superiority to actions only', () => {
+        expectRouted({ type: 'combat_superiority', oncePerTurn: true }, { actions: ['combat_superiority'] })
     })
 
-    it('categorizes combat_superiority without oncePerTurn as special action', () => {
-        const features = [makeFeature({ type: 'combat_superiority' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.specialActions).toHaveLength(1)
-        expect(result.actions).toHaveLength(0)
+    it('routes combat_superiority without oncePerTurn to specialActions only', () => {
+        expectRouted({ type: 'combat_superiority' }, { specialActions: ['combat_superiority'] })
     })
 })
 
-// ── Casting time conditional types ──
+// ── CLA-357 regression: the router used to push these rows TWICE (sheet
+// name-dedupe hid the dupe) — one action per feature is truth. ──
 
-describe('collectAutomationFromFeatures – casting_time conditional types', () => {
-    it('categorizes misty_wanderer by casting_time', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'misty_wanderer', casting_time: '1 bonus action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'misty_wanderer', casting_time: '1 action' })], ps)
-        expect(actionResult.actions).toHaveLength(1)
-        expect(actionResult.bonusActions).toHaveLength(0)
-    })
-
-    it('categorizes trance_of_order as a bonus action', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'trance_of_order', action: 'bonus_action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-    })
-
-    it('categorizes cosmic_omen by casting_time', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen', casting_time: '1 bonus_action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-
-        const reactionResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen', casting_time: '1 reaction' })], ps)
-        expect(reactionResult.reactions).toHaveLength(1)
-        expect(reactionResult.actions).toHaveLength(0)
-
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'cosmic_omen', casting_time: '1 action' })], ps)
-        expect(actionResult.actions).toHaveLength(1)
-        expect(actionResult.bonusActions).toHaveLength(0)
-    })
-
-    it('categorizes illusory_reality by casting_time', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'illusory_reality', casting_time: '1 bonus_action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'illusory_reality', casting_time: '1 action' })], ps)
-        expect(actionResult.actions).toHaveLength(1)
-        expect(actionResult.bonusActions).toHaveLength(0)
-    })
-
-    it('categorizes lesser_restoration by casting_time', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'lesser_restoration', casting_time: '1 bonus_action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'lesser_restoration', casting_time: '1 action' })], ps)
-        expect(actionResult.actions).toHaveLength(1)
-        expect(actionResult.bonusActions).toHaveLength(0)
-    })
-
-    it('categorizes protection_from_poison by casting_time', () => {
-        const bonusResult = collectAutomationFromFeatures([makeFeature({ type: 'protection_from_poison', casting_time: '1 bonus_action' })], ps)
-        expect(bonusResult.bonusActions).toHaveLength(1)
-        expect(bonusResult.actions).toHaveLength(0)
-
-        const actionResult = collectAutomationFromFeatures([makeFeature({ type: 'protection_from_poison' })], ps)
-        expect(actionResult.actions).toHaveLength(1)
-        expect(actionResult.bonusActions).toHaveLength(0)
-    })
+describe('collectAutomationFromFeatures – CLA-357 single-row regression', () => {
+    it.each(['arcane_charge', 'telekinetic_movement'])('routes exactly one %s action row', expectRoutedAll)
 })
 
-// ── Attack rider conditional types ──
-
-describe('collectAutomationFromFeatures – attack_rider conditional types', () => {
-    it('categorizes attack_rider with chooseOne as passive', () => {
-        const features = [makeFeature({ type: 'attack_rider', chooseOne: true })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-        expect(result.actions).toHaveLength(0)
-    })
-
-    it('categorizes attack_rider with maxEffects > 1 as passive', () => {
-        const features = [makeFeature({ type: 'attack_rider', maxEffects: 2 })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes attack_rider with oncePerTurn and passive casting_time as passive', () => {
-        const features = [makeFeature({ type: 'attack_rider', oncePerTurn: true, casting_time: 'passive' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes attack_rider with trigger as passive', () => {
-        const features = [makeFeature({ type: 'attack_rider', trigger: 'after_hit' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes plain attack_rider without options as action', () => {
-        const features = [makeFeature({ type: 'attack_rider' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-    })
-})
-
-// ── Array automations ──
-
-describe('collectAutomationFromFeatures – array automations', () => {
-    it('handles array of automations on a single feature', () => {
-        const features = [{
-            name: 'Dual Feature',
-            automation: [
-                { type: 'warding_bond' },
-                { type: 'bulwark_of_force' },
-            ]
-        }]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-        expect(result.actions[0].type).toBe('warding_bond')
-        expect(result.bonusActions).toHaveLength(1)
-        expect(result.bonusActions[0].type).toBe('bulwark_of_force')
-    })
-
-    it('handles multiple features each with array automations', () => {
-        const features = [
-            { name: 'F1', automation: [{ type: 'warding_bond' }, { type: 'sleep' }] },
-            { name: 'F2', automation: [{ type: 'psionic_strike' }] },
-        ]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
-        expect(result.reactions).toHaveLength(1)
-    })
-
-    it('handles mixed single and array automations', () => {
-        const features = [
-            { name: 'Single', automation: { type: 'warding_bond' } },
-            { name: 'Array', automation: [{ type: 'sleep' }, { type: 'psionic_strike' }] },
-        ]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(2)
-        expect(result.reactions).toHaveLength(1)
-    })
-})
-
-// ── Contact Patron (CLA-061) regression test ──
+// ── Contact Patron (CLA-061) regression ──
 
 describe('collectAutomationFromFeatures – Contact Patron (CLA-061)', () => {
     it('collects both free_spell action and contact_patron_auto_save passive from array automation', () => {
@@ -532,51 +325,5 @@ describe('collectAutomationFromFeatures – Contact Patron (CLA-061)', () => {
         expect(result.passives[0].effect).toBe('contact_patron_auto_save')
         expect(result.passives[0].name).toBe('Contact Patron')
         expect(result.passives[0].hasAutomation).toBe(true)
-    })
-
-    it('collects contact_patron_auto_save passive when it is a standalone feature', () => {
-        const feature = {
-            name: 'Contact Patron Auto Save',
-            automation: {
-                type: 'passive_rule',
-                effect: 'contact_patron_auto_save',
-                casting_time: 'passive',
-            },
-        }
-
-        const result = collectAutomationFromFeatures([feature], ps)
-
-        expect(result.passives).toHaveLength(1)
-        expect(result.passives[0].type).toBe('passive_rule')
-        expect(result.passives[0].effect).toBe('contact_patron_auto_save')
-    })
-})
-
-// ── processFeatureAutomation edge cases ──
-
-describe('processFeatureAutomation – edge cases', () => {
-    let processFeatureAutomation
-
-    beforeAll(async () => {
-        const mod = await import('./automationCollector.js')
-        processFeatureAutomation = mod.processFeatureAutomation
-    })
-
-    it('handles all empty arrays', () => {
-        const result = processFeatureAutomation([], [], [], [], ps)
-        expect(result.actions).toEqual([])
-        expect(result.bonusActions).toEqual([])
-        expect(result.reactions).toEqual([])
-        expect(result.specialActions).toEqual([])
-        expect(result.passives).toEqual([])
-    })
-
-    it('does not add duplicate wrappers for same-named features', () => {
-        const actions = [{ name: 'Test', automation: { type: 'warding_bond' } }]
-        const bonusActions = []
-        const reactions = []
-        const specialActions = [{ name: 'Test', automation: { type: 'warding_bond' } }]
-        processFeatureAutomation(actions, bonusActions, reactions, specialActions, ps)
-        expect(actions).toHaveLength(1)
     })
 })

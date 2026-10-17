@@ -1,211 +1,137 @@
+// @maintained-by-ai
+// combatSuperiority.js builder-envelope unit lane (#2099) — this file owns the
+// per-maneuver ENVELOPE VALUES this module emits. Sibling lanes (cite, don't re-pin):
+// • routing breadth: automationCollector.types.test.js
+// • movement + skill_check collect→render with full disk-shape input:
+//   automationCollector.combatSuperiorityMovement.test.js (#2083)
+// • grant_attack full envelope via collector (incl. disk-missing effect default):
+//   automationCollector.combatSuperiorityGrantAttack.test.js (#2082)
+// • commanding_presence_reaction envelope (all 7 exports' sixth handler):
+//   combatSuperiority.mn004.test.js — NOT re-pinned here
+// • downstream DC math on the 'ability' token (buildSaveDc → 17, never baked 14,
+//   MN-020): executeAttackRider.mn020.test.js / combatSuperiorityQueries.mn020.test.js
+// • executor lanes: src/services/automation/handlers/class-fighter-rogue/*
+//
+// #2099 stale-fixture fix, applied: the old skill_check fixture dropped 'Insight'
+// from Tactical Assessment's skills and wrote ability as 'INT'. Both re-anchored
+// VERBATIM to public/data/2024/maneuvers.json (ability is 'Intelligence' spelled
+// out on disk); the Ambush row adds the initiativeBonus:true anchor so a hardcoded
+// false cannot pass. combat_superiority anchored verbatim to the Battle Master row
+// in public/data/2024/classes.json. Envelopes are exact toEqual — extra synthetic
+// input keys (actionType/damageBonus/dieExpression on maneuver rows) must NOT be
+// copied into the envelope. No clocks; pure function, zero mocks.
 import { describe, it, expect } from 'vitest'
 import { combatSuperiorityHandlers } from './combatSuperiority.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'
 
+// VERBATIM from public/data/2024/classes.json Battle Master → Combat Superiority.
+const BM_AUTO = {
+    type: 'combat_superiority',
+    saveType: 'WIS',
+    saveAbility: ['STR', 'DEX'],
+    saveDc: 'ability',
+    dieExpression: 'superiority_die',
+    uses_max: 4,
+    recharge: 'short_rest',
+    maxOptions: 3,
+    maxOptionsScaling: { 7: 2, 10: 2, 15: 2 },
+}
+
+// BASE_STATS: STR +4 beats DEX +2 → saveAbility 'STR'.
+const BM_ENVELOPE = {
+    type: 'combat_superiority',
+    name: 'Combat Superiority',
+    saveType: 'WIS',
+    saveDc: 'ability', // MN-020: token rides through, never a baked number
+    saveAbility: 'STR',
+    saveAbilities: ['STR', 'DEX'],
+    dieExpression: 'superiority_die', // string token, not evaluated at build time
+    usesMax: 4,
+    usesRecharge: 'short_rest',
+    options: [],
+    maxOptions: 3,
+    oncePerTurn: false,
+    chooseOne: false,
+    hasAutomation: true,
+}
+
 describe('combatSuperiorityHandlers – combat_superiority', () => {
-    it('returns combat_superiority info with defaults', () => {
-        const feature = makeFeature({ type: 'combat_superiority' })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
+    it.each([
+        [3, 3], // base; first scaling threshold is level 7
+        [7, 5], // +2 at the first threshold
+        [15, 9], // 3 + 2 + 2 + 2 — all thresholds accumulate
+    ])('builds the exact disk-row envelope for a level %i host (maxOptions %i)', (level, maxOptions) => {
+        const result = combatSuperiorityHandlers.combat_superiority(
+            makeFeature(BM_AUTO, 'Combat Superiority'),
+            { ...BASE_STATS, level },
+        )
+        expect(result).toEqual({ ...BM_ENVELOPE, maxOptions })
+    })
 
-        expect(result).toMatchObject({
-            type: 'combat_superiority',
-            name: 'Test Feature',
-            saveType: 'WIS',
-            saveAbility: 'STR',
-            dieExpression: 'superiority_die',
-            usesMax: 4,
-            usesRecharge: 'short_rest',
-            options: [],
-            oncePerTurn: false,
-            chooseOne: false,
-            hasAutomation: true,
+    it('picks the higher-modifier save ability from the disk pair, not the first entry', () => {
+        const result = combatSuperiorityHandlers.combat_superiority(makeFeature(BM_AUTO, 'Combat Superiority'), {
+            ...BASE_STATS,
+            abilities: [{ name: 'Strength', bonus: 1 }, { name: 'Dexterity', bonus: 5 }],
         })
-        expect(result.saveDc).toBe('ability')
+        expect(result.saveAbility).toBe('DEX')
+        expect(result.saveAbilities).toEqual(['STR', 'DEX'])
     })
 
-    it('uses explicit saveDc when not ability', () => {
-        const feature = makeFeature({ type: 'combat_superiority', saveDc: 15 })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.saveDc).toBe(15)
-    })
-
-    // MN-020: the builder must NOT bake a numeric DC — collectAutomationFromFeatures
-    // runs before rules.getAbilities folds ability `.bonus`, so baking produced DC 14
-    // for a STR +3 lv18 host. The 'ability' token resolves at prompt time via
-    // buildSaveDc (CLA-342 precedent).
-    it('passes the saveDc token through without baking a number', () => {
-        const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.saveDc).toBe('ability')
-        expect(result.saveAbility).toBe('STR')
-    })
-
-    it('passes through custom saveAbility with the saveDc token', () => {
-        const feature = makeFeature({
-            type: 'combat_superiority',
-            saveDc: 'ability',
-            saveAbility: 'WIS',
-            saveType: 'WIS',
-        })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.saveDc).toBe('ability')
-        expect(result.saveAbility).toBe('WIS')
-        expect(result.saveType).toBe('WIS')
-    })
-
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
-            type: 'combat_superiority',
-            dieExpression: '2d8',
-            uses_max: 6,
-            recharge: 'long_rest',
-            oncePerTurn: true,
-            chooseOne: true,
-        })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.dieExpression).toBe('2d8')
-        expect(result.usesMax).toBe(6)
-        expect(result.usesRecharge).toBe('long_rest')
-        expect(result.oncePerTurn).toBe(true)
-        expect(result.chooseOne).toBe(true)
-    })
-
-    it('coerces oncePerTurn and chooseOne to boolean', () => {
-        const feature = makeFeature({
-            type: 'combat_superiority',
-            oncePerTurn: 1,
-            chooseOne: 'yes',
-        })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        expect(result.oncePerTurn).toBe(true)
-        expect(result.chooseOne).toBe(true)
-    })
-
-    it('handles missing proficiency in playerStats', () => {
-        const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, { ...BASE_STATS, proficiency: undefined })
-        expect(result.saveDc).toBe('ability')
-    })
-
-    it('handles empty abilities array in playerStats', () => {
-        const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability' })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, { ...BASE_STATS, abilities: [] })
-        expect(result.saveDc).toBe('ability')
-    })
-
-    // MN-020: DC resolution moved to prompt time (buildSaveDc) — a STR +3 PB +6
-    // host must resolve 17 there, not the old baked 8 + 0 + 6 = 14.
-    it('resolves 17 for a STR +3 PB +6 host via buildSaveDc at prompt time', async () => {
-        const { buildSaveDc } = await import('../../../automation/common/savePrompt.js')
-        const feature = makeFeature({ type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] })
-        const result = combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)
-        const computedStats = {
-            proficiency: 6,
-            abilities: [
-                { name: 'Strength', bonus: 3 },
-                { name: 'Dexterity', bonus: 0 },
-            ],
-        }
-        expect(result.saveDc).toBe('ability')
-        expect(buildSaveDc(result, computedStats)).toBe(17)
+    it.each([
+        ['synthetic minimal shape — every builder default is load-bearing',
+            makeFeature({ type: 'combat_superiority' }),
+            { ...BM_ENVELOPE, name: 'Test Feature', saveAbilities: ['STR'] }],
+        ['explicit overrides — numeric saveDc honored here (unlike mn004, which discards it); truthy flags coerce to boolean',
+            makeFeature({ type: 'combat_superiority', saveAbility: ['STR', 'DEX'], saveDc: 15, dieExpression: '2d8', uses_max: 6, recharge: 'long_rest', oncePerTurn: 1, chooseOne: 'yes' }),
+            { ...BM_ENVELOPE, name: 'Test Feature', saveDc: 15, dieExpression: '2d8', usesMax: 6, usesRecharge: 'long_rest', oncePerTurn: true, chooseOne: true }],
+    ])('%s', (_label, feature, expected) => {
+        expect(combatSuperiorityHandlers.combat_superiority(feature, BASE_STATS)).toEqual(expected)
     })
 })
 
-describe('combatSuperiorityHandlers – tactical_mind', () => {
-    it('returns tactical_mind info with defaults and passes through custom fields', () => {
-        const feature = makeFeature({ type: 'tactical_mind', bonusExpression: '+2d4' })
-        const result = combatSuperiorityHandlers.tactical_mind(feature, BASE_STATS)
-
-        expect(result.type).toBe('tactical_mind')
-        expect(result.name).toBe('Test Feature')
-        expect(result.bonusExpression).toBe('+2d4')
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom name', () => {
-        const feature = makeFeature({ type: 'tactical_mind' }, 'Tactical Genius')
-        const result = combatSuperiorityHandlers.tactical_mind(feature, BASE_STATS)
-        expect(result.name).toBe('Tactical Genius')
-    })
-})
-
-describe('combatSuperiorityHandlers – know_enemy', () => {
-    it('returns know_enemy info with defaults and passes through custom fields', () => {
-        const feature = makeFeature({ type: 'know_enemy', range: '60_ft', uses_max: 6 })
-        const result = combatSuperiorityHandlers.know_enemy(feature, BASE_STATS)
-
-        expect(result.type).toBe('know_enemy')
-        expect(result.name).toBe('Test Feature')
-        expect(result.range).toBe('60_ft')
-        expect(result.usesMax).toBe(6)
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom name', () => {
-        const feature = makeFeature({ type: 'know_enemy' }, 'Know Foe')
-        const result = combatSuperiorityHandlers.know_enemy(feature, BASE_STATS)
-        expect(result.name).toBe('Know Foe')
+describe('combatSuperiorityHandlers – tactical_mind / know_enemy', () => {
+    it.each([
+        ['tactical_mind minimal — bonusExpression defaults to empty string', 'tactical_mind',
+            makeFeature({ type: 'tactical_mind' }),
+            { type: 'tactical_mind', name: 'Test Feature', bonusExpression: '', hasAutomation: true }],
+        ['tactical_mind passes through custom expression and name', 'tactical_mind',
+            makeFeature({ type: 'tactical_mind', bonusExpression: '+2d4' }, 'Tactical Genius'),
+            { type: 'tactical_mind', name: 'Tactical Genius', bonusExpression: '+2d4', hasAutomation: true }],
+        ['know_enemy minimal — defaults 30_ft / 4 uses', 'know_enemy',
+            makeFeature({ type: 'know_enemy' }),
+            { type: 'know_enemy', name: 'Test Feature', range: '30_ft', usesMax: 4, hasAutomation: true }],
+        ['know_enemy passes through custom range/uses/name', 'know_enemy',
+            makeFeature({ type: 'know_enemy', range: '60_ft', uses_max: 6 }, 'Know Foe'),
+            { type: 'know_enemy', name: 'Know Foe', range: '60_ft', usesMax: 6, hasAutomation: true }],
+    ])('%s', (_label, type, feature, expected) => {
+        expect(combatSuperiorityHandlers[type](feature, BASE_STATS)).toEqual(expected)
     })
 })
 
-// MN-002: movement/skill-check maneuvers were dropped pre-render because
-// DISPATCH had no entries — collector specialActions bucket stayed empty.
-describe('combatSuperiorityHandlers – combat_superiority_movement', () => {
-    it('builds Bait and Switch movement info and carries maneuverName', () => {
-        const feature = makeFeature({
-            type: 'combat_superiority_movement',
-            maneuverName: 'Bait and Switch',
-            effect: 'ac_bonus_and_swap',
-            range: '5_ft',
-        }, 'Bait and Switch')
-        const result = combatSuperiorityHandlers.combat_superiority_movement(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
-            type: 'combat_superiority_movement',
-            name: 'Bait and Switch',
-            maneuverName: 'Bait and Switch',
-            effect: 'ac_bonus_and_swap',
-            range: '5_ft',
-            hasAutomation: true,
-        })
-    })
-
-    it('falls back to feature name and default effect/range', () => {
-        const feature = makeFeature({ type: 'combat_superiority_movement' }, 'Bait and Switch')
-        const result = combatSuperiorityHandlers.combat_superiority_movement(feature, BASE_STATS)
-        expect(result.maneuverName).toBe('Bait and Switch')
-        expect(result.effect).toBe('ac_bonus_and_swap')
-        expect(result.range).toBe('5_ft')
-    })
-})
-
-describe('combatSuperiorityHandlers – combat_superiority_skill_check', () => {
-    it('builds skill-check info and carries skills/ability/initiativeBonus', () => {
-        const feature = makeFeature({
-            type: 'combat_superiority_skill_check',
-            maneuverName: 'Tactical Assessment',
-            skills: ['History', 'Investigation'],
-            ability: 'INT',
-            initiativeBonus: false,
-        }, 'Tactical Assessment')
-        const result = combatSuperiorityHandlers.combat_superiority_skill_check(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
-            type: 'combat_superiority_skill_check',
-            name: 'Tactical Assessment',
-            maneuverName: 'Tactical Assessment',
-            skills: ['History', 'Investigation'],
-            ability: 'INT',
-            initiativeBonus: false,
-            hasAutomation: true,
-        })
-    })
-
-    it('defaults skills to empty array and initiativeBonus to false', () => {
-        const feature = makeFeature({ type: 'combat_superiority_skill_check' }, 'Ambush')
-        const result = combatSuperiorityHandlers.combat_superiority_skill_check(feature, BASE_STATS)
-        expect(result.skills).toEqual([])
-        expect(result.ability).toBeNull()
-        expect(result.initiativeBonus).toBe(false)
+// MN-002/MN-003: maneuverName must ride the envelope — every dispatcher reads
+// action.automation.maneuverName. Row values VERBATIM from
+// public/data/2024/maneuvers.json; automation key-set mirrors maneuvers.js
+// synthesis (its extra keys must NOT be copied into the envelope). Commander's
+// Strike full row is pinned verbatim through the collector in #2082 — here only
+// its minimal-fallback path runs.
+describe('combatSuperiorityHandlers – movement / skill_check / grant_attack envelopes (MN-002/003)', () => {
+    it.each([
+        ['movement row verbatim (Bait and Switch)', 'combat_superiority_movement',
+            { name: 'Bait and Switch', description: 'Expend one Superiority Die and switch places.', automation: { type: 'combat_superiority_movement', maneuverName: 'Bait and Switch', actionType: 'movement', effect: 'ac_bonus_and_swap', dieExpression: 'superiority_die', range: '5_ft', hasAutomation: true } },
+            { type: 'combat_superiority_movement', name: 'Bait and Switch', description: 'Expend one Superiority Die and switch places.', maneuverName: 'Bait and Switch', effect: 'ac_bonus_and_swap', range: '5_ft', hasAutomation: true }],
+        ['movement minimal — maneuverName falls back to feature name, disk-value defaults hold', 'combat_superiority_movement',
+            { name: 'Bait and Switch', automation: { type: 'combat_superiority_movement' } },
+            { type: 'combat_superiority_movement', name: 'Bait and Switch', description: '', maneuverName: 'Bait and Switch', effect: 'ac_bonus_and_swap', range: '5_ft', hasAutomation: true }],
+        ['skill_check row verbatim (Tactical Assessment — skills include Insight, ability spelled out, NOT #2099-stale History/Investigation-only INT)', 'combat_superiority_skill_check',
+            { name: 'Tactical Assessment', description: 'Add a Superiority Die to one ability check.', automation: { type: 'combat_superiority_skill_check', maneuverName: 'Tactical Assessment', actionType: 'skill_check', skills: ['History', 'Investigation', 'Insight'], ability: 'Intelligence', initiativeBonus: false, hasAutomation: true } },
+            { type: 'combat_superiority_skill_check', name: 'Tactical Assessment', description: 'Add a Superiority Die to one ability check.', maneuverName: 'Tactical Assessment', skills: ['History', 'Investigation', 'Insight'], ability: 'Intelligence', initiativeBonus: false, hasAutomation: true }],
+        ['skill_check row verbatim (Ambush — initiativeBonus true proves the read, ability absent on disk → null)', 'combat_superiority_skill_check',
+            { name: 'Ambush', description: 'Add a Superiority Die to Stealth or Initiative.', automation: { type: 'combat_superiority_skill_check', maneuverName: 'Ambush', actionType: 'skill_check', skills: ['Stealth'], initiativeBonus: true, hasAutomation: true } },
+            { type: 'combat_superiority_skill_check', name: 'Ambush', description: 'Add a Superiority Die to Stealth or Initiative.', maneuverName: 'Ambush', skills: ['Stealth'], ability: null, initiativeBonus: true, hasAutomation: true }],
+        ['grant_attack minimal — effect/range defaults, oncePerTurn false when absent', 'combat_superiority_grant_attack',
+            { name: "Commander's Strike", automation: { type: 'combat_superiority_grant_attack' } },
+            { type: 'combat_superiority_grant_attack', name: "Commander's Strike", description: '', maneuverName: "Commander's Strike", effect: 'grant_attack_damage', range: '30_ft', oncePerTurn: false, hasAutomation: true }],
+    ])('%s', (_label, type, feature, expected) => {
+        expect(combatSuperiorityHandlers[type](feature, BASE_STATS)).toEqual(expected)
     })
 })

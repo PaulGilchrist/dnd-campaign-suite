@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -27,18 +28,25 @@ describe('FT-036 — Punch and Grab routes to automation.passives', () => {
     });
   });
 
-  it('collects the rider into passives (never actions), preserving the marker', () => {
+  it('routes the real rider into passives and nowhere else, verbatim markers intact', () => {
     const benefit = loadGrapplerPunchAndGrab();
     // parse2024OtherBenefit default push for type:'action': automation verbatim.
     const feature = { name: benefit.name, description: benefit.description, type: benefit.type, automation: benefit.automation };
     const playerStats = { name: 'Monk1', abilities: [], proficiency: 2 };
     const result = collectAutomationFromFeatures([feature], playerStats);
-    const rider = result.passives.find(p => p.effect === 'punch_and_grab');
-    expect(rider).toMatchObject({
+    // Set-exactness: exactly one occurrence across every bucket, in passives.
+    const bucketsWithRider = Object.entries(result)
+      .filter(([, items]) => Array.isArray(items) && items.some(item => item?.effect === 'punch_and_grab'))
+      .map(([bucket]) => bucket);
+    expect(bucketsWithRider).toEqual(['passives']);
+    // Consumer (steps/features/grappler.js) gates on the collected rider keeping
+    // the routing/load-bearing markers: trigger, oncePerTurn, casting_time passive.
+    expect(result.passives.filter(p => p.effect === 'punch_and_grab')).toHaveLength(1);
+    expect(result.passives.find(p => p.effect === 'punch_and_grab')).toMatchObject({
       type: 'attack_rider',
       trigger: 'unarmed_strike_hit',
       oncePerTurn: true,
+      casting_time: 'passive',
     });
-    expect(result.actions.some(a => a.effect === 'punch_and_grab')).toBe(false);
   });
 });

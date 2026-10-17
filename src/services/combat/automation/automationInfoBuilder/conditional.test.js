@@ -1,333 +1,364 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest'
 
 import { conditionalHandlers } from './conditional.js'
-import { BASE_STATS } from '../automationInfoBuilder.test-utils.js'
+import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'
 
-function featureWith(automation, name = 'Test Feature') {
-    return { name, automation }
-}
+// Unit home for conditional.js envelope VALUES. Dispatch through the facade and
+// registry liveness are pinned by automationInfoBuilder.test.js; modifier
+// extraction by automationModifiers.test.js; collector routing by
+// automationCollector.*.test.js. This file pins exact output envelopes only —
+// every custom value is deliberately distinct from its default so a silently
+// hardcoded field fails (input-equals-default blindness audit).
+//
+// Inputs are verbatim disk anchors (path cited inline) or explicitly labelled
+// synthetic discriminating feeds (machinery-tests — real features never carry
+// these exact shapes; they exist to separate read-vs-hardcoded arms).
 
-// ── conditional_advantage ────────────────────────────────────────────
+// ── exact envelopes: discriminating custom feeds ─────────────────────
 
-describe('conditional_advantage', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'conditional_advantage',
+const CUSTOM_CASES = [
+    {
+        // Synthetic: effect 'disadvantage' through the ADVANTAGE builder proves
+        // effect is read from automation, not hardcoded (mirrored in the
+        // disadvantage case below — no default leaks across builders).
+        handler: 'conditional_advantage',
+        automation: {
             target: 'ability_check',
             condition: 'adjacent_to_enemy',
-            effect: 'advantage',
+            effect: 'disadvantage',
             abilities: ['STR', 'DEX'],
             uses: 3,
             recharge: 'short_rest',
             casting_time: '1 action',
             trigger: 'on_spell_cast'
-        })
-        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+        },
+        expected: {
             type: 'conditional_advantage',
             name: 'Test Feature',
             target: 'ability_check',
             condition: 'adjacent_to_enemy',
-            effect: 'advantage',
+            effect: 'disadvantage',
             abilities: ['STR', 'DEX'],
             uses: 3,
             recharge: 'short_rest',
             casting_time: '1 action',
             trigger: 'on_spell_cast',
             hasAutomation: true
-        })
-    })
-
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
-
-        expect(result.target).toBe('saving_throw')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('advantage')
-        expect(result.abilities).toEqual([])
-        expect(result.uses).toBeNull()
-        expect(result.recharge).toBe('long_rest')
-        expect(result.casting_time).toBe('passive')
-        expect(result.trigger).toBe('')
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes through custom feature name', () => {
-        const feature = featureWith({ condition: 'flanking' }, 'Flanking Strike')
-        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
-        expect(result.name).toBe('Flanking Strike')
-    })
-})
-
-// ── conditional_disadvantage ─────────────────────────────────────────
-
-describe('conditional_disadvantage', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'conditional_disadvantage',
+        }
+    },
+    {
+        // Synthetic (see above): effect 'advantage' through the DISADVANTAGE builder.
+        handler: 'conditional_disadvantage',
+        automation: {
             target: 'saving_throw',
             condition: 'below_half_hp',
-            effect: 'disadvantage',
+            effect: 'advantage',
             abilities: ['CON']
-        })
-        const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+        },
+        expected: {
             type: 'conditional_disadvantage',
             name: 'Test Feature',
             target: 'saving_throw',
             condition: 'below_half_hp',
-            effect: 'disadvantage',
+            effect: 'advantage',
             abilities: ['CON'],
             hasAutomation: true
-        })
-    })
-
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
-
-        expect(result.target).toBe('attack_roll')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('disadvantage')
-        expect(result.abilities).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
-// ── conditional_replacement ──────────────────────────────────────────
-
-describe('conditional_replacement', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'conditional_replacement',
+        }
+    },
+    {
+        // Verbatim public/data/2024/classes.json conditional_replacement
+        // (psionic psion-shown mechanics); casting_time is on disk but the
+        // builder drops it — exact toEqual pins that truncation.
+        handler: 'conditional_replacement',
+        automation: {
             target: 'ability_check',
-            saveType: 'DEX',
-            condition: 'stealthed',
-            effect: 'replace_on_stealth',
-            replacementAbility: 'DEX'
-        })
-        const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+            saveType: 'STR',
+            condition: 'low_total',
+            effect: 'replacement',
+            replacementAbility: 'STR',
+            casting_time: 'passive'
+        },
+        expected: {
             type: 'conditional_replacement',
             name: 'Test Feature',
             target: 'ability_check',
-            saveType: 'DEX',
-            condition: 'stealthed',
-            effect: 'replace_on_stealth',
-            replacementAbility: 'DEX',
+            saveType: 'STR',
+            condition: 'low_total',
+            effect: 'replacement',
+            replacementAbility: 'STR',
             hasAutomation: true
-        })
-    })
-
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
-
-        expect(result.target).toBe('saving_throw')
-        expect(result.saveType).toBe('')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('')
-        expect(result.replacementAbility).toBe('')
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
-// ── condition_immunity_while_active ──────────────────────────────────
-
-describe('condition_immunity_while_active', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'condition_immunity_while_active',
+        }
+    },
+    {
+        // Synthetic: Rage-shaped immunity (public/data/2024/classes.json uses
+        // target 'self', identical to the default — this feed uses a
+        // non-default target so target-read vs default is distinguishable.
+        handler: 'condition_immunity_while_active',
+        automation: {
             target: 'allies_in_range',
             immunities: ['charmed', 'frightened'],
             requiresActive: 'aura_of_protection'
-        })
-        const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+        },
+        expected: {
             type: 'condition_immunity_while_active',
             name: 'Test Feature',
             target: 'allies_in_range',
             immunities: ['charmed', 'frightened'],
             requiresActive: 'aura_of_protection',
             hasAutomation: true
-        })
-    })
-
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
-
-        expect(result.target).toBe('self')
-        expect(result.immunities).toEqual([])
-        expect(result.requiresActive).toBe('')
-        expect(result.hasAutomation).toBe(true)
-    })
-})
-
-// ── evasion ──────────────────────────────────────────────────────────
-
-describe('evasion', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'evasion',
-            saveType: 'CON',
-            shareable: true,
-            shareRange: 30
-        })
-        const result = conditionalHandlers.evasion(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+        }
+    },
+    {
+        // Synthetic: saveType 'CON' distinguishes read from the hardcoded
+        // 'DEX' default. shareable:'yes' pins the !! coercion (non-boolean
+        // truthy → true) and shareRange:'30' pins verbatim token passthrough
+        // (|| does not coerce numbers) — observed behavior, not sanitized.
+        handler: 'evasion',
+        automation: { saveType: 'CON', shareable: 'yes', shareRange: '30' },
+        expected: {
             type: 'evasion',
             name: 'Test Feature',
             saveType: 'CON',
             shareable: true,
-            shareRange: 30,
+            shareRange: '30',
             hasAutomation: true
-        })
-    })
-
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.evasion(feature, BASE_STATS)
-
-        expect(result.saveType).toBe('DEX')
-        expect(result.shareable).toBe(false)
-        expect(result.shareRange).toBe(0)
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('coerces shareable to boolean for truthy values', () => {
-        const feature = featureWith({ shareable: 'yes' })
-        const result = conditionalHandlers.evasion(feature, BASE_STATS)
-        expect(result.shareable).toBe(true)
-    })
-})
-
-// ── save_proficiency ─────────────────────────────────────────────────
-
-describe('save_proficiency', () => {
-    it('returns correct shape with full automation data', () => {
-        const feature = featureWith({
-            type: 'save_proficiency',
-            saveType: 'WIS',
-            fallbackTypes: ['INT', 'CHA']
-        })
-        const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
+        }
+    },
+    {
+        // Verbatim public/data/feats.json Brawny save_proficiency.
+        handler: 'save_proficiency',
+        automation: {
+            saveType: 'Strength',
+            fallbackTypes: ['Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+        },
+        expected: {
             type: 'save_proficiency',
             name: 'Test Feature',
-            saveType: 'WIS',
-            fallbackTypes: ['INT', 'CHA'],
+            saveType: 'Strength',
+            fallbackTypes: ['Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'],
             hasAutomation: true
-        })
-    })
+        }
+    }
+]
 
-    it('applies defaults when automation is an empty object', () => {
-        const feature = featureWith({})
-        const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
+// ── exact envelopes: empty-automation defaults arm ───────────────────
 
-        expect(result.saveType).toBe('')
-        expect(result.fallbackTypes).toEqual([])
-        expect(result.hasAutomation).toBe(true)
+const DEFAULTS_CASES = [
+    {
+        handler: 'conditional_advantage',
+        expected: {
+            type: 'conditional_advantage',
+            name: 'Test Feature',
+            target: 'saving_throw',
+            condition: '',
+            effect: 'advantage',
+            abilities: [],
+            uses: null,
+            recharge: 'long_rest',
+            casting_time: 'passive',
+            trigger: '',
+            hasAutomation: true
+        }
+    },
+    {
+        handler: 'conditional_disadvantage',
+        expected: {
+            type: 'conditional_disadvantage',
+            name: 'Test Feature',
+            target: 'attack_roll',
+            condition: '',
+            effect: 'disadvantage',
+            abilities: [],
+            hasAutomation: true
+        }
+    },
+    {
+        handler: 'conditional_replacement',
+        expected: {
+            type: 'conditional_replacement',
+            name: 'Test Feature',
+            target: 'saving_throw',
+            saveType: '',
+            condition: '',
+            effect: '',
+            replacementAbility: '',
+            hasAutomation: true
+        }
+    },
+    {
+        handler: 'condition_immunity_while_active',
+        expected: {
+            type: 'condition_immunity_while_active',
+            name: 'Test Feature',
+            target: 'self',
+            immunities: [],
+            requiresActive: '',
+            hasAutomation: true
+        }
+    },
+    {
+        handler: 'evasion',
+        expected: {
+            type: 'evasion',
+            name: 'Test Feature',
+            saveType: 'DEX',
+            shareable: false,
+            shareRange: 0,
+            hasAutomation: true
+        }
+    },
+    {
+        handler: 'save_proficiency',
+        expected: {
+            type: 'save_proficiency',
+            name: 'Test Feature',
+            saveType: '',
+            fallbackTypes: [],
+            hasAutomation: true
+        }
+    }
+]
+
+describe('conditional builders – custom feeds, exact envelope', () => {
+    it.each(CUSTOM_CASES)('$handler reads every field', ({ handler, automation, expected }) => {
+        expect(conditionalHandlers[handler](makeFeature(automation), BASE_STATS)).toEqual(expected)
     })
 })
 
-// ── passive_rule ─────────────────────────────────────────────────────
+describe('conditional builders – empty automation, exact defaults envelope', () => {
+    it.each(DEFAULTS_CASES)('$handler', ({ handler, expected }) => {
+        expect(conditionalHandlers[handler](makeFeature({}), BASE_STATS)).toEqual(expected)
+    })
+})
+
+describe('conditional builders – hardcoded fields cannot be overridden', () => {
+    it.each(Object.keys(conditionalHandlers))(
+        '%s hardcodes type/name despite poison input',
+        (handler) => {
+            const result = conditionalHandlers[handler](
+                makeFeature({ type: 'poison_type', name: 'poison_name' }, 'Real Name'),
+                BASE_STATS
+            )
+            expect(result.type).toBe(handler)
+            expect(result.name).toBe('Real Name')
+            expect(result.hasAutomation).toBe(true)
+        }
+    )
+})
+
+describe('conditional_advantage – loose || truthiness quirks (pinned as observed)', () => {
+    it('collapses every falsy automation value to the || default', () => {
+        const result = conditionalHandlers.conditional_advantage(makeFeature({
+            target: '',
+            condition: '',
+            effect: '',
+            abilities: [],
+            uses: 0,
+            recharge: '',
+            casting_time: '',
+            trigger: ''
+        }), BASE_STATS)
+
+        // uses:0 → null is the load-bearing quirk: a zero-use feature reports
+        // unlimited (null), NOT 0. Pinned honestly, not sanitized.
+        expect(result).toEqual({
+            type: 'conditional_advantage',
+            name: 'Test Feature',
+            target: 'saving_throw',
+            condition: '',
+            effect: 'advantage',
+            abilities: [],
+            uses: null,
+            recharge: 'long_rest',
+            casting_time: 'passive',
+            trigger: '',
+            hasAutomation: true
+        })
+    })
+})
+
+// ── passive_rule: three-way branch on effect (=== 'ignore_resistance') ──
 
 describe('passive_rule', () => {
-    it('returns ignore_resistance shape with only relevant fields', () => {
-        const feature = featureWith({
-            type: 'passive_rule',
+    it('ignore_resistance: short envelope, generic fields truncated despite poison input', () => {
+        // damageTypes verbatim public/data/2024/feats.json (Crushing-advance-style feat);
+        // generic fields added as poison to prove the branch drops them.
+        const result = conditionalHandlers.passive_rule(makeFeature({
             effect: 'ignore_resistance',
-            damageTypes: ['fire', 'cold']
-        })
-        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
-            type: 'passive_rule',
-            name: 'Test Feature',
-            effect: 'ignore_resistance',
-            damageTypes: ['fire', 'cold'],
-            hasAutomation: true
-        })
-        expect(result).not.toHaveProperty('criticalRange')
-        expect(result).not.toHaveProperty('bonusExpression')
-        expect(result).not.toHaveProperty('spells')
-        expect(result).not.toHaveProperty('riderSave')
-        expect(result).not.toHaveProperty('resistanceTypes')
-    })
-
-    it('defaults damageTypes to empty array for ignore_resistance', () => {
-        const feature = featureWith({ effect: 'ignore_resistance' })
-        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-        expect(result.damageTypes).toEqual([])
-    })
-
-    it('returns generic shape for non-ignore_resistance effects', () => {
-        const feature = featureWith({
-            type: 'passive_rule',
-            effect: 'critical_range',
-            criticalRange: '18-20',
-            bonusExpression: '+2d6',
-            spells: ['fire bolt', 'thunderwave'],
-            riderSave: 'DEX',
+            damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
             casting_time: '1 action',
-            cost: 2,
-            resource: 'sorcery_points',
-            resistanceTypes: ['fire', 'cold'],
-            duration: '1_minute',
-            endsOnCondition: 'blinded'
-        })
-        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-
-        expect(result).toMatchObject({
-            type: 'passive_rule',
-            name: 'Test Feature',
-            effect: 'critical_range',
-            criticalRange: '18-20',
             bonusExpression: '+2d6',
-            spells: ['fire bolt', 'thunderwave'],
+            criticalRange: '18-20',
+            spells: ['fire bolt'],
             riderSave: 'DEX',
-            primalKnowledge: [],
-            casting_time: '1 action',
-            cost: 2,
-            resource: 'sorcery_points',
-            resistanceTypes: ['fire', 'cold'],
+            skills: ['stealth'],
+            resistanceTypes: ['fire'],
             duration: '1_minute',
             endsOnCondition: 'blinded',
+            resource: 'ki'
+        }), BASE_STATS)
+
+        expect(result).toEqual({
+            type: 'passive_rule',
+            name: 'Test Feature',
+            effect: 'ignore_resistance',
+            damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
             hasAutomation: true
         })
     })
 
-    it('defaults all generic fields to empty string, null, or 0', () => {
-        const feature = featureWith({ effect: 'something_else' })
-        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+    it.each([
+        {
+            // Verbatim near-miss token public/data/feats.json: effect is
+            // DISTINCT from the branch key (=== not startsWith), so it routes
+            // generic with the token verbatim and damageTypes dropped.
+            label: 'public/data/feats.json ignore_resistance_and_treat_1s_as_2s',
+            automation: {
+                effect: 'ignore_resistance_and_treat_1s_as_2s',
+                damageTypes: ['player_choice'],
+                casting_time: '1 action'
+            },
+            effect: 'ignore_resistance_and_treat_1s_as_2s'
+        },
+        {
+            label: 'missing effect routes generic as empty string',
+            automation: {},
+            effect: ''
+        }
+    ])('$label routes generic arm', ({ automation, effect }) => {
+        const result = conditionalHandlers.passive_rule(makeFeature(automation), BASE_STATS)
 
-        expect(result.bonusExpression).toBe('')
-        expect(result.criticalRange).toBe('')
-        expect(result.spells).toEqual([])
-        expect(result.riderSave).toBeNull()
-        expect(result.primalKnowledge).toEqual([])
-        expect(result.casting_time).toBe('')
-        expect(result.cost).toBe(0)
-        expect(result.resource).toBe('')
-        expect(result.resistanceTypes).toEqual([])
-        expect(result.duration).toBe('')
-        expect(result.endsOnCondition).toBe('')
+        expect(result.type).toBe('passive_rule')
+        expect(result.effect).toBe(effect)
+        expect(result.hasAutomation).toBe(true)
+        expect(result).not.toHaveProperty('damageTypes')
     })
 
-    it('maps skills to primalKnowledge in generic shape', () => {
-        const feature = featureWith({
-            effect: 'critical_range',
-            skills: ['stealth', 'deception']
+    it('generic arm maps skills→primalKnowledge and carries casting_time verbatim', () => {
+        // Verbatim public/data/2024/classes.json primal_knowledge passive_rule.
+        const result = conditionalHandlers.passive_rule(makeFeature({
+            effect: 'primal_knowledge',
+            skills: ['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival'],
+            casting_time: 'passive'
+        }), BASE_STATS)
+
+        expect(result).toEqual({
+            type: 'passive_rule',
+            name: 'Test Feature',
+            effect: 'primal_knowledge',
+            bonusExpression: '',
+            criticalRange: '',
+            spells: [],
+            riderSave: null,
+            primalKnowledge: ['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival'],
+            casting_time: 'passive',
+            cost: 0,
+            resource: '',
+            resistanceTypes: [],
+            duration: '',
+            endsOnCondition: '',
+            hasAutomation: true
         })
-        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-        expect(result.primalKnowledge).toEqual(['stealth', 'deception'])
     })
 })
