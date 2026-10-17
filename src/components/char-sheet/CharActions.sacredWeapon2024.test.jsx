@@ -1,8 +1,10 @@
-import { render, screen, act } from '@testing-library/react';
+// @maintained-by-ai
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
+import { showWeaponMasteryPopup } from '../../hooks/combat/useActionPopup.js';
 
 const _syncedStore = new Map();
 
@@ -196,7 +198,16 @@ function mockRuntimeValues(buffs = [], conditions = []) {
   });
 }
 
-describe('CharActions sacred weapon and 2024 mastery', () => {
+const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' };
+
+function charismaStats(bonus) {
+  return createStats({
+    attacks: [longsword],
+    abilities: [{ name: 'STR', bonus: 3 }, { name: 'Charisma', bonus }],
+  });
+}
+
+describe('CharActions attack row display (sacred weapon, mastery, save DC, penalties)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -206,175 +217,97 @@ describe('CharActions sacred weapon and 2024 mastery', () => {
     hasAutomation.mockImplementation(() => false);
   });
 
-  describe('sacred weapon hit bonus calculation', () => {
-    it('adds Charisma bonus to melee attack hit bonus when sacred weapon buff is active', async () => {
+  describe('sacred weapon hit bonus', () => {
+    it('boosts melee hit bonus by Charisma and shows the breakdown tooltip when buff is active', async () => {
       mockRuntimeValues([{ effect: 'sacred_weapon' }]);
 
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' }],
-        abilities: [
-          { name: 'STR', bonus: 3 },
-          { name: 'Charisma', bonus: 4 },
-        ],
-      });
+      await act(async () => { render(<CharActions playerStats={charismaStats(4)} />); });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText('+9')).toBeInTheDocument();
+      const hit = screen.getByText('+9');
+      expect(hit).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +4');
     });
 
-    it('does not add sacred weapon bonus for ranged attacks', async () => {
+    it.each([
+      { name: 'ranged attack with buff active', buffs: [{ effect: 'sacred_weapon' }],
+        attack: { name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action', weaponType: 'ranged' } },
+      { name: 'melee attack without the buff', buffs: [], attack: longsword },
+    ])('leaves hit bonus untouched for $name', async ({ buffs, attack }) => {
+      mockRuntimeValues(buffs);
+
+      const stats = createStats({
+        attacks: [attack],
+        abilities: [{ name: 'STR', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
+      });
+      await act(async () => { render(<CharActions playerStats={stats} />); });
+
+      const hit = screen.getByText('+5');
+      expect(hit).not.toHaveAttribute('title');
+    });
+
+    it('applies a minimum +1 bonus when the Charisma modifier is negative', async () => {
       mockRuntimeValues([{ effect: 'sacred_weapon' }]);
 
-      const stats = createStats({
-        attacks: [{ name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action', weaponType: 'ranged' }],
-        abilities: [
-          { name: 'DEX', bonus: 3 },
-          { name: 'Charisma', bonus: 4 },
-        ],
-      });
+      await act(async () => { render(<CharActions playerStats={charismaStats(-2)} />); });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText('+5')).toBeInTheDocument();
+      const hit = screen.getByText('+6');
+      expect(hit).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +1');
     });
 
-    it('does not add sacred weapon bonus when buff not active', async () => {
-      mockRuntimeValues([], []);
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' }],
-        abilities: [
-          { name: 'STR', bonus: 3 },
-          { name: 'Charisma', bonus: 4 },
-        ],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText('+5')).toBeInTheDocument();
-    });
-
-    it('shows hit bonus title with sacred weapon breakdown when applicable', async () => {
+    it('folds the exhaustion penalty into the sacred-weapon-boosted total', async () => {
       mockRuntimeValues([{ effect: 'sacred_weapon' }]);
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' }],
-        abilities: [
-          { name: 'STR', bonus: 3 },
-          { name: 'Charisma', bonus: 4 },
-        ],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      const hitEl = screen.getByText('+9');
-      expect(hitEl).toHaveAttribute('title', 'Base: +5, Sacred Weapon: +4');
-    });
-
-    it('uses minimum 1 for Charisma bonus in sacred weapon', async () => {
-      mockRuntimeValues([{ effect: 'sacred_weapon' }]);
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' }],
-        abilities: [
-          { name: 'STR', bonus: 3 },
-          { name: 'Charisma', bonus: -2 },
-        ],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText('+6')).toBeInTheDocument();
-    });
-
-    it('computes effective hit with both sacred weapon and exhaustion penalty', async () => {
-      mockRuntimeValues([{ effect: 'sacred_weapon' }]);
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action', weaponType: 'melee' }],
-        abilities: [
-          { name: 'STR', bonus: 3 },
-          { name: 'Charisma', bonus: 4 },
-        ],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} exhaustionPenalty={2} />); });
 
       // Base 5 + sacred weapon 4 = 9, minus exhaustion 2 = 7
+      await act(async () => { render(<CharActions playerStats={charismaStats(4)} exhaustionPenalty={2} />); });
+
       expect(screen.getByText('+7')).toBeInTheDocument();
     });
   });
 
-  describe('2024 rules mastery column', () => {
-    it('renders mastery column for 2024 rules attacks', async () => {
+  describe('2024 mastery column', () => {
+    it('renders the Mastery header and the attack mastery name as a clickable cell that opens the popup', async () => {
       mockRuntimeValues();
 
       const stats = createStats({
         rules: '2024',
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
+        attacks: [{ ...longsword, mastery: 'Vex' }],
         automation: { passives: [{ type: 'weapon_kind_mastery' }] },
       });
-
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
       expect(screen.getByText('Mastery')).toBeInTheDocument();
+      const cell = screen.getByText('Vex');
+      expect(cell).toHaveClass('clickable');
+
+      fireEvent.click(cell);
+      expect(showWeaponMasteryPopup).toHaveBeenCalledWith('Vex', expect.anything());
     });
   });
 
-  describe('ability check for attacks with save DC', () => {
-    it('shows save DC column instead of hit bonus for attacks with saveDc', async () => {
-      mockRuntimeValues();
+  it('shows the save DC instead of a hit bonus for save-based attacks', async () => {
+    mockRuntimeValues();
 
-      const stats = createStats({
-        attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
-      expect(screen.queryByText('+5')).not.toBeInTheDocument();
+    const stats = createStats({
+      attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
     });
+    await act(async () => { render(<CharActions playerStats={stats} />); });
+
+    expect(screen.getByText(/DC 14 CON/)).toBeInTheDocument();
+    expect(screen.queryByText('+5')).not.toBeInTheDocument();
   });
 
-  describe('penalized stat classes', () => {
-    const createStats = (overrides = {}) => ({
-      ...basePlayerStats,
-      attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-      ...overrides,
-    });
+  describe('hit cell penalty states', () => {
+    it.each([
+      { name: 'exhaustion', props: { exhaustionPenalty: 2 }, text: '+3', classes: ['stat--penalized'] },
+      { name: 'disadvantage', props: { conditionAttackMode: 'disadvantage' }, text: '+5', classes: ['stat--penalized'] },
+      { name: 'cannotAct', props: { cannotAct: true }, text: '+5', classes: ['stat--penalized', 'disabled-attack'] },
+    ])('marks the hit cell penalized for $name', async ({ props, text, classes }) => {
+      await act(async () => { render(<CharActions playerStats={createStats({ attacks: [longsword] })} {...props} />); });
 
-    const penalizedCases = [
-      { name: 'exhaustionPenalty > 0', props: { exhaustionPenalty: 2 }, expectedText: '+3', expectedClass: 'stat--penalized' },
-      { name: 'conditionAttackMode=disadvantage', props: { conditionAttackMode: 'disadvantage' }, expectedText: '+5', expectedClass: 'stat--penalized' },
-    ];
-
-    for (const { name, props, expectedText, expectedClass } of penalizedCases) {
-      it(`applies ${expectedClass} when ${name}`, async () => {
-        const stats = createStats(props);
-        await act(async () => { render(<CharActions playerStats={stats} {...props} />); });
-        expect(screen.getByText(expectedText)).toHaveClass(expectedClass);
-      });
-    }
-
-    it('applies disabled-attack class when cannotAct is true', async () => {
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} />); });
-      expect(screen.getByText('+5')).toHaveClass('disabled-attack');
-    });
-
-    it('applies both stat--penalized and disabled-attack classes when cannotAct and exhaustionPenalty', async () => {
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} exhaustionPenalty={2} />); });
-      const cell = screen.getByText('+3');
-      expect(cell).toHaveClass('stat--penalized');
-      expect(cell).toHaveClass('disabled-attack');
-    });
-
-    it('applies stat--penalized when both exhaustionPenalty and conditionAttackMode are set', async () => {
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} exhaustionPenalty={1} conditionAttackMode="disadvantage" />); });
-      expect(screen.getByText('+4')).toHaveClass('stat--penalized');
+      const cell = screen.getByText(text);
+      classes.forEach(cls => expect(cell).toHaveClass(cls));
+      if (!classes.includes('disabled-attack')) {
+        expect(cell).not.toHaveClass('disabled-attack');
+      }
     });
   });
 });

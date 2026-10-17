@@ -1,11 +1,20 @@
+// @maintained-by-ai
 import { render, waitFor, act, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './CharActions.jsx';
+
+// Integration lane: renders the real CharActions (real useCharActionsAttackHandlers)
+// and clicks the real attack row to verify the Reckless Attack / Brutal Strike
+// chooser is reached through the component's own wiring (props → hook deps →
+// setModalState fan-out to parent). Mode selection, latch semantics, and the
+// confirm/cancel flows are covered by useCharActionsAttackHandlers*.test.js —
+// CharActionModals is mocked here, so confirm clicks live in that lane, not this one.
 
 // --- Shared mock infrastructure ---
 
 const _syncedStore = new Map();
 let _setModalState = vi.fn();
+const _rollAttack = vi.fn();
 
 vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
   useSyncedState: vi.fn((_, key, defaultValue) => {
@@ -50,7 +59,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
-    rollAttack: vi.fn(),
+    rollAttack: _rollAttack,
     rollDamage: vi.fn(),
     rollSkillCheck: vi.fn(),
     rollAbilityCheck: vi.fn(),
@@ -174,9 +183,8 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 vi.mock('../../services/encounters/combatData.js', () => ({
   getActiveCreatureName: vi.fn(() => 'TestFighter'),
   loadCombatSummary: vi.fn(() => Promise.resolve(null)),
-  // CLA-143: Attack-action lane stamps the round latch — extend partial mock (§45)
   getCurrentCombatRound: vi.fn(() => 1),
-    getCombatSummary: vi.fn(() => null),
+  getCombatSummary: vi.fn(() => null),
 }));
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
   getMonsterData: vi.fn(() => Promise.resolve(null)),
@@ -236,9 +244,7 @@ const basePlayerStats = {
   attacks: [
     { name: 'Longsword', type: 'Action', hitBonus: 7, range: '5ft', damage: '1d8+4', damageType: 'Slashing' },
   ],
-  actions: [
-    { name: 'Reckless Attack', automation: { type: 'buff', effect: 'advantage_attacks' } },
-  ],
+  actions: [],
   specialActions: [],
   class: { name: 'Fighter', class_levels: [{ level: 5, focus_points: 2 }] },
   feats: [],
@@ -248,6 +254,32 @@ const basePlayerStats = {
     actions: [],
   },
 };
+
+const RECKLESS_SPECIAL_ACTION = {
+  effect: 'advantage_attacks_advantage_against',
+  trigger: 'first_attack_of_turn',
+};
+
+// The chooser reads only playerStats.automation.{specialActions,passives}.
+function statsWithReckless({ passives = [] } = {}) {
+  return {
+    ...basePlayerStats,
+    automation: { ...basePlayerStats.automation, passives, specialActions: [RECKLESS_SPECIAL_ACTION] },
+  };
+}
+
+async function renderAndClickLongsword(props) {
+  const utils = render(<CharActions {...baseProps} {...props} />);
+  await waitFor(() => expect(utils.getByText('Longsword')).toBeInTheDocument());
+  await act(async () => { fireEvent.click(utils.getByText('Longsword')); });
+  return utils;
+}
+
+function recklessModalOpens() {
+  return _setModalState.mock.calls
+    .map(c => c[0]?.recklessAttackModal)
+    .filter(Boolean);
+}
 
 const baseProps = {
   playerStats: basePlayerStats,
@@ -264,92 +296,75 @@ const baseProps = {
 
 // --- Tests ---
 
-describe('CharActions — Reckless Attack & Brutal Strike modal integration', () => {
+describe('CharActions — Reckless Attack / Brutal Strike chooser wiring', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     _syncedStore.clear();
     _setModalState = vi.fn();
     setupFetchMock();
-    // Reset getRuntimeValue to default mock behavior
-    const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
-    getRuntimeValue.mockImplementation((_, key) => _syncedStore.get(key));
   });
 
-  describe('reckless attack modal flow', () => {
-    it('calls setModalState with recklessAttackModal when feature exists, buff is not active, and not offered this turn', async () => {
-      const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
-      toggleBuff.mockReturnValue({ wasActive: false });
-
-      const stats = {
-        ...basePlayerStats,
-        specialActions: [{ effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' }],
-        passives: [],
-        automation: { ...basePlayerStats.automation, specialActions: [{ effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' }] },
-      };
-
-      const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
-      await waitFor(() => expect(getByText('Longsword')).toBeInTheDocument());
-
-      const attackLink = getByText('Longsword');
-      await act(async () => { fireEvent.click(attackLink); });
-
-      await waitFor(() => {
-        expect(_setModalState).toHaveBeenCalledWith(expect.objectContaining({
-          recklessAttackModal: expect.objectContaining({ mode: 'full' }),
-        }));
-      });
-
-      // Verify cancel flow does not toggle buff (toggleBuff is only called in handleRecklessAttackConfirm)
-      expect(toggleBuff).not.toHaveBeenCalled();
-    });
-
-    it('does not call setModalState with recklessAttackModal when cannotAct is true', async () => {
-      const stats = {
-        ...basePlayerStats,
-        specialActions: [{ effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' }],
-        automation: { ...basePlayerStats.automation, specialActions: [{ effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' }] },
-      };
-
-      const { getByText } = render(<CharActions {...baseProps} playerStats={stats} cannotAct={true} />);
-      await waitFor(() => expect(getByText('Longsword')).toBeInTheDocument());
-
-      const attackLink = getByText('Longsword');
-      await act(async () => { fireEvent.click(attackLink); });
-
-      await waitFor(() => {
-        const recklessCalls = _setModalState.mock.calls.filter(
-          c => c[0]?.recklessAttackModal
-        );
-        expect(recklessCalls.length).toBe(0);
-      });
-    });
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
-  describe('brutal strike modal flow', () => {
-    it('calls setModalState with brutalOnly mode when reckless is active and brutal strike passive exists', async () => {
-      const passives = [
-        { type: 'attack_rider', trigger: 'strength_attack_hit_after_reckless', damageExpression: '2d6', options: ['d6'], maxEffects: 1 },
-      ];
-      const stats = {
-        ...basePlayerStats,
-        passives,
-        automation: { ...basePlayerStats.automation, passives, specialActions: [{ effect: 'advantage_attacks_advantage_against', trigger: 'first_attack_of_turn' }] },
-      };
+  it.each([
+    { label: 'can act', cannotAct: false },
+    { label: 'cannot act', cannotAct: true },
+  ])('clicking the Longsword row when the attacker $label never rolls or buffs before the chooser is confirmed', async ({ cannotAct }) => {
+    const onSpellModalStateChange = vi.fn();
+    const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
 
-      // Pre-populate the synced store so getRuntimeValue returns activeBuffs with reckless attack
-      _syncedStore.set('activeBuffs', [{ effect: 'advantage_attacks_advantage_against' }]);
-
-      const { getByText } = render(<CharActions {...baseProps} playerStats={stats} />);
-      await waitFor(() => expect(getByText('Longsword')).toBeInTheDocument());
-
-      const attackLink = getByText('Longsword');
-      await act(async () => { fireEvent.click(attackLink); });
-
-      await waitFor(() => {
-        expect(_setModalState).toHaveBeenCalledWith(expect.objectContaining({
-          recklessAttackModal: expect.objectContaining({ mode: 'brutalOnly' }),
-        }));
-      });
+    await renderAndClickLongsword({
+      playerStats: statsWithReckless(),
+      cannotAct,
+      onSpellModalStateChange,
     });
+
+    const opens = recklessModalOpens();
+    if (cannotAct) {
+      expect(opens).toHaveLength(0);
+    } else {
+      // Full chooser opens exactly once, carrying the clicked attack, and the
+      // parent sheet receives the same modal state through the fan-out wrapper.
+      expect(opens).toHaveLength(1);
+      expect(opens[0]).toEqual(expect.objectContaining({
+        mode: 'full',
+        attack: expect.objectContaining({ name: 'Longsword' }),
+      }));
+      expect(onSpellModalStateChange).toHaveBeenCalledWith(expect.objectContaining({
+        recklessAttackModal: expect.objectContaining({ mode: 'full' }),
+      }));
+    }
+
+    // The chooser owns the attack: no roll and no reckless buff until confirm.
+    expect(_rollAttack).not.toHaveBeenCalled();
+    expect(toggleBuff).not.toHaveBeenCalled();
+  });
+
+  it('clicking the Longsword row while reckless is active opens the brutalOnly chooser with the rider payload', async () => {
+    const passives = [{
+      name: 'Improved Brutal Strike',
+      type: 'attack_rider',
+      trigger: 'strength_attack_hit_after_reckless',
+      damageExpression: '2d6',
+      options: [{ name: 'Staggering Blow', effect: 'disadvantage_on_next_save' }],
+      maxEffects: 1,
+    }];
+    // Runtime store reports the reckless buff already active on the character.
+    _syncedStore.set('activeBuffs', [{ effect: 'advantage_attacks_advantage_against' }]);
+
+    await renderAndClickLongsword({ playerStats: statsWithReckless({ passives }) });
+
+    const opens = recklessModalOpens();
+    expect(opens).toHaveLength(1);
+    expect(opens[0]).toEqual(expect.objectContaining({
+      mode: 'brutalOnly',
+      riderName: 'Improved Brutal Strike',
+      brutalStrikeOptions: passives[0].options,
+      attack: expect.objectContaining({ name: 'Longsword' }),
+    }));
+    // The chooser owns the attack: no roll until confirm.
+    expect(_rollAttack).not.toHaveBeenCalled();
   });
 });

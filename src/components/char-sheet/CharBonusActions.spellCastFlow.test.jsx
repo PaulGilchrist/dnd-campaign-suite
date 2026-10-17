@@ -1,9 +1,12 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
+// Full shape of the mocked useSpellMetamagicFlow return — every key the
+// component destructures from the hook. Tests override only what they assert.
+const { flowShape } = vi.hoisted(() => ({
+  flowShape: () => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
@@ -23,7 +26,17 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingSanctuary: null,
     handleSanctuaryConfirm: vi.fn(),
     handleSanctuarySkip: vi.fn(),
-  })),
+    pendingHex: null,
+    handleHexConfirm: vi.fn(),
+    handleHexSkip: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+  }),
+}));
+
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => flowShape()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -121,6 +134,7 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
     return (
       <div data-testid="spell-detail-popup">
         <div data-testid="spell-name">{props.spell?.name}</div>
+        <span data-testid="upcast-levels">{JSON.stringify(props.upcastLevels ?? null)}</span>
         {props.onClose && <button data-testid="close-btn" onClick={props.onClose}>Close</button>}
         {props.onCast && <button data-testid="cast-btn" onClick={() => props.onCast(props.spell, {})}>Cast</button>}
       </div>
@@ -210,134 +224,77 @@ function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
+// Override the metamagic-flow host with stable mocks for the keys under test.
+function mockFlow(overrides = {}) {
+  vi.mocked(useSpellMetamagicFlow).mockReturnValue({ ...flowShape(), ...overrides });
+}
+
+async function openSpellDetail(spellName) {
+  render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: spellName, level: 1, range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
+  fireEvent.click(screen.getByText(spellName));
+  await waitFor(() => {
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+}
+
+async function castUntilHexModal() {
+  await openSpellDetail('Hex');
+  fireEvent.click(screen.getByTestId('cast-btn'));
+  await waitFor(() => {
+    expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
+  });
+}
+
 describe('CharBonusActions - Spell Cast Flow', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
   });
 
-  describe('Hex spell casting flow', () => {
-    const hexSpell = { name: 'Hex', level: 1, range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('opens HexAbilityModal when casting Hex spell via Cast button', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [hexSpell] } })} />);
-      fireEvent.click(screen.getByText('Hex'));
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('cast-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
-      });
+  it('opens the Hex ability chooser modal when casting Hex from the spell detail popup', async () => {
+    await openSpellDetail('Hex');
+    expect(screen.getByTestId('spell-name')).toHaveTextContent('Hex');
+    fireEvent.click(screen.getByTestId('cast-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
     });
+  });
 
-    it('closes HexAbilityModal when cancel is clicked', async () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [hexSpell] } })} />);
-      fireEvent.click(screen.getByText('Hex'));
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('cast-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText('Cancel'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('hex-ability-modal')).not.toBeInTheDocument();
-      });
-    });
-
-    it('calls gateMetamagic with hexAbility context when ability is selected in Hex modal', async () => {
-      const gateMetamagicMock = vi.fn();
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-        pendingMetamagic: null,
-        gateMetamagic: gateMetamagicMock,
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingBarkskin: null,
-        handleBarkskinConfirm: vi.fn(),
-        handleBarkskinSkip: vi.fn(),
-        pendingHealingWord: null,
-        handleHealingWordConfirm: vi.fn(),
-        handleHealingWordSkip: vi.fn(),
-        pendingSanctuary: null,
-        handleSanctuaryConfirm: vi.fn(),
-        handleSanctuarySkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [hexSpell] } })} />);
-      fireEvent.click(screen.getByText('Hex'));
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('cast-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText(/Strength \(STR\)/));
-      await waitFor(() => {
-        expect(gateMetamagicMock).toHaveBeenCalledWith(
-          expect.objectContaining({ name: 'Hex' }),
-          expect.objectContaining({ hexAbility: 'STR' }),
-        );
-      });
-    });
-
-    it('does not call gateMetamagic when Hex modal is cancelled', async () => {
-      const gateMetamagicMock = vi.fn();
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-        pendingMetamagic: null,
-        gateMetamagic: gateMetamagicMock,
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingBarkskin: null,
-        handleBarkskinConfirm: vi.fn(),
-        handleBarkskinSkip: vi.fn(),
-        pendingHealingWord: null,
-        handleHealingWordConfirm: vi.fn(),
-        handleHealingWordSkip: vi.fn(),
-        pendingSanctuary: null,
-        handleSanctuaryConfirm: vi.fn(),
-        handleSanctuarySkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [hexSpell] } })} campaignName="test-campaign" cannotAct={true} />);
-      fireEvent.click(screen.getByText('Hex'));
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId('cast-btn'));
-      await waitFor(() => {
-        expect(screen.getByTestId('hex-ability-modal')).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByText('Cancel'));
+  it('closing the chooser without choosing an ability dismisses the modal without casting', async () => {
+    const gateMetamagic = vi.fn();
+    mockFlow({ gateMetamagic });
+    await castUntilHexModal();
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => {
       expect(screen.queryByTestId('hex-ability-modal')).not.toBeInTheDocument();
-      expect(gateMetamagicMock).not.toHaveBeenCalled();
     });
+    expect(gateMetamagic).not.toHaveBeenCalled();
   });
 
-  describe('spell cast flow - upcast levels integration', () => {
-    const upcastableSpell = { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-
-    it('passes spell and upcastLevels to buildUpcastLevels when spell detail popup opens', async () => {
-      const buildUpcastLevelsMock = vi.fn(() => [1, 2, 3]);
-      vi.mocked(useSpellUpcastFlow).mockReturnValue({ buildUpcastLevels: buildUpcastLevelsMock });
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [upcastableSpell] } })} />);
-      fireEvent.click(screen.getByText('Shocking Grasp'));
-      await waitFor(() => {
-        expect(buildUpcastLevelsMock).toHaveBeenCalledWith(upcastableSpell);
-      });
+  it('choosing an ability dismisses the chooser and gates the Hex cast with the chosen ability', async () => {
+    const gateMetamagic = vi.fn();
+    mockFlow({ gateMetamagic });
+    await castUntilHexModal();
+    fireEvent.click(screen.getByText(/Dexterity \(DEX\)/));
+    await waitFor(() => {
+      expect(gateMetamagic).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Hex' }),
+        expect.objectContaining({ hexAbility: 'DEX' }),
+      );
     });
+    expect(screen.queryByTestId('hex-ability-modal')).not.toBeInTheDocument();
   });
 
+  it('feeds the selected spell into buildUpcastLevels and surfaces the built levels in the detail popup', async () => {
+    const buildUpcastLevels = vi.fn(() => [1, 2, 3]);
+    vi.mocked(useSpellUpcastFlow).mockReturnValue({ buildUpcastLevels });
+    render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
+    fireEvent.click(screen.getByText('Shocking Grasp'));
+    await waitFor(() => {
+      expect(buildUpcastLevels).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Shocking Grasp' })
+      );
+    });
+    expect(screen.getByTestId('upcast-levels')).toHaveTextContent('[1,2,3]');
+  });
 });

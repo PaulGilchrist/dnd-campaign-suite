@@ -1,9 +1,9 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import CharBonusActions from './CharBonusActions.jsx';
 import { categorizeFeatures } from '../../services/character/featureCategorizationUtils.js';
-import { normalizeCastingTime } from '../../services/shared/castingTimeUtils.js';
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
   useSpellMetamagicFlow: vi.fn(() => ({
@@ -168,20 +168,18 @@ describe('CLA-179 Illusory Reality entry point', () => {
     localStorage.clear();
   });
 
-  it('ships the Illusionist Illusory Reality feature with canonical casting_time', () => {
+  it('categorizes the real disk-shipped Illusory Reality feature into bonusActions, not specialActions', () => {
     const feature = getIllusionistFeature('Illusory Reality');
-    expect(normalizeCastingTime(feature.automation.casting_time)).toBe('1 bonus action');
+    // Pin the canonical casting_time format the categorizer contracts on;
+    // a data regression here silently reroutes the feature out of the BA lane.
     expect(feature.automation.casting_time).toBe('1 bonus action');
-  });
 
-  it('categorizes the real Illusory Reality feature into bonusActions, not specialActions', () => {
-    const feature = getIllusionistFeature('Illusory Reality');
     const result = categorizeFeatures([feature], { actions: [], bonusActions: [], reactions: [], characterAdvancement: [] });
     expect(result.bonusActions.map(f => f.name)).toContain('Illusory Reality');
     expect(result.specialActions.map(f => f.name)).not.toContain('Illusory Reality');
   });
 
-  it('renders the Illusory Reality bonus action as a clickable row that dispatches automation', () => {
+  it('renders the real Illusory Reality feature as a clickable row that dispatches its automation', () => {
     const feature = getIllusionistFeature('Illusory Reality');
     const categorized = categorizeFeatures([feature], { actions: [], bonusActions: [], reactions: [], characterAdvancement: [] });
     const playerStats = { ...basePlayerStats, bonusActions: categorized.bonusActions };
@@ -192,6 +190,9 @@ describe('CLA-179 Illusory Reality entry point', () => {
     const row = screen.getByText(/Illusory Reality:/);
     expect(row).toHaveClass('clickable');
     fireEvent.click(row);
+    // hasAutomation is unmocked: this click also pins illusory_reality's
+    // routing through the real automation registry.
+    expect(onAutomationAction).toHaveBeenCalledTimes(1);
     expect(onAutomationAction).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Illusory Reality',
       automation: expect.objectContaining({ type: 'illusory_reality' }),

@@ -1,16 +1,19 @@
-// Removed: "renders the section header" (subsumed by incapacitated test)
-// Removed: "renders attack names from playerStats.attacks" (subset of "renders multiple attacks")
-// Removed: "renders base actions list after fetch completes" (specific case of "renders actions returned from actions.json")
-// Removed: "renders an empty base actions list" (no unique behavioral coverage)
-// Removed: "does not add mastery-enabled class for 5e rules" (subsumed by "without weapon_kind_mastery passive" test)
-// Removed: "does not trigger attack when cannotAct is true" (covered by CharActions.grapple.test.jsx)
-// Rewrote: "renders actions returned from actions.json" — removed brittle fetch URL assertion
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+// @maintained-by-ai
+// CharActions: section rendering + attack-name click contract.
+// Deliberately NOT covered here (pinned by siblings):
+// - base-actions row text/clickables → CharActions.baseActions.test.jsx
+// - attack-context build rejection/recovery → CharActions.handlers.test.jsx
+// - disabled-attack row cell states → CharActions.sacredWeapon2024.test.jsx
+// - popup/event bus behaviour → CharActions.events.test.jsx
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
+import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 
 const _syncedStore = new Map();
+const mockRollAttack = vi.fn();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -33,7 +36,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
-    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(),
+    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn(),
     rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
   })),
 }));
@@ -187,6 +190,7 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
 
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
+  automation: { passives: [] },
   spellAbilities: { spells: [], toHit: 5, saveDc: 13 },
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
@@ -195,7 +199,10 @@ function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-describe('CharActions - Rendering', () => {
+const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' };
+const shortbow = { name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action' };
+
+describe('CharActions rendering and attack click', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -204,137 +211,72 @@ describe('CharActions - Rendering', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
   });
 
-  describe('section header and incapacitated state', () => {
-    it('renders "(Incapacitated)" label when cannotAct is true', async () => {
-      await act(async () => { render(<CharActions playerStats={createStats()} cannotAct={true} />); });
-      expect(screen.getByText('(Incapacitated)')).toBeInTheDocument();
-    });
-
-    it('does not render "(Incapacitated)" when cannotAct is false', async () => {
-      await act(async () => { render(<CharActions playerStats={createStats()} cannotAct={false} />); });
-      expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
-    });
+  it.each([
+    { cannotAct: false, cannotActReason: undefined, expectedLabel: null },
+    { cannotAct: true, cannotActReason: undefined, expectedLabel: '(Incapacitated)' },
+    { cannotAct: true, cannotActReason: 'Stunned', expectedLabel: '(Stunned)' },
+  ])('shows $expectedLabel in the cannot-act label (cannotAct=$cannotAct)', async ({ cannotAct, cannotActReason, expectedLabel }) => {
+    await act(async () => { render(<CharActions playerStats={createStats()} cannotAct={cannotAct} cannotActReason={cannotActReason} />); });
+    const label = document.querySelector('.disabled-attack-label');
+    if (expectedLabel) {
+      expect(label).not.toBeNull();
+      expect(label).toHaveTextContent(expectedLabel);
+    } else {
+      expect(label).toBeNull();
+    }
   });
 
-  describe('attacks rendering', () => {
-    it('renders multiple attacks', async () => {
-      const stats = createStats({
-        attacks: [
-          { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' },
-          { name: 'Shortbow', range: 80, hitBonus: 5, damage: '1d6+3', damageType: 'Piercing', type: 'Action' },
-        ],
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Longsword')).toBeInTheDocument();
-      expect(screen.getByText('Shortbow')).toBeInTheDocument();
-    });
-  });
-
-  describe('base actions from actions.json', () => {
-    it('renders actions returned from actions.json when the list differs', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Dash', 'Disengage']) });
-      await act(async () => { render(<CharActions playerStats={createStats()} />); });
-      await waitFor(() => {
-        expect(screen.getByText(/Dash/)).toBeInTheDocument();
-        expect(screen.getByText(/Disengage/)).toBeInTheDocument();
-        expect(screen.queryByText(/Hide/)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('weapon mastery column for 2024 rules', () => {
-    it('adds mastery-enabled class when 2024 rules and weapon_kind_mastery passive exists', async () => {
-      const stats2024 = createStats({
-        rules: '2024',
-        automation: {
-          ...basePlayerStats.automation,
-          passives: [{ type: 'weapon_kind_mastery' }],
-        },
-      });
-      await act(async () => { render(<CharActions playerStats={stats2024} />); });
-      const container = screen.getByText('Actions').closest('.char-actions');
-      const attacksDiv = container?.querySelector('.attacks');
-      expect(attacksDiv?.className).toContain('mastery-enabled');
-    });
-
-    it('does not add mastery-enabled class without weapon_kind_mastery passive', async () => {
-      const statsNoMastery = createStats({
-        rules: '2024',
-        automation: { passives: [] },
-      });
-      await act(async () => { render(<CharActions playerStats={statsNoMastery} />); });
-      const container = screen.getByText('Actions').closest('.char-actions');
-      const attacksDiv = container?.querySelector('.attacks');
-      expect(attacksDiv?.className).not.toContain('mastery-enabled');
-    });
-  });
-
-  describe('attack click handlers', () => {
-    it('calls rollAttack when an attack name is clicked', async () => {
-      const mockRollAttack = vi.fn();
-      const { default: useLoggedDiceRoll } = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn(),
-        rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const attackLink = screen.getByText('Longsword');
-      await act(async () => { fireEvent.click(attackLink); });
-      expect(mockRollAttack).toHaveBeenCalled();
-    });
-
-    it('calls endFriendsOnHostileAction and endInvisibilityOnHostileAction on attack click', async () => {
-      const mockRollAttack = vi.fn();
-      const { default: useLoggedDiceRoll } = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn(),
-        rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-
-      const stats = createStats({
-        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const attackLink = screen.getByText('Longsword');
-      await act(async () => { fireEvent.click(attackLink); });
-
-      const { endFriendsOnHostileAction } = await import('../../services/rules/features/friendsService.js');
-      const { endInvisibilityOnHostileAction } = await import('../../services/rules/features/invisibilityService.js');
-      expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
-      expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
-    });
-  });
-
-});
-
-describe('CharActions - Action Feature Details', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    _syncedStore.clear();
-    getRuntimeValue.mockImplementation(() => null);
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-  });
-
-  it('renders action with details as clickable', async () => {
-    const stats = createStats({
-      actions: [{ name: 'TestAction', details: 'Some details', description: 'A description', automation: null }],
-    });
+  it('renders one row per Action attack with clickable name, range, hit, damage and damage type', async () => {
+    const stats = createStats({ attacks: [longsword, shortbow] });
     await act(async () => { render(<CharActions playerStats={stats} />); });
-    expect(screen.getByText(/TestAction:/)).toHaveClass('clickable');
+
+    expect(screen.getByText('Longsword')).toHaveClass('clickable');
+    expect(screen.getByText('Shortbow')).toHaveClass('clickable');
+    expect(screen.getByText('5 ft.')).toBeInTheDocument();
+    expect(screen.getByText('80 ft.')).toBeInTheDocument();
+    expect(screen.getAllByText('+5')).toHaveLength(2);
+    expect(screen.getByText('1d8+3')).toBeInTheDocument();
+    expect(screen.getByText('1d6+3')).toBeInTheDocument();
+    expect(screen.getByText('Slashing')).toBeInTheDocument();
+    expect(screen.getByText('Piercing')).toBeInTheDocument();
   });
 
-  it('renders action without details or automation as non-clickable', async () => {
-    const stats = createStats({
-      actions: [{ name: 'PlainAction', description: 'Plain description' }],
-    });
+  it.each([
+    { rules: '2024', passives: [{ type: 'weapon_kind_mastery' }], enabled: true },
+    { rules: '2024', passives: [], enabled: false },
+    { rules: '5e', passives: [{ type: 'weapon_kind_mastery' }], enabled: false },
+  ])('enables the mastery column class only for 2024 rules with the passive (rules=$rules)', async ({ rules, passives, enabled }) => {
+    await act(async () => { render(<CharActions playerStats={createStats({ rules, automation: { passives } })} />); });
+    const attacksDiv = document.querySelector('.attacks');
+    expect(attacksDiv).not.toBeNull();
+    if (enabled) {
+      expect(attacksDiv).toHaveClass('mastery-enabled');
+    } else {
+      expect(attacksDiv).not.toHaveClass('mastery-enabled');
+    }
+  });
+
+  it('clicking an attack name rolls the attack and ends Friends/Invisibility', async () => {
+    const stats = createStats({ attacks: [longsword] });
     await act(async () => { render(<CharActions playerStats={stats} />); });
-    expect(screen.getByText(/PlainAction:/)).not.toHaveClass('clickable');
+    await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
+
+    expect(mockRollAttack).toHaveBeenCalledTimes(1);
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { hitBonus: 5 });
+    expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestCharacter', undefined);
+  });
+
+  it.each([
+    { action: { name: 'TestAction', details: 'Some details', description: 'A description', automation: null }, clickable: true },
+    { action: { name: 'PlainAction', description: 'Plain description' }, clickable: false },
+  ])('renders feature action "$action.name" clickable=$clickable', async ({ action, clickable }) => {
+    await act(async () => { render(<CharActions playerStats={createStats({ actions: [action] })} />); });
+    const row = screen.getByText(`${action.name}:`);
+    if (clickable) {
+      expect(row).toHaveClass('clickable');
+    } else {
+      expect(row).not.toHaveClass('clickable');
+    }
   });
 });

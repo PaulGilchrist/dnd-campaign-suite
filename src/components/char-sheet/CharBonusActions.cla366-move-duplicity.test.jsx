@@ -1,7 +1,12 @@
+// @maintained-by-ai
 // CLA-366 regression: the Invoke Duplicity "move the illusion" clause had no
 // producer anywhere. While the create_illusion buff is active, a
 // "Move Invoke Duplicity (Transposition)" bonus action row must render and
 // route to the swap confirm (which persists te + ability_use log).
+// Covers the row's three branches only: render+route, hidden without the
+// buff, and disabled/no-dispatch while the caster cannot act.
+// Handler/modal lanes are covered elsewhere (tempTeleportHandler.cla366-
+// transposition.test.js, TeleportModal.test.jsx) — not re-tested here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -186,5 +191,17 @@ describe('CLA-366 Move Invoke Duplicity bonus action row', () => {
     render(<CharBonusActions playerStats={basePlayerStats} campaignName="test-campaign" onAutomationAction={vi.fn()} />);
 
     expect(screen.queryByText(/Move Invoke Duplicity/)).toBeNull();
+  });
+
+  it('shows the row as disabled and dispatches nothing when the caster cannot act', () => {
+    runtimeValues.activeBuffs = [{ name: 'Invoke Duplicity', effect: 'create_illusion', duration: '1_minute' }];
+    const onAutomationAction = vi.fn();
+
+    render(<CharBonusActions playerStats={basePlayerStats} campaignName="test-campaign" cannotAct onAutomationAction={onAutomationAction} />);
+
+    const row = screen.getByText(/Move Invoke Duplicity \(Transposition\):/);
+    expect(row).toHaveClass('disabled-attack');
+    fireEvent.click(row);
+    expect(onAutomationAction).not.toHaveBeenCalled();
   });
 });

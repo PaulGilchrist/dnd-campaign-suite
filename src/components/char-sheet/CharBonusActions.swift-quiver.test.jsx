@@ -1,5 +1,6 @@
+// @maintained-by-ai
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
@@ -156,6 +157,11 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
 // SP-129: buildSwiftQuiverAttack rows must carry BOTH type and actionType.
 // The BA lane filter (CharBonusActions.jsx) keys off attack.type ONLY —
 // a row with actionType but no type is silently dropped from the lane.
+// Producer contract (both fields, two rows) is pinned in
+// attackCalc2024-special-attacks.test.js; generic single-row lane rendering
+// and the hit-cell click lane are pinned in CharBonusActions.rendering /
+// .interactive tests. This file pins the Swift Quiver consumer half:
+// both full-shape rows render together, and type is the hard requirement.
 describe('CharBonusActions - Swift Quiver rows', () => {
   const swiftQuiverRow = (overrides = {}) => ({
     name: 'Swift Quiver (1st Attack)',
@@ -184,35 +190,35 @@ describe('CharBonusActions - Swift Quiver rows', () => {
     spellAbilities: { spells: [] },
   };
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-    localStorage.clear();
-  });
+  const renderLane = (attacks, props = {}) => render(
+    <CharBonusActions
+      playerStats={{ ...basePlayerStats, attacks }}
+      getWeaponMastery={() => null}
+      {...props}
+    />
+  );
 
-  it('renders both Swift Quiver rows in the bonus action lane when type is set', () => {
-    const stats = {
-      ...basePlayerStats,
-      attacks: [
-        swiftQuiverRow(),
-        swiftQuiverRow({ name: 'Swift Quiver (2nd Attack)' }),
-      ],
-    };
-    render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+  it('renders both Swift Quiver rows as live attack cells in the bonus action lane', () => {
+    renderLane(
+      [swiftQuiverRow(), swiftQuiverRow({ name: 'Swift Quiver (2nd Attack)' })],
+      { exhaustionPenalty: 0 }
+    );
+
     expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     expect(screen.getByText('Swift Quiver (1st Attack)')).toBeInTheDocument();
     expect(screen.getByText('Swift Quiver (2nd Attack)')).toBeInTheDocument();
+    // Each row renders a real attack cell (to-hit, range, damage) — not just a label.
+    expect(screen.getAllByText('+9')).toHaveLength(2);
+    expect(screen.getAllByText('600 ft.')).toHaveLength(2);
+    expect(screen.getAllByText('1d8+5')).toHaveLength(2);
   });
 
-  it('drops Swift Quiver rows missing type even when actionType is "Bonus Action" (SP-129 regression)', () => {
-    const { type, ...rowWithoutType } = swiftQuiverRow();
-    const { type: type2, ...row2WithoutType } = swiftQuiverRow({ name: 'Swift Quiver (2nd Attack)' });
-    void type;
-    void type2;
-    const stats = {
-      ...basePlayerStats,
-      attacks: [rowWithoutType, row2WithoutType],
-    };
-    const { container } = render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
+  it('drops rows entirely when type is missing even though actionType is "Bonus Action" (SP-129 filter pin)', () => {
+    const { container } = renderLane([
+      swiftQuiverRow({ type: undefined }),
+      swiftQuiverRow({ name: 'Swift Quiver (2nd Attack)', type: undefined }),
+    ]);
+
     expect(screen.queryByText('Swift Quiver (1st Attack)')).not.toBeInTheDocument();
     expect(screen.queryByText('Swift Quiver (2nd Attack)')).not.toBeInTheDocument();
     expect(container.querySelector('.sectionHeader')).toBeNull();

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharActionSpellPopups from './CharActionSpellPopups.jsx';
@@ -9,52 +10,46 @@ vi.mock('../common/popup.jsx', () => ({
 }));
 
 vi.mock('./popups/MetamagicPopup.jsx', () => ({
-  default: function TestMetamagicPopup() {
-    return <div data-testid="metamagic-popup" />;
-  },
+  default: () => <div data-testid="metamagic-popup" />,
+}));
+
+vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
+  default: () => <div data-testid="spell-detail-popup" />,
+}));
+
+vi.mock('./popups/MagicMissileTargetPopup.jsx', () => ({
+  default: () => <div data-testid="magic-missile-popup" />,
 }));
 
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: function TestCreatureSelectionModal() {
-    return <div data-testid="creature-selection-modal" />;
-  },
-}));
-
-vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: function TestSecondaryTargetModal({ title, targets, onTargetSelected, onSkip, description, confirmLabel, hideConfirm }) {
+  default: function TestCreatureSelectionModal({ title, targets, onConfirm, onSkip }) {
     return (
-      <div data-testid={`secondary-modal-${title}`}>
-        <span data-testid="title">{title}</span>
-        <span data-testid="description">{description}</span>
-        <span data-testid="confirm-label">{confirmLabel}</span>
-        {targets?.map((t, i) => (
-          <span
-            key={i}
-            data-testid={`target-${i}`}
-            data-target-value={t.value !== undefined ? t.value : t.name}
-            onClick={() => onTargetSelected(t.value !== undefined ? t.value : t.name)}
-          >
-            {t.value !== undefined ? t.label : t.name}
-          </span>
+      <div data-testid={`creature-selection-${title}`}>
+        {(targets || []).map((t, i) => (
+          <span key={i} data-testid={`target-${i}`}>{typeof t === 'string' ? t : t.name}</span>
         ))}
-        {!hideConfirm && targets?.length > 0 ? (
-          <button data-testid="confirm" onClick={() => onTargetSelected(targets[0].value !== undefined ? targets[0].value : targets[0].name)}>Confirm</button>
-        ) : null}
+        <button data-testid="confirm" onClick={() => onConfirm((targets || []).map(t => (typeof t === 'string' ? t : t.name)))}>Confirm</button>
         <button data-testid="skip" onClick={onSkip}>Skip</button>
       </div>
     );
   },
 }));
 
-vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-  default: function TestSpellDetailPopup() {
-    return <div data-testid="spell-detail-popup" />;
-  },
-}));
-
-vi.mock('./popups/MagicMissileTargetPopup.jsx', () => ({
-  default: function TestMagicMissileTargetPopup() {
-    return <div data-testid="magic-missile-popup" />;
+// Touch-target specs always pass { name, type } objects; Greater Restoration's
+// value/label effect step is owned by the greaterRestoration sibling file.
+vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
+  default: function TestSecondaryTargetModal({ title, targets, onTargetSelected, onSkip, description, confirmLabel }) {
+    return (
+      <div data-testid={`secondary-modal-${title}`}>
+        <span data-testid="title">{title}</span>
+        <span data-testid="description">{description}</span>
+        <span data-testid="confirm-label">{confirmLabel}</span>
+        {(targets || []).map((t, i) => (
+          <span key={i} data-testid={`target-${i}`} onClick={() => onTargetSelected(t.name)}>{t.name}</span>
+        ))}
+        <button data-testid="skip" onClick={onSkip}>Skip</button>
+      </div>
+    );
   },
 }));
 
@@ -68,20 +63,10 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 
 const runtimeStore = new Map();
 
-function buildRuntimeKey(k, p) {
-  return `${k}:${p}`;
-}
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((key, prop) => {
-    return runtimeStore.get(buildRuntimeKey(key, prop)) ?? null;
-  }),
+  getRuntimeValue: vi.fn((key, prop) => runtimeStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn(),
 }));
-
-function setTargetEffects(effects) {
-  runtimeStore.set(buildRuntimeKey('campaign', 'targetEffects'), effects);
-}
 
 function createBaseProps(overrides) {
   return {
@@ -147,73 +132,105 @@ function createBaseProps(overrides) {
   };
 }
 
+// Haste and Remove Curse confirm/skip wiring is covered by CharActionSpellPopups.test.jsx;
+// these rows complete touch-target-modal coverage for the remaining specs, including the
+// per-spell payload shape (pick: 'array' sends [name], pick: 'object' sends { targetName }).
+const TOUCH_TARGET_SPELLS = [
+  { name: 'Barkskin', pending: 'actionPendingBarkskin', confirm: 'actionHandleBarkskinConfirm', skip: 'actionHandleBarkskinSkip', pick: 'array', description: 'AC becomes 17' },
+  { name: 'Mage Armor', pending: 'actionPendingMageArmor', confirm: 'actionHandleMageArmorConfirm', skip: 'actionHandleMageArmorSkip', pick: 'array', description: '13 + Dexterity modifier' },
+  { name: 'Heal', pending: 'actionPendingHeal', confirm: 'actionHandleHealConfirm', skip: 'actionHandleHealSkip', pick: 'object', description: '70 hit points' },
+  { name: 'Cure Wounds', pending: 'actionPendingCureWounds', confirm: 'actionHandleCureWoundsConfirm', skip: 'actionHandleCureWoundsSkip', pick: 'object', description: 'touch range' },
+  { name: 'Revivify', pending: 'actionPendingRevivify', confirm: 'actionHandleRevivifyConfirm', skip: 'actionHandleRevivifySkip', pick: 'object', description: '0 Hit Points' },
+];
+
+function visibleTargetNames() {
+  return screen.queryAllByTestId(/^target-\d+$/).map(el => el.textContent);
+}
+
 describe('CharActionSpellPopups - SecondaryTargetModal Spells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeStore.clear();
-    setTargetEffects(null);
   });
 
-  const secondaryTargetSpells = [
-    { name: 'Barkskin', key: 'actionPendingBarkskin', confirmHandler: 'actionHandleBarkskinConfirm', skipHandler: 'actionHandleBarkskinSkip', payload: { creatureTargets: ['Ally1'] }, description: 'AC becomes 17' },
-    { name: 'Mage Armor', key: 'actionPendingMageArmor', confirmHandler: 'actionHandleMageArmorConfirm', skipHandler: 'actionHandleMageArmorSkip', payload: { creatureTargets: ['Ally1'] }, description: '13 + Dexterity modifier' },
-    { name: 'Heal', key: 'actionPendingHeal', confirmHandler: 'actionHandleHealConfirm', skipHandler: 'actionHandleHealSkip', payload: { creatureTargets: ['Ally1'] }, description: '70 hit points' },
-    { name: 'Cure Wounds', key: 'actionPendingCureWounds', confirmHandler: 'actionHandleCureWoundsConfirm', skipHandler: 'actionHandleCureWoundsSkip', payload: { creatureTargets: ['Ally1'] }, description: 'touch range' },
-    { name: 'Revivify', key: 'actionPendingRevivify', confirmHandler: 'actionHandleRevivifyConfirm', skipHandler: 'actionHandleRevivifySkip', payload: { creatureTargets: ['Ally1'] }, description: '0 Hit Points' },
+  it.each(TOUCH_TARGET_SPELLS)(
+    'runs $name target flow: metadata, $pick confirm payload, skip cancels',
+    ({ name, pending, confirm, skip, pick, description }) => {
+      const confirmFn = vi.fn();
+      const skipFn = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ [confirm]: confirmFn, [skip]: skipFn })}
+          {...{ [pending]: { creatureTargets: ['Ally1'] } }}
+        />
+      );
+
+      expect(screen.getByTestId(`secondary-modal-${name}`)).toBeInTheDocument();
+      expect(screen.getByTestId('title')).toHaveTextContent(name);
+      expect(screen.getByTestId('confirm-label')).toHaveTextContent(`Cast ${name}`);
+      expect(screen.getByTestId('description')).toHaveTextContent(description);
+      expect(screen.getByTestId('target-0')).toHaveTextContent('Ally1');
+
+      screen.getByTestId('target-0').click();
+      expect(confirmFn).toHaveBeenCalledTimes(1);
+      expect(confirmFn).toHaveBeenCalledWith(pick === 'array' ? ['Ally1'] : { targetName: 'Ally1' });
+
+      screen.getByTestId('skip').click();
+      expect(skipFn).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('still opens Haste when every creature target is empty so the cast can be cancelled', () => {
+    const skipFn = vi.fn();
+    render(
+      <CharActionSpellPopups
+        {...createBaseProps({ actionPendingHaste: { creatureTargets: [] }, actionHandleHasteSkip: skipFn })}
+      />
+    );
+    expect(screen.getByTestId('secondary-modal-Haste')).toBeInTheDocument();
+    expect(visibleTargetNames()).toHaveLength(0);
+    screen.getByTestId('skip').click();
+    expect(skipFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Canonical lane for filterForcecageBlockedTargets / isForcecageBlocked: one row per
+// trapped-combination branch of the inside/outside-the-cage targeting rule.
+describe('CharActionSpellPopups - Forcecage blocking filter', () => {
+  const forcecage = (target, source) => ({ effect: 'forcecage', target, source });
+
+  const blockedCases = [
+    { name: 'allows all targets when no targetEffects exist', effects: null, expected: ['Ally1', 'Ally2'] },
+    { name: 'ignores non-forcecage target effects', effects: [{ effect: 'bless', target: 'Ally1', source: 'Cleric' }], expected: ['Ally1', 'Ally2'] },
+    { name: 'blocks a target trapped in another caster\'s cage', effects: [forcecage('Ally1', 'Cage1')], expected: ['Ally2'] },
+    { name: 'blocks free targets when the caster is trapped', effects: [forcecage('Test Character', 'Cage1')], expected: [] },
+    { name: 'allows a co-trapped ally in the same cage but not free outsiders', effects: [forcecage('Test Character', 'Cage1'), forcecage('Ally1', 'Cage1')], expected: ['Ally1'] },
+    { name: 'blocks targets trapped in a different cage than the caster', effects: [forcecage('Test Character', 'Cage1'), forcecage('Ally1', 'Cage2')], expected: [] },
   ];
 
-  describe('renders correct metadata', () => {
-    it.each(secondaryTargetSpells)('renders $name with correct title, description, and confirm label', ({ name, key, payload, description }) => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ [key]: payload })}
-        />
-      );
-      expect(screen.getByTestId('title')).toHaveTextContent(name);
-      expect(screen.getByTestId('description')).toHaveTextContent(description);
-      expect(screen.getByTestId('confirm-label')).toHaveTextContent(`Cast ${name}`);
-    });
+  it.each(blockedCases)('Haste target list: $name', ({ effects, expected }) => {
+    if (effects) runtimeStore.set('campaign:targetEffects', effects);
+    render(
+      <CharActionSpellPopups
+        {...createBaseProps({ actionPendingHaste: { creatureTargets: ['Ally1', 'Ally2'] } })}
+      />
+    );
+    expect(visibleTargetNames()).toEqual(expected);
   });
 
-  describe('Empty targets', () => {
-    it('renders no targets when creatureTargets is empty', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingHaste: { creatureTargets: [] },
-          })}
-        />
-      );
-      expect(screen.getByTestId('title')).toHaveTextContent('Haste');
-      expect(screen.queryByTestId('target-0')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Forcecage filtering', () => {
-    it('filters out forcecage-trapped targets', () => {
-      setTargetEffects([{ effect: 'forcecage', target: 'Ally1', source: 'Cage1' }]);
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingHaste: { creatureTargets: ['Ally1', 'Ally2'] },
-          })}
-        />
-      );
-      expect(screen.getByTestId('target-0')).toHaveTextContent('Ally2');
-      expect(screen.queryByTestId('target-1')).not.toBeInTheDocument();
-    });
-
-    it('allows all targets when no targetEffects exist', () => {
-      setTargetEffects(null);
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingHaste: { creatureTargets: ['Ally1', 'Ally2'] },
-          })}
-        />
-      );
-      expect(screen.getByTestId('target-0')).toHaveTextContent('Ally1');
-      expect(screen.getByTestId('target-1')).toHaveTextContent('Ally2');
-    });
+  it('applies the same filter to the CreatureSelectionModal lane and its confirm payload', () => {
+    const confirmFn = vi.fn();
+    runtimeStore.set('campaign:targetEffects', [forcecage('Ally1', 'Cage1')]);
+    render(
+      <CharActionSpellPopups
+        {...createBaseProps({
+          actionPendingBless: { creatureTargets: ['Ally1', 'Ally2'], maxTargets: 3 },
+          actionHandleBlessConfirm: confirmFn,
+        })}
+      />
+    );
+    expect(visibleTargetNames()).toEqual(['Ally2']);
+    screen.getByTestId('confirm').click();
+    expect(confirmFn).toHaveBeenCalledWith(['Ally2']);
   });
 });

@@ -1,5 +1,11 @@
-// Cleanup: Removed redundant "renders Grapple as clickable" test (covered by baseActions.test.jsx).
-// Consolidated "grapple fails" and "grapple tie" into single parameterized test (same failure path).
+// @maintained-by-ai
+// CharActions grapple CLICK integration — owns only the component wiring lane:
+// span click → useCharActionsBaseActions invoked with the component's props/mocks →
+// observable popup + runtime-store write. All handleGrappleAction internals
+// (already-grappled guard, contest resolution, monk-Dex, JoAT/advantage stacking,
+// STR-mod fallbacks, log text) are owned by useCharActionsBaseActions.test.js and
+// useCharActionsBaseActions.grapple-contest-math.test.js; the Grapple-clickable-span
+// contract is owned by CharActions.baseActions.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -183,58 +189,52 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
   buildAttackContextSync: vi.fn(() => ({ hitBonus: 5 })),
 }));
 
+// Realistic grapple stats: listed Athletics skill total +6 (STR 3 + prof 3).
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
   spellAbilities: { spells: [], toHit: 5, saveDc: 13 },
-  abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
+  abilities: [{ name: 'Strength', bonus: 3, skills: [{ name: 'Athletics', bonus: 6 }] }],
+  skillProficiencies: ['Athletics'], proficiency: 3,
 };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
+// NPC target with only a STR mod resolvable → contest auto-resolves vs Athletics.
+function npcTarget(name, strBonus) {
+  return { name, conditions: [], type: 'npc', computedStats: { abilities: [{ name: 'Strength', bonus: strBonus }] } };
 }
 
-function makeWrapper(setPopupHtml, rollAbilityCheck) {
-  return ({ children }) => (
+// Renders CharActions (base-actions loaded via mocked fetch), wires the grapple
+// dependencies (popup sink via DiceRollContext, dice roll via useLoggedDiceRoll,
+// combat summary/target via mocked services), then clicks the Grapple span.
+async function renderGrappleAndClick({ cannotAct = false, target = npcTarget('Goblin', 1), lastAttack = null } = {}) {
+  const setPopupHtml = vi.fn();
+  const rollAbilityCheck = vi.fn().mockResolvedValue(undefined);
+
+  getRuntimeValue.mockImplementation((_name, key) => {
+    if (key === 'lastAttack') return lastAttack;
+    if (key === 'activeBuffs') return [];
+    if (key === 'hasteExtraActionUsed') return false;
+    if (key === 'activeConditions') return [];
+    return null;
+  });
+  loadCombatSummary.mockResolvedValue({ creatures: [target] });
+  getTargetFromAttacker.mockReturnValue(target);
+  useLoggedDiceRoll.mockReturnValue({
+    popupHtml: null, setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(),
+    rollSkillCheck: vi.fn(), rollAbilityCheck, quickRollPlayerSave: vi.fn(),
+  });
+
+  const wrapper = ({ children }) => (
     <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml, rollAbilityCheck }}>
       {children}
     </DiceRollContext.Provider>
   );
+  await act(async () => render(<CharActions playerStats={basePlayerStats} campaignName="test-campaign" cannotAct={cannotAct} />, { wrapper }));
+  const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
+  await act(async () => { fireEvent.click(grappleBtn); });
+  return { setPopupHtml, rollAbilityCheck };
 }
 
-// Helper that renders CharActions with all grapple-related mocks configured,
-// ensuring the fetch for actions.json resolves before the test proceeds.
-async function renderGrappleWithMocks(mocks, statsOverride = {}) {
-  const {
-    mockSetPopupHtml,
-    mockRollAbilityCheck,
-    grvImpl,
-    loadCsData,
-    targetFromAttacker,
-    cannotAct,
-  } = mocks;
-
-  if (grvImpl) {
-    getRuntimeValue.mockImplementation(grvImpl);
-  }
-  if (mockSetPopupHtml) {
-    useLoggedDiceRoll.mockReturnValue({
-      popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(),
-      rollSkillCheck: vi.fn(), rollAbilityCheck: mockRollAbilityCheck || vi.fn().mockResolvedValue(undefined),
-      quickRollPlayerSave: vi.fn(),
-    });
-  }
-  if (loadCsData) {
-    loadCombatSummary.mockResolvedValue(loadCsData);
-  }
-  if (targetFromAttacker !== undefined) {
-    getTargetFromAttacker.mockReturnValue(targetFromAttacker);
-  }
-
-  const wrapper = makeWrapper(mockSetPopupHtml, mockRollAbilityCheck);
-  await act(async () => render(<CharActions playerStats={createStats(statsOverride)} campaignName="test-campaign" cannotAct={cannotAct || false} />, { wrapper }));
-}
-
-describe('CharActions grapple action — integration', () => {
+describe('CharActions grapple click integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -243,200 +243,48 @@ describe('CharActions grapple action — integration', () => {
     getRuntimeValue.mockImplementation(() => null);
   });
 
-  describe('grapple click behavior', () => {
-    it('shows error popup when no target selected', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const mockRollAbilityCheck = vi.fn().mockResolvedValue(undefined);
+  it('clicking Grapple rolls Strength (Athletics) against the target contest and stamps grappled on success', async () => {
+    const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ lastAttack: { d20: 12, total: 18 } });
 
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      await renderGrappleWithMocks({
-        mockSetPopupHtml,
-        mockRollAbilityCheck,
-        grvImpl: (_name, key) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'hasteExtraActionUsed') return false;
-          if (key === 'activeConditions') return [];
-          return null;
-        },
-        loadCsData: { lastAttack: null, creatures: [{ name: 'Goblin', conditions: [] }] },
-        targetFromAttacker: null,
-      });
-
-      const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
-      await act(async () => { fireEvent.click(grappleBtn); });
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-          name: 'Grapple',
-          description: expect.stringContaining('No target selected'),
-        }));
-      });
-      expect(mockRollAbilityCheck).not.toHaveBeenCalled();
-    });
-
-    it.each([
-      { label: 'roll <= target STR (fails)', d20: 3, strMod: 3, proficiency: 3, targetStr: 10, targetName: 'Orc' },
-      { label: 'roll === target STR tie (fails)', d20: 10, strMod: 0, proficiency: 0, targetStr: 10, targetName: 'Goblin' },
-    ])('grapple failure: $label', async ({ d20, strMod, proficiency, targetStr, targetName }) => {
-      const mockSetPopupHtml = vi.fn();
-      const mockRollAbilityCheck = vi.fn().mockResolvedValue(undefined);
-      const strCheckBonus = strMod + proficiency;
-
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      const stats = createStats({ actions: ['Grapple'], skillProficiencies: ['Athletics'], level: 5 });
-      stats.abilities = [
-        { name: 'Strength', bonus: strMod, skills: [{ name: 'Athletics', bonus: strCheckBonus }] },
-        { name: 'Dexterity', bonus: 0, skills: [] },
-        { name: 'Constitution', bonus: 0, skills: [] },
-        { name: 'Intelligence', bonus: 0, skills: [] },
-        { name: 'Wisdom', bonus: 0, skills: [] },
-        { name: 'Charisma', bonus: 0, skills: [] },
-      ];
-
-      await renderGrappleWithMocks({
-        mockSetPopupHtml,
-        mockRollAbilityCheck,
-        loadCsData: {
-          lastAttack: { d20, bonus: strCheckBonus, total: d20 + strCheckBonus },
-          creatures: [{ name: targetName, conditions: [], type: 'npc', ability_score_modifiers: { str: targetStr } }],
-        },
-        targetFromAttacker: { name: targetName, conditions: [], type: 'npc', ability_score_modifiers: { str: targetStr } },
-      }, stats);
-
-      const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
-      await act(async () => { fireEvent.click(grappleBtn); });
-
-      await waitFor(() => {
-        expect(mockRollAbilityCheck).toHaveBeenCalledWith('Strength', expect.any(Number), expect.any(Object));
-      });
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-          name: 'Grapple',
-          description: expect.stringContaining('Grapple failed'),
-        }));
+    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 6, {});
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Grapple',
+        description: 'Grapple successful! (d20: 12 + 6 = 18) vs Goblin Athletics (+1). Target is now grappled.',
       });
     });
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['grappled'], 'test-campaign');
+  });
 
-    it('shows popup when target is already grappled', async () => {
-      const mockSetPopupHtml = vi.fn();
+  it('clicking Grapple reports failure and leaves the target ungrappled when the check loses the contest', async () => {
+    const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ target: npcTarget('Ogre', 8), lastAttack: { d20: 1, total: 7 } });
 
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return ['grappled'];
-        return null;
-      });
-
-      await renderGrappleWithMocks({
-        mockSetPopupHtml,
-        grvImpl: (_name, key) => {
-          if (key === 'activeBuffs') return [];
-          if (key === 'hasteExtraActionUsed') return false;
-          if (key === 'activeConditions') return ['grappled'];
-          return null;
-        },
-        loadCsData: { lastAttack: null, creatures: [{ name: 'Goblin', conditions: ['grappled'] }] },
-        targetFromAttacker: { name: 'Goblin', conditions: ['grappled'] },
-      });
-
-      const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
-      await act(async () => { fireEvent.click(grappleBtn); });
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-          name: 'Grapple',
-          description: expect.stringContaining('already grappled'),
-        }));
+    expect(rollAbilityCheck).toHaveBeenCalledWith('Strength', 6, {});
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith({
+        type: 'automation_info',
+        name: 'Grapple',
+        description: 'Grapple failed! (d20: 1 + 6 = 7) vs Ogre Athletics (+8). Target is not grappled.',
       });
     });
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Ogre', 'activeConditions', expect.arrayContaining(['grappled']), 'test-campaign');
+  });
 
-    it('does nothing when cannotAct is true', async () => {
-      const mockSetPopupHtml = vi.fn();
+  it.each([
+    { label: 'cannotAct prop silently blocks the click', cannotAct: true, target: npcTarget('Goblin', 1), expectedPopup: null },
+    { label: 'no selected target prompts to select one', cannotAct: false, target: null, expectedPopup: { type: 'automation_info', name: 'Grapple', description: 'No target selected. Select a target in combat first.' } },
+  ])('guard: $label', async ({ cannotAct, target, expectedPopup }) => {
+    const { setPopupHtml, rollAbilityCheck } = await renderGrappleAndClick({ cannotAct, target });
 
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      await renderGrappleWithMocks({
-        mockSetPopupHtml,
-        cannotAct: true,
-      });
-
-      const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
-      await act(async () => { fireEvent.click(grappleBtn); });
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-    });
-
-    it('uses Dexterity ability check for monk characters', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const mockRollAbilityCheck = vi.fn().mockResolvedValue(undefined);
-      const dexMod = 4;
-      const proficiency = 3;
-      const dexCheckBonus = dexMod + proficiency;
-
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return [];
-        if (_name === 'campaign' && key === 'lastAttack') return { d20: 15, bonus: dexCheckBonus, total: 15 + dexCheckBonus };
-        return null;
-      });
-
-      const stats = createStats({
-        actions: ['Grapple'],
-        class: { name: 'Monk' },
-        level: 5,
-      });
-      stats.abilities = [
-        { name: 'Strength', bonus: 0, skills: [] },
-        { name: 'Dexterity', bonus: dexMod, skills: [{ name: 'Athletics', bonus: dexCheckBonus }] },
-        { name: 'Constitution', bonus: 0, skills: [] },
-        { name: 'Intelligence', bonus: 0, skills: [] },
-        { name: 'Wisdom', bonus: 0, skills: [] },
-        { name: 'Charisma', bonus: 0, skills: [] },
-      ];
-
-      await renderGrappleWithMocks({
-        mockSetPopupHtml,
-        mockRollAbilityCheck,
-        loadCsData: {
-          lastAttack: { d20: 15, bonus: dexCheckBonus, total: 15 + dexCheckBonus },
-          creatures: [{ name: 'Goblin', conditions: [], type: 'npc', ability_score_modifiers: { str: 1 } }],
-        },
-        targetFromAttacker: { name: 'Goblin', conditions: [], type: 'npc', ability_score_modifiers: { str: 1 } },
-      }, stats);
-
-      const grappleBtn = await waitFor(() => screen.getByText('Grapple'));
-      await act(async () => { fireEvent.click(grappleBtn); });
-
+    if (expectedPopup) {
       await waitFor(() => {
-        expect(mockRollAbilityCheck).toHaveBeenCalledWith('Dexterity', expect.any(Number), expect.any(Object));
+        expect(setPopupHtml).toHaveBeenCalledWith(expectedPopup);
       });
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-          name: 'Grapple',
-          description: expect.stringContaining('Grapple successful'),
-        }));
-      });
-    });
+    } else {
+      expect(setPopupHtml).not.toHaveBeenCalled();
+    }
+    expect(rollAbilityCheck).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['grappled']), 'test-campaign');
   });
 });

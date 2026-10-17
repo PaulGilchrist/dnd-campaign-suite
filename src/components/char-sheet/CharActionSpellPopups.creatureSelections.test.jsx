@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharActionSpellPopups from './CharActionSpellPopups.jsx';
@@ -14,21 +15,17 @@ vi.mock('./popups/MetamagicPopup.jsx', () => ({
   },
 }));
 
+// Stub that surfaces how the component wires each ally-selection spell:
+// title identifies the modal, targets/maxTargets verify data pass-through,
+// and confirm/skip buttons let tests verify the pending→handler dispatch.
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', () => ({
-  default: function TestCreatureSelectionModal({ title, icon, targets, maxTargets, description, confirmLabel, confirmIcon: _, onConfirm, onSkip }) {
+  default: function TestCreatureSelectionModal({ title, targets, maxTargets, onConfirm, onSkip }) {
     return (
       <div data-testid={`creature-selection-${title}`}>
-        <span data-testid="title">{title}</span>
-        <span data-testid="icon">{icon}</span>
-        <span data-testid="description">{description}</span>
-        <span data-testid="creature-count">{targets?.length}</span>
-        <span data-testid="max-targets">{maxTargets}</span>
-        <span data-testid="confirm-label">{confirmLabel}</span>
-        {onConfirm && <button data-testid="confirm" onClick={() => onConfirm(targets?.map(t => t.name || t))}>Confirm</button>}
-        {onSkip && <button data-testid="skip" onClick={onSkip}>Skip</button>}
-        {targets?.map((t, i) => (
-          <span key={i} data-testid={`target-${i}`}>{typeof t === 'string' ? t : t.name}</span>
-        ))}
+        <span data-testid="targets">{(targets || []).map(t => (typeof t === 'string' ? t : t.name)).join(',')}</span>
+        {maxTargets !== undefined && <span data-testid="max-targets">{String(maxTargets)}</span>}
+        <button data-testid="confirm" onClick={() => onConfirm((targets || []).map(t => (typeof t === 'string' ? t : t.name)))}>Confirm</button>
+        <button data-testid="skip" onClick={onSkip}>Skip</button>
       </div>
     );
   },
@@ -90,39 +87,53 @@ function createBaseProps(overrides) {
   };
 }
 
+// One row per spell in ALLY_SELECTION_MODAL_SPECS: exercises the full
+// pending→modal→handler wiring for that spell in a single render.
+const allySelectionSpells = [
+  { name: 'Aid', pending: 'actionPendingAid', confirm: 'actionHandleAidConfirm', skip: 'actionHandleAidSkip', targets: ['Ally1', 'Ally2'], maxTargets: 3 },
+  { name: 'Bane', pending: 'actionPendingBane', confirm: 'actionHandleBaneConfirm', skip: 'actionHandleBaneSkip', targets: ['Goblin1', 'Goblin2'], maxTargets: 3 },
+  { name: 'Bless', pending: 'actionPendingBless', confirm: 'actionHandleBlessConfirm', skip: 'actionHandleBlessSkip', targets: ['Ally1', 'Ally2'], maxTargets: 3 },
+  { name: 'Faerie Fire', pending: 'actionPendingFaerieFire', confirm: 'actionHandleFaerieFireConfirm', skip: 'actionHandleFaerieFireSkip', targets: ['Goblin1', 'Goblin2'] },
+  { name: 'Beacon of Hope', pending: 'actionPendingBeaconOfHope', confirm: 'actionHandleBeaconOfHopeConfirm', skip: 'actionHandleBeaconOfHopeSkip', targets: ['Ally1', 'Ally2'] },
+  { name: 'Pass Without Trace', pending: 'actionPendingPassWithoutTrace', confirm: 'actionHandlePassWithoutTraceConfirm', skip: 'actionHandlePassWithoutTraceSkip', targets: ['Ally1', 'Ally2'] },
+];
+
 describe('CharActionSpellPopups - CreatureSelectionModal Spells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  const creatureSelectionSpells = [
-    { name: 'Aid', key: 'actionPendingAid', handleConfirm: 'actionHandleAidConfirm', handleSkip: 'actionHandleAidSkip', props: { creatureTargets: ['Ally1', 'Ally2'], maxTargets: 3 } },
-    { name: 'Bane', key: 'actionPendingBane', handleConfirm: 'actionHandleBaneConfirm', handleSkip: 'actionHandleBaneSkip', props: { creatureTargets: ['Goblin1', 'Goblin2'], maxTargets: 3 } },
-    { name: 'Bless', key: 'actionPendingBless', handleConfirm: 'actionHandleBlessConfirm', handleSkip: 'actionHandleBlessSkip', props: { creatureTargets: ['Ally1', 'Ally2'], maxTargets: 3 } },
-    { name: 'Faerie Fire', key: 'actionPendingFaerieFire', handleConfirm: 'actionHandleFaerieFireConfirm', handleSkip: 'actionHandleFaerieFireSkip', props: { creatureTargets: ['Goblin1', 'Goblin2'] } },
-    { name: 'Beacon of Hope', key: 'actionPendingBeaconOfHope', handleConfirm: 'actionHandleBeaconOfHopeConfirm', handleSkip: 'actionHandleBeaconOfHopeSkip', props: { creatureTargets: ['Ally1', 'Ally2'] } },
-    { name: 'Pass Without Trace', key: 'actionPendingPassWithoutTrace', handleConfirm: 'actionHandlePassWithoutTraceConfirm', handleSkip: 'actionHandlePassWithoutTraceSkip', props: { creatureTargets: ['Ally1', 'Ally2'] } },
-  ];
+  it.each(allySelectionSpells)(
+    'wires $name: shows pending targets, casts through $confirm, cancels through $skip',
+    ({ name, pending, confirm, skip, targets, maxTargets }) => {
+      const confirmFn = vi.fn();
+      const skipFn = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ [confirm]: confirmFn, [skip]: skipFn })}
+          {...{ [pending]: { creatureTargets: targets, maxTargets } }}
+        />
+      );
 
-  it.each(creatureSelectionSpells)('renders CreatureSelectionModal for $name', ({ name, key, props }) => {
-    const propsWithSpell = { ...createBaseProps(), [key]: { ...props } };
-    render(<CharActionSpellPopups {...propsWithSpell} />);
-    expect(screen.getByTestId(`creature-selection-${name}`)).toBeInTheDocument();
-  });
+      const modal = screen.getByTestId(`creature-selection-${name}`);
+      expect(modal).toBeInTheDocument();
+      expect(screen.getByTestId('targets')).toHaveTextContent(targets.join(','));
+      if (maxTargets !== undefined) {
+        expect(screen.getByTestId('max-targets')).toHaveTextContent(String(maxTargets));
+      } else {
+        expect(screen.queryByTestId('max-targets')).not.toBeInTheDocument();
+      }
 
-  it.each(creatureSelectionSpells)('calls the confirm handler for $name with target names', ({ key, handleConfirm, props }) => {
-    const handleConfirmFn = vi.fn();
-    const propsWithSpell = { ...createBaseProps({ [handleConfirm]: handleConfirmFn }), [key]: { ...props } };
-    render(<CharActionSpellPopups {...propsWithSpell} />);
-    screen.getByTestId('confirm').click();
-    expect(handleConfirmFn).toHaveBeenCalledWith(props.creatureTargets);
-  });
+      screen.getByTestId('confirm').click();
+      expect(confirmFn).toHaveBeenCalledWith(targets);
 
-  it.each(creatureSelectionSpells)('calls the skip handler for $name', ({ key, handleSkip, props }) => {
-    const handleSkipFn = vi.fn();
-    const propsWithSpell = { ...createBaseProps({ [handleSkip]: handleSkipFn }), [key]: { ...props } };
-    render(<CharActionSpellPopups {...propsWithSpell} />);
-    screen.getByTestId('skip').click();
-    expect(handleSkipFn).toHaveBeenCalled();
+      screen.getByTestId('skip').click();
+      expect(skipFn).toHaveBeenCalled();
+    }
+  );
+
+  it('renders no creature-selection modal when no spell is pending', () => {
+    const { container } = render(<CharActionSpellPopups {...createBaseProps()} />);
+    expect(container.querySelectorAll('[data-testid^="creature-selection-"]')).toHaveLength(0);
   });
 });

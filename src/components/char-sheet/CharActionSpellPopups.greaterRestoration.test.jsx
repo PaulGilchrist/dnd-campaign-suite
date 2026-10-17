@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import CharActionSpellPopups from './CharActionSpellPopups.jsx';
@@ -157,8 +158,25 @@ function createBaseProps(overrides) {
   };
 }
 
-function setTargetEffects(targetName, effects) {
-  runtimeStore.set(buildRuntimeKey('campaign', 'targetEffects'), effects);
+// Seed a target's effect-state in the runtime store; every slot defaults to
+// "nothing removable" so each test only states what differs.
+function setTargetState(targetName, state = {}) {
+  runtimeStore.set(buildRuntimeKey(targetName, 'activeConditions'), state.activeConditions ?? []);
+  runtimeStore.set(buildRuntimeKey(targetName, 'exhaustionLevel'), state.exhaustionLevel ?? 0);
+  runtimeStore.set(buildRuntimeKey(targetName, 'activeBuffs'), state.activeBuffs ?? []);
+  runtimeStore.set(buildRuntimeKey(targetName, 'abilityReductions'), state.abilityReductions ?? {});
+  runtimeStore.set(buildRuntimeKey(targetName, 'hpMaxReduction'), state.hpMaxReduction ?? 0);
+}
+
+function pendingGR(overrides) {
+  return { creatureTargets: ['Ally1'], range: 'Touch', ...overrides };
+}
+
+// Render with a pending Greater Restoration cast and advance from the target
+// step to the effect step by clicking the first creature target.
+async function openEffectStep(props) {
+  render(<CharActionSpellPopups {...createBaseProps(props)} />);
+  screen.getByTestId('target-0').click();
 }
 
 describe('CharActionSpellPopups - Greater Restoration 2-Step Flow', () => {
@@ -167,447 +185,125 @@ describe('CharActionSpellPopups - Greater Restoration 2-Step Flow', () => {
     runtimeStore.clear();
   });
 
-  describe('Step 1: Target Selection', () => {
-    it('renders SecondaryTargetModal with correct metadata when actionPendingGreaterRestoration is truthy', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1', 'Ally2'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-          })}
-        />
-      );
-      expect(screen.getByTestId('title')).toHaveTextContent('Greater Restoration');
-      expect(screen.getByTestId('description')).toHaveTextContent('Touch');
-      expect(screen.getByTestId('confirm-label')).toHaveTextContent('Cast Greater Restoration');
-      expect(screen.getByTestId('target-0')).toHaveTextContent('Ally1');
-      expect(screen.getByTestId('target-1')).toHaveTextContent('Ally2');
+  it('opens the target step with spell metadata, and Skip cancels the cast', () => {
+    const skip = vi.fn();
+    const confirm = vi.fn();
+    render(
+      <CharActionSpellPopups
+        {...createBaseProps({
+          actionPendingGreaterRestoration: pendingGR({ creatureTargets: ['Ally1', 'Ally2'] }),
+          actionHandleGreaterRestorationSkip: skip,
+          actionHandleGreaterRestorationConfirm: confirm,
+        })}
+      />
+    );
+    expect(screen.getByTestId('title')).toHaveTextContent('Greater Restoration');
+    expect(screen.getByTestId('description')).toHaveTextContent('Touch');
+    expect(screen.getByTestId('confirm-label')).toHaveTextContent('Cast Greater Restoration');
+    expect(screen.getByTestId('target-name-0')).toHaveTextContent('Ally1');
+    expect(screen.getByTestId('target-name-1')).toHaveTextContent('Ally2');
+
+    screen.getByTestId('skip').click();
+    expect(skip).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('advances to the effect step offering only Greater Restoration-removable conditions', async () => {
+    setTargetState('Ally1', { activeConditions: ['charmed', 'petrified', 'frightened', 'poisoned', 'blinded'] });
+    await openEffectStep({
+      actionPendingGreaterRestoration: pendingGR(),
     });
 
-    it('calls actionHandleGreaterRestorationSkip when skip is clicked', () => {
-      const actionHandleGreaterRestorationSkip = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationSkip })}
-          actionPendingGreaterRestoration={{ creatureTargets: ['Ally1'], range: 'Touch' }}
-        />
-      );
-      screen.getByTestId('skip').click();
-      expect(actionHandleGreaterRestorationSkip).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('Charmed condition')).toBeInTheDocument();
+      expect(screen.getByText('Petrified condition')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Frightened condition')).not.toBeInTheDocument();
+    expect(screen.queryByText('Poisoned condition')).not.toBeInTheDocument();
+    expect(screen.queryByText('Blinded condition')).not.toBeInTheDocument();
+    expect(screen.getByTestId('description')).toHaveTextContent('Ally1');
+    expect(screen.getByTestId('confirm-label')).toHaveTextContent('Remove Effect');
+  });
+
+  const effectCases = [
+    { name: 'condition', state: { activeConditions: ['charmed'] }, text: 'Charmed condition', selection: { type: 'condition', condition: 'charmed' } },
+    { name: 'exhaustion', state: { exhaustionLevel: 2 }, text: 'Exhaustion level (current: 2)', selection: { type: 'exhaustion' } },
+    { name: 'curse', state: { activeBuffs: [{ type: 'cursed' }] }, text: 'Curse (including attunement to cursed magic item)', selection: { type: 'curse' } },
+    { name: 'ability_reduction', state: { abilityReductions: { STR: -2 } }, text: 'Ability score reduction', selection: { type: 'ability_reduction' } },
+    { name: 'hp_max_reduction', state: { hpMaxReduction: 10 }, text: 'Hit Point maximum reduction', selection: { type: 'hp_max_reduction' } },
+  ];
+
+  it.each(effectCases)('detects $name, confirms it with the right selection payload, and returns to the target step', async ({ state, text, selection }) => {
+    const confirm = vi.fn();
+    const skip = vi.fn();
+    setTargetState('Ally1', state);
+    await openEffectStep({
+      actionPendingGreaterRestoration: pendingGR(),
+      actionHandleGreaterRestorationConfirm: confirm,
+      actionHandleGreaterRestorationSkip: skip,
     });
 
-    it('renders no targets when creatureTargets is empty', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: [], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-          })}
-        />
-      );
-      expect(screen.getByTestId('title')).toHaveTextContent('Greater Restoration');
-      expect(screen.queryByTestId('target-0')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    });
+    screen.getByText(text).click();
+    expect(confirm).toHaveBeenCalledWith({ targetName: 'Ally1', selections: [selection] });
+    expect(skip).not.toHaveBeenCalled();
+    // Back at step 1: the first list entry is the creature again, not an effect label.
+    await waitFor(() => {
+      expect(screen.getByTestId('target-name-0')).toHaveTextContent('Ally1');
     });
   });
 
-  describe('Step 2: Effect Selection', () => {
-    it('displays conditions from activeConditions in runtime store', async () => {
-      setTargetEffects('campaign', []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['charmed', 'petrified']);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Charmed condition')).toBeInTheDocument();
-        expect(screen.getByText('Petrified condition')).toBeInTheDocument();
-      });
+  it('shows the no-effects message with confirm hidden and routes dismissal to the no-effects handler', async () => {
+    const noEffects = vi.fn();
+    const confirm = vi.fn();
+    const skip = vi.fn();
+    // Nothing removable: unsupported condition, non-curse buff, zero counters.
+    setTargetState('Ally1', { activeConditions: ['frightened'], activeBuffs: [{ type: 'blessing' }] });
+    await openEffectStep({
+      actionPendingGreaterRestoration: pendingGR(),
+      actionHandleGreaterRestorationNoEffects: noEffects,
+      actionHandleGreaterRestorationConfirm: confirm,
+      actionHandleGreaterRestorationSkip: skip,
     });
 
-    it('displays exhaustion level when greater than zero', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 2);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Exhaustion level (current: 2)')).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.getByText(/No removable effects found on Ally1/)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Exhaustion level/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Curse (including attunement to cursed magic item)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ability score reduction')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hit Point maximum reduction')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confirm')).not.toBeInTheDocument();
 
-    it('does not display exhaustion when level is zero', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByText(/Exhaustion level/)).not.toBeInTheDocument();
-      });
-    });
-
-    it('displays curse when activeBuffs has type "cursed"', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), [{ type: 'cursed' }]);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Curse (including attunement to cursed magic item)')).toBeInTheDocument();
-      });
-    });
-
-    it('does not display curse when no cursed buffs exist', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), [{ type: 'other' }]);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByText(/Curse/)).not.toBeInTheDocument();
-      });
-    });
-
-    it('displays ability score reduction when abilityReductions has entries', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), { STR: -2 });
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Ability score reduction')).toBeInTheDocument();
-      });
-    });
-
-    it('does not display ability score reduction when empty', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByText('Ability score reduction')).not.toBeInTheDocument();
-      });
-    });
-
-    it('displays HP maximum reduction when greater than zero', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 10);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Hit Point maximum reduction')).toBeInTheDocument();
-      });
-    });
-
-    it('does not display HP reduction when zero', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByText('Hit Point maximum reduction')).not.toBeInTheDocument();
-      });
-    });
-
-    it('shows "No removable effects" message when target has no removable effects', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-            actionHandleGreaterRestorationNoEffects: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText(/No removable effects found on Ally1/)).toBeInTheDocument();
-      });
-    });
-
-    it('calls actionHandleGreaterRestorationNoEffects when skipping with no effects', async () => {
-      const actionHandleGreaterRestorationNoEffects = vi.fn();
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationNoEffects })}
-          actionPendingGreaterRestoration={{ creatureTargets: ['Ally1'], range: 'Touch' }}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Skip' })).toBeInTheDocument();
-      });
-      screen.getByRole('button', { name: 'Skip' }).click();
-      expect(actionHandleGreaterRestorationNoEffects).toHaveBeenCalled();
-    });
-
-    it('does not call noEffects when skipping with effects present', async () => {
-      const actionHandleGreaterRestorationNoEffects = vi.fn();
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['charmed']);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationNoEffects })}
-          actionPendingGreaterRestoration={{ creatureTargets: ['Ally1'], range: 'Touch' }}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Charmed condition')).toBeInTheDocument();
-      });
-      screen.getByRole('button', { name: 'Skip' }).click();
-      expect(actionHandleGreaterRestorationNoEffects).not.toHaveBeenCalled();
-    });
-
-    it('only includes conditions supported by Greater Restoration', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['frightened', 'poisoned', 'blinded']);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.queryByText('Poisoned condition')).not.toBeInTheDocument();
-        expect(screen.queryByText('Frightened condition')).not.toBeInTheDocument();
-        expect(screen.queryByText('Blinded condition')).not.toBeInTheDocument();
-      });
+    screen.getByTestId('skip').click();
+    expect(noEffects).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(skip).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId('target-name-0')).toHaveTextContent('Ally1');
     });
   });
 
-  describe('Effect selection callbacks', () => {
-    const effectTests = [
-      { name: 'condition selection', setup: () => {
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['charmed']);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-        runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-      }, searchText: 'Charmed condition', expectedSelection: { type: 'condition', condition: 'charmed' } },
-      { name: 'exhaustion selection', setup: () => {
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 3);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-        runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-      }, searchText: 'Exhaustion level (current: 3)', expectedSelection: { type: 'exhaustion' } },
-      { name: 'curse selection', setup: () => {
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), [{ type: 'cursed' }]);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-        runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-      }, searchText: 'Curse (including attunement to cursed magic item)', expectedSelection: { type: 'curse' } },
-      { name: 'ability_reduction selection', setup: () => {
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), { STR: -2 });
-        runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-      }, searchText: 'Ability score reduction', expectedSelection: { type: 'ability_reduction' } },
-      { name: 'hp_max_reduction selection', setup: () => {
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-        runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-        runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 10);
-      }, searchText: 'Hit Point maximum reduction', expectedSelection: { type: 'hp_max_reduction' } },
-    ];
-
-    it.each(effectTests)('calls actionHandleGreaterRestorationConfirm with $name', async ({ setup, searchText, expectedSelection }) => {
-      const actionHandleGreaterRestorationConfirm = vi.fn();
-      setup();
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationConfirm })}
-          actionPendingGreaterRestoration={{ creatureTargets: ['Ally1'], range: 'Touch' }}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText(searchText)).toBeInTheDocument();
-      });
-      screen.getByText(searchText).click();
-      expect(actionHandleGreaterRestorationConfirm).toHaveBeenCalledWith({
-        targetName: 'Ally1',
-        selections: [expectedSelection],
-      });
+  it('returns to the target step when skipping the effect step with effects present, without casting or refunding', async () => {
+    const confirm = vi.fn();
+    const noEffects = vi.fn();
+    setTargetState('Ally1', { activeConditions: ['charmed'] });
+    await openEffectStep({
+      actionPendingGreaterRestoration: pendingGR(),
+      actionHandleGreaterRestorationConfirm: confirm,
+      actionHandleGreaterRestorationNoEffects: noEffects,
     });
 
-    it('clears selected target after effect is confirmed, returning to target selection', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['charmed']);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationConfirm: vi.fn(),
-            actionHandleGreaterRestorationSkip: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Charmed condition')).toBeInTheDocument();
-      });
-      screen.getByText('Charmed condition').click();
-      expect(screen.getByTestId('target-0')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Charmed condition')).toBeInTheDocument();
     });
-
-    it('clears selected target on skip during effect selection, returning to target selection', async () => {
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeConditions'), ['charmed']);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'exhaustionLevel'), 0);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'activeBuffs'), []);
-      runtimeStore.set(buildRuntimeKey('Ally1', 'abilityReductions'), {});
-      runtimeStore.set(buildRuntimeKey('Ally1', 'hpMaxReduction'), 0);
-
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({
-            actionPendingGreaterRestoration: { creatureTargets: ['Ally1'], range: 'Touch' },
-            actionHandleGreaterRestorationSkip: vi.fn(),
-          })}
-        />
-      );
-      screen.getByTestId('target-0').click();
-      await waitFor(() => {
-        expect(screen.getByText('Charmed condition')).toBeInTheDocument();
-      });
-      screen.getByRole('button', { name: 'Skip' }).click();
-      expect(screen.getByTestId('target-0')).toBeInTheDocument();
+    screen.getByTestId('skip').click();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(noEffects).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByTestId('target-name-0')).toHaveTextContent('Ally1');
     });
   });
 });

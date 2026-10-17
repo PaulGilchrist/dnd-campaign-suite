@@ -1,8 +1,8 @@
+// @maintained-by-ai
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 const _syncedStore = new Map();
 
@@ -201,7 +201,10 @@ function renderWithFetch(component, options = {}) {
   return act(async () => { render(component, options); });
 }
 
-describe('CharActions spell damage display and spell click', () => {
+// Potent Spellcasting feature as authored on real character data (2024 Cleric cantrip bonus).
+const potentSpellcastingFeature = { type: 'damage_bonus', name: 'Potent Spellcasting', options: ['Spellcasting Ability', 'Wisdom'], upgrades: false };
+
+describe('CharActions action spell bar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -209,159 +212,112 @@ describe('CharActions spell damage display and spell click', () => {
     getRuntimeValue.mockImplementation(() => null);
   });
 
-  describe('getSpellDamageDisplay', () => {
-    it.each([
-      { spellName: 'Healing Word', level: 1, heal_at_slot_level: true, modifier: 2, expectedText: '1d4+2' },
-      { spellName: 'Healing Word', level: 1, heal_at_slot_level: true, modifier: 3, expectedText: '1d4+3' },
-    ])('shows resolved heal expression for heal_at_slot_level spells (mod: $modifier)', async ({ spellName, level, heal_at_slot_level, modifier, expectedText }) => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: spellName, level, heal_at_slot_level, casting_time: '1 action', prepared: 'Prepared' }],
-          toHit: 5, saveDc: 13, modifier,
-        },
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      expect(screen.getByText(spellName)).toBeInTheDocument();
-      expect(screen.getByText(expectedText)).toBeInTheDocument();
+  it('shows the resolved heal formula with the caster spellcasting modifier for healing action spells', async () => {
+    const stats = createStats({
+      spellAbilities: {
+        spells: [{ name: 'Healing Word', level: 1, heal_at_slot_level: true, casting_time: '1 action', prepared: 'Prepared' }],
+        toHit: 5, saveDc: 13, modifier: 2,
+      },
     });
 
-    it('shows resolved damage for non-0 level spells', async () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: 'Fireball', level: 3, damage: '8d6', casting_time: '1 action', prepared: 'Prepared' }],
-          toHit: 5, saveDc: 13,
-        },
-      });
+    await renderWithFetch(<CharActions playerStats={stats} />);
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('8d6')).toBeInTheDocument();
-    });
-
-    it('does not render spells without damage or heal_at_slot_level', async () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: 'Minor Illusion', level: 0, casting_time: '1 action', prepared: 'Always' }],
-          toHit: 5, saveDc: 13,
-        },
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      // getActionSpellNames filters out spells without damage or heal_at_slot_level
-      expect(screen.queryByText('Minor Illusion')).not.toBeInTheDocument();
-    });
-
-    it.each([
-      { label: 'appends Wis mod when chosen', chosenOption: 'Spellcasting Ability', wisBonus: 2, expectedText: '1d6+2' },
-      { label: 'does not append when no option chosen', chosenOption: null, wisBonus: 2, expectedText: '1d6' },
-      { label: 'does not append when Wis mod is 0', chosenOption: 'Wisdom', wisBonus: 0, expectedText: '1d6' },
-    ])('potent spellcasting: $label', async ({ chosenOption, wisBonus, expectedText }) => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: 'Burning Hands', level: 0, damage: '1d6', casting_time: '1 action', prepared: 'Prepared' }],
-          toHit: 5, saveDc: 13,
-        },
-        abilities: [{ name: 'STR', bonus: 3 }, { name: 'Wisdom', bonus: wisBonus }],
-        automation: {
-          actions: [{ type: 'damage_bonus', name: 'Potent Spellcasting', options: ['Spellcasting Ability', 'Wisdom'], upgrades: false }],
-        },
-      });
-
-      const chosenKey = '_Potent_Spellcasting_option';
-      getRuntimeValue.mockImplementation((_name, key, _campaign) => {
-        if (key === chosenKey) return chosenOption;
-        return null;
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      expect(screen.getByText('Burning Hands')).toBeInTheDocument();
-      expect(screen.getByText(expectedText)).toBeInTheDocument();
-    });
+    expect(screen.getByText('Healing Word')).toBeInTheDocument();
+    expect(screen.getByText('1d4+2')).toBeInTheDocument();
   });
 
-  describe('handleActionSpellClick', () => {
-    it.each([
-      { spellName: 'Fireball', damage: '8d6', level: 3, element: 'spell' },
-      { spellName: 'Fireball', damage: '8d6', level: 3, element: 'damage' },
-    ])('renders spell $element as clickable element', async ({ spellName, damage, level }) => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: spellName, level, range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage }],
-          toHit: 5, saveDc: 13,
-        },
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      const text = level === 0 ? spellName : (damage === '8d6' ? '8d6' : spellName);
-      const el = level === 0 ? screen.getByText(spellName) : screen.getByText(text);
-      expect(el).toHaveClass('clickable');
+  it('shows leveled spell damage as a clickable cell, never boosted by Potent Spellcasting', async () => {
+    const stats = createStats({
+      spellAbilities: {
+        spells: [{ name: 'Fireball', level: 3, range: '150 ft', damage: '8d6', casting_time: '1 action', prepared: 'Prepared' }],
+        toHit: 5, saveDc: 13,
+      },
+      automation: { actions: [potentSpellcastingFeature] },
     });
+    // Potent bonus is fully opted-in (Wis 2) — if it leaked past the cantrip-only
+    // guard the cell would read 8d6+2.
+    getRuntimeValue.mockImplementation((_name, key) => (key === '_Potent_Spellcasting_option' ? 'Spellcasting Ability' : null));
 
-    it('renders healing spells with resolved heal expression', async () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [{ name: 'Healing Word', level: 1, heal_at_slot_level: true, casting_time: '1 action', prepared: 'Prepared' }],
-          toHit: 5, saveDc: 13, modifier: 3,
-        },
-      });
+    await renderWithFetch(<CharActions playerStats={stats} />);
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
-
-      expect(screen.getByText('Healing Word')).toBeInTheDocument();
-      expect(screen.getByText('1d4+3')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Fireball')).toHaveClass('clickable');
+    expect(screen.getByText('8d6')).toHaveClass('clickable');
+    expect(screen.queryByText('8d6+2')).not.toBeInTheDocument();
   });
 
-  describe('automation actions display', () => {
-    it('renders automation actions with badge when saveDc is present', async () => {
-      const stats = createStats({
-        actions: [
-          { name: 'Divine Intervention', description: 'Call on divine power.', automation: { type: 'save_attack', saveDc: 15, saveType: 'CHA' } },
-        ],
-      });
-
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
-
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [];
-        if (key === 'hasteExtraActionUsed') return false;
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      await renderWithFetch(<CharActions playerStats={stats} campaignName="test-campaign" />, { wrapper });
-
-      expect(screen.getByText('Actions')).toBeInTheDocument();
-      expect(screen.getByText(/Divine Intervention:/)).toBeInTheDocument();
-      expect(screen.getByText(/DC 15 CHA/)).toBeInTheDocument();
+  it('omits action spells that deal neither damage nor healing', async () => {
+    const stats = createStats({
+      spellAbilities: {
+        spells: [{ name: 'Minor Illusion', level: 0, casting_time: '1 action', prepared: 'Always' }],
+        toHit: 5, saveDc: 13,
+      },
     });
 
-    it('renders automation actions without badge when no saveDc', async () => {
-      const stats = createStats({
-        actions: [
-          { name: 'Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } },
-        ],
-      });
+    await renderWithFetch(<CharActions playerStats={stats} />);
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.queryByText('Minor Illusion')).not.toBeInTheDocument();
+  });
 
-      expect(screen.getByText(/Rage:/)).toBeInTheDocument();
-      expect(screen.queryByText(/DC/)).not.toBeInTheDocument();
+  it.each([
+    { label: 'adds the Wis bonus to cantrip damage when Spellcasting Ability is chosen', chosenOption: 'Spellcasting Ability', expectedText: '1d6+2' },
+    { label: 'leaves cantrip damage unmodified until an option is chosen', chosenOption: null, expectedText: '1d6' },
+  ])('Potent Spellcasting: $label', async ({ chosenOption, expectedText }) => {
+    const stats = createStats({
+      spellAbilities: {
+        spells: [{ name: 'Burning Hands', level: 0, damage: '1d6', casting_time: '1 action', prepared: 'Prepared' }],
+        toHit: 5, saveDc: 13,
+      },
+      automation: { actions: [potentSpellcastingFeature] },
     });
+    getRuntimeValue.mockImplementation((_name, key) => {
+      if (key === '_Potent_Spellcasting_option') return chosenOption;
+      return null;
+    });
+
+    await renderWithFetch(<CharActions playerStats={stats} />);
+
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
+  });
+});
+
+describe('CharActions automation feature-row badges', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    _syncedStore.clear();
+    getRuntimeValue.mockImplementation(() => null);
+  });
+
+  it.each([
+    {
+      label: 'shows numeric save DC and damage badges',
+      automation: { type: 'save_attack', saveDc: 15, saveType: 'CHA', damage: '2d6', damageType: 'Fire' },
+      expectedBadges: [/DC 15 CHA/, /2d6 Fire/],
+    },
+    {
+      label: "resolves the 'ability' save DC placeholder to the caster's spell save DC",
+      automation: { type: 'save_attack', saveDc: 'ability', saveType: 'CON' },
+      expectedBadges: [/DC 13 CON/],
+    },
+    {
+      label: 'renders no badge for automations without a save DC or damage',
+      automation: { type: 'combat_stance' },
+      expectedBadges: [],
+    },
+  ])('$label', async ({ automation, expectedBadges }) => {
+    const stats = createStats({
+      actions: [{ name: 'Feature Action', description: 'Do the thing.', automation }],
+    });
+
+    await renderWithFetch(<CharActions playerStats={stats} campaignName="test-campaign" />);
+
+    expect(screen.getByText(/Feature Action:/)).toBeInTheDocument();
+    for (const badge of expectedBadges) {
+      expect(screen.getByText(badge)).toBeInTheDocument();
+    }
+    if (expectedBadges.length === 0) {
+      expect(screen.queryByText(/DC \d/)).not.toBeInTheDocument();
+    }
   });
 });

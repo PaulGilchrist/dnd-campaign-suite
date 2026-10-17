@@ -1,9 +1,19 @@
+// @maintained-by-ai
+// CharBonusActions host: pending-popup DISPLAY contract.
+// When useSpellMetamagicFlow arms a pending state, this host must surface the
+// right popup/modal with the right display data (spell identity, sorcery
+// points, chooser title + targets) — and stay popup-free when idle.
+// Click lanes live in CharBonusActions.interactive.test.jsx; the Hex/upcast
+// detail-popup host is covered in CharBonusActions.spellCastFlow.test.jsx;
+// Lesser Restoration/Hex target popups in CharBonusActions.lesserRestoration.test.jsx.
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
+// Full shape of the mocked useSpellMetamagicFlow return — every key the
+// component destructures from the hook. Tests override only what they assert.
+const { flowShape } = vi.hoisted(() => ({
+  flowShape: () => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
@@ -14,7 +24,26 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingGreaterRestoration: null,
     handleGreaterRestorationConfirm: vi.fn(),
     handleGreaterRestorationSkip: vi.fn(),
-  })),
+    pendingBarkskin: null,
+    handleBarkskinConfirm: vi.fn(),
+    handleBarkskinSkip: vi.fn(),
+    pendingHealingWord: null,
+    handleHealingWordConfirm: vi.fn(),
+    handleHealingWordSkip: vi.fn(),
+    pendingSanctuary: null,
+    handleSanctuaryConfirm: vi.fn(),
+    handleSanctuarySkip: vi.fn(),
+    pendingHex: null,
+    handleHexConfirm: vi.fn(),
+    handleHexSkip: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+  }),
+}));
+
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => flowShape()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -83,7 +112,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
-    rangeToFeet: vi.fn(() => null),
+  rangeToFeet: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({
@@ -92,47 +121,53 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
-  buildFeatureDetailHtml: vi.fn((entity) => {
-    if (entity.details) {
-      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    }
-    return null;
-  }),
-}));
-
-vi.mock('./popups/MetamagicPopup.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
+  buildFeatureDetailHtml: vi.fn(() => null),
 }));
 
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
 }));
 
-vi.mock('./HexAbilityModal.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="hex-ability-modal"><button onClick={props.onCancel}>Cancel</button></div>),
+// Echo the display data the host must pass through: spell identity on the
+// metamagic popup, title + creature targets on the shared chooser modal.
+vi.mock('./popups/MetamagicPopup.jsx', () => ({
+  default: vi.fn((props) => (
+    <div data-testid="metamagic-popup">
+      {props.spell?.name} L{props.spell?.level} SP {props.playerStats?._metamagicCurrentSP}
+    </div>
+  )),
+}));
+
+vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
+  default: vi.fn((props) => <div data-testid="spell-detail-popup">{props.spell?.name}</div>),
+}));
+
+vi.mock('./modals/HexAbilityModal.jsx', () => ({
+  default: vi.fn(() => <div data-testid="hex-ability-modal" />),
 }));
 
 vi.mock('./modals/shared/SecondaryTargetModal.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="secondary-target-modal">{props.title}</div>),
+  default: vi.fn((props) => (
+    <div data-testid="secondary-target-modal">
+      {props.title}
+      {(props.targets || []).map((t) => <span key={t.name}>{t.name}</span>)}
+    </div>
+  )),
 }));
 
 vi.mock('./ArcaneVigorModal.jsx', () => ({
   default: vi.fn(() => <div data-testid="arcane-vigor-modal">Arcane Vigor</div>),
 }));
 
-vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
-  default: vi.fn((props) => {
-    return (
-      <div data-testid="spell-detail-popup">
-        <div data-testid="spell-name">{props.spell?.name}</div>
-        {props.onClose && <button data-testid="close-btn" onClick={props.onClose}>Close</button>}
-        {props.onCast && <button data-testid="cast-btn" onClick={() => props.onCast(props.spell, {})}>Cast</button>}
-      </div>
-    );
-  }),
-}));
-
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
+
+const CAMPAIGN = 'test-campaign';
+
+const bonusSpell = (spell) => ({
+  casting_time: '1 bonus action',
+  prepared: 'Prepared',
+  ...spell,
+});
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -140,81 +175,82 @@ const basePlayerStats = {
   level: 5,
   attacks: [],
   bonusActions: [],
-  spellAbilities: { spells: [] },
+  spellAbilities: { spells: [], modifier: 3, toHit: 7, saveDc: 15 },
 };
 
 function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-describe('CharBonusActions - Spell Cast Flow', () => {
+function renderWithSpells(spells) {
+  render(<CharBonusActions playerStats={createStats({ spellAbilities: { ...basePlayerStats.spellAbilities, spells } })} campaignName={CAMPAIGN} />);
+}
+
+// Override the metamagic-flow host with stable mocks for the keys under test.
+function mockFlow(overrides = {}) {
+  vi.mocked(useSpellMetamagicFlow).mockReturnValue({ ...flowShape(), ...overrides });
+}
+
+describe('CharBonusActions - pending popup display', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
   });
 
-  describe('MetamagicPopup rendering', () => {
-    it('renders MetamagicPopup when pendingMetamagic is set', () => {
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-        pendingMetamagic: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingBarkskin: null,
-        handleBarkskinConfirm: vi.fn(),
-        handleBarkskinSkip: vi.fn(),
-        pendingHealingWord: null,
-        handleHealingWordConfirm: vi.fn(),
-        handleHealingWordSkip: vi.fn(),
-        pendingSanctuary: null,
-        handleSanctuaryConfirm: vi.fn(),
-        handleSanctuarySkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      });
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } })} />);
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-    });
+  it.each([
+    {
+      label: 'surfaces the MetamagicPopup mapped from pendingMetamagic (name, level, SP)',
+      pending: { spellName: 'Fireball', spellLevel: 3, _currentSP: 5 },
+      shown: true,
+    },
+    {
+      label: 'renders no popup and no chooser when the flow is idle',
+      pending: null,
+      shown: false,
+    },
+  ])('$label', ({ pending, shown }) => {
+    mockFlow({ pendingMetamagic: pending });
+    renderWithSpells([bonusSpell({ name: 'Shocking Grasp', level: 0, range: 'Touch' })]);
 
-    it.each([
-      { label: 'pendingBarkskin', pending: 'pendingBarkskin', spell: { name: 'Barkskin', range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' } },
-      { label: 'pendingHealingWord', pending: 'pendingHealingWord', spell: { name: 'Healing Word', range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' } },
-      { label: 'pendingSanctuary', pending: 'pendingSanctuary', spell: { name: 'Sanctuary', range: '30 ft.', casting_time: '1 bonus action', prepared: 'Prepared' } },
-    ])('renders SecondaryTargetModal for $label', ({ pending, spell }) => {
-      const mockReturn = {
-        pendingMetamagic: null,
-        gateMetamagic: vi.fn(),
-        handleConfirm: vi.fn(),
-        handleSkip: vi.fn(),
-        pendingAid: null,
-        handleAidConfirm: vi.fn(),
-        handleAidSkip: vi.fn(),
-        pendingGreaterRestoration: null,
-        handleGreaterRestorationConfirm: vi.fn(),
-        handleGreaterRestorationSkip: vi.fn(),
-      };
-      mockReturn[pending] = { creatureTargets: ['Ally1'] };
-      const handleKey = pending.replace('pending', 'handle').replace(/([A-Z])/g, '$1').replace(/^handle/, 'handle');
-      const skipKey = `${handleKey}Skip`;
-      mockReturn[handleKey] = vi.fn();
-      mockReturn[skipKey] = vi.fn();
-      vi.mocked(useSpellMetamagicFlow).mockReturnValue(mockReturn);
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument();
-    });
+    const popup = screen.queryByTestId('metamagic-popup');
+    expect(!!popup).toBe(shown);
+    if (shown) {
+      // Pins the host→popup data mapping, not just the popup's presence.
+      expect(popup).toHaveTextContent('Fireball L3 SP 5');
+    } else {
+      expect(screen.queryByTestId('secondary-target-modal')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
+    }
   });
 
-  describe('spell damage display for healing spells', () => {
-    const healingSpell = { name: 'Healing Word', level: 1, range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared', heal_at_slot_level: true };
+  it.each([
+    { pending: 'pendingBarkskin', title: 'Barkskin' },
+    { pending: 'pendingHealingWord', title: 'Healing Word' },
+    { pending: 'pendingSanctuary', title: 'Sanctuary' },
+  ])('arms the $title target chooser when $pending is armed', ({ pending, title }) => {
+    mockFlow({ [pending]: { creatureTargets: ['Ally 1', 'Ally 2'] } });
+    renderWithSpells([bonusSpell({ name: title, level: 1, range: '60 ft.' })]);
 
-    it('shows "Healing" type label for healing spells', () => {
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [healingSpell] } })} />);
-      expect(screen.getByText('Healing')).toBeInTheDocument();
-    });
+    const modal = screen.getByTestId('secondary-target-modal');
+    expect(modal).toHaveTextContent(title);
+    expect(modal).toHaveTextContent('Ally 1');
+    expect(modal).toHaveTextContent('Ally 2');
   });
 
+  it.each([
+    { spellName: 'Healing Word', spell: bonusSpell({ name: 'Healing Word', level: 1, range: '60 ft.', heal_at_slot_level: true }), label: 'Healing' },
+    {
+      spellName: 'Flaming Sphere',
+      spell: bonusSpell({ name: 'Flaming Sphere', level: 1, range: '60 ft.', dc: { dc_type: 'DEX' }, damage: { damage_at_slot_level: { 1: '8d6' }, damage_type: 'Fire' } }),
+      label: 'Fire',
+    },
+    { spellName: 'Misty Step', spell: bonusSpell({ name: 'Misty Step', level: 2, range: 'Self' }), label: 'Utility' },
+  ])('$spellName shows $label in the Type column', ({ spell, label }) => {
+    renderWithSpells([spell]);
+    // Row rendered on the bonus lane, then its own type label — the healing
+    // spell must not fall through to the default 'Utility' label.
+    expect(screen.getByText(spell.name)).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
 });

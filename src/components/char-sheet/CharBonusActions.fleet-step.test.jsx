@@ -1,6 +1,11 @@
-// CLA-405: "Step of the Wind (Fleet Step)" row appears reactively when the
-// grant latch matches the current round, dispatches the canonical
-// step_of_the_wind lane after consuming, and never renders otherwise.
+// @maintained-by-ai
+// CLA-405 (CharBonusActions half): the "Step of the Wind (Fleet Step)" row
+// surfaces ONLY when the holder-keyed grant latch matches the current combat
+// round for an eligible character, and its click consumes the grant BEFORE
+// dispatching the canonical step_of_the_wind lane (dispatching nothing when
+// consumption refuses or the character cannot act). Grant stamping, eligibility
+// internals, and latch clearing are covered by fleetStepService.test.js and
+// useCharActions*.fleetStep.test.js — not re-tested here.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -98,9 +103,10 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/warBondHandler.j
 }));
 
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { consumeFleetStep, FLEET_STEP_GRANT_KEY } from '../../services/rules/features/fleetStepService.js';
+import { consumeFleetStep, isFleetStepEligible, FLEET_STEP_GRANT_KEY } from '../../services/rules/features/fleetStepService.js';
 
 const campaignName = 'test-campaign';
+const ROW_LABEL = 'Step of the Wind (Fleet Step):';
 
 const monkStats = {
   name: 'Disciplined_Monk',
@@ -112,70 +118,82 @@ const monkStats = {
   spellAbilities: { spells: [] },
 };
 
-function renderRow() {
-  const onAutomationAction = vi.fn();
-  const { container } = render(
-    <CharBonusActions playerStats={monkStats} campaignName={campaignName} onAutomationAction={onAutomationAction} />
+function renderRow({ cannotAct = false, grantRound = 3, eligible = true, onAutomationAction = vi.fn() } = {}) {
+  vi.mocked(isFleetStepEligible).mockReturnValue(eligible);
+  vi.mocked(useRuntimeValue).mockImplementation((_n, key) => (key === FLEET_STEP_GRANT_KEY ? grantRound : null));
+  const utils = render(
+    <CharBonusActions
+      playerStats={monkStats}
+      campaignName={campaignName}
+      cannotAct={cannotAct}
+      onAutomationAction={onAutomationAction}
+    />
   );
-  return { onAutomationAction, container };
+  return { onAutomationAction, ...utils };
 }
 
 describe('CharBonusActions — Fleet Step row (CLA-405)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isFleetStepEligible).mockReturnValue(true);
+    vi.mocked(consumeFleetStep).mockResolvedValue(true);
     vi.mocked(useRuntimeValue).mockImplementation((_n, key) => (key === FLEET_STEP_GRANT_KEY ? 3 : null));
   });
 
-  it('renders the Step of the Wind (Fleet Step) affordance when the grant matches the current round', () => {
+  it('renders the Step of the Wind (Fleet Step) row when the grant matches the current round', () => {
     renderRow();
-    expect(screen.getByText('Step of the Wind (Fleet Step):')).toBeTruthy();
+    expect(screen.getByText(ROW_LABEL)).toBeTruthy();
+    expect(screen.getByText(/Granted by Fleet Step/)).toBeTruthy();
   });
 
-  it('does NOT render the row when no grant is pending', () => {
-    vi.mocked(useRuntimeValue).mockReturnValue(null);
-    renderRow();
-    expect(screen.queryByText('Step of the Wind (Fleet Step):')).toBeNull();
+  it('does NOT render the row without a live grant — missing, stale, or ineligible', () => {
+    const cases = [
+      ['no grant stamped', { grantRound: null }],
+      ['grant stamped on a previous round (stale)', { grantRound: 2 }],
+      ['grant stamped but character ineligible', { grantRound: 3, eligible: false }],
+    ];
+    for (const [cause, props] of cases) {
+      const { unmount } = renderRow(props);
+      expect(screen.queryByText(ROW_LABEL), `expected no row: ${cause}`).toBeNull();
+      unmount();
+    }
   });
 
-  it('does NOT render the row when the grant latch is stale (previous round)', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((_n, key) => (key === FLEET_STEP_GRANT_KEY ? 2 : null));
-    renderRow();
-    expect(screen.queryByText('Step of the Wind (Fleet Step):')).toBeNull();
-  });
-
-  it('does NOT render for ineligible characters even with a grant stamped', async () => {
-    vi.mocked(useRuntimeValue).mockImplementation((_n, key) => (key === FLEET_STEP_GRANT_KEY ? 3 : null));
-    const { isFleetStepEligible } = await import('../../services/rules/features/fleetStepService.js');
-    vi.mocked(isFleetStepEligible).mockReturnValueOnce(false);
-    render(
-      <CharBonusActions
-        playerStats={{ ...monkStats, rules: '5e' }}
-        campaignName={campaignName}
-        onAutomationAction={vi.fn()}
-      />
-    );
-    expect(screen.queryByText('Step of the Wind (Fleet Step):')).toBeNull();
-  });
-
-  it('consumes the grant BEFORE dispatch and routes via the canonical step_of_the_wind lane', async () => {
-    const { onAutomationAction } = renderRow();
+  it('click consumes the grant BEFORE dispatching the canonical step_of_the_wind lane', async () => {
     const order = [];
     consumeFleetStep.mockImplementationOnce(async () => { order.push('consume'); return true; });
-    fireEvent.click(screen.getByText('Step of the Wind (Fleet Step):'));
-    await waitFor(() => expect(onAutomationAction).toHaveBeenCalledTimes(1));
-    order.push('dispatch');
+    const onDispatch = vi.fn(() => order.push('dispatch'));
+    renderRow({ onAutomationAction: onDispatch });
+
+    fireEvent.click(screen.getByText(ROW_LABEL));
+
+    await waitFor(() => expect(onDispatch).toHaveBeenCalledTimes(1));
     expect(order).toEqual(['consume', 'dispatch']);
-    const action = onAutomationAction.mock.calls[0][0];
-    expect(action.automation.type).toBe('step_of_the_wind');
+    expect(consumeFleetStep).toHaveBeenCalledWith(monkStats, campaignName);
+    const action = onDispatch.mock.calls[0][0];
+    expect(action.name).toBe('Step of the Wind');
+    expect(action.automation).toMatchObject({
+      type: 'step_of_the_wind',
+      action: 'bonus_action',
+      casting_time: '1 bonus action',
+      cost: { resource: 'focus_points', amount: 1 },
+    });
+    // Fleet Step IS the grant — no after_attack_action trigger gate on the lane.
     expect(action.automation.trigger).toBeUndefined();
-    expect(action.automation.cost).toEqual({ resource: 'focus_points', amount: 1 });
   });
 
-  it('does NOT dispatch the Step lane when consumption refuses (no grant pending)', async () => {
-    consumeFleetStep.mockImplementationOnce(async () => false);
-    const { onAutomationAction } = renderRow();
-    fireEvent.click(screen.getByText('Step of the Wind (Fleet Step):'));
+  it('does NOT dispatch when consumption refuses, NOR consume at all when the character cannot act', async () => {
+    consumeFleetStep.mockResolvedValueOnce(false);
+    const refused = renderRow();
+    fireEvent.click(screen.getByText(ROW_LABEL));
     await waitFor(() => expect(consumeFleetStep).toHaveBeenCalledTimes(1));
-    expect(onAutomationAction).not.toHaveBeenCalled();
+    expect(refused.onAutomationAction).not.toHaveBeenCalled();
+    refused.unmount();
+
+    const blocked = renderRow({ cannotAct: true });
+    fireEvent.click(screen.getByText(ROW_LABEL));
+    await waitFor(() => expect(blocked.getByText(ROW_LABEL)).toBeTruthy());
+    expect(consumeFleetStep).toHaveBeenCalledTimes(1);
+    expect(blocked.onAutomationAction).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,10 @@
-// Removed: test that asserted internal implementation (rollExpression/addEntry calls) — covered by useSimpleDamageRoll unit tests
-// Rewrote: popup-clearing test to assert observable state transitions instead of fragile call ordering
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { rollExpression } from '../../services/dice/diceRoller.js';
 
 const _syncedStore = new Map();
 
@@ -180,69 +180,76 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
   buildAttackContextSync: vi.fn(() => ({ hitBonus: 5 })),
 }));
 
+const dagger = { name: 'Dagger', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Action' };
+
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
   spellAbilities: { spells: [], toHit: 5, saveDc: 13 },
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
-}
-
-function renderWithWrapper(ui, options = {}) {
+function renderCharActions(stats, popupHtml, setPopupHtml) {
   globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
-  return act(async () => { render(ui, options); });
+  return act(async () => {
+    render(
+      <DiceRollContext.Provider value={{ popupHtml, setPopupHtml }}>
+        <CharActions playerStats={stats} campaignName="test-campaign" />
+      </DiceRollContext.Provider>
+    );
+  });
 }
 
-describe('CharActions simple damage roll', () => {
+describe('CharActions simple damage roll (weapon damage cell, no target)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
   });
 
-  describe('handleSimpleDamageRoll', () => {
-    it('clears existing popup and shows new damage popup when weapon damage is clicked', async () => {
-      const mockSetPopupHtml = vi.fn();
-      const wrapper = ({ children }) => (
-        <DiceRollContext.Provider value={{ popupHtml: { type: 'some-popup' }, setPopupHtml: mockSetPopupHtml }}>
-          {children}
-        </DiceRollContext.Provider>
-      );
+  it('clicking a weapon damage cell logs the roll once and replaces any open popup with the damage result', async () => {
+    const setPopupHtml = vi.fn();
 
-      await renderWithWrapper(
-        <CharActions
-          playerStats={createStats({
-            attacks: [{ name: 'Dagger', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Action' }]
-          })}
-          campaignName="test-campaign"
-        />,
-        { wrapper }
-      );
+    await renderCharActions({ ...basePlayerStats, attacks: [dagger] }, { type: 'some-popup' }, setPopupHtml);
 
-      const damageEl = screen.getByText('1d4+3');
-      await act(async () => { fireEvent.click(damageEl); });
+    await act(async () => { fireEvent.click(screen.getByText('1d4+3')); });
 
-      await waitFor(() => {
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-          type: 'roll',
-          rollType: 'damage',
-          name: 'Dagger',
-          formula: '1d4+3',
-          damageType: 'Piercing',
-          note: 'Direct damage roll (no target)',
-          total: 5,
-        }));
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-          type: 'damage',
-          name: 'Dagger',
-          formula: '1d4+3',
-          damageType: 'Piercing',
-          note: 'Direct damage roll (no target)',
-          total: 5,
-        }));
-      });
+    await waitFor(() => {
+      expect(addEntry).toHaveBeenCalledTimes(1);
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Dagger',
+        formula: '1d4+3',
+        rolls: [3, 2],
+        total: 5,
+        modifier: 0,
+        damageType: 'Piercing',
+        note: 'Direct damage roll (no target)',
+      }));
+      // The popup ends on the new damage result (any prior popup is replaced).
+      expect(setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
+        type: 'damage',
+        name: 'Dagger',
+        formula: '1d4+3',
+        rolls: [3, 2],
+        total: 5,
+        modifier: 0,
+        damageType: 'Piercing',
+        note: 'Direct damage roll (no target)',
+      }));
     });
+  });
+
+  it('clicking a weapon damage cell is inert when the roll fails — nothing logged, popup unchanged', async () => {
+    const setPopupHtml = vi.fn();
+    vi.mocked(rollExpression).mockReturnValueOnce(null);
+
+    await renderCharActions({ ...basePlayerStats, attacks: [dagger] }, null, setPopupHtml);
+
+    await act(async () => { fireEvent.click(screen.getByText('1d4+3')); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -187,7 +188,7 @@ describe('CharBonusActions - Rendering', () => {
   });
 
   describe('section visibility', () => {
-    it('returns null when there are no bonus actions, bonus action attacks, bonus action spells, or horde breaker', () => {
+    it('returns null when there are no bonus actions, bonus action attacks, or bonus action spells', () => {
       const stats = createStats({
         bonusActions: [],
         attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
@@ -199,18 +200,29 @@ describe('CharBonusActions - Rendering', () => {
     });
 
     it.each([
-      { label: 'bonusActions array has entries', stats: createStats({ bonusActions: [{ name: 'Cunning Action', description: 'Dash, Hide, or Disengage.' }] }) },
-      { label: 'bonus action attacks exist', stats: createStats({ attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }] }) },
-    ])('renders section when $label', ({ stats }) => {
+      {
+        label: 'bonusActions array has entries',
+        stats: createStats({ bonusActions: [{ name: 'Cunning Action', description: 'Dash, Hide, or Disengage.' }] }),
+      },
+      {
+        label: 'bonus action attacks exist',
+        stats: createStats({ attacks: [{ name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' }] }),
+      },
+      {
+        label: 'bonus action spells exist',
+        spell: { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' },
+        stats: createStats({ spellAbilities: { spells: [{ name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }] } }),
+      },
+    ])('renders section when $label', ({ stats, spell }) => {
+      if (spell) {
+        vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set([spell.name]));
+      }
       render(<CharBonusActions playerStats={stats} />);
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
-
-    it('renders section when bonus action spells exist', () => {
-      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set(['Shocking Grasp']));
-      const spell = { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
+      if (spell) {
+        // The spell lane must actually render the row, not just the header.
+        expect(screen.getByText(spell.name)).toBeInTheDocument();
+      }
     });
   });
 
@@ -224,111 +236,65 @@ describe('CharBonusActions - Rendering', () => {
       type: 'Bonus Action',
     };
 
-    it('displays the attack name, range, damage, and damage type', () => {
-      const stats = createStats({ attacks: [bonusActionAttack] });
-      render(<CharBonusActions playerStats={stats} />);
+    it('displays name, level, range, hit bonus, damage, and damage type', () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} exhaustionPenalty={0} />);
       expect(screen.getByText('Main Gauche')).toBeInTheDocument();
       expect(screen.getByText('5 ft.')).toBeInTheDocument();
+      expect(screen.getByText('+5')).toBeInTheDocument();
       expect(screen.getByText('1d4+3')).toBeInTheDocument();
       expect(screen.getByText('Piercing')).toBeInTheDocument();
     });
 
-    it('applies exhaustionPenalty to hit bonus display', () => {
-      const stats = createStats({ attacks: [bonusActionAttack] });
-      render(<CharBonusActions playerStats={stats} exhaustionPenalty={3} />);
+    it('reduces the displayed hit bonus by exhaustionPenalty', () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} exhaustionPenalty={3} />);
       expect(screen.getByText('+2')).toBeInTheDocument();
+      expect(screen.queryByText('+5')).not.toBeInTheDocument();
     });
-  });
-
-  describe('bonus action attacks with save DC', () => {
-    const saveDcAttack = {
-      name: 'Cone of Cold',
-      range: 60,
-      saveDc: 14,
-      saveType: 'CON',
-      damage: '8d8',
-      damageType: 'Cold',
-      type: 'Bonus Action',
-    };
 
     it.each([
-      { bonus: 0, expected: 'DC 14 CON', noHitBonus: true },
-      { bonus: 1, expected: 'DC 15 CON', noHitBonus: false },
-    ])('displays save DC with sorcery bonus ($bonus)', ({ bonus, expected, noHitBonus }) => {
-      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: bonus });
-      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
+      { saveDcBonus: 0, expected: 'DC 14 CON' },
+      { saveDcBonus: 1, expected: 'DC 15 CON' },
+    ])('save DC attacks show $expected in the hit column with sorcery bonus $saveDcBonus', ({ saveDcBonus, expected }) => {
+      vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus });
+      const saveDcAttack = { name: 'Cone of Cold', range: 60, saveDc: 14, saveType: 'CON', damage: '8d8', damageType: 'Cold', type: 'Bonus Action' };
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} exhaustionPenalty={0} />);
       expect(screen.getByText(expected)).toBeInTheDocument();
-      if (noHitBonus) {
-        expect(screen.queryByText('+5')).not.toBeInTheDocument();
+      // A save DC row never shows a to-hit bonus.
+      expect(screen.queryByText('+5')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { attackName: 'Minor Illusion Attack', spellLevel: 0, expected: 'Cantrip' },
+      { attackName: 'Ice Knife', spellLevel: 2, expected: '2' },
+      { attackName: 'Main Gauche', spellLevel: null, expected: null },
+    ])('attack level column shows $expected for spell attack $attackName', ({ attackName, spellLevel, expected }) => {
+      // The formatUtils mock maps these two names to fixed levels; others → null.
+      const stats = createStats({
+        attacks: [{ name: attackName, range: 60, hitBonus: 5, damage: '1d8', damageType: 'Psychic', type: 'Bonus Action' }],
+        spellAbilities: { toHit: 5, spells: [{ name: attackName, level: spellLevel }] },
+      });
+      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} exhaustionPenalty={0} />);
+      if (expected) {
+        expect(screen.getByText(expected)).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Cantrip')).not.toBeInTheDocument();
       }
     });
   });
 
-  describe('bonus action descriptions rendering', () => {
-    it('renders bonus action with clickable name when it has details', () => {
-      const bonusActionDesc = {
+  describe('bonus feature rows rendering', () => {
+    it('renders bonus feature rows with name and description', () => {
+      const bonusAction = {
         name: 'Cunning Action',
         description: 'You can take a bonus action.',
         details: 'Dash, Hide, or Disengage.',
       };
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
-      expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusAction] })} />);
+      expect(screen.getByText('Cunning Action:')).toBeInTheDocument();
       expect(screen.getByText(/You can take a bonus action/)).toBeInTheDocument();
     });
-  });
 
-  describe('2024 rules rendering', () => {
-    const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
-
-    it('shows Mastery column header for 2024 rules with weapon_kind_mastery passive', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack], automation: { passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Kind Mastery' }] } })} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
-
-    it('does not show Mastery column when 2024 rules but no weapon_kind_mastery passive', () => {
-      render(<CharBonusActions playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack], automation: { passives: [] } })} getWeaponMastery={() => null} />);
-      expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('bonus action attack attack level display', () => {
-    it('shows Cantrip for level 0 attacks', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Minor Illusion Attack', range: 120, hitBonus: 5, damage: '1d8', damageType: 'Psychic', type: 'Bonus Action' }],
-        spellAbilities: { toHit: 5, spells: [{ name: 'Minor Illusion Attack', level: 0 }] },
-      });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Cantrip')).toBeInTheDocument();
-    });
-
-    it('shows numeric level for higher level attacks', () => {
-      const stats = createStats({
-        attacks: [{ name: 'Ice Knife', range: 60, hitBonus: 5, damage: '1d10', damageType: 'Cold', type: 'Bonus Action' }],
-        spellAbilities: { toHit: 5, spells: [{ name: 'Ice Knife', level: 2 }] },
-      });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
-  });
-
-  describe('bonus action spells - level display', () => {
-    it('shows Cantrip for level 0 bonus action spells', () => {
-      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set(['Shocking Grasp']));
-      const spell = { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('Cantrip')).toBeInTheDocument();
-    });
-
-    it('shows numeric level for leveled bonus action spells', () => {
-      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set(['Hideous Laughter']));
-      const spell = { name: 'Hideous Laughter', level: 1, range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
-      expect(screen.getByText('1')).toBeInTheDocument();
-    });
-  });
-
-  describe('bonus action descriptions - featuresToIgnore filtering', () => {
-    it('filters out bonus actions that are in featuresToIgnore list', () => {
+    it('filters out bonus actions listed in featuresToIgnore', () => {
       vi.mocked(getCategories).mockReturnValue({ featuresToIgnore: ['Spellcasting'] });
       const bonusActions = [
         { name: 'Spellcasting', description: 'Cast spells.' },
@@ -338,30 +304,42 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.queryByText(/Spellcasting:/)).not.toBeInTheDocument();
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
     });
-  });
 
-  describe('automation badges on bonus actions', () => {
-    it('shows pool badge for healing_pool automation', () => {
+    it.each([
+      { label: 'healing_pool', automation: { type: 'healing_pool', pool: 15 }, badge: /Pool: 15 HP/ },
+      { label: 'damage', automation: { type: 'bonus_action_attack', damage: '1d8+3', damageType: 'Slashing' }, badge: /1d8\+3 Slashing/ },
+    ])('shows a $label automation badge on bonus action rows', ({ automation, badge }) => {
       vi.mocked(hasAutomation).mockReturnValue(true);
-      const bonusAction = {
-        name: 'Favored Soul',
-        description: 'Healing pool feature.',
-        automation: { type: 'healing_pool', pool: 15 },
-      };
+      const bonusAction = { name: 'Automated Feature', description: 'Feature with automation.', automation };
       render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusAction] })} />);
-      expect(screen.getByText(/Pool: 15 HP/)).toBeInTheDocument();
-    });
-
-    it('shows damage badge for bonus action with damage', () => {
-      vi.mocked(hasAutomation).mockReturnValue(true);
-      const bonusAction = {
-        name: 'War Priest',
-        description: 'Make an attack.',
-        automation: { type: 'bonus_action_attack', damage: '1d8+3', damageType: 'Slashing' },
-      };
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusAction] })} />);
-      expect(screen.getByText(/1d8\+3 Slashing/)).toBeInTheDocument();
+      expect(screen.getByText(badge)).toBeInTheDocument();
     });
   });
 
+  describe('2024 rules Mastery column', () => {
+    const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
+
+    it.each([
+      { label: 'with', passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Kind Mastery' }] },
+      { label: 'without', passives: [] },
+    ])('shows the Mastery column header only $label a weapon_kind_mastery passive', ({ label, passives }) => {
+      render(<CharBonusActions
+        playerStats={createStats({ rules: '2024', attacks: [bonusActionAttack], automation: { passives } })}
+        getWeaponMastery={() => null}
+      />);
+      expect((!!screen.queryByText('Mastery'))).toBe(label === 'with');
+    });
+  });
+
+  describe('bonus action spells - level display', () => {
+    it.each([
+      { spell: { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' }, expected: 'Cantrip' },
+      { spell: { name: 'Hideous Laughter', level: 1, range: '60 ft.', casting_time: '1 bonus action', prepared: 'Prepared' }, expected: '1' },
+    ])('spell rows show $expected in the level column', ({ spell, expected }) => {
+      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set([spell.name]));
+      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+      expect(screen.getByText(spell.name)).toBeInTheDocument();
+    });
+  });
 });

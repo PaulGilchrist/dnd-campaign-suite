@@ -1,5 +1,15 @@
-// Cleanup: Consolidated 2 redundant Cloak of Shadows skip tests into 1 parameterized test (same behavior, different action names).
-// Rewrote 2024 no-FP message test to assert key text content instead of brittle exact HTML string.
+// @maintained-by-ai
+// CharActions integration: monk Focus Point lane verified end-to-end by clicking the
+// rendered feature rows on the sheet. The skip/spend/refuse decision matrix itself is
+// unit-tested at the hook level (useCharActionsAutomation.test.js and
+// useCharActionsAutomation.test.early-returns.js); this file pins only what only the
+// component can prove: a real row click wires playerStats.specialActions, the
+// cloak_of_shadows activeBuff, and the runtime store focusPoints write together.
+//
+// CLA-159: standalone 'Hand of Healing' ALWAYS charges 1 FP — the FP-free HoH
+// exemption is only for HoH used AS PART of Flurry (bonusAttacksHandler lane,
+// CLA-144/CLA-158). CLA-166: the row-click skip list is flurry rows only
+// ('Flurry of Blows', 'Heightened Flurry of Blows').
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
@@ -160,177 +170,83 @@ vi.mock('./useCharActionModals.js', () => ({
   })),
 }));
 
-const BASE_PLAYER_STATS = {
-  name: 'TestCharacter',
-  rules: '5e',
-  level: 5,
-  attacks: [],
-  actions: [],
-  bonusActions: [],
-  spellAbilities: { spells: [] },
-  equipment: [],
-};
-
-function createStats(overrides = {}) {
-  return { ...BASE_PLAYER_STATS, ...overrides };
-}
-
-function renderWithDiceRollContext(ui, { wrapper } = {}) {
-  const mockSetPopupHtml = vi.fn();
-  const defaultWrapper = ({ children }) => (
-    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
-      {children}
-    </DiceRollContext.Provider>
-  );
-  return {
-    ...render(ui, { wrapper: wrapper || defaultWrapper }),
-    mockSetPopupHtml,
-  };
-}
-
-function mountAction(actionName, { specialActions = [], buffs = [], rules = '5e' } = {}) {
+// Mount CharActions with one clickable auto_effect feature row and the given
+// runtime state (stored focus points, activeBuffs) / specialActions / ruleset.
+// Returns the DiceRollContext setPopupHtml spy so refusal popups are observable.
+function mountCharActions({ actionName, specialActions = [], buffs = [], rules = '5e', focusPoints = 2 }) {
   getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'focusPoints') return 2;
+    if (key === 'focusPoints') return focusPoints;
     if (key === 'activeBuffs') return buffs;
     return null;
   });
 
-  const stats = createStats({
-    class: { class_levels: [{ level: 5, focus_points: 2 }] },
-    level: 5,
+  const setPopupHtml = vi.fn();
+  const playerStats = {
+    name: 'TestCharacter',
     rules,
-    ...(specialActions.length > 0 ? { specialActions: specialActions.map((name) => ({ name })) } : {}),
+    level: 5,
+    attacks: [],
+    bonusActions: [],
+    spellAbilities: { spells: [] },
+    equipment: [],
+    class: { class_levels: [{ level: 5, focus_points: 2 }] },
     actions: [{ name: actionName, description: 'Test action.', automation: { type: 'auto_effect' } }],
-  });
+    ...(specialActions.length > 0 ? { specialActions: specialActions.map((name) => ({ name })) } : {}),
+  };
 
-  return render(<CharActions playerStats={stats} campaignName="test-campaign" />);
+  render(
+    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml }}>
+      <CharActions playerStats={playerStats} campaignName="test-campaign" />
+    </DiceRollContext.Provider>
+  );
+  return setPopupHtml;
 }
 
-describe('CharActions monk ki focus point skip logic', () => {
+async function clickActionRow(actionName) {
+  await act(async () => { fireEvent.click(screen.getByText(`${actionName}:`)); });
+}
+
+describe('CharActions monk focus point lane (row-click integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-    getRuntimeValue.mockImplementation((_name, key) => {
-      if (key === 'focusPoints') return 2;
-      if (key === 'activeBuffs') return [];
-      return null;
-    });
     hasAutomation.mockReturnValue(true);
     executeHandler.mockResolvedValue({ type: 'popup', payload: 'Action executed' });
   });
 
-  // CLA-159: 'Hand of Healing' removed from the skip list — the FP-free HoH
-  // exemption is only for HoH used AS PART of Flurry (bonusAttacksHandler lane,
-  // CLA-144/CLA-158). The standalone sheet affordance always charges 1 FP.
-  describe('Flurry of Healing and Harm skip', () => {
-    it('spends focus point for standalone Hand of Healing when Flurry of Healing and Harm is active (CLA-159)', async () => {
-      mountAction('Hand of Healing', {
-        specialActions: ['Flurry of Healing and Harm'],
-      });
+  // CLA-166 skip list vs CLA-159 charge: FP-free exemptions apply to flurry rows
+  // ONLY; standalone Hand of Healing always charges 1 FP (from 2 to 1).
+  it.each([
+    { actionName: 'Flurry of Blows', exemption: 'Flurry of Healing and Harm', expectation: 'skips the focus point spend', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: false },
+    { actionName: 'Flurry of Blows', exemption: 'Cloak of Shadows', expectation: 'skips the focus point spend', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: false },
+    { actionName: 'Hand of Healing', exemption: 'Flurry of Healing and Harm', expectation: 'still spends 1 focus point (CLA-159)', specialActions: ['Flurry of Healing and Harm'], buffs: [], spendsFP: true },
+    { actionName: 'Hand of Healing', exemption: 'Cloak of Shadows', expectation: 'still spends 1 focus point', specialActions: [], buffs: [{ effect: 'cloak_of_shadows' }], spendsFP: true },
+  ])('clicking $actionName with $exemption active $expectation but always executes the action', async ({ actionName, specialActions, buffs, spendsFP }) => {
+    mountCharActions({ actionName, specialActions, buffs });
 
-      const actionEl = screen.getByText(/Hand of Healing:/);
-      await act(async () => { fireEvent.click(actionEl); });
+    await clickActionRow(actionName);
 
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'focusPoints',
-        1,
-        'test-campaign'
-      );
+    await waitFor(() => {
+      expect(executeHandler).toHaveBeenCalled();
     });
-
-    it.each(['Flurry of Blows', 'Heightened Flurry of Blows'])('skips focus point spend for %s when Flurry of Healing and Harm is active', async (actionName) => {
-      mountAction(actionName, {
-        specialActions: ['Flurry of Healing and Harm'],
-      });
-
-      const actionEl = screen.getByText(new RegExp(`${actionName}:`));
-      await act(async () => { fireEvent.click(actionEl); });
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestCharacter',
-        'focusPoints',
-        expect.any(Number),
-        'test-campaign'
-      );
-    });
+    if (spendsFP) {
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'focusPoints', 1, 'test-campaign');
+    } else {
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), 'test-campaign');
+    }
   });
 
-  describe('Cloak of Shadows skip', () => {
-    it.each([
-      { actionName: 'Flurry of Blows', label: 'Flurry of Blows' },
-      { actionName: 'Heightened Flurry of Blows', label: 'Heightened Flurry of Blows' },
-    ])('skips focus point spend for $actionName when Cloak of Shadows is active', async ({ actionName }) => {
-      mountAction(actionName, {
-        buffs: [{ effect: 'cloak_of_shadows' }],
-      });
+  it('blocks a focus-spending row at 0 FP with a "No Focus Points remaining" popup for the 2024 ruleset', async () => {
+    const setPopupHtml = mountCharActions({ actionName: 'Flurry of Blows', rules: '2024', focusPoints: 0 });
 
-      const actionEl = screen.getByText(new RegExp(`${actionName}:`));
-      await act(async () => { fireEvent.click(actionEl); });
+    await clickActionRow('Flurry of Blows');
 
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestCharacter',
-        'focusPoints',
-        expect.any(Number),
-        'test-campaign'
-      );
+    await waitFor(() => {
+      expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Focus Points remaining'));
     });
-
-    it('does NOT skip focus point spend for Hand of Healing when Cloak of Shadows is active', async () => {
-      mountAction('Hand of Healing', {
-        buffs: [{ effect: 'cloak_of_shadows' }],
-      });
-
-      const actionEl = screen.getByText(/Hand of Healing:/);
-      await act(async () => { fireEvent.click(actionEl); });
-
-      await waitFor(() => {
-        expect(executeHandler).toHaveBeenCalled();
-      });
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'focusPoints',
-        1,
-        'test-campaign'
-      );
-    });
-  });
-
-  describe('2024 ruleset no-FP message', () => {
-    it('shows "Focus Points" message for 2024 ruleset when focus points are 0', async () => {
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === 'focusPoints') return 0;
-        return null;
-      });
-
-      const stats = createStats({
-        class: { class_levels: [{ level: 5, focus_points: 2 }] },
-        level: 5,
-        rules: '2024',
-        actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
-      });
-
-      const { mockSetPopupHtml } = renderWithDiceRollContext(
-        <CharActions playerStats={stats} campaignName="test-campaign" />
-      );
-
-      const actionEl = screen.getByText(/Flurry of Blows:/);
-      await act(async () => { fireEvent.click(actionEl); });
-
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Focus Points'));
-      });
-    });
+    expect(executeHandler).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', 'focusPoints', expect.any(Number), 'test-campaign');
   });
 });

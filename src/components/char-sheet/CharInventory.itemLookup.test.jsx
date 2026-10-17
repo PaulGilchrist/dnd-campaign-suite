@@ -1,31 +1,22 @@
-// CharInventory item lookup tests
+// @maintained-by-ai
+// CharInventory item lookup — parenthetical extraction before equipment lookup
+// (seam unique to this file per the seam map in CharInventory.edgeCases.test.jsx).
 //
-// Tests in this file cover unique lookup normalization edge cases:
-//   - Parentheses at start of name (no extraction)
-//   - Multiple parenthetical groups in name
+// Both tests assert the LOOKUP OUTCOME (item found vs not found), not just the
+// bold title — the not-found branch of buildItemPopupHtml also emits
+// `<b>${itemName}</b>`, so a title-only assertion passes even with the
+// extraction logic deleted.
 //
-// Tests removed as duplicates already covered in:
-//   CharInventory.popup.test.jsx - case-insensitive matching (line 44-65),
-//     whitespace normalization via "Potion of Healing" (line 14-26),
-//     index field matching (line 67-82),
-//     parentheses extraction "Rations (10)" (line 28-40),
-//     item not found behavior (line 189-202)
-//   CharInventory.edgeCases.test.jsx - whitespace-only item names (line 47-51)
-//   CharInventory.popup.pluralSingular.test.jsx - irregular plurals,
-//     multi-word names with mid-name plural
+//   - Leading parenthesis: indexOf('(') === 0 must NOT trigger extraction; the
+//     full name reaches the DB and matches.
+//   - Multiple groups: only text before the FIRST parenthesis is used as the
+//     lookup key ("Box (Large) (Heavy)" → "Box").
 //
-// Removed tests (6):
-//   REMOVE: case-insensitive lookup (duplicate of popup.test.jsx:44-65)
-//   REMOVE: leading/trailing spaces (duplicate of edgeCases.test.jsx:47-51)
-//   REMOVE: extra spaces between words (duplicate of popup.test.jsx:14-26)
-//   REMOVE: tab characters (duplicate of "extra spaces" + fragile assertion)
-//   REMOVE: index field normalization (duplicate of popup.test.jsx:67-82)
-//   REMOVE: Item (N) format (duplicate of popup.test.jsx:28-40)
-//   REMOVE: item not found after normalization (duplicate of popup.test.jsx:189-202)
-//
-// Kept tests (2):
-//   KEEP: parentheses at start of name (unique edge case)
-//   KEEP: multiple parenthetical groups (unique edge case)
+// Not duplicated here (covered by siblings):
+//   popup.test.jsx — exact name/index match, plural fallback, not-found message,
+//     load-error handling; "Rations (10)" there pins only the not-found branch.
+//   edgeCases.test.jsx — falsy-vs-truthy cost, blank clickable elements.
+//   popup.pluralSingular.test.jsx — placeholder file, no tests remain.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRenderComponent } from './charInventory.test-utils.jsx';
@@ -38,27 +29,32 @@ describe('CharInventory item lookup', () => {
     helpers.setup();
   });
 
-  describe('parentheses edge cases', () => {
-    it('should handle item name with parentheses at the start (no extraction)', async () => {
-      helpers.setup([
-        { name: '(Special) Item', index: 'special-item' },
-      ]);
-      const stats = { inventory: { magicItems: [], equipped: ['(Special) Item'], backpack: [] } };
-      helpers.renderComponent(stats);
-      await helpers.clickItemByText('(Special) Item');
-      const callArg = helpers.setPopupHtmlSpy.mock.calls[0][0];
-      expect(callArg).toContain('<b>(Special) Item</b>');
-    });
+  it('looks up a leading-parenthesis name un-extracted — finds it when the database stores the same name', async () => {
+    helpers.setup([
+      { name: '(Special) Item', index: 'special-item', desc: ['Straight from the vault.'] },
+    ]);
+    const stats = { inventory: { magicItems: [], equipped: ['(Special) Item'], backpack: [] } };
+    helpers.renderComponent(stats);
+    await helpers.clickItemByText('(Special) Item');
+    const callArg = helpers.setPopupHtmlSpy.mock.calls[0][0];
+    // Found branch only: db title + desc, and no not-found fallback.
+    expect(callArg).toContain('<b>(Special) Item</b>');
+    expect(callArg).toContain('Straight from the vault.');
+    expect(callArg).not.toContain('not found in database');
+  });
 
-    it('should extract only text before first parentheses for multiple parenthetical groups', async () => {
-      helpers.setup([
-        { name: 'Box (Large) (Heavy)', index: 'box-large-heavy' },
-      ]);
-      const stats = { inventory: { magicItems: [], equipped: ['Box (Large) (Heavy)'], backpack: [] } };
-      helpers.renderComponent(stats);
-      await helpers.clickItemByText('Box (Large) (Heavy)');
-      const callArg = helpers.setPopupHtmlSpy.mock.calls[0][0];
-      expect(callArg).toContain('<b>Box (Large) (Heavy)</b>');
-    });
+  it('uses only the text before the FIRST parenthesis as the lookup key for multiple parenthetical groups', async () => {
+    helpers.setup([
+      { name: 'Box', index: 'box', desc: ['A sturdy container.'] },
+    ]);
+    const stats = { inventory: { magicItems: [], equipped: ['Box (Large) (Heavy)'], backpack: [] } };
+    helpers.renderComponent(stats);
+    await helpers.clickItemByText('Box (Large) (Heavy)');
+    const callArg = helpers.setPopupHtmlSpy.mock.calls[0][0];
+    // Popup shows the resolved db name "Box" (found) — not the raw inventory
+    // name — proving the key was "Box" and not "Box (Large)" or the full string.
+    expect(callArg).toContain('<b>Box</b>');
+    expect(callArg).not.toContain('<b>Box (Large) (Heavy)</b>');
+    expect(callArg).not.toContain('not found in database');
   });
 });

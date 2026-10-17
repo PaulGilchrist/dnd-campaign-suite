@@ -57,6 +57,9 @@ honestly — after a fix, the pinning test must be updated in the same commit).
     `targetEffectDefinitions`** + unreachable (#2105);
     **`automationRouter.js:130-132` `bonusActionManeuvers` spread dead** — no
     builder emits it (#2089).
+- 🔴 **`CharActions.jsx:449` + `CharBonusActions.jsx:848` double-`.name`** — call
+  sites pass `playerStats.name` (string) into `useSimpleDamageRoll`, which re-reads
+  `.name` → every simple damage log gets `characterName: undefined` (run2 #12).
 
 ## ⚠ Suspected / needs adjudication
 
@@ -74,6 +77,11 @@ honestly — after a fix, the pinning test must be updated in the same commit).
 - steps-config languageWarnings drop (`CharacterCreationWizard.jsx:61`) and
   `Players.jsx:41` `dragging?.creatureId` should be `playerId` — the two hard
   FIXME canon failures; fixing these two retires the canon exceptions.
+- ⚠ useCharActionsEventListeners.js:41-64 — damage-type-choice/skip window listeners registered without effect cleanup; stale listeners survive dismissal/unmount and re-register on reopen; :64 choice handler fires post-setPopupHtml(null). Maintained pass run2 #5 (CharActions.events); deletion of prior post-unmount brittleness test corroborates.
+- ⚠ CharBonusActions.jsx:221 — bonus-attack hit-cell onClick fires even when cannotAct (row only visually disabled), unlike damage cell guard :253; SAME pattern at CharActions.jsx:69 (spell hit cell) vs guarded :169 — looks like house convention where parent onAttackClick self-guards via assertCanAct denial popup; needs owner ruling. Run2 #22.
+- ⚠ CharCharacterAdvancement.jsx:44 — object options never highlight: `opt === currentOption` compares object vs string fallback `options[0].name` (:32) → all object options render dim with no runtime pin; fix = compare resolved names. Run2 #32.
+- ⚠ CharInventory.jsx:14 zero-handling asymmetry — `if (item.weight)` drops genuine weight:0 disk rows (equipment.json:127/167/467) while cost:{quantity:0} renders 'Cost: 0 gp' in same function; needs owner ruling. Run2 #35.
+- ⚠ CharBonusActions.jsx:216 — hit cell renders literal 'NaN' when exhaustionPenalty prop undefined (confirmed live in test until :0 passed; real Intl.NumberFormat emits 'NaN'); :280 same class for saveDc+displaySaveDcBonus (lower confidence, current data always carries saveDc). Fix: default props. Run2 #27.
 
 ## 🗑 Dead exports / zero-consumer code (delete + retire pins)
 
@@ -99,6 +107,7 @@ test-utils (#2092), infoBuilder elemental dead builders ×3,
 useLoggedDiceRollEventHandlers:45-47 fake-registry rec (#2078).
 
 ## 📌 Deferred tidy-ups (post-queue)
+- CharCharacterAdvancement.jsx:37-44 inline styles on Choice rows/highlight — violates no-inline-styles convention (behavior correct; run2 #31).
 
 contextBuilder-cover deletion; grease wiring ticket; conditionMatches
 extraction; Fast Hands dupes; relentless latch; massCureWounds spellAbilities

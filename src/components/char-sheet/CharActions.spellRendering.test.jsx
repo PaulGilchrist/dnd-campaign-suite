@@ -1,8 +1,10 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 
 const _syncedStore = new Map();
 
@@ -178,13 +180,15 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
   buildAttackContextSync: vi.fn(() => ({ hitBonus: 5 })),
 }));
 
-vi.mock('../../services/rules/core/spellDamageUtils.js', () => ({
+// Real isAutoHitSpell (heal spells + Magic Missile) so the save-DC hit-cell branch stays
+// exercised; only the damage-formula resolvers are stubbed for flat test fixtures.
+vi.mock('../../services/rules/core/spellDamageUtils.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   resolveSpellDamageAtLevel: vi.fn((spell) => {
     if (spell?.damage && typeof spell.damage === 'object') return spell.damage.amount || '';
     if (spell?.damage && typeof spell.damage === 'string' && spell.damage !== 'Utility') return spell.damage;
     return '';
   }),
-  isAutoHitSpell: vi.fn((spell) => !!spell?.dc),
   resolveHealExpression: vi.fn((_spell, _level, mod) => `1d4+${mod ?? 0}`),
 }));
 
@@ -221,17 +225,17 @@ const basePlayerStats = {
   abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
 };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
+function spell(name, overrides = {}) {
+  return { name, range: '60 ft', casting_time: '1 action', prepared: 'Prepared', ...overrides };
 }
 
-function mockRuntimeValues(buffs = [], conditions = []) {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    if (key === 'hasteExtraActionUsed') return false;
-    if (key === 'activeConditions') return conditions;
-    return null;
-  });
+function statsWithSpells(spells, overrides = {}) {
+  return { ...basePlayerStats, ...overrides, spellAbilities: { ...basePlayerStats.spellAbilities, spells, ...overrides.spellAbilities } };
+}
+
+async function renderActions(stats) {
+  globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+  await act(async () => { render(<CharActions playerStats={stats} />); });
 }
 
 // --- Tests ---
@@ -241,153 +245,166 @@ describe('CharActions spell rendering', () => {
     vi.clearAllMocks();
     localStorage.clear();
     _syncedStore.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
     getRuntimeValue.mockImplementation(() => null);
   });
 
-  describe('spell rendering in actions section', () => {
-    it('renders spells with correct name, level, and damage columns', async () => {
-      mockRuntimeValues();
+  it('renders spell rows with name, level, range, and damage columns (Cantrip label for level 0)', async () => {
+    await renderActions(statsWithSpells([
+      spell('Fireball', { level: 3, range: '150 ft', damage: '8d6' }),
+      spell('Fire Bolt', { level: 0, range: '120 ft', damage: '1d10' }),
+    ]));
 
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: 'Fireball', level: 3, range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
-            { name: 'Fire Bolt', level: 0, range: '120 ft', casting_time: '1 action', prepared: 'Prepared', damage: '1d10' },
-          ],
-          toHit: 5,
-          saveDc: 15,
-        },
-      });
+    expect(screen.getByText('Fireball')).toHaveClass('clickable');
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('150 ft')).toBeInTheDocument();
+    expect(screen.getByText('8d6')).toBeInTheDocument();
+    expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
+    expect(screen.getByText('Cantrip')).toBeInTheDocument();
+    expect(screen.getByText('120 ft')).toBeInTheDocument();
+    expect(screen.getByText('1d10')).toBeInTheDocument();
+  });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+  it.each([
+    {
+      label: 'shows the damage_type from a structured damage object',
+      s: spell('Fireball', { level: 3, damage: { amount: '8d6', damage_type: 'Fire' } }),
+      expectedType: 'Fire',
+    },
+    {
+      label: 'shows Healing for heal_at_slot_level spells',
+      s: spell('Cure Wounds', { level: 1, heal_at_slot_level: true }),
+      expectedType: 'Healing',
+    },
+    {
+      label: 'shows Utility for non-damage cantrips',
+      s: spell('Minor Illusion', { level: 0, damage: 'Utility' }),
+      expectedType: 'Utility',
+    },
+  ])('Type column: $label', async ({ s, expectedType }) => {
+    await renderActions(statsWithSpells([s]));
 
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(screen.getByText(s.name)).toBeInTheDocument();
+    expect(screen.getByText(expectedType)).toBeInTheDocument();
+    if (expectedType === 'Fire') {
+      // The amount from the structured object must land in the damage column.
       expect(screen.getByText('8d6')).toBeInTheDocument();
-      expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
-      expect(screen.getByText('Cantrip')).toBeInTheDocument();
-    });
-
-    it.each([
-      { spellName: 'Cure Wounds', level: 1, heal_at_slot_level: true, expectedType: 'Healing' },
-      { spellName: 'Minor Illusion', level: 0, damage: 'Utility', expectedType: 'Utility' },
-    ])('renders $spellName with "$expectedType" type label', async ({ spellName, level, heal_at_slot_level, damage, expectedType }) => {
-      mockRuntimeValues();
-
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: spellName, level, range: 'Touch', casting_time: '1 action', prepared: 'Prepared', heal_at_slot_level, damage },
-          ],
-          toHit: 5,
-          saveDc: 13,
-        },
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText(spellName)).toBeInTheDocument();
-      expect(screen.getByText(expectedType)).toBeInTheDocument();
-    });
-
-    it('renders damage type from structured damage object', async () => {
-      mockRuntimeValues();
-
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: 'Fireball', level: 3, range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: { amount: '8d6', damage_type: 'Fire' } },
-          ],
-          toHit: 5,
-          saveDc: 15,
-        },
-      });
-
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
-      expect(screen.getByText('Fire')).toBeInTheDocument();
-    });
+    }
   });
 
-  describe('hit column behavior', () => {
-    it('shows empty hit column for auto-hit spells and spells without attack_type', async () => {
-      mockRuntimeValues();
+  it.each([
+    {
+      label: 'attack cantrip shows clickable attack bonus that dispatches handleSpellAttackClick',
+      s: spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' }),
+      expectedHit: '+5',
+      clickable: true,
+    },
+    {
+      label: 'save-DC spell shows the caster DC instead of an attack bonus',
+      s: spell('Ray of Sickness', { level: 1, damage: '2d8', dc: { dc_type: 'CON', dc_success: 'half' } }),
+      expectedHit: 'DC 13 CON',
+      clickable: false,
+    },
+    {
+      label: 'auto-hit spell (Magic Missile) shows an empty hit cell',
+      s: spell('Magic Missile', { level: 1, damage: '4d4+4' }),
+      expectedHit: null,
+      clickable: false,
+    },
+    {
+      label: 'spell without attack_type shows an empty hit cell',
+      s: spell('Color Spray', { level: 1, damage: '8d6' }),
+      expectedHit: null,
+      clickable: false,
+    },
+  ])('Hit column: $label', async ({ s, expectedHit, clickable }) => {
+    const handleSpellAttackClick = vi.fn();
+    useActionSpellMetamagic.mockReturnValue({
+      pendingActionMetamagic: null,
+      handleActionMetamagicConfirm: vi.fn(),
+      handleActionMetamagicSkip: vi.fn(),
+      handleActionSpellDamageClick: vi.fn(),
+      handleSpellAttackClick,
+      handleSpellDamageClick: vi.fn(),
+    });
 
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: 'Ray of Sickness', level: 1, range: '60 ft', casting_time: '1 action', prepared: 'Prepared', damage: '2d8', dc: { dc_type: 'CON', dc_success: 'half' } },
-            { name: 'Magic Missile', level: 1, range: '120 ft', casting_time: '1 action', prepared: 'Prepared', damage: '4d4+4' },
-          ],
-          toHit: 5,
-          saveDc: 13,
-        },
-      });
+    await renderActions(statsWithSpells([s]));
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-
+    if (expectedHit) {
+      const hitCell = screen.getByText(expectedHit);
+      if (clickable) {
+        expect(hitCell).toHaveClass('clickable');
+        await act(async () => { fireEvent.click(hitCell); });
+        expect(handleSpellAttackClick).toHaveBeenCalledWith(expect.objectContaining({
+          name: s.name, type: 'Action', hitBonus: 5, damage: '1d10',
+        }));
+      } else {
+        expect(hitCell).toHaveClass('save-dc-display');
+      }
+    } else {
       expect(screen.queryByText('+5')).not.toBeInTheDocument();
-    });
+      expect(document.querySelector('.save-dc-display')).toBeNull();
+    }
   });
 
-  describe('spell attack/damage click handlers', () => {
-    it('calls resolveSpellDamage when damage is clicked for save-DC spell attack', async () => {
-      const mockResolveSpellDamage = vi.fn();
-      getRuntimeValue.mockReturnValue(null);
-
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: null,
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: mockResolveSpellDamage,
-        handleSpellAttackClick: vi.fn(),
-      });
-
-      const stats = createStats({
-        attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
-      });
-
-      await act(async () => {
-        globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-        render(<CharActions playerStats={stats} />);
-      });
-
-      const damageElement = screen.getByText('1d12');
-      await act(async () => { fireEvent.click(damageElement); });
-
-      expect(mockResolveSpellDamage).toHaveBeenCalledWith(stats.attacks[0]);
+  it.each([
+    {
+      label: 'save-DC spell routes the damage click to resolveSpellDamage with the composed attack item',
+      s: spell('Fireball', { level: 3, damage: '8d6', dc: { dc_type: 'CON', dc_success: 'half' } }),
+      expectedResolve: expect.objectContaining({ name: 'Fireball', damage: '8d6', saveDc: 13, saveType: 'CON', type: 'Action' }),
+    },
+    {
+      label: 'attack spell routes the damage click to the metamagic gate, bypassing resolveSpellDamage',
+      s: spell('Fire Bolt', { level: 0, attack_type: 'ranged', damage: '1d10' }),
+      expectedResolve: null,
+    },
+  ])('Damage cell dispatch: $label', async ({ s, expectedResolve }) => {
+    const resolveSpellDamage = vi.fn();
+    const gateMetamagic = vi.fn();
+    useActionSpellMetamagic.mockReturnValue({
+      pendingActionMetamagic: null,
+      handleActionMetamagicConfirm: vi.fn(),
+      handleActionMetamagicSkip: vi.fn(),
+      handleActionSpellDamageClick: resolveSpellDamage,
+      handleSpellAttackClick: vi.fn(),
+      handleSpellDamageClick: vi.fn(),
+    });
+    useSpellMetamagicFlow.mockReturnValue({
+      pendingMetamagic: null, gateMetamagic, handleConfirm: vi.fn(), handleSkip: vi.fn(),
     });
 
-    it('calls handleSpellAttackClick for spell attacks with attack_type', async () => {
-      const mockHandleSpellAttackClick = vi.fn();
+    const stats = statsWithSpells([s]);
+    await renderActions(stats);
 
-      useActionSpellMetamagic.mockReturnValue({
-        pendingActionMetamagic: null,
-        handleActionMetamagicConfirm: vi.fn(),
-        handleActionMetamagicSkip: vi.fn(),
-        handleActionSpellDamageClick: vi.fn(),
-        handleSpellAttackClick: mockHandleSpellAttackClick,
-      });
+    await act(async () => { fireEvent.click(screen.getByText(s.damage)); });
 
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: 'Fire Bolt', level: 0, range: '120 ft', casting_time: '1 action', prepared: 'Prepared', damage: '1d10', attack_type: 'ranged' },
-          ],
-          toHit: 5,
-          saveDc: 13,
-        },
-      });
+    if (expectedResolve) {
+      expect(resolveSpellDamage).toHaveBeenCalledWith(expectedResolve);
+      expect(gateMetamagic).not.toHaveBeenCalled();
+    } else {
+      expect(gateMetamagic).toHaveBeenCalledWith(stats.spellAbilities.spells[0], {});
+      expect(resolveSpellDamage).not.toHaveBeenCalled();
+    }
+  });
 
-      await act(async () => {
-        globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
-        render(<CharActions playerStats={stats} />);
-      });
-
-      const attackEl = screen.getByText('+5');
-      await act(async () => { fireEvent.click(attackEl); });
-
-      expect(mockHandleSpellAttackClick).toHaveBeenCalled();
+  it('routes a save-DC attack-row damage click to resolveSpellDamage', async () => {
+    const resolveSpellDamage = vi.fn();
+    useActionSpellMetamagic.mockReturnValue({
+      pendingActionMetamagic: null,
+      handleActionMetamagicConfirm: vi.fn(),
+      handleActionMetamagicSkip: vi.fn(),
+      handleActionSpellDamageClick: resolveSpellDamage,
+      handleSpellAttackClick: vi.fn(),
+      handleSpellDamageClick: vi.fn(),
     });
+
+    const stats = {
+      ...basePlayerStats,
+      attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],
+    };
+    await renderActions(stats);
+
+    await act(async () => { fireEvent.click(screen.getByText('1d12')); });
+
+    expect(resolveSpellDamage).toHaveBeenCalledWith(stats.attacks[0]);
   });
 });

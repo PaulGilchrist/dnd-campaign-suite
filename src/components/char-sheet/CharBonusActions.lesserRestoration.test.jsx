@@ -1,3 +1,8 @@
+// @maintained-by-ai
+// CharBonusActions host wiring for the Lesser Restoration bonus-action lane:
+// the armed TargetSpellPopups mount, the host-owned two-step target→condition
+// state, and confirm/skip routing. Shared popup internals (condition filtering,
+// no-conditions empty state) are covered in char-spells/CharSpells.Popups.restoration.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -5,12 +10,15 @@ import CharBonusActions from './CharBonusActions.jsx';
 const mockHandleConfirm = vi.fn();
 const mockHandleSkip = vi.fn();
 
-vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
-  useSpellMetamagicFlow: vi.fn(() => ({
+function flowStub(overrides = {}) {
+  return {
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
     handleSkip: vi.fn(),
+    pendingAid: null,
+    handleAidConfirm: vi.fn(),
+    handleAidSkip: vi.fn(),
     pendingBarkskin: null,
     handleBarkskinConfirm: vi.fn(),
     handleBarkskinSkip: vi.fn(),
@@ -23,7 +31,15 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingLesserRestoration: null,
     handleLesserRestorationConfirm: mockHandleConfirm,
     handleLesserRestorationSkip: mockHandleSkip,
-  })),
+    pendingHex: null,
+    handleHexConfirm: vi.fn(),
+    handleHexSkip: vi.fn(),
+    ...overrides,
+  };
+}
+
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
+  useSpellMetamagicFlow: vi.fn(() => flowStub()),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
@@ -61,8 +77,9 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
+  // Target-scoped so the two-step flow proves it looks up the CHOSEN target.
   getRuntimeValue: vi.fn((name, key) => {
-    if (key === 'activeConditions') return ['poisoned'];
+    if (key === 'activeConditions') return name === 'Orc 1' ? ['poisoned'] : [];
     return null;
   }),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
@@ -89,10 +106,6 @@ vi.mock('./popups/MetamagicPopup.jsx', () => ({
 
 vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
-}));
-
-vi.mock('./HexAbilityModal.jsx', () => ({
-  default: vi.fn(() => <div data-testid="hex-ability-modal">HexAbilityModal</div>),
 }));
 
 vi.mock('./ArcaneVigorModal.jsx', () => ({
@@ -129,74 +142,56 @@ function makePending() {
   };
 }
 
-function mountWithFlow(overrides = {}) {
-  vi.mocked(useSpellMetamagicFlow).mockReturnValue({
-    pendingMetamagic: null,
-    gateMetamagic: vi.fn(),
-    handleConfirm: vi.fn(),
-    handleSkip: vi.fn(),
-    pendingBarkskin: null,
-    handleBarkskinConfirm: vi.fn(),
-    handleBarkskinSkip: vi.fn(),
-    pendingHealingWord: null,
-    handleHealingWordConfirm: vi.fn(),
-    handleHealingWordSkip: vi.fn(),
-    pendingSanctuary: null,
-    handleSanctuaryConfirm: vi.fn(),
-    handleSanctuarySkip: vi.fn(),
-    pendingLesserRestoration: null,
-    handleLesserRestorationConfirm: mockHandleConfirm,
-    handleLesserRestorationSkip: mockHandleSkip,
-    ...overrides,
-  });
+function mount(overrides = {}) {
+  vi.mocked(useSpellMetamagicFlow).mockReturnValue(flowStub(overrides));
   return render(<CharBonusActions playerStats={basePlayerStats} campaignName="test-campaign" />);
+}
+
+function castOnOrc() {
+  fireEvent.click(screen.getByRole('radio', { name: 'Orc 1' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cast Lesser Restoration' }));
 }
 
 describe('CharBonusActions - Lesser Restoration pickers', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    localStorage.clear();
   });
 
-  it('renders nothing when no Lesser Restoration pending op is staged', () => {
-    mountWithFlow();
+  it('does not mount the Lesser Restoration popup when no pending op is staged', () => {
+    mount();
     expect(screen.queryByText('Lesser Restoration', { selector: '.sp-header' })).not.toBeInTheDocument();
     expect(screen.queryByText('Cast Lesser Restoration')).not.toBeInTheDocument();
   });
 
-  it('renders the target picker modal when pendingLesserRestoration is staged', () => {
-    mountWithFlow({ pendingLesserRestoration: makePending() });
+  it('mounts the target picker listing every candidate target when staged', () => {
+    mount({ pendingLesserRestoration: makePending() });
     expect(screen.getByText('Lesser Restoration', { selector: '.sp-header' })).toBeInTheDocument();
-    expect(screen.getByText('Cast Lesser Restoration')).toBeInTheDocument();
-    expect(screen.getByText('Divine_Cleric')).toBeInTheDocument();
-    expect(screen.getByText('Orc 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cast Lesser Restoration' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Divine_Cleric' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Orc 1' })).toBeInTheDocument();
   });
 
-  it('advances to the condition picker listing only conditions on the chosen target', async () => {
-    mountWithFlow({ pendingLesserRestoration: makePending() });
-    fireEvent.click(screen.getByText('Orc 1'));
-    fireEvent.click(screen.getByText('Cast Lesser Restoration'));
+  it('advances target step to a target-specific condition picker and confirms with targetName and condition', async () => {
+    mount({ pendingLesserRestoration: makePending() });
+    castOnOrc();
+
     await waitFor(() => {
       expect(screen.getByText('Choose one condition to remove from Orc 1.')).toBeInTheDocument();
     });
-    expect(screen.getByText('Poisoned condition')).toBeInTheDocument();
-    expect(screen.getByText('Remove Condition')).toBeInTheDocument();
-  });
+    expect(screen.getByRole('radio', { name: 'Poisoned condition' })).toBeInTheDocument();
+    // Host-owned two-step state: the condition step replaces the target step.
+    expect(screen.queryByRole('button', { name: 'Cast Lesser Restoration' })).not.toBeInTheDocument();
 
-  it('calls handleLesserRestorationConfirm with targetName and condition on confirm', async () => {
-    mountWithFlow({ pendingLesserRestoration: makePending() });
-    fireEvent.click(screen.getByText('Orc 1'));
-    fireEvent.click(screen.getByText('Cast Lesser Restoration'));
-    await waitFor(() => screen.getByText('Poisoned condition'));
-    fireEvent.click(screen.getByText('Poisoned condition'));
-    fireEvent.click(screen.getByText('Remove Condition'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Poisoned condition' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Condition' }));
+    expect(mockHandleConfirm).toHaveBeenCalledTimes(1);
     expect(mockHandleConfirm).toHaveBeenCalledWith({ targetName: 'Orc 1', condition: 'poisoned' });
   });
 
-  it('calls handleLesserRestorationSkip without confirming when skipped at the target stage', () => {
-    mountWithFlow({ pendingLesserRestoration: makePending() });
-    fireEvent.click(screen.getByText('Skip'));
-    expect(mockHandleSkip).toHaveBeenCalled();
+  it('routes Skip at the target stage to handleLesserRestorationSkip without confirming', () => {
+    mount({ pendingLesserRestoration: makePending() });
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(mockHandleSkip).toHaveBeenCalledTimes(1);
     expect(mockHandleConfirm).not.toHaveBeenCalled();
   });
 });

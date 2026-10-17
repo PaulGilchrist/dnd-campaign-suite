@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getActionSpellNames,
@@ -7,270 +8,140 @@ import {
 } from '../../services/ui/spellSectionUtils.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-// Minimal mock: only what spellSectionUtils.js actually imports
+// The runtime store is mocked so buff lookups (Elder Champion, active features)
+// are deterministic; the partitioning logic under test runs unmocked.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-const actionSpell = { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' };
-const bonusActionSpell = { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' };
-const reactionSpell = { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared', damage: '1d4' };
-const alwaysSpell = { name: 'Minor Illusion', casting_time: '1 action', prepared: 'Always', damage: 'Utility' };
-const alwaysNoDamageSpell = { name: 'Prestidigitation', casting_time: '1 action', prepared: 'Always' };
-const notPreparedSpell = { name: 'Unknown Spell', casting_time: '1 action', prepared: 'Not Prepared', damage: '4d6' };
-const healSpell = { name: 'Cure Wounds', casting_time: '1 action', prepared: 'Prepared', heal_at_slot_level: true };
-const actionSpellAltCase = { name: 'Lightning Bolt', casting_time: 'Action', prepared: 'Prepared', damage: '8d6' };
+const CAMPAIGN = 'test-campaign';
 
-function createStats(overrides = {}) {
-  return {
-    name: 'TestCharacter',
-    spellAbilities: { spells: [] },
-    automation: {},
-    ...overrides,
-  };
+function createStats(spells = [], automation = {}) {
+  return { name: 'TestCharacter', spellAbilities: { spells }, automation };
 }
 
-function mockBuffs(buffs) {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    return null;
-  });
+function mockActiveBuffs(buffs) {
+  getRuntimeValue.mockImplementation((_name, key) => (key === 'activeBuffs' ? buffs : null));
 }
 
-function mockBuffsAndConditions(buffs, conditions) {
-  getRuntimeValue.mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return buffs;
-    if (key === 'activeConditions') return conditions;
-    return null;
-  });
-}
-
-describe('spellSectionUtils', () => {
+describe('spellSectionUtils section partitioning', () => {
   beforeEach(() => {
     getRuntimeValue.mockImplementation(() => null);
   });
 
   describe('getActionSpellNames', () => {
-    it('returns action spells with damage or healing', () => {
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, healSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Cure Wounds']));
+    it('includes only prepared action-time spells with damage or healing, in any casting-time casing', () => {
+      const stats = createStats([
+        { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+        { name: 'Cure Wounds', casting_time: '1 action', prepared: 'Prepared', heal_at_slot_level: true },
+        { name: 'Minor Illusion', casting_time: '1 action', prepared: 'Always', damage: 'Utility' },
+        { name: 'Lightning Bolt', casting_time: 'Action', prepared: 'Prepared', damage: '8d6' },
+        // excluded: no damage/healing, unprepared, wrong casting time
+        { name: 'Prestidigitation', casting_time: '1 action', prepared: 'Always' },
+        { name: 'Unknown Spell', casting_time: '1 action', prepared: 'Not Prepared', damage: '4d6' },
+        { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' },
+        { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared', damage: '1d4' },
+      ]);
+      expect(getActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Fireball', 'Cure Wounds', 'Minor Illusion', 'Lightning Bolt']));
     });
 
-    it('returns action spells with "Always" prepared status when they have damage', () => {
-      const stats = createStats({ spellAbilities: { spells: [alwaysSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Minor Illusion']));
-    });
-
-    it('excludes "Always" spells without damage or healing', () => {
-      const stats = createStats({ spellAbilities: { spells: [alwaysNoDamageSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result.size).toBe(0);
-    });
-
-    it('excludes unprepared spells and non-action spells', () => {
-      const stats = createStats({ spellAbilities: { spells: [notPreparedSpell, bonusActionSpell, reactionSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result.size).toBe(0);
-    });
-
-    it('returns empty set when Elder Champion is active', () => {
-      mockBuffs([{ name: 'Elder Champion' }]);
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set());
-    });
-
-    it('filters multiple spells correctly', () => {
-      const stats = createStats({
-        spellAbilities: { spells: [actionSpell, healSpell, actionSpellAltCase, notPreparedSpell, bonusActionSpell] },
-      });
-      const result = getActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Cure Wounds', 'Lightning Bolt']));
-    });
-
-    it('handles null/undefined spellAbilities gracefully', () => {
-      expect(getActionSpellNames(createStats({ spellAbilities: undefined }), 'test-campaign')).toEqual(new Set());
-      expect(getActionSpellNames(createStats({ spellAbilities: null }), 'test-campaign')).toEqual(new Set());
-      expect(getActionSpellNames(createStats({ spellAbilities: {} }), 'test-campaign')).toEqual(new Set());
-    });
-
-    it('returns action spells when Elder Champion check throws (error suppressed)', () => {
-      getRuntimeValue.mockImplementation(() => { throw new Error('store error'); });
-      const stats = createStats({ spellAbilities: { spells: [actionSpell] } });
-      expect(getActionSpellNames(stats, 'test-campaign')).toEqual(new Set(['Fireball']));
+    it('suppresses all action spells while Elder Champion is active', () => {
+      mockActiveBuffs([{ name: 'Elder Champion' }]);
+      const stats = createStats([{ name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }]);
+      expect(getActionSpellNames(stats, CAMPAIGN)).toEqual(new Set());
     });
   });
 
   describe('getBonusActionSpellNames', () => {
-    it('returns bonus action spells', () => {
-      const stats = createStats({ spellAbilities: { spells: [bonusActionSpell] } });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Shocking Grasp']));
+    it('includes prepared bonus-action spells only', () => {
+      const stats = createStats([
+        { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' },
+        { name: 'Healing Word', casting_time: 'Bonus Action', prepared: 'Always' },
+        { name: 'Hidden Spell', casting_time: '1 bonus action', prepared: 'Not Prepared', damage: '1d6' },
+        { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+      ]);
+      expect(getBonusActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Shocking Grasp', 'Healing Word']));
     });
 
-    it('includes action spells when Elder Champion is active', () => {
-      mockBuffs([{ name: 'Elder Champion' }]);
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp']));
+    it('promotes prepared action spells to bonus actions while Elder Champion is active', () => {
+      mockActiveBuffs([{ name: 'Elder Champion' }]);
+      const stats = createStats([
+        { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+        { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' },
+        { name: 'Hidden Spell', casting_time: '1 action', prepared: 'Not Prepared', damage: '4d6' },
+        { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared', damage: '1d4' },
+      ]);
+      expect(getBonusActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Fireball', 'Shocking Grasp']));
     });
 
-    it('excludes unprepared bonus action spells', () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Hidden Spell', casting_time: '1 bonus action', prepared: 'Not Prepared', damage: '1d6' }] },
+    it('includes spell names from active automation features, honoring type, spell list, and bonus casting time', () => {
+      // Only Mantle of Majesty and Misty Wanderer are active buffs.
+      mockActiveBuffs([{ name: 'Mantle of Majesty' }, { name: 'Misty Wanderer' }]);
+      const stats = createStats([], {
+        bonusActions: [
+          // active, array spell value → both names included
+          { name: 'Mantle of Majesty', type: 'free_spell', spell: ['Command', 'Thaumaturgy'], casting_time: '1 bonus action' },
+          // inactive feature → excluded
+          { name: 'Fey Presence', type: 'fey_reinforcements', spell: 'Faerie Fire', casting_time: '1 bonus action' },
+          // active-ish but wrong casting time → excluded
+          { name: 'Mantle of Majesty', type: 'free_spell', spell: 'Charm Person', casting_time: '1 action' },
+        ],
+        specialActions: [
+          // misty_wanderer is allowed in specialActions (no casting-time requirement)
+          { name: 'Misty Wanderer', type: 'misty_wanderer', spell: 'Misty Step' },
+          // type not in the specialActions allowlist → excluded
+          { name: 'Misty Wanderer', type: 'charged_ability', spell: 'Hidden Step' },
+        ],
       });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result.size).toBe(0);
-    });
-
-    it('includes spells from active automation features (free_spell, fey_reinforcements, misty_wanderer)', () => {
-      mockBuffsAndConditions([{ name: 'Mantle of Majesty' }, { name: 'Fey Presence' }, { name: 'Misty Wanderer' }], []);
-      const stats = createStats({
-        spellAbilities: { spells: [] },
-        automation: {
-          bonusActions: [{
-            name: 'Mantle of Majesty',
-            type: 'free_spell',
-            spell: 'Command',
-            casting_time: '1 bonus action',
-          }, {
-            name: 'Fey Presence',
-            type: 'fey_reinforcements',
-            spell: 'Faerie Fire',
-            casting_time: '1 bonus action',
-          }],
-          specialActions: [{
-            name: 'Misty Wanderer',
-            type: 'misty_wanderer',
-            spell: 'Misty Step',
-            casting_time: '1 bonus action',
-          }],
-        },
-      });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Command', 'Faerie Fire', 'Misty Step']));
-    });
-
-    it('excludes inactive automation features', () => {
-      const stats = createStats({
-        spellAbilities: { spells: [] },
-        automation: {
-          bonusActions: [{
-            name: 'Mantle of Majesty',
-            type: 'free_spell',
-            spell: 'Command',
-            casting_time: '1 bonus action',
-          }],
-          specialActions: [{
-            name: 'Misty Wanderer',
-            type: 'misty_wanderer',
-            spell: 'Misty Step',
-            casting_time: '1 bonus action',
-          }],
-        },
-      });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result.size).toBe(0);
-    });
-
-    it('handles array spell values in features', () => {
-      mockBuffsAndConditions([{ name: 'Mantle of Majesty' }], []);
-      const stats = createStats({
-        spellAbilities: { spells: [] },
-        automation: {
-          bonusActions: [{
-            name: 'Mantle of Majesty',
-            type: 'free_spell',
-            spell: ['Command', 'Thaumaturgy'],
-            casting_time: '1 bonus action',
-          }],
-        },
-      });
-      const result = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Command', 'Thaumaturgy']));
-    });
-
-    it('handles Elder Champion with try/catch returning false', () => {
-      getRuntimeValue.mockImplementation(() => { throw new Error('store error'); });
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell] } });
-      expect(getBonusActionSpellNames(stats, 'test-campaign')).toEqual(new Set(['Shocking Grasp']));
-    });
-
-    it('returns empty set when spellAbilities or automation is null/undefined', () => {
-      expect(getBonusActionSpellNames(createStats({ spellAbilities: undefined }), 'test-campaign')).toEqual(new Set());
-      expect(getBonusActionSpellNames(createStats({ automation: undefined }), 'test-campaign')).toEqual(new Set());
+      expect(getBonusActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Command', 'Thaumaturgy', 'Misty Step']));
     });
   });
 
   describe('getReactionSpellNames', () => {
-    it('returns reaction spells with damage', () => {
-      const stats = createStats({ spellAbilities: { spells: [reactionSpell] } });
-      const result = getReactionSpellNames(stats);
-      expect(result).toEqual(new Set(['Shield']));
-    });
-
-    it('excludes non-reaction and unprepared spells', () => {
-      const stats = createStats({ spellAbilities: { spells: [actionSpell, bonusActionSpell, { name: 'Hidden Reaction', casting_time: '1 reaction', prepared: 'Not Prepared', damage: '1d4' }] } });
-      const result = getReactionSpellNames(stats);
-      expect(result.size).toBe(0);
-    });
-
-    it('handles null/undefined spellAbilities gracefully', () => {
-      expect(getReactionSpellNames(createStats({ spellAbilities: undefined }))).toEqual(new Set());
-      expect(getReactionSpellNames(createStats({ spellAbilities: null }))).toEqual(new Set());
-      expect(getReactionSpellNames(createStats({ spellAbilities: {} }))).toEqual(new Set());
+    it('includes prepared reaction spells only', () => {
+      const stats = createStats([
+        { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared', damage: '1d4' },
+        { name: 'Feather Fall', casting_time: 'Reaction', prepared: 'Always' },
+        { name: 'Hidden Reaction', casting_time: '1 reaction', prepared: 'Not Prepared', damage: '1d4' },
+        { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+      ]);
+      expect(getReactionSpellNames(stats)).toEqual(new Set(['Shield', 'Feather Fall']));
     });
   });
 
   describe('getExcludedSpellNames', () => {
-    it('returns union of action, bonus, and reaction spell names', () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [actionSpell, bonusActionSpell, reactionSpell, alwaysSpell],
-        },
-      });
-      const result = getExcludedSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp', 'Shield', 'Minor Illusion']));
+    it('unions action, bonus, and reaction spell names including automation feature spells', () => {
+      mockActiveBuffs([{ name: 'Mantle of Majesty' }]);
+      const stats = createStats(
+        [
+          { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+          { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' },
+          { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared', damage: '1d4' },
+          { name: 'Prestidigitation', casting_time: '1 action', prepared: 'Always' },
+        ],
+        { bonusActions: [{ name: 'Mantle of Majesty', type: 'free_spell', spell: 'Command', casting_time: '1 bonus action' }] }
+      );
+      expect(getExcludedSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Fireball', 'Shocking Grasp', 'Shield', 'Command']));
     });
+  });
 
-    it('excludes spells from automation features too', () => {
-      mockBuffsAndConditions([{ name: 'Mantle of Majesty' }], []);
-      const stats = createStats({
-        spellAbilities: { spells: [actionSpell] },
-        automation: {
-          bonusActions: [{
-            name: 'Mantle of Majesty',
-            type: 'free_spell',
-            spell: 'Command',
-            casting_time: '1 bonus action',
-          }],
-        },
-      });
-      const result = getExcludedSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Command']));
-    });
+  it('falls back to normal partitioning when the runtime store throws', () => {
+    getRuntimeValue.mockImplementation(() => { throw new Error('store error'); });
+    const stats = createStats([
+      { name: 'Fireball', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
+      { name: 'Shocking Grasp', casting_time: '1 bonus action', prepared: 'Prepared', damage: '1d8' },
+    ]);
+    expect(getActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Fireball']));
+    expect(getBonusActionSpellNames(stats, CAMPAIGN)).toEqual(new Set(['Shocking Grasp']));
+  });
 
-    it('handles null/undefined spellAbilities gracefully', () => {
-      expect(getExcludedSpellNames(createStats({ spellAbilities: undefined }), 'test-campaign')).toEqual(new Set());
-      expect(getExcludedSpellNames(createStats({ spellAbilities: null }), 'test-campaign')).toEqual(new Set());
-    });
-
-    it('respects Elder Champion suppression for action spells', () => {
-      const ecBuff = [{ name: 'Elder Champion' }];
-      getRuntimeValue.mockImplementation(() => ecBuff);
-      const stats = createStats({
-        spellAbilities: { spells: [actionSpell, bonusActionSpell] },
-      });
-      const actionResult = getActionSpellNames(stats, 'test-campaign');
-      expect(actionResult).toEqual(new Set());
-
-      const bonusResult = getBonusActionSpellNames(stats, 'test-campaign');
-      expect(bonusResult).toEqual(new Set(['Fireball', 'Shocking Grasp']));
-
-      const result = getExcludedSpellNames(stats, 'test-campaign');
-      expect(result).toEqual(new Set(['Fireball', 'Shocking Grasp']));
-    });
+  it('returns empty sets when spell data is missing', () => {
+    for (const spellAbilities of [undefined, null, {}]) {
+      const stats = { name: 'TestCharacter', spellAbilities };
+      expect(getActionSpellNames(stats, CAMPAIGN)).toEqual(new Set());
+      expect(getBonusActionSpellNames(stats, CAMPAIGN)).toEqual(new Set());
+      expect(getReactionSpellNames(stats)).toEqual(new Set());
+      expect(getExcludedSpellNames(stats, CAMPAIGN)).toEqual(new Set());
+    }
   });
 });

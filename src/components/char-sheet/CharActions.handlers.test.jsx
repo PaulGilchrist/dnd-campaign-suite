@@ -1,11 +1,18 @@
+// @maintained-by-ai
+// CharActions attack-row error resilience (component level).
+// Happy-path click→rollAttack is pinned in CharActions.rendering.test.jsx;
+// hook-level ctx resolution/rejection is pinned in useCharActionsAttackHandlers.test.js.
+// This file pins the component-level consequence: a rejected attack-context build
+// logs, skips the roll, and leaves the attack row fully usable on the next click.
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
+import { buildAttackContext } from '../../services/automation/contextBuilder.js';
 
 
 const _syncedStore = new Map();
+const mockRollAttack = vi.fn();
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -26,7 +33,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
-    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
+    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn(), rollSkillCheck: vi.fn(), rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
   })),
 }));
 
@@ -177,17 +184,9 @@ vi.mock('../../services/automation/contextBuilder.js', () => ({
   buildAttackContextSync: vi.fn(() => ({ hitBonus: 5 })),
 }));
 
-const basePlayerStats = {
-  name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [],
-  spellAbilities: { spells: [], toHit: 5, saveDc: 13 },
-  abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3,
-};
+const longsword = { name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' };
 
-function createStats(overrides = {}) {
-  return { ...basePlayerStats, ...overrides };
-}
-
-describe('CharActions handlers', () => {
+describe('CharActions attack-row resilience', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -195,22 +194,27 @@ describe('CharActions handlers', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(['Hide', 'Dash', 'Disengage', 'Dodge', 'Grapple']) });
     getRuntimeValue.mockImplementation(() => null);
     vi.mocked(buildAttackContext).mockResolvedValue({ hitBonus: 5 });
-    vi.mocked(buildAttackContextSync).mockReturnValue({ hitBonus: 5 });
   });
 
-  describe('handleAttackClick', () => {
-    it('logs error when buildCtx rejects', async () => {
-      vi.mocked(buildAttackContext).mockRejectedValue(new Error('context error'));
-      const consoleError = console.error;
-      console.error = vi.fn();
+  it('a rejected attack-context build logs the error, rolls nothing, and leaves the row usable for the next click', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const buildError = new Error('context error');
+    vi.mocked(buildAttackContext).mockRejectedValueOnce(buildError);
 
-      render(<CharActions playerStats={createStats({ attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }] })} />);
+    render(<CharActions playerStats={{ name: 'TestCharacter', rules: '5e', level: 5, attacks: [longsword], actions: [], spellAbilities: { spells: [], toHit: 5, saveDc: 13 }, abilities: [{ name: 'STR', bonus: 3 }], proficiency: 3 }} />);
 
-      const attackEl = screen.getByText('Longsword');
-      await act(async () => { fireEvent.click(attackEl); });
+    // Failed build: error surfaced, no roll, row still present and interactive.
+    await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
 
-      expect(console.error).toHaveBeenCalledWith('[CharActions] Error:', expect.any(Error));
-      console.error = consoleError;
-    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.any(String), buildError);
+    expect(mockRollAttack).not.toHaveBeenCalled();
+
+    // Recovery: with build succeeding again, the same row rolls normally.
+    await act(async () => { fireEvent.click(screen.getByText('Longsword')); });
+
+    expect(mockRollAttack).toHaveBeenCalledTimes(1);
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { hitBonus: 5 });
+
+    errorSpy.mockRestore();
   });
 });

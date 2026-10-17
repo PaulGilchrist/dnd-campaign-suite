@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
@@ -11,9 +12,6 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null,
-    handleGreaterRestorationConfirm: vi.fn(),
-    handleGreaterRestorationSkip: vi.fn(),
   })),
 }));
 
@@ -111,7 +109,7 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="spell-detail-popup">{props.spell?.name || 'SpellDetailPopup'}</div>),
 }));
 
-vi.mock('./HexAbilityModal.jsx', () => ({
+vi.mock('./modals/HexAbilityModal.jsx', () => ({
   default: vi.fn((props) => <div data-testid="hex-ability-modal"><button onClick={props.onCancel}>Cancel</button></div>),
 }));
 
@@ -168,10 +166,13 @@ vi.mock('../../services/ui/formatUtils.js', () => ({
 }));
 
 import { getRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getBonusActionSpellNames } from '../../services/ui/spellSectionUtils.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { isWithinRange } from '../../services/rules/combat/rangeCheck.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { useSimpleDamageRoll } from '../../hooks/combat/useSimpleDamageRoll.js';
+import { addEntry } from '../../services/ui/logService.js';
+
+const CAMPAIGN = 'test-campaign';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -192,8 +193,8 @@ describe('CharBonusActions - Edge Cases', () => {
     localStorage.clear();
   });
 
-  describe('Nick mastery round check (2024 rules)', () => {
-    const lightWeaponAttack = {
+  describe('Nick mastery Light-row filtering (WM-003)', () => {
+    const nickDagger = {
       name: 'Dagger',
       weaponName: 'Dagger',
       range: 5,
@@ -204,121 +205,50 @@ describe('CharBonusActions - Edge Cases', () => {
       properties: ['Light'],
       mastery: 'Nick',
     };
+    const vexShortsword = {
+      name: 'Shortsword',
+      weaponName: 'Shortsword',
+      range: 5,
+      hitBonus: 5,
+      damage: '1d6+2',
+      damageType: 'Piercing',
+      type: 'Bonus Action',
+      properties: ['Finesse', 'Light', 'Monk'],
+      mastery: 'Vex',
+    };
+    const mainGauche = {
+      name: 'Main Gauche',
+      range: 5,
+      hitBonus: 5,
+      damage: '1d4+3',
+      damageType: 'Piercing',
+      type: 'Bonus Action',
+    };
+    const kindMasteryPassives = [{ type: 'weapon_kind_mastery', name: 'Weapon Mastery' }];
 
     it.each([
-      { label: 'filters out', nickRound: 1, currentRound: 1, shouldShow: false },
-      { label: 'shows when rounds differ', nickRound: 5, currentRound: 1, shouldShow: true },
-    ])('Nick mastery: $label Light weapon when _Nick_UsedRound=$nickRound and currentRound=$currentRound', ({ shouldShow }) => {
+      { label: 'hides the Nick Light row while the Nick latch matches the current round', nickRound: 1, attacks: [nickDagger], visible: [], hidden: ['Dagger'] },
+      { label: 'keeps the Nick row when the latch belongs to another round', nickRound: 5, attacks: [nickDagger], visible: ['Dagger'], hidden: [] },
+      { label: 'never filters Light rows under 5e rules', rules: '5e', nickRound: 1, attacks: [nickDagger], visible: ['Dagger'], hidden: [] },
+      { label: 'keeps a non-Nick Light row alongside the hidden Nick row', nickRound: 1, attacks: [vexShortsword, nickDagger], visible: ['Shortsword'], hidden: ['Dagger'] },
+      { label: 'keeps a non-Light row even while Nick is latched', nickRound: 1, attacks: [mainGauche], visible: ['Main Gauche'], hidden: [] },
+      { label: 'keeps the Nick row when the kind-mastery bucket excludes it (WM-008 parity)', nickRound: 1, attacks: [nickDagger], chosen: ['Scimitar'], visible: ['Dagger'], hidden: [] },
+      { label: 'hides the Nick row once the kind-mastery bucket includes it', nickRound: 1, attacks: [nickDagger], chosen: ['Scimitar', 'Dagger'], visible: [], hidden: ['Dagger'] },
+    ])('$label', ({ rules = '2024', nickRound, attacks, chosen = null, visible, hidden }) => {
       vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return shouldShow ? 5 : 1;
+        if (key === '_Nick_UsedRound') return nickRound;
+        if (key === '_Weapon_Kind_Mastery_chosenWeapons') return chosen;
         return null;
       });
-      const stats = createStats({ attacks: [lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      if (shouldShow) {
-        expect(screen.getByText('Dagger')).toBeInTheDocument();
-      }
-      else {
-        expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
-      }
-    });
-
-    it('does not filter Light weapons when not using 2024 rules', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
-        return null;
-      });
-      const stats = createStats({ rules: '5e', attacks: [lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
-    });
-
-    // WM-003 F2: the latch must hide ONLY the Nick-consumed weapon row.
-    it('WM-003: keeps non-Nick Light rows (Vex Shortsword) while hiding the Nick-consumed row', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => (key === '_Nick_UsedRound' ? 1 : null));
-      const shortswordRow = {
-        name: 'Shortsword',
-        weaponName: 'Shortsword',
-        range: 5,
-        hitBonus: 5,
-        damage: '1d6+2',
-        damageType: 'Piercing',
-        type: 'Bonus Action',
-        properties: ['Finesse', 'Light', 'Monk'],
-        mastery: 'Vex',
-      };
-      const stats = createStats({ attacks: [shortswordRow, lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Shortsword')).toBeInTheDocument();
-      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
-    });
-
-    it('WM-003: keeps a Nick weapon row when the kind-bucket gate excludes it (WM-008 parity)', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
-        if (key === '_Weapon_Kind_Mastery_chosenWeapons') return ['Scimitar'];
-        return null;
-      });
-      const stats = createStats({
-        automation: { passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Mastery' }], bonusActions: [] },
-        attacks: [lightWeaponAttack],
-      });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
-    });
-
-    it('WM-003: hides the Nick weapon row once the kind bucket includes it and Nick is latched', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
-        if (key === '_Weapon_Kind_Mastery_chosenWeapons') return ['Scimitar', 'Dagger'];
-        return null;
-      });
-      const stats = createStats({
-        automation: { passives: [{ type: 'weapon_kind_mastery', name: 'Weapon Mastery' }], bonusActions: [] },
-        attacks: [lightWeaponAttack],
-      });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.queryByText('Dagger')).not.toBeInTheDocument();
-    });
-
-    it('WM-003: keeps the Nick weapon row visible when the latch belongs to an earlier round', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 2;
-        return null;
-      });
-      const stats = createStats({ attacks: [lightWeaponAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Dagger')).toBeInTheDocument();
+      const automation = chosen ? { passives: kindMasteryPassives, bonusActions: [] } : undefined;
+      const stats = createStats({ rules, attacks, ...(automation ? { automation } : {}) });
+      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} getWeaponMastery={() => null} />);
+      visible.forEach((name) => expect(screen.getByText(name)).toBeInTheDocument());
+      hidden.forEach((name) => expect(screen.queryByText(name)).not.toBeInTheDocument());
     });
   });
 
-  describe('Elder Champion spell conversion', () => {
-    it('shows both bonus action and converted action spells when Elder Champion is active', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
-        return null;
-      });
-      vi.mocked(useRuntimeValue).mockImplementation((name, key) => {
-        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
-        return null;
-      });
-      vi.mocked(getBonusActionSpellNames).mockImplementation(() => {
-        return new Set(['Shocking Grasp', 'Shooting Star', 'Misty Step']);
-      });
-      const spells = [
-        { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' },
-        { name: 'Shooting Star', range: '60 ft.', casting_time: '1 action', prepared: 'Prepared' },
-        { name: 'Misty Step', range: '30 ft.', casting_time: '1 bonus action', prepared: 'Prepared' },
-      ];
-      const stats = createStats({ spellAbilities: { spells } });
-      render(<CharBonusActions playerStats={stats} />);
-      expect(screen.getByText('Shocking Grasp')).toBeInTheDocument();
-      expect(screen.getByText('Shooting Star')).toBeInTheDocument();
-      expect(screen.getByText('Misty Step')).toBeInTheDocument();
-    });
-  });
-
-  describe('cannotAct blocking edge cases', () => {
+  describe('cannotAct gating on bonus attack rows', () => {
     const bonusActionAttack = {
       name: 'Main Gauche',
       range: 5,
@@ -328,37 +258,35 @@ describe('CharBonusActions - Edge Cases', () => {
       type: 'Bonus Action',
     };
 
-    it('adds disabled-attack class to hit bonus when cannotAct is true', () => {
-      const mockOnAttackClick = vi.fn();
+    it.each([
+      { label: 'blocks damage rolls and marks the hit cell disabled', cannotAct: true, expectRolled: false },
+      { label: 'allows damage rolls and leaves the hit cell enabled', cannotAct: false, expectRolled: true },
+    ])('cannotAct $label', ({ cannotAct, expectRolled }) => {
+      const roll = vi.fn();
+      vi.mocked(useSimpleDamageRoll).mockReturnValue(roll);
       const stats = createStats({ attacks: [bonusActionAttack] });
-      render(<CharBonusActions playerStats={stats} onAttackClick={mockOnAttackClick} cannotAct={true} exhaustionPenalty={0} />);
-      const hitBonusElement = screen.getByText('+5');
-      expect(hitBonusElement).toHaveClass('disabled-attack');
+      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={vi.fn()} cannotAct={cannotAct} exhaustionPenalty={0} />);
+
+      const hitCell = screen.getByText('+5');
+      expect(hitCell).toHaveClass('clickable');
+      if (cannotAct) {
+        expect(hitCell).toHaveClass('disabled-attack', 'stat--penalized');
+      }
+      else {
+        expect(hitCell).not.toHaveClass('disabled-attack');
+      }
+
+      fireEvent.click(screen.getByText('1d4+3'));
+      if (expectRolled) {
+        expect(roll).toHaveBeenCalledWith(expect.objectContaining({ name: 'Main Gauche', damage: '1d4+3' }));
+      }
+      else {
+        expect(roll).not.toHaveBeenCalled();
+      }
     });
   });
 
-  describe('non-Light bonus action attacks in 2024 rules', () => {
-    const nonLightAttack = {
-      name: 'Main Gauche',
-      range: 5,
-      hitBonus: 5,
-      damage: '1d4+3',
-      damageType: 'Piercing',
-      type: 'Bonus Action',
-    };
-
-    it('shows non-Light bonus action attacks regardless of Nick mastery round', () => {
-      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
-        if (key === '_Nick_UsedRound') return 1;
-        return null;
-      });
-      const stats = createStats({ attacks: [nonLightAttack] });
-      render(<CharBonusActions playerStats={stats} getWeaponMastery={() => null} />);
-      expect(screen.getByText('Main Gauche')).toBeInTheDocument();
-    });
-  });
-
-  describe('Horde Breaker conditional rendering', () => {
+  describe('Horde Breaker conditional row', () => {
     const shortswordAttack = {
       name: 'Shortsword',
       range: 5,
@@ -388,41 +316,22 @@ describe('CharBonusActions - Edge Cases', () => {
       });
     }
 
-    it('hides the placeholder until a melee weapon hit readies it', () => {
-      mockHbRuntime({ ready: null });
+    function renderBonusActions(props = {}) {
       const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
+      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} getWeaponMastery={() => null} exhaustionPenalty={0} {...props} />);
+    }
 
-    it('shows the row after a ready hit, using the actual weapon damage', () => {
-      mockHbRuntime();
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} />);
-      expect(screen.getByText('Horde Breaker')).toBeInTheDocument();
-      expect(screen.getByText('1d6-1')).toBeInTheDocument();
-      expect(screen.queryByText('1d4')).not.toBeInTheDocument();
-    });
-
-    it('hides the row once used this round', () => {
-      mockHbRuntime({ usedRound: 1 });
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-
-    it('hides the row when the ready state is from a previous round', () => {
-      mockHbRuntime({ ready: { round: 99, targetName: 'Zombie 1', attackName: 'Shortsword' } });
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
-    });
-
-    it('hides the row when the Hunter\'s Prey choice is Colossus Slayer', () => {
-      mockHbRuntime({ choice: 'Colossus Slayer' });
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} />);
-      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
+    it.each([
+      { label: 'no melee weapon hit has readied it', ready: null, visible: [], hidden: ['Horde Breaker', '1d4'] },
+      { label: 'it was already used this round', usedRound: 1, visible: [], hidden: ['Horde Breaker'] },
+      { label: 'the ready state is from a previous round', ready: { round: 99, targetName: 'Zombie 1', attackName: 'Shortsword' }, visible: [], hidden: ['Horde Breaker'] },
+      { label: 'the Hunter\'s Prey choice is Colossus Slayer', choice: 'Colossus Slayer', visible: [], hidden: ['Horde Breaker'] },
+      { label: 'a melee weapon hit this round readied it', visible: ['Horde Breaker', '1d6-1'], hidden: ['1d4'] },
+    ])('hides/shows the row when $label', ({ choice, ready, usedRound, visible, hidden }) => {
+      mockHbRuntime({ choice, ready, usedRound });
+      renderBonusActions();
+      visible.forEach((text) => expect(screen.getByText(text)).toBeInTheDocument());
+      hidden.forEach((text) => expect(screen.queryByText(text)).not.toBeInTheDocument());
     });
 
     it('opens a secondary target modal of valid creatures and rolls the attack against the selected one', async () => {
@@ -432,17 +341,20 @@ describe('CharBonusActions - Edge Cases', () => {
           { name: 'Zombie 1', currentHp: 10 },
           { name: 'Zombie 2', currentHp: 10 },
           { name: 'Zombie 3', currentHp: 10 },
+          { name: 'Zombie 4', currentHp: 0 },
         ],
       });
       vi.mocked(isWithinRange).mockImplementation(async (a, b) => b === 'Zombie 2');
       const rollAttack = vi.fn();
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} rollAttack={rollAttack} />);
+      renderBonusActions({ rollAttack });
 
       fireEvent.click(screen.getByText('Horde Breaker'));
       await waitFor(() => expect(screen.getByTestId('secondary-target-modal')).toBeInTheDocument());
-      expect(screen.getByText('Zombie 2')).toBeInTheDocument();
+      // Only a living, different creature within range of BOTH the original
+      // target and the attacker qualifies (Zombie 3: out of range, 4: dead).
+      expect(screen.getByRole('button', { name: 'Zombie 2' })).toBeInTheDocument();
       expect(screen.queryByText('Zombie 3')).not.toBeInTheDocument();
+      expect(screen.queryByText('Zombie 4')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Zombie 2' }));
       expect(rollAttack).toHaveBeenCalledWith(
@@ -455,6 +367,10 @@ describe('CharBonusActions - Edge Cases', () => {
           autoDamageName: 'Horde Breaker',
         }),
       );
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+        abilityName: 'Horde Breaker',
+        targetName: 'Zombie 2',
+      }));
       expect(screen.queryByTestId('secondary-target-modal')).not.toBeInTheDocument();
     });
 
@@ -469,8 +385,7 @@ describe('CharBonusActions - Edge Cases', () => {
       vi.mocked(isWithinRange).mockResolvedValue(false);
       const setPopupHtml = vi.fn();
       vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml });
-      const stats = createStats({ attacks: [shortswordAttack, hordeBreakerAttack] });
-      render(<CharBonusActions playerStats={stats} campaignName="any-campaign" getWeaponMastery={() => null} exhaustionPenalty={0} setPopupHtml={setPopupHtml} />);
+      renderBonusActions();
 
       fireEvent.click(screen.getByText('Horde Breaker'));
       await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
