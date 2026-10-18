@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
@@ -30,52 +30,21 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
   const _rollSavingThrow = vi.fn();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const mockHook = vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
     rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
+    rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: _rollSavingThrow,
     rollSkillCheck: vi.fn(),
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
-  return { default: mockHook, _rollAttack, _rollDamage, _rollSavingThrow, _setPopupHtml };
+  return { default: mockHook, _rollAttack, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};

@@ -1,6 +1,11 @@
-# test-maintain state
-- Cursor: run2#559 done; next run2#560 (queue head: MonsterCardHelpers.push-clause.test.js)
-- Last batch flush: #161 (GREEN canon + player-save flake WATCHLIST)
-- Next batch flush: after run2#574 (Batch #162)
-- Queue: .opencode/plans/test-maintain-queue.txt (990); ledger+mirror synced
-- Spec: ~/.config/opencode/commands/test-maintain.md (preflight :126 + scoped-git :107 ACTIVE)
+# test-maintain state (updated 2026-10-18, session stopped by owner — resume from disk)
+- Cursor: run2#678 DONE (marker-verified). NEXT dispatch: run2#679 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory.
+- Batch: #163 flushed GREEN canon (lint clean; 34,182 pass; 2 canon FIXME + 3 expected + player-save FLAKE 3x = GREEN canon w/ flake; evidence /tmp/batch163.log).
+- Batch discipline: flush every 15 dispatches — last window anchor run2#678; NEXT flush after run2#692 (Batch #164). (History: #163-#167 were missed after #162 anchor slip; catch-up done; do not repeat.)
+- Counters at batch #163: completed 1822 / remaining 872 / total 2694 (queue regenerated from marker truth, both copies synced).
+- ACTIVE REC: ElementalAttunementModal.player-save flake (3x: #158/#161/#163; isolated 21/21) — carry to that lane's audit turn.
+- Lane families CLOSED through run2#678: legendary-uses fleet (#619-#639 template super-owner cite-map in ledger), spellcasting template (#645-#670), prerequisite (#662/#663), ram-charge (#667/#668/#669/#672), secondary/transport (#673/#674/#675), utility spellcast (#677/#678).
+- Standing recs to carry: two-handed owner cites :25-61; charge-bonus grant/decline owner; usage #571 :16-38; template exhausted-canonical :190/latch :304/cooldown :399 (#639 cite-map in ledger); triceratops Gore 1570/1610/1656 fold candidates; per-monster computeDamageAfterSave pins -> applyDamage.save-full owner; shared modal mock factories (spellcast + runtime) orchestration-level proposals pending owner.
+- Queue: .opencode/plans/test-maintain-queue.txt (872) — consume sequentially from head; regenerate only at batch boundaries.
+- Spec: ~/.config/opencode/commands/test-maintain.md (PREFLIGHT :126 + SCOPED-GIT :107 ACTIVE in every dispatch prompt).
+- Anomaly log: transparent-retry preflight hits #560/#599 (verify-only, fine); #620 malformed subagent output -> verified untouched -> clean re-dispatch pattern works.

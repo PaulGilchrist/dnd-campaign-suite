@@ -1,18 +1,33 @@
+// @maintained-by-ai
 // MA-1016 modal seam: handleSpellCast forks the innate utility row
-// (Ice Mephit "Fog Cloud") to resolveUtilitySpellCastRow — MA-1014 lane,
-// uses-leg added: press 1 spends the MA-00633 numeric 1/Day via
-// spendMonsterAbilityUse (monsterSpellUses {'Fog Cloud':1}) and logs the
-// advisory cast "(Charisma)" — no spell_save_dc, so no DC is printed and
-// the block-save fork stays unreachable (§218/§860 DC-Unknown trap). No
-// recharge key (row authors none), no save/attack roll. Press 2 refuses:
-// mc-prerequisite-refusal popup + fog_cloud_refused automation log, ZERO
-// extra ability_use records (§57). Chip spent state pinned component-side
-// (MonsterAction.ma1016 — mocked useRuntimeValue does not re-render, §179).
+// (Ice Mephit "Fog Cloud", real monsters.json bytes: spellcasting_ability
+// + numeric uses:1/maxUses:1 MA-0633 shape, usage "1/Day" on the FIELD —
+// so the modal's own description-parsing spellUsesGate (:1683/:2516) is a
+// deliberate passthrough) to resolveUtilitySpellCastRow BEFORE the
+// invisibility ender and BEFORE the block-save fork — routing the save seam
+// here would spend then resolve "DC Unknown" (§218/§860; spell_save_dc never
+// reaches the save DC). Fork/economy identity: press 1 spends the 1/Day via
+// spendMonsterAbilityUse (monsterSpellUses {'Fog Cloud':1}, no monsterRecharge
+// key — that economy is MA-1014 ice wall's) + advisory cast "(Charisma)" with
+// the BY-name fog §70 byte (#387 — service monsterUtilitySpellCast.ma1016
+// pins the same advisory at service level; this lane pins the chip→modal
+// wiring through the real row). Press 2 refuses via the SERVICE numeric gate
+// through the modal runtime store: mc-prerequisite-refusal popup +
+// fog_cloud_refused log, zero extra records (§57) — distinct emitter from
+// spellcasting.test.jsx:281's buildMonsterSpellRefusalEntry "already cast
+// today" lane. Restored-uses pins the MA-0020 uses-gate re-arm at the modal
+// seam (service fog test has no recovered-row test; §70 rest-rearm stays
+// GM-enforced). Generic advisory record: service owner
+// monsterUtilitySpellCast.js; usage parse: monsterAbilityUses.test.js;
+// chip spent state: MonsterAction.ma1016-fog-cloud-chip.test.jsx (mocked
+// useRuntimeValue does not re-render, §179). Dead-mock purge per #677
+// utility-lane map — diceRoller/sanitize/mapsService/abilityLookup/
+// conditionEffects/damageUtils/rangeValidation empirically inert on this path.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
@@ -20,14 +35,6 @@ const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
 const ICE_MEPHIT = monsters.find(m => m.index === 'ice-mephit');
 const FOG_ROW = ICE_MEPHIT.actions[1];
 const MONSTER_NAME = 'Ice Mephit 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -40,52 +47,21 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
   const _rollSavingThrow = vi.fn();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const mockHook = vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
     rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
+    rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: _rollSavingThrow,
     rollSkillCheck: vi.fn(),
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
-  return { default: mockHook, _rollAttack, _rollDamage, _rollSavingThrow, _setPopupHtml };
+  return { default: mockHook, _rollAttack, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -144,7 +120,6 @@ describe('MA-1016 modal: Fog Cloud chip → 1/Day-gated advisory cast', () => {
     expect(spend.description).toMatch(/uses Fog Cloud — 1 use spent, 0 left today/);
     const cast = abilityUses('Fog Cloud')[1];
     expect(cast.description).toMatch(/^Ice Mephit 1 casts Fog Cloud via Spellcasting \(Charisma\)\./);
-    expect(cast.description).toContain('No spell components required.');
     expect(cast.description).not.toMatch(/spell save DC/);
     expect(cast.description).toMatch(/Fog zones have no engine consumer \(§70\)/);
     expect(_rollSavingThrow).not.toHaveBeenCalled();

@@ -1463,3 +1463,11 @@ run2#673: encounter/MonsterCardModal.ma0889-goblin-boss-advantage-rider -> maint
 run2#674: encounter/MonsterCardModal.ma0962-half-dragon-claw-secondary -> maintained (5->2, 63->41): BY-name FIX; composite label survives transport pinned once; null-triple->#589 owner; rec: ma0963:92-97 helper re-read droppable; owners 24/24
 run2#675: encounter/MonsterCardModal.ma0963-half-dragon-breath -> maintained (12->9, 98->76): extract :47-48/:50-53 cited-owner BYTE-EXACT; rec #674 :92-97 cut; math/cone/transport->owners; sibling-shift :85-90->:69-74 logged; owners 27/27
 run2#676: encounter/MonsterCardModal.ma1000-homunculus-bite-save-rider -> maintained (7->3, 127->90): MA-0560 bare-word false-match fingerprint kept; 3 false-sides byte-identical to secondary-save-transport owner cut; owners 50/50
+ORCH NOTE: boundaries #163-#167 MISSED (spec drift after #162 anchor slip; per-file ledger+marker gates held throughout, scoped verification only since #573). Batch #163 catch-up flush running now (lint+full suite, evidence /tmp/batch163.log). Queue regenerated from marker truth: 1822/872/2694 — strict drop confirmed (+104 = #574-#677 exact).
+
+## Batch #163 (CATCH-UP) — PROGRESS: completed 1822 / remaining 872 (total 2694)
+- Covers run2#574-#677 (104 files, boundaries missed per drift note above — discipline restored, next flush after run2#692)
+- Suite: lint clean; 2752 files, 34,182 passed, 2 canon FIXME + 3 expected + ElementalAttunementModal.player-save FLAKE 3x (#158/#161/#163, isolated 21/21 GREEN) = GREEN canon w/ flake (evidence /tmp/batch163.log)
+- ACTIVE REC (escalated): player-save flake root-cause — 3rd sighting under parallel load; likely default findBy timeout vs slow async chain in lane; suggest explicit {timeout} pin or serial-retry on that file at next lane audit
+- Test count 34,934->34,182 (-752): expected from mass template trims (#611 276->32 etc.)
+run2#678: encounter/MonsterCardModal.ma1016-fog-cloud-spellcast -> maintained (3 kept 177->152, mocks 11->4): modal-distinct numeric-gate refusal + MA-0020 re-arm kept (#677 precedent honestly inapplicable); neighbors 46/46
