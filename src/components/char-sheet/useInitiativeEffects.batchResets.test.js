@@ -1,17 +1,33 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
+// Lane map: this file pins ONLY the buildInitiativeUpdates payload delivered
+// via setRuntimeBatch at the initiative seam. Event guard clauses (null
+// playerStats/detail, name mismatch — including "no batch for another
+// roller") are pinned in useInitiativeEffects.initiativeRolled.test.js;
+// clearBuffByName / "no buff -> no write" negatives in
+// useInitiativeEffects.buffClearing.test.js; the per-character active-state
+// setRuntimeValue snapshot and ONCE_PER_TURN_TRACKER_KEYS loop in
+// useInitiativeEffects.activeStateClearing.test.js; concentration /
+// invisibility / regenerate lanes in their own siblings.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getStore: vi.fn(() => new Map()),
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
-    listeners: new Map(),
+    // Exactly the four exports live in this import graph: useInitiativeEffects
+    // .js and its only real collaborator, boonOfCombatProwess.js, import
+    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys
+    // (probed: lines 2 of useInitiativeEffects.js, line 2 of
+    // boonOfCombatProwess.js). Dead-mock purge: getStore/useSyncedState/
+    // listeners were never read through any module loaded here.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
     getAllStoreKeys: vi.fn(() => []),
 }));
 
+// Each factory supplies every named binding useInitiativeEffects.js imports;
+// inert defaults keep the non-batch lanes (concentration, invisibility,
+// shapechange, regenerate, storage) inert so only the batch seam is observed.
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -48,7 +64,24 @@ vi.mock('../../services/automation/handlers/spells/shapechangeService.js', () =>
 import { getRuntimeValue, setRuntimeBatch } from '../../hooks/runtime/useRuntimeState.js';
 import { BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY } from '../../services/rules/features/boonOfCombatProwess.js';
 
-describe('useInitiativeEffects - batch resets and once-per-turn trackers', () => {
+// Byte-exact contract of buildInitiativeUpdates: every once-per-round flag
+// it resets unconditionally on a new initiative roll. Any key added to or
+// removed from the batch (or a changed value) fails toHaveBeenCalledWith.
+const UNCONDITIONAL_RESETS = {
+    actionSurgeUsedThisRound: null,
+    projectedWardDamage: null,
+    psionicStrikeUsedThisTurn: null,
+    dreadAmbushUsedThisTurn: null,
+    // CLA-100: Ambusher's Leap once-per-combat latch re-arms on initiative.
+    dreadAmbushSpeedActive: null,
+    hurlThroughHellTurnUsed: null,
+    portentUsedThisTurn: null,
+    // FT-007: Boon of Combat Prowess round latch + Stroke of Luck.
+    [BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY]: null,
+    strokeOfLuckUsed: null,
+};
+
+describe('useInitiativeEffects - buildInitiativeUpdates batch payload', () => {
     const campaignName = 'test-campaign';
     const defaultPlayerStats = {
         name: 'TestMonk',
@@ -70,79 +103,31 @@ describe('useInitiativeEffects - batch resets and once-per-turn trackers', () =>
         getRuntimeValue.mockReturnValue(null);
     });
 
-    function renderHookWithStats(stats = defaultPlayerStats) {
-        return renderHook(() =>
-            useInitiativeEffects(stats, campaignName, vi.fn())
-        );
-    }
+    it.each([
+        {
+            label: 'without the Relentless passive',
+            passives: [],
+            expected: UNCONDITIONAL_RESETS,
+        },
+        {
+            label: 'with the Relentless passive',
+            passives: [{ type: 'passive_rule', effect: 'relentless' }],
+            expected: { ...UNCONDITIONAL_RESETS, relentlessUsedRound: null },
+        },
+    ])('sends one byte-exact reset batch for $label', ({ passives, expected }) => {
+        const stats = {
+            ...defaultPlayerStats,
+            automation: { ...defaultPlayerStats.automation, passives },
+        };
+        renderHook(() => useInitiativeEffects(stats, campaignName, vi.fn()));
 
-    function dispatchInitiativeRoll(detail) {
         window.dispatchEvent(
-            new CustomEvent('initiative-rolled', { detail })
+            new CustomEvent('initiative-rolled', {
+                detail: { characterName: 'TestMonk', roll: 15 },
+            })
         );
-    }
 
-    function batchResetCalls() {
-        return vi.mocked(setRuntimeBatch).mock.calls;
-    }
-
-    function assertBatchResetCalledWithAllFields(expectedFields) {
-        const calls = batchResetCalls();
-        expect(calls.length).toBe(1);
-        const [name, updates, cmpName] = calls[0];
-        expect(name).toBe('TestMonk');
-        expect(cmpName).toBe(campaignName);
-        for (const field of expectedFields) {
-            expect(updates).toHaveProperty(field, null);
-        }
-    }
-
-    describe('setRuntimeBatch once-per-turn trackers', () => {
-        it('resets all unconditional batch fields in a single call', () => {
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            assertBatchResetCalledWithAllFields([
-                'actionSurgeUsedThisRound',
-                'psionicStrikeUsedThisTurn',
-                'dreadAmbushUsedThisTurn',
-                // CLA-100: Ambusher's Leap once-per-combat latch re-arms on initiative.
-                'dreadAmbushSpeedActive',
-                'hurlThroughHellTurnUsed',
-                'portentUsedThisTurn',
-                BOON_OF_COMBAT_PROWESS_USED_ROUND_KEY,
-                'strokeOfLuckUsed',
-            ]);
-        });
-
-        it('includes relentlessUsedRound when player has Relentless passive', () => {
-            const stats = {
-                ...defaultPlayerStats,
-                automation: {
-                    ...defaultPlayerStats.automation,
-                    passives: [
-                        { type: 'passive_rule', effect: 'relentless' },
-                    ],
-                },
-            };
-            renderHookWithStats(stats);
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const calls = batchResetCalls();
-            expect(calls.length).toBe(1);
-            expect(calls[0][1]).toHaveProperty('relentlessUsedRound', null);
-        });
-
-        it('excludes relentlessUsedRound when player lacks Relentless passive', () => {
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const calls = batchResetCalls();
-            expect(calls.length).toBe(1);
-            expect(calls[0][1]).not.toHaveProperty('relentlessUsedRound');
-        });
-
-        it('does not call setRuntimeBatch when no updates are needed (no matching character)', () => {
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'OtherPlayer', roll: 15 });
-            expect(setRuntimeBatch).not.toHaveBeenCalled();
-        });
+        expect(setRuntimeBatch).toHaveBeenCalledTimes(1);
+        expect(setRuntimeBatch).toHaveBeenCalledWith('TestMonk', expected, campaignName);
     });
 });

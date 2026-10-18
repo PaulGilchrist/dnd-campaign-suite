@@ -1,10 +1,14 @@
+// @maintained-by-ai
 // MA-0042: area picker persisting-zone arm seam — with a zoneTe payload
 // (byte-inert when null) the confirm writes a zone te per covered creature
 // (`lair_insect_cloud`, source=caster, repeatTurnEnd) + caster tracking
 // `_lair_insect_cloud_<caster>` {saveDc, saveType, radiusFt, repeatTurnEnd,
-// affectedNames}, plus a GM-enforced ability_use log. The RAW "repeat 3d6 at
-// turn end" clause is advisory (no turn-END zone-damage consumer in this
-// engine) — the log says so. Non-zone rows write zero zone state.
+// damage, duration, affectedNames}, plus a GM-enforced ability_use log. The
+// RAW "repeat 3d6 at turn end" clause stays advisory copy while zones
+// enforcement is off — the log says so. Ordinary save math is unchanged by
+// the arm (fail full / success half). Non-zone rows write zero zone state.
+// Family map (#216): save-less pure arm → lair-darkness (#215); damageless
+// save+zone composite → lair-sand-cloud; zoneTe data-pins → MonsterCardModal.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -81,6 +85,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
+  // Mixed confirm (2 quick-roll randoms per NPC): Thug 1 fails DC 15
+  // (d20 2 + con 1, full damage), Thug 2 succeeds (d20 20 + con 1, half).
   let i = 0;
   const seq = [0.05, 0.05, 0.95, 0.95];
   randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
@@ -109,46 +115,56 @@ function renderCloud({ zoneTe = ZONE_TE } = {}) {
   );
 }
 
+async function openAndConfirm() {
+  const utils = renderCloud();
+  await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
+  // Pre-confirm inertness: picker open, zero writes.
+  expect(runtime.store['campaign.targetEffects']).toBeFalsy();
+  expect(addEntry).not.toHaveBeenCalled();
+  fireEvent.click(utils.getByText('Confirm'));
+  await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
+  return utils;
+}
+
 describe('MA-0042 area picker persisting-zone arm', () => {
-  it('confirm writes a zone te per covered creature (source=caster, repeatTurnEnd) + GM-enforced turn-end log', async () => {
-    const { getByText } = renderCloud();
-    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalled());
-    const te = runtime.store['campaign.targetEffects'];
-    expect(te.filter(t => t.effect === 'lair_insect_cloud').map(t => t.target).sort()).toEqual(['Thug 1', 'Thug 2']);
-    const cloudTe = te.find(t => t.effect === 'lair_insect_cloud');
-    expect(cloudTe.source).toBe('Adult Black Dragon 1');
-    expect(cloudTe.dc).toBe(15);
-    expect(cloudTe.radiusFt).toBe(20);
-    expect(cloudTe.repeatTurnEnd).toBe(true);
+  it('mixed confirm arms the zone: te per creature + caster tracking + honest arm log; save math halves damage only', async () => {
+    await openAndConfirm();
+
+    // Zone te: one per covered creature, source=caster, DC/radius carried,
+    // persistent (until_end_of_zone) with the Constitution repeat-save
+    // descriptor riding on the te for the turn-end consumer.
+    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_insect_cloud');
+    expect(tes.map(t => t.target).sort()).toEqual(['Thug 1', 'Thug 2']);
+    expect(tes.every(t => (
+      t.source === 'Adult Black Dragon 1'
+      && t.dc === 15
+      && t.radiusFt === 20
+      && t.repeatTurnEnd === true
+      && t.duration === 'until_end_of_zone'
+      && t.saveType === 'Constitution'
+    ))).toBe(true);
+
+    // Caster tracking blob for any future zone consumer.
+    const tracking = runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1'];
+    expect(tracking).toMatchObject({
+      saveDc: 15,
+      saveType: 'Constitution',
+      radiusFt: 20,
+      repeatTurnEnd: true,
+      damage: '3d6',
+      duration: 'until dismissed or used again (advisory)',
+    });
+    expect([...tracking.affectedNames].sort()).toEqual(['Thug 1', 'Thug 2']);
+
+    // Arm log naming the zone with radius + DC, and the honest adjudication
+    // copy (H3 §17: repeat is engine-consumed only while enforcement is on).
     const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('lair_insect_cloud zone armed'));
     expect(log).toBeTruthy();
     expect(log.description).toMatch(/radius 20 ft.*Constitution save DC 15/);
-    // H3 (§17): the old "GM-enforced (no turn-end zone-damage consumer)"
-    // confession is retired — enforcement OFF keeps the honest residual copy.
     expect(log.description).toMatch(/Repeat 3d6 at turn end — engine-consumed while zones enforcement is on \(currently off — GM-adjudicated\)/);
-  });
 
-  it('stamps caster tracking `_lair_insect_cloud_<caster>` with saveDc/radius/affectedNames', async () => {
-    const { getByText } = renderCloud();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1']).toBeTruthy());
-    const tracking = runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1'];
-    expect(tracking.saveDc).toBe(15);
-    expect(tracking.saveType).toBe('Constitution');
-    expect(tracking.radiusFt).toBe(20);
-    expect(tracking.repeatTurnEnd).toBe(true);
-    expect(tracking.damage).toBe('3d6');
-    expect(tracking.affectedNames.sort()).toEqual(['Thug 1', 'Thug 2']);
-  });
-
-  it('save math untouched: fail full 10 Piercing, success half 5, both flagged zone te', async () => {
-    const { getByText } = renderCloud();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
+    // Ordinary save math untouched by the arm: the save-success leg halves
+    // damage only — Thug 1 pays full 10 Piercing, Thug 2 half 5.
     const byTarget = Object.fromEntries(applyDamageToTarget.mock.calls.map(c => [c[1], c[2]]));
     expect(byTarget['Thug 1']).toBe(10);
     expect(byTarget['Thug 2']).toBe(5);
@@ -156,13 +172,15 @@ describe('MA-0042 area picker persisting-zone arm', () => {
     expect(logs.map(l => [l.targetName, l.saveResult, l.finalDamage].join(':')).sort()).toEqual(['Thug 1:failure:10', 'Thug 2:success:5']);
   });
 
-  it('zoneTe null (all other consumers) → zero zone state written', async () => {
+  it('zoneTe null (all other consumers) → zero zone state written, ordinary save/damage flow intact', async () => {
     const { getByText } = renderCloud({ zoneTe: null });
     await waitFor(() => expect(seenTargets.current.length).toBe(2));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalled());
+    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
     expect(runtime.store['campaign.targetEffects'] || []).toEqual([]);
     expect(Object.keys(runtime.store).some(k => k.includes('lair_insect_cloud'))).toBe(false);
     expect(addEntry.mock.calls.map(c => c[1]).some(e => (e.description || '').includes('lair_insect_cloud'))).toBe(false);
+    // Byte-inert means zone-only: both save-damage legs still resolve normally.
+    expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage')).toHaveLength(2);
   });
 });

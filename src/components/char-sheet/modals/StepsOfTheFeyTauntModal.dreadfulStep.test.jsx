@@ -1,27 +1,30 @@
-// Redundant tests removed (2):
-//   - "renders the dreadful description with damage and save info" → already
-//     covered in render.test.jsx:100 (initial step option descriptions include
-//     "2d10 Psychic damage")
-//   - "renders the save DC in the dreadful description" → already covered in
-//     render.test.jsx:96-100 (description rendering with DC)
-//
-// Kept "shows result with correct remaining count after dreadful skip" because
-// integration.test.jsx:120-127 tests the free-cast skip flow (handleFreeCastSkip),
-// while this test covers the normal skip flow (handleSkip) — different code paths.
-//
-// 14 tests → 12 tests. 4 rendering tests kept for Dreadful-specific sub-view.
-// 2 skip flow tests kept (no-targets result text + remaining count display).
-// 7 confirmation flow tests kept (save listeners, logging, custom params,
-// multi-target, no-targets guard).
+// @maintained-by-ai
+// Dreadful Step lane only: subview copy + confirm gating, exact save-dispatch
+// payloads (incl. saveDc/featureName pass-through), and the save-resolution
+// damage seam — owned solely here (no sibling dispatches save-result or
+// touches applyDamageToTarget). Choice-step copy lives in render.test.jsx,
+// overlay/close seams and the free-cast skip in integration.test.jsx, no-uses
+// blocking in noUses.test.jsx.
+// Note: handleSkip mislabels this lane "Taunting Step" in normal mode —
+// reported source bug; un-pinned here (only correct substrings asserted).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
+import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+
+const { combatContext, promptState } = vi.hoisted(() => ({
+    combatContext: { creatures: [] },
+    promptState: { n: 0 },
+}));
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
-    createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
-        promptId: `prompt-${targetName}`,
+    // Real signature is (campaignName, { targetName, saveType, saveDc }).
+    // Unique promptId per call so unresolved listeners from one test can
+    // never match another test's save-result events.
+    createSaveListener: vi.fn((_campaignName, { targetName, saveType, saveDc }) => ({
+        promptId: `prompt-${targetName}-${++promptState.n}`,
         targetName,
         saveType,
         saveDc,
@@ -37,15 +40,7 @@ vi.mock('../../../services/rules/effects/expirations.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'activeConditions' && characterKey !== 'campaign') {
-            return [];
-        }
-        if (propertyName === 'targetEffects' && characterKey === 'campaign') {
-            return [];
-        }
-        return null;
-    }),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -54,21 +49,22 @@ vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
 }));
 
 vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
+    getCombatContext: vi.fn(() => Promise.resolve(combatContext)),
 }));
 
-const basePlayerStats = { name: 'FeyTrickster' };
-const baseTargets = [
-    { name: 'Goblin1', currentHp: 5, maxHp: 7 },
-    { name: 'Orc1', currentHp: 12, maxHp: 15 },
-];
+vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
+    applyDamageToTarget: vi.fn(),
+}));
 
 const baseProps = {
     mode: 'normal',
     title: 'Steps of the Fey',
-    targets: baseTargets,
+    targets: [
+        { name: 'Goblin1', currentHp: 5, maxHp: 7 },
+        { name: 'Orc1', currentHp: 12, maxHp: 15 },
+    ],
     action: { name: 'Steps of the Fey', automation: { type: 'class_feature' } },
-    playerStats: basePlayerStats,
+    playerStats: { name: 'FeyTrickster' },
     campaignName: 'test-campaign',
     saveDc: 14,
     featureName: 'Steps of the Fey',
@@ -80,176 +76,147 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-async function selectTargetByName(name) {
-    const row = screen.getByText(name).closest('.secondary-target-row');
-    if (!row) return null;
-    await act(async () => { fireEvent.click(row); });
-    const checkbox = row.querySelector('input[type="checkbox"]');
-    expect(checkbox.checked).toBe(true);
-    return row;
+function openDreadfulSelection() {
+    fireEvent.click(screen.getByText('Dreadful Step'));
+}
+
+function checkTarget(name) {
+    fireEvent.click(screen.getByRole('checkbox', { name: new RegExp(name) }));
+}
+
+function getDreadfulButton() {
+    return screen.getByRole('button', { name: /Dreadful/ });
 }
 
 describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        localStorage.clear();
+        vi.restoreAllMocks();
     });
 
-    describe('creature selection modal rendering', () => {
-        it('shows CreatureSelectionModal when Dreadful Step is selected', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            expect(screen.getByText(/Dreadful Step: Select creatures/)).toBeInTheDocument();
+    it('opens the dreadful target selection with DC/damage copy and enables confirm only once a creature is checked', () => {
+        render(<StepsOfTheFeyTauntModal {...makeProps()} />);
+        openDreadfulSelection();
+
+        expect(screen.getByText('Dreadful Step: Select creatures to target.')).toBeInTheDocument();
+        expect(screen.getByText(/WIS save \(DC 14\) or take 2d10 Psychic damage\./)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+        expect(getDreadfulButton()).toBeDisabled();
+        expect(createSaveListener).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+
+        checkTarget('Goblin1');
+        expect(screen.getByRole('button', { name: 'Dreadful (1)' })).toBeEnabled();
+        expect(createSaveListener).not.toHaveBeenCalled();
+    });
+
+    it('skip resolves to the no-targets result without dispatching saves and leaves uses intact', async () => {
+        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3 })} />);
+        openDreadfulSelection();
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+        });
+        const body = screen.getByText('Done').closest('.sp-modal').querySelector('.sp-body');
+        expect(body.textContent).toContain('No targets selected');
+        expect(body.textContent).toContain('3 remaining');
+        expect(createSaveListener).not.toHaveBeenCalled();
+    });
+
+    it('confirming dispatches an exact WIS save prompt and ability_use log per target, waiting indefinitely for saves', async () => {
+        const onClose = vi.fn();
+        render(<StepsOfTheFeyTauntModal {...makeProps({ saveDc: 18, featureName: 'Fey Trickery', onClose })} />);
+        openDreadfulSelection();
+        checkTarget('Goblin1');
+        checkTarget('Orc1');
+        await act(async () => { fireEvent.click(getDreadfulButton()); });
+
+        const [goblinPrompt, orcPrompt] = createSaveListener.mock.results.map(r => r.value.promptId);
+        expect(createSaveListener).toHaveBeenCalledTimes(2);
+        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', { targetName: 'Goblin1', saveType: 'WIS', saveDc: 18 });
+        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', { targetName: 'Orc1', saveType: 'WIS', saveDc: 18 });
+
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: 'FeyTrickster',
+            abilityName: 'Fey Trickery',
+            description: 'Fey Trickery triggered — Goblin1 must make WIS save (DC 18) or take 2d10 Psychic damage.',
+            promptId: goblinPrompt,
+        });
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: 'FeyTrickster',
+            abilityName: 'Fey Trickery',
+            description: 'Fey Trickery triggered — Orc1 must make WIS save (DC 18) or take 2d10 Psychic damage.',
+            promptId: orcPrompt,
         });
 
-        it('renders Dreadful button with brain icon in creature selection modal', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            expect(screen.getByRole('button', { name: /Dreadful/ })).toBeInTheDocument();
-        });
+        // Saves stay open until answered — no premature result, no close.
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+        expect(onClose).not.toHaveBeenCalled();
 
-        it('renders Skip button in dreadful creature selection modal', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-        });
-
-        it('disables the Dreadful button when no targets are selected', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            expect(dreadfulButton).toBeDisabled();
+        // Answer the saves so this render's listeners are unhooked.
+        await act(async () => {
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: goblinPrompt, success: true } }));
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: orcPrompt, success: true } }));
         });
     });
 
-    describe('skip flow', () => {
-        it('skips dreadful step and shows result when Skip is clicked', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); });
+    it('resolved saves apply 2d10 Psychic damage only to failures and summarize with a decremented count', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5); // each d10 rolls 6 → failed target takes 12
+        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3 })} />);
+        openDreadfulSelection();
+        checkTarget('Goblin1');
+        checkTarget('Orc1');
+        await act(async () => { fireEvent.click(getDreadfulButton()); });
 
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-            });
-            const body = document.querySelector('.sp-body');
-            expect(body.textContent).toContain('No targets selected');
+        const [goblinPrompt, orcPrompt] = createSaveListener.mock.results.map(r => r.value.promptId);
+        await act(async () => {
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: goblinPrompt, success: true } }));
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: orcPrompt, success: false } }));
         });
 
-        it('shows result with correct remaining count after dreadful skip', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3 })} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); });
-
-            await waitFor(() => {
-                const body = document.querySelector('.sp-body');
-                expect(body.textContent).toContain('3 remaining');
-            });
-        });
-    });
-
-    describe('confirmation flow', () => {
-        it('confirms targets and shows save prompt when Dreadful is clicked', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await selectTargetByName('Goblin1');
-
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            await waitFor(() => {
-                expect(createSaveListener).toHaveBeenCalledWith(
-                    'test-campaign',
-                    expect.objectContaining({
-                        targetName: 'Goblin1',
-                        saveType: 'WIS',
-                        saveDc: 14,
-                    })
-                );
-            });
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
 
-        it('logs ability_use entry when dreadful is confirmed', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await selectTargetByName('Goblin1');
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+        expect(applyDamageToTarget).toHaveBeenCalledWith(
+            combatContext,
+            'Orc1',
+            12,
+            ['Psychic'],
+            { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'FeyTrickster' }
+        );
 
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            await waitFor(() => {
-                expect(addEntry).toHaveBeenCalledWith(
-                    'test-campaign',
-                    expect.objectContaining({
-                        type: 'ability_use',
-                        characterName: 'FeyTrickster',
-                        abilityName: 'Steps of the Fey',
-                    })
-                );
-            });
+        // 2 ability_use + 2 save_result, exact payloads.
+        expect(addEntry).toHaveBeenCalledTimes(4);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'save_result',
+            characterName: 'FeyTrickster',
+            rollType: 'save-class_feature',
+            targetName: 'Goblin1',
+            saveDc: 14,
+            saveType: 'WIS',
+            success: true,
+            description: 'Goblin1 succeeded on WIS save from Steps of the Fey. No effect.',
+        });
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'save_result',
+            characterName: 'FeyTrickster',
+            rollType: 'save-class_feature',
+            targetName: 'Orc1',
+            saveDc: 14,
+            saveType: 'WIS',
+            success: false,
+            description: 'Orc1 failed WIS save. Orc1 takes 12 Psychic damage.',
         });
 
-        it('creates save prompts for multiple selected targets', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await selectTargetByName('Goblin1');
-            await selectTargetByName('Orc1');
-
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            await waitFor(() => {
-                expect(createSaveListener).toHaveBeenCalledTimes(2);
-                const calls = createSaveListener.mock.calls;
-                expect(calls[0][1].targetName).toBe('Goblin1');
-                expect(calls[1][1].targetName).toBe('Orc1');
-                expect(calls[0][1].saveType).toBe('WIS');
-                expect(calls[1][1].saveType).toBe('WIS');
-            });
-        });
-
-        it('does not call Dreadful when no targets are selected', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            expect(createSaveListener).not.toHaveBeenCalled();
-        });
-
-        it('uses custom saveDc when provided', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ saveDc: 18 })} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await selectTargetByName('Goblin1');
-
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            await waitFor(() => {
-                expect(createSaveListener).toHaveBeenCalledWith(
-                    'test-campaign',
-                    expect.objectContaining({ saveDc: 18 })
-                );
-            });
-        });
-
-        it('logs ability_use with custom featureName', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ featureName: 'Fey Trickery' })} />);
-            await act(async () => { fireEvent.click(screen.getByText('Dreadful Step')); });
-            await selectTargetByName('Goblin1');
-
-            const dreadfulButton = screen.getByRole('button', { name: /Dreadful/ });
-            await act(async () => { fireEvent.click(dreadfulButton); });
-
-            await waitFor(() => {
-                expect(addEntry).toHaveBeenCalledWith(
-                    'test-campaign',
-                    expect.objectContaining({
-                        type: 'ability_use',
-                        abilityName: 'Fey Trickery',
-                    })
-                );
-            });
-        });
+        const body = screen.getByRole('button', { name: 'Done' }).closest('.sp-modal').querySelector('.sp-body');
+        expect(body.textContent).toContain('2 creature(s) targeted');
+        expect(body.textContent).toContain('1 failed save — 12 Psychic damage. 1 saved.');
+        expect(body.textContent).toContain('2 remaining');
     });
 });

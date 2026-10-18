@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1520: Sprite "Enchanting Bow" — the row's OWN Hit clause carries the
 // Charmed rider ("Hit: 1 Piercing damage, and the target has the Charmed
 // condition until the start of the sprite's next turn") but the row authored
@@ -7,67 +8,64 @@
 // zero-state FAIL(a). Fix: DATA one-field hit_conditions:["charmed"] after
 // range (MA-0984 Trash Lob / MA-1274 otyugh byte-shape). Flat-damage row
 // stays byte-unchanged: damage_dice_primary ABSENT → extractFlatHitDamage
-// (:2739) supplies the constant "1" (MA-0322 lineage, flat never doubles on
-// crit). §108 residual: engine-wide took-damage clears Charmed inside
-// applyDamage BEFORE the hit clause re-grants (handlePlainDamage.js:1154 →
-// :1181) — live ledger shows removed→applied pairs per hit; accepted.
+// supplies the constant "1" (MA-0322 lineage, owner flat-hit-damage.test.js;
+// flat never doubles on crit). §108 residual: engine-wide took-damage clears
+// Charmed inside applyDamage BEFORE the hit clause re-grants (handlePlain-
+// Damage.js:1154 → :1181) — live ledger shows removed→applied pairs per hit;
+// accepted. sprite is NOT in handlePlainDamage.hitClause HIT_CLAUSE_ROWS
+// :224-282 (grep-verified), so THIS file is the sole byte-owner: one fused
+// test locks disk row keys BY NAME in transport order + exact bytes (exact
+// toEqual absorbs name/attack_bonus/range, the prose Charmed word, flat-
+// damage-dice absence, and every save-decoy/hit_target_effect/hit_condition_
+// roll field-absence check — this row carries NO 0/"" save decoys, disk keys
+// decide shape), then the "+6" chip press delivers that exact row through
+// onAttack (identity — payload IS the disk object, MonsterAction.jsx:480
+// passthrough). Clause arm for the ["charmed"]+escapeDc-null shape and the
+// attack suppression gate are owned generically: hitClause mega-lane data-
+// locks via byte-twins satyr-revelmaster Prance :270 and noble-prodigy
+// Beguiling Strike :266 (charmed, escapeDc null) + clause arm :289-301,
+// suppression census ma0286:95-121, DC0 save gate ma1071 — per-census (#419,
+// cf. ma1357:17-22) no local buildHitConditionClause/attackRowMissingToHit
+// re-derivation here — exact-bytes + live chip are the tighter pin. Needle
+// Sword twin's rider absence is a foreign row: its inert-bytes belong to
+// MA-1522 sprite-invisibility.test.js:127, not re-derived here.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const SPRITE = monsters.find((m) => m.index === 'sprite');
-const BOW = SPRITE.actions[1];
+const BOW = monsters.find((m) => m.index === 'sprite').actions[1];
+
+const BOW_EXACT = {
+  name: 'Enchanting Bow',
+  description: "Ranged Attack Roll: +6, range 40/160 ft. Hit: 1 Piercing damage, and the target has the Charmed condition until the start of the sprite's next turn.",
+  attack_bonus: 6,
+  range: '40/160 ft.',
+  hit_conditions: ['charmed'],
+};
 
 describe('MA-1520 disk fingerprint: sprite Enchanting Bow hit_conditions fix', () => {
-  it('row authors hit_conditions ["charmed"] after range (MA-0984/MA-0010 byte-shape)', () => {
-    expect(BOW.name).toBe('Enchanting Bow');
-    expect(BOW.attack_bonus).toBe(6);
-    expect(BOW.range).toBe('40/160 ft.');
-    expect(BOW.hit_conditions).toEqual(['charmed']);
-    const keys = Object.keys(BOW);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('range') + 1);
-  });
+  it('sole-owner row fingerprint + live "+6" chip presses exact row through onAttack', () => {
+    // Byte-shape: keys BY NAME in transport order, hit_conditions sits
+    // immediately after range (MA-0984/MA-0010 byte-shape); this row carries
+    // NO save_dc/save_type/save_effect decoys, NO damage dice (flat "1" via
+    // extractFlatHitDamage), NO escape_dc/hit_target_effect/hit_condition_roll.
+    expect(Object.keys(BOW)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'range',
+      'hit_conditions',
+    ]);
+    // Exact bytes: any drifted numeric, added save decoy, prose drift, or
+    // added/dropped key breaks this one assertion (absorbs all field-absence
+    // and prose checks, including the canonical Charmed word on the Hit).
+    expect(BOW).toEqual(BOW_EXACT);
 
-  it('flat-damage row byte-unchanged: NO damage dice authored (extractFlatHitDamage supplies "1")', () => {
-    expect(BOW.damage_dice_primary).toBeUndefined();
-    expect(BOW.damage_type_primary).toBeUndefined();
-  });
-
-  it('no save/decoy fields: only hit_conditions arms the hit grant path (§118)', () => {
-    expect(BOW.save_dc).toBeUndefined();
-    expect(BOW.save_type).toBeUndefined();
-    expect(BOW.save_effect).toBeUndefined();
-    expect(BOW.escape_dc).toBeUndefined();
-    expect(BOW.hit_target_effect).toBeUndefined();
-    expect(BOW.hit_condition_roll).toBeUndefined();
-  });
-
-  it('Hit clause prose still carries the canonical Charmed word (rider belongs to HIT)', () => {
-    expect(BOW.description).toMatch(/Hit:.*Charmed/s);
-  });
-
-  it('buildHitConditionClause arms the Charmed rider (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(BOW);
-    expect(clause).toEqual({
-      conditions: ['charmed'],
-      escapeDc: null,
-      attackName: 'Enchanting Bow',
-      targetEffect: null,
-    });
-  });
-
-  it('Needle Sword twin byte-unchanged: still no rider of its own', () => {
-    const sword = SPRITE.actions[0];
-    expect(sword.name).toBe('Needle Sword');
-    expect(sword.hit_conditions).toBeUndefined();
-    expect(buildHitConditionClause(sword)).toBeNull();
-  });
-
-  it('attack half stays live: one "+6" chip, no save/DC decoy chip', () => {
-    expect(attackRowMissingToHit(BOW)).toBe(false);
+    // Chip-level dispatch: exactly one "+6" attack chip (no save/DC decoy
+    // chip, no damage chip — attack_bonus arms the attack lane), press routes
+    // name/bonus/row once.
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -85,6 +83,10 @@ describe('MA-1520 disk fingerprint: sprite Enchanting Bow hit_conditions fix', (
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+6']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Enchanting Bow', 6, expect.objectContaining({ name: 'Enchanting Bow' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Enchanting Bow', 6, BOW_EXACT);
+    // Identity: the payload IS the disk row — hit_conditions bytes ride the
+    // attack lane untouched (no copy/strip) into the clause consumer.
+    expect(onAttack.mock.calls[0][2]).toBe(BOW);
   });
 });

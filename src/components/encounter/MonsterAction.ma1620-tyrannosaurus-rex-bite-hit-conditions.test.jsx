@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1620: Tyrannosaurus Rex "Bite" — prose carries "If the target is a
 // Large or smaller creature, it has the Grappled condition (escape DC 17)"
 // but the row shipped WITHOUT hit_conditions/escape_dc, so the grapple rider
@@ -6,67 +7,80 @@
 // applyHitClauseConditions w/ size gate isLargeOrSmallerTarget at :836).
 // Two-field DATA fix mirroring the MA-0909/MA-1274 byte-shape (MA-0010
 // seam): hit_conditions:["grappled"] + escape_dc:17 placed after
-// damage_type_primary. Locks: disk row shape + key placement, clause arms
-// Grappled with escapeDc:17, damage/description fields byte-unchanged, the
-// "+10" attack chip stays live, no save fields on row; Tail row pin inverted
-// by MA-1621 (Tail now carries hit_conditions ["prone"], still no escape_dc).
-// "While Grappled → Restrained + Tail immunity" is the sustained-grapple
-// state machine with zero producers (§70) — GM-adjudicated residual; single
-// grappled grant is the ceiling, restrained must NOT join hit_conditions.
+// damage_type_primary. tyrannosaurus-rex is NOT in handlePlainDamage.hit
+// Clause HIT_CLAUSE_ROWS :224-282 (grep-verified BY NAME — no tyrannosaurus
+// row, and grappled+escape_dc 17 appears nowhere in the table; honest tuple
+// read: nearest grappled-escape twins sit at DC 12-14, e.g. aboleth 14
+// :227, ankheg 13 :232, bugbear-warrior 12 :240) → THIS file is the sole
+// byte-owner: one fused test locks disk row keys BY NAME + exact bytes
+// (verbatim toEqual absorbs the no-save-fields absence check, the
+// restrained-NEVER-joins §70 advisory, and every numerics/description pin),
+// arms the tuple-miss clause locally, then the "+10" chip press delivers
+// that exact row through onAttack (identity — payload IS the disk object).
+// OWNERS OUTSIDE THIS FILE (trimmed, cited):
+//  - attackRowMissingToHit suppression gate OFF leg + whole-database live-
+//    chip census → MonsterAction.ma0286-slam-suppression.test.jsx (armed
+//    attack_bonus rows keep their chip; tyrannosaurus Bite sits in census)
+//  - DC0 save-chip gate → MonsterAction.ma1071-pincer-staff-dc0-gate.test.jsx
+//  - generic conditions+escapeDc clause passthrough → handlePlainDamage.hit
+//    Clause.test.js:183-216 (and its grappled-escape twin table lane)
+//  - Tail row prone pin + Bite-untouched inverted pin → MA-1621 sibling
+//    (MonsterAction.ma1621-tyrannosaurus-rex-tail-hit-conditions.test.jsx)
+// "While Grappled → Restrained + Tail immunity" stays the sustained-grapple
+// state machine with zero producers (§70) — GM-adjudicated residual; the
+// verbatim ['grappled'] bytes here are the ceiling.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
+import { buildHitConditionClause } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const REX = monsters.find((m) => m.index === 'tyrannosaurus-rex');
-const BITE = REX.actions[1];
-const TAIL = REX.actions[2];
+const BITE = monsters.find((m) => m.index === 'tyrannosaurus-rex').actions[1];
+
+const BITE_EXACT = {
+  name: 'Bite',
+  description: "Melee Attack Roll: +10, reach 10 ft. Hit: 33 (4d12 + 7) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 17). While Grappled, the target has the Restrained condition and can't be targeted by the tyrannosaurus's Tail.",
+  attack_bonus: 10,
+  reach: '10 ft.',
+  damage_dice_primary: '4d12 + 7',
+  damage_type_primary: 'Piercing',
+  hit_conditions: ['grappled'],
+  escape_dc: 17,
+};
 
 describe('MA-1620 disk fingerprint: tyrannosaurus-rex Bite grapple rider fix', () => {
-  it('disk row carries hit_conditions ["grappled"] + escape_dc 17 after damage_type_primary (MA-0909/MA-1274 byte-shape)', () => {
-    expect(BITE.name).toBe('Bite');
-    expect(BITE.hit_conditions).toEqual(['grappled']);
-    expect(BITE.escape_dc).toBe(17);
-    const keys = Object.keys(BITE);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
-    expect(BITE.attack_bonus).toBe(10);
-    expect(BITE.reach).toBe('10 ft.');
-  });
+  it('sole-owner row fingerprint + tuple-miss clause arm + live "+10" chip presses exact row through onAttack', () => {
+    // Byte-shape: keys BY NAME in transport order, hit_conditions + escape_dc
+    // sit immediately after damage_type_primary (MA-0909/MA-1274 byte-shape).
+    expect(Object.keys(BITE)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+      'escape_dc',
+    ]);
+    // Exact bytes: any added save_dc/save_type/hit_target_effect, any
+    // restrained join (§70 ceiling), or drifted numeric (+10 attack bonus,
+    // 10 ft. reach, 4d12 + 7 Piercing, escape DC 17) breaks this one
+    // assertion (absorbs field-absence + prose "escape DC 17"/"Grappled
+    // condition" pins).
+    expect(BITE).toEqual(BITE_EXACT);
 
-  it('damage + description fields byte-unchanged (core numeric axis was already live)', () => {
-    expect(BITE.damage_dice_primary).toBe('4d12 + 7');
-    expect(BITE.damage_type_primary).toBe('Piercing');
-    expect(BITE.description).toContain('escape DC 17');
-    expect(BITE.description).toContain('Grappled condition');
-  });
-
-  it('row carries NO save fields (attack ride, no save leg)', () => {
-    expect(BITE.save_dc).toBeUndefined();
-    expect(BITE.save_type).toBeUndefined();
-    expect(BITE.hit_target_effect).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Grappled rider with escapeDc 17 (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(BITE);
-    expect(clause).toEqual({
+    // Tuple-miss delta: no HIT_CLAUSE_ROWS twin arms this exact
+    // grappled+escapeDc 17 clause — pin the arm locally (was null pre-fix).
+    expect(buildHitConditionClause(BITE)).toEqual({
       conditions: ['grappled'],
       escapeDc: 17,
       attackName: 'Bite',
       targetEffect: null,
     });
-  });
 
-  it('restrained NEVER joins hit_conditions (sustained-grapple state machine = §70 advisory)', () => {
-    expect(BITE.hit_conditions).not.toContain('restrained');
-    expect(TAIL.hit_conditions).toEqual(['prone']);
-    expect(TAIL.escape_dc).toBeUndefined();
-  });
-
-  it('attack half stays live: one "+10" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(BITE)).toBe(false);
+    // Chip-level dispatch: exactly one "+10" attack chip (no damage chip —
+    // attack_bonus arms the attack lane), press routes name/bonus/row once.
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -84,6 +98,11 @@ describe('MA-1620 disk fingerprint: tyrannosaurus-rex Bite grapple rider fix', (
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+10']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Bite', 10, expect.objectContaining({ name: 'Bite' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Bite', 10, BITE_EXACT);
+    // Identity: the payload IS the disk row — hit_conditions + escape_dc
+    // bytes ride the attack lane untouched (no copy/strip) into the clause
+    // consumer.
+    expect(onAttack.mock.calls[0][2]).toBe(BITE);
   });
 });

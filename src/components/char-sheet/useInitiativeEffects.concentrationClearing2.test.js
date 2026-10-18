@@ -1,17 +1,36 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
+// Lane map: this file owns the spell-specific concentration branches NOT reached by
+// concentrationClearing.test.js (#350, which owns the CONCENTRATION_SOURCE_EFFECTS
+// table + Protection from Energy sweep): restoreCalmEmotions (useInitiativeEffects.js:158),
+// Circle of Power clear+sweep (:210-213), LATE_CONCENTRATION_SOURCE_EFFECTS Compulsion /
+// Enhance Ability (:27-30, dispatched :214-216), and revertShapeEffects Polymorph /
+// Shapechange (:181-187, dispatched :217-222). Split consolidated from 20 tests to 6
+// parameterized tests (13 runs); Calm Emotions restore-guard rows that also lived in
+// edgeCases.test.js are folded into one it.each here (edgeCases pruning reported upstream).
+// Project rule honored: concentration stays concentration — every assertion is event-driven
+// at the initiative seam, never a wall-clock gate.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getStore: vi.fn(() => new Map()),
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
-    listeners: new Map(),
+    // Exactly the four live bindings in this import graph: useInitiativeEffects.js:2
+    // and its loaded collaborator boonOfCombatProwess.js:2 import
+    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys.
+    // Dead-mock purge: getStore/useSyncedState/listeners were never read by any module
+    // loaded here (probed exports at useRuntimeState.js:5,21 — useSyncedState is not
+    // even an export of that file; #350 justification adopted).
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
     getAllStoreKeys: vi.fn(() => []),
 }));
 
+// Each factory supplies every named binding useInitiativeEffects.js imports (:3-9);
+// inert defaults keep the non-owned lanes (invisibility, dice, generic buffs) silent
+// so only the spell-specific concentration seam is observed. combatData also exports
+// getCurrentCombatRound (boonOfCombatProwess.js:1) but it is never called on this
+// lane, so an undefined binding is honest here (#350/buffClearing precedent).
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -51,9 +70,13 @@ import * as storageService from '../../services/ui/storage.js';
 import { revertPolymorph } from '../../services/automation/handlers/spells/polymorphService.js';
 import { revertShapechange } from '../../services/automation/handlers/spells/shapechangeService.js';
 
-describe('useInitiativeEffects - concentration clearing (Calm Emotions, Circle of Power, Compulsion, Enhance Ability, Polymorph, Shapechange)', () => {
+describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emotions, Circle of Power, Compulsion, Enhance Ability, Polymorph, Shapechange)', () => {
     const campaignName = 'test-campaign';
-    const defaultPlayerStats = {
+    const TE = 'targetEffects';
+    const BUFFS = 'activeBuffs';
+    const CONDS = 'activeConditions';
+
+    const playerStats = {
         name: 'TestMonk',
         level: 15,
         class: {
@@ -68,581 +91,237 @@ describe('useInitiativeEffects - concentration clearing (Calm Emotions, Circle o
         actions: [],
     };
 
+    const PRESERVED = { name: 'Mage Armor', effect: 'mage_armor' };
+
+    // Production-faithful fake store (#348/#350 pattern): setRuntimeValue updates the
+    // value the NEXT getRuntimeValue sees, so multi-effect restore chains filter fresh
+    // data and a resurrection or overwrite of written state fails the final-state
+    // byte checks — unlike a static mock returning stale data.
+    let store;
+
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
+        store = new Map();
+        getRuntimeValue.mockImplementation((name, key) =>
+            store.has(`${name}|${key}`) ? store.get(`${name}|${key}`) : null
+        );
+        setRuntimeValue.mockImplementation((name, key, value) => {
+            store.set(`${name}|${key}`, value);
+        });
     });
 
-    function renderHookWithStats(stats = defaultPlayerStats) {
-        return renderHook(() =>
-            useInitiativeEffects(stats, campaignName, vi.fn())
-        );
-    }
-
-    function dispatchInitiativeRoll(detail) {
+    function rollInitiative() {
         window.dispatchEvent(
-            new CustomEvent('initiative-rolled', { detail })
+            new CustomEvent('initiative-rolled', {
+                detail: { characterName: 'TestMonk', roll: 15 },
+            })
         );
     }
 
-    function mockCombatSummary(concentrationSpell, extraCreatures = []) {
-        const creatures = [
-            {
-                name: 'TestMonk',
-                concentration: concentrationSpell ? { spell: concentrationSpell } : null,
-            },
-            ...extraCreatures,
-        ];
-        vi.mocked(getCombatSummary).mockReturnValue({ creatures });
+    // TestMonk concentrates `spell`; extras add buff-sweep bystanders.
+    function concentrate(spell, extras = []) {
+        const cs = {
+            creatures: [
+                { name: 'TestMonk', concentration: { spell }, hp: 30 },
+                ...extras,
+            ],
+        };
+        getCombatSummary.mockReturnValue(cs);
+        return cs;
     }
 
-    describe('Calm Emotions concentration clearing', () => {
-        it('clears concentration, restores suppressed conditions, removes targetEffects, and removes buffs from all creatures', () => {
-            mockCombatSummary('Calm Emotions', [
+    const teWrites = () =>
+        setRuntimeValue.mock.calls.filter(([name, key]) => name === 'campaign' && key === TE);
+    const buffWrites = () =>
+        setRuntimeValue.mock.calls.filter(([, key]) => key === BUFFS);
+    const condWrites = () =>
+        setRuntimeValue.mock.calls.filter(([, key]) => key === CONDS);
+    const storedTE = () => store.get(`campaign|${TE}`);
+
+    describe('Calm Emotions — restoreCalmEmotions chain', () => {
+        it('restores suppressed conditions to every target, strips only TestMonk-sourced calm_emotions, and sweeps the buff from all creatures — byte-exact', () => {
+            const cs = concentrate('Calm Emotions', [{ name: 'Ally1' }, { name: 'Ally2' }]);
+            const calmFrighten1 = { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: ['Frightened'], target: 'Enemy1' };
+            // Second effect re-targets Enemy1: with the fake store the restore must see
+            // the fresh ['Frightened'] and append, not clobber (static mocks hid this).
+            const calmCharm1 = { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: ['Charmed'], target: 'Enemy1' };
+            // Enemy2 has no activeConditions stored at all — restore from nothing.
+            const calmCharm2 = { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: ['Charmed'], target: 'Enemy2' };
+            const allyCalm = { effect: 'calm_emotions', source: 'AllyCaster', mode: 'immunity', suppressedConditions: ['Frightened'], target: 'Enemy3' };
+            const unrelated = { effect: 'other_effect', source: 'Ally' };
+            store.set(`campaign|${TE}`, [calmFrighten1, calmCharm1, calmCharm2, allyCalm, unrelated]);
+            const CALM_BUFF = { name: 'Calm Emotions', effect: 'calm_emotions' };
+            store.set(`TestMonk|${BUFFS}`, [CALM_BUFF, PRESERVED]);
+            store.set(`Ally1|${BUFFS}`, [CALM_BUFF, PRESERVED]);
+            store.set(`Ally2|${BUFFS}`, [PRESERVED]);
+
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
+
+            // Condition restores, in effect order, byte-exact (4 args, no skipSync).
+            expect(condWrites()).toEqual([
+                ['Enemy1', CONDS, ['Frightened'], campaignName],
+                ['Enemy1', CONDS, ['Frightened', 'Charmed'], campaignName],
+                ['Enemy2', CONDS, ['Charmed'], campaignName],
+            ]);
+            expect(store.get(`Enemy1|${CONDS}`)).toEqual(['Frightened', 'Charmed']);
+            expect(store.get(`Enemy2|${CONDS}`)).toEqual(['Charmed']);
+            // One skipSync=true strip holding every survivor byte-exactly: an
+            // over-clear (allyCalm) or under-clear breaks these bytes.
+            const survivors = [allyCalm, unrelated];
+            expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName, true]]);
+            expect(storedTE()).toEqual(survivors);
+            // Buff sweep: exactly two writes (cs order TestMonk, Ally1; Ally2 holds no match).
+            expect(buffWrites()).toEqual([
+                ['TestMonk', BUFFS, [PRESERVED], campaignName],
+                ['Ally1', BUFFS, [PRESERVED], campaignName],
+            ]);
+            // Concentration flag persists cleared, once, with bystanders intact.
+            expect(storageService.default.set).toHaveBeenCalledTimes(1);
+            expect(cs.creatures).toEqual([
+                { name: 'TestMonk', concentration: null, hp: 30 },
                 { name: 'Ally1' },
                 { name: 'Ally2' },
             ]);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Frightened'],
-                        target: 'Enemy1',
-                    },
-                    { effect: 'other_effect', source: 'Ally' },
-                ];
-                if (key === 'activeConditions') return [];
-                if (key === 'activeBuffs') return [
-                    { name: 'Calm Emotions', effect: 'calm_emotions' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            // Should clear concentration and persist combat summary
-            expect(storageService.default.set).toHaveBeenCalledWith(
-                'combatSummary',
-                expect.objectContaining({
-                    creatures: expect.arrayContaining([
-                        expect.objectContaining({ name: 'TestMonk', concentration: null }),
-                    ]),
-                }),
-                campaignName
-            );
-            // Should restore Frightened to Enemy1
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Enemy1',
-                'activeConditions',
-                ['Frightened'],
-                campaignName
-            );
-            // Should remove calm_emotions effects
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'other_effect', source: 'Ally' }],
-                campaignName,
-                true
-            );
-            // Should remove Calm Emotions buff from each creature
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally1',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally2',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
         });
 
-        it('removes calm_emotions targetEffects and restores suppressed conditions', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Frightened'],
-                        target: 'Enemy1',
-                    },
-                    { effect: 'other_effect', source: 'Ally' },
-                ];
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            // Should restore Frightened to Enemy1
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Enemy1',
-                'activeConditions',
-                ['Frightened'],
-                campaignName
-            );
-            // Should remove calm_emotions effects
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{
-                    effect: 'other_effect',
-                    source: 'Ally',
-                }],
-                campaignName,
-                true
-            );
-        });
+        // Guard branch (useInitiativeEffects.js:162-163): malformed/satisfied effects
+        // skip the restore, but the strip (filter on effect+source only, :173) and the
+        // concentration break still fire — positive legs keep the absence non-vacuous.
+        it.each([
+            ['mode is not immunity', { effect: 'calm_emotions', source: 'TestMonk', mode: 'suppressed', suppressedConditions: ['Frightened'], target: 'Enemy1' }, {}],
+            ['suppressedConditions is not an array', { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: 'Frightened', target: 'Enemy1' }, {}],
+            ['suppressedConditions is empty', { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: [], target: 'Enemy1' }, {}],
+            ['target is missing', { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: ['Frightened'] }, {}],
+            ['the condition is already present (case-insensitive)', { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: ['frightened'], target: 'Enemy1' }, { [`Enemy1|${CONDS}`]: ['Frightened'] }],
+        ])('restores no conditions when %s, yet still breaks concentration and strips the effect', (_label, effect, seeds) => {
+            const cs = concentrate('Calm Emotions');
+            const unrelated = { effect: 'other_effect', source: 'Ally' };
+            store.set(`campaign|${TE}`, [effect, unrelated]);
+            Object.entries(seeds).forEach(([k, v]) => store.set(k, v));
 
-        it('removes Calm Emotions buff from all creatures', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'calm_emotions', source: 'TestMonk', target: 'Enemy1' },
-                ];
-                if (key === 'activeBuffs') return [
-                    { name: 'Calm Emotions', effect: 'calm_emotions' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
 
-        it('does nothing when no calm_emotions effects exist', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const effCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(effCalls.length).toBe(0);
-        });
-
-        it('does not restore conditions when mode is not immunity', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'suppressed',
-                        suppressedConditions: ['Frightened'],
-                        target: 'Enemy1',
-                    },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(condCalls.length).toBe(0);
-        });
-
-        it('does not restore conditions when suppressedConditions is not an array', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: 'Frightened',
-                        target: 'Enemy1',
-                    },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(condCalls.length).toBe(0);
-        });
-
-        it('does not restore conditions when suppressedConditions is empty', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: [],
-                        target: 'Enemy1',
-                    },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(condCalls.length).toBe(0);
-        });
-
-        it('does not restore conditions when target is missing', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Frightened'],
-                    },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(condCalls.length).toBe(0);
-        });
-
-        it('does not restore a condition that is already present (case-insensitive)', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['frightened'],
-                        target: 'Enemy1',
-                    },
-                ];
-                if (key === 'activeConditions') return ['Frightened'];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const condCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[1] === 'activeConditions'
-            );
-            expect(condCalls.length).toBe(0);
-        });
-
-        it('restores conditions to target that has no activeConditions (undefined)', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Frightened'],
-                        target: 'Enemy1',
-                    },
-                ];
-                if (key === 'activeConditions') return undefined;
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Enemy1',
-                'activeConditions',
-                ['Frightened'],
-                campaignName
-            );
-        });
-
-        it('restores conditions from multiple calm_emotions effects', () => {
-            mockCombatSummary('Calm Emotions');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Frightened'],
-                        target: 'Enemy1',
-                    },
-                    {
-                        effect: 'calm_emotions',
-                        source: 'TestMonk',
-                        mode: 'immunity',
-                        suppressedConditions: ['Charmed'],
-                        target: 'Enemy2',
-                    },
-                ];
-                if (key === 'activeConditions') return [];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Enemy1',
-                'activeConditions',
-                ['Frightened'],
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Enemy2',
-                'activeConditions',
-                ['Charmed'],
-                campaignName
-            );
+            expect(condWrites()).toHaveLength(0);
+            expect(storageService.default.set).toHaveBeenCalledTimes(1);
+            expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
+            expect(teWrites()).toEqual([['campaign', TE, [unrelated], campaignName, true]]);
+            expect(storedTE()).toEqual([unrelated]);
         });
     });
 
     describe('Circle of Power concentration clearing', () => {
-        it('removes circle_of_power targetEffect and Circle of Power buff from all creatures', () => {
-            mockCombatSummary('Circle of Power', [
-                { name: 'Ally1' },
+        it('clears only TestMonk-sourced circle_of_power and sweeps the buff from all creatures', () => {
+            const cs = concentrate('Circle of Power', [{ name: 'Ally1' }, { name: 'Ally2' }]);
+            const own = { effect: 'circle_of_power', source: 'TestMonk', target: 'Ally1' };
+            const allySameKey = { effect: 'circle_of_power', source: 'AllyCaster', target: 'Ally2' };
+            const unrelated = { effect: 'other_effect', source: 'Ally' };
+            store.set(`campaign|${TE}`, [own, allySameKey, unrelated]);
+            const COP_BUFF = { name: 'Circle of Power', effect: 'circle_power' };
+            store.set(`TestMonk|${BUFFS}`, [COP_BUFF, PRESERVED]);
+            store.set(`Ally1|${BUFFS}`, [COP_BUFF, PRESERVED]);
+            store.set(`Ally2|${BUFFS}`, [PRESERVED]);
+
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
+
+            expect(teWrites()).toEqual([['campaign', TE, [allySameKey, unrelated], campaignName, true]]);
+            expect(storedTE()).toEqual([allySameKey, unrelated]);
+            expect(buffWrites()).toEqual([
+                ['TestMonk', BUFFS, [PRESERVED], campaignName],
+                ['Ally1', BUFFS, [PRESERVED], campaignName],
             ]);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'circle_of_power', source: 'TestMonk' },
-                    { effect: 'other_effect' },
-                ];
-                if (key === 'activeBuffs') return [
-                    { name: 'Circle of Power', effect: 'circle_power' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'other_effect' }],
-                campaignName,
-                true
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally1',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('does nothing when no circle_of_power exists', () => {
-            mockCombatSummary('Circle of Power');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const effCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(effCalls.length).toBe(0);
+            expect(storageService.default.set).toHaveBeenCalledTimes(1);
+            expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
         });
     });
 
-    describe('Compulsion concentration clearing', () => {
-        it('removes compulsion targetEffect from campaign', () => {
-            mockCombatSummary('Compulsion');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'compulsion', source: 'TestMonk', target: 'Enemy' },
-                    { effect: 'other_effect' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'other_effect' }],
-                campaignName,
-                true
-            );
-        });
+    describe('LATE_CONCENTRATION_SOURCE_EFFECTS clearing', () => {
+        // Late-dispatched table (useInitiativeEffects.js:27-30) — same clearSourceEffects
+        // mechanism as #350's early table but reached only through these rows.
+        it.each([
+            ['Compulsion', 'compulsion'],
+            ['Enhance Ability', 'enhance_ability'],
+        ])(
+            'losing %s concentration removes only TestMonk-sourced %s, byte-exact, with skipSync',
+            (spell, effectKey) => {
+                const cs = concentrate(spell);
+                const own = { effect: effectKey, source: 'TestMonk', target: 'Enemy' };
+                const allySameKey = { effect: effectKey, source: 'AllyCaster', target: 'Ally' };
+                const ownUnrelated = { effect: 'frightened', source: 'TestMonk' };
+                store.set(`campaign|${TE}`, [own, allySameKey, ownUnrelated]);
 
-        it('does nothing when no compulsion exists', () => {
-            mockCombatSummary('Compulsion');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const effCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(effCalls.length).toBe(0);
-        });
+                renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+                rollInitiative();
+
+                const survivors = [allySameKey, ownUnrelated];
+                expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName, true]]);
+                expect(storedTE()).toEqual(survivors);
+                expect(storageService.default.set).toHaveBeenCalledTimes(1);
+                expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
+            }
+        );
     });
 
-    describe('Enhance Ability concentration clearing', () => {
-        it('removes enhance_ability targetEffect from campaign', () => {
-            mockCombatSummary('Enhance Ability');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'enhance_ability', source: 'TestMonk', target: 'Ally' },
-                    { effect: 'other_effect' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'other_effect' }],
-                campaignName,
-                true
+    describe('spell gating across owned lanes', () => {
+        it('losing Compulsion concentration touches no other spell lane — other keys, buffs and reverts survive byte-exact', () => {
+            const cs = concentrate('Compulsion', [{ name: 'Ally1' }]);
+            const otherLaneEffects = ['calm_emotions', 'circle_of_power', 'polymorph', 'shapechange'].map(
+                effect => ({ effect, source: 'TestMonk', mode: 'immunity', suppressedConditions: ['Frightened'], target: 'Enemy1' })
             );
-        });
+            const ownCompulsion = { effect: 'compulsion', source: 'TestMonk', target: 'Enemy2' };
+            store.set(`campaign|${TE}`, [...otherLaneEffects, ownCompulsion]);
+            const otherBuffs = [
+                { name: 'Circle of Power', effect: 'circle_power' },
+                { name: 'Calm Emotions', effect: 'calm_emotions' },
+                { name: 'Protection from Energy', effect: 'protection_energy' },
+            ];
+            store.set(`TestMonk|${BUFFS}`, otherBuffs);
+            store.set(`Ally1|${BUFFS}`, otherBuffs);
 
-        it('does nothing when no enhance_ability exists', () => {
-            mockCombatSummary('Enhance Ability');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            const effCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(effCalls.length).toBe(0);
-        });
-    });
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
 
-    describe('Polymorph concentration clearing', () => {
-        it('calls revertPolymorph for each polymorph effect from the rolling player', () => {
-            mockCombatSummary('Polymorph');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'polymorph', source: 'TestMonk', target: 'Goblin1' },
-                    { effect: 'polymorph', source: 'TestMonk', target: 'Goblin2' },
-                    { effect: 'other_effect' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertPolymorph).toHaveBeenCalledWith('Goblin1', campaignName);
-            expect(revertPolymorph).toHaveBeenCalledWith('Goblin2', campaignName);
-        });
-
-        it('does not call revertPolymorph for polymorph effects from other sources', () => {
-            mockCombatSummary('Polymorph');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'polymorph', source: 'OtherCaster', target: 'Goblin1' },
-                    { effect: 'polymorph', source: 'TestMonk', target: 'Goblin2' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertPolymorph).toHaveBeenCalledTimes(1);
-            expect(revertPolymorph).toHaveBeenCalledWith('Goblin2', campaignName);
-        });
-
-        it('does not call revertPolymorph when no polymorph effects exist', () => {
-            mockCombatSummary('Polymorph');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+            // Positive leg: the Compulsion clear itself happened...
+            expect(teWrites()).toEqual([['campaign', TE, otherLaneEffects, campaignName, true]]);
+            expect(storageService.default.set).toHaveBeenCalledTimes(1);
+            expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
+            // ...so these absences are spell-gating, not a dead seam: no calm restore,
+            // no buff sweep, no shape reverts for un-concentrated spells.
+            expect(condWrites()).toHaveLength(0);
+            expect(buffWrites()).toHaveLength(0);
             expect(revertPolymorph).not.toHaveBeenCalled();
+            expect(revertShapechange).not.toHaveBeenCalled();
+            expect(storedTE()).toEqual(otherLaneEffects);
         });
     });
 
-    describe('Shapechange concentration clearing', () => {
-        it('calls revertShapechange for each shapechange effect from the rolling player', () => {
-            mockCombatSummary('Shapechange');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'shapechange', source: 'TestMonk', target: 'Dragon' },
-                    { effect: 'other_effect' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertShapechange).toHaveBeenCalledWith('Dragon', campaignName);
-        });
+    describe('Polymorph / Shapechange reverts', () => {
+        it.each([
+            ['Polymorph', 'polymorph', revertPolymorph],
+            ['Shapechange', 'shapechange', revertShapechange],
+        ])('losing %s concentration reverts exactly each caster-sourced target and leaves targetEffects to the service', (_spell, effectKey, revert) => {
+            concentrate(_spell);
+            const own1 = { effect: effectKey, source: 'TestMonk', target: 'Goblin1' };
+            const own2 = { effect: effectKey, source: 'TestMonk', target: 'Goblin2' };
+            const allySameKey = { effect: effectKey, source: 'AllyCaster', target: 'Dragon' };
+            const unrelated = { effect: 'other_effect', source: 'TestMonk' };
+            const seed = [own1, own2, allySameKey, unrelated];
+            store.set(`campaign|${TE}`, seed);
 
-        it('calls revertShapechange for multiple shapechange effects from the rolling player', () => {
-            mockCombatSummary('Shapechange');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'shapechange', source: 'TestMonk', target: 'Dragon' },
-                    { effect: 'shapechange', source: 'TestMonk', target: 'Golem' },
-                    { effect: 'other_effect' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertShapechange).toHaveBeenCalledWith('Dragon', campaignName);
-            expect(revertShapechange).toHaveBeenCalledWith('Golem', campaignName);
-        });
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
 
-        it('does not call revertShapechange for shapechange effects from other sources', () => {
-            mockCombatSummary('Shapechange');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [
-                    { effect: 'shapechange', source: 'OtherCaster', target: 'Dragon' },
-                    { effect: 'shapechange', source: 'TestMonk', target: 'Golem' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertShapechange).toHaveBeenCalledTimes(1);
-            expect(revertShapechange).toHaveBeenCalledWith('Golem', campaignName);
-        });
-
-        it('does not call revertShapechange when no shapechange effects exist', () => {
-            mockCombatSummary('Shapechange');
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'targetEffects') return [{ effect: 'other_effect' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(revertShapechange).not.toHaveBeenCalled();
+            // Exact call list: other-source effects never revert, no phantom extra calls.
+            expect(revert.mock.calls).toEqual([
+                ['Goblin1', campaignName],
+                ['Goblin2', campaignName],
+            ]);
+            // The seam itself strips nothing — revert service owns the effect removal.
+            expect(teWrites()).toHaveLength(0);
+            expect(storedTE()).toEqual(seed);
+            expect(storageService.default.set).toHaveBeenCalledTimes(1);
         });
     });
 });

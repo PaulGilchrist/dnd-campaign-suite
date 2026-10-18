@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
+// Direct imports of the hook plus transitive-graph pins (steps/index.js is
+// loaded unmocked; these stubs keep its subtree deterministic and side-effect-free).
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -51,293 +54,175 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 
-const mockPlayerStats = {
-    name: 'TestFighter',
-    level: 5,
-    abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 2 }],
-    proficiency: 3,
-    class: { name: 'Barbarian', class_levels: [{ level: 5, rage_damage: 2 }] },
-    automation: { actions: [], passives: [] },
-};
+const CHAR = 'TestFighter';
+const CAMPAIGN = 'test-campaign';
+const TARGET = 'Goblin';
 
-const mockCampaignName = 'test-campaign';
-
-const modalState = {};
-const mockSetModalState = vi.fn((updates) => {
-    if (typeof updates === 'function') {
-        return updates(modalState);
-    }
-    Object.assign(modalState, updates);
-});
-
-function UseAttackDamageResolution(overrides = {}) {
+// Fresh deps per mount — nothing shared between tests.
+function Harness(overrides = {}) {
     const deps = {
-        playerStats: mockPlayerStats,
-        campaignName: mockCampaignName,
+        playerStats: { name: CHAR },
+        campaignName: CAMPAIGN,
         mapName: null,
         popupHtml: null,
         setPopupHtml: vi.fn(),
         rollDamage: vi.fn(),
-        buildCtx: vi.fn(() => Promise.resolve({ targetName: 'Goblin' })),
-        buildCtxSync: vi.fn(() => Promise.resolve({ targetName: 'Goblin' })),
-        modalState,
-        setModalState: mockSetModalState,
-        pendingDamage: null,
+        setModalState: vi.fn(),
         setPendingDamage: vi.fn(),
         resumeRef: { current: null },
         ...overrides,
     };
-    return useAttackDamageResolution(deps);
+    return { api: useAttackDamageResolution(deps), deps };
 }
 
-function resetModalState() {
-    Object.keys(modalState).forEach((k) => delete modalState[k]);
+// Pipeline paused at attackRiderManeuvers with damage stashed (the #306
+// pendingOptions state this consumer lane is supposed to close).
+function stashAtManeuvers() {
+    const resume = vi.fn();
+    const ctx = { targetName: TARGET };
+    const resumeRef = { current: { _pausedStep: 'attackRiderManeuvers', pipelineStash: { pipeline: { resume }, ctx } } };
+    return { resume, resumeRef };
 }
+
+const brutalStrike = (...options) => ({
+    name: 'Brutal Strike',
+    automation: { options },
+});
 
 describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
-        getActiveBuffs.mockReturnValue([]);
-        hasTwoWeaponFighting.mockReturnValue(false);
-        resetModalState();
-        mockSetModalState.mockClear();
+        vi.resetAllMocks();
     });
 
-    afterEach(() => {
-        resetModalState();
-    });
+    it('closes the options modal, latches brutal-strike flags, pops automation_info — damage stays stashed', async () => {
+        const { resume, resumeRef } = stashAtManeuvers();
+        const { api, deps } = Harness({ resumeRef });
 
-    // ── Brutal Strike flag setup ────────────────────────────────────────
-
-    describe('brutal strike flags', () => {
-        it('sets _brutalStrikeActive and _brutalStrikeEffects before processing', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Extra Damage', effect: 'extra_damage' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Extra Damage', { maneuver, targetName: 'Goblin', description: 'Test' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeActive', true, 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeEffects', ['Extra Damage'], 'test-campaign');
+        await api.handleAttackRiderOptionSelect('Extra Damage', {
+            maneuver: brutalStrike({ name: 'Extra Damage', effect: 'extra_damage' }),
+            targetName: TARGET,
+            description: 'Test description',
         });
 
-        it('clears attackRiderOptionsModal after selection', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Extra Damage', effect: 'extra_damage' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Extra Damage', { maneuver, targetName: 'Goblin', description: 'Test' });
-
-            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
+        expect(deps.setModalState).toHaveBeenCalledTimes(1);
+        expect(deps.setModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
+        // The loop #306 left stashed closes via the runtime latch, NOT resume:
+        expect(resume).not.toHaveBeenCalled();
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CHAR, '_brutalStrikeActive', true, CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, CHAR, '_brutalStrikeEffects', ['Extra Damage'], CAMPAIGN);
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(deps.setPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Brutal Strike',
+            description: 'Test description Selected: Extra Damage.',
         });
     });
 
-    // ── Push effect ─────────────────────────────────────────────────────
+    it.each([
+        {
+            branch: 'push_15ft writes instant push and appends push text',
+            option: { name: 'Knock Back', effect: 'push_15ft' },
+            expectedEffect: { target: TARGET, source: CHAR, option: 'Knock Back', effect: 'push', value: 15, duration: 'instant' },
+            expectedDescription: 'Test description Goblin pushed 15 feet. Selected: Knock Back.',
+        },
+        {
+            branch: 'speed_reduction passes explicit option.value through byte-exact',
+            option: { name: 'Slow', effect: 'speed_reduction', value: '10_ft_until_end_of_turn' },
+            expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: '10_ft_until_end_of_turn', duration: 'until_start_of_next_turn' },
+            // Honest pin: log text hardcodes "15 feet" even for non-15 values.
+            expectedDescription: "Test description Goblin's speed reduced by 15 feet. Selected: Slow.",
+        },
+        {
+            branch: 'speed_reduction defaults value when option.value is missing',
+            option: { name: 'Slow', effect: 'speed_reduction' },
+            expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: '15_ft_until_start_of_next_turn', duration: 'until_start_of_next_turn' },
+            expectedDescription: "Test description Goblin's speed reduced by 15 feet. Selected: Slow.",
+        },
+    ])('immediate effect $branch', async ({ option, expectedEffect, expectedDescription }) => {
+        const preExisting = { target: 'Orc', source: 'SomeoneElse', effect: 'sanctuary' };
+        getRuntimeValue.mockImplementation((key, prop) => (prop === 'targetEffects' ? [preExisting] : undefined));
+        const { api, deps } = Harness();
 
-    describe('push_15ft effect', () => {
-        it('applies push targetEffect with targetName', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                return null;
-            });
-
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Knock Back', effect: 'push_15ft' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Knock Back', { maneuver, targetName: 'Goblin', description: 'Brutal Strike' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Goblin', source: 'TestFighter',
-                        option: 'Knock Back', effect: 'push', value: 15,
-                        duration: 'instant',
-                    }),
-                ]),
-                'test-campaign',
-            );
+        await api.handleAttackRiderOptionSelect(option.name, {
+            maneuver: brutalStrike(option),
+            targetName: TARGET,
+            description: 'Test description',
         });
 
-        it('does not apply push effect when targetName is null', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                return null;
-            });
-
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Knock Back', effect: 'push_15ft' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Knock Back', { maneuver, targetName: null, description: 'Brutal Strike' });
-
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'targetEffects'
-            );
-            expect(targetEffectCalls).toHaveLength(0);
+        // Byte-exact round-trip: stored effects preserved, new effect appended last.
+        expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [preExisting, expectedEffect], CAMPAIGN);
+        expect(deps.setPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Brutal Strike',
+            description: expectedDescription,
         });
     });
 
-    // ── Speed reduction effect ──────────────────────────────────────────
+    it.each([
+        {
+            branch: 'option not found in automation.options',
+            optionName: 'Nonexistent Option',
+            option: null,
+            targetName: TARGET,
+        },
+        {
+            branch: 'push_15ft with null targetName',
+            optionName: 'Knock Back',
+            option: { name: 'Knock Back', effect: 'push_15ft' },
+            targetName: null,
+        },
+        {
+            branch: 'speed_reduction with null targetName',
+            optionName: 'Slow',
+            option: { name: 'Slow', effect: 'speed_reduction' },
+            targetName: null,
+        },
+    ])('effect-free path $branch: flags latch, popup shows base description, zero targetEffects writes', async ({ optionName, option, targetName }) => {
+        const { api, deps } = Harness();
 
-    describe('speed_reduction effect', () => {
-        it('applies speed_reduction targetEffect with targetName', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                return null;
-            });
-
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Slow', effect: 'speed_reduction', value: '15_ft_until_start_of_next_turn' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Slow', { maneuver, targetName: 'Goblin', description: 'Brutal Strike' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        target: 'Goblin', source: 'TestFighter',
-                        option: 'Slow', effect: 'speed_reduction',
-                        value: '15_ft_until_start_of_next_turn',
-                        duration: 'until_start_of_next_turn',
-                    }),
-                ]),
-                'test-campaign',
-            );
+        await api.handleAttackRiderOptionSelect(optionName, {
+            maneuver: brutalStrike(...(option ? [option] : [])),
+            targetName,
+            description: 'Test description',
         });
 
-        it('defaults duration when option.value is missing and does not apply when targetName is null', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                return null;
-            });
-
-            // Test default duration
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Slow', effect: 'speed_reduction' }],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Slow', { maneuver, targetName: 'Goblin', description: 'Brutal Strike' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign', 'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        value: '15_ft_until_start_of_next_turn',
-                        duration: 'until_start_of_next_turn',
-                    }),
-                ]),
-                'test-campaign',
-            );
-
-            // Test null targetName
-            getRuntimeValue.mockClear();
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') return [];
-                return null;
-            });
-            setRuntimeValue.mockClear();
-
-            await handleAttackRiderOptionSelect('Slow', { maneuver, targetName: null, description: 'Brutal Strike' });
-
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'targetEffects'
-            );
-            expect(targetEffectCalls).toHaveLength(0);
+        // Only the two flag latches hit the runtime store — no targetEffects at all.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CHAR, '_brutalStrikeActive', true, CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, CHAR, '_brutalStrikeEffects', [optionName], CAMPAIGN);
+        expect(deps.setPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Brutal Strike',
+            description: `Test description Selected: ${optionName}.`,
         });
     });
 
-    // ── Option found in automation.options ──────────────────────────────
+    it.each([
+        { branch: 'null modalPayload', payload: null, mutatesBeforeThrow: false },
+        {
+            branch: 'payload without maneuver',
+            payload: { targetName: TARGET, description: 'Test description' },
+            // Honest pin: modal close + flag latch execute BEFORE the
+            // maneuver.automation access throws (validation-after-mutation).
+            mutatesBeforeThrow: true,
+        },
+    ])('rejects on invalid payload ($branch)', async ({ payload, mutatesBeforeThrow }) => {
+        const { resume, resumeRef } = stashAtManeuvers();
+        const { api, deps } = Harness({ resumeRef });
 
-    describe('option found in automation.options', () => {
-        it('clears attackRiderOptionsModal and sets popupHtml with automation_info', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [{ name: 'Extra Damage', effect: 'extra_damage' }],
-                },
-            };
+        await expect(api.handleAttackRiderOptionSelect('Some Option', payload))
+            .rejects.toThrow(TypeError);
 
-            await handleAttackRiderOptionSelect('Extra Damage', { maneuver, targetName: 'Goblin', description: 'Brutal Strike' });
-
-            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
-        });
-    });
-
-    // ── Missing option ──────────────────────────────────────────────────
-
-    describe('missing option', () => {
-        it('still sets flags and popupHtml when option is not found in automation.options', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const maneuver = {
-                name: 'Brutal Strike',
-                automation: {
-                    options: [],
-                },
-            };
-
-            await handleAttackRiderOptionSelect('Nonexistent Option', { maneuver, targetName: 'Goblin', description: 'Brutal Strike' });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeActive', true, 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_brutalStrikeEffects', ['Nonexistent Option'], 'test-campaign');
-            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
-
-            const targetEffectCalls = setRuntimeValue.mock.calls.filter(
-                (c) => c[1] === 'targetEffects'
-            );
-            expect(targetEffectCalls).toHaveLength(0);
-        });
-    });
-
-    // ── Edge cases ──────────────────────────────────────────────────────
-
-    describe('edge cases', () => {
-        it('throws when maneuver is missing (no automation property)', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-
-            await expect(
-                handleAttackRiderOptionSelect('Some Option', { targetName: 'Goblin', description: 'Test' })
-            ).rejects.toThrow();
-        });
-
-        it('throws when modalPayload is null', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-
-            await expect(
-                handleAttackRiderOptionSelect('Some Option', null)
-            ).rejects.toThrow();
-        });
+        expect(resume).not.toHaveBeenCalled();
+        expect(deps.setPopupHtml).not.toHaveBeenCalled();
+        if (mutatesBeforeThrow) {
+            expect(deps.setModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
+            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        } else {
+            expect(deps.setModalState).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        }
     });
 });

@@ -1,33 +1,32 @@
-// MA-1673: Vrock "Spores" (DC 15 Constitution, "20-foot Emanation", 1d10
-// Poison, Poisoned fail-only) rides the SaveAttackAoeModal picker via the
-// MA-0590 emanation-range parse. Pre-fix the absent dc_success let
-// resolveBlockSaveDcSuccess (action.dc_success ?? 'half', §456/:523) default
-// the picker to 'half' — live proof: +19 save SUCCESS paid rolls [7] → fd 3,
-// hp_change −3, results modal "Saved — takes 3 Poison damage (rolled 18,
-// halved)", picker copy fabricated "takes half damage" (§1191). Fix DATA
-// dc_success:"none" → success pays ZERO (applyDamageToTarget never even
-// fires — §279 picker zero-leg fingerprint), fail pays FULL 1d10 + Poisoned.
-// Rigs ride FULL-word saveBonuses.constitution (§163: computeNpcSave reads
-// cs.saveBonuses[saveType.toLowerCase()] = 'constitution'; -19 = always-fail
-// floor, +19 = always-success even on nat 1).
+// @maintained-by-ai
+// MA-1673/MA-1674: Vrock "Spores" and "Stunning Scream" (both DC 15
+// Constitution, 20-ft Emanation) ride the SaveAttackAoeModal picker via the
+// MA-0590 emanation parse with the FIX DATA dc_success:"none" — success pays
+// ZERO (applyDamageToTarget never fires on that leg — §279 picker zero-leg
+// fingerprint), fail pays FULL dice + the authored condition (MA-0063
+// fail-grant shape with {dc, ability, source} meta for the PC badge re-save
+// seam). Pre-fix the absent dc_success let resolveBlockSaveDcSuccess
+// (action.dc_success ?? 'half', §456/:523) default the picker to 'half' —
+// live fingerprint: "Saved — takes 3 Poison damage (rolled 18, halved)" +
+// fabricated "takes half damage" copy (§1191). One mixed confirm per row
+// adjudicates BOTH faces in a single pass: Bandit 1 nat 1 (< DC 15 even at
+// bonus 0) FAILS, Bandit 2 nat 20 SUCCEEDS. Rigs keep saveBonuses EMPTY and
+// the dice decisive so the outcome holds under either key spelling
+// (live cs carries abbr keys, computeNpcSave reads full-word — §163) and the
+// lane stays green across the fix instead of enshrining the mismatch.
+// Owned elsewhere: key-order/data pins (MonsterCardModal.legendary-uses-*),
+// usage-counter spend chips (MonsterAction/MonsterCardModal usage lanes),
+// copy-honesty family canon (thunderclap-sphere), skip/cancel
+// (creature-selection lane).
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 import monstersData from '../../../../../public/data/monsters.json';
 
-const sporesRow = () => monstersData.find(m => m.index === 'vrock').actions.find(a => a.name === 'Spores');
+const vrockRow = (name) => monstersData.find(m => m.index === 'vrock').actions.find(a => a.name === name);
 
 const pickerCopy = vi.hoisted(() => ({ current: null }));
 const runtimeStore = vi.hoisted(() => ({}));
-
-const combatSummary = vi.hoisted(() => ({
-  current: {
-    creatures: [
-      { name: 'Vrock 1', type: 'npc', currentHp: 152, maxHp: 152, ac: 15, saveBonuses: { con: 4 }, resistances: ['Cold', 'Fire', 'Lightning'], immunities: [], conditions: [] },
-      { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, saveBonuses: { constitution: -19, con: 1 }, resistances: [], immunities: [], conditions: [] },
-    ],
-  },
-}));
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 7, rolls: [7], modifier: 0 })),
@@ -47,7 +46,7 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
 }));
 
-// Faithful computeDamageAfterSave semantics (§87/MA-0367 three-mode):
+// Faithful computeDamageAfterSave/Evasion three-mode semantics (§87/MA-0367):
 // fail → raw, 'half' → floor, 'full' → raw, 'none' → 0. The pre-fix leak
 // shape is exactly what the row WITHOUT dc_success produced ('half').
 vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
@@ -75,7 +74,13 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => combatSummary.current),
+  getCombatSummary: vi.fn(() => ({
+    creatures: [
+      { name: 'Vrock 1', type: 'npc', currentHp: 152, maxHp: 152, ac: 15, saveBonuses: {}, resistances: ['Cold', 'Fire', 'Lightning'], immunities: [], conditions: [] },
+      { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, saveBonuses: {}, resistances: [], immunities: [], conditions: [] },
+      { name: 'Bandit 2', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, saveBonuses: {}, resistances: [], immunities: [], conditions: [] },
+    ],
+  })),
   setCombatSummaryCache: vi.fn(),
 }));
 
@@ -119,10 +124,9 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 
-const screamRow = () => monstersData.find(m => m.index === 'vrock').actions.find(a => a.name === 'Stunning Scream');
-
-function renderRowPicker(row, opts = {}) {
+function renderRowPicker(row, { damageType, saveConditions }) {
   // dc_success flows exactly as MonsterCardModal.resolveBlockSaveDcSuccess
   // computes it for the live chip: Number(save_dc) > 0 ? dc_success ?? 'half'.
   const dcSuccess = Number(row.save_dc) > 0 ? (row.dc_success ?? 'half') : null;
@@ -132,11 +136,11 @@ function renderRowPicker(row, opts = {}) {
       playerStats={{ name: 'Vrock 1' }}
       campaignName="test-campaign"
       damage={row.damage_dice_primary}
-      damageType={opts.damageType}
+      damageType={damageType}
       saveType={row.save_type}
       saveDc={row.save_dc}
       dcSuccess={dcSuccess}
-      saveConditions={opts.saveConditions}
+      saveConditions={saveConditions}
       titleOverride=" 20-ft Radius (GM positions tokens; selection advisory)"
       excludeNames={['Vrock 1']}
       rangeGateFt={20}
@@ -146,105 +150,73 @@ function renderRowPicker(row, opts = {}) {
   );
 }
 
-function renderSporesPicker() {
-  return renderRowPicker(sporesRow(), { damageType: 'Poison', saveConditions: ['poisoned'] });
-}
-
-function renderScreamPicker() {
-  return renderRowPicker(screamRow(), { damageType: 'Thunder', saveConditions: ['stunned'] });
-}
-
+let randomSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
-  combatSummary.current.creatures[1].currentHp = 999;
+  // Mixed-confirm seam (2 quick-roll randoms per NPC, target order):
+  // Bandit 1 nat 1 → total 1 < DC 15 FAIL; Bandit 2 nat 20 ≥ DC 15 SAVE.
+  const seq = [0.01, 0.01, 0.99, 0.99];
+  let i = 0;
+  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
 });
+afterEach(() => randomSpy.mockRestore());
 
-describe('MA-1673 Vrock Spores picker seam (live emanation route)', () => {
-  it('dc_success resolves to none, never the half-default', () => {
-    const row = sporesRow();
+async function mixedConfirm({ row, damageType, condition }) {
+  const { getByText } = renderRowPicker(row, { damageType, saveConditions: [condition] });
+  await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
+
+  const conditionLabel = condition.charAt(0).toUpperCase() + condition.slice(1);
+
+  // Picker surface before confirm: excludeNames leaves exactly the two
+  // bandits (never the caster) and dc_success:'none' copy is honest (§1191).
+  expect([...document.querySelectorAll('.secondary-target-row input')].map(i => i.dataset.name)).toEqual(['Bandit 1', 'Bandit 2']);
+  expect(pickerCopy.current).toMatch(/takes no damage/i);
+  expect(pickerCopy.current).not.toMatch(/half damage/i);
+  // Pre-confirm inertness: nothing resolved, prompted, or logged.
+  expect(applyDamageToTarget).not.toHaveBeenCalled();
+  expect(addTargetResult).not.toHaveBeenCalled();
+  expect(addEntry).not.toHaveBeenCalled();
+
+  fireEvent.click(getByText('Confirm'));
+  await waitFor(() => expect(addTargetResult).toHaveBeenCalledTimes(2));
+
+  const saveLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage');
+  const failLog = saveLogs.find(e => e.targetName === 'Bandit 1');
+
+  // FAIL face: FULL raw roll, byte-formula from the live row, condition +
+  // {dc, ability, source} meta granted for the badge re-save seam.
+  expect(applyDamageToTarget).toHaveBeenCalledTimes(1); // zero-leg never applies (§279)
+  const call = applyDamageToTarget.mock.calls[0];
+  expect(call[1]).toBe('Bandit 1');
+  expect(call[2]).toBe(7);
+  expect(call[3]).toEqual([damageType]);
+  expect(failLog).toMatchObject({ formula: row.damage_dice_primary, rolls: [7], finalDamage: 7, saveResult: 'failure', saveRoll: 1, saveDc: 15, dcSuccess: 'none', targetName: 'Bandit 1' });
+  expect(runtimeStore['Bandit 1.activeConditions']).toContain(condition);
+  expect(runtimeStore['Bandit 1.activeConditionMeta'][condition]).toMatchObject({ dc: 15, ability: 'con', source: 'Vrock 1' });
+  const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'condition' && e.action === 'applied' && e.characterName === 'Bandit 1');
+  expect(condLog.description).toMatch(new RegExp(conditionLabel));
+
+  // SAVE face (dc_success:'none'): ZERO damage, nothing granted, no PC
+  // prompt on this all-NPC emanation route — the picker auto-adjudicates.
+  expect(sendSavePrompt).not.toHaveBeenCalled();
+  expect(runtimeStore['Bandit 2.activeConditions'] ?? []).not.toContain(condition);
+  const rows = addTargetResult.mock.calls.map(c => c[1]);
+  expect(rows.find(r => r.targetName === 'Bandit 1')).toMatchObject({ saveResult: 'failure', appliedDamage: 7 });
+  expect(rows.find(r => r.targetName === 'Bandit 2')).toMatchObject({ saveResult: 'success', appliedDamage: 0 });
+}
+
+describe('MA-1673/MA-1674 Vrock emanation picker seam (live monsters.json rows)', () => {
+  it('Spores mixed confirm: nat 1 FAIL pays FULL 1d10 Poison + Poisoned w/ meta; nat 20 SAVE pays ZERO, grants nothing', async () => {
+    const row = vrockRow('Spores');
+    expect(row.dc_success).toBe('none'); // the fix data — never the 'half' default
+    await mixedConfirm({ row, damageType: 'Poison', condition: 'poisoned' });
+  });
+
+  it('Stunning Scream mixed confirm: nat 1 FAIL pays FULL 3d6 Thunder + Stunned w/ meta; nat 20 SAVE pays ZERO, grants nothing', async () => {
+    const row = vrockRow('Stunning Scream');
     expect(row.dc_success).toBe('none');
-    expect(Number(row.save_dc) > 0 ? (row.dc_success ?? 'half') : null).toBe('none');
-  });
-
-  it('FAIL face (constitution −19 always-fail floor): FULL 1d10 byte "1d10" rolls [7] + Poisoned granted with source meta', async () => {
-    const { getByText } = renderSporesPicker();
-    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(1));
-    const call = applyDamageToTarget.mock.calls[0];
-    expect(call[1]).toBe('Bandit 1');
-    expect(call[2]).toBe(7);
-    expect(call[3]).toEqual(['Poison']);
-    const saveLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.rollType === 'save-damage');
-    expect(saveLog).toMatchObject({ formula: '1d10', rolls: [7], finalDamage: 7, saveResult: 'failure', saveDc: 15, dcSuccess: 'none', targetName: 'Bandit 1' });
-    expect(runtimeStore['Bandit 1.activeConditions']).toContain('poisoned');
-    expect(runtimeStore['Bandit 1.activeConditionMeta'].poisoned).toMatchObject({ dc: 15, ability: 'con', source: 'Vrock 1' });
-    const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'condition' && e.action === 'applied');
-    expect(condLog.description).toMatch(/Poisoned/);
-  });
-
-  it('SUCCESS face (constitution +19 always-success): ZERO damage — no applyDamageToTarget, no hp_change, no Poisoned grant', async () => {
-    combatSummary.current.creatures[1].saveBonuses = { constitution: 19, con: 1 };
-    const { getByText } = renderSporesPicker();
-    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addTargetResult).toHaveBeenCalled());
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(runtimeStore['Bandit 1.activeConditions'] ?? []).not.toContain('poisoned');
-    const dmgLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage');
-    expect(dmgLogs.every(e => e.finalDamage === 0)).toBe(true);
-    // Picker copy honesty (§1191): dc_success:'none' prints "no damage", never half.
-    expect(pickerCopy.current).toMatch(/takes no damage/i);
-    expect(pickerCopy.current).not.toMatch(/half damage/i);
-  });
-});
-
-// MA-1674: Vrock "Stunning Scream" picker twin — RAW success pays ZERO + no
-// Stunned; FAIL pays FULL 3d6 Thunder + Stunned. Pre-fix data had NO
-// dc_success (picker defaulted 'half', fabricated "takes half damage" copy —
-// "Saved — takes 4 Thunder damage (rolled 15, halved)" live fingerprint) and
-// a `uses:"1/Day"` STRING gate (Number→NaN→null, no counter, no spend).
-describe('MA-1674 Vrock Stunning Scream picker seam', () => {
-  it('row data: dc_success none after save_type + MA-0633 numeric 1/Day triple', () => {
-    const row = screamRow();
-    expect(row.dc_success).toBe('none');
-    expect(Object.keys(row).indexOf('dc_success')).toBe(Object.keys(row).indexOf('save_type') + 1);
-    expect(row.usage).toBe('1/Day');
-    expect(row.uses).toBe(1);
-    expect(row.maxUses).toBe(1);
-    expect(Number(row.save_dc) > 0 ? (row.dc_success ?? 'half') : null).toBe('none');
-  });
-
-  it('FAIL face (constitution −19 floor): FULL "3d6" rolls [7] Thunder + Stunned granted with source meta', async () => {
-    combatSummary.current.creatures[1].saveBonuses = { constitution: -19, con: 1 };
-    const { getByText } = renderScreamPicker();
-    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(1));
-    const call = applyDamageToTarget.mock.calls[0];
-    expect(call[1]).toBe('Bandit 1');
-    expect(call[2]).toBe(7);
-    expect(call[3]).toEqual(['Thunder']);
-    const saveLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.rollType === 'save-damage');
-    expect(saveLog).toMatchObject({ formula: '3d6', rolls: [7], finalDamage: 7, saveResult: 'failure', saveDc: 15, dcSuccess: 'none', targetName: 'Bandit 1' });
-    expect(runtimeStore['Bandit 1.activeConditions']).toContain('stunned');
-    expect(runtimeStore['Bandit 1.activeConditionMeta'].stunned).toMatchObject({ dc: 15, ability: 'con', source: 'Vrock 1' });
-    const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'condition' && e.action === 'applied');
-    expect(condLog.description).toMatch(/Stunned/);
-  });
-
-  it('SUCCESS face (constitution +19): ZERO damage — no applyDamageToTarget, no Stunned, copy honest "no damage"', async () => {
-    combatSummary.current.creatures[1].saveBonuses = { constitution: 19, con: 1 };
-    const { getByText } = renderScreamPicker();
-    await waitFor(() => expect(document.querySelector('.sp-roll-btn')).toBeTruthy());
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addTargetResult).toHaveBeenCalled());
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(runtimeStore['Bandit 1.activeConditions'] ?? []).not.toContain('stunned');
-    const dmgLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage');
-    expect(dmgLogs.every(e => e.finalDamage === 0)).toBe(true);
-    expect(pickerCopy.current).toMatch(/takes no damage/i);
-    expect(pickerCopy.current).not.toMatch(/half damage/i);
+    expect(row).toMatchObject({ usage: '1/Day', uses: 1, maxUses: 1 }); // MA-0633 numeric triple (no NaN string gate)
+    await mixedConfirm({ row, damageType: 'Thunder', condition: 'stunned' });
   });
 });

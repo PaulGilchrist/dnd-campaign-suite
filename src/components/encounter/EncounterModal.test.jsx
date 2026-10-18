@@ -1,20 +1,34 @@
+// @maintained-by-ai
+/* Lane — EncounterModal internals: open-gate, save/load render surfaces, name input →
+ * local state, Enter-submit, load-list sorting, delete-confirm seam from the MODAL side,
+ * exact onSave/onLoad/onDelete payloads. The REAL formatEncounterName runs under test
+ * (identity mock deleted): list names and the delete prompt show formatted names, so
+ * pins cite it — formatEncounterName('dragon-lair') === 'Dragon Lair' while payloads
+ * stay raw. MarkdownPreview is a lightweight stub (sanitize/markdown rendering is owned
+ * by its own lane); this file only pins the `enc.description &&` conditional (:129).
+ * KNOWN DEFECTS (#410, report-not-fix, pinned honestly here):
+ *   1) :55 the modal confirms deletes itself; EncounterBuilder confirms first too, so
+ *      users see two dialogs. Tests below pin the modal-side prompt ONLY — the
+ *      builder-side confirm is owned by EncounterBuilder.uncovered-handlers.test.jsx.
+ *   2) :95 the rename FORM renders only when prop mode==='rename', but the sole caller
+ *      (EncounterBuilder.jsx:635, mode from useEncounterManagement) ever sets
+ *      'save' | 'load' — :145's pen sets modal-local renameTarget which renders nothing.
+ *      handleRename is dead in the prod UI, so no rename-mode tests live here.
+ * The overlay (:61) has no onClick, so backdrop/content clicks structurally cannot
+ * close — no vacuous "does not close" pins for them.
+ * Owned elsewhere: builder Save-commit #399, load-hydrate #403, action seam #410. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import EncounterModal from './EncounterModal.jsx';
-
-vi.mock('../../services/encounters/encountersService.js', () => ({
-    formatEncounterName: vi.fn((name) => name),
-}));
 
 vi.mock('../common/MarkdownPreview.jsx', () => ({
     default: ({ text }) => <div data-testid="markdown-preview">{text}</div>,
 }));
 
 const mockOnClose = vi.fn();
-const mockOnSave = vi.fn();
+const mockOnSave = vi.fn(() => Promise.resolve());
 const mockOnLoad = vi.fn();
 const mockOnDelete = vi.fn();
-const mockOnRename = vi.fn();
 
 const createProps = (overrides = {}) => ({
     isOpen: true,
@@ -23,7 +37,6 @@ const createProps = (overrides = {}) => ({
     onSave: mockOnSave,
     onLoad: mockOnLoad,
     onDelete: mockOnDelete,
-    onRename: mockOnRename,
     encounters: [],
     loading: false,
     ...overrides,
@@ -44,199 +57,128 @@ describe('EncounterModal', () => {
         vi.restoreAllMocks();
     });
 
-    describe('rendering', () => {
-        it('renders nothing when isOpen is false', () => {
-            render(<EncounterModal {...createProps({ isOpen: false })} />);
-            expect(screen.queryByRole('heading')).not.toBeInTheDocument();
-        });
-
-        it.each(['save', 'load', 'rename'])('renders the "%s" mode title', (mode) => {
-            render(<EncounterModal {...createProps({ mode })} />);
-            const title = `${mode.charAt(0).toUpperCase() + mode.slice(1)} Encounter`;
-            expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
-        });
-
-        it('closes when the close button is clicked but not when the backdrop is clicked', () => {
-            const { container } = render(<EncounterModal {...createProps()} />);
-            fireEvent.click(container.querySelector('.encounter-modal-overlay'));
-            expect(mockOnClose).not.toHaveBeenCalled();
-            expect(container.querySelector('.encounter-modal')).toBeInTheDocument();
-
-            fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-            expect(mockOnClose).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not close when clicking content inside the modal', () => {
-            render(<EncounterModal {...createProps()} />);
-            fireEvent.click(screen.getByRole('heading', { name: 'Save Encounter' }));
-            expect(mockOnClose).not.toHaveBeenCalled();
-        });
+    it('renders nothing when isOpen is false', () => {
+        render(<EncounterModal {...createProps({ isOpen: false })} />);
+        expect(screen.queryByRole('heading')).not.toBeInTheDocument();
     });
 
-    describe('Save mode', () => {
-        it('renders the name input and save button', () => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            expect(screen.getByLabelText('Encounter Name')).toHaveAttribute('placeholder', 'e.g., Goblin Ambush');
-            expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
-        });
+    it('save mode renders the title, name input and Save button; Close fires onClose exactly once', () => {
+        render(<EncounterModal {...createProps({ mode: 'save' })} />);
+        expect(screen.getByRole('heading', { name: 'Save Encounter' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Encounter Name')).toHaveAttribute('placeholder', 'e.g., Goblin Ambush');
+        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
 
-        it('trims, saves, resets the input, and closes the modal on save', async () => {
-            const onSave = vi.fn(() => Promise.resolve());
-            render(<EncounterModal {...createProps({ mode: 'save', onSave })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: '  Goblin Ambush  ' } });
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-            });
-            expect(onSave).toHaveBeenCalledWith('Goblin Ambush');
-            await waitFor(() => {
-                expect(input).toHaveValue('');
-                expect(mockOnClose).toHaveBeenCalled();
-            });
-        });
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
 
-        it('saves when Enter is pressed and does not save for other keys', async () => {
-            const onSave = vi.fn(() => Promise.resolve());
-            render(<EncounterModal {...createProps({ mode: 'save', onSave })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value: 'Enter Save' } });
-            await act(async () => {
-                fireEvent.keyDown(input, { key: 'Enter' });
-            });
-            expect(onSave).toHaveBeenCalledWith('Enter Save');
-            onSave.mockClear();
-            fireEvent.change(input, { target: { value: 'Test' } });
-            fireEvent.keyDown(input, { key: 'a' });
-            expect(onSave).not.toHaveBeenCalled();
-        });
-
-        it.each(['', '   '])('does not save and shows an error when the name is "%s"', (value) => {
-            render(<EncounterModal {...createProps({ mode: 'save' })} />);
-            const input = screen.getByLabelText('Encounter Name');
-            fireEvent.change(input, { target: { value } });
+    it('trims the name, saves it, resets the input, and closes the modal', async () => {
+        render(<EncounterModal {...createProps({ mode: 'save' })} />);
+        const input = screen.getByLabelText('Encounter Name');
+        fireEvent.change(input, { target: { value: '  Goblin Ambush  ' } });
+        await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-            expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
-            expect(mockOnSave).not.toHaveBeenCalled();
-            expect(mockOnClose).not.toHaveBeenCalled();
         });
+        expect(mockOnSave).toHaveBeenCalledWith('Goblin Ambush');
+        expect(input).toHaveValue('');
+        expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    describe('Load mode', () => {
-        it('shows a loading message while encounters are being fetched', () => {
-            render(<EncounterModal {...createProps({ mode: 'load', loading: true })} />);
-            expect(screen.getByText('Loading...')).toBeInTheDocument();
+    it('submits on Enter in the input but not on other keys', async () => {
+        render(<EncounterModal {...createProps({ mode: 'save' })} />);
+        const input = screen.getByLabelText('Encounter Name');
+        fireEvent.change(input, { target: { value: 'Enter Save' } });
+        await act(async () => {
+            fireEvent.keyDown(input, { key: 'Enter' });
         });
+        expect(mockOnSave).toHaveBeenCalledWith('Enter Save');
+        expect(mockOnSave).toHaveBeenCalledTimes(1);
+        mockOnSave.mockClear();
+        fireEvent.keyDown(input, { key: 'a' });
+        expect(mockOnSave).not.toHaveBeenCalled();
+    });
 
-        it('shows an empty state when no encounters have been saved', () => {
-            render(<EncounterModal {...createProps({ mode: 'load' })} />);
-            expect(screen.getByText('No saved encounters yet.')).toBeInTheDocument();
-        });
+    it.each(['', '   '])('shows an inline error for blank name "%s" and never saves or closes', (value) => {
+        render(<EncounterModal {...createProps({ mode: 'save' })} />);
+        fireEvent.change(screen.getByLabelText('Encounter Name'), { target: { value } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
+        expect(mockOnSave).not.toHaveBeenCalled();
+        expect(mockOnClose).not.toHaveBeenCalled();
+    });
 
-        it('lists encounters sorted by effective XP ascending', () => {
-            const encounters = [
-                encounter('high-xp', { effectiveXP: 500 }),
-                encounter('low-xp', { effectiveXP: 100 }),
-                encounter('no-xp'),
-                encounter('first-100', { effectiveXP: 100 }),
-                encounter('first-50', { effectiveXP: 50 }),
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            const listItems = screen.getAllByRole('listitem');
-            const names = listItems.map((li) => li.querySelector('.encounter-list-name').textContent);
-            expect(names).toEqual(['no-xp', 'first-50', 'low-xp', 'first-100', 'high-xp']);
-        });
+    it('load mode shows the loading state, then the empty state once fetched', () => {
+        const { rerender } = render(<EncounterModal {...createProps({ mode: 'load', loading: true })} />);
+        expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
+        expect(screen.getByText('Loading...')).toBeInTheDocument();
 
-        it('shows the formatted XP label when effectiveXP is present', () => {
-            const encounters = [encounter('goblin-ambush', { effectiveXP: 1500 })];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.getByText(`${(1500).toLocaleString()} effective XP`)).toBeInTheDocument();
-        });
+        rerender(<EncounterModal {...createProps({ mode: 'load', loading: false, encounters: [] })} />);
+        expect(screen.getByText('No saved encounters yet.')).toBeInTheDocument();
+    });
 
-        it('hides the XP label when effectiveXP is null or missing', () => {
-            const encounters = [encounter('null-xp', { effectiveXP: null }), encounter('missing-xp')];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.queryByText(/effective XP/)).not.toBeInTheDocument();
-        });
+    it('sorts the load list by effective XP ascending (null/missing sort first) and formats names', () => {
+        const encounters = [
+            encounter('dragon-lair', { effectiveXP: 1500 }),
+            encounter('goblin-ambush', { effectiveXP: 100 }),
+            encounter('road-encounter'),
+            encounter('old-map', { effectiveXP: null }),
+            encounter('forest-shrine', { effectiveXP: 100 }),
+        ];
+        render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        const loadOrder = screen
+            .getAllByRole('button', { name: /^Load / })
+            .map((btn) => btn.getAttribute('aria-label'));
+        expect(loadOrder).toEqual([
+            'Load road-encounter',
+            'Load old-map',
+            'Load goblin-ambush',
+            'Load forest-shrine',
+            'Load dragon-lair',
+        ]);
+        // Real formatEncounterName: hyphenated raw name → title-cased display name.
+        expect(screen.getByText('Dragon Lair')).toBeInTheDocument();
+    });
 
-        it('renders the description as markdown only when one is present', () => {
-            const encounters = [
-                encounter('with-desc', { description: 'Goblins near the road' }),
-                encounter('no-desc'),
-            ];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            expect(screen.getAllByTestId('markdown-preview')).toHaveLength(1);
-            expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Goblins near the road');
-        });
+    it('shows the thousands-separated XP label only when effectiveXP is present', () => {
+        const encounters = [encounter('dragon-lair', { effectiveXP: 1500 }), encounter('old-map', { effectiveXP: null }), encounter('road-encounter')];
+        render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        expect(screen.getByText('1,500 effective XP')).toBeInTheDocument();
+        expect(screen.queryAllByText(/effective XP/)).toHaveLength(1);
+    });
 
-        it('calls onLoad with the selected encounter name when load is clicked', () => {
-            const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
-            render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Load dragon-lair' }));
-            expect(mockOnLoad).toHaveBeenCalledTimes(1);
-            expect(mockOnLoad).toHaveBeenCalledWith('dragon-lair');
-        });
+    it('renders a description preview only for encounters that have one', () => {
+        const encounters = [
+            encounter('with-desc', { description: 'Goblins near the road' }),
+            encounter('no-desc'),
+        ];
+        render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        expect(screen.getAllByTestId('markdown-preview')).toHaveLength(1);
+        expect(screen.getByTestId('markdown-preview')).toHaveTextContent('Goblins near the road');
+    });
 
-        it('calls onDelete after confirmation using the formatted name in the prompt', async () => {
-            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-            render(<EncounterModal {...createProps({ mode: 'load', encounters: [encounter('goblin-ambush')] })} />);
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
-            });
-            expect(confirmSpy).toHaveBeenCalledWith('Delete "goblin-ambush"?');
-            expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
-        });
+    it('calls onLoad with the raw encounter name when Load is clicked', () => {
+        const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
+        render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Load dragon-lair' }));
+        expect(mockOnLoad).toHaveBeenCalledTimes(1);
+        expect(mockOnLoad).toHaveBeenCalledWith('dragon-lair');
+    });
 
-        it('does not delete when confirmation is cancelled', () => {
-            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-            render(<EncounterModal {...createProps({ mode: 'load', encounters: [encounter('goblin-ambush')] })} />);
+    // Modal-side pin of the double-confirm defect #410: the builder confirms BEFORE
+    // calling onDelete, so users see this prompt as a SECOND dialog in prod.
+    it('confirms deletes with the formatted name and calls onDelete with the raw name only when confirmed', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
+        render(<EncounterModal {...createProps({ mode: 'load', encounters })} />);
+        await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
-            expect(confirmSpy).toHaveBeenCalled();
-            expect(mockOnDelete).not.toHaveBeenCalled();
         });
-    });
+        expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
+        expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
 
-    describe('Rename mode', () => {
-        it('renders the new name input and rename button', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename', renameTarget: { name: 'old-name' } })} />);
-            expect(screen.getByLabelText('New Name')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
-        });
-
-        it('pre-fills the new name input when renameTarget is provided', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename', renameTarget: { name: 'old-name' } })} />);
-            expect(screen.getByLabelText('New Name')).toHaveValue('old-name');
-        });
-
-        it('does not rename and shows an error when the new name is empty', () => {
-            render(<EncounterModal {...createProps({ mode: 'rename', renameTarget: { name: 'old-name' } })} />);
-            const input = screen.getByLabelText('New Name');
-            fireEvent.change(input, { target: { value: '   ' } });
-            fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
-            expect(screen.getByText('New name is required')).toBeInTheDocument();
-            expect(mockOnRename).not.toHaveBeenCalled();
-        });
-
-        it('calls onRename with the old and new names and resets the input', async () => {
-            render(<EncounterModal {...createProps({ mode: 'rename', renameTarget: { name: 'old-name' } })} />);
-            const input = screen.getByLabelText('New Name');
-            fireEvent.change(input, { target: { value: 'New Name' } });
-            await act(async () => {
-                fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
-            });
-            await waitFor(() => {
-                expect(mockOnRename).toHaveBeenCalledWith('old-name', 'New Name');
-                expect(input).toHaveValue('');
-            });
-        });
-
-        it('renames when Enter is pressed in the input', async () => {
-            render(<EncounterModal {...createProps({ mode: 'rename', renameTarget: { name: 'old-name' } })} />);
-            const input = screen.getByLabelText('New Name');
-            fireEvent.change(input, { target: { value: 'Enter Rename' } });
-            await act(async () => {
-                fireEvent.keyDown(input, { key: 'Enter' });
-            });
-            expect(mockOnRename).toHaveBeenCalledWith('old-name', 'Enter Rename');
-        });
+        confirmSpy.mockReturnValue(false);
+        fireEvent.click(screen.getByRole('button', { name: 'Delete dragon-lair' }));
+        expect(confirmSpy).toHaveBeenLastCalledWith('Delete "Dragon Lair"?');
+        expect(mockOnDelete).toHaveBeenCalledTimes(1);
     });
 });

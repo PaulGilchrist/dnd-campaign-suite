@@ -1,3 +1,12 @@
+// @maintained-by-ai
+// Lane: Disappearing Step mode-specific render + accept dispatch exact payloads.
+// Consolidated 3 tests → 2: the free-cast decrement test shared the same click
+// path as the accept test (decrementCount() runs inside applyDisappearingStep),
+// so its payload is now asserted in the accept test; the "already invisible"
+// test pins the real branch (no activeConditions rewrite) instead of a bare
+// addExpiration toHaveBeenCalled. Cancel no-op is covered by the shared
+// handleCancel in refreshingStep.test.jsx; overlay/close seams live in
+// integration.test.jsx; choice-step copy in render.test.jsx.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
@@ -22,7 +31,7 @@ vi.mock('../../../services/rules/effects/expirations.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((characterKey, propertyName, _campaignName) => {
+    getRuntimeValue: vi.fn((characterKey, propertyName) => {
         if (propertyName === 'activeConditions' && characterKey !== 'campaign') {
             return [];
         }
@@ -58,11 +67,23 @@ const baseProps = {
     saveDc: 14,
     featureName: 'Steps of the Fey',
     newCount: 3,
+    freeCastCountKey: 'stepsRemaining',
     onClose: vi.fn(),
 };
 
-function makeProps(overrides) {
-    return { ...baseProps, ...(overrides || {}) };
+// Exact shape applyDisappearingStep must send to the expiration registry.
+const expectedExpiration = {
+    attackerName: 'FeyTrickster',
+    targetName: 'FeyTrickster',
+    effects: [{ type: 'condition', condition: 'invisible' }],
+    campaignName: 'test-campaign',
+    rounds: undefined,
+    expireOnCreatureName: 'FeyTrickster',
+};
+
+function openDisappearingConfirm(props) {
+    render(<StepsOfTheFeyTauntModal {...baseProps} {...(props || {})} />);
+    fireEvent.click(screen.getByText('Disappearing Step'));
 }
 
 describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
@@ -71,61 +92,50 @@ describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
         localStorage.clear();
     });
 
-    describe('disappearing step flow', () => {
-        it('applies invisible condition and adds expiration when Disappear is clicked', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            const disappearingOption = screen.getByText('Disappearing Step').closest('.clickable');
-            fireEvent.click(disappearingOption);
-            const disappearButton = screen.getByRole('button', { name: /Disappear/ });
-            fireEvent.click(disappearButton);
+    it('shows the Disappearing Step confirmation, stays inert, then writes exact condition, expiration, and decrement payloads on accept', async () => {
+        openDisappearingConfirm();
 
-            await waitFor(() => {
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'FeyTrickster',
-                    'activeConditions',
-                    expect.arrayContaining(['invisible']),
-                    'test-campaign'
-                );
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'FeyTrickster', targetName: 'FeyTrickster', effects: expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'invisible' })]), campaignName: 'test-campaign', rounds: undefined, expireOnCreatureName: 'FeyTrickster' });
-                const body = document.querySelector('.sp-body');
-                expect(body.textContent).toContain('Disappearing Step');
-                expect(body.textContent).toContain('Invisible condition');
-                expect(body.textContent).toContain('2 remaining');
-            });
+        // Mode-specific confirmation copy, with nothing applied yet.
+        expect(screen.getByText('Disappearing Step')).toBeInTheDocument();
+        expect(screen.getByText('You gain the Invisible condition until the start of your next turn.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Disappear/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /Disappear/ }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+        });
+        // Exactly two writes: the invisible condition and the free-cast decrement.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'activeConditions', ['invisible'], 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', 2, 'test-campaign');
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith(expectedExpiration);
+        expect(document.querySelector('.sp-body').textContent).toContain('2 remaining');
+        expect(document.querySelector('.sp-body').textContent).toContain('Invisible condition until the start of your next turn.');
+    });
+
+    it('does not rewrite activeConditions when already invisible but still refreshes the expiration', async () => {
+        vi.mocked(getRuntimeValue).mockImplementation((characterKey, propertyName) => {
+            if (propertyName === 'activeConditions' && characterKey === 'FeyTrickster') {
+                return ['invisible'];
+            }
+            return null;
         });
 
-        it('refreshes expiration when invisible condition is already present', async () => {
-            vi.mocked(getRuntimeValue).mockImplementation((key, prop) => {
-                if (prop === 'activeConditions' && key === 'FeyTrickster') return ['invisible'];
-                return null;
-            });
+        openDisappearingConfirm();
+        fireEvent.click(screen.getByRole('button', { name: /Disappear/ }));
 
-            render(<StepsOfTheFeyTauntModal {...makeProps()} />);
-            const disappearingOption = screen.getByText('Disappearing Step').closest('.clickable');
-            fireEvent.click(disappearingOption);
-            const disappearButton = screen.getByRole('button', { name: /Disappear/ });
-            fireEvent.click(disappearButton);
-
-            await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalled();
-            });
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
-
-        it('decrements free cast count when freeCastCountKey is provided', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ freeCastCountKey: 'stepsRemaining' })} />);
-            const disappearingOption = screen.getByText('Disappearing Step').closest('.clickable');
-            fireEvent.click(disappearingOption);
-            const disappearButton = screen.getByRole('button', { name: /Disappear/ });
-            fireEvent.click(disappearButton);
-
-            await waitFor(() => {
-                expect(setRuntimeValue).toHaveBeenCalledWith(
-                    'FeyTrickster',
-                    'stepsRemaining',
-                    2,
-                    'test-campaign'
-                );
-            });
-        });
+        // Only the decrement is written — the condition write is skipped.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', 2, 'test-campaign');
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith(expectedExpiration);
     });
 });

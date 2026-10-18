@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1530: Steam Mephit Steam Breath cone picker — CON DC 10, 2d4 Fire,
 // 15-ft Cone. Confirms the picker grants the authored fail clause
 // "the target's Speed decreases by 10 feet until the end of the mephit's
@@ -5,10 +6,14 @@
 // (sourced from the mephit, value 10, until_end_of_next_turn) + ONE
 // caster-anchored expiry clock removing it at the mephit's next turn-start
 // (MA-0995/MA-1147 javelin byte-shape twin; RAW end-of-turn anchor is the
-// accepted advisory residual) + one "Speed Reduced −10 ft" condition log.
-// Repeat breaths REPLACE not stack (registerTargetEffect dedupes per
-// target+effect+source). Successful saves grant nothing (half damage only,
-// §96 floor); speedReduceClause null (every other row) is byte-inert.
+// accepted advisory residual) + one "Speed Reduced −10 ft" condition log,
+// with damage paid FULL on the fail. Repeat breaths REPLACE not stack
+// (registerTargetEffect dedupes per target+effect+source — generic dedupe
+// pinned in targetEffectDefinitions.test.js; this lane pins that grants via
+// THIS seam never accumulate). Successful saves grant nothing (half damage
+// only, §96 floor); speedReduceClause null (every other row) is byte-inert
+// even on a failed save. JSON parse of the clause is owned by
+// MonsterCardHelpers.speed-reduce.test.js — this lane feeds its literal.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -92,9 +97,19 @@ const STEAM = monstersData.find(m => m.index === 'steam-mephit');
 const BREATH = STEAM.actions.find(a => a.name === 'Steam Breath');
 
 let randomSpy;
-function spyRandom(seq) {
-  let i = 0;
-  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
+function spyRandom(value) {
+  // Constant-seq clamp: the save seam draws 2 raw d20s per NPC (:59-60) plus
+  // prompt-id noise — a flat stream is outcome-deterministic for any count.
+  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => value);
+}
+function entriesOfType(pred) {
+  return addEntry.mock.calls.map(c => c[1]).filter(pred);
+}
+async function confirmBreath() {
+  const { getByText } = renderBreath();
+  await waitFor(() => expect(seenTargets.current).toHaveLength(1));
+  fireEvent.click(getByText('Confirm'));
+  await waitFor(() => expect(addEntry).toHaveBeenCalled());
 }
 afterEach(() => randomSpy?.mockRestore());
 
@@ -122,88 +137,96 @@ function renderBreath(speedReduceClause = parseSpeedReduceClause(BREATH.save_eff
 
 beforeEach(() => {
   vi.clearAllMocks();
-  Object.keys(runtime.store).forEach(k => delete runtime.store[`${k}`]);
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
   expirations.current = [];
 });
 
 describe('MA-1530 Steam Mephit Steam Breath picker speed_reduction grant', () => {
-  it('failed NPC CON save grants speed_reduction te value 10 + ONE caster-anchored clock + "Speed Reduced −10 ft" log; damage paid FULL', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
+  it('failed NPC CON save grants speed_reduction te value 10 + ONE caster-anchored clock + "Speed Reduced −10 ft" log, damage FULL; repeat breath REPLACE not stack', async () => {
+    spyRandom(0.01); // nat 1 + (−10) vs DC 10 → fail
     const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(1));
+    expect(seenTargets.current[0].name).toBe('Bandit 1');
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
 
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    const te = tes.find(t => t.effect === 'speed_reduction' && t.target === 'Bandit 1');
-    expect(te).toBeTruthy();
-    expect(te).toMatchObject({ source: 'Steam Mephit 1', duration: 'until_end_of_next_turn', value: 10, actionName: 'Steam Breath' });
+    const tes = (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_reduction');
+    expect(tes).toHaveLength(1);
+    expect(tes[0]).toMatchObject({
+      target: 'Bandit 1',
+      source: 'Steam Mephit 1',
+      duration: 'until_end_of_next_turn',
+      value: 10,
+      actionName: 'Steam Breath',
+    });
 
     const clocks = expirations.current.filter(x => x.effects?.some(e => e.type === 'remove_target_effect' && e.effectKey === 'speed_reduction'));
-    expect(clocks.length).toBe(1);
+    expect(clocks).toHaveLength(1);
     expect(clocks[0]).toMatchObject({
       attackerName: 'Steam Mephit 1',
       targetName: 'Bandit 1',
       campaignName: 'test-campaign',
       expireOnCreatureName: 'Steam Mephit 1',
     });
-    expect(clocks[0].rounds).toBeUndefined();
+    expect(clocks[0].rounds).toBeUndefined(); // caster-anchor, not a round countdown
 
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'Speed Reduced');
-    expect(log).toBeTruthy();
-    expect(log.characterName).toBe('Bandit 1');
-    expect(log.sourceName).toBe('Steam Mephit 1');
-    expect(log.sourceAbility).toBe('Steam Breath');
-    expect(log.description).toMatch(/failed the Constitution save \(DC 10\) in Steam Mephit 1's Steam Breath — Speed Reduced \u221210 ft until the end of Steam Mephit 1's next turn/);
+    const logs = entriesOfType(e => e.type === 'condition' && e.condition === 'Speed Reduced');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      characterName: 'Bandit 1',
+      sourceName: 'Steam Mephit 1',
+      sourceAbility: 'Steam Breath',
+    });
+    expect(logs[0].description).toMatch(/failed the Constitution save \(DC 10\) in Steam Mephit 1's Steam Breath — Speed Reduced \u221210 ft until the end of Steam Mephit 1's next turn/);
 
-    const dmg = addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage');
+    const dmg = entriesOfType(e => e.rollType === 'save-damage' && e.saveResult === 'failure')[0];
     expect(dmg).toBeTruthy();
-    expect(dmg.finalDamage).toBe(7);
+    expect(dmg.finalDamage).toBe(7); // fail pays FULL raw 7
     expect(dmg.saveResult).toBe('failure');
+
+    // Second breath from the same mephit: registerTargetEffect dedupes per
+    // (target, effect, source) — the te is REPLACED, never stacked (consumer
+    // conditionEffects accumulates −N only across DISTINCT sources).
+    await confirmBreath();
+    const tes2 = (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_reduction');
+    expect(tes2).toHaveLength(1);
+    expect(tes2[0]).toMatchObject({ target: 'Bandit 1', source: 'Steam Mephit 1', value: 10 });
   });
 
   it('successful NPC CON save pays HALF (floor 7/2 = 3 §96) and grants NOTHING — no te, no clock, no Speed Reduced log', async () => {
-    spyRandom([0.99, 0.99, 0.99, 0.99]);
+    spyRandom(0.99); // nat 20 + (−10) = 10 = DC → save succeeds
     const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(1));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).some(t => t.effect === 'speed_reduction')).toBe(false);
-    expect(expirations.current.some(x => x.effects?.some(e => e.effectKey === 'speed_reduction'))).toBe(false);
-    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.condition === 'Speed Reduced')).toBeFalsy();
-    const dmg = addEntry.mock.calls.map(c => c[1]).find(e => e.rollType === 'save-damage');
+
+    // Damage lane ran (half) — the absence below is the !success gate, not a dead flow.
+    const dmg = entriesOfType(e => e.rollType === 'save-damage')[0];
+    expect(dmg).toBeTruthy();
     expect(dmg.finalDamage).toBe(3);
     expect(dmg.saveResult).toBe('success');
+
+    expect((runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_reduction')).toHaveLength(0);
+    expect(expirations.current.filter(x => x.effects?.some(e => e.effectKey === 'speed_reduction'))).toHaveLength(0);
+    expect(entriesOfType(e => e.condition === 'Speed Reduced')).toHaveLength(0);
   });
 
-  it('repeat breaths REPLACE not stack — second failed save keeps exactly ONE te at value 10 (consumer accumulates only across distinct sources)', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01, 0.01, 0.01]);
-    const first = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(first.getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-
-    const second = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(second.getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['campaign.targetEffects'].filter(t => t.effect === 'speed_reduction').length).toBe(1));
-
-    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'speed_reduction');
-    expect(tes.length).toBe(1);
-    expect(tes[0].target).toBe('Bandit 1');
-    expect(tes[0].source).toBe('Steam Mephit 1');
-    expect(tes[0].value).toBe(10);
-  });
-
-  it('speedReduceClause null (every other row) is byte-inert: failed save grants no speed_reduction', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
+  it('speedReduceClause null (every other row) is byte-inert: failed save still pays FULL damage but grants no speed_reduction', async () => {
+    spyRandom(0.01);
     const { getByText } = renderBreath(null);
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(1));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).some(t => t.effect === 'speed_reduction')).toBe(false);
-    expect(expirations.current.some(x => x.effects?.some(e => e.effectKey === 'speed_reduction'))).toBe(false);
-    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.condition === 'Speed Reduced')).toBeFalsy();
+
+    // Non-vacuous: the failed-save damage lane executed at full strength.
+    const dmg = entriesOfType(e => e.rollType === 'save-damage')[0];
+    expect(dmg).toBeTruthy();
+    expect(dmg.finalDamage).toBe(7);
+    expect(dmg.saveResult).toBe('failure');
+
+    expect((runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'speed_reduction')).toHaveLength(0);
+    expect(expirations.current.filter(x => x.effects?.some(e => e.effectKey === 'speed_reduction'))).toHaveLength(0);
+    expect(entriesOfType(e => e.condition === 'Speed Reduced')).toHaveLength(0);
   });
 });

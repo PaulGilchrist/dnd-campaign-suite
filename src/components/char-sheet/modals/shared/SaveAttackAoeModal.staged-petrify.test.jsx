@@ -1,19 +1,18 @@
+// @maintained-by-ai
 // MA-0904: Gorgon "Petrifying Breath" 30-ft Cone picker — the MA-0501
 // staged-petrify ladder (cockatricePetrifyService, ONE shared ladder, no
-// fork) rides the cone picker via the structured staged_petrify key.
-// First failed CON save (DC 15) grants RESTRAINED ONLY — the generic
-// saveConditions auto-grant (extractor word-scan yields Petrified+Restrained,
-// the REAL double-grant defect) is SUPPRESSED while the ladder is armed
-// (§108 clause-supersedes precedent) — plus the petrifying_bite_staged te
-// (label discriminator 'Petrifying Breath', dc 15, petrifiedRounds 14400 =
-// 24h×600, CLA-334) that the existing MA-0501 turn-END repeater consumes.
-// Successful saves grant nothing. Non-ladder rows stay byte-inert.
+// fork) rides the cone picker via the stagedPetrify PROP (parse/transport
+// pinned in MonsterCardModal.gorgon-breath.test.jsx; extractor word-scan and
+// ladder internals incl. the turn-END repeater pinned in their own lanes).
+// This lane pins only the picker seam: armed, the ladder OWNS the fail leg —
+// fail#1 lands RESTRAINED ONLY + petrifying_bite_staged te (label
+// discriminator 'Petrifying Breath', dc 15 — the generic saveConditions
+// auto-grant is SUPPRESSED, §108 clause-supersedes); a successful save
+// grants nothing; disarmed, the MA-0063 flat grant stays byte-inert.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 import monstersData from '../../../../../public/data/monsters.json';
-import { extractConditionsFromSaveEffect } from '../../../encounter/MonsterCardHelpers.js';
-import { buildSaveOptions, parseStagedPetrifyClause } from '../../../encounter/MonsterCardModal.jsx';
 
 vi.mock('../../../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -45,13 +44,13 @@ vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   normalizeSaveType: vi.fn((t) => t),
 }));
 vi.mock('../../../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-
-const csFixture = vi.hoisted(() => ({ conBonus: -19 }));
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Gorgon 1', type: 'npc', currentHp: 50, maxHp: 50, saveBonuses: {}, resistances: [], immunities: [] },
-      { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, saveBonuses: { constitution: csFixture.conBonus, con: csFixture.conBonus }, resistances: [], immunities: [] },
+      // Full-lowercase key the modal reads (saveType.toLowerCase() —
+      // SaveAttackAoeModal.jsx:47). +2 fails nat 1 (3 < DC 15), passes nat 20 (22 ≥ DC 15).
+      { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, saveBonuses: { constitution: 2 }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -82,18 +81,31 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 }));
 
 import { addEntry } from '../../../../services/ui/logService.js';
+import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
+import { stageSleepTargets } from '../../../../services/rules/features/sleepService.js';
+import { stageParalysisTargets } from '../../../../services/rules/features/paralyzingBreathService.js';
 
 const GORGON = 'Gorgon 1';
+const TARGET = 'Bandit 1';
 const gorgonRow = () => monstersData.find(m => m.name === 'Gorgon').actions.find(a => a.name === 'Petrifying Breath');
+// What the extractor word-scan yields for the ladder-word prose (extractor
+// correctness owned by MonsterCardHelpers lanes) — supplied as the prop the
+// armed ladder must suppress.
+const FLAT_SAVE_CONDITIONS = ['petrified', 'restrained'];
 
 let randomSpy;
-function spyRandom(seq) {
-  let i = 0;
-  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
+function spyRandom(value) {
+  randomSpy = vi.spyOn(Math, 'random').mockReturnValue(value);
 }
 afterEach(() => randomSpy?.mockRestore());
 
-function renderBreath(stagedPetrify = parseStagedPetrifyClause(gorgonRow())) {
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  seenTargets.current = [];
+});
+
+function renderBreath(stagedPetrify = { petrifiedRounds: 14400 }) {
   return render(
     <SaveAttackAoeModal
       action={gorgonRow()}
@@ -108,7 +120,7 @@ function renderBreath(stagedPetrify = parseStagedPetrifyClause(gorgonRow())) {
       titleOverride="30-ft Cone (GM positions tokens; selection advisory)"
       excludeNames={[GORGON]}
       rangeGateFt={null}
-      saveConditions={extractConditionsFromSaveEffect(gorgonRow().save_effect)}
+      saveConditions={FLAT_SAVE_CONDITIONS}
       stagedPetrify={stagedPetrify}
       storeLastAttack={false}
       onClose={vi.fn()}
@@ -116,42 +128,28 @@ function renderBreath(stagedPetrify = parseStagedPetrifyClause(gorgonRow())) {
   );
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  seenTargets.current = [];
-  csFixture.conBonus = -19;
-});
+const conditionLogs = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.action === 'applied');
+const ladderTes = () => (runtime.store['campaign.targetEffects'] || []).filter(t => t.effect === 'petrifying_bite_staged');
 
 describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', () => {
-  it('DATA LOCK: gorgon actions[1] authors staged_petrify{petrified_hours:24} → parse arms petrifiedRounds 14400; no repeat_save key invented', () => {
-    const row = gorgonRow();
-    expect(row.staged_petrify).toEqual({ petrified_hours: 24 });
-    expect(row.repeat_save).toBeUndefined();
-    expect(row.save_dc).toBe(15);
-    expect(row.save_type).toBe('Constitution');
-    expect(row.damage_dice_primary).toBeUndefined();
-    expect(parseStagedPetrifyClause(row)).toEqual({ petrifiedRounds: 14400 });
-    expect(buildSaveOptions(row).stagedPetrify).toEqual({ petrifiedRounds: 14400 });
-  });
-
-  it('EXTRACTOR byte-invariant: word-scan still yields Petrified+Restrained — suppression is via ladder arm, not the extractor', () => {
-    expect(extractConditionsFromSaveEffect(gorgonRow().save_effect)).toEqual(expect.arrayContaining(['petrified', 'restrained']));
-  });
-
-  it('failed NPC Con save: RESTRAINED ONLY (no Petrified) + petrifying_bite_staged te dc15 + ladder-armed log; no fabricated 1-minute petrified', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
+  it('picker inert until Confirm; failed save arms the ladder: RESTRAINED ONLY + petrifying_bite_staged te, flat saveConditions grant suppressed', async () => {
+    spyRandom(0.01); // nat 1 + con +2 = 3 < DC 15 → fail
     const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Bandit 1.activeConditions']).toBeTruthy());
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
 
-    expect(runtime.store['Bandit 1.activeConditions']).toEqual(['restrained']);
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    const te = tes.find(t => t.effect === 'petrifying_bite_staged');
-    expect(te).toBeTruthy();
-    expect(te).toMatchObject({
-      target: 'Bandit 1',
+    // Pre-confirm inertness: the picker grants nothing before Confirm.
+    expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();
+    expect(runtime.store['campaign.targetEffects']).toBeUndefined();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+
+    fireEvent.click(getByText('Confirm'));
+
+    // Positive legs: ladder grant + te ride through the REAL cockatricePetrifyService.
+    await waitFor(() => expect(runtime.store[`${TARGET}.activeConditions`]).toEqual(['restrained']));
+    expect(ladderTes()).toHaveLength(1);
+    expect(ladderTes()[0]).toMatchObject({
+      target: TARGET,
       effect: 'petrifying_bite_staged',
       stage: 'restrained',
       condition: 'restrained',
@@ -159,37 +157,50 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
       dc: 15,
       saveType: 'CON',
       duration: 'ladder_until_second_failure',
-      label: 'Petrifying Breath',
+      label: 'Petrifying Breath', // cone-vs-bite discriminator
       petrifiedRounds: 14400,
     });
-    const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'applied');
-    expect(condLog.condition).toBe('Restrained');
-    expect(condLog.reason).toBe('Petrifying Breath (failed save)');
+    const condLog = conditionLogs().find(e => e.characterName === TARGET);
+    expect(condLog).toMatchObject({ condition: 'Restrained', reason: 'Petrifying Breath (failed save)', sourceName: GORGON });
     expect(condLog.note).toContain('second failure Petrifies');
-    // No MA-0063 flat-condition stamp for petrified anywhere.
-    const stamps = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.condition === 'Petrified');
-    expect(stamps).toHaveLength(0);
+
+    // Gated absence proofs: armed ladder OWNS the fail leg — the extractor's
+    // flat ['petrified','restrained'] spray never lands, and no other lane stirs.
+    expect(runtime.store[`${TARGET}.activeConditions`]).not.toContain('petrified');
+    expect(conditionLogs().filter(e => e.condition === 'Petrified')).toHaveLength(0);
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(stageParalysisTargets).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled(); // damageless row
   });
 
-  it('successful NPC Con save: zero conditions, zero ladder te, ladder stays unarmed', async () => {
-    csFixture.conBonus = 19;
-    spyRandom([0.99, 0.99, 0.99, 0.99]);
-    const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+  it('successful save: honest Saved row, zero grants — ladder stays unarmed', async () => {
+    spyRandom(0.99); // nat 20 + con +2 = 22 ≥ DC 15 → success
+    const { getByText, container } = renderBreath();
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect(runtime.store['Bandit 1.activeConditions']).toBeUndefined();
-    expect((runtime.store['campaign.targetEffects'] || []).find(t => t.effect === 'petrifying_bite_staged')).toBeFalsy();
+
+    // Positive leg first: the save resolved and rendered its result row.
+    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20)'));
+
+    // Then the absences: no condition, no ladder te, no condition log, no damage.
+    expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();
+    expect(ladderTes()).toHaveLength(0);
+    expect(conditionLogs().filter(e => e.characterName === TARGET)).toHaveLength(0);
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  it('byte-inert non-ladder rows: stagedPetrify null keeps the MA-0063 flat saveConditions grant untouched', async () => {
-    spyRandom([0.01, 0.01, 0.01, 0.01]);
+  it('byte-inert disarmed: stagedPetrify null keeps the MA-0063 flat saveConditions grant untouched (both conditions land, no te)', async () => {
+    spyRandom(0.01);
     const { getByText } = renderBreath(null);
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual([TARGET]));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Bandit 1.activeConditions']).toBeTruthy());
-    // Unsuppressed extractor grant: both conditions land (pre-fix behavior).
-    expect(runtime.store['Bandit 1.activeConditions']).toEqual(expect.arrayContaining(['petrified', 'restrained']));
-    expect((runtime.store['campaign.targetEffects'] || []).find(t => t.effect === 'petrifying_bite_staged')).toBeFalsy();
+
+    // Positive leg: the unsuppressed one-shot grant lands BOTH extractor conditions.
+    await waitFor(() => expect(runtime.store[`${TARGET}.activeConditions`]).toEqual(expect.arrayContaining(FLAT_SAVE_CONDITIONS)));
+
+    // Gated absence: the ladder never armed on the disarmed row.
+    expect(ladderTes()).toHaveLength(0);
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(stageParalysisTargets).not.toHaveBeenCalled();
   });
 });

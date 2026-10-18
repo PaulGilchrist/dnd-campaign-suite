@@ -1,7 +1,12 @@
-// MA-0006 regression: Aarakocra Aeromancer Feather Fall (1/Day) reaction gate.
-// Gate: campaign lastAttack trigger:'falling' (CLA-315 seam) + this monster as
-// relevant actor; round latch; 1/Day spend with ability_use log; refusals log
-// feather_fall_refused and spend nothing. Negation is advisory (CLA-325).
+// @maintained-by-ai
+// Gated monster reaction COMPUTATION owner (MA-0006 feather_fall archetype, MA-0013
+// counterspell, MA-0341 parry gate + MA-0681 elemental_absorption): trigger identity,
+// actor, round latch (initiative seam, never a wall-clock timer), uses arithmetic,
+// spend/refusal logs. Chip press + card rendering are component lane #417 — computation
+// only here. Standing rec #417/#500: the file keeps ONE getGatedMonsterReaction(plainRow)
+// →null leg (feather_fall registry test below; the MA-0341 :360 and MA-0681 :640 twins
+// are deleted). Parry DATA twins (MA-0565/0573/0643/0702/0869/0997/1048/1140/1236/1238)
+// fold into one it.each locking each monster's authored acBonus end-to-end.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -54,9 +59,14 @@ function makeDeps({ lastAttack = null, round = 1, store = {} } = {}) {
 }
 
 describe('MA-0006 gated monster reaction registry', () => {
-  it('recognises the feather_fall automation row and ignores plain rows', () => {
+  it('feather_fall row arms, plain rows inert; uses arithmetic fresh/spent/plain', () => {
     expect(getGatedMonsterReaction(FEATHER_FALL_ACTION)?.effect).toBe('feather_fall');
+    // #417: the ONLY getGatedMonsterReaction(plainRow)→null leg file-wide
+    // (old MA-0341 :360 Scimitar and MA-0681 :640 Scimitar duplicates deleted per #500).
     expect(getGatedMonsterReaction({ name: 'Mace', description: 'Hit: 1d6+2 bludgeoning.' })).toBeNull();
+    expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, {})).toBe(1);
+    expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, { feather_fall: 1 })).toBe(0);
+    expect(monsterReactionUsesRemaining({ name: 'Plain' }, {})).toBeNull();
   });
 
   it('monsters.json carries the uses field + automation on reactions[0]', () => {
@@ -66,71 +76,47 @@ describe('MA-0006 gated monster reaction registry', () => {
     expect(reaction.maxUses).toBe(1);
     expect(reaction.usage).toBe('1/Day');
   });
-
-  it('computes remaining uses', () => {
-    expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, {})).toBe(1);
-    expect(monsterReactionUsesRemaining(FEATHER_FALL_ACTION, { feather_fall: 1 })).toBe(0);
-    expect(monsterReactionUsesRemaining({ name: 'Plain' }, {})).toBeNull();
-  });
 });
 
-describe('MA-0006 monsterReactionGate refusals', () => {
+describe('MA-0006 monsterReactionGate truth table', () => {
   const def = getGatedMonsterReaction(FEATHER_FALL_ACTION);
 
-  it('refuses when no falling lastAttack exists', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: null, currentRound: 1, storedUses: {}, usedRound: 0 });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('trigger');
-  });
-
-  it('refuses a non-falling lastAttack (CLA-315: weapon attacks must not satisfy falling)', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: { trigger: 'hit', attackerName: 'Thug 1', targetName: MONSTER }, currentRound: 1, storedUses: {}, usedRound: 0 });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('trigger');
-  });
-
-  it('refuses when this monster is not the falling actor', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack({ attackerName: 'Other 1', targetName: 'Other 1' }), currentRound: 1, storedUses: {}, usedRound: 0 });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('actor');
-  });
-
-  it('refuses a second use in the same round (round latch)', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack(), currentRound: 3, storedUses: {}, usedRound: 3 });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('round');
-  });
-
-  it('refuses at 1/Day exhaustion even in a fresh round', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack(), currentRound: 2, storedUses: { feather_fall: 1 }, usedRound: 1 });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('uses');
-  });
-
-  it('allows a fresh falling trigger for the relevant actor', () => {
-    const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack(), currentRound: 1, storedUses: {}, usedRound: 0 });
-    expect(gate.ok).toBe(true);
-    expect(gate.limit).toBe(1);
+  it('refuses trigger/trigger/actor/round/uses; allows fresh falling trigger', () => {
+    const rows = [
+      ['trigger: no lastAttack', null, 1, {}, 0, 'trigger'],
+      ['trigger: non-falling lastAttack (CLA-315)', { trigger: 'hit', attackerName: 'Thug 1', targetName: MONSTER }, 1, {}, 0, 'trigger'],
+      ['actor: another monster is falling', fallingAttack({ attackerName: 'Other 1', targetName: 'Other 1' }), 1, {}, 0, 'actor'],
+      ['round: second use same round (latch)', fallingAttack(), 3, {}, 3, 'round'],
+      ['uses: 1/Day exhausted fresh round', fallingAttack(), 2, { feather_fall: 1 }, 1, 'uses'],
+    ];
+    for (const [label, lastAttack, round, uses, usedRound, reason] of rows) {
+      const gate = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack, currentRound: round, storedUses: uses, usedRound });
+      expect(gate.ok, label).toBe(false);
+      expect(gate.reason, label).toBe(reason);
+    }
+    const ok = monsterReactionGate({ def, action: FEATHER_FALL_ACTION, monsterName: MONSTER, lastAttack: fallingAttack(), currentRound: 1, storedUses: {}, usedRound: 0 });
+    expect(ok.ok).toBe(true);
+    expect(ok.limit).toBe(1);
   });
 });
 
 describe('MA-0006 resolveMonsterGatedReaction spend + refusal logging', () => {
-  it('refusal (no falling event): feather_fall_refused logged, zero spend', async () => {
-    const { state, logs, deps } = makeDeps({ lastAttack: null });
-    const result = await resolveMonsterGatedReaction({ action: FEATHER_FALL_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs).toHaveLength(1);
-    expect(logs[0].automationType).toBe('feather_fall_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-  });
-
-  it('refusal (wrong actor): feather_fall_refused logged, zero spend', async () => {
-    const { logs, deps } = makeDeps({ lastAttack: fallingAttack({ attackerName: 'Goblin 1', targetName: 'Goblin 1' }) });
-    const result = await resolveMonsterGatedReaction({ action: FEATHER_FALL_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('feather_fall_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+  it('refusals log feather_fall_refused with zero spend (no event / round latch / 1/Day)', async () => {
+    const scenarios = [
+      ['no falling event', {}, undefined, undefined],
+      ['same-round second click (round latch)', { lastAttack: fallingAttack(), round: 4, store: { [`${MONSTER}._feather_fall_usedRound`]: 4, [`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]: { feather_fall: 1 } } }, { feather_fall: 1 }, undefined],
+      ['fresh round at spent uses refuses 1/Day (no phantom spend)', { lastAttack: fallingAttack(), round: 7, store: { [`${MONSTER}._feather_fall_usedRound`]: 4, [`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]: { feather_fall: 1 } } }, { feather_fall: 1 }, /1\/Day/],
+    ];
+    for (const [label, opts, expectedUses, descRe] of scenarios) {
+      const { state, logs, deps } = makeDeps(opts);
+      const result = await resolveMonsterGatedReaction({ action: FEATHER_FALL_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
+      expect(result.ok, label).toBe(false);
+      expect(logs, label).toHaveLength(1);
+      expect(logs[0].automationType, label).toBe('feather_fall_refused');
+      if (descRe) expect(logs[0].description, label).toMatch(descRe);
+      expect(deps.setRuntimeValue, label).not.toHaveBeenCalled();
+      expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`], label).toEqual(expectedUses);
+    }
   });
 
   it('success: round latch + 1/Day spend written, ability_use log names Feather Fall', async () => {
@@ -144,25 +130,6 @@ describe('MA-0006 resolveMonsterGatedReaction spend + refusal logging', () => {
     expect(spend.abilityName).toBe('Feather Fall');
     expect(spend.description).toMatch(/GM-enforced for monsters/);
     expect(spend.description).toMatch(/0 left today/);
-  });
-
-  it('same-round second click refuses with zero additional spend', async () => {
-    const { state, logs, deps } = makeDeps({ lastAttack: fallingAttack(), round: 4, store: { [`${MONSTER}._feather_fall_usedRound`]: 4, [`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]: { feather_fall: 1 } } });
-    const result = await resolveMonsterGatedReaction({ action: FEATHER_FALL_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('feather_fall_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ feather_fall: 1 });
-  });
-
-  it('next-day/next-round click at spent uses refuses 1/Day (no phantom spend)', async () => {
-    const { state, logs, deps } = makeDeps({ lastAttack: fallingAttack(), round: 7, store: { [`${MONSTER}._feather_fall_usedRound`]: 4, [`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]: { feather_fall: 1 } } });
-    const result = await resolveMonsterGatedReaction({ action: FEATHER_FALL_ACTION, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('feather_fall_refused');
-    expect(logs[0].description).toMatch(/1\/Day/);
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ feather_fall: 1 });
   });
 });
 
@@ -208,105 +175,87 @@ function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, 
 }
 
 describe('MA-0013 Counterspell registry + pure check', () => {
-  it('monsters.json aberrant-cultist reactions[0] carries the automation + 2/Day shape', () => {
+  it('monsters.json aberrant-cultist reactions[0] data-lock arms the gate', () => {
     expect(COUNTERSPELL_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' });
     expect(COUNTERSPELL_ACTION.uses).toBe(2);
     expect(COUNTERSPELL_ACTION.maxUses).toBe(2);
     expect(getGatedMonsterReaction(COUNTERSPELL_ACTION)?.effect).toBe('counterspell');
   });
 
-  it('isSpellOriginLastAttack accepts spell-save, spell-attack, isSpellDamage and stamped spell school', () => {
-    expect(isSpellOriginLastAttack(null)).toBe(false);
-    expect(isSpellOriginLastAttack({ rollType: 'save', isSpellDamage: true })).toBe(true);
-    expect(isSpellOriginLastAttack({ attackType: 'spell', spellLevel: 3 })).toBe(true);
-    expect(isSpellOriginLastAttack(pcSpellAttack())).toBe(true);
-    expect(isSpellOriginLastAttack({ attackerName: PC, attackName: 'Mace', weaponType: 'melee' })).toBe(false);
+  it('isSpellOriginLastAttack truth table: spell origins true, null/weapon false', () => {
+    const rows = [
+      [null, false],
+      [{ rollType: 'save', isSpellDamage: true }, true],
+      [{ attackType: 'spell', spellLevel: 3 }, true],
+      [pcSpellAttack(), true],
+      [{ attackerName: PC, attackName: 'Mace', weaponType: 'melee' }, false],
+    ];
+    for (const [la, expected] of rows) {
+      expect(isSpellOriginLastAttack(la), JSON.stringify(la)).toBe(expected);
+    }
   });
 
-  it('resolveCounterspellCheck: level <3 auto-counters (no roll)', () => {
-    const r = resolveCounterspellCheck({ spellLevel: 0, abilityMod: 4, rollD20: () => 1 });
-    expect(r).toMatchObject({ auto: true, countered: true, spellLevel: 0 });
-    const r2 = resolveCounterspellCheck({ spellLevel: 2, abilityMod: 0, rollD20: () => 1 });
-    expect(r2.auto).toBe(true);
-    expect(r2.countered).toBe(true);
-  });
-
-  it('resolveCounterspellCheck: level >=3 uses d20+WIS vs DC 10+level (CLA-322)', () => {
+  it('resolveCounterspellCheck: <3 auto-counters no roll; >=3 d20+WIS vs DC 10+level (CLA-322)', () => {
+    const auto = resolveCounterspellCheck({ spellLevel: 0, abilityMod: 4, rollD20: () => 1 });
+    expect(auto).toMatchObject({ auto: true, countered: true, spellLevel: 0 });
+    const auto2 = resolveCounterspellCheck({ spellLevel: 2, abilityMod: 0, rollD20: () => 1 });
+    expect(auto2.auto).toBe(true);
+    expect(auto2.countered).toBe(true);
     const hit = resolveCounterspellCheck({ spellLevel: 3, abilityMod: 4, rollD20: () => 9 });
     expect(hit).toMatchObject({ auto: false, total: 13, targetDC: 13, countered: true });
     const miss = resolveCounterspellCheck({ spellLevel: 3, abilityMod: 4, rollD20: () => 8 });
     expect(miss).toMatchObject({ total: 12, targetDC: 13, countered: false });
   });
 
-  it('counterspellGate refuses a non-spell or monster-origin lastAttack', () => {
-    const g1 = counterspellGate({ lastAttack: { attackerName: PC, attackName: 'Mace' }, attackerIsPC: true, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
-    expect(g1.reason).toBe('trigger');
-    const g2 = counterspellGate({ lastAttack: pcSpellAttack({ attackerName: 'Thug 1' }), attackerIsPC: false, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
-    expect(g2.reason).toBe('trigger');
+  it('counterspellGate refuses a monster-origin spell cast (attackerIsPC=false)', () => {
+    // Non-spell origin (Mace) is the same refusal reason already pinned via
+    // isSpellOriginLastAttack above and the resolve-level no-spell row below.
+    const g = counterspellGate({ lastAttack: pcSpellAttack({ attackerName: 'Thug 1' }), attackerIsPC: false, monsterName: CULTIST, currentRound: 1, storedUses: {}, usedRound: 0, action: COUNTERSPELL_ACTION });
+    expect(g.reason).toBe('trigger');
   });
 });
 
 describe('MA-0013 resolveMonsterGatedReaction — Counterspell', () => {
-  it('cantrip (<3) auto-countered, 2→1 spend, counterspell log names the trigger spell, cast marked resolved', async () => {
-    const { state, logs, campaignWrites, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 0 }) });
-    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.countered).toBe(true);
-    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
-    const spend = logs.find(l => l.type === 'ability_use');
-    expect(spend.abilityName).toBe('Counterspell');
-    expect(spend.description).toMatch(/Fire Bolt/);
-    expect(spend.description).toMatch(/auto-countered/);
-    expect(spend.description).toMatch(/1 left today/);
-    expect(campaignWrites[0]).toMatchObject({ counterspellResolved: true, counteredBy: CULTIST, counteredSpell: 'Fire Bolt' });
-    expect(deps.rollD20).not.toHaveBeenCalled();
+  it('auto (<3) and check (>=3) outcomes: countered/not-countered, spent, stamped, logged', async () => {
+    const auto = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 0 }) });
+    const autoResult = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps: auto.deps });
+    expect(autoResult.ok).toBe(true);
+    expect(autoResult.countered).toBe(true);
+    expect(auto.state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const autoSpend = auto.logs.find(l => l.type === 'ability_use');
+    expect(autoSpend.abilityName).toBe('Counterspell');
+    expect(autoSpend.description).toMatch(/Fire Bolt/);
+    expect(autoSpend.description).toMatch(/auto-countered/);
+    expect(autoSpend.description).toMatch(/1 left today/);
+    expect(auto.campaignWrites[0]).toMatchObject({ counterspellResolved: true, counteredBy: CULTIST, counteredSpell: 'Fire Bolt' });
+    expect(auto.deps.rollD20).not.toHaveBeenCalled();
+
+    const failed = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 3, isCantrip: false }), d20: 1 });
+    const failedResult = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps: failed.deps });
+    expect(failedResult.ok).toBe(true);
+    expect(failedResult.countered).toBe(false);
+    expect(failed.state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const failedSpend = failed.logs.find(l => l.abilityName === 'Counterspell');
+    expect(failedSpend.description).toMatch(/d20 \(1\) \+ 4 = 5 vs DC 13/);
+    expect(failedSpend.description).toMatch(/failed — spell resolves/);
+    expect(failed.campaignWrites[0]).toMatchObject({ counterspellResolved: true, counterspellCheckFailed: true });
   });
 
-  it('level >=3 failed check: reaction is spent, spell NOT countered, check logged vs DC', async () => {
-    const { state, logs, campaignWrites, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 3, isCantrip: false }), d20: 1 });
-    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.countered).toBe(false);
-    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
-    const spend = logs.find(l => l.abilityName === 'Counterspell');
-    expect(spend.description).toMatch(/d20 \(1\) \+ 4 = 5 vs DC 13/);
-    expect(spend.description).toMatch(/failed — spell resolves/);
-    expect(campaignWrites[0]).toMatchObject({ counterspellResolved: true, counterspellCheckFailed: true });
-  });
-
-  it('second click on the SAME resolved cast: counterspell_refused (countered), zero additional spend', async () => {
-    const { state, logs, deps } = makeCounterDeps({
-      lastAttack: pcSpellAttack({ spellLevel: 0, counterspellResolved: true }),
-      store: { [`${CULTIST}._counterspell_usedRound`]: 1, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('counterspell_refused');
-    expect(logs[0].description).toMatch(/countered|resolved/);
-    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
-  });
-
-  it('no spell lastAttack: counterspell_refused (trigger), zero spend', async () => {
-    const { state, logs, deps } = makeCounterDeps({ lastAttack: { attackerName: PC, attackName: 'Mace', weaponType: 'melee' } });
-    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('counterspell_refused');
-    expect(logs[0].description).toMatch(/trigger/);
-    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('at 2/Day exhaustion a fresh PC spell still refuses with zero spend', async () => {
-    const { state, logs, deps } = makeCounterDeps({
-      lastAttack: pcSpellAttack({ spellLevel: 0 }),
-      round: 5,
-      store: { [`${CULTIST}._counterspell_usedRound`]: 2, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 2 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('counterspell_refused');
-    expect(logs[0].description).toMatch(/2\/Day/);
-    expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 2 });
+  it('refusals log counterspell_refused zero-spend (resolved cast / no spell / 2/Day)', async () => {
+    const scenarios = [
+      ['second click on the SAME resolved cast', { lastAttack: pcSpellAttack({ spellLevel: 0, counterspellResolved: true }), store: { [`${CULTIST}._counterspell_usedRound`]: 1, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } } }, { counterspell: 1 }, /countered|resolved/],
+      ['no spell lastAttack (trigger)', { lastAttack: { attackerName: PC, attackName: 'Mace', weaponType: 'melee' } }, undefined, /trigger/],
+      ['2/Day exhaustion on a fresh PC spell', { lastAttack: pcSpellAttack({ spellLevel: 0 }), round: 5, store: { [`${CULTIST}._counterspell_usedRound`]: 2, [`${CULTIST}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 2 } } }, { counterspell: 2 }, /2\/Day/],
+    ];
+    for (const [label, opts, expectedUses, descRe] of scenarios) {
+      const { state, logs, deps } = makeCounterDeps(opts);
+      const result = await resolveMonsterGatedReaction({ action: COUNTERSPELL_ACTION, monsterName: CULTIST, campaignName: CAMPAIGN, deps });
+      expect(result.ok, label).toBe(false);
+      expect(logs[0].automationType, label).toBe('counterspell_refused');
+      expect(logs[0].description, label).toMatch(descRe);
+      expect(state[`${CULTIST}.${MONSTER_REACTION_USES_KEY}`], label).toEqual(expectedUses);
+      expect(deps.setRuntimeValue, label).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -350,51 +299,39 @@ function makeParryDeps({ lastAttack = meleeHitOnCaptain(), round = 1, store = {}
   };
 }
 
-describe('MA-0341 Parry registry + row shape', () => {
-  it('monsters.json bandit-captain reactions[0] carries the automation + At Will sentinel', () => {
+describe('MA-0341 Parry owner — registry + gate truth tables', () => {
+  it('monsters.json bandit-captain reactions[0] byte-shape + At Will sentinel', () => {
     expect(PARRY_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
     expect(PARRY_ACTION.usage).toBe('At Will');
     expect(PARRY_ACTION.uses).toBe(999);
     expect(PARRY_ACTION.maxUses).toBe(999);
     expect(getGatedMonsterReaction(PARRY_ACTION)?.effect).toBe('parry');
-    expect(getGatedMonsterReaction({ name: 'Scimitar', description: 'Hit: 1d6+5 slashing.' })).toBeNull();
-  });
-});
-
-describe('MA-0341 parryGate RAW identity refusals', () => {
-  it('refuses no lastAttack (trigger) and non-melee attacks (melee)', () => {
-    expect(parryIdentityRefusal(null, CAPTAIN)).toBe('trigger');
-    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), rollType: 'save' }, CAPTAIN)).toBe('trigger');
-    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), weaponType: 'ranged' }, CAPTAIN)).toBe('melee');
-    const g = parryGate({ lastAttack: meleeHitOnCaptain({ weaponType: 'ranged' }), monsterName: CAPTAIN, currentRound: 1, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
-    expect(g.ok).toBe(false);
-    expect(g.reason).toBe('melee');
   });
 
-  it('refuses spell-origin attacks even when weaponType falls back to melee (MA-0245 stamp guard)', () => {
-    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), damageSchool: 'Evocation', isCantrip: true }, CAPTAIN)).toBe('spell');
-    expect(parryIdentityRefusal({ ...meleeHitOnCaptain(), attackType: 'spell' }, CAPTAIN)).toBe('spell');
-    const g = parryGate({ lastAttack: { ...meleeHitOnCaptain(), damageSchool: 'Evocation' }, monsterName: CAPTAIN, currentRound: 1, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
-    expect(g.ok).toBe(false);
-    expect(g.reason).toBe('spell');
+  it('parryIdentityRefusal RAW truth table (all distinct branches)', () => {
+    const rows = [
+      ['no lastAttack', null, 'trigger'],
+      ['save roll, not an attack', { ...meleeHitOnCaptain(), rollType: 'save' }, 'trigger'],
+      ['ranged weapon attack', { ...meleeHitOnCaptain(), weaponType: 'ranged' }, 'melee'],
+      ['spell-origin with melee fallback (MA-0245 stamp guard)', { ...meleeHitOnCaptain(), damageSchool: 'Evocation', isCantrip: true }, 'spell'],
+      ['attackType spell stamp', { ...meleeHitOnCaptain(), attackType: 'spell' }, 'spell'],
+      ['wrong target', meleeHitOnCaptain({ targetName: 'Thug 1' }), 'trigger'],
+      ['miss', meleeHitOnCaptain({ hit: false }), 'miss'],
+      ['damage already committed', meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }), 'resolved'],
+      ['already parried', meleeHitOnCaptain({ parryResolved: true }), 'reacted'],
+      ['self-inflicted attack', meleeHitOnCaptain({ attackerName: CAPTAIN }), 'attacker'],
+      ['unresolved melee hit accepted', meleeHitOnCaptain(), null],
+    ];
+    for (const [label, lastAttack, expected] of rows) {
+      expect(parryIdentityRefusal(lastAttack, CAPTAIN) ?? null, label).toBe(expected);
+    }
   });
 
-  it('refuses wrong target, a miss, committed damage, and an already-parried attack', () => {
-    expect(parryIdentityRefusal(meleeHitOnCaptain({ targetName: 'Thug 1' }), CAPTAIN)).toBe('trigger');
-    expect(parryIdentityRefusal(meleeHitOnCaptain({ hit: false }), CAPTAIN)).toBe('miss');
-    expect(parryIdentityRefusal(meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }), CAPTAIN)).toBe('resolved');
-    expect(parryIdentityRefusal(meleeHitOnCaptain({ parryResolved: true }), CAPTAIN)).toBe('reacted');
-    expect(parryIdentityRefusal(meleeHitOnCaptain({ attackerName: CAPTAIN }), CAPTAIN)).toBe('attacker');
-  });
-
-  it('accepts the unresolved melee hit and reports the attacker', () => {
+  it('parryGate: accepts unresolved melee hit (attacker, limit 999), 1/round latch re-arms next round', () => {
     const g = parryGate({ lastAttack: meleeHitOnCaptain(), monsterName: CAPTAIN, currentRound: 4, storedUses: {}, usedRound: 0, action: PARRY_ACTION });
     expect(g.ok).toBe(true);
     expect(g.attackerName).toBe(SLASHER);
     expect(g.limit).toBe(999);
-  });
-
-  it('1/round latch: refuses a second press in the same round, re-arms next round', () => {
     const same = parryGate({ lastAttack: meleeHitOnCaptain(), monsterName: CAPTAIN, currentRound: 4, storedUses: {}, usedRound: 4, action: PARRY_ACTION });
     expect(same.ok).toBe(false);
     expect(same.reason).toBe('round');
@@ -404,24 +341,22 @@ describe('MA-0341 parryGate RAW identity refusals', () => {
 });
 
 describe('MA-0341 resolveMonsterGatedReaction — Parry', () => {
-  it('refusal (no melee hit): parry_refused logged, zero writes', async () => {
-    const { state, logs, deps } = makeParryDeps({ lastAttack: null });
-    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs).toHaveLength(1);
-    expect(logs[0].automationType).toBe('parry_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${CAPTAIN}.activeBuffs`]).toBeUndefined();
-    expect(state[`${CAPTAIN}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-  });
-
-  it('refusal (damage already applied): parry_refused (resolved), zero writes', async () => {
-    const { logs, deps } = makeParryDeps({ lastAttack: meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }) });
-    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('parry_refused');
-    expect(logs[0].description).toMatch(/resolved/);
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+  it('refusals log parry_refused zero-write (no melee hit / damage committed)', async () => {
+    const scenarios = [
+      ['no melee hit', { lastAttack: null }, undefined],
+      ['damage already applied (resolved)', { lastAttack: meleeHitOnCaptain({ damageApplied: true, actualDamage: 8 }) }, /resolved/],
+    ];
+    for (const [label, opts, descRe] of scenarios) {
+      const { state, logs, deps } = makeParryDeps(opts);
+      const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
+      expect(result.ok, label).toBe(false);
+      expect(logs, label).toHaveLength(1);
+      expect(logs[0].automationType, label).toBe('parry_refused');
+      if (descRe) expect(logs[0].description, label).toMatch(descRe);
+      expect(deps.setRuntimeValue, label).not.toHaveBeenCalled();
+      expect(state[`${CAPTAIN}.activeBuffs`], label).toBeUndefined();
+      expect(state[`${CAPTAIN}.${MONSTER_REACTION_USES_KEY}`], label).toBeUndefined();
+    }
   });
 
   it('success: activeBuffs +2 AC stamp + round latch + lastAttack parryResolved + ability_use log, At Will never spends MONSTER_REACTION_USES', async () => {
@@ -442,144 +377,77 @@ describe('MA-0341 resolveMonsterGatedReaction — Parry', () => {
     expect(spend.description).toMatch(/At Will/);
     expect(spend.description).toMatch(/GM-enforced/);
   });
-
-  it('same-round second press on the same attack: parry_refused (round/reacted), zero additional writes', async () => {
-    const { logs, deps } = makeParryDeps({
-      round: 6,
-      lastAttack: meleeHitOnCaptain({ parryResolved: true, parriedBy: CAPTAIN }),
-      store: { [`${CAPTAIN}._parry_usedRound`]: 6, [`${CAPTAIN}.activeBuffs`]: [{ effect: 'parry', acBonus: 2 }] },
-    });
-    const result = await resolveMonsterGatedReaction({ action: PARRY_ACTION, monsterName: CAPTAIN, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('parry_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
 });
 
-// MA-0565: Death Knight Parry — MA-0341 routine DATA twin. Disk reactions[0]
-// prose-only (name/trigger/description) = gate-null inert; fix authors the
-// MA-0341 byte-shape with acBonus 6 (RAW: +6 AC vs the triggering melee hit).
+// Parry DATA twins — routine re-authors of the MA-0341 byte-shape on disk
+// (each reactions[0] was prose-only = gate-null inert; the fix authors the
+// byte-shape with THAT monster's RAW acBonus — MUST be authored because
+// buildParryBuff silently defaults 2). One folded it.each (standing rec): per
+// monster locks automation byte-shape, prose acBonus, At Will sentinel, arms
+// the gate, and runs resolve end-to-end so the stamped bonus and AC-flip log
+// carry the authored value (never the silent default). Gate refusal/latch and
+// identity branches are owned by the MA-0341 tables above — not re-pinned here.
 const DEATH_KNIGHT_ACTION = monsters.find(m => m.index === 'death-knight').reactions[0];
 const KNIGHT = 'Death Knight 1';
-
-describe('MA-0565 Death Knight Parry — data-lock + acBonus 6', () => {
-  it('monsters.json death-knight reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 6)', () => {
-    expect(DEATH_KNIGHT_ACTION.name).toBe('Parry');
-    expect(DEATH_KNIGHT_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 6 });
-    expect(DEATH_KNIGHT_ACTION.usage).toBe('At Will');
-    expect(DEATH_KNIGHT_ACTION.uses).toBe(999);
-    expect(DEATH_KNIGHT_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(DEATH_KNIGHT_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the knight and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
-    const g = parryGate({ lastAttack: hit, monsterName: KNIGHT, currentRound: 3, storedUses: {}, usedRound: 0, action: DEATH_KNIGHT_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: KNIGHT, currentRound: 3, storedUses: {}, usedRound: 3, action: DEATH_KNIGHT_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +6 AC stamp, AC 20 → 26 flips the nat-flush hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: DEATH_KNIGHT_ACTION, monsterName: KNIGHT, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(6);
-    expect(result.newAc).toBe(26);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${KNIGHT}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 6)).toBe(true);
-    expect(state[`${KNIGHT}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: KNIGHT, parryAcBonus: 6 });
-    expect(state[`${KNIGHT}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 26/);
-  });
-});
-
-// MA-0573: Death Knight Aspirant Parry — MA-0565 routine DATA twin. Disk
-// reactions[0] was prose-only = gate-null inert; fix authors the MA-0341
-// byte-shape with acBonus 4 (RAW: +4 AC vs the triggering melee hit).
 const ASPIRANT_ACTION = monsters.find(m => m.index === 'death-knight-aspirant').reactions[0];
 const ASPIRANT = 'Death Knight Aspirant 1';
-
-describe('MA-0573 Death Knight Aspirant Parry — data-lock + acBonus 4', () => {
-  it('monsters.json death-knight-aspirant reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 4)', () => {
-    expect(ASPIRANT_ACTION.name).toBe('Parry');
-    expect(ASPIRANT_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 4 });
-    expect(ASPIRANT_ACTION.usage).toBe('At Will');
-    expect(ASPIRANT_ACTION.uses).toBe(999);
-    expect(ASPIRANT_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(ASPIRANT_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the aspirant and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: ASPIRANT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
-    const g = parryGate({ lastAttack: hit, monsterName: ASPIRANT, currentRound: 3, storedUses: {}, usedRound: 0, action: ASPIRANT_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: ASPIRANT, currentRound: 3, storedUses: {}, usedRound: 3, action: ASPIRANT_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +4 AC stamp, AC 20 → 24 flips the nat-flush hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: ASPIRANT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 9, total: 21, targetAc: 20, effectiveAc: 20 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: ASPIRANT_ACTION, monsterName: ASPIRANT, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(4);
-    expect(result.newAc).toBe(24);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${ASPIRANT}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 4)).toBe(true);
-    expect(state[`${ASPIRANT}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: ASPIRANT, parryAcBonus: 4 });
-    expect(state[`${ASPIRANT}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 24/);
-  });
-});
-
-// MA-0643: Drow Elite Warrior Parry — MA-0341 routine DATA twin. Disk
-// reactions[0] was prose-only = gate-null inert; fix authors the MA-0341
-// byte-shape with acBonus 3 (RAW: +3 AC vs the triggering melee hit).
 const DROW_ACTION = monsters.find(m => m.index === 'drow-elite-warrior').reactions[0];
 const DROW = 'Drow Elite Warrior 1';
+const ERINYES_ACTION = monsters.find(m => m.index === 'erinyes').reactions[0];
+const ERINYES = 'Erinyes 1';
+const GLADIATOR_ACTION = monsters.find(m => m.index === 'gladiator').reactions[0];
+const GLADIATOR = 'Gladiator 1';
+const WARLORD_ACTION = monsters.find(m => m.index === 'hobgoblin-warlord').reactions[0];
+const WARLORD = 'Hobgoblin Warlord 1';
+const KNIGHT_ACTION = monsters.find(m => m.index === 'knight').reactions[0];
+const KNIGHT_1 = 'Knight 1';
+const MARILITH_ACTION = monsters.find(m => m.index === 'marilith').reactions[0];
+const MARILITH = 'Marilith 1';
+const NIMBLEWRIGHT_ACTION = monsters.find(m => m.index === 'nimblewright').reactions[0];
+const NIMBLEWRIGHT = 'Nimblewright 1';
+const NOBLE_ACTION = monsters.find(m => m.index === 'noble').reactions[0];
+const NOBLE = 'Noble 1';
 
-describe('MA-0643 Drow Elite Warrior Parry — data-lock + acBonus 3', () => {
-  it('monsters.json drow-elite-warrior reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
-    expect(DROW_ACTION.name).toBe('Parry');
-    expect(DROW_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
-    expect(DROW_ACTION.usage).toBe('At Will');
-    expect(DROW_ACTION.uses).toBe(999);
-    expect(DROW_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(DROW_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the drow and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Gladiator 1', targetName: DROW, attackName: 'Spear', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 7, total: 19, targetAc: 18, effectiveAc: 18 };
-    const g = parryGate({ lastAttack: hit, monsterName: DROW, currentRound: 3, storedUses: {}, usedRound: 0, action: DROW_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: DROW, currentRound: 3, storedUses: {}, usedRound: 3, action: DROW_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +3 AC stamp, AC 18 → 21 flips the 18-20 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Gladiator 1', targetName: DROW, attackName: 'Spear', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 7, total: 19, targetAc: 18, effectiveAc: 18 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: DROW_ACTION, monsterName: DROW, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(3);
-    expect(result.newAc).toBe(21);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${DROW}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
-    expect(state[`${DROW}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: DROW, parryAcBonus: 3 });
-    expect(state[`${DROW}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 21/);
-  });
+it.each([
+  // MA-0565: +6 vs the triggering melee hit — AC 20 → 26 flips the total-21 hit to miss.
+  { ma: 'MA-0565', action: DEATH_KNIGHT_ACTION, monster: KNIGHT, acBonus: 6, newAc: 26, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 12, bonus: 9, total: 21, targetAc: 20 },
+  // MA-0573: AC 20 → 24 flips the total-21 hit to miss.
+  { ma: 'MA-0573', action: ASPIRANT_ACTION, monster: ASPIRANT, acBonus: 4, newAc: 24, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 12, bonus: 9, total: 21, targetAc: 20 },
+  // MA-0643: AC 18 → 21 flips the 18-20 window hit to miss.
+  { ma: 'MA-0643', action: DROW_ACTION, monster: DROW, acBonus: 3, newAc: 21, attacker: 'Gladiator 1', weapon: 'Spear', d20: 12, bonus: 7, total: 19, targetAc: 18 },
+  // MA-0702: AC 18 → 22 flips the 18-21 window hit to miss.
+  { ma: 'MA-0702', action: ERINYES_ACTION, monster: ERINYES, acBonus: 4, newAc: 22, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 17, bonus: 3, total: 20, targetAc: 18 },
+  // MA-0869: AC 16 → 19 flips the 16-18 window hit to miss.
+  { ma: 'MA-0869', action: GLADIATOR_ACTION, monster: GLADIATOR, acBonus: 3, newAc: 19, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 14, bonus: 3, total: 17, targetAc: 16 },
+  // MA-0997: AC 20 → 23 flips the 20-22 window hit to miss (row prose "adds 3").
+  { ma: 'MA-0997', action: WARLORD_ACTION, monster: WARLORD, acBonus: 3, newAc: 23, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 17, bonus: 3, total: 20, targetAc: 20 },
+  // MA-1048: AC 18 → 20 flips the 18-19 window hit to miss (do NOT copy the warlord's 3).
+  { ma: 'MA-1048', action: KNIGHT_ACTION, monster: KNIGHT_1, acBonus: 2, newAc: 20, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 15, bonus: 3, total: 18, targetAc: 18 },
+  // MA-1140: AC 16 → 21 flips the 16-20 window hit to miss (row prose "adds 5").
+  { ma: 'MA-1140', action: MARILITH_ACTION, monster: MARILITH, acBonus: 5, newAc: 21, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 13, bonus: 3, total: 16, targetAc: 16 },
+  // MA-1236: AC 18 → 20 flips the 18-19 window hit to miss.
+  { ma: 'MA-1236', action: NIMBLEWRIGHT_ACTION, monster: NIMBLEWRIGHT, acBonus: 2, newAc: 20, attacker: 'Bandit Captain 1', weapon: 'Scimitar', d20: 15, bonus: 3, total: 18, targetAc: 18 },
+  // MA-1238: AC 15 → 17 flips the 15-16 window hit to miss. Wielded-weapon clause stays GM-enforced advisory (§235).
+  { ma: 'MA-1238', action: NOBLE_ACTION, monster: NOBLE, acBonus: 2, newAc: 17, attacker: 'Bandit 1', weapon: 'Scimitar', d20: 12, bonus: 3, total: 15, targetAc: 15 },
+])('$ma $monster Parry acBonus $acBonus: data-lock, arms gate, resolve AC $targetAc → $newAc never spends', async ({ action, monster, acBonus, newAc, attacker, weapon, d20, bonus, total, targetAc }) => {
+  expect(action.name).toBe('Parry');
+  expect(action.description).toMatch(new RegExp(`adds ${acBonus} to its AC`));
+  expect(action.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus });
+  expect(action.usage).toBe('At Will');
+  expect(action.uses).toBe(999);
+  expect(action.maxUses).toBe(999);
+  expect(getGatedMonsterReaction(action)?.effect).toBe('parry');
+  const hit = { attackerName: attacker, targetName: monster, attackName: weapon, rollType: 'attack', weaponType: 'melee', hit: true, d20, bonus, total, targetAc, effectiveAc: targetAc };
+  const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
+  const result = await resolveMonsterGatedReaction({ action, monsterName: monster, campaignName: CAMPAIGN, deps });
+  expect(result.ok).toBe(true);
+  expect(result.acBonus).toBe(acBonus);
+  expect(result.newAc).toBe(newAc);
+  expect(state[`${monster}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === acBonus)).toBe(true);
+  expect(state[`${monster}._parry_usedRound`]).toBe(3);
+  expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: monster, parryAcBonus: acBonus });
+  expect(state[`${monster}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+  expect(logs.find(l => l.type === 'ability_use').description).toMatch(new RegExp(`AC ${targetAc} → ${newAc}`));
 });
 
 // MA-0681: Elemental Cultist Elemental Absorption (1/Day) — damage-taken
@@ -625,60 +493,51 @@ function makeAbsorbDeps({ lastAttack = pendingFireHitOnCultist(), round = 1, sto
   };
 }
 
-describe('MA-0681 Elemental Absorption registry + data-lock', () => {
-  it('monsters.json elemental-cultist reactions[0] carries the automation + numeric 1/Day', () => {
+describe('MA-0681 Elemental Absorption data-lock + gate truth tables', () => {
+  it('monsters.json elemental-cultist reactions[0] locks RAW, arms the gate', () => {
     expect(ABSORPTION_ACTION.name).toBe('Elemental Absorption');
     expect(ABSORPTION_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'damage_taken_elemental', effect: 'elemental_absorption', tempHp: 10 });
     expect(ABSORPTION_ACTION.automation.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']);
     expect(ABSORPTION_ACTION.uses).toBe(1);
     expect(ABSORPTION_ACTION.maxUses).toBe(1);
     expect(ABSORPTION_ACTION.usage).toBe('1/Day');
-  });
-
-  it('getGatedMonsterReaction arms the chip and the counter renders remaining uses', () => {
+    // Uses-remaining arithmetic is the MA-0006 table's lane — not re-pinned here.
     expect(getGatedMonsterReaction(ABSORPTION_ACTION)?.effect).toBe('elemental_absorption');
-    expect(getGatedMonsterReaction({ name: 'Scimitar', description: 'Hit: 1d6+2 slashing.' })).toBeNull();
-    expect(monsterReactionUsesRemaining(ABSORPTION_ACTION, {})).toBe(1);
-    expect(monsterReactionUsesRemaining(ABSORPTION_ACTION, { elemental_absorption: 1 })).toBe(0);
   });
 
-  it('elementalAbsorptionMatchedType matches case-insensitively and rejects non-elemental', () => {
-    expect(elementalAbsorptionMatchedType(pendingFireHitOnCultist(), ABSORPTION_ACTION.automation)).toBe('Fire');
-    expect(elementalAbsorptionMatchedType(pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }), ABSORPTION_ACTION.automation)).toBeNull();
-  });
-});
-
-describe('MA-0681 elementalAbsorptionGate RAW identity refusals', () => {
-  it('refuses no lastAttack / wrong target / miss / committed damage / already absorbed', () => {
-    expect(elementalAbsorptionIdentityRefusal(null, CULTIST_681, ABSORPTION_ACTION.automation)).toBe('trigger');
-    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ targetName: 'Other 1' }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('trigger');
-    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ hit: false }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('miss');
-    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ damageApplied: true, actualDamage: 22 }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('resolved');
-    expect(elementalAbsorptionIdentityRefusal(pendingFireHitOnCultist({ elementalAbsorptionResolved: true }), CULTIST_681, ABSORPTION_ACTION.automation)).toBe('reacted');
-  });
-
-  it('refuses non-elemental damage of any kind (never triggers)', () => {
-    for (const t of ['Poison', 'Necrotic', 'Bludgeoning', 'Radiant', 'Psychic', 'Slashing']) {
-      const hit = pendingFireHitOnCultist({ primaryDamageType: t, damageTypes: [t] });
-      expect(elementalAbsorptionIdentityRefusal(hit, CULTIST_681, ABSORPTION_ACTION.automation)).toBe('type');
+  it('identity refusals + round latch + 1/Day uses truth table', () => {
+    const auto = ABSORPTION_ACTION.automation;
+    const refusalRows = [
+      ['no lastAttack', null, 'trigger'],
+      ['wrong target', pendingFireHitOnCultist({ targetName: 'Other 1' }), 'trigger'],
+      ['miss', pendingFireHitOnCultist({ hit: false }), 'miss'],
+      ['damage committed', pendingFireHitOnCultist({ damageApplied: true, actualDamage: 22 }), 'resolved'],
+      ['already absorbed', pendingFireHitOnCultist({ elementalAbsorptionResolved: true }), 'reacted'],
+      ['non-elemental Poison', pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }), 'type'],
+      ['non-elemental Bludgeoning', pendingFireHitOnCultist({ primaryDamageType: 'Bludgeoning', damageTypes: ['Bludgeoning'] }), 'type'],
+    ];
+    for (const [label, lastAttack, reason] of refusalRows) {
+      expect(elementalAbsorptionIdentityRefusal(lastAttack, CULTIST_681, auto), label).toBe(reason);
+    }
+    const latchRows = [
+      ['round latch', pendingFireHitOnCultist(), 3, {}, 3, 'round'],
+      ['1/Day exhausted', pendingFireHitOnCultist(), 8, { elemental_absorption: 1 }, 2, 'uses'],
+    ];
+    for (const [label, lastAttack, round, uses, usedRound, reason] of latchRows) {
+      const g = elementalAbsorptionGate({ lastAttack, monsterName: CULTIST_681, currentRound: round, storedUses: uses, usedRound, action: ABSORPTION_ACTION });
+      expect(g.ok, label).toBe(false);
+      expect(g.reason, label).toBe(reason);
     }
   });
 
-  it('accepts every RAW elemental type on a pending hit', () => {
+  it('accepts every RAW elemental type on a pending hit (matchedType echo, gate arms)', () => {
     for (const t of ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder']) {
-      const g = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist({ primaryDamageType: t, damageTypes: [t] }), monsterName: CULTIST_681, currentRound: 1, storedUses: {}, usedRound: 0, action: ABSORPTION_ACTION });
-      expect(g.ok).toBe(true);
-      expect(g.matchedType).toBe(t);
+      const lastAttack = pendingFireHitOnCultist({ primaryDamageType: t, damageTypes: [t] });
+      expect(elementalAbsorptionMatchedType(lastAttack, ABSORPTION_ACTION.automation), t).toBe(t);
+      const g = elementalAbsorptionGate({ lastAttack, monsterName: CULTIST_681, currentRound: 1, storedUses: {}, usedRound: 0, action: ABSORPTION_ACTION });
+      expect(g.ok, t).toBe(true);
+      expect(g.matchedType, t).toBe(t);
     }
-  });
-
-  it('1/round latch + 1/Day uses refusals', () => {
-    const same = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist(), monsterName: CULTIST_681, currentRound: 3, storedUses: {}, usedRound: 3, action: ABSORPTION_ACTION });
-    expect(same.ok).toBe(false);
-    expect(same.reason).toBe('round');
-    const spent = elementalAbsorptionGate({ lastAttack: pendingFireHitOnCultist(), monsterName: CULTIST_681, currentRound: 8, storedUses: { elemental_absorption: 1 }, usedRound: 2, action: ABSORPTION_ACTION });
-    expect(spent.ok).toBe(false);
-    expect(spent.reason).toBe('uses');
   });
 });
 
@@ -710,368 +569,20 @@ describe('MA-0681 resolveMonsterElementalAbsorption press → arm + spend + THP'
     expect(result.tempHp).toBe(25);
   });
 
-  it('second press on the same resolved hit: elemental_absorption_refused (reacted), zero additional spend', async () => {
-    const { state, logs, deps } = makeAbsorbDeps({
-      lastAttack: pendingFireHitOnCultist({ elementalAbsorptionResolved: true }),
-      round: 5,
-      store: { [`${CULTIST_681}._elemental_absorption_usedRound`]: 5, [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('elemental_absorption_refused');
-    expect(logs[0].description).toMatch(/reacted/);
-    expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ elemental_absorption: 1 });
-  });
-
-  it('spent 1/Day on a fresh elemental hit: elemental_absorption_refused (uses), zero THP, zero spend', async () => {
-    const { state, logs, thpGrants, deps } = makeAbsorbDeps({ round: 9, store: { [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } } });
-    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('elemental_absorption_refused');
-    expect(logs[0].description).toMatch(/uses/i);
-    expect(thpGrants).toHaveLength(0);
-    expect(state[`${CULTIST_681}.activeBuffs`]).toBeUndefined();
-  });
-
-  it('non-elemental damage never fires: elemental_absorption_refused (type), zero writes', async () => {
-    const { state, logs, thpGrants, deps } = makeAbsorbDeps({ lastAttack: pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }) });
-    const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('elemental_absorption_refused');
-    expect(logs[0].description).toMatch(/type/);
-    expect(thpGrants).toHaveLength(0);
-    expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+  it('refusals log elemental_absorption_refused zero-THP zero-spend (reacted / uses / type)', async () => {
+    const scenarios = [
+      ['second press on the same resolved hit (reacted)', { lastAttack: pendingFireHitOnCultist({ elementalAbsorptionResolved: true }), round: 5, store: { [`${CULTIST_681}._elemental_absorption_usedRound`]: 5, [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } } }, { elemental_absorption: 1 }, /reacted/],
+      ['spent 1/Day on a fresh elemental hit (uses)', { round: 9, store: { [`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`]: { elemental_absorption: 1 } } }, { elemental_absorption: 1 }, /uses/i],
+      ['non-elemental damage never fires (type)', { lastAttack: pendingFireHitOnCultist({ primaryDamageType: 'Poison', damageTypes: ['Poison'] }) }, undefined, /type/],
+    ];
+    for (const [label, opts, expectedUses, descRe] of scenarios) {
+      const { state, logs, thpGrants, deps } = makeAbsorbDeps(opts);
+      const result = await resolveMonsterGatedReaction({ action: ABSORPTION_ACTION, monsterName: CULTIST_681, campaignName: CAMPAIGN, deps });
+      expect(result.ok, label).toBe(false);
+      expect(logs[0].automationType, label).toBe('elemental_absorption_refused');
+      expect(logs[0].description, label).toMatch(descRe);
+      expect(thpGrants, label).toHaveLength(0);
+      expect(state[`${CULTIST_681}.${MONSTER_REACTION_USES_KEY}`], label).toEqual(expectedUses);
+    }
   });
 });
-
-// MA-0702: Erinyes Parry — MA-0643 routine DATA twin. Disk reactions[0] was
-// prose-only (name/trigger/description) = gate-null inert; fix authors the
-// MA-0341 byte-shape with acBonus 4 (RAW: +4 AC vs the triggering melee hit).
-const ERINYES_ACTION = monsters.find(m => m.index === 'erinyes').reactions[0];
-const ERINYES = 'Erinyes 1';
-
-describe('MA-0702 Erinyes Parry — data-lock + acBonus 4', () => {
-  it('monsters.json erinyes reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 4)', () => {
-    expect(ERINYES_ACTION.name).toBe('Parry');
-    expect(ERINYES_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 4 });
-    expect(ERINYES_ACTION.usage).toBe('At Will');
-    expect(ERINYES_ACTION.uses).toBe(999);
-    expect(ERINYES_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(ERINYES_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the erinyes and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: ERINYES, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 18, effectiveAc: 18 };
-    const g = parryGate({ lastAttack: hit, monsterName: ERINYES, currentRound: 3, storedUses: {}, usedRound: 0, action: ERINYES_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: ERINYES, currentRound: 3, storedUses: {}, usedRound: 3, action: ERINYES_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +4 AC stamp, AC 18 → 22 flips the 18-21 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: ERINYES, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 18, effectiveAc: 18 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: ERINYES_ACTION, monsterName: ERINYES, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(4);
-    expect(result.newAc).toBe(22);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${ERINYES}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 4)).toBe(true);
-    expect(state[`${ERINYES}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: ERINYES, parryAcBonus: 4 });
-    expect(state[`${ERINYES}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 22/);
-  });
-});
-
-// MA-0869: Gladiator Parry — MA-0643/MA-0702 routine DATA twin. Disk
-// reactions[0] was prose-only (name/trigger/description) = gate-null inert;
-// fix authors the MA-0341 byte-shape with acBonus 3 (RAW: +3 AC vs the
-// triggering melee hit; AC 16 → 19, 16-18 window flips to miss).
-const GLADIATOR_ACTION = monsters.find(m => m.index === 'gladiator').reactions[0];
-const GLADIATOR = 'Gladiator 1';
-
-describe('MA-0869 Gladiator Parry — data-lock + acBonus 3', () => {
-  it('monsters.json gladiator reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
-    expect(GLADIATOR_ACTION.name).toBe('Parry');
-    expect(GLADIATOR_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
-    expect(GLADIATOR_ACTION.usage).toBe('At Will');
-    expect(GLADIATOR_ACTION.uses).toBe(999);
-    expect(GLADIATOR_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(GLADIATOR_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the gladiator and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: GLADIATOR, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 16, effectiveAc: 16 };
-    const g = parryGate({ lastAttack: hit, monsterName: GLADIATOR, currentRound: 3, storedUses: {}, usedRound: 0, action: GLADIATOR_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: GLADIATOR, currentRound: 3, storedUses: {}, usedRound: 3, action: GLADIATOR_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +3 AC stamp, AC 16 → 19 flips the 16-18 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: GLADIATOR, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 14, bonus: 3, total: 17, targetAc: 16, effectiveAc: 16 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: GLADIATOR_ACTION, monsterName: GLADIATOR, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(3);
-    expect(result.newAc).toBe(19);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${GLADIATOR}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
-    expect(state[`${GLADIATOR}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: GLADIATOR, parryAcBonus: 3 });
-    expect(state[`${GLADIATOR}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 16 → 19/);
-  });
-});
-
-// MA-0997: Hobgoblin Warlord Parry — MA-0643/MA-0702/MA-0869 routine DATA
-// twin. Disk reactions[0] was prose-only (name/trigger/description) = gate-null
-// inert (MonsterCardHelpers.js:1530 automation.effect gate, Modal:2089 silent
-// return); fix authors the MA-0341 byte-shape with acBonus 3 (row prose "adds
-// 3" — MUST be authored: buildParryBuff :1236 silently defaults 2). RAW: +3 AC
-// vs the triggering melee hit; AC 20 → 23, 20-22 window flips to miss.
-const WARLORD_ACTION = monsters.find(m => m.index === 'hobgoblin-warlord').reactions[0];
-const WARLORD = 'Hobgoblin Warlord 1';
-
-describe('MA-0997 Hobgoblin Warlord Parry — data-lock + acBonus 3', () => {
-  it('monsters.json hobgoblin-warlord reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 3)', () => {
-    expect(WARLORD_ACTION.name).toBe('Parry');
-    expect(WARLORD_ACTION.description).toMatch(/adds 3 to its AC/);
-    expect(WARLORD_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 3 });
-    expect(WARLORD_ACTION.usage).toBe('At Will');
-    expect(WARLORD_ACTION.uses).toBe(999);
-    expect(WARLORD_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(WARLORD_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the warlord and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: WARLORD, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 20, effectiveAc: 20 };
-    const g = parryGate({ lastAttack: hit, monsterName: WARLORD, currentRound: 3, storedUses: {}, usedRound: 0, action: WARLORD_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: WARLORD, currentRound: 3, storedUses: {}, usedRound: 3, action: WARLORD_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +3 AC stamp, AC 20 → 23 flips the 20-22 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: WARLORD, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 17, bonus: 3, total: 20, targetAc: 20, effectiveAc: 20 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: WARLORD_ACTION, monsterName: WARLORD, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(3);
-    expect(result.newAc).toBe(23);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${WARLORD}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(true);
-    expect(state[`${WARLORD}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(false);
-    expect(state[`${WARLORD}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: WARLORD, parryAcBonus: 3 });
-    expect(state[`${WARLORD}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 20 → 23/);
-  });
-});
-
-// MA-1048: Knight Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997 routine DATA
-// twin. Disk reactions[0] was prose-only (name/trigger/description) = gate-null
-// inert (MonsterCardHelpers.js:1558 automation.effect gate, Modal handleGated-
-// Reaction silent return); fix authors the MA-0341 byte-shape with acBonus 2
-// (knight row prose "adds 2" — do NOT copy the warlord's 3; buildParryBuff
-// silently defaults 2 so an authored value MUST match the row prose). RAW:
-// +2 AC vs the triggering melee hit; AC 18 → 20, 18-19 window flips to miss.
-const KNIGHT_ACTION = monsters.find(m => m.index === 'knight').reactions[0];
-const KNIGHT_1 = 'Knight 1';
-
-describe('MA-1048 Knight Parry — data-lock + acBonus 2', () => {
-  it('monsters.json knight reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 2)', () => {
-    expect(KNIGHT_ACTION.name).toBe('Parry');
-    expect(KNIGHT_ACTION.description).toMatch(/adds 2 to its AC/);
-    expect(KNIGHT_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
-    expect(KNIGHT_ACTION.automation).not.toMatchObject({ acBonus: 3 });
-    expect(KNIGHT_ACTION.usage).toBe('At Will');
-    expect(KNIGHT_ACTION.uses).toBe(999);
-    expect(KNIGHT_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(KNIGHT_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate arms the chip for the knight: accepts unresolved melee hit, refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT_1, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
-    const g = parryGate({ lastAttack: hit, monsterName: KNIGHT_1, currentRound: 3, storedUses: {}, usedRound: 0, action: KNIGHT_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: KNIGHT_1, currentRound: 3, storedUses: {}, usedRound: 3, action: KNIGHT_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +2 AC stamp, AC 18 → 20 flips the 18-19 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: KNIGHT_1, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: KNIGHT_ACTION, monsterName: KNIGHT_1, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(2);
-    expect(result.newAc).toBe(20);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${KNIGHT_1}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
-    expect(state[`${KNIGHT_1}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 3)).toBe(false);
-    expect(state[`${KNIGHT_1}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: KNIGHT_1, parryAcBonus: 2 });
-    expect(state[`${KNIGHT_1}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 20/);
-  });
-});
-
-// MA-1140: Marilith Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997/MA-1048
-// routine DATA twin. Disk reactions[0] was prose-only (name/trigger/description)
-// = gate-null inert (getGatedMonsterReaction MonsterCardHelpers.js:1556 keys
-// automation.effect only; no affordance, every attack effAc:16 parryAcBonus:0);
-// fix authors the MA-0341 byte-shape with acBonus 5 (row prose "adds 5" — MUST
-// be authored, buildParryBuff :1262 silently defaults 2). RAW: +5 AC vs the
-// triggering melee hit; AC 16 → 21, 16-20 window flips to miss. At Will sentinel
-// matches marilith "Reactive" RAW (unlimited, 1/round latch).
-const MARILITH_ACTION = monsters.find(m => m.index === 'marilith').reactions[0];
-const MARILITH = 'Marilith 1';
-
-describe('MA-1140 Marilith Parry — data-lock + acBonus 5', () => {
-  it('monsters.json marilith reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 5)', () => {
-    expect(MARILITH_ACTION.name).toBe('Parry');
-    expect(MARILITH_ACTION.description).toMatch(/adds 5 to its AC/);
-    expect(MARILITH_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 5 });
-    expect(MARILITH_ACTION.automation).not.toMatchObject({ acBonus: 2 });
-    expect(MARILITH_ACTION.usage).toBe('At Will');
-    expect(MARILITH_ACTION.uses).toBe(999);
-    expect(MARILITH_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(MARILITH_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate accepts unresolved melee hit on the marilith and refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: MARILITH, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 13, bonus: 3, total: 16, targetAc: 16, effectiveAc: 16 };
-    const g = parryGate({ lastAttack: hit, monsterName: MARILITH, currentRound: 3, storedUses: {}, usedRound: 0, action: MARILITH_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: MARILITH, currentRound: 3, storedUses: {}, usedRound: 3, action: MARILITH_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: buildParryBuff stamps acBonus 5, AC 16 → 21 flips the 16-20 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: MARILITH, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 13, bonus: 3, total: 16, targetAc: 16, effectiveAc: 16 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: MARILITH_ACTION, monsterName: MARILITH, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(5);
-    expect(result.newAc).toBe(21);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${MARILITH}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 5)).toBe(true);
-    expect(state[`${MARILITH}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(false);
-    expect(state[`${MARILITH}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: MARILITH, parryAcBonus: 5 });
-    expect(state[`${MARILITH}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 16 → 21/);
-  });
-});
-
-// MA-1236: Nimblewright Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997/
-// MA-1048/MA-1140 routine DATA twin. Disk reactions[0] was prose-only
-// (name/description) = gate-null inert (§114 fingerprint: getGatedMonsterReaction
-// keys automation.effect only; GatedReactionSlot returns null; live row-scoped
-// census 0 mc-dice-link). Fix authors the MA-0341 byte-shape with acBonus 2
-// (row prose "adds 2" — buildParryBuff defaults 2 but MUST be authored for the
-// honest disk record). RAW: +2 AC vs the triggering melee hit; AC 18 → 20 flips
-// the 18-19 window hit to miss. At Will sentinel (unlimited, 1/round latch).
-const NIMBLEWRIGHT_ACTION = monsters.find(m => m.index === 'nimblewright').reactions[0];
-const NIMBLEWRIGHT = 'Nimblewright 1';
-
-describe('MA-1236 Nimblewright Parry — data-lock + acBonus 2', () => {
-  it('monsters.json nimblewright reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 2)', () => {
-    expect(NIMBLEWRIGHT_ACTION.name).toBe('Parry');
-    expect(NIMBLEWRIGHT_ACTION.description).toMatch(/adds 2 to its AC/);
-    expect(NIMBLEWRIGHT_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
-    expect(NIMBLEWRIGHT_ACTION.usage).toBe('At Will');
-    expect(NIMBLEWRIGHT_ACTION.uses).toBe(999);
-    expect(NIMBLEWRIGHT_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(NIMBLEWRIGHT_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate arms the chip for the nimblewright: accepts unresolved melee hit, refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit Captain 1', targetName: NIMBLEWRIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
-    const g = parryGate({ lastAttack: hit, monsterName: NIMBLEWRIGHT, currentRound: 3, storedUses: {}, usedRound: 0, action: NIMBLEWRIGHT_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: NIMBLEWRIGHT, currentRound: 3, storedUses: {}, usedRound: 3, action: NIMBLEWRIGHT_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +2 AC stamp, AC 18 → 20 flips the 18-19 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit Captain 1', targetName: NIMBLEWRIGHT, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 15, bonus: 3, total: 18, targetAc: 18, effectiveAc: 18 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: NIMBLEWRIGHT_ACTION, monsterName: NIMBLEWRIGHT, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(2);
-    expect(result.newAc).toBe(20);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${NIMBLEWRIGHT}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
-    expect(state[`${NIMBLEWRIGHT}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: NIMBLEWRIGHT, parryAcBonus: 2 });
-    expect(state[`${NIMBLEWRIGHT}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 18 → 20/);
-  });
-});
-
-// MA-1238: Noble Parry — MA-0341/MA-0643/MA-0702/MA-0869/MA-0997/MA-1048/
-// MA-1140/MA-1236 routine DATA twin. Disk reactions[0] was prose-only
-// (name/trigger/description) = gate-null inert (§114 fingerprint:
-// getGatedMonsterReaction MonsterCardHelpers.js:1714 keys automation.effect
-// only; GatedReactionSlot MonsterAction.jsx:165 returns null; live row-scoped
-// census 0 mc-dice-link, row-click log delta 0). Fix authors the MA-0341
-// byte-shape with acBonus 2 (row prose "adds 2" — buildParryBuff defaults 2
-// but MUST be authored for the honest disk record). RAW: +2 AC vs the
-// triggering melee hit; AC 15 → 17 flips the 15-16 window hit to miss.
-// At Will sentinel (unlimited, 1/round latch). Wielded-weapon clause stays
-// GM-enforced advisory (§235 spend-log copy).
-const NOBLE_ACTION = monsters.find(m => m.index === 'noble').reactions[0];
-const NOBLE = 'Noble 1';
-
-describe('MA-1238 Noble Parry — data-lock + acBonus 2', () => {
-  it('monsters.json noble reactions[0] carries the automation + At Will sentinel (MA-0341 byte-shape, acBonus 2)', () => {
-    expect(NOBLE_ACTION.name).toBe('Parry');
-    expect(NOBLE_ACTION.trigger).toMatch(/hit by a melee attack roll/);
-    expect(NOBLE_ACTION.description).toMatch(/adds 2 to its AC/);
-    expect(NOBLE_ACTION.automation).toEqual({ type: 'reaction', trigger: 'melee_hit', effect: 'parry', acBonus: 2 });
-    expect(NOBLE_ACTION.usage).toBe('At Will');
-    expect(NOBLE_ACTION.uses).toBe(999);
-    expect(NOBLE_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(NOBLE_ACTION)?.effect).toBe('parry');
-  });
-
-  it('gate arms the chip for the noble: accepts unresolved melee hit, refuses a 2nd same-round press', () => {
-    const hit = { attackerName: 'Bandit 1', targetName: NOBLE, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 3, total: 15, targetAc: 15, effectiveAc: 15 };
-    const g = parryGate({ lastAttack: hit, monsterName: NOBLE, currentRound: 3, storedUses: {}, usedRound: 0, action: NOBLE_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    const again = parryGate({ lastAttack: hit, monsterName: NOBLE, currentRound: 3, storedUses: {}, usedRound: 3, action: NOBLE_ACTION });
-    expect(again.ok).toBe(false);
-    expect(again.reason).toBe('round');
-  });
-
-  it('resolve: +2 AC stamp, AC 15 → 17 flips the 15-16 window hit to miss, At Will never spends uses', async () => {
-    const hit = { attackerName: 'Bandit 1', targetName: NOBLE, attackName: 'Scimitar', rollType: 'attack', weaponType: 'melee', hit: true, d20: 12, bonus: 3, total: 15, targetAc: 15, effectiveAc: 15 };
-    const { state, logs, campaignWrites, deps } = makeParryDeps({ lastAttack: hit, round: 3 });
-    const result = await resolveMonsterGatedReaction({ action: NOBLE_ACTION, monsterName: NOBLE, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(2);
-    expect(result.newAc).toBe(17);
-    expect(result.newAc).toBeGreaterThan(hit.total);
-    expect(state[`${NOBLE}.activeBuffs`].some(b => b.effect === 'parry' && b.acBonus === 2)).toBe(true);
-    expect(state[`${NOBLE}._parry_usedRound`]).toBe(3);
-    expect(campaignWrites[0]).toMatchObject({ parryResolved: true, parriedBy: NOBLE, parryAcBonus: 2 });
-    expect(state[`${NOBLE}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(logs.find(l => l.type === 'ability_use').description).toMatch(/AC 15 → 17/);
-  });
-});
-

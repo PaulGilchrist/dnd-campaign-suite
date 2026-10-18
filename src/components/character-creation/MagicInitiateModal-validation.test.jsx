@@ -1,232 +1,156 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { MagicInitiateModal, createProps } from './MagicInitiateModal.test-utils.js';
-import { renderMarkdown } from '../../services/ui/sanitize.js';
 
 vi.mock('../../services/ui/sanitize.js', () => ({
   renderMarkdown: vi.fn((md) => `<p>${md}</p>`),
 }));
 
+const errorTexts = () =>
+  Array.from(document.querySelectorAll('.mi-error')).map((el) => el.textContent);
+
+const selectFor = (labelText) =>
+  screen.getByText(labelText).closest('.mi-selector').querySelector('select');
+
 describe('MagicInitiateModal - Validation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(renderMarkdown).mockReturnValue('<p>mocked</p>');
-  });
+  // Each case exercises a DISTINCT validateInstance gate: exact error copy,
+  // exact error set, and zero writes / editor stays blocked on save attempt.
+  describe('save-instance gate branches', () => {
+    const blockedCases = [
+      {
+        title: 'class is cleared',
+        instances: [{ class: 'Bard', cantrips: ['Dancing Lights', 'Acid Splash'], level1Spell: 'Heroism' }],
+        changes: [['Class:', '']],
+        errors: ['Class is required'],
+      },
+      {
+        title: 'no spells are selected',
+        instances: [{ class: 'Wizard', cantrips: [null, null], level1Spell: null }],
+        changes: [],
+        errors: ['Cantrip 1 is required', 'Cantrip 2 is required', 'Level 1 spell is required'],
+      },
+      {
+        // Guidance is a Cleric/Druid cantrip, not a Wizard cantrip.
+        title: 'cantrip is not from the selected class',
+        instances: [{ class: 'Wizard', cantrips: ['Guidance', 'Acid Splash'], level1Spell: 'Burning Hands' }],
+        changes: [],
+        errors: ['Not a valid Wizard cantrip'],
+      },
+      {
+        // Bless is a Cleric spell, not a Wizard spell.
+        title: 'level 1 spell is not from the selected class',
+        instances: [{ class: 'Wizard', cantrips: ['Acid Splash', 'Chill Touch'], level1Spell: 'Bless' }],
+        changes: [],
+        errors: ['Not a valid Wizard level 1 spell'],
+      },
+      {
+        // Duplicate cantrips can only enter via saved data — the UI's
+        // updateCantrip auto-clears duplicates made through the selects.
+        title: 'both cantrips are the same saved value',
+        instances: [{ class: 'Wizard', cantrips: ['Acid Splash', 'Acid Splash'], level1Spell: 'Burning Hands' }],
+        changes: [],
+        errors: ['Must be different from Cantrip 1'],
+      },
+      {
+        // Guidance is the only Cleric cantrip in mock data, so cantrip 2
+        // can never be filled without triggering duplicate prevention.
+        title: 'class cannot supply a second cantrip',
+        instances: null,
+        changes: [['Class:', 'Cleric'], ['Cantrip 1:', 'Guidance'], ['Level 1 Spell:', 'Bless']],
+        errors: ['Cantrip 2 is required'],
+      },
+    ];
 
-  describe('required field errors', () => {
-    it('should show class error when class is cleared and instance saved', () => {
-      const existingInstances = [
-        { class: 'Bard', cantrips: ['Dancing Lights', 'Acid Splash'], level1Spell: 'Heroism' },
-      ];
+    it.each(blockedCases)('blocks Save Instance with exact errors when $title', ({ instances, changes, errors }) => {
       const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
+        formData: { magicInitiateInstances: instances || [], spells: [] },
       });
       render(<MagicInitiateModal {...props} />);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: '' } });
+      if (instances) {
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+      } else {
+        fireEvent.click(screen.getByText('Add Another Instance'));
+      }
+      changes.forEach(([label, value]) =>
+        fireEvent.change(selectFor(label), { target: { value } })
+      );
 
       fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
 
-      expect(screen.getByText('Class is required')).toBeInTheDocument();
-    });
-
-    it('should show all three cantrip/level1 required errors when instance has class but no spells', () => {
-      const existingInstances = [
-        { class: 'Wizard', cantrips: [null, null], level1Spell: null },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText('Cantrip 1 is required')).toBeInTheDocument();
-      expect(screen.getByText('Cantrip 2 is required')).toBeInTheDocument();
-      expect(screen.getByText('Level 1 spell is required')).toBeInTheDocument();
-    });
-  });
-
-  describe('class membership validation', () => {
-    it('should show "Not a valid" error when cantrip is not from selected class', () => {
-      // Guidance is a Cleric/Druid cantrip, not a Wizard cantrip.
-      const existingInstances = [
-        {
-          class: 'Wizard',
-          cantrips: ['Guidance', 'Acid Splash'],
-          level1Spell: 'Burning Hands',
-        },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText(/Not a valid Wizard cantrip/)).toBeInTheDocument();
-    });
-
-    it('should show "Not a valid" error when level 1 spell is not from selected class', () => {
-      // Bless is a Cleric spell, not a Wizard spell.
-      const existingInstances = [
-        {
-          class: 'Wizard',
-          cantrips: ['Acid Splash', 'Chill Touch'],
-          level1Spell: 'Bless',
-        },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText(/Not a valid Wizard level 1 spell/)).toBeInTheDocument();
+      expect(errorTexts()).toEqual(errors);
+      // Save blocked: still in editor, no summary re-render, zero writes.
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+      expect(screen.queryByText(/^Instance \d+: /)).not.toBeInTheDocument();
+      expect(props.onArrayFieldChange).not.toHaveBeenCalled();
+      expect(props.onClose).not.toHaveBeenCalled();
     });
   });
 
-  describe('duplicate cantrip validation', () => {
-    it('should show "Must be different from Cantrip 1" when both cantrips are the same', () => {
-      // The UI's updateCantrip auto-prevents duplicates, so we test the validation
-      // by loading an instance that already has duplicate cantrips from saved data.
-      const existingInstances = [
-        {
-          class: 'Wizard',
-          cantrips: ['Acid Splash', 'Acid Splash'],
-          level1Spell: 'Burning Hands',
-        },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
+  it('opens the gate and shows the saved instance in the summary when all fields are valid', () => {
+    const props = createProps();
+    render(<MagicInitiateModal {...props} />);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
+    fireEvent.click(screen.getByText('Add Another Instance'));
+    fireEvent.change(selectFor('Class:'), { target: { value: 'Wizard' } });
+    fireEvent.change(selectFor('Cantrip 1:'), { target: { value: 'Acid Splash' } });
+    fireEvent.change(selectFor('Cantrip 2:'), { target: { value: 'Chill Touch' } });
+    fireEvent.change(selectFor('Level 1 Spell:'), { target: { value: 'Burning Hands' } });
 
-      expect(screen.getByText('Must be different from Cantrip 1')).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
+
+    // Gate passed: editor closes and the instance appears in the summary.
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(screen.getByText('Instance 1: Wizard')).toBeInTheDocument();
+    expect(errorTexts()).toEqual([]);
+    // Save Instance only gates; persisting is Save All's job (save lane).
+    expect(props.onArrayFieldChange).not.toHaveBeenCalled();
   });
 
-  describe('error clearing', () => {
-    it('should show and clear errors when class is changed', () => {
-      const existingInstances = [
-        { class: 'Wizard', cantrips: [null, null], level1Spell: null },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText('Cantrip 1 is required')).toBeInTheDocument();
-
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Cleric' } });
-
-      expect(screen.queryByText('Cantrip 1 is required')).not.toBeInTheDocument();
+  it('clears all errors as soon as any editor field changes', () => {
+    const props = createProps({
+      formData: {
+        magicInitiateInstances: [{ class: 'Wizard', cantrips: [null, null], level1Spell: null }],
+        spells: [],
+      },
     });
+    render(<MagicInitiateModal {...props} />);
 
-    it('should clear errors when starting edit on an instance', () => {
-      const existingInstances = [
-        { class: '', cantrips: [null, null], level1Spell: null },
-      ];
-      const props = createProps({
-        formData: { magicInitiateInstances: existingInstances, spells: [] },
-      });
-      render(<MagicInitiateModal {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
+    expect(errorTexts()).toEqual([
+      'Cantrip 1 is required',
+      'Cantrip 2 is required',
+      'Level 1 spell is required',
+    ]);
 
-      // Trigger errors by saving
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
+    fireEvent.change(selectFor('Class:'), { target: { value: 'Cleric' } });
 
-      expect(screen.getByText('Class is required')).toBeInTheDocument();
-
-      // Cancel and re-edit to trigger startEdit which clears errors
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-
-      expect(screen.queryByText('Class is required')).not.toBeInTheDocument();
-    });
-
-    it('should clear errors when adding a new instance', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText('Cantrip 1 is required')).toBeInTheDocument();
-
-      // Cancel and add a new instance
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      fireEvent.click(screen.getByText('Add Another Instance'));
-
-      expect(screen.queryByText('Cantrip 1 is required')).not.toBeInTheDocument();
-    });
+    expect(errorTexts()).toEqual([]);
   });
 
-  describe('valid submission', () => {
-    it('should not show any validation errors when all fields are valid', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-
-      const selects = document.querySelectorAll('.mi-selector-select');
-      const cantrip1Select = selects[1];
-      const cantrip2Select = selects[2];
-      const level1Select = selects[3];
-
-      fireEvent.change(cantrip1Select, { target: { value: 'Acid Splash' } });
-      fireEvent.change(cantrip2Select, { target: { value: 'Chill Touch' } });
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.queryByText('Class is required')).not.toBeInTheDocument();
-      expect(screen.queryByText('Cantrip 1 is required')).not.toBeInTheDocument();
-      expect(screen.queryByText('Cantrip 2 is required')).not.toBeInTheDocument();
-      expect(screen.queryByText('Level 1 spell is required')).not.toBeInTheDocument();
-      expect(screen.queryByText(/Not a valid/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Must be different/)).not.toBeInTheDocument();
+  it.each([
+    { entry: 'Edit', instances: [{ class: 'Wizard', cantrips: [null, null], level1Spell: null }] },
+    { entry: 'Add Another Instance', instances: [] },
+  ])('clears stale errors when re-entering the editor via $entry', ({ entry, instances }) => {
+    const props = createProps({
+      formData: { magicInitiateInstances: instances, spells: [] },
     });
+    render(<MagicInitiateModal {...props} />);
 
-    it('should show Cantrip 2 required when no second option exists for the class', () => {
-      // Guidance is the only Cleric cantrip in mock data, so cantrip 2 cannot be filled
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
+    const openEditor = () =>
+      entry === 'Edit'
+        ? fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+        : fireEvent.click(screen.getByText('Add Another Instance'));
 
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Cleric' } });
+    openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
+    expect(errorTexts().length).toBeGreaterThan(0);
 
-      const selects = document.querySelectorAll('.mi-selector-select');
-      const cantrip1Select = selects[1];
-      const level1Select = selects[3];
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    openEditor();
 
-      // Guidance is a valid Cleric cantrip
-      fireEvent.change(cantrip1Select, { target: { value: 'Guidance' } });
-
-      // Bless is a valid Cleric level 1 spell
-      fireEvent.change(level1Select, { target: { value: 'Bless' } });
-
-      // cantrip2 has no valid Cleric option (Guidance is the only one, and selecting it
-      // would trigger duplicate prevention), so it should show a required error
-      fireEvent.click(screen.getByRole('button', { name: 'Save Instance' }));
-
-      expect(screen.getByText('Cantrip 2 is required')).toBeInTheDocument();
-    });
+    expect(errorTexts()).toEqual([]);
   });
 });

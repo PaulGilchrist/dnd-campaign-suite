@@ -1,7 +1,12 @@
-// MN-015 regression: handleAttackRiderManeuverUse must forward the Combat
-// Superiority feature's save DC spec into the rider action (previously sent an
-// empty `{ automation: {} }` -> buildSaveDc DC-10 fallback), and must NOT ride
-// the maneuver die onto damage when the service returns a size-gate refusal.
+// @maintained-by-ai
+// MN-015 lane — handleAttackRiderManeuverUse save-DC forwarding + size-gate refusal.
+// Owns the exact executeAttackRiderManeuver consumer args: the combat_superiority
+// action payload is forwarded verbatim (numeric DC passthrough vs 'ability' token
+// fallback — prop-distinct, never a silent DC-10/empty-automation shape) and a
+// refused rider never folds its die onto damage or spends anything.
+// Lane ownership (do not duplicate here): dispatch/popup/resume/prompt-close →
+// useAttackDamageResolution.maneuvers.test.js; ally picker → .maneuveringAlly.test.js;
+// precision-miss die math → .mn014.test.js; rider prompt gating → steps/attackRollDamageSteps.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
@@ -50,6 +55,8 @@ vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
     getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }));
 
+// Factory exports the full handler surface consumed by the steps import graph,
+// even where this lane only asserts executeAttackRiderManeuver.
 vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
     getAttackRiderOptions: vi.fn(),
     getAttackRiderOptionsByContext: vi.fn(),
@@ -61,23 +68,35 @@ import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { executeAttackRiderManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
-const makePlayerStats = (specialActions = []) => ({
-    name: 'EvasiveFighter',
-    level: 18,
-    abilities: [
-        { name: 'Strength', bonus: 0 },
-        { name: 'Dexterity', bonus: 0 },
-    ],
-    proficiency: 6,
-    automation: { actions: [], passives: [], specialActions },
-});
+const CHAR = 'TestFighter';
+const CAMPAIGN = 'test-campaign';
+const TARGET = 'Gibbering Mouther 1';
+const ATTACK = { name: 'Dagger', damage: '1d4+2', damageType: 'piercing', weaponType: 'melee' };
+const HIT_CONTEXT = { isMiss: false, hit: true, targetName: TARGET };
+const CURRENT = { formula: '1d4+2', total: 7, rolls: [5, 2] };
+const PUSHING = { name: 'Pushing Attack', damageBonus: true, dieExpression: 'superiority_die' };
+const RIDER_OK = { type: 'popup', payload: { type: 'automation_info', name: 'Pushing Attack', description: 'ok' } };
+
+// Fresh fixtures per mount — no cross-test bleed of popup/modal/pause state.
+function makeStats(specialActions = []) {
+    return {
+        name: CHAR,
+        level: 5,
+        abilities: [
+            { name: 'Strength', bonus: 3 },
+            { name: 'Dexterity', bonus: 2 },
+        ],
+        proficiency: 3,
+        automation: { actions: [], passives: [], specialActions },
+    };
+}
 
 function UseAttackDamageResolution(overrides = {}) {
-    const setPopupHtml = vi.fn();
-    const setModalState = vi.fn();
-    return useAttackDamageResolution({
-        playerStats: makePlayerStats(),
-        campaignName: 'test-campaign',
+    const setPopupHtml = overrides.setPopupHtml ?? vi.fn();
+    const setModalState = overrides.setModalState ?? vi.fn();
+    const api = useAttackDamageResolution({
+        playerStats: makeStats(),
+        campaignName: CAMPAIGN,
         mapName: null,
         popupHtml: null,
         setPopupHtml,
@@ -90,80 +109,74 @@ function UseAttackDamageResolution(overrides = {}) {
         resumeRef: { current: null },
         ...overrides,
     });
+    return { api, setPopupHtml, setModalState };
 }
 
-describe('MN-015 handleAttackRiderManeuverUse — save DC forwarding', () => {
+describe('MN-015 handleAttackRiderManeuverUse — save DC forwarding + size-gate refusal', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', payload: { description: 'ok' } });
+        vi.resetAllMocks();
+        executeAttackRiderManeuver.mockResolvedValue(RIDER_OK);
     });
 
-    it('forwards the resolved numeric saveDc from the combat_superiority special-action info', async () => {
-        const stats = makePlayerStats([
-            { type: 'combat_superiority', name: 'Combat Superiority', saveDc: 14, saveAbility: 'STR', saveAbilities: ['STR', 'DEX'] },
-        ]);
-        const { handleAttackRiderManeuverUse } = UseAttackDamageResolution({ playerStats: stats });
+    // Prop-distinct rows: computed numeric DC 14/STR vs the 'ability'/['STR','DEX']
+    // token fallback — a dropped forward (empty automation → DC-10 fallback downstream)
+    // or a misread field fails on the exact byte-exact action arg.
+    it.each([
+        {
+            branch: 'numeric DC passthrough from combat_superiority special-action info',
+            specialActions: [{ type: 'combat_superiority', name: 'Combat Superiority', saveDc: 14, saveAbility: 'STR' }],
+            expectedAction: { automation: { type: 'combat_superiority', saveDc: 14, saveAbility: 'STR' } },
+        },
+        {
+            branch: "'ability' token + STR/DEX default when no combat_superiority info is present",
+            specialActions: [],
+            expectedAction: { automation: { type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] } },
+        },
+    ])('forwards $expectedAction.automation verbatim to executeAttackRiderManeuver — $branch', async ({ specialActions, expectedAction }) => {
+        const playerStats = makeStats(specialActions);
+        const { api } = UseAttackDamageResolution({ playerStats });
 
-        await handleAttackRiderManeuverUse(
-            { name: 'Pushing Attack', damageBonus: true },
-            { damageType: 'piercing' },
-            { isMiss: false, targetName: 'Gibbering Mouther 1' },
-            '1d6', 3, [3],
-        );
+        await api.handleAttackRiderManeuverUse(PUSHING, ATTACK, HIT_CONTEXT, CURRENT);
 
         expect(executeAttackRiderManeuver).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ saveDc: 14, saveAbility: 'STR' }),
-            }),
-            stats,
-            'test-campaign',
+            expectedAction,
+            playerStats,
+            CAMPAIGN,
             'Pushing Attack',
-            expect.anything(),
+            { weaponType: 'melee', isUnarmedStrike: false, targetName: TARGET },
         );
     });
 
-    it('falls back to saveDc:"ability" + STR/DEX when no combat_superiority info is present', async () => {
-        const { handleAttackRiderManeuverUse } = UseAttackDamageResolution();
-
-        await handleAttackRiderManeuverUse(
-            { name: 'Pushing Attack', damageBonus: true },
-            { damageType: 'piercing' },
-            { isMiss: false, targetName: 'Gibbering Mouther 1' },
-            '1d6', 3, [3],
-        );
-
-        const action = executeAttackRiderManeuver.mock.calls[0][0];
-        expect(action.automation.saveDc).toBe('ability');
-        expect(action.automation.saveAbility).toEqual(['STR', 'DEX']);
-    });
-
-    it('MN-015: a size-gate refusal adds no die to damage, spends nothing, logs, and still shows the popup', async () => {
+    it('a size-gate refusal adds no die to damage, spends nothing, logs the refusal, and still shows the popup', async () => {
+        const REFUSAL = 'Pushing Attack: Target is Huge (too large — only Large or smaller affected).';
+        // dieValue is present so a regressed !result.refused guard WOULD fold 6
+        // onto the formula and write attackRiderDieValue — the assertions below bite.
         executeAttackRiderManeuver.mockResolvedValue({
             type: 'popup',
             refused: true,
-            payload: { type: 'automation_info', name: 'Pushing Attack', description: 'Pushing Attack: Target is Huge (too large — only Large or smaller affected).' },
-            logEntries: [{ type: 'ability_use', characterName: 'EvasiveFighter', abilityName: 'Pushing Attack', description: 'Pushing Attack: Target is Huge (too large — only Large or smaller affected).' }],
+            dieValue: 6,
+            payload: { type: 'automation_info', name: 'Pushing Attack', description: REFUSAL },
+            logEntries: [{ type: 'ability_use', characterName: CHAR, abilityName: 'Pushing Attack', description: REFUSAL }],
         });
-        const setPopupHtml = vi.fn();
-        const { handleAttackRiderManeuverUse } = UseAttackDamageResolution({ setPopupHtml });
+        const { api, setPopupHtml } = UseAttackDamageResolution();
 
-        const result = await handleAttackRiderManeuverUse(
-            { name: 'Pushing Attack', damageBonus: true, dieExpression: 'superiority_die' },
-            { damageType: 'piercing' },
-            { isMiss: false, targetName: 'Hill Giant 1' },
-            { formula: '1d6', total: 3, rolls: [3] },
+        const result = await api.handleAttackRiderManeuverUse(
+            PUSHING,
+            ATTACK,
+            { isMiss: false, hit: true, targetName: 'Hill Giant 1' },
+            CURRENT,
         );
 
-        expect(result.formula).toBe('1d6');
-        expect(result.total).toBe(3);
-        expect(setRuntimeValue).not.toHaveBeenCalledWith('EvasiveFighter', 'attackRiderDieValue', expect.anything(), 'test-campaign');
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        expect(result).toEqual(CURRENT);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
             type: 'ability_use',
+            characterName: CHAR,
             abilityName: 'Pushing Attack',
-            description: expect.stringContaining('too large'),
-        }));
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            description: expect.stringContaining('Large or smaller'),
-        }));
+            description: REFUSAL,
+        });
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Pushing Attack', description: REFUSAL });
     });
 });

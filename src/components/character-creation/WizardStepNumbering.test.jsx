@@ -1,102 +1,118 @@
+// @maintained-by-ai
+/**
+ * OWNER of the wizard step-numbering contract: one canonical index drives the
+ * sidebar indicator, the content headings, and the Next/Back walk order.
+ * - The flows table below is the exhaustive numbering pin (exact
+ *   [canonicalStep, displayNumber] pairs + hidden steps for all four flows);
+ *   WizardSidebar.test.jsx owns tab titles/enablement, useWizardNavigation.test.js
+ *   owns validation/enablement semantics, and the ruleset walk-skip is delegated
+ *   here by that hook's test header.
+ * - 5e skips step 5 (Background); editing skips step 1 (Ruleset); display
+ *   numbers stay consecutive 1..N over the visible steps only.
+ */
 import { render, screen } from '@testing-library/react';
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { WIZARD_STEPS, getVisibleSteps, getDisplayNumber, getTotalSteps } from '../../config/steps-config.js';
+import { getVisibleSteps, getDisplayNumber } from '../../config/steps-config.js';
 import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 import WizardSidebar from './WizardSidebar.jsx';
 import WizardStepSpecial from './WizardStepSpecial.jsx';
 import WizardStepBackground from './WizardStepBackground.jsx';
 
+// useWizardNavigation validates through this boundary; its rules live in utils.test.js.
 vi.mock('../../config/utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
-  validateFinalFormData: vi.fn(() => ({})),
-  validateAbilityTotals: vi.fn(() => Promise.resolve({})),
-  hasDuplicateCharacterName: vi.fn(() => false),
-  DUPLICATE_CHARACTER_NAME_ERROR: 'A character with that name already exists',
 }));
 
-describe('wizard step numbering (indicator and content share one index)', () => {
-  const canonicalTitle = (step) => WIZARD_STEPS.find((s) => s.step === step)?.title;
-
-  describe('getVisibleSteps', () => {
-    it('numbers all 17 steps consecutively for the 2024 create flow', () => {
-      const steps = getVisibleSteps({ ruleset: '2024' });
-      expect(steps).toHaveLength(getTotalSteps());
-      expect(steps.map((s) => s.displayNumber)).toEqual(steps.map((_, i) => i + 1));
-      expect(getDisplayNumber(5, { ruleset: '2024' })).toBe(5);
-      expect(getDisplayNumber(8, { ruleset: '2024' })).toBe(8);
-    });
-
-    it('renumbers consecutively for the 5e create flow with Background absent from BOTH', () => {
-      const steps = getVisibleSteps({ ruleset: '5e' });
-      expect(steps).toHaveLength(16);
-      expect(steps.map((s) => s.displayNumber)).toEqual(steps.map((_, i) => i + 1));
-      expect(steps.map((s) => s.step)).not.toContain(5);
-      expect(steps.map((s) => s.title)).not.toContain('Background');
-      expect(getDisplayNumber(5, { ruleset: '5e' })).toBeUndefined();
-      expect(getDisplayNumber(6, { ruleset: '5e' })).toBe(5);
-      expect(getDisplayNumber(8, { ruleset: '5e' })).toBe(7);
-      expect(getDisplayNumber(17, { ruleset: '5e' })).toBe(16);
-    });
-
-    it('renumbers consecutively when editing (Ruleset step skipped)', () => {
-      const steps = getVisibleSteps({ isEditing: true, ruleset: '5e' });
-      expect(steps).toHaveLength(15);
-      expect(steps.map((s) => s.displayNumber)).toEqual(steps.map((_, i) => i + 1));
-      expect(getDisplayNumber(1, { isEditing: true })).toBeUndefined();
-      expect(getDisplayNumber(2, { isEditing: true })).toBe(1);
+describe('wizard step numbering (indicator, headings, and walk share one index)', () => {
+  // Exhaustive contract: exact visible steps and consecutive display numbers per flow.
+  describe.each([
+    {
+      flow: '2024 create',
+      ctx: { ruleset: '2024' },
+      pairs: [
+        [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [9, 9],
+        [10, 10], [11, 11], [12, 12], [13, 13], [14, 14], [15, 15], [16, 16], [17, 17],
+      ],
+      hidden: [],
+    },
+    {
+      flow: '5e create (Background absent, 6+ shift down)',
+      ctx: { ruleset: '5e' },
+      pairs: [
+        [1, 1], [2, 2], [3, 3], [4, 4], [6, 5], [7, 6], [8, 7], [9, 8], [10, 9],
+        [11, 10], [12, 11], [13, 12], [14, 13], [15, 14], [16, 15], [17, 16],
+      ],
+      hidden: [5],
+    },
+    {
+      flow: '2024 editing (Ruleset absent, 2+ shift down)',
+      ctx: { isEditing: true, ruleset: '2024' },
+      pairs: [
+        [2, 1], [3, 2], [4, 3], [5, 4], [6, 5], [7, 6], [8, 7], [9, 8], [10, 9],
+        [11, 10], [12, 11], [13, 12], [14, 13], [15, 14], [16, 15], [17, 16],
+      ],
+      hidden: [1],
+    },
+    {
+      flow: '5e editing (both skips)',
+      ctx: { isEditing: true, ruleset: '5e' },
+      pairs: [
+        [2, 1], [3, 2], [4, 3], [6, 4], [7, 5], [8, 6], [9, 7], [10, 8], [11, 9],
+        [12, 10], [13, 11], [14, 12], [15, 13], [16, 14], [17, 15],
+      ],
+      hidden: [1, 5],
+    },
+  ])('$flow', ({ ctx, pairs, hidden }) => {
+    it('numbers every visible step consecutively and hides non-flow steps', () => {
+      const steps = getVisibleSteps(ctx);
+      expect(steps.map(({ step, displayNumber }) => [step, displayNumber])).toEqual(pairs);
+      pairs.forEach(([step, display]) => {
+        expect(getDisplayNumber(step, ctx)).toBe(display);
+      });
+      hidden.forEach((step) => {
+        expect(getDisplayNumber(step, ctx)).toBeUndefined();
+      });
     });
   });
 
   describe('WizardSidebar indicator', () => {
-    const renderNumbers = (props = {}) => {
-      const { container } = render(
+    // Titles/enablement are owned by WizardSidebar.test.jsx; this pins only that
+    // the rendered tab numbers carry the shifted display numbers, gap-free.
+    // Tabs read as "<displayNumber><title>"; the save tab is prefixed "✓".
+    const renderedNumbers = () =>
+      screen.getAllByRole('button', { name: /^\d/ }).map((btn) => Number(btn.textContent.match(/^\d+/)[0]));
+
+    const renderSidebar = (ctx) =>
+      render(
         <WizardSidebar
           currentStep={2}
           getStepEnabled={() => true}
           goToStep={vi.fn()}
           isSaveEnabled
           onSave={vi.fn()}
-          {...props}
+          {...ctx}
         />
       );
-      return Array.from(container.querySelectorAll('.sidebar-tab .sidebar-tab-number')).map((el) => Number(el.textContent));
-    };
 
-    it('lists every step with no numbering gap for 5e (no 4→6 jump)', () => {
-      const numbers = renderNumbers({ ruleset: '5e' });
-      expect(numbers).toHaveLength(16);
-      expect(numbers).toEqual(numbers.map((_, i) => i + 1));
-      expect(numbers).not.toContain(17);
-    });
-
-    it('lists all 17 steps consecutively for 2024', () => {
-      const numbers = renderNumbers({ ruleset: '2024' });
-      expect(numbers).toHaveLength(17);
-      expect(numbers).toEqual(numbers.map((_, i) => i + 1));
-    });
-
-    it('numbers tabs consecutively when editing', () => {
-      const numbers = renderNumbers({ isEditing: true, ruleset: '2024' });
-      expect(numbers).toHaveLength(16);
-      expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+    it.each([
+      ['5e create', { ruleset: '5e' }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]],
+      ['5e editing', { isEditing: true, ruleset: '5e' }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]],
+    ])('renders gap-free numbers for %s', (_label, ctx, expected) => {
+      renderSidebar(ctx);
+      expect(renderedNumbers()).toEqual(expected);
     });
   });
 
-  describe('content headings match the indicator number', () => {
-    it('Special Actions heading uses the shared display number', () => {
+  describe('content headings consume the shared display number', () => {
+    it('Special Actions heading shows the shifted 5e number (17 → Step 16)', () => {
       render(<WizardStepSpecial stepNumber={getDisplayNumber(17, { ruleset: '5e' })} formData={{}} onArrayFieldChange={vi.fn()} />);
-      expect(screen.getByText('Step 16: Special Actions')).toBeInTheDocument();
-
-      render(<WizardStepSpecial stepNumber={getDisplayNumber(17, { ruleset: '2024' })} formData={{}} onArrayFieldChange={vi.fn()} />);
-      expect(screen.getByText('Step 17: Special Actions')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Step 16: Special Actions' })).toBeInTheDocument();
     });
 
-    it('Background heading uses the shared display number where 2024 shows it, and its title matches the indicator tab', () => {
-      const display = getDisplayNumber(5, { ruleset: '2024' });
-      render(<WizardStepBackground stepNumber={display} formData={{}} backgrounds={[]} ruleset="2024" onInputChange={vi.fn()} />);
-      expect(screen.getByText(`Step ${display}: Background`)).toBeInTheDocument();
-      expect(canonicalTitle(5)).toBe('Background');
+    it('Background heading shows at its 2024 display number (Step 5: Background)', () => {
+      render(<WizardStepBackground stepNumber={getDisplayNumber(5, { ruleset: '2024' })} formData={{}} backgrounds={[]} ruleset="2024" onInputChange={vi.fn()} />);
+      expect(screen.getByRole('heading', { name: 'Step 5: Background' })).toBeInTheDocument();
     });
   });
 

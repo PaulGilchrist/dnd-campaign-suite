@@ -1,6 +1,10 @@
+// @maintained-by-ai
 // CLA-321: SaveAttackAoeModal must enforce the Soulstitch Spells stamp on the live sheet AoE path.
+// Three lanes: (1) NPC auto-resolve at confirm (protected zeroed, unprotected normal, stamp consumed
+// once, popup row); (2) PC auto-resolve at confirm (no prompt); (3) stamp applied mid-prompt is
+// enforced by the save-result handler.
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
 // ── Mocked modules ──
@@ -120,12 +124,17 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-function selectAndConfirm(names) {
-  for (const name of names) {
-    const input = screen.getByText(name).closest('label').querySelector('input[type="checkbox"]');
-    fireEvent.click(input);
-  }
-  fireEvent.click(screen.getByRole('button', { name: /Fireball/ }));
+async function renderAndConfirm(names) {
+  await act(async () => {
+    render(<SaveAttackAoeModal {...baseProps} />);
+  });
+  await act(async () => {
+    for (const name of names) {
+      const input = screen.getByText(name).closest('label').querySelector('input[type="checkbox"]');
+      fireEvent.click(input);
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Fireball/ }));
+  });
 }
 
 function soulstitchLogCalls() {
@@ -135,100 +144,103 @@ function soulstitchLogCalls() {
 }
 
 describe('SaveAttackAoeModal — CLA-321 Soulstitch enforcement', () => {
+  let randomSpy;
   beforeEach(() => {
     vi.clearAllMocks();
     hasSoulstitchProtection.mockReturnValue(false);
+    // Deterministic save dice: every d20 draw lands 1 (floor(0.01*20)+1).
+    randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
   });
 
-  it('NPC branch: chosen creature auto-succeeds with 0 damage and skips the save roll and damage apply', async () => {
+  afterEach(() => {
+    randomSpy.mockRestore();
+  });
+
+  it('NPC lane: protected creature auto-succeeds for 0 damage while unprotected creatures take normal damage, the stamp clears once, and the popup marks the protected row', async () => {
     hasSoulstitchProtection.mockImplementation((targetName) => targetName === 'Thug 1');
 
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm(['Thug 1', 'Zombie 1']);
-    });
+    await renderAndConfirm(['Thug 1', 'Zombie 1']);
 
+    // Thug 1: auto-success log — no roll dice, 0 damage, soulstitch-labelled.
     const autoLogs = soulstitchLogCalls();
     expect(autoLogs).toHaveLength(1);
-    expect(autoLogs[0].targetName).toBe('Thug 1');
-    expect(autoLogs[0].saveResult).toBe('soulstitch_auto_success');
-    expect(autoLogs[0].finalDamage).toBe(0);
+    expect(autoLogs[0]).toMatchObject({
+      name: 'Fireball (Soulstitch)',
+      targetName: 'Thug 1',
+      saveResult: 'soulstitch_auto_success',
+      saveRoll: null,
+      rolls: [],
+      finalDamage: 0,
+    });
 
+    // Thug 1 never receives an applyDamage write; the rollback ledger records 0.
     const appliedTargets = applyDamageToTarget.mock.calls.map(c => c[1]);
     expect(appliedTargets).not.toContain('Thug 1');
-    expect(appliedTargets).toContain('Zombie 1');
+    const thugResults = addTargetResult.mock.calls.map(c => c[1]).filter(r => r.targetName === 'Thug 1');
+    expect(thugResults).toHaveLength(1);
+    expect(thugResults[0]).toMatchObject({ saveResult: 'soulstitch_auto_success', appliedDamage: 0 });
 
-    const autoResults = addTargetResult.mock.calls.map(c => c[1]).filter(r => r.targetName === 'Thug 1');
-    expect(autoResults[0].saveResult).toBe('soulstitch_auto_success');
-    expect(autoResults[0].appliedDamage).toBe(0);
-  });
-
-  it('NPC branch: unchosen creatures still roll normally and take damage', async () => {
-    hasSoulstitchProtection.mockImplementation((targetName) => targetName === 'Thug 1');
-
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm(['Thug 1', 'Zombie 1']);
-    });
-
+    // Zombie 1: unprotected, normal path — pinned roll 1 + (-1) = 0 fails DC 17 and pays full 20.
     const normalLogs = addEntry.mock.calls
       .map(c => c[1])
       .filter(e => e && e.rollType === 'save-damage' && e.targetName === 'Zombie 1');
     expect(normalLogs).toHaveLength(1);
-    expect(normalLogs[0].saveResult).not.toBe('soulstitch_auto_success');
-    expect(normalLogs[0].finalDamage).toBeGreaterThan(0);
-  });
-
-  it('consumes the stamp after all saves resolve', async () => {
-    hasSoulstitchProtection.mockImplementation((targetName) => targetName === 'Thug 1');
-
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
+    expect(normalLogs[0]).toMatchObject({
+      name: 'Fireball',
+      saveResult: 'failure',
+      saveRoll: 1,
+      saveBonus: -1,
+      finalDamage: 20,
     });
-    await act(async () => {
-      selectAndConfirm(['Thug 1']);
-    });
+    const zombieApply = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Zombie 1');
+    expect(zombieApply).toHaveLength(1);
+    expect(zombieApply[0][2]).toBe(20);
 
+    // Stamp lasts only the cast that wrote it — cleared exactly once after all saves resolve.
     expect(clearSoulstitchStamp).toHaveBeenCalledTimes(1);
     expect(clearSoulstitchStamp).toHaveBeenCalledWith('DivinationWizard', 'test-campaign');
+
+    // Result popup: exactly one soulstitch row (the protected creature), normal row for the rest.
+    await waitFor(() => {
+      expect(screen.getAllByText(/Soulstitch — automatically succeeds, takes no damage/)).toHaveLength(1);
+    });
+    expect(screen.getByText(/Failed — takes 20 Fire damage \(rolled 1\)/)).toBeInTheDocument();
   });
 
-  it('PC branch: chosen player auto-resolves without a save prompt and takes no damage', async () => {
+  it('PC lane: chosen player auto-resolves at confirm — no save prompt, auto-success log, zero damage written', async () => {
     hasSoulstitchProtection.mockImplementation((targetName) => targetName === 'Player One');
 
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm(['Player One']);
-    });
+    await renderAndConfirm(['Player One']);
 
     expect(sendSavePrompt).not.toHaveBeenCalled();
 
     const autoLogs = soulstitchLogCalls();
     expect(autoLogs).toHaveLength(1);
-    expect(autoLogs[0].targetName).toBe('Player One');
-    expect(autoLogs[0].saveResult).toBe('soulstitch_auto_success');
-    expect(autoLogs[0].finalDamage).toBe(0);
+    expect(autoLogs[0]).toMatchObject({
+      name: 'Fireball (Soulstitch)',
+      targetName: 'Player One',
+      saveResult: 'soulstitch_auto_success',
+      saveRoll: null,
+      finalDamage: 0,
+    });
+
+    // The PC lane writes a 0-damage apply (HP-tracking stub), never a positive amount.
+    const pcApply = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Player One');
+    expect(pcApply).toHaveLength(1);
+    expect(pcApply[0][2]).toBe(0);
+
+    const pcResults = addTargetResult.mock.calls.map(c => c[1]).filter(r => r.targetName === 'Player One');
+    expect(pcResults).toHaveLength(1);
+    expect(pcResults[0]).toMatchObject({ saveResult: 'soulstitch_auto_success', appliedDamage: 0 });
   });
 
-  it('PC prompt branch: a soulstitch-chosen target that resolves via save-result is forced to auto-success 0 damage', async () => {
-    // Not protected during the resolve loop → prompt is sent for Player One.
-    hasSoulstitchProtection.mockReturnValue(false);
-
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm(['Player One']);
-    });
+  it('PC prompt lane: stamp applied mid-cast forces auto-success 0 damage on the save-result, bypassing the failed roll', async () => {
+    // Unprotected at confirm → prompt is sent for Player One.
+    await renderAndConfirm(['Player One']);
     expect(sendSavePrompt).toHaveBeenCalledTimes(1);
 
-    // Stamp applied mid-cast (chooser re-confirm); the modal-local handler must enforce it.
+    // Stamp lands mid-cast (chooser re-confirm); the modal-local save-result handler must enforce it
+    // even though the player's rolled save (3 + 3 = 6) failed DC 17.
     hasSoulstitchProtection.mockReturnValue(true);
     await act(async () => {
       window.dispatchEvent(new CustomEvent('save-result', {
@@ -249,25 +261,19 @@ describe('SaveAttackAoeModal — CLA-321 Soulstitch enforcement', () => {
 
     await waitFor(() => {
       const autoLogs = soulstitchLogCalls().filter(e => e.targetName === 'Player One');
-      expect(autoLogs.length).toBeGreaterThan(0);
-      expect(autoLogs[0].saveResult).toBe('soulstitch_auto_success');
-    });
-    const applied = applyDamageToTarget.mock.calls.filter(c => c[1] === 'Player One');
-    expect(applied.length).toBe(0);
-  });
-
-  it('result popup shows the soulstitch row for the chosen creature', async () => {
-    hasSoulstitchProtection.mockImplementation((targetName) => targetName === 'Thug 1');
-
-    await act(async () => {
-      render(<SaveAttackAoeModal {...baseProps} />);
-    });
-    await act(async () => {
-      selectAndConfirm(['Thug 1']);
+      expect(autoLogs).toHaveLength(1);
+      expect(autoLogs[0]).toMatchObject({ saveResult: 'soulstitch_auto_success', finalDamage: 0 });
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/Soulstitch — automatically succeeds, takes no damage/)).toBeInTheDocument();
-    });
+    // The failed-roll damage path must not run: no apply writes, no non-soulstitch save-damage log.
+    expect(applyDamageToTarget.mock.calls.filter(c => c[1] === 'Player One')).toHaveLength(0);
+    const normalLogs = addEntry.mock.calls
+      .map(c => c[1])
+      .filter(e => e && e.rollType === 'save-damage' && e.targetName === 'Player One' && !String(e.name).includes('(Soulstitch)'));
+    expect(normalLogs).toHaveLength(0);
+
+    const pcResults = addTargetResult.mock.calls.map(c => c[1]).filter(r => r.targetName === 'Player One');
+    expect(pcResults).toHaveLength(1);
+    expect(pcResults[0]).toMatchObject({ saveResult: 'soulstitch_auto_success', appliedDamage: 0 });
   });
 });

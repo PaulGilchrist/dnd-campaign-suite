@@ -1,160 +1,178 @@
+// @maintained-by-ai
+// Base lane for useCharActionsModalHandlers: the exact 27-key return contract
+// consumed by CharActionModals' destructure, plus the only three confirm routings
+// no family lane owns (verified by grep 2026-10-17): bulwarkOfForce,
+// zealousPresence, psychicWhispers. All other handler routings are owned by the
+// six routing-seam lanes: useCharActionsModalHandlers.{areaEffects,buffs,
+// combatSuperiority,healing,inspiration,oceanicGift}.test.js.
+// Dead-mock purge (#343/#344): bardicInspiration/reactionBonus/oceanicGift and
+// every other service mock is never invoked by these tests and is removed; only
+// modules whose exports the surviving tests observe are mocked, each carrying the
+// keys the live import graph destructures (handle destructured by
+// services/automation/index.js per #318 — runtime-probed by sibling lanes;
+// removing it fails import with "No handle export"). Everything else loads for
+// real — side-effect-free at import, verified by the sibling buffs lane.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
 
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-  toggleBuff: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
-  setTempHp: vi.fn(),
-}));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
-  handle: vi.fn(),
-  handleCombatSuperiorityBonusAction: vi.fn(),
-  handleCombatSuperiorityReaction: vi.fn(),
-  handleCombatSuperiorityGrantAttack: vi.fn(),
-  handleCombatSuperiorityMovement: vi.fn(),
-  handleCombatSuperioritySkillCheck: vi.fn(),
-  handleCombatSuperiorityCommandingPresenceReaction: vi.fn(),
-  handleCombatSuperioritySweepingAttack: vi.fn(),
-  handleAttackRiderPrompt: vi.fn(),
-  handleSkillCheckPrompt: vi.fn(),
-  executeSweepingAttack: vi.fn(),
-  executeBaitAndSwitchChoice: vi.fn(),
-  executeCommanderStrikeChoice: vi.fn(),
-  executeRallyChoice: vi.fn(),
-}));
-
 vi.mock('../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js', () => ({
-  handle: vi.fn(),
+  handle: vi.fn(), // mandatory at module load (#318)
   activateBulwarkOfForce: vi.fn(),
 }));
 
 vi.mock('../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js', () => ({
-  handle: vi.fn(),
+  handle: vi.fn(), // mandatory at module load (#318)
   confirmZealousPresence: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/healing/massHealHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHeal: vi.fn(),
+vi.mock('../../services/automation/handlers/buffs/buffHandler.js', () => ({
+  handle: vi.fn(), // mandatory at module load (#318; also real importee celestialRevelationHandler.js)
+  confirmPsychicWhispers: vi.fn(),
+  confirmTelepathicSpeech: vi.fn(), // destructured by useCharActionsAutomation.js in the live graph
 }));
 
-vi.mock('../../services/automation/handlers/class-sorcerer/clockworkCavalcadeHandler.js', () => ({
-  handle: vi.fn(),
-  confirmClockworkCavalcadeHeal: vi.fn(),
-  confirmClockworkCavalcadeDispel: vi.fn(),
-  confirmClockworkCavalcadeRepair: vi.fn(),
-}));
+const { activateBulwarkOfForce } = await import('../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js');
+const { confirmZealousPresence } = await import('../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js');
+const { confirmPsychicWhispers } = await import('../../services/automation/handlers/buffs/buffHandler.js');
 
-vi.mock('../../services/automation/handlers/healing/massCureWoundsHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassCureWounds: vi.fn(),
-}));
+const CAMPAIGN = 'test-campaign';
 
-vi.mock('../../services/automation/handlers/healing/prayerOfHealingHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPrayerOfHealing: vi.fn(),
-}));
+function stats() {
+  return { name: 'TestChar', class: { name: 'Sorcerer' } };
+}
 
-vi.mock('../../services/automation/handlers/buffs/powerWordFortifyHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPowerWordFortify: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massHealingWordHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHealingWord: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js', () => ({
-  handle: vi.fn(),
-  handleMove: vi.fn(),
-  activateNaturesSanctuary: vi.fn(),
-  moveNaturesSanctuary: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js', () => ({
-  handle: vi.fn(),
-  activateCoronaOfLight: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js', () => ({
-  handle: vi.fn(),
-  confirmRadianceOfDawn: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/tempHpBuffHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMantleOfInspiration: vi.fn(),
-  confirmVitalityOfTheTree: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-warlock/celestialResilienceHandler.js', () => ({
-  handle: vi.fn(),
-  confirmCelestialResilience: vi.fn(),
-  skipCelestialResilience: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-druid/oceanicGiftHandler.js', () => ({
-  handle: vi.fn(),
-  confirmOceanicGift: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-bard/bardicInspirationHandler.js', () => ({
-  handle: vi.fn(),
-  applyBardicInspiration: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/reactions/reactionBonusHandler.js', () => ({
-  handle: vi.fn(),
-  applyInspiringMovement: vi.fn(),
-}));
-
-const mockSetPopupHtml = vi.fn();
-const mockSetModalState = vi.fn();
-
-function getHandlers(modalState = {}, mergedModalState = {}) {
+function mount(modalState = {}, mergedModalState = {}) {
+  const setPopupHtml = vi.fn();
+  const setModalState = vi.fn();
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCharActionsModalHandlers({
-    setPopupHtml: mockSetPopupHtml,
-    setModalState: mockSetModalState,
+  const handlers = useCharActionsModalHandlers({
+    setPopupHtml,
+    setModalState,
     modalState,
     mergedModalState,
   });
+  return { handlers, setPopupHtml, setModalState };
 }
+
+// The full public contract: if CharActionModals destructures a key that
+// disappears here, every consumer breaks — pin the exact key set.
+const EXPECTED_KEYS = [
+  'handleBaitAndSwitchChoiceConfirm',
+  'handleBardicInspirationConfirm',
+  'handleBulwarkOfForceConfirm',
+  'handleCelestialResilienceConfirm',
+  'handleCelestialResilienceSkip',
+  'handleClockworkCavalcadeDispelConfirm',
+  'handleClockworkCavalcadeHealConfirm',
+  'handleClockworkCavalcadeRepairConfirm',
+  'handleCommanderStrikeChoiceConfirm',
+  'handleCoronaEnemySelectionConfirm',
+  'handleInspiringMovementConfirm',
+  'handleInspiringSmiteConfirm',
+  'handleMantleOfInspirationConfirm',
+  'handleMassCureWoundsConfirm',
+  'handleMassHealConfirm',
+  'handleMassHealingWordConfirm',
+  'handleNaturesSanctuaryConfirm',
+  'handleOceanicGiftConfirm',
+  'handlePowerWordFortifyConfirm',
+  'handlePrayerOfHealingConfirm',
+  'handlePsychicWhispersConfirm',
+  'handleRadianceOfDawnConfirm',
+  'handleRallyChoiceConfirm',
+  'handleSweepingAttackConfirm',
+  'handleTricksterBlessingConfirm',
+  'handleVitalityOfTheTreeConfirm',
+  'handleZealousPresenceConfirm',
+];
+
+// Rows for the three confirm routes no family lane covers. All three share
+// the positional seam (action, playerStats, campaignName, targetNames) read
+// from modalState (not mergedModalState) and the payload-only popup + clear.
+const UNOWNED_ROUTES = [
+  {
+    name: 'Bulwark of Force',
+    handler: 'handleBulwarkOfForceConfirm',
+    modalKey: 'bulwarkOfForceModal',
+    service: activateBulwarkOfForce,
+    arg: ['Goblin1', 'Goblin2'],
+  },
+  {
+    name: 'Zealous Presence',
+    handler: 'handleZealousPresenceConfirm',
+    modalKey: 'zealousPresenceModal',
+    service: confirmZealousPresence,
+    arg: ['Ally1', 'Ally2'],
+  },
+  {
+    name: 'Psychic Whispers',
+    handler: 'handlePsychicWhispersConfirm',
+    modalKey: 'psychicWhispersModal',
+    service: confirmPsychicWhispers,
+    arg: ['Victim1'],
+  },
+];
+
+const modalData = (route) => ({
+  action: { name: route.name },
+  playerStats: stats(),
+  campaignName: CAMPAIGN,
+});
+const openModal = (route) => ({ [route.modalKey]: modalData(route) });
 
 describe('useCharActionsModalHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetPopupHtml.mockClear();
-    mockSetModalState.mockClear();
   });
 
-  describe('return value', () => {
-    it('returns an object with exactly 27 handler functions', () => {
-      const handlers = getHandlers();
-      const entries = Object.entries(handlers);
-      expect(entries.length).toBe(27);
-      entries.forEach(([_key, value]) => {
-        expect(typeof value).toBe('function');
-      });
-    });
-
-    it('returns unique function references (no duplicates)', () => {
-      const handlers = getHandlers();
-      const values = Object.values(handlers);
-      const uniqueValues = new Set(values);
-      expect(uniqueValues.size).toBe(values.length);
+  it('returns exactly the 27 named handler keys, all functions', () => {
+    const { handlers } = mount();
+    expect(Object.keys(handlers).sort()).toEqual(EXPECTED_KEYS);
+    Object.values(handlers).forEach((value) => {
+      expect(typeof value).toBe('function');
     });
   });
+
+  it.each(UNOWNED_ROUTES.map(route => ({ desc: `${route.name} confirm`, route })))(
+    '$desc: exact positional service passthrough, payload-only popup, modal cleared',
+    async ({ route }) => {
+      const data = modalData(route);
+      const { handlers, setPopupHtml, setModalState } = mount(openModal(route));
+      route.service.mockResolvedValue({ payload: '<b>done</b>' });
+
+      await handlers[route.handler](route.arg);
+
+      expect(route.service).toHaveBeenCalledTimes(1);
+      expect(route.service).toHaveBeenCalledWith(data.action, data.playerStats, CAMPAIGN, route.arg);
+      expect(setPopupHtml).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).toHaveBeenCalledWith('<b>done</b>');
+      expect(setModalState).toHaveBeenCalledTimes(1);
+      expect(setModalState).toHaveBeenCalledWith({ [route.modalKey]: null });
+
+      // payload-less result: service still runs, popup stays silent, modal closes
+      vi.clearAllMocks();
+      route.service.mockResolvedValue({});
+      const second = mount(openModal(route));
+      await second.handlers[route.handler](route.arg);
+      expect(route.service).toHaveBeenCalledTimes(1);
+      expect(second.setPopupHtml).not.toHaveBeenCalled();
+      expect(second.setModalState).toHaveBeenCalledWith({ [route.modalKey]: null });
+    }
+  );
+
+  it.each(UNOWNED_ROUTES.flatMap(route => [
+    { desc: `${route.name}: no targets selected`, route, modalState: openModal(route), arg: undefined },
+    { desc: `${route.name}: modal not open`, route, modalState: {}, arg: route.arg },
+  ]))(
+    '$desc — refuses: no service call, no popup, no modal clear',
+    async ({ route, modalState, arg }) => {
+      const { handlers, setPopupHtml, setModalState } = mount(modalState);
+
+      await handlers[route.handler](arg);
+
+      expect(route.service).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
+    }
+  );
 });

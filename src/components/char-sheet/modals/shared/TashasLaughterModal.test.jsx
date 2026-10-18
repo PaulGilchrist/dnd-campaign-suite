@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// TashasLaughterModal BASE lane: initial render/copy, maxTargets header math,
+// target selection/toggle, empty states, pre-confirm inertness, and skip/close.
+// NPC auto-roll resolution lives in TashasLaughterModal.npc-saves.test.jsx;
+// player save-prompt resolution lives in TashasLaughterModal.player-saves.test.jsx;
+// Heighten radio internals live in CreatureSelectionModal.test.jsx — not repeated here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TashasLaughterModal from './TashasLaughterModal.jsx';
@@ -33,7 +39,12 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
+import { addEntry } from '../../../../services/ui/logService.js';
+import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { addExpiration } from '../../../../services/rules/effects/expirations.js';
+import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
 const campaignName = 'test-campaign';
 
@@ -49,6 +60,7 @@ const baseAction = {
     automation: { type: 'tashas_hideous_laughter' },
 };
 
+// saveBonuses are read with fully-lowercase keys (rollNpcSave lowercases saveType).
 const baseCombatSummary = {
     creatures: [
         { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 7, saveBonuses: { wis: 0 } },
@@ -57,6 +69,7 @@ const baseCombatSummary = {
     ],
 };
 
+// spellSlotLevel defaults to a sane 1 — omitting it hits the open NaN defect pinned below.
 function makeProps(overrides = {}) {
     return {
         action: baseAction,
@@ -64,25 +77,23 @@ function makeProps(overrides = {}) {
         campaignName,
         saveType: 'WIS',
         saveDc: 14,
+        spellSlotLevel: 1,
         onClose: vi.fn(),
         ...overrides,
     };
 }
 
-// Helper: select a target row by index (clicks the label, not raw checkbox)
+// Click a target row by index (the row label, not the raw checkbox).
 function selectTarget(index) {
-    const labels = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(labels[index]);
+    fireEvent.click(document.querySelectorAll('.secondary-target-row')[index]);
 }
 
-// Helper: get the confirm button
 function getConfirmButton() {
     return screen.getByRole('button', { name: /Tasha's Hideous Laughter/ });
 }
 
-// Helper: get the skip button
-function clickSkip() {
-    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+function targetCheckboxes() {
+    return screen.getAllByRole('checkbox');
 }
 
 beforeEach(() => {
@@ -90,166 +101,132 @@ beforeEach(() => {
     getCombatSummary.mockReturnValue(baseCombatSummary);
     getRuntimeValue.mockReturnValue([]);
     setRuntimeValue.mockReturnValue(undefined);
+    addEntry.mockResolvedValue(undefined);
 });
 
-describe('TashasLaughterModal - UI Tests', () => {
-    describe('initial render', () => {
-        it('renders the modal with title and target list', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByText("Tasha's Hideous Laughter")).toBeInTheDocument();
-            expect(screen.getByText('Goblin')).toBeInTheDocument();
-            expect(screen.getByText('Orc')).toBeInTheDocument();
-            expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
-        });
+describe('TashasLaughterModal - base rendering and selection', () => {
+    it('renders title, save/DC copy, rules note, every creature in combat, and a disabled confirm', () => {
+        render(<TashasLaughterModal {...makeProps()} />);
 
-        it('renders the description with save type and DC', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByText(/Select up to/)).toBeInTheDocument();
-            expect(screen.getByText(/WIS/)).toBeInTheDocument();
-            expect(screen.getByText(/DC 14/)).toBeInTheDocument();
-        });
+        expect(screen.getByText("Tasha's Hideous Laughter")).toBeInTheDocument();
+        expect(screen.getByText(/Select up to 1 creature/)).toBeInTheDocument();
+        expect(screen.getByText(/WIS/)).toBeInTheDocument();
+        expect(screen.getByText(/DC 14/)).toBeInTheDocument();
+        expect(screen.getByText(/On a failed save/)).toBeInTheDocument();
+        expect(screen.getByText(/can't end the Prone condition/)).toBeInTheDocument();
+        expect(screen.getByText(/Concentration/)).toBeInTheDocument();
 
-        it('renders the note about prone and incapacitated conditions', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            // Use a unique substring from the note to avoid matching multiple elements
-            expect(screen.getByText(/On a failed save/)).toBeInTheDocument();
-            expect(screen.getByText(/can't end the Prone condition/)).toBeInTheDocument();
-            expect(screen.getByText(/Concentration/)).toBeInTheDocument();
-        });
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+        expect(screen.getByText('PlayerAlly')).toBeInTheDocument();
 
-        it('disables the confirm button when no target is selected', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(getConfirmButton()).toBeDisabled();
-        });
-
-        it('renders skip button', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-        });
-
-        it('renders with music icon in the header', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            const header = document.querySelector('.sp-header');
-            expect(header.querySelector('.fa-solid.fa-music')).toBeInTheDocument();
-        });
+        expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+        expect(getConfirmButton()).toBeDisabled();
     });
 
-    describe('maxTargets based on spell slot level', () => {
-        it.each([
-            { slot: 1, expected: 1 },
-            { slot: 3, expected: 3 },
-            { slot: 5, expected: 5 },
-        ])('renders description with maxTargets = spellSlotLevel ($slot)', ({ slot, expected }) => {
-            render(<TashasLaughterModal {...makeProps({ spellSlotLevel: slot })} />);
-            expect(screen.getByText(new RegExp(`Select up to ${expected} creature`))).toBeInTheDocument();
-        });
-
-        it('enforces maxTargets limit when selecting', () => {
-            render(<TashasLaughterModal {...makeProps({ spellSlotLevel: 2 })} />);
-            selectTarget(0);
-            selectTarget(1);
-            expect(getConfirmButton()).toHaveTextContent('(2)');
-            const checkboxes = screen.getAllByRole('checkbox');
-            expect(checkboxes[2]).toBeDisabled();
-        });
+    it.each([
+        { slot: 3, expected: 3 },
+        { slot: 5, expected: 5 },
+    ])('shows maxTargets = $expected in the description for spell slot level $slot', ({ slot, expected }) => {
+        render(<TashasLaughterModal {...makeProps({ spellSlotLevel: slot })} />);
+        expect(screen.getByText(new RegExp(`Select up to ${expected} creature`))).toBeInTheDocument();
     });
 
-    describe('target selection', () => {
-        it('selects a target when its row is clicked and enables confirm', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            selectTarget(0);
-            const checkboxes = screen.getAllByRole('checkbox');
-            expect(checkboxes[0]).toBeChecked();
-            expect(getConfirmButton()).toBeEnabled();
-        });
-
-        it('allows selecting multiple targets when spellSlotLevel > 1', () => {
-            render(<TashasLaughterModal {...makeProps({ spellSlotLevel: 3 })} />);
-            selectTarget(0);
-            selectTarget(1);
-            const checkboxes = screen.getAllByRole('checkbox');
-            expect(checkboxes[0]).toBeChecked();
-            expect(checkboxes[1]).toBeChecked();
-            expect(getConfirmButton()).toHaveTextContent('(2)');
-        });
-
-        it('toggles a target off when its row is clicked again', () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            selectTarget(0);
-            const checkboxes = screen.getAllByRole('checkbox');
-            expect(checkboxes[0]).toBeChecked();
-            selectTarget(0);
-            expect(checkboxes[0]).not.toBeChecked();
-            expect(getConfirmButton()).toBeDisabled();
-        });
+    // KNOWN DEFECT (TashasLaughterModal.jsx:91): Math.max(1, undefined) is NaN, so an
+    // omitted spellSlotLevel renders "Select up to NaN creature(s)". Pin of CURRENT broken
+    // behavior — update this test (and the source) when fixed; do NOT treat as correct.
+    it('KNOWN DEFECT: renders "Select up to NaN" when spellSlotLevel is not passed', () => {
+        const props = makeProps();
+        delete props.spellSlotLevel;
+        render(<TashasLaughterModal {...props} />);
+        expect(screen.getByText(/Select up to NaN creature/)).toBeInTheDocument();
     });
 
-    describe('close/skip behavior', () => {
-        it('closes when Skip is clicked', () => {
-            const onClose = vi.fn();
-            render(<TashasLaughterModal {...makeProps({ onClose })} />);
-            clickSkip();
-            expect(onClose).toHaveBeenCalledTimes(1);
-        });
+    it('checks a target row on click and enables confirm, then untoggles back to disabled', () => {
+        render(<TashasLaughterModal {...makeProps()} />);
+
+        selectTarget(0);
+        expect(targetCheckboxes()[0]).toBeChecked();
+        expect(getConfirmButton()).toBeEnabled();
+
+        selectTarget(0);
+        expect(targetCheckboxes()[0]).not.toBeChecked();
+        expect(getConfirmButton()).toBeDisabled();
     });
 
-    describe('empty targets', () => {
-        it('renders empty target list when no creatures in combat', () => {
-            getCombatSummary.mockReturnValue({ creatures: [] });
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByText('No targets available.')).toBeInTheDocument();
-            expect(getConfirmButton()).toBeDisabled();
-        });
+    it('caps selection at maxTargets: with slot 2 both rows check, the third disables, and clicking it does nothing', () => {
+        render(<TashasLaughterModal {...makeProps({ spellSlotLevel: 2 })} />);
 
-        it('renders the caster as a target when caster is the only creature', () => {
-            getCombatSummary.mockReturnValue({
-                creatures: [
-                    { name: 'Wizard1', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 4 } },
-                ],
-            });
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByText('Wizard1')).toBeInTheDocument();
-        });
+        selectTarget(0);
+        selectTarget(1);
+        expect(targetCheckboxes()[0]).toBeChecked();
+        expect(targetCheckboxes()[1]).toBeChecked();
+        expect(getConfirmButton()).toHaveTextContent('(2)');
+        expect(targetCheckboxes()[2]).toBeDisabled();
+
+        selectTarget(2);
+        expect(targetCheckboxes()[2]).not.toBeChecked();
+        expect(getConfirmButton()).toHaveTextContent('(2)');
     });
 
-    describe('metamagic heighten rendering', () => {
-        it('shows heighten note and radio buttons when metamagicHeighten is true', () => {
-            render(<TashasLaughterModal {...makeProps({ metamagicHeighten: true })} />);
-            expect(screen.getByText(/Heightened Spell/)).toBeInTheDocument();
-            expect(screen.getByText(/one target will have disadvantage/)).toBeInTheDocument();
-            const heightenRadios = document.querySelectorAll('input[name="heightenTarget"]');
-            expect(heightenRadios).toHaveLength(baseCombatSummary.creatures.length);
-        });
+    it('stays completely inert through selection — nothing rolls, logs, or writes until confirm', () => {
+        render(<TashasLaughterModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
 
-        it('does not show heighten note or radio buttons when metamagicHeighten is false', () => {
-            render(<TashasLaughterModal {...makeProps({ metamagicHeighten: false })} />);
-            expect(screen.queryByText(/Heightened Spell/)).not.toBeInTheDocument();
-            expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
-        });
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(sendSavePrompt).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(storeSpellLastAttack).not.toHaveBeenCalled();
+        expect(addTargetResult).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(persistAndNotify).not.toHaveBeenCalled();
+        expect(getConfirmButton()).toBeEnabled();
     });
 
-    describe('edge cases', () => {
-        it('shows heighten radios when there is only one creature', () => {
-            getCombatSummary.mockReturnValue({
-                creatures: [
-                    { name: 'SoloEnemy', type: 'npc', currentHp: 10, maxHp: 10, saveBonuses: { wis: 3 } },
-                ],
-            });
-            render(<TashasLaughterModal {...makeProps({ metamagicHeighten: true })} />);
-            expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(1);
-        });
+    it('closes without side effects when Skip is clicked', () => {
+        const onClose = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose })} />);
 
-        it('shows heighten radios when there are no creatures', () => {
-            getCombatSummary.mockReturnValue({ creatures: [] });
-            render(<TashasLaughterModal {...makeProps({ metamagicHeighten: true })} />);
-            expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
-            expect(screen.getByText('No targets available.')).toBeInTheDocument();
-        });
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
 
-        it('shows no targets when combat summary has no creatures array', () => {
-            getCombatSummary.mockReturnValue({});
-            render(<TashasLaughterModal {...makeProps()} />);
-            expect(screen.getByText('No targets available.')).toBeInTheDocument();
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { label: 'no creatures array', summary: {} },
+        { label: 'empty creatures array', summary: { creatures: [] } },
+    ])('shows the empty-state copy and blocks confirm with $label', ({ summary }) => {
+        getCombatSummary.mockReturnValue(summary);
+        render(<TashasLaughterModal {...makeProps()} />);
+
+        expect(screen.getByText('No targets available.')).toBeInTheDocument();
+        expect(document.querySelectorAll('.secondary-target-row')).toHaveLength(0);
+        expect(getConfirmButton()).toBeDisabled();
+    });
+
+    it('lists the caster as a selectable target when they are the only creature in combat', () => {
+        getCombatSummary.mockReturnValue({
+            creatures: [{ name: 'Wizard1', type: 'player', currentHp: 30, maxHp: 30, saveBonuses: { wis: 4 } }],
         });
+        render(<TashasLaughterModal {...makeProps()} />);
+
+        expect(targetCheckboxes()).toHaveLength(1);
+        selectTarget(0);
+        expect(getConfirmButton()).toBeEnabled();
+    });
+
+    it('appends the Heightened Spell note only when metamagicHeighten is set', () => {
+        const { unmount } = render(<TashasLaughterModal {...makeProps({ metamagicHeighten: true })} />);
+        expect(screen.getByText(/Heightened Spell: one target will have disadvantage\./)).toBeInTheDocument();
+        // Radios mirror every target — wiring only; radio behavior is CreatureSelectionModal's lane.
+        expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(baseCombatSummary.creatures.length);
+
+        unmount();
+        render(<TashasLaughterModal {...makeProps({ metamagicHeighten: false })} />);
+        expect(screen.queryByText(/Heightened Spell/)).not.toBeInTheDocument();
+        expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(0);
     });
 });

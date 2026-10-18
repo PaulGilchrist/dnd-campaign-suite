@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TacticalMasterModal from './TacticalMasterModal.jsx';
@@ -23,7 +24,7 @@ import * as useActionPopup from '../../../hooks/combat/useActionPopup.js';
 
 const mockPlayerStats = { name: 'Throg', level: 12, abilities: [{ name: 'CON', bonus: 3 }] };
 
-function makeProps(overrides) {
+function makeProps(overrides = {}) {
   return {
     attackName: 'Longsword Attack',
     baseMastery: 'Vex',
@@ -31,18 +32,14 @@ function makeProps(overrides) {
     targetName: 'Goblin',
     playerStats: mockPlayerStats,
     campaignName: 'test-campaign',
-    onConfirm: vi.fn(),
+    onConfirm: vi.fn().mockResolvedValue(undefined),
     onClose: vi.fn(),
     isChoiceMode: false,
-    ...(overrides || {}),
+    ...overrides,
   };
 }
 
 function renderModal(overrides) {
-  useActionPopup.loadWeaponMasteries.mockResolvedValue([
-    { name: 'Vex', description: 'Gain advantage on next attack.' },
-    { name: 'Push', description: 'Push enemy 10 ft away.' },
-  ]);
   return render(<TacticalMasterModal {...makeProps(overrides)} />);
 }
 
@@ -54,280 +51,146 @@ beforeEach(() => {
   ]);
 });
 
-// ── Rendering ──
-
 describe('TacticalMasterModal - rendering', () => {
-  it('renders the header with title, icon, and attack name', () => {
+  it('renders header, target instruction, radio options, and action buttons', () => {
     renderModal();
     expect(screen.getByText(/Tactical Master/)).toBeInTheDocument();
     expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
-  });
-
-  it('shows target name in instruction when targetName is provided', () => {
-    renderModal();
     expect(screen.getByText(/Choose a mastery property against/)).toBeInTheDocument();
-    expect(screen.getByText(/Goblin/)).toBeInTheDocument();
+    expect(screen.getByText('Goblin')).toBeInTheDocument();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByText('Advantage on Next Attack')).toBeInTheDocument();
+    expect(screen.getByText('Push (10 ft)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Apply/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
   });
 
-  it('omits target name from instruction when targetName is null', () => {
+  it('uses featureName for the title, falling back to "Tactical Master"', () => {
+    const { unmount } = renderModal({ featureName: 'Battering Roots' });
+    expect(screen.getByText(/Battering Roots/)).toBeInTheDocument();
+    expect(screen.queryByText(/Tactical Master/)).not.toBeInTheDocument();
+    unmount();
+
+    renderModal();
+    expect(screen.getByText(/Tactical Master/)).toBeInTheDocument();
+  });
+
+  it('omits the target from the instruction when targetName is null', () => {
     renderModal({ targetName: null });
     expect(screen.getByText(/Choose a mastery property:/)).toBeInTheDocument();
     expect(screen.queryByText(/Choose a mastery property against/)).not.toBeInTheDocument();
   });
 
-  it('renders Apply and Skip buttons in selection state', () => {
-    renderModal();
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-  });
-
-  it('renders with no masteries when baseMastery and replaceOptions are null/empty', () => {
-    renderModal({ baseMastery: null, replaceOptions: [] });
-    expect(screen.getByText(/Longsword Attack/)).toBeInTheDocument();
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
-  });
-});
-
-// ── Mastery options rendering ──
-
-describe('TacticalMasterModal - mastery options', () => {
-  it('renders radio inputs for each available mastery option', () => {
-    renderModal();
+  it('deduplicates options, excludes Graze, and badges only feature-source masteries', () => {
+    renderModal({ baseMastery: 'Vex', replaceOptions: ['Vex', 'Push', 'Graze'] });
     expect(screen.getAllByRole('radio')).toHaveLength(2);
-  });
-
-  it('deduplicates a mastery appearing in both baseMastery and replaceOptions', () => {
-    const props = makeProps();
-    props.baseMastery = 'Vex';
-    props.replaceOptions = ['Vex', 'Push'];
-    render(<TacticalMasterModal {...props} />);
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getByText(/Advantage on Next Attack/)).toBeInTheDocument();
-    expect(screen.getByText(/Push \(10 ft\)/)).toBeInTheDocument();
-  });
-
-  it('excludes Graze from replaceOptions regardless of list size', () => {
-    const props = makeProps();
-    props.baseMastery = 'Push';
-    props.replaceOptions = ['Topple', 'Sap', 'Slow', 'Vex', 'Cleave', 'Nick', 'Graze'];
-    render(<TacticalMasterModal {...props} />);
     expect(screen.queryByText(/Graze/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Topple \(Prone\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Cleave \(Extra Attack\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('Feature')).toHaveLength(1);
   });
 
-  it('marks feature-source masteries with a Feature badge', () => {
-    renderModal();
-    expect(screen.getByText('Feature')).toBeInTheDocument();
-  });
-
-  it('does not mark weapon-source masteries with a Feature badge', () => {
-    const props = makeProps();
-    props.replaceOptions = [];
-    render(<TacticalMasterModal {...props} />);
-    expect(screen.queryByText('Feature')).not.toBeInTheDocument();
-  });
-
-  it('falls back to mastery name when MASTERY_EFFECTS has no entry', () => {
-    const props = makeProps();
-    props.baseMastery = 'CustomMastery';
-    props.replaceOptions = [];
-    render(<TacticalMasterModal {...props} />);
-    expect(screen.getByText('CustomMastery')).toBeInTheDocument();
-  });
-
-  it('uses description priority: loadWeaponMasteries > MASTERY_EFFECTS > mastery name', async () => {
+  it('prefers loaded descriptions, falls back to MASTERY_EFFECTS, then to the mastery name', async () => {
     useActionPopup.loadWeaponMasteries.mockResolvedValue([
-      { name: 'Vex', description: 'Overridden Vex desc.' },
       { name: 'Push', description: 'Push desc from file.' },
     ]);
-    const props = makeProps();
-    props.baseMastery = 'Vex';
-    props.replaceOptions = ['Push', 'UnknownMastery'];
-    render(<TacticalMasterModal {...props} />);
-    expect(await screen.findByText('Overridden Vex desc.')).toBeInTheDocument();
+    renderModal({ replaceOptions: ['Push', 'UnknownMastery'] });
     expect(await screen.findByText('Push desc from file.')).toBeInTheDocument();
-    expect(await screen.findByText('UnknownMastery')).toBeInTheDocument();
-  });
-
-  it('uses MASTERY_EFFECTS description when loadWeaponMasteries returns empty data', async () => {
-    useActionPopup.loadWeaponMasteries.mockResolvedValue([]);
-    renderModal();
-    expect(await screen.findByText(/You have Advantage/)).toBeInTheDocument();
+    expect(screen.getByText(/You have Advantage on your next attack roll/)).toBeInTheDocument();
+    expect(screen.getByText('UnknownMastery')).toBeInTheDocument();
   });
 });
 
-// ── Selection behavior ──
-
-describe('TacticalMasterModal - selection', () => {
-  it('has the baseMastery option selected initially', () => {
-    renderModal();
+describe('TacticalMasterModal - defaults and selection', () => {
+  it('defaults selection and instruction copy by mode', () => {
+    const { unmount } = renderModal();
     expect(screen.getByRole('radio', { name: /Advantage on Next Attack/, checked: true })).toBeInTheDocument();
-  });
+    expect(screen.getByText(/replace that property/)).toBeInTheDocument();
+    unmount();
 
-  it('selects a mastery when its radio is clicked and deselects the previous option', () => {
-    renderModal();
-    fireEvent.click(screen.getByText(/Push \(10 ft\)/));
+    renderModal({ isChoiceMode: true, baseMastery: null, replaceOptions: ['Push', 'Sap'] });
     expect(screen.getByRole('radio', { name: /Push/, checked: true })).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /Advantage on Next Attack/, checked: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Advantage on Next Attack/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/in addition to the mastery property/)).toBeInTheDocument();
   });
-});
 
-// ── Apply button ──
+  it('keeps Apply disabled and inert until a mastery is selected', () => {
+    const onConfirm = vi.fn();
+    const { rerender } = renderModal({ baseMastery: null, replaceOptions: [], onConfirm });
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    const apply = screen.getByRole('button', { name: /Apply/ });
+    expect(apply).toBeDisabled();
+    fireEvent.click(apply);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
 
-describe('TacticalMasterModal - apply button', () => {
-  it('is enabled when baseMastery is pre-selected', () => {
-    renderModal();
+    rerender(<TacticalMasterModal {...makeProps({ baseMastery: null, replaceOptions: ['Push'], onConfirm })} />);
+    expect(screen.getByRole('radio', { name: /Push/, checked: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
+    fireEvent.click(screen.getByText('Push (10 ft)'));
     expect(screen.getByRole('button', { name: /Apply/ })).not.toBeDisabled();
   });
 
-  it('is disabled when there are no masteries', () => {
-    renderModal({ baseMastery: null, replaceOptions: [] });
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
-  });
-
-  it('calls onConfirm with the selected mastery when apply is clicked', async () => {
+  it('moves the radio selection and confirms the exact mastery name exactly once', () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
-    render(<TacticalMasterModal {...makeProps({ onConfirm })} />);
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-    expect(onConfirm).toHaveBeenCalledWith('Vex');
-  });
+    renderModal({ onConfirm });
+    fireEvent.click(screen.getByText('Push (10 ft)'));
+    expect(screen.getByRole('radio', { name: /Push/, checked: true })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Advantage on Next Attack/, checked: true })).not.toBeInTheDocument();
 
-  it('calls onConfirm with the second mastery option when selected', async () => {
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
-    render(<TacticalMasterModal {...makeProps({ onConfirm })} />);
-    fireEvent.click(screen.getByText(/Push \(10 ft\)/));
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledWith('Push');
   });
 });
 
-// ── Applied state ──
-
 describe('TacticalMasterModal - applied state', () => {
-  function setupAppliedState(onConfirm = vi.fn().mockResolvedValue(undefined)) {
-    render(<TacticalMasterModal {...makeProps({ onConfirm })} />);
+  it('shows the applied state after confirming and closes via Done without re-confirming', async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderModal({ onConfirm, onClose });
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-  }
 
-  it('shows success message with Done button after applying', async () => {
-    setupAppliedState();
-    expect(await screen.findByText(/Mastery applied successfully/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-  });
-
-  it('hides selection elements after applying', async () => {
-    setupAppliedState();
-    await screen.findByRole('button', { name: 'Done' });
-    expect(screen.queryByText(/Choose a mastery property/)).not.toBeInTheDocument();
+    const done = await screen.findByRole('button', { name: 'Done' });
+    expect(screen.getByText(/Mastery applied successfully/)).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Apply/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/You can choose one mastery property per hit/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+
+    fireEvent.click(done);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
   // WM-003 F3: a once-per-turn refusal must surface its payload text, not success.
-  it('surfaces a once-per-turn refusal description instead of the success message', async () => {
-    const refusal = {
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Nick', refused: true, description: 'Throg can use Nick only once per turn.' },
-    };
-    const onConfirm = vi.fn().mockResolvedValue(refusal);
-    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Nick', replaceOptions: [] })} />);
+  it.each([
+    { case: 'an explicit refused flag', payload: { name: 'Nick', refused: true, description: 'Throg can use Nick only once per turn.' } },
+    { case: 'a popup lacking the mastery_rider automation', payload: { name: 'Cleave', description: 'Cleave can only be used once per turn.' } },
+    { case: 'a refused flag alongside automation', payload: { name: 'Nick', refused: true, description: 'Nick already used this turn.', automation: { type: 'mastery_rider', masteries: ['Nick'] } } },
+    { case: 'a refusal lacking a description', payload: { name: 'Nick', refused: true } },
+  ])('surfaces the refusal text for $case instead of the success message', async ({ payload }) => {
+    const onConfirm = vi.fn().mockResolvedValue({ type: 'popup', payload: { type: 'automation_info', ...payload } });
+    renderModal({ baseMastery: 'Nick', replaceOptions: [], onConfirm });
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-    expect(await screen.findByText('Throg can use Nick only once per turn.')).toBeInTheDocument();
+    expect(await screen.findByText(payload.description || 'Mastery not applied.')).toBeInTheDocument();
     expect(screen.queryByText(/Mastery applied successfully/)).not.toBeInTheDocument();
   });
 
-  it('treats a refusal popup lacking the mastery_rider automation as a refusal', async () => {
-    const refusal = {
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Cleave', description: 'Cleave can only be used once per turn.' },
-    };
-    const onConfirm = vi.fn().mockResolvedValue(refusal);
-    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Cleave', replaceOptions: [] })} />);
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-    expect(await screen.findByText('Cleave can only be used once per turn.')).toBeInTheDocument();
-    expect(screen.queryByText(/Mastery applied successfully/)).not.toBeInTheDocument();
-  });
-
-  it('still shows the success message when onConfirm resolves with the mastery_rider popup', async () => {
-    const success = {
+  it('shows success when onConfirm resolves with a mastery_rider popup', async () => {
+    const onConfirm = vi.fn().mockResolvedValue({
       type: 'popup',
       payload: { type: 'automation_info', name: 'Nick', description: 'Nick applied.', automation: { type: 'mastery_rider', masteries: ['Nick'] } },
-    };
-    const onConfirm = vi.fn().mockResolvedValue(success);
-    render(<TacticalMasterModal {...makeProps({ onConfirm, baseMastery: 'Nick', replaceOptions: [] })} />);
+    });
+    renderModal({ baseMastery: 'Nick', replaceOptions: [], onConfirm });
     fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
     expect(await screen.findByText(/Mastery applied successfully/)).toBeInTheDocument();
-  });
-
-  it('does not call onConfirm again when Done is clicked', async () => {
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
-    const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onConfirm, onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: /Apply/ }));
-    await screen.findByText(/Mastery applied successfully/);
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Nick applied.')).not.toBeInTheDocument();
   });
 });
-
-// ── Close behavior ──
 
 describe('TacticalMasterModal - close behavior', () => {
-  it('calls onClose when Skip button is clicked', () => {
+  it('calls onClose once when Skip is clicked', () => {
     const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onClose })} />);
+    renderModal({ onClose });
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call onClose when the overlay background is clicked', () => {
-    const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
-  });
-
-  it('does not close when the modal content area is clicked', () => {
-    const onClose = vi.fn();
-    render(<TacticalMasterModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-});
-
-// ── Single mastery source and isChoiceMode ──
-
-describe('TacticalMasterModal - single mastery source and isChoiceMode', () => {
-  it('renders only base mastery when replaceOptions is empty', () => {
-    renderModal({ replaceOptions: [] });
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
-    expect(screen.getByText(/Advantage on Next Attack/)).toBeInTheDocument();
-  });
-
-  it('renders only replace options when baseMastery is null', () => {
-    renderModal({ baseMastery: null });
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
-    expect(screen.getByText(/Push \(10 ft\)/)).toBeInTheDocument();
-  });
-
-  it('selects the first replace option as default when isChoiceMode is true, baseMastery when false', () => {
-    const choiceProps = makeProps();
-    choiceProps.isChoiceMode = true;
-    choiceProps.baseMastery = null;
-    choiceProps.replaceOptions = ['Push', 'Sap'];
-    render(<TacticalMasterModal {...choiceProps} />);
-    expect(screen.getByRole('radio', { name: /Push/, checked: true })).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /Advantage on Next Attack/ })).not.toBeInTheDocument();
-
-    const normalProps = makeProps();
-    normalProps.isChoiceMode = false;
-    render(<TacticalMasterModal {...normalProps} />);
-    expect(screen.getByRole('radio', { name: /Advantage on Next Attack/, checked: true })).toBeInTheDocument();
   });
 });

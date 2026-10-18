@@ -1,45 +1,38 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
 
 const getRuntimeValueMock = vi.fn(() => null);
 const setRuntimeValueMock = vi.fn();
-const setRuntimeBatchMock = vi.fn();
+const addEntryMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
   useRuntimeValue: () => null,
-  listeners: new Map(),
   getRuntimeValue: vi.fn((...args) => getRuntimeValueMock(...args)),
   setRuntimeValue: vi.fn((...args) => setRuntimeValueMock(...args)),
-  setRuntimeBatch: vi.fn((...args) => setRuntimeBatchMock(...args)),
+  setRuntimeBatch: vi.fn(),
 }));
 
+// Mocked dice: rollDice(1, d) => { total: 4, rolls: [4] }; CON bonus 2 => 6 HP per die.
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollDice: vi.fn((count, _die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
 }));
 
 vi.mock('../../services/rules/effects/restRules.js', () => ({
   getHitDieSize: vi.fn(() => 8),
   computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
   SHORT_REST_RESOURCES: ['channelDivinityCharges', 'wildShapeUses'],
-  getShortRestResourceLabels: vi.fn(() => ['Spell Slots (1st+)', 'Hit Dice']),
-  clearHuntersMarkConcentration: vi.fn(),
+  getShortRestResourceLabels: vi.fn(() => []),
   applyShortRest: vi.fn(async () => ({})),
 }));
 
-vi.mock('../../services/rules/effects/expirations.js', () => ({
-  clearAllExpirationEffects: vi.fn(),
-}));
-
 vi.mock('../../services/character/classFeatures.js', () => ({
-  getClassFeatures: vi.fn(() => ({ songOfRestDie: 6 })),
+  getClassFeatures: vi.fn(() => ({})),
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
-  evaluateAutoExpression: vi.fn(() => 2),
+  evaluateAutoExpression: vi.fn(() => 0),
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -53,8 +46,6 @@ vi.mock('../../services/rules/combat/applyHealing.js', () => ({
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpellData: vi.fn(() => Promise.resolve([])),
 }));
-
-const addEntryMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: addEntryMock,
@@ -90,17 +81,15 @@ function createPlayerStats(overrides = {}) {
 
 function renderModal(overrides = {}) {
   const playerStats = createPlayerStats(overrides);
-  const onClose = vi.fn();
-  const onComplete = vi.fn();
   const rendered = render(
     <ShortRestModal
       playerStats={playerStats}
       campaignName={mockCampaignName}
-      onClose={onClose}
-      onComplete={onComplete}
+      onClose={vi.fn()}
+      onComplete={vi.fn()}
     />
   );
-  return { ...rendered, onClose, onComplete, playerStats };
+  return { ...rendered, playerStats };
 }
 
 function setupGetRuntimeValue(returns) {
@@ -110,15 +99,20 @@ function setupGetRuntimeValue(returns) {
   });
 }
 
-function firstLogMessage() {
-  expect(addEntryMock.mock.calls.length).toBeGreaterThan(0);
-  const logCall = addEntryMock.mock.calls[0][1];
-  return logCall.message;
+function clickRollOne() {
+  fireEvent.click(screen.getByRole('button', { name: /Roll One/i }));
 }
 
-function expectLogContains(text) {
-  const message = firstLogMessage();
-  expect(message).toContain(text);
+async function completeRest() {
+  fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
+  await act(async () => {});
+}
+
+// Exactly one short_rest log entry, returned for message assertions.
+function shortRestEntry() {
+  const entries = addEntryMock.mock.calls.map(c => c[1]).filter(e => e && e.type === 'short_rest');
+  expect(entries).toHaveLength(1);
+  return entries[0];
 }
 
 describe('ShortRestModal - Completion Flow', () => {
@@ -127,146 +121,121 @@ describe('ShortRestModal - Completion Flow', () => {
     getRuntimeValueMock.mockImplementation(() => null);
   });
 
-  describe('HP tracking', () => {
-    it('updates currentHitPoints on completion after rolling hit dice', async () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /Roll One/i }));
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
+  it.each([
+    { hpBefore: 30, expected: 36, why: 'applies rolled recovery to below-max HP' },
+    { hpBefore: 42, expected: 45, why: 'clamps recovery at max hit points (45)' },
+  ])('on completion delegates applyShortRest(skipAutoRecovery) and writes currentHitPoints and consumed hit dice — $why', async ({ hpBefore, expected }) => {
+    setupGetRuntimeValue({ currentHitPoints: hpBefore });
+    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+    const { playerStats } = renderModal();
+    clickRollOne();
+    await completeRest();
 
-      const hpCalls = setRuntimeValueMock.mock.calls.filter(
-        (call) => call[1] === 'currentHitPoints'
-      );
-      expect(hpCalls.length).toBe(1);
-      expect(hpCalls[0][2]).toBeLessThanOrEqual(45);
-    });
+    // Base rest logic delegated once, with UI-driven recovery skipped so it is not double-applied.
+    expect(applyShortRest).toHaveBeenCalledTimes(1);
+    expect(applyShortRest).toHaveBeenCalledWith(playerStats, mockCampaignName, { skipAutoRecovery: true });
+    // Mocked dice: roll 4 + CON 2 = 6 HP. Exactly one HP write, computed from the runtime baseline.
+    expect(setRuntimeValueMock.mock.calls.filter(c => c[1] === 'currentHitPoints')).toHaveLength(1);
+    expect(setRuntimeValueMock).toHaveBeenCalledWith('Thorin', 'currentHitPoints', expected, mockCampaignName);
+    // One of five hit dice consumed, persisted for the next rest.
+    expect(setRuntimeValueMock).toHaveBeenCalledWith('Thorin', 'shortRestHitDice', 4, mockCampaignName);
   });
 
-  describe('log entries', () => {
-    it('calls addEntry with short_rest type on completion', async () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /Roll One/i }));
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
+  it('logs exactly one short_rest entry with roll detail and HP transition, no phantom restorations', async () => {
+    setupGetRuntimeValue({ currentHitPoints: 30 });
+    renderModal();
+    clickRollOne();
+    await completeRest();
 
-      expect(addEntryMock).toHaveBeenCalled();
-      expect(addEntryMock.mock.calls[0][1].type).toBe('short_rest');
-    });
-
-    it('includes hit dice details in log when dice were rolled', async () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /Roll One/i }));
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      expectLogContains('Hit Dice:');
-      expectLogContains('HP recovered');
-    });
+    const { message } = shortRestEntry();
+    expect(message).toContain('Thorin takes a short rest.');
+    expect(message).toContain('Hit Dice: 1d8 (4→6) = 6 HP recovered');
+    expect(message).toContain('Current HP: 30 → 36');
+    // Plain Cleric with nothing restored — nothing may claim a resource line.
+    expect(message).not.toContain('Resources restored');
   });
 
-  describe('resource restoration logging', () => {
-    it('logs Second Wind for Fighter when not at max', async () => {
-      setupGetRuntimeValue({ secondWindUses: 0 });
-      renderModal({
-        class: {
-          name: 'Fighter',
-          major: { name: 'Fighter' },
-          class_levels: [{ level: 5, second_wind: 1 }],
-        },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      expectLogContains('Second Wind');
+  it('logs a zero-dice rest honestly and every resting feature label in one completion', async () => {
+    setupGetRuntimeValue({ exhaustionLevel: 1 });
+    renderModal({
+      level: 10,
+      class: { name: 'Ranger', major: { name: 'Ranger' } },
+      specialActions: [{ name: 'Improved Warding Flare' }],
+      automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
     });
+    await completeRest();
 
-    it('logs Rage (2024) for Barbarian 2024 when not at max', async () => {
-      setupGetRuntimeValue({ ragePoints: 0 });
-      renderModal({
-        rules: '2024',
-        class: {
-          name: 'Barbarian',
-          major: { name: 'Barbarian' },
-          class_levels: [{ level: 5, rages: 2 }],
-        },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
+    const { message } = shortRestEntry();
+    expect(message).toContain('Hit Dice: 0 used');
+    expect(message).toContain('Resources restored: Warding Flare, Bolstering Treats, Tireless (exhaustion reduced)');
+  });
 
-      expectLogContains('Rage (2024)');
-    });
+  it.each([
+    {
+      desc: 'logs Second Wind for a Fighter below max',
+      stats: { class: { name: 'Fighter', major: { name: 'Fighter' }, class_levels: [{ level: 5, second_wind: 1 }] } },
+      runtime: { secondWindUses: 0 },
+      label: 'Second Wind',
+      want: true,
+    },
+    {
+      desc: 'omits Second Wind when the Fighter is already at max',
+      stats: { class: { name: 'Fighter', major: { name: 'Fighter' }, class_levels: [{ level: 5, second_wind: 1 }] } },
+      runtime: { secondWindUses: 1 },
+      label: 'Second Wind',
+      want: false,
+    },
+    {
+      desc: 'logs Rage for a 2024 Barbarian below max',
+      stats: { rules: '2024', class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ level: 5, rages: 2 }] } },
+      runtime: { ragePoints: 0 },
+      label: 'Rage (2024)',
+      want: true,
+    },
+    {
+      desc: 'omits Rage for a 5e Barbarian (2024-only gate)',
+      stats: { rules: '5e', class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ level: 5, rages: 2 }] } },
+      runtime: { ragePoints: 0 },
+      label: 'Rage (2024)',
+      want: false,
+    },
+  ])('$desc', async ({ stats, runtime, label, want }) => {
+    setupGetRuntimeValue(runtime);
+    renderModal(stats);
+    await completeRest();
 
-    it('logs Warding Flare when Improved Warding Flare feature exists', async () => {
-      renderModal({
-        specialActions: [{ name: 'Improved Warding Flare' }],
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
+    const { message } = shortRestEntry();
+    expect(message).toContain('takes a short rest.');
+    if (want) {
+      expect(message).toContain(`Resources restored: ${label}`);
+    } else {
+      expect(message).not.toContain(label.split(' (')[0]);
+      expect(message).not.toContain('Resources restored');
+    }
+  });
 
-      expectLogContains('Warding Flare');
-    });
-
-    // CLA-145: pin inverted — the old version asserted the false "Resources
-    // restored: Bardic Inspiration" label with no runtime write. The label
-    // must now ride the actual restore (applyShortRest's write seam).
-    it('logs Font of Inspiration only when a below-max pool was restored', async () => {
+  // CLA-145: the Font of Inspiration label must ride applyShortRest's write output,
+  // never availability alone — both cases run with the pool below max (CHA 3, uses 0);
+  // the only difference is what the producer reports it restored.
+  it.each([true, false])(
+    'CLA-145: Font label attribution follows applyShortRest (fontOfInspirationRestored: %s)',
+    async (restored) => {
       setupGetRuntimeValue({ bardicInspirationUses: 0 });
       const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
-      vi.mocked(applyShortRest).mockResolvedValueOnce({ fontOfInspirationRestored: true });
-      renderModal({
-        class: { name: 'Bard', major: { name: 'Bard' } },
-        automation: { passives: [{ type: 'font_of_inspiration' }] },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      expectLogContains('Bardic Inspiration (Font of Inspiration)');
-    });
-
-    it('does not log Font of Inspiration restored when nothing was written', async () => {
-      setupGetRuntimeValue({ bardicInspirationUses: 3 });
-      renderModal({
-        class: { name: 'Bard', major: { name: 'Bard' } },
-        automation: { passives: [{ type: 'font_of_inspiration' }] },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      const message = firstLogMessage();
-      expect(message).not.toContain('Bardic Inspiration');
-      expect(message).toContain('takes a short rest');
-    });
-
-    it('logs Pact Magic for Warlock', async () => {
+      applyShortRest.mockResolvedValueOnce({ fontOfInspirationRestored: restored });
       renderModal({
         class: { name: 'Warlock', major: { name: 'Archfey' } },
+        automation: { passives: [{ type: 'font_of_inspiration' }] },
       });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
+      await completeRest();
 
-      expectLogContains('Pact Magic');
-    });
-
-    it('logs Bolstering Treats when feature exists', async () => {
-      renderModal({
-        automation: { passives: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      expectLogContains('Bolstering Treats');
-    });
-
-    it('logs Tireless for Ranger level 10+ with exhaustion', async () => {
-      setupGetRuntimeValue({ exhaustionLevel: 1 });
-      renderModal({
-        class: { name: 'Ranger', major: { name: 'Ranger' } },
-        level: 10,
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Complete Short Rest/i }));
-      await act(() => Promise.resolve());
-
-      expectLogContains('Tireless');
-    });
-  });
+      const { message } = shortRestEntry();
+      if (restored) {
+        expect(message).toContain('Resources restored: Bardic Inspiration (Font of Inspiration), Pact Magic (Warlock spell slots)');
+      } else {
+        expect(message).not.toContain('Bardic Inspiration');
+        expect(message).toContain('Resources restored: Pact Magic (Warlock spell slots)');
+      }
+    }
+  );
 });

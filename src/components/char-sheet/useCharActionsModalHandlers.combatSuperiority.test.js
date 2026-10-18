@@ -1,23 +1,30 @@
+// @maintained-by-ai
+// Routing-seam lane: combat-superiority maneuver-choice modal confirms in useCharActionsModalHandlers.
+// Pins arg-gate refusals (isolated falsy legs), byte-exact dispatch payloads + arity to the
+// combatSuperiorityHandler execute* services, popup surfacing on result.payload only,
+// logEntries flush to the campaign log on the bait-and-switch/rally lanes (MN-002/MN-016),
+// and modalState clears.
+// Handler/service internals are owned by combatSuperiorityHandler.test.js,
+// combatSuperiorityChoices.test.js and combatSuperiorityUtils tests; modal UI wiring
+// lives in CharActionModals.inline-choice-modals.test.jsx and
+// CharActionModals.secondary-targets.test.jsx — not restated here.
+// Mocks: only the routed execute* services + logService are replaced; every other import
+// in the hook's graph loads for real (buffToggle/tempHp/useRuntimeState are never invoked
+// by these four handlers). Mock keys kept to everything automation/index.js destructures
+// from combatSuperiorityHandler in the live graph (#318).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
-
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-  toggleBuff: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
-  setTempHp: vi.fn(),
-}));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-}));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
+  executeSweepingAttack: vi.fn(),
+  executeBaitAndSwitchChoice: vi.fn(),
+  executeCommanderStrikeChoice: vi.fn(),
+  executeRallyChoice: vi.fn(),
+  // destructured by services/automation/index.js in the live graph (#318)
   handle: vi.fn(),
   handleCombatSuperiorityBonusAction: vi.fn(),
   handleCombatSuperiorityReaction: vi.fn(),
@@ -28,12 +35,9 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
   handleCombatSuperioritySweepingAttack: vi.fn(),
   handleAttackRiderPrompt: vi.fn(),
   handleSkillCheckPrompt: vi.fn(),
-  executeSweepingAttack: vi.fn(),
-  executeBaitAndSwitchChoice: vi.fn(),
-  executeCommanderStrikeChoice: vi.fn(),
-  executeRallyChoice: vi.fn(),
 }));
 
+const { addEntry } = await import('../../services/ui/logService.js');
 const {
   executeSweepingAttack,
   executeBaitAndSwitchChoice,
@@ -41,262 +45,173 @@ const {
   executeRallyChoice,
 } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
 
-const { addEntry } = await import('../../services/ui/logService.js');
+const CAMPAIGN = 'test-campaign';
 
-const mockSetPopupHtml = vi.fn();
-const mockSetModalState = vi.fn();
-
-function getHandlers(modalState = {}, mergedModalState = {}) {
+function mount() {
+  const setPopupHtml = vi.fn();
+  const setModalState = vi.fn();
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCharActionsModalHandlers({
-    setPopupHtml: mockSetPopupHtml,
-    setModalState: mockSetModalState,
-    modalState,
-    mergedModalState,
+  const handlers = useCharActionsModalHandlers({
+    setPopupHtml,
+    setModalState,
+    modalState: {},
+    mergedModalState: {},
   });
+  return { handlers, setPopupHtml, setModalState };
 }
 
-function makePlayerStats() {
+function stats() {
   return { name: 'TestChar', class: { name: 'Fighter' } };
 }
 
-function makeModalData(overrides = {}) {
-  return {
-    playerStats: makePlayerStats(),
-    campaignName: 'test-campaign',
-    ...overrides,
-  };
-}
+// One row per routed maneuver-confirm handler: how to invoke it, which service it must
+// dispatch to with byte-exact args, and which modalState key it must clear.
+const MANEUVERS = [
+  {
+    name: 'Sweeping Attack',
+    target: 'Goblin',
+    invoke: (h, target, data) => h.handleSweepingAttackConfirm(target, data),
+    service: executeSweepingAttack,
+    data: () => ({ playerStats: stats(), campaignName: CAMPAIGN }),
+    expectedCall: (data, target) => [
+      { automation: { secondaryTargetName: target } },
+      data.playerStats,
+      CAMPAIGN,
+      target,
+    ],
+    clearKey: 'sweepingAttackTargetModal',
+  },
+  {
+    name: 'Bait and Switch',
+    target: 'Orc',
+    invoke: (h, target, data) => h.handleBaitAndSwitchChoiceConfirm(target, data),
+    service: executeBaitAndSwitchChoice,
+    data: () => ({ playerStats: stats(), campaignName: CAMPAIGN, dieValue: 15, maneuverName: 'Trip' }),
+    expectedCall: (data, target) => [
+      { dieValue: 15, maneuverName: 'Trip' },
+      data.playerStats,
+      CAMPAIGN,
+      target,
+    ],
+    clearKey: 'baitAndSwitchChoiceModal',
+  },
+  {
+    name: 'Commander Strike',
+    target: 'Ally1',
+    invoke: (h, target, data) => h.handleCommanderStrikeChoiceConfirm(target, data),
+    service: executeCommanderStrikeChoice,
+    data: () => ({ playerStats: stats(), campaignName: CAMPAIGN, dieValue: 12, maneuverName: 'Commander Strike' }),
+    expectedCall: (data, target) => [
+      { dieValue: 12, maneuverName: 'Commander Strike' },
+      data.playerStats,
+      CAMPAIGN,
+      target,
+    ],
+    clearKey: 'commanderStrikeChoiceModal',
+  },
+  {
+    name: 'Rally',
+    target: 'Ally2',
+    invoke: (h, target, data) => h.handleRallyChoiceConfirm(target, data),
+    service: executeRallyChoice,
+    data: () => ({
+      playerStats: stats(),
+      campaignName: CAMPAIGN,
+      dieValue: 10,
+      maneuverName: 'Rally the Brave',
+      totalHp: 20,
+      extraHp: 5,
+      description: 'Rally description',
+    }),
+    expectedCall: (data, target) => [{
+      action: { dieValue: 10, maneuverName: 'Rally the Brave' },
+      playerStats: data.playerStats,
+      campaignName: CAMPAIGN,
+      chosenName: target,
+      totalHp: 20,
+      extraHp: 5,
+      description: 'Rally description',
+    }],
+    clearKey: 'rallyChoiceModal',
+  },
+];
 
-describe('useCharActionsModalHandlers - combat superiority', () => {
+describe('useCharActionsModalHandlers - combat superiority routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetPopupHtml.mockClear();
-    mockSetModalState.mockClear();
   });
 
-  describe('handleSweepingAttackConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when targetName is %s', async (targetName) => {
-      const handlers = getHandlers();
-      await handlers.handleSweepingAttackConfirm(targetName, {});
-      expect(executeSweepingAttack).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('returns early without side effects when targetName is an empty string', async () => {
-      const handlers = getHandlers();
-      await handlers.handleSweepingAttackConfirm('', {});
-      expect(executeSweepingAttack).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it.each([null, undefined])('returns early without side effects when modalData is %s', async (modalData) => {
-      const handlers = getHandlers();
-      await handlers.handleSweepingAttackConfirm('target', modalData);
-      expect(executeSweepingAttack).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('calls executeSweepingAttack with correct args and clears modal', async () => {
-      executeSweepingAttack.mockResolvedValue({ payload: '<p>Hit!</p>' });
-      const handlers = getHandlers();
-      const modalData = makeModalData();
-      await handlers.handleSweepingAttackConfirm('Goblin', modalData);
-      expect(executeSweepingAttack).toHaveBeenCalledWith(
-        { automation: { secondaryTargetName: 'Goblin' } },
-        modalData.playerStats,
-        modalData.campaignName,
-        'Goblin'
-      );
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Hit!</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ sweepingAttackTargetModal: null });
-    });
-
-    it('does not call setPopupHtml when result has no payload but still clears modal', async () => {
-      executeSweepingAttack.mockResolvedValue({});
-      const handlers = getHandlers();
-      const modalData = makeModalData();
-      await handlers.handleSweepingAttackConfirm('Goblin', modalData);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ sweepingAttackTargetModal: null });
-    });
+  it.each(
+    MANEUVERS.flatMap(m => [
+      { desc: `${m.name}: empty target`, m, target: '', data: m.data() },
+      { desc: `${m.name}: null modalData`, m, target: m.target, data: null },
+    ])
+  )('refuses without side effects — $desc', async ({ m, target, data }) => {
+    const { handlers, setPopupHtml, setModalState } = mount();
+    await m.invoke(handlers, target, data);
+    expect(m.service).not.toHaveBeenCalled();
+    expect(setPopupHtml).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setModalState).not.toHaveBeenCalled();
   });
 
-  describe('handleBaitAndSwitchChoiceConfirm', () => {
-    it.each([null, undefined, ''])('returns early without side effects when targetName is %s', async (targetName) => {
-      const handlers = getHandlers();
-      await handlers.handleBaitAndSwitchChoiceConfirm(targetName, {});
-      expect(executeBaitAndSwitchChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
+  it.each(MANEUVERS.map(m => [m]))(
+    '$name confirm dispatches exact service payload, surfaces popup, clears modal',
+    async (m) => {
+      m.service.mockResolvedValue({ payload: `<p>${m.name}!</p>` });
+      const { handlers, setPopupHtml, setModalState } = mount();
+      const data = m.data(m.target);
+      await m.invoke(handlers, m.target, data);
+      expect(m.service).toHaveBeenCalledTimes(1);
+      expect(m.service).toHaveBeenCalledWith(...m.expectedCall(data, m.target));
+      expect(setPopupHtml).toHaveBeenCalledWith(`<p>${m.name}!</p>`);
+      expect(setModalState).toHaveBeenCalledWith({ [m.clearKey]: null });
+    }
+  );
 
-    it.each([null, undefined])('returns early without side effects when modalData is %s', async (modalData) => {
-      const handlers = getHandlers();
-      await handlers.handleBaitAndSwitchChoiceConfirm('Orc', modalData);
-      expect(executeBaitAndSwitchChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
+  it.each(MANEUVERS.map(m => [m]))(
+    '$name confirm with no payload logs nothing but still clears the modal',
+    async (m) => {
+      m.service.mockResolvedValue({});
+      const { handlers, setPopupHtml, setModalState } = mount();
+      const data = m.data(m.target);
+      await m.invoke(handlers, m.target, data);
+      expect(m.service).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ [m.clearKey]: null });
+    }
+  );
 
-    it('calls executeBaitAndSwitchChoice with correct args and clears modal', async () => {
-      executeBaitAndSwitchChoice.mockResolvedValue({ payload: '<p>Success</p>' });
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 15, maneuverName: 'Trip' });
-      await handlers.handleBaitAndSwitchChoiceConfirm('Orc', modalData);
-      expect(executeBaitAndSwitchChoice).toHaveBeenCalledWith(
-        { dieValue: 15, maneuverName: 'Trip' },
-        modalData.playerStats,
-        modalData.campaignName,
-        'Orc'
-      );
-      expect(mockSetModalState).toHaveBeenCalledWith({ baitAndSwitchChoiceModal: null });
-    });
-
-    it('does not call setPopupHtml when result has no payload but still clears modal', async () => {
-      executeBaitAndSwitchChoice.mockResolvedValue({});
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 15, maneuverName: 'Trip' });
-      await handlers.handleBaitAndSwitchChoiceConfirm('Orc', modalData);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ baitAndSwitchChoiceModal: null });
-    });
-
-    // MN-002: grant log must reach the campaign log (mirror rally flush).
-    it('flushes executeBaitAndSwitchChoice logEntries to the campaign log', async () => {
-      const grantEntry = {
+  // MN-002 / MN-016: maneuver grants must reach the campaign log, keyed by the
+  // modalData campaignName — only bait-and-switch and rally flush logEntries.
+  it.each([
+    {
+      m: MANEUVERS[1],
+      entry: {
         type: 'ability_use',
         characterName: 'TestChar',
         abilityName: 'Bait and Switch',
         description: 'Bait and Switch: Orc gains +7 AC until the start of TestChar\'s next turn.',
-      };
-      executeBaitAndSwitchChoice.mockResolvedValue({ payload: '<p>Applied</p>', logEntries: [grantEntry] });
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 7, maneuverName: 'Bait and Switch' });
-      await handlers.handleBaitAndSwitchChoiceConfirm('Orc', modalData);
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', grantEntry);
-      expect(mockSetModalState).toHaveBeenCalledWith({ baitAndSwitchChoiceModal: null });
-    });
-  });
-
-  describe('handleCommanderStrikeChoiceConfirm', () => {
-    it.each([null, undefined, ''])('returns early without side effects when targetName is %s', async (targetName) => {
-      const handlers = getHandlers();
-      await handlers.handleCommanderStrikeChoiceConfirm(targetName, {});
-      expect(executeCommanderStrikeChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it.each([null, undefined])('returns early without side effects when modalData is %s', async (modalData) => {
-      const handlers = getHandlers();
-      await handlers.handleCommanderStrikeChoiceConfirm('Ally1', modalData);
-      expect(executeCommanderStrikeChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('calls executeCommanderStrikeChoice with correct args and clears modal', async () => {
-      executeCommanderStrikeChoice.mockResolvedValue({ payload: '<p>Struck</p>' });
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 12, maneuverName: 'Commander Strike' });
-      await handlers.handleCommanderStrikeChoiceConfirm('Ally1', modalData);
-      expect(executeCommanderStrikeChoice).toHaveBeenCalledWith(
-        { dieValue: 12, maneuverName: 'Commander Strike' },
-        modalData.playerStats,
-        modalData.campaignName,
-        'Ally1'
-      );
-      expect(mockSetModalState).toHaveBeenCalledWith({ commanderStrikeChoiceModal: null });
-    });
-
-    it('does not call setPopupHtml when result has no payload but still clears modal', async () => {
-      executeCommanderStrikeChoice.mockResolvedValue({});
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 12, maneuverName: 'Commander Strike' });
-      await handlers.handleCommanderStrikeChoiceConfirm('Ally1', modalData);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ commanderStrikeChoiceModal: null });
-    });
-  });
-
-  describe('handleRallyChoiceConfirm', () => {
-    it.each([null, undefined, ''])('returns early without side effects when targetName is %s', async (targetName) => {
-      const handlers = getHandlers();
-      await handlers.handleRallyChoiceConfirm(targetName, {});
-      expect(executeRallyChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it.each([null, undefined])('returns early without side effects when modalData is %s', async (modalData) => {
-      const handlers = getHandlers();
-      await handlers.handleRallyChoiceConfirm('Ally2', modalData);
-      expect(executeRallyChoice).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('calls executeRallyChoice with all parameters and clears modal', async () => {
-      executeRallyChoice.mockResolvedValue({ payload: '<p>Rally!</p>' });
-      const handlers = getHandlers();
-      const modalData = makeModalData({
-        dieValue: 10,
-        maneuverName: 'Rally the Brave',
-        totalHp: 20,
-        extraHp: 5,
-        description: 'Rally description',
-      });
-      await handlers.handleRallyChoiceConfirm('Ally2', modalData);
-      expect(executeRallyChoice).toHaveBeenCalledWith({
-        action: { dieValue: 10, maneuverName: 'Rally the Brave' },
-        playerStats: modalData.playerStats,
-        campaignName: modalData.campaignName,
-        chosenName: 'Ally2',
-        totalHp: 20,
-        extraHp: 5,
-        description: 'Rally description',
-      });
-      expect(mockSetModalState).toHaveBeenCalledWith({ rallyChoiceModal: null });
-    });
-
-    it('does not call setPopupHtml when result has no payload but still clears modal', async () => {
-      executeRallyChoice.mockResolvedValue({});
-      const handlers = getHandlers();
-      const modalData = makeModalData({
-        dieValue: 10,
-        maneuverName: 'Rally the Brave',
-        totalHp: 20,
-        extraHp: 5,
-        description: 'Rally description',
-      });
-      await handlers.handleRallyChoiceConfirm('Ally2', modalData);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ rallyChoiceModal: null });
-    });
-
-    it('flushes executeRallyChoice logEntries to the campaign log (MN-016)', async () => {
-      const grantEntry = {
+      },
+    },
+    {
+      m: MANEUVERS[3],
+      entry: {
         type: 'ability_use',
         characterName: 'TestChar',
         abilityName: 'Rally',
         description: 'Rally: HexWarlock gains 16 temporary hit points.',
         d10Roll: 7,
-      };
-      executeRallyChoice.mockResolvedValue({ payload: { description: 'Rally!' }, logEntries: [grantEntry] });
-      const handlers = getHandlers();
-      const modalData = makeModalData({
-        dieValue: 7,
-        maneuverName: 'Rally',
-        totalHp: 16,
-        extraHp: 9,
-        description: 'Rally description',
-      });
-      await handlers.handleRallyChoiceConfirm('HexWarlock', modalData);
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', grantEntry);
-      expect(mockSetModalState).toHaveBeenCalledWith({ rallyChoiceModal: null });
-    });
-
-    it('does not call addEntry when result has no logEntries', async () => {
-      executeRallyChoice.mockResolvedValue({ payload: { description: 'Rally!' } });
-      const handlers = getHandlers();
-      const modalData = makeModalData({ dieValue: 7, maneuverName: 'Rally', totalHp: 16, extraHp: 9 });
-      await handlers.handleRallyChoiceConfirm('HexWarlock', modalData);
-      expect(addEntry).not.toHaveBeenCalled();
-    });
+      },
+    },
+  ])('$m.name confirm flushes logEntries to the campaign log', async ({ m, entry }) => {
+    m.service.mockResolvedValue({ payload: '<p>Applied</p>', logEntries: [entry] });
+    const { handlers, setPopupHtml, setModalState } = mount();
+    const data = m.data(m.target);
+    await m.invoke(handlers, m.target, data);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, entry);
+    expect(setPopupHtml).toHaveBeenCalledWith('<p>Applied</p>');
+    expect(setModalState).toHaveBeenCalledWith({ [m.clearKey]: null });
   });
 });

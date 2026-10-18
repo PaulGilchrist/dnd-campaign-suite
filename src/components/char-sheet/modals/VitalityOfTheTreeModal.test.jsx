@@ -1,59 +1,20 @@
-import { render, screen } from '@testing-library/react';
+// @maintained-by-ai
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import VitalityOfTheTreeModal from './VitalityOfTheTreeModal.jsx';
 
-// ── Minimal mock — only renders structure, no selection logic.
-//     Selection behavior is fully covered by CreatureSelectionModal.test.jsx.
-
+// Thin-wrapper lane only: this component's entire behavior is forwarding
+// exact copy, targets, and callbacks to CreatureSelectionModal. All
+// selection, target-formatting, empty-state, and confirm/skip behavior is
+// covered by shared/CreatureSelectionModal.test.jsx — the mock stays
+// inert so this file never verifies mock internals.
 vi.mock('./shared/CreatureSelectionModal.jsx', () => ({
-  default: vi.fn((props) => {
-    const selected = props.defaultSelected || [];
-    return (
-      <div data-testid="creature-selection-modal">
-        <div className="sp-header">
-          <i className={`fa-solid ${props.icon}`}></i> {props.title}
-        </div>
-        {props.description && <p>{props.description}</p>}
-        {props.note && <p className="sp-note">{props.note}</p>}
-        <div className="secondary-target-list">
-          {props.targets.map((target, i) => {
-            const name = target.name || target;
-            return (
-              <label key={i} className="secondary-target-row" data-testid={`target-${i}`}>
-                <span className="secondary-target-name">
-                  <strong>{name}</strong>
-                </span>
-              </label>
-            );
-          })}
-          {props.targets.length === 0 && (
-            <p className="sp-note">No targets available.</p>
-          )}
-        </div>
-        <div className="sp-actions">
-          <button
-            className="sp-roll-btn"
-            disabled={selected.length === 0}
-            type="button"
-          >
-            <i className={`fa-solid ${props.confirmIcon || 'fa-crosshairs'}`}></i> {props.confirmLabel || 'Confirm'} ({selected.length})
-          </button>
-          <button className="sp-dismiss-btn" onClick={props.onSkip} type="button">
-            Skip
-          </button>
-        </div>
-      </div>
-    );
-  }),
+  default: vi.fn(() => null),
 }));
 
-// Re-import mocked module for prop assertions
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
 
-// ── Test helpers ──
-
-const mockOnConfirm = vi.fn();
-const mockOnSkip = vi.fn();
+const MockedModal = vi.mocked(CreatureSelectionModal);
 
 const objectTargets = [
   { name: 'Ally1', type: 'player', currentHp: 15, maxHp: 30 },
@@ -61,71 +22,54 @@ const objectTargets = [
   { name: 'Enemy1', type: 'npc', currentHp: 20, maxHp: 40 },
 ];
 
-// ── Tests ──
-
 describe('VitalityOfTheTreeModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('passes correct hardcoded and runtime props to CreatureSelectionModal', () => {
+  it('forwards the exact vitality copy, targets, and callbacks to CreatureSelectionModal', () => {
+    const onConfirm = vi.fn();
+    const onSkip = vi.fn();
+
     render(
       <VitalityOfTheTreeModal
         creatureTargets={objectTargets}
         tempHp={7}
         maxTargets={3}
-        onConfirm={mockOnConfirm}
-        onSkip={mockOnSkip}
+        onConfirm={onConfirm}
+        onSkip={onSkip}
       />
     );
-    const props = vi.mocked(CreatureSelectionModal).mock.calls[0][0];
-    expect(props.title).toBe('Vitality of the Tree');
-    expect(props.icon).toBe('fa-tree');
-    expect(props.description).toBe('Choose up to 3 creatures to grant temporary hit points');
-    expect(props.note).toBe("Each target gains 7 temp HP from the World Tree's life force.");
-    expect(props.confirmLabel).toBe('Grant Vitality');
-    expect(props.confirmIcon).toBe('fa-tree');
-    expect(props.targets).toEqual(objectTargets);
-    expect(props.maxTargets).toBe(3);
-    expect(props.onConfirm).toBe(mockOnConfirm);
-    expect(props.onSkip).toBe(mockOnSkip);
+
+    expect(MockedModal).toHaveBeenCalledTimes(1);
+    expect(MockedModal.mock.calls[0][0]).toEqual({
+      title: 'Vitality of the Tree',
+      icon: 'fa-tree',
+      targets: objectTargets,
+      maxTargets: 3,
+      description: 'Choose up to 3 creatures to grant temporary hit points',
+      note: "Each target gains 7 temp HP from the World Tree's life force.",
+      confirmLabel: 'Grant Vitality',
+      confirmIcon: 'fa-tree',
+      onConfirm,
+      onSkip,
+    });
   });
 
-  it('renders targets in object, string, and empty formats', () => {
-    const stringTargets = ['TargetA', 'TargetB'];
-    const testCases = [
-      { targets: objectTargets, expected: ['Ally1', 'Ally2', 'Enemy1'] },
-      { targets: stringTargets, expected: ['TargetA', 'TargetB'] },
-      { targets: [], expected: ['No targets available.'] },
-    ];
-    for (const { targets, expected } of testCases) {
-      render(
-        <VitalityOfTheTreeModal
-          creatureTargets={targets}
-          tempHp={5}
-          maxTargets={2}
-          onConfirm={() => {}}
-          onSkip={() => {}}
-        />
-      );
-      for (const text of expected) {
-        expect(screen.getByText(text)).toBeInTheDocument();
-      }
-    }
-  });
-
-  it('renders with tempHp of 0', () => {
+  it('interpolates maxTargets and tempHp into description and note, including tempHp of 0', () => {
     render(
       <VitalityOfTheTreeModal
-        creatureTargets={[{ name: 'Ally1' }]}
+        creatureTargets={[]}
         tempHp={0}
         maxTargets={1}
-        onConfirm={() => {}}
-        onSkip={() => {}}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
       />
     );
-    expect(
-      screen.getByText("Each target gains 0 temp HP from the World Tree's life force.")
-    ).toBeInTheDocument();
+
+    expect(MockedModal).toHaveBeenCalledTimes(1);
+    const { description, note } = MockedModal.mock.calls[0][0];
+    expect(description).toBe('Choose up to 1 creatures to grant temporary hit points');
+    expect(note).toBe("Each target gains 0 temp HP from the World Tree's life force.");
   });
 });

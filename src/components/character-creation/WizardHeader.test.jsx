@@ -1,17 +1,26 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardHeader from './WizardHeader.jsx';
 
+const createProps = (overrides = {}) => ({
+  title: 'Create New Character',
+  onClose: vi.fn(),
+  ...overrides,
+});
+
 describe('WizardHeader', () => {
-  it('renders the heading with the provided title', () => {
-    render(<WizardHeader title="Test Title" onClose={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Test Title' })).toBeInTheDocument();
+  it('renders the title prop as the header heading', () => {
+    const props = createProps({ title: 'Edit Character' });
+    render(<WizardHeader {...props} />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Edit Character' })).toBeInTheDocument();
   });
 
-  it('renders the close button and calls onClose when clicked', () => {
-    const onClose = vi.fn();
-    render(<WizardHeader title="Test" onClose={onClose} />);
+  it('routes the × close button click to onClose exactly once', () => {
+    const props = createProps();
+    render(<WizardHeader {...props} />);
+    expect(props.onClose).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '×' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 });

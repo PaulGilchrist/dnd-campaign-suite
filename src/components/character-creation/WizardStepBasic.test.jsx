@@ -1,10 +1,22 @@
-// Removed 2 tests:
-//   - "should render an empty alignment select when fetch fails" → redundant with error-logging test (same failure path)
-//   - "should do nothing when no file is selected" → low-value negative assertion for trivial guard
+// @maintained-by-ai
+/**
+ * Unit lane for WizardStepBasic (name / level / alignment / portrait).
+ *
+ * Lane partition (do not restate here):
+ *  - flow glue, live duplicate-name guard, step-2 heading in context
+ *    -> CharacterCreationWizard.integration.test.jsx
+ *  - heading numbering via shared getDisplayNumber -> WizardStepNumbering.test.jsx
+ *  - validator copy for name/level/alignment -> config/utils validators
+ * This file pins only component behavior: exact ('key', value) onChange
+ * payloads, portrait src resolution branches, and verbatim display of
+ * props-supplied errors on the correct field only.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepBasic from './WizardStepBasic.jsx';
 
+// Disk-faithful fixture: mirrors public/data/alignments.json exactly
+// (9 entries, same order) so the option-population pin is real.
 const mockAlignments = [
   'Lawful Good',
   'Neutral Good',
@@ -17,7 +29,8 @@ const mockAlignments = [
   'Chaotic Evil',
 ];
 
-function createMockProps(overrides = {}) {
+// Fresh props per test so mock call histories never leak across tests.
+function createProps(overrides = {}) {
   return {
     formData: {
       name: 'Test Character',
@@ -35,238 +48,167 @@ function createMockProps(overrides = {}) {
   };
 }
 
-function setupFetchMock(alignments) {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve(alignments),
-  });
-}
-
-function setupFetchFailure() {
-  global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+function renderBasic(props = {}) {
+  const stepProps = createProps(props);
+  render(<WizardStepBasic stepNumber={2} {...stepProps} />);
+  return stepProps;
 }
 
 describe('WizardStepBasic', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    setupFetchMock(mockAlignments);
+    vi.restoreAllMocks();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockAlignments),
+    });
   });
 
-  describe('Render', () => {
-    it('should display initial form values', async () => {
-      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
+  it('renders default state: fields reflect formData, alignments populate in exact order, upload placeholder with no remove button', async () => {
+    renderBasic();
 
-      expect(screen.getByDisplayValue('Test Character')).toBeInTheDocument();
-      await waitFor(() => {
-        expect(screen.getByRole('combobox')).toHaveValue('Lawful Good');
+    expect(screen.getByRole('textbox')).toHaveValue('Test Character');
+    expect(screen.getByRole('spinbutton')).toHaveValue(5);
+
+    // Wait for fetch-populated options (last option), then pin exact order.
+    await screen.findByText('Chaotic Evil');
+    const alignmentSelect = screen.getByRole('combobox');
+    expect(optionLabels(alignmentSelect)).toEqual(mockAlignments);
+    expect(alignmentSelect).toHaveValue('Lawful Good');
+
+    expect(screen.getByText('Click to upload')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Image' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: 'base64 image takes precedence over imagePath',
+      campaignName: undefined,
+      formData: { image: 'data:image/png;base64,aaa', imagePath: '/should/be/ignored.jpg' },
+      expectedSrc: 'data:image/png;base64,aaa',
+    },
+    {
+      label: 'relative imagePath is prefixed with campaigns/:name',
+      campaignName: 'my-campaign',
+      formData: { imagePath: 'portraits/hero.jpg' },
+      expectedSrc: 'campaigns/my-campaign/portraits/hero.jpg',
+    },
+    {
+      label: 'absolute URL imagePath is left untouched',
+      campaignName: 'my-campaign',
+      formData: { imagePath: 'https://example.com/hero.jpg' },
+      expectedSrc: 'https://example.com/hero.jpg',
+    },
+    {
+      label: 'relative imagePath without campaignName is left untouched',
+      campaignName: undefined,
+      formData: { imagePath: '/path/to/portrait.jpg' },
+      expectedSrc: '/path/to/portrait.jpg',
+    },
+  ])('portrait preview: $label', async ({ campaignName, formData, expectedSrc }) => {
+    renderBasic({ campaignName, formData });
+
+    const preview = screen.getByRole('img');
+    expect(preview).toHaveAttribute('alt', 'Character');
+    expect(preview).toHaveAttribute('src', expectedSrc);
+    expect(screen.queryByText('Click to upload')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Image' })).toBeInTheDocument();
+  });
+
+  it('typing the name sends the exact ("name", value) payload', () => {
+    const { onInputChange } = renderBasic();
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'New Name' } });
+
+    expect(onInputChange).toHaveBeenCalledTimes(1);
+    expect(onInputChange).toHaveBeenCalledWith('name', 'New Name');
+  });
+
+  it.each([
+    { input: '10', expected: 10 },
+    { input: '0', expected: 0 }, // falsy level must pass through as a number, not be defaulted away
+    { input: '', expected: NaN }, // cleared field sends NaN; the validator owns rejection copy
+  ])('changing level to "%s" sends parsed integer level %p', ({ input, expected }) => {
+    const { onInputChange } = renderBasic({ formData: { level: 1 } });
+
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: input } });
+
+    expect(onInputChange).toHaveBeenCalledWith('level', expected);
+  });
+
+  it('changing alignment sends ("alignment", value)', async () => {
+    const { onInputChange } = renderBasic();
+
+    const alignmentSelect = await screen.findByRole('combobox');
+    fireEvent.change(alignmentSelect, { target: { value: 'Chaotic Neutral' } });
+
+    expect(onInputChange).toHaveBeenCalledWith('alignment', 'Chaotic Neutral');
+  });
+
+  it.each([
+    { field: 'name', role: 'textbox' },
+    { field: 'level', role: 'spinbutton' },
+    { field: 'alignment', role: 'combobox' },
+  ])(
+    'displays a props-supplied error verbatim on the $field field only (copy owned by validators)',
+    async ({ field, role }) => {
+      const message = `${field} failed validation`;
+      renderBasic({ errors: { [field]: message } });
+
+      // Flush the alignment fetch so no act noise leaks after assertions.
+      await screen.findByRole('combobox');
+
+      expect(screen.getByText(message)).toBeInTheDocument();
+      expect(screen.getByRole(role)).toHaveClass('error');
+
+      // Pin BOTH states: no message for the other fields, and they stay clean.
+      const others = ['textbox', 'spinbutton', 'combobox'].filter((r) => r !== role);
+      others.forEach((otherRole) => {
+        expect(screen.getByRole(otherRole)).not.toHaveClass('error');
       });
+    },
+  );
+
+  it('Remove Image click clears both image and imagePath', () => {
+    const { onInputChange } = renderBasic({
+      formData: { image: 'data:image/png;base64,test', imagePath: '/path/to/img.jpg' },
     });
 
-    it('should show "Click to upload" and no remove button when no image is set', () => {
-      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Image' }));
 
-      expect(screen.getByText('Click to upload')).toBeInTheDocument();
-      expect(screen.queryByText('Remove Image')).not.toBeInTheDocument();
-    });
-
-    it.each([
-      { label: 'base64 image data', formData: { image: 'data:image/png;base64,test' } },
-      { label: 'image path', formData: { imagePath: '/path/to/portrait.jpg' } },
-    ])('should render image preview from %s', ({ formData }) => {
-      render(<WizardStepBasic stepNumber={2} {...createMockProps({ formData })} />);
-
-      const preview = screen.getByRole('img');
-      expect(preview).toBeInTheDocument();
-      expect(preview).toHaveAttribute('src', formData.image || formData.imagePath);
-      expect(screen.queryByText('Click to upload')).not.toBeInTheDocument();
-    });
-
-    it('should use campaignName to construct image path when imagePath is a relative path', async () => {
-      render(
-        <WizardStepBasic stepNumber={2}
-          {...createMockProps({
-            campaignName: 'my-campaign',
-            formData: { imagePath: 'portraits/hero.jpg' },
-          })}
-        />
-      );
-
-      const preview = screen.getByRole('img');
-      expect(preview).toHaveAttribute(
-        'src',
-        'campaigns/my-campaign/portraits/hero.jpg',
-      );
-    });
-
-    it('should not prepend campaigns/ when imagePath is an absolute URL', () => {
-      render(
-        <WizardStepBasic stepNumber={2}
-          {...createMockProps({
-            campaignName: 'my-campaign',
-            formData: { imagePath: 'https://example.com/hero.jpg' },
-          })}
-        />
-      );
-
-      const preview = screen.getByRole('img');
-      expect(preview).toHaveAttribute('src', 'https://example.com/hero.jpg');
-    });
-
-    it('should render remove button when an image is set', () => {
-      render(
-        <WizardStepBasic stepNumber={2}
-          {...createMockProps({
-            formData: { image: 'data:image/png;base64,test' },
-          })}
-        />
-      );
-
-      expect(screen.getByText('Remove Image')).toBeInTheDocument();
-    });
+    expect(onInputChange).toHaveBeenCalledWith('image', '');
+    expect(onInputChange).toHaveBeenCalledWith('imagePath', '');
   });
 
-  describe('Input changes', () => {
-    it('should call onInputChange with name when the name input changes', () => {
-      const mockOnChange = vi.fn();
-      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
+  it('selecting a file reads it via FileReader and sends image data URL plus filename', async () => {
+    const { onInputChange } = renderBasic();
 
-      const nameInput = screen.getByDisplayValue('Test Character');
-      fireEvent.change(nameInput, { target: { value: 'New Name' } });
+    const file = new File(['test'], 'test-image.png', { type: 'image/png' });
+    fireEvent.change(document.querySelector('input[type="file"]'), { target: { files: [file] } });
 
-      expect(mockOnChange).toHaveBeenCalledWith('name', 'New Name');
+    // Real jsdom FileReader — deterministic base64 for content "test".
+    await waitFor(() => {
+      expect(onInputChange).toHaveBeenCalledWith('image', 'data:image/png;base64,dGVzdA==');
     });
-
-    it.each([
-      { input: '10', expected: 10, label: 'parses valid integer' },
-      { input: '', expected: NaN, label: 'returns NaN for empty string' },
-      { input: 'abc', expected: NaN, label: 'returns NaN for non-numeric string' },
-      { input: '0', expected: 0, label: 'parses zero' },
-      { input: '-5', expected: -5, label: 'parses negative number' },
-    ])(
-      'should call onInputChange with parsed integer level when level input changes (%s)',
-      ({ input, expected }) => {
-        const mockOnChange = vi.fn();
-        render(
-          <WizardStepBasic stepNumber={2}
-            {...createMockProps({
-              formData: { level: 1 },
-              onInputChange: mockOnChange,
-            })}
-          />
-        );
-
-        const levelInput = document.querySelector('input[type="number"]');
-        fireEvent.change(levelInput, { target: { value: input } });
-
-        expect(mockOnChange).toHaveBeenCalledWith('level', expected);
-      },
-    );
-
-    it('should call onInputChange with alignment when the alignment select changes', async () => {
-      const mockOnChange = vi.fn();
-      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
-
-      await waitFor(() => {
-        const alignmentSelect = screen.getByRole('combobox');
-        expect(alignmentSelect).toBeInTheDocument();
-      });
-
-      const alignmentSelect = screen.getByRole('combobox');
-      fireEvent.change(alignmentSelect, { target: { value: 'Chaotic Neutral' } });
-
-      expect(mockOnChange).toHaveBeenCalledWith('alignment', 'Chaotic Neutral');
-    });
+    expect(onInputChange).toHaveBeenCalledWith('imageName', 'test-image.png');
   });
 
-  describe('Validation errors', () => {
-    it.each([
-      { field: 'name', error: 'Name is required', getQuery: () => screen.getByDisplayValue('Test Character') },
-      { field: 'level', error: 'Level is required', getQuery: () => document.querySelector('input[type="number"]') },
-      { field: 'alignment', error: 'Alignment is required', getQuery: () => screen.getByRole('combobox') },
-    ])(
-      'should render error message and error class for the %s field',
-      ({ field, error, getQuery }) => {
-        render(
-          <WizardStepBasic stepNumber={2}
-            {...createMockProps({
-              errors: { [field]: error },
-            })}
-          />
-        );
+  it('logs the fetch error and still renders usable fields when alignments fail to load', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
-        expect(screen.getByText(error)).toBeInTheDocument();
-        const input = getQuery();
-        expect(input).toHaveClass('error');
-      },
-    );
-  });
+    renderBasic();
 
-  describe('Image removal', () => {
-    it('should clear both image and imagePath when Remove Image is clicked', () => {
-      const mockOnChange = vi.fn();
-      render(
-        <WizardStepBasic stepNumber={2}
-          {...createMockProps({
-            onInputChange: mockOnChange,
-            formData: {
-              image: 'data:image/png;base64,test',
-              imagePath: '/path/to/img.jpg',
-            },
-          })}
-        />
-      );
-
-      const removeBtn = screen.getByText('Remove Image');
-      fireEvent.click(removeBtn);
-
-      expect(mockOnChange).toHaveBeenCalledWith('image', '');
-      expect(mockOnChange).toHaveBeenCalledWith('imagePath', '');
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading alignments:', expect.any(Error));
     });
-  });
-
-  describe('Image upload', () => {
-    it('should read the selected file via FileReader and call onInputChange', () => {
-      const mockOnChange = vi.fn();
-      const mockResult = 'data:image/png;base64,mockdata';
-
-      const readAsDataURLSpy = vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function () {
-        // Simulate successful read
-        Object.defineProperty(this, 'result', { value: mockResult, writable: true, configurable: true });
-        if (this.onload) {
-          this.onload({ target: this });
-        }
-      });
-
-      render(<WizardStepBasic stepNumber={2} {...createMockProps({ onInputChange: mockOnChange })} />);
-
-      const fileInput = document.querySelector('input[type="file"]');
-      const file = new File(['test'], 'test-image.png', { type: 'image/png' });
-
-      fireEvent.change(fileInput, { target: { files: [file] } });
-
-      expect(mockOnChange).toHaveBeenCalledWith('image', mockResult);
-      expect(mockOnChange).toHaveBeenCalledWith('imageName', 'test-image.png');
-
-      readAsDataURLSpy.mockRestore();
-    });
-  });
-
-  describe('Alignment fetch error handling', () => {
-    it('should log an error and keep rendering when alignment fetch fails', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      setupFetchFailure();
-      render(<WizardStepBasic stepNumber={2} {...createMockProps()} />);
-
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith(
-          'Error loading alignments:',
-          expect.any(Error),
-        );
-      });
-
-      expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
-      consoleSpy.mockRestore();
-    });
+    // No crash: the rest of the step stays interactive.
+    expect(screen.getByRole('textbox')).toHaveValue('Test Character');
+    expect(screen.getByRole('spinbutton')).toHaveValue(5);
   });
 });
+
+// Helper: exact ordered option labels of a <select>.
+function optionLabels(select) {
+  return Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
+}

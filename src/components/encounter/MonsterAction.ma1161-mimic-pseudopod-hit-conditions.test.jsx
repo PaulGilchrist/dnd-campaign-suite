@@ -1,73 +1,79 @@
-// MA-1161: Mimic "Pseudopod" — description carries the grapple rider "If the
+// @maintained-by-ai: 2026-10-18
+// MA-1161: Mimic "Pseudopod" — prose carries the grapple rider "If the
 // target is a Large or smaller creature, it has the Grappled condition (escape
 // DC 13). Ability checks made to escape this grapple have Disadvantage." but
 // the row shipped WITHOUT hit_conditions/escape_dc, so the rider was
 // structurally inert (buildHitConditionClause reads the hit_conditions/
 // escape_dc keys only, NEVER description; consumer live in
 // handlePlainDamage.applyHitClauseConditions). Two-field DATA fix mirroring
-// MA-0930 Grick Tentacles / MA-1157 Mezzoloth Claws (f0eae38e3) byte-shape:
-// hit_conditions:["grappled"] + escape_dc:13 placed after
-// damage_type_secondary — escape_dc is 13 per row prose, NOT the 14 twin
-// value. "Ability checks made to escape this grapple have Disadvantage" is
-// GM-adjudicated advisory (no transport, §70 grapple state-machine zero
-// producers) — accepted, not built. Locks: disk row shape + key placement,
-// clause arms with escapeDc 13, single "+5" attack chip, secondary Acid
-// damage keys byte-intact, save decoys gated off (MA-1071).
+// MA-0930 Grick Tentacles / MA-1157 Mezzoloth Claws byte-shape:
+// hit_conditions:["grappled"] + escape_dc:13 after damage_type_secondary —
+// escape_dc is 13 per row prose, NOT the 14 twin value. Unowned plain
+// fused-1: HIT_CLAUSE_ROWS (handlePlainDamage.hitClause.test.js :224-282)
+// carries NO mimic tuple, so exact disk bytes + clause arm stay HERE.
+// OWNED ELSEWHERE (direct calls pruned): DC0 decoy save-lane gate →
+// MonsterAction.ma1071-pincer-staff-dc0-gate.test.jsx (the decoy fields
+// save_dc:0/save_type:""/save_effect:"" stay pinned HERE via verbatim row
+// bytes; save-chip absence rides the exact ['+5'] chip list — save chips
+// render as .mc-dice-link base-class per MonsterAction.jsx :138/:145);
+// attackRowMissingToHit suppression → MA-0286 census truth-table (:89) +
+// whole-file census (:101, covers mimic/Pseudopod live +5); runtime
+// hit-clause lane → handlePlainDamage.hitClause.test.js (generic
+// grappled+DC-13 tuples :232/:236/:239 own the channel). Bite twin
+// conditional_damage → MA-1160 owner. "Ability checks made to escape this
+// grapple have Disadvantage" is GM-adjudicated advisory — §70 grapple
+// state-machine zero producers — accepted, not built.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
+import { buildHitConditionClause } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const PSEUDOPOD = monsters.find((m) => m.index === 'mimic').actions[1];
+const PSEUDOPOD = monsters.find((m) => m.index === 'mimic').actions.find((a) => a.name === 'Pseudopod');
 
-describe('MA-1161 disk fingerprint: mimic Pseudopod grapple rider fix', () => {
-  it('description carries the raw rider prose byte-intact', () => {
-    expect(PSEUDOPOD.name).toBe('Pseudopod');
-    expect(PSEUDOPOD.description).toContain('Melee Attack Roll: +5, reach 5 ft.');
-    expect(PSEUDOPOD.description).toContain('Hit: 7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage.');
-    expect(PSEUDOPOD.description).toContain('Grappled</strong> condition (escape DC 13)');
-    expect(PSEUDOPOD.description).toContain('Ability checks made to escape this grapple have Disadvantage.');
-  });
-
-  it('disk row carries hit_conditions ["grappled"] + escape_dc 13 after damage_type_secondary (MA-0930/MA-1157 byte-shape)', () => {
-    expect(PSEUDOPOD.hit_conditions).toEqual(['grappled']);
-    expect(PSEUDOPOD.escape_dc).toBe(13);
-    const keys = Object.keys(PSEUDOPOD);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_secondary') + 1);
-    expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
-    expect(PSEUDOPOD.attack_bonus).toBe(5);
-    expect(PSEUDOPOD.reach).toBe('5 ft.');
-  });
-
-  it('damage axes byte-intact: primary "1d8 + 3" Bludgeoning + secondary "1d8" Acid', () => {
-    expect(PSEUDOPOD.damage_dice_primary).toBe('1d8 + 3');
-    expect(PSEUDOPOD.damage_type_primary).toBe('Bludgeoning');
-    expect(PSEUDOPOD.damage_dice_secondary).toBe('1d8');
-    expect(PSEUDOPOD.damage_type_secondary).toBe('Acid');
-  });
-
-  it('row has NO real save fields — save_dc 0 decoy stays gated off (MA-1071)', () => {
-    expect(PSEUDOPOD.save_dc).toBe(0);
-    expect(PSEUDOPOD.save_type).toBe('');
-    expect(PSEUDOPOD.save_effect).toBe('');
-    expect(PSEUDOPOD.hit_target_effect).toBeUndefined();
-    expect(PSEUDOPOD.hit_condition_roll).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Grappled rider with escapeDc 13 (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(PSEUDOPOD);
-    expect(clause).toEqual({
+describe('MA-1161 mimic Pseudopod hit_conditions fix', () => {
+  it('fused lock: exact disk-row bytes arm the Grappled clause escape DC 13; one "+5" chip live, click payloads the raw row', () => {
+    expect(Object.keys(PSEUDOPOD)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'save_dc',
+      'save_type',
+      'save_effect',
+      'range',
+      'reach',
+      'recharge',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'damage_dice_secondary',
+      'damage_type_secondary',
+      'hit_conditions',
+      'escape_dc',
+    ]);
+    expect(PSEUDOPOD).toEqual({
+      name: 'Pseudopod',
+      description: 'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage. If the target is a Large or smaller creature, it has the <strong>Grappled</strong> condition (escape DC 13). Ability checks made to escape this grapple have Disadvantage.',
+      attack_bonus: 5,
+      save_dc: 0,
+      save_type: '',
+      save_effect: '',
+      range: '',
+      reach: '5 ft.',
+      recharge: '',
+      damage_dice_primary: '1d8 + 3',
+      damage_type_primary: 'Bludgeoning',
+      damage_dice_secondary: '1d8',
+      damage_type_secondary: 'Acid',
+      hit_conditions: ['grappled'],
+      escape_dc: 13,
+    });
+    expect(buildHitConditionClause(PSEUDOPOD)).toEqual({
       conditions: ['grappled'],
       escapeDc: 13,
       attackName: 'Pseudopod',
       targetEffect: null,
     });
-  });
-
-  it('attack half stays live: one "+5" chip, no DC chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(PSEUDOPOD)).toBe(false);
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -84,8 +90,9 @@ describe('MA-1161 disk fingerprint: mimic Pseudopod grapple rider fix', () => {
     );
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+5']);
-    expect(container.querySelectorAll('.mc-dice-link-save, .mc-dice-link-save-clickable')).toHaveLength(0);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Pseudopod', 5, expect.objectContaining({ name: 'Pseudopod' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Pseudopod', 5, PSEUDOPOD);
+    expect(onAttack.mock.calls[0][2]).toBe(PSEUDOPOD);
   });
 });

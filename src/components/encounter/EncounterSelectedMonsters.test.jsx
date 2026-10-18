@@ -1,160 +1,119 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+// @maintained-by-ai
+// EncounterSelectedMonsters component-contract lane: renders the REAL panel directly
+// (never a replica). Uniquely owns (per lane map): exact per-row callback payloads +
+// call counts (onRemoveMonster index, onViewDetails full selected-entry bytes),
+// handler-omitted details-button gating (Source L21 — builder ALWAYS passes a handler,
+// so #406 can never exercise the omit branch), exact per-row text set (name + qty
+// suffix rule + XP via toLocaleString separators + CR), header total across multi-row
+// qty multipliers, and empty/null/undefined unmount (builder never passes undefined/null).
+// Owned elsewhere — do NOT duplicate: row-chrome lifecycle, panel remove/view seams
+// through the builder state machine, and Clear All (#406 panel-interactions — this
+// component renders NO Clear All button; that seam lives in EncounterSummaryPanel),
+// table-side qty controls dispatch (#414 EncounterMonsterTable).
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
 
-describe('EncounterSelectedMonsters', () => {
-  const baseMonster = {
-    index: 'goblin',
-    name: 'Goblin',
-    xp: 50,
-    challenge_rating: 0.25,
+// Fresh props + fresh mock handlers per render so nothing bleeds between tests (#362).
+function createProps(monsters = [], overrides = {}) {
+  return {
+    selectedMonsters: monsters,
+    onRemoveMonster: vi.fn(),
+    ...overrides,
   };
+}
 
-  describe('empty/null state', () => {
-    it.each([
-      [undefined, 'undefined'],
-      [null, 'null'],
-      [[], 'empty array'],
-    ])('returns null when selectedMonsters is %s', (value) => {
-      const { container } = render(
-        <EncounterSelectedMonsters selectedMonsters={value} onRemoveMonster={vi.fn()} />
-      );
-      expect(screen.queryByText(/Selected Monsters/)).not.toBeInTheDocument();
-      expect(container.innerHTML).toBe('');
-    });
+const makeMonster = (index, name, xp, challenge_rating, qty) => ({
+  index,
+  name,
+  xp,
+  challenge_rating,
+  ...(qty === undefined ? {} : { qty }),
+});
+
+describe('EncounterSelectedMonsters', () => {
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['an empty array', []],
+  ])('renders nothing when selectedMonsters is %s', (_label, value) => {
+    const props = createProps();
+    props.selectedMonsters = value;
+    const { container } = render(<EncounterSelectedMonsters {...props} />);
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByText(/Selected Monsters/)).not.toBeInTheDocument();
   });
 
-  describe('monster list rendering', () => {
-    it('renders the section header with total monster count including qty multipliers', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { ...baseMonster, qty: 3 },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5, qty: 2 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('Selected Monsters (5)')).toBeInTheDocument();
-    });
+  it('renders the header total and one exact row per monster (name + qty suffix, XP with separators, CR)', () => {
+    const monsters = [
+      makeMonster('goblin', 'Goblin', 50, 0.25, 3),
+      makeMonster('ancient-red-dragon', 'Ancient Red Dragon', 25000, 24, 2),
+      makeMonster('orc', 'Orc', 100, 0.5, 1),
+      makeMonster('bandit', 'Bandit', 25, 0.125),
+    ];
+    const { container } = render(<EncounterSelectedMonsters {...createProps(monsters)} />);
 
-    it('renders monster names, CR, and XP', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByText('Orc')).toBeInTheDocument();
-      expect(screen.getByText('CR 0.25')).toBeInTheDocument();
-      expect(screen.getByText('CR 0.5')).toBeInTheDocument();
-      expect(screen.getByText('50 XP')).toBeInTheDocument();
-      expect(screen.getByText('100 XP')).toBeInTheDocument();
-    });
+    // Qty multiplies across rows: 3 + 2 + 1 + (missing qty -> 1).
+    expect(screen.getByText('Selected Monsters (7)')).toBeInTheDocument();
 
-    it('displays total XP per monster row with qty multiplier and thousands separators', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { ...baseMonster, qty: 3 },
-            { index: 'ancient-red-dragon', name: 'Ancient Red Dragon', xp: 25000, challenge_rating: 24, qty: 2 },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('150 XP')).toBeInTheDocument();
-      expect(screen.getByText('50,000 XP')).toBeInTheDocument();
-    });
+    const rows = Array.from(container.querySelectorAll('.selected-item'));
+    expect(rows).toHaveLength(4);
+    const textsIn = (row) => Array.from(row.querySelectorAll('span')).map((s) => s.textContent);
+    expect(textsIn(rows[0])).toEqual(['150 XP', 'CR 0.25', 'Goblin (3)']);
+    expect(textsIn(rows[1])).toEqual(['50,000 XP', 'CR 24', 'Ancient Red Dragon (2)']);
 
-    it('renders monster names with qty only when qty is greater than 1', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { ...baseMonster, index: 'goblin-qty5', name: 'Goblin', qty: 5 },
-            { ...baseMonster, index: 'goblin-qty1', name: 'Goblin A', qty: 1 },
-            { ...baseMonster, index: 'goblin-no-qty', name: 'Goblin B' },
-            { ...baseMonster, index: 'goblin-qty-zero', name: 'Goblin C', qty: 0 },
-            { ...baseMonster, index: 'goblin-qty-null', name: 'Goblin D', qty: null },
-          ]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.getByText('Goblin (5)')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin A (1)')).not.toBeInTheDocument();
-      expect(screen.getByText('Goblin A')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin B (1)')).not.toBeInTheDocument();
-      expect(screen.getByText('Goblin B')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin C (1)')).not.toBeInTheDocument();
-      expect(screen.getByText('Goblin C')).toBeInTheDocument();
-      expect(screen.queryByText('Goblin D (1)')).not.toBeInTheDocument();
-      expect(screen.getByText('Goblin D')).toBeInTheDocument();
-    });
+    // Qty suffix appears only when qty > 1; qty 1 and missing qty show the bare name.
+    expect(textsIn(rows[2])).toEqual(['100 XP', 'CR 0.5', 'Orc']);
+    expect(textsIn(rows[3])).toEqual(['25 XP', 'CR 0.125', 'Bandit']);
+    expect(screen.queryByText('Orc (1)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bandit (1)')).not.toBeInTheDocument();
   });
 
-  describe('remove button', () => {
-    it('calls onRemoveMonster with the correct monster index when clicked', () => {
-      const onRemove = vi.fn();
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5 },
-          ]}
-          onRemoveMonster={onRemove}
-        />
-      );
-      fireEvent.click(screen.getByLabelText('Remove Orc'));
-      expect(onRemove).toHaveBeenCalledWith('orc');
-      fireEvent.click(screen.getByLabelText('Remove Goblin'));
-      expect(onRemove).toHaveBeenCalledWith('goblin');
-    });
+  it('calls onRemoveMonster once per click with the exact monster index of the clicked row', () => {
+    const monsters = [
+      makeMonster('goblin', 'Goblin', 50, 0.25, 1),
+      makeMonster('orc', 'Orc', 100, 0.5, 2),
+    ];
+    const props = createProps(monsters);
+    const { container } = render(<EncounterSelectedMonsters {...props} />);
+    const panel = within(container.querySelector('.encounter-selected'));
+
+    fireEvent.click(panel.getByRole('button', { name: 'Remove Orc' }));
+    expect(props.onRemoveMonster).toHaveBeenCalledTimes(1);
+    expect(props.onRemoveMonster).toHaveBeenCalledWith('orc');
+
+    fireEvent.click(panel.getByRole('button', { name: 'Remove Goblin' }));
+    expect(props.onRemoveMonster).toHaveBeenCalledTimes(2);
+    expect(props.onRemoveMonster).toHaveBeenCalledWith('goblin');
   });
 
-  describe('details button', () => {
-    it('does not render a details button when onViewDetails is not provided', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[baseMonster]}
-          onRemoveMonster={vi.fn()}
-        />
-      );
-      expect(screen.queryByLabelText('View details for Goblin')).not.toBeInTheDocument();
-    });
+  it('omits the details button for every row when onViewDetails is not provided, keeping remove intact', () => {
+    const monsters = [
+      makeMonster('goblin', 'Goblin', 50, 0.25, 1),
+      makeMonster('orc', 'Orc', 100, 0.5, 1),
+    ];
+    const { container } = render(<EncounterSelectedMonsters {...createProps(monsters)} />);
+    expect(container.querySelectorAll('.details-btn')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /View details for/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Remove /})).toHaveLength(2);
+  });
 
-    it('renders a details button when onViewDetails is provided', () => {
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[baseMonster]}
-          onRemoveMonster={vi.fn()}
-          onViewDetails={vi.fn()}
-        />
-      );
-      expect(screen.getByLabelText('View details for Goblin')).toBeInTheDocument();
-    });
+  it('calls onViewDetails once with the exact selected-entry bytes of the clicked row', () => {
+    const orc = makeMonster('orc', 'Orc', 100, 0.5, 2);
+    const monsters = [makeMonster('goblin', 'Goblin', 50, 0.25, 1), orc];
+    const onViewDetails = vi.fn();
+    const props = createProps(monsters, { onViewDetails });
+    const { container } = render(<EncounterSelectedMonsters {...props} />);
 
-    it('calls onViewDetails with the correct monster object when clicked', () => {
-      const onViewDetails = vi.fn();
-      render(
-        <EncounterSelectedMonsters
-          selectedMonsters={[
-            { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 },
-            { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5 },
-          ]}
-          onRemoveMonster={vi.fn()}
-          onViewDetails={onViewDetails}
-        />
-      );
-      fireEvent.click(screen.getByLabelText('View details for Orc'));
-      expect(onViewDetails).toHaveBeenCalledWith({
-        index: 'orc',
-        name: 'Orc',
-        xp: 100,
-        challenge_rating: 0.5,
-      });
+    fireEvent.click(within(container).getByRole('button', { name: 'View details for Orc' }));
+    expect(onViewDetails).toHaveBeenCalledTimes(1);
+    // Full selected entry — every field, including live qty, passed untouched.
+    expect(onViewDetails).toHaveBeenCalledWith({
+      index: 'orc',
+      name: 'Orc',
+      xp: 100,
+      challenge_rating: 0.5,
+      qty: 2,
     });
   });
 });

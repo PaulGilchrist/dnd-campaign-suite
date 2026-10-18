@@ -1,577 +1,247 @@
+// @maintained-by-ai
+// Grapple ACTION lane of useCharActionsBaseActions: enforcement/selection gates
+// (cannotAct, no-target, already-grappled), adv/dis check-context resolution,
+// target contest-modifier fallback CHANNELS with byte-exact popup pins (including
+// popup sign formatting), and grappled-condition stamping on the success leg.
+// Attacker bonus math (skill channels, Jack of All Trades, exhaustion), the
+// higher-of-Athletics-or-Acrobatics contest resolution, and the outcome boundary
+// (tie/loss) are owned byte-exact by
+// useCharActionsBaseActions.grapple-contest-math.test.js — not duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import {
     createHooks,
     mockRollAbilityCheck,
     mockSetPopupHtml,
-    mockAddEntry,
     mockLoadCombatSummary,
     campaignName,
     basePlayerStats,
 } from './useCharActionsBaseActions.test-utils.js';
 
-const defaultCs = {
-    creatures: [
-        { name: 'TestFighter', targetName: 'TargetCreature' },
-        {
-            name: 'TargetCreature',
-            conditions: [],
-            computedStats: { abilities: [{ name: 'Strength', bonus: 2 }] },
-        },
-    ],
-};
+// Fighter (TestFighter lv5, STR +4, no Athletics proficiency): grapple check
+// bonus 4. Monk swaps to Dexterity (+2 from basePlayerStats abilities).
+const monkStats = { ...basePlayerStats, class: { name: 'Monk' } };
 
-const defaultGrv = vi.fn((charKey, key) => {
-    if (key === 'lastAttack') return { total: 18, d20: 12 };
-    return undefined;
-});
-
-function createDefaultHooks(overrides = {}) {
-    return createHooks({
-        loadCombatSummary: () => Promise.resolve(defaultCs),
-        getRuntimeValue: defaultGrv,
-        ...overrides,
+function grv(total, d20, storedConditions) {
+    return vi.fn((charKey, key) => {
+        if (key === 'lastAttack') return { total, d20 };
+        if (charKey === 'TargetCreature') return storedConditions;
+        return undefined;
     });
 }
 
-describe('useCharActionsBaseActions', () => {
+function targetWith(overrides) {
+    return { name: 'TargetCreature', conditions: [], ...overrides };
+}
+
+function csWith(target) {
+    return { creatures: [{ name: 'TestFighter', targetName: target.name }, target] };
+}
+
+// Runs one grapple. Default target resolves its contest from
+// computedStats.abilities (+2); every row overrides what its lane owns.
+// getMonsterData is passed straight through: undefined falls back to the
+// shared test-utils mock (used only by fallback rows that truly reach it).
+function useGrappleRun({ playerStats = basePlayerStats, target, total = 18, d20 = 12, storedConditions = [], conditionEffects = {}, getMonsterData } = {}) {
+    const setRuntimeValue = vi.fn().mockResolvedValue(undefined);
+    const deps = createHooks({
+        playerStats,
+        conditionEffects,
+        loadCombatSummary: () => Promise.resolve(csWith(target ?? targetWith({ computedStats: { abilities: [{ name: 'Strength', bonus: 2 }] } }))),
+        getRuntimeValue: grv(total, d20, storedConditions),
+        setRuntimeValue,
+        getMonsterData,
+    });
+    return { hooks: useCharActionsBaseActions(deps), setRuntimeValue };
+}
+
+describe('useCharActionsBaseActions — handleGrappleAction', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('handleGrappleAction', () => {
-        it('returns early when cannotAct is true', async () => {
+    describe('gates', () => {
+        it('cannotAct silently blocks before anything loads', async () => {
             const hooks = createHooks({ cannotAct: true });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
 
             expect(mockLoadCombatSummary).not.toHaveBeenCalled();
             expect(mockSetPopupHtml).not.toHaveBeenCalled();
+            expect(mockRollAbilityCheck).not.toHaveBeenCalled();
         });
 
-        it('shows popup when combat summary is null', async () => {
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(null),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Grapple',
-                description: 'No target selected. Select a target in combat first.',
-            });
-        });
-
-        it('shows popup when combat summary has no creatures', async () => {
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve({ creatures: [] }),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Grapple',
-                description: 'No target selected. Select a target in combat first.',
-            });
-        });
-
-        it('shows popup when attacker has no targetName', async () => {
-            const cs = {
-                creatures: [{ name: 'TestFighter', conditions: [] }],
-            };
+        it.each([
+            { label: 'combat summary is null', cs: null },
+            { label: 'combat summary has no creatures', cs: { creatures: [] } },
+            { label: 'attacker has no selected target', cs: { creatures: [{ name: 'TestFighter', conditions: [] }] } },
+        ])('no-target gate: $label', async ({ cs }) => {
             const hooks = createHooks({
                 loadCombatSummary: () => Promise.resolve(cs),
+                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
             });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
 
             expect(mockSetPopupHtml).toHaveBeenCalledWith({
                 type: 'automation_info',
                 name: 'Grapple',
                 description: 'No target selected. Select a target in combat first.',
             });
+            expect(mockRollAbilityCheck).not.toHaveBeenCalled();
         });
 
-        it('shows popup when target is already grappled', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: ['grappled'], computedStats: { abilities: [] } },
-                ],
-            };
+        it('already-grappled gate refuses before rolling', async () => {
             const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
+                loadCombatSummary: () => Promise.resolve(csWith(targetWith({ conditions: ['grappled'] }))),
+                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
             });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
 
             expect(mockSetPopupHtml).toHaveBeenCalledWith({
                 type: 'automation_info',
                 name: 'Grapple',
                 description: 'Target is already grappled.',
             });
+            expect(mockRollAbilityCheck).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('advantage/disadvantage check-context resolution', () => {
+        it.each([
+            {
+                label: 'strCheckDisadvantage forces disadvantage',
+                stats: basePlayerStats,
+                ce: { strCheckDisadvantage: true },
+                ability: 'Strength',
+                bonus: 4,
+                ctx: { forcedMode: 'disadvantage' },
+            },
+            {
+                label: 'hex weakness on Strength forces disadvantage',
+                stats: basePlayerStats,
+                ce: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'Strength' },
+                ability: 'Strength',
+                bonus: 4,
+                ctx: { forcedMode: 'disadvantage' },
+            },
+            {
+                label: 'blanket abilityCheckAdvantage cancels strCheckDisadvantage',
+                stats: basePlayerStats,
+                ce: { strCheckDisadvantage: true, abilityCheckAdvantage: true },
+                ability: 'Strength',
+                bonus: 4,
+                ctx: { forcedMode: undefined },
+            },
+            {
+                label: 'monk grapples with Dexterity instead of Strength',
+                stats: monkStats,
+                ce: {},
+                ability: 'Dexterity',
+                bonus: 2,
+                ctx: {},
+            },
+            {
+                label: 'monk Peerless Athlete forces advantage on Dexterity',
+                stats: monkStats,
+                ce: { peerlessAthleteAdvantageSkills: ['Dexterity'] },
+                ability: 'Dexterity',
+                bonus: 2,
+                ctx: { forcedMode: 'advantage' },
+            },
+            {
+                label: 'hex weakness on Strength is inert for a monk Dexterity grapple',
+                stats: monkStats,
+                ce: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'Strength' },
+                ability: 'Dexterity',
+                bonus: 2,
+                ctx: {},
+            },
+        ])('$label', async ({ stats, ce, ability, bonus, ctx }) => {
+            const { hooks } = useGrappleRun({ playerStats: stats, conditionEffects: ce });
+            await hooks.handleGrappleAction();
+
+            expect(mockRollAbilityCheck).toHaveBeenCalledWith(ability, bonus, ctx);
+        });
+    });
+
+    describe('target contest-modifier fallback channels', () => {
+        it.each([
+            {
+                label: 'computedStats.abilities is the first channel (+ sign formatting)',
+                target: targetWith({ computedStats: { abilities: [{ name: 'Strength', bonus: 2 }] } }),
+                popup: 'Grapple successful! (d20: 12 + 4 = 18) vs TargetCreature Athletics (+2). Target is now grappled.',
+            },
+            {
+                label: 'target.abilities entries when computedStats is absent',
+                target: targetWith({ abilities: [{ name: 'Strength', bonus: 3 }] }),
+                popup: 'Grapple successful! (d20: 12 + 4 = 18) vs TargetCreature Athletics (+3). Target is now grappled.',
+            },
+            {
+                label: 'inline ability_score_modifiers on an npc target',
+                target: targetWith({ type: 'npc', ability_score_modifiers: { str: 4 } }),
+                popup: 'Grapple successful! (d20: 12 + 4 = 18) vs TargetCreature Athletics (+4). Target is now grappled.',
+            },
+            {
+                label: 'negative modifier formats with a minus sign',
+                target: targetWith({ computedStats: { abilities: [{ name: 'Strength', bonus: -2 }] } }),
+                popup: 'Grapple successful! (d20: 12 + 4 = 18) vs TargetCreature Athletics (-2). Target is now grappled.',
+            },
+        ])('$label', async ({ target, popup }) => {
+            const { hooks } = useGrappleRun({ target });
+            await hooks.handleGrappleAction();
+
+            expect(mockSetPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Grapple', description: popup });
         });
 
-        it('performs grapple ability check and shows success popup when roll exceeds target STR', async () => {
-            const hooks = createDefaultHooks({
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Strength',
-                expect.any(Number),
-                expect.any(Object),
-            );
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('Grapple successful'),
-                }),
-            );
-            expect(mockAddEntry).toHaveBeenCalledWith(
-                campaignName,
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestFighter',
-                    abilityName: 'Grapple',
-                }),
-            );
-        });
-
-        it('performs grapple ability check and shows failure popup when roll does not exceed target STR', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    {
-                        name: 'TargetCreature',
-                        conditions: [],
-                        computedStats: { abilities: [{ name: 'Strength', bonus: 5 }] },
-                    },
-                ],
-            };
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 4, d20: 0 };
-                return undefined;
-            });
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('Grapple failed'),
-                }),
-            );
-        });
-
-        it('uses Dexterity for monk instead of Strength', async () => {
-            const monkStats = {
-                ...basePlayerStats,
-                class: { name: 'Monk' },
-                abilities: [
-                    { name: 'Strength', bonus: 2 },
-                    { name: 'Dexterity', bonus: 5 },
-                    { name: 'Wisdom', bonus: 1 },
-                    { name: 'Constitution', bonus: 3 },
-                    { name: 'Intelligence', bonus: 0 },
-                    { name: 'Charisma', bonus: 0 },
-                ],
-            };
-            const hooks = createDefaultHooks({ playerStats: monkStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Dexterity',
-                expect.any(Number),
-                expect.any(Object),
-            );
-        });
-
-        it('applies Jack of All Trades half-proficiency bonus to grapple check', async () => {
-            const playerStats = {
-                ...basePlayerStats,
-                automation: { passives: [{ type: 'jack_of_all_trades' }] },
-            };
-            const hooks = createDefaultHooks({ playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalled();
-        });
-
-        it('applies peerlessAthleteAdvantageSkills for monk', async () => {
-            const monkStats = {
-                ...basePlayerStats,
-                class: { name: 'Monk' },
-                abilities: [
-                    { name: 'Strength', bonus: 2 },
-                    { name: 'Dexterity', bonus: 5 },
-                    { name: 'Wisdom', bonus: 1 },
-                    { name: 'Constitution', bonus: 3 },
-                    { name: 'Intelligence', bonus: 0 },
-                    { name: 'Charisma', bonus: 0 },
-                ],
-            };
-            const hooks = createDefaultHooks({
-                playerStats: monkStats,
-                conditionEffects: { peerlessAthleteAdvantageSkills: ['Dexterity'] },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Dexterity',
-                expect.any(Number),
-                { forcedMode: 'advantage' },
-            );
-        });
-
-        it('applies strCheckDisadvantage condition', async () => {
-            const hooks = createDefaultHooks({
-                conditionEffects: { strCheckDisadvantage: true },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Strength',
-                expect.any(Number),
-                { forcedMode: 'disadvantage' },
-            );
-        });
-
-        it('applies hexAbilityCheckDisadvantage for matching ability', async () => {
-            const hooks = createDefaultHooks({
-                conditionEffects: {
-                    hexAbilityCheckDisadvantage: true,
-                    hexAbilityCheckDisadvantageAbility: 'Strength',
-                },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Strength',
-                expect.any(Number),
-                { forcedMode: 'disadvantage' },
-            );
-        });
-
-        it('does not apply hexAbilityCheckDisadvantage for non-matching ability (monk)', async () => {
-            const monkStats = {
-                ...basePlayerStats,
-                class: { name: 'Monk' },
-                abilities: [
-                    { name: 'Strength', bonus: 2 },
-                    { name: 'Dexterity', bonus: 5 },
-                    { name: 'Wisdom', bonus: 1 },
-                    { name: 'Constitution', bonus: 3 },
-                    { name: 'Intelligence', bonus: 0 },
-                    { name: 'Charisma', bonus: 0 },
-                ],
-            };
-            const hooks = createDefaultHooks({
-                playerStats: monkStats,
-                conditionEffects: {
-                    hexAbilityCheckDisadvantage: true,
-                    hexAbilityCheckDisadvantageAbility: 'Strength',
-                },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Dexterity',
-                expect.any(Number),
-                expect.any(Object),
-            );
-        });
-
-        it('overrides disadvantage with abilityCheckAdvantage', async () => {
-            const hooks = createDefaultHooks({
-                conditionEffects: {
-                    strCheckDisadvantage: true,
-                    abilityCheckAdvantage: true,
-                },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-                'Strength',
-                expect.any(Number),
-                { forcedMode: undefined },
-            );
-        });
-
-        it('gets target STR from computedStats.abilities', async () => {
-            const hooks = createDefaultHooks({
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('+2'),
-                }),
-            );
-        });
-
-        it('gets target STR from target.abilities fallback', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], abilities: [{ name: 'Strength', bonus: 3 }] },
-                ],
-            };
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: defaultGrv,
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('+3'),
-                }),
-            );
-        });
-
-        it('gets target STR from ability_score_modifiers.str fallback', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], type: 'npc', ability_score_modifiers: { str: 4 } },
-                ],
-            };
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: defaultGrv,
-                getMonsterData: vi.fn().mockResolvedValue(null),
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('+4'),
-                }),
-            );
-        });
-
-        it('gets target STR from monster data when all else fails', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], type: 'monster' },
-                ],
-            };
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 3, d20: 0 };
-                return undefined;
-            });
-            const gmd = vi.fn().mockResolvedValue({ ability_score_modifiers: { str: 5 } });
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
+        it('bestiary lookup backs a monster target with no local ability data', async () => {
+            const gmd = vi.fn().mockResolvedValue({ ability_score_modifiers: { str: 7 } });
+            const { hooks, setRuntimeValue } = useGrappleRun({
+                target: targetWith({ type: 'monster' }),
+                total: 5,
+                d20: 1,
                 getMonsterData: gmd,
             });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+            await hooks.handleGrappleAction();
 
             expect(gmd).toHaveBeenCalledWith('TargetCreature', expect.any(Array));
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('Grapple failed'),
-                }),
-            );
+            expect(mockSetPopupHtml).toHaveBeenCalledWith({
+                type: 'automation_info',
+                name: 'Grapple',
+                description: 'Grapple failed! (d20: 1 + 4 = 5) vs TargetCreature Athletics (+7). Target is not grappled.',
+            });
+            // Failure leg pinned in the popup above — nothing may be stamped.
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('gets target STR from player creature in combat summary', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', type: 'player' },
-                    {
-                        name: 'TargetCreature',
-                        computedStats: { abilities: [{ name: 'Strength', bonus: 6 }] },
-                    },
-                ],
-            };
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 18, d20: 12 };
-                if (charKey === 'TargetCreature') return [];
-                return undefined;
-            });
-            const gmd = vi.fn().mockResolvedValue(null);
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
+        it('player targets resolve locally and never hit the bestiary', async () => {
+            // Bestiary would answer +99 if the player lane ever mis-routed there.
+            const gmd = vi.fn().mockResolvedValue({ ability_score_modifiers: { str: 99 } });
+            const { hooks, setRuntimeValue } = useGrappleRun({
+                target: { name: 'ElfTest', conditions: [], type: 'player' },
                 getMonsterData: gmd,
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
             });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+            await hooks.handleGrappleAction();
 
             expect(gmd).not.toHaveBeenCalled();
+            expect(mockSetPopupHtml).toHaveBeenCalledWith({
+                type: 'automation_info',
+                name: 'Grapple',
+                description: 'Grapple successful! (d20: 12 + 4 = 18) vs ElfTest Athletics (+0). Target is now grappled.',
+            });
+            expect(setRuntimeValue).toHaveBeenCalledWith('ElfTest', 'activeConditions', ['grappled'], campaignName);
         });
+    });
 
-        it('sets grappled condition on target creature when grapple succeeds', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], computedStats: { abilities: [{ name: 'Strength', bonus: 1 }] } },
-                ],
-            };
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 18, d20: 12 };
-                if (charKey === 'TargetCreature') return [];
-                return undefined;
-            });
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
+    describe('grappled condition stamping (success leg)', () => {
+        it.each([
+            { label: 'fresh target gets grappled appended', stored: [], expected: ['grappled'] },
+            { label: 'existing grappled is deduplicated, other conditions keep order', stored: ['grappled', 'poisoned'], expected: ['poisoned', 'grappled'] },
+            { label: 'capitalised Grappled variant is replaced by canonical grappled', stored: ['Grappled'], expected: ['grappled'] },
+            { label: 'undefined stored conditions are treated as empty', stored: undefined, expected: ['grappled'] },
+        ])('$label', async ({ stored, expected }) => {
+            const { hooks, setRuntimeValue } = useGrappleRun({ storedConditions: stored });
+            await hooks.handleGrappleAction();
 
-            expect(srw).toHaveBeenCalledWith(
-                'TargetCreature',
-                'activeConditions',
-                expect.arrayContaining(['grappled']),
-                campaignName,
-            );
-        });
-
-        it('filters out existing grappled condition before re-adding it', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], computedStats: { abilities: [{ name: 'Strength', bonus: 1 }] } },
-                ],
-            };
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 18, d20: 12 };
-                if (charKey === 'TargetCreature') return ['grappled', 'poisoned'];
-                return undefined;
-            });
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(srw).toHaveBeenCalledWith(
-                'TargetCreature',
-                'activeConditions',
-                ['poisoned', 'grappled'],
-                campaignName,
-            );
-        });
-
-        it('handles undefined target activeConditions gracefully', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], computedStats: { abilities: [{ name: 'Strength', bonus: 1 }] } },
-                ],
-            };
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const grv = vi.fn((charKey, key) => {
-                if (key === 'lastAttack') return { total: 18, d20: 12 };
-                return undefined;
-            });
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(srw).toHaveBeenCalledWith(
-                'TargetCreature',
-                'activeConditions',
-                ['grappled'],
-                campaignName,
-            );
-        });
-
-        it('applies exhaustionPenalty to grapple check bonus', async () => {
-            const hooks = createDefaultHooks({ exhaustionPenalty: 2 });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockRollAbilityCheck).toHaveBeenCalled();
-        });
-
-        it('formats positive STR bonus with + sign in popup', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], computedStats: { abilities: [{ name: 'Strength', bonus: 3 }] } },
-                ],
-            };
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: defaultGrv,
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('+3'),
-                }),
-            );
-        });
-
-        it('formats negative STR bonus with minus sign in popup', async () => {
-            const cs = {
-                creatures: [
-                    { name: 'TestFighter', targetName: 'TargetCreature' },
-                    { name: 'TargetCreature', conditions: [], computedStats: { abilities: [{ name: 'Strength', bonus: -2 }] } },
-                ],
-            };
-            const hooks = createHooks({
-                loadCombatSummary: () => Promise.resolve(cs),
-                getRuntimeValue: defaultGrv,
-                setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleGrappleAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    description: expect.stringContaining('-2'),
-                }),
-            );
-        });
-
-        it('returns the three action handlers', async () => {
-            const hooks = createHooks();
-            const actions = useCharActionsBaseActions(hooks);
-
-            expect(typeof actions.handleHideAction).toBe('function');
-            expect(typeof actions.handleDodgeAction).toBe('function');
-            expect(typeof actions.handleGrappleAction).toBe('function');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TargetCreature', 'activeConditions', expected, campaignName);
         });
     });
 });

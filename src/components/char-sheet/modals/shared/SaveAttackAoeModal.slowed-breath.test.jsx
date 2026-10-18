@@ -1,15 +1,17 @@
-// MA-0087: Adult Copper Dragon Slowing Breath picker — damageless CON DC 18
-// cone. Confirming the picker grants the authored "slowed" rider te clauses on
-// each NPC failed save: speed_half, no_reactions and no_action_and_bonus_action
-// (each an existing registered te with a live consumer, sourced from the
-// dragon, duration until_end_of_next_turn + rounds:2 expiry clock, MA-0073
-// recipe) with one named Slowed condition log. Successful saves grant nothing.
-// ZERO damage (dc_success none) and the picker copy never carries the
-// half-damage boilerplate — the "null null damage" cosmetic is gone.
+// @maintained-by-ai
+// MA-0087 lane: damageless "slowed" rider picker (Adult Copper Slowing Breath
+// shape — CON DC 18, dc_success none, no damage formula). Given an authored
+// slowedClauses prop, the picker shows the Slowed rider copy (never null-null /
+// half-damage boilerplate) and stays inert until Confirm. On confirm, each NPC
+// that FAILS the save grants the three registered te clauses (speed_half,
+// no_reactions, no_action_and_bonus_action) sourced from the caster with
+// until_end_of_next_turn duration + a rounds:2 expiry clock each (MA-0073
+// recipe) plus one named Slowed condition log; each NPC that SAVES grants
+// nothing. Zero damage either way. JSON parsing of the clause is pinned in
+// MonsterCardHelpers.slowed-clauses.test.js — this lane feeds the literal.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
-import monstersData from '../../../../../public/data/monsters.json';
 
 vi.mock('../../../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -47,7 +49,8 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Adult Copper Dragon 1', type: 'npc', currentHp: 184, maxHp: 184, saveBonuses: {}, resistances: [], immunities: ['Acid'] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { con: 1 }, resistances: [], immunities: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { constitution: 2 }, resistances: [], immunities: [] },
+      { name: 'Acolyte 2', type: 'npc', currentHp: 33, maxHp: 33, saveBonuses: {}, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -84,10 +87,9 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
-import { parseSlowedClauses } from '../../../encounter/MonsterCardHelpers.js';
 
-const COPPER = monstersData.find(m => m.index === 'adult-copper-dragon');
-const SLOWING = COPPER.actions.find(a => a.name === 'Slowing Breath');
+const SLOWING_ACTION = { name: 'Slowing Breath' };
+const SLOWED_CLAUSES = { effects: ['speed_half', 'no_reactions', 'no_action_and_bonus_action'] };
 
 let randomSpy;
 function spyRandom(seq) {
@@ -99,7 +101,7 @@ afterEach(() => randomSpy?.mockRestore());
 function renderBreath() {
   return render(
     <SaveAttackAoeModal
-      action={SLOWING}
+      action={SLOWING_ACTION}
       playerStats={{ name: 'Adult Copper Dragon 1' }}
       campaignName="test-campaign"
       range={60}
@@ -112,7 +114,7 @@ function renderBreath() {
       excludeNames={['Adult Copper Dragon 1']}
       rangeGateFt={60}
       saveConditions={[]}
-      slowedClauses={parseSlowedClauses(SLOWING.save_effect)}
+      slowedClauses={SLOWED_CLAUSES}
       storeLastAttack={false}
       onClose={vi.fn()}
     />
@@ -127,48 +129,52 @@ beforeEach(() => {
 });
 
 describe('MA-0087 Adult Copper Slowing Breath picker', () => {
-  it('damageless picker copy states the Slowed riders, never null-null / half-damage boilerplate', async () => {
+  it('damageless picker copy states the full Slowed rider and stays inert until Confirm — no null / half-damage boilerplate', async () => {
     spyRandom([0.5]);
     renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
+    expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Acolyte 2']);
+
     const copy = document.querySelector('.sp-note-copy').textContent;
-    expect(copy).toMatch(/Slowed: can't take Reactions, Speed halved/);
-    expect(copy).not.toMatch(/null/i);
-    expect(copy).not.toMatch(/half damage/i);
+    expect(copy).toContain("Slowed: can't take Reactions, Speed halved, and one action or Bonus Action (not both) until the end of its next turn.");
+    expect(document.querySelector('.sp-desc').textContent).toContain('Constitution');
+    expect(document.querySelector('.sp-desc').textContent).toContain('DC 18');
+    expect(document.querySelector('.sp-overlay').textContent).not.toMatch(/null/i);
+    expect(document.querySelector('.sp-overlay').textContent).not.toMatch(/half damage/i);
+
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+    expect(expirations.current).toHaveLength(0);
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('NPC failed CON save grants speed_half + no_reactions + no_action_and_bonus_action te + rounds:2 clocks + one Slowed log, zero damage', async () => {
-    spyRandom([0.05, 0.05, 0.05, 0.05, 0.05, 0.05]);
+  it('mixed confirm: failed CON save grants the slowed te trio + rounds:2 clocks + one Slowed log; successful save grants nothing; zero damage', async () => {
+    // Two draws per NPC save in selection order: Thug 1 rolls 1+2=3 (fails DC 18),
+    // Acolyte 2 rolls 20 (succeeds).
+    spyRandom([0.01, 0.01, 0.99, 0.99]);
     const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    await waitFor(() => expect(runtime.store['campaign.targetEffects']).toHaveLength(3));
 
-    const tes = runtime.store['campaign.targetEffects'] || [];
-    for (const effect of ['speed_half', 'no_reactions', 'no_action_and_bonus_action']) {
-      const te = tes.find(t => t.effect === effect && t.target === 'Thug 1');
-      expect(te, `te ${effect}`).toBeTruthy();
+    const tes = runtime.store['campaign.targetEffects'];
+    expect(tes.map(t => t.effect).sort()).toEqual(['no_action_and_bonus_action', 'no_reactions', 'speed_half']);
+    for (const te of tes) {
+      expect(te.target).toBe('Thug 1');
       expect(te.source).toBe('Adult Copper Dragon 1');
       expect(te.duration).toBe('until_end_of_next_turn');
       expect(te.actionName).toBe('Slowing Breath');
     }
+
     expect(expirations.current).toHaveLength(3);
     expect(expirations.current.every(e => e.rounds === 2 && e.targetName === 'Thug 1')).toBe(true);
+    expect(expirations.current.map(e => e.effects[0].effectKey).sort()).toEqual(['no_action_and_bonus_action', 'no_reactions', 'speed_half']);
 
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.condition === 'Slowed');
-    expect(log).toBeTruthy();
-    expect(log.description).toMatch(/can't take Reactions, Speed halved/);
+    const slowedLogs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.condition === 'Slowed');
+    expect(slowedLogs).toHaveLength(1);
+    expect(slowedLogs[0].characterName).toBe('Thug 1');
+    expect(slowedLogs[0].description).toMatch(/failed the Constitution save \(DC 18\)/);
+
+    // Zero damage on this damageless row, for either outcome.
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-  });
-
-  it('NPC successful CON save grants nothing — no te, no expiry, no Slowed log', async () => {
-    spyRandom([0.99, 0.99, 0.99, 0.99, 0.99, 0.99]);
-    const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect((runtime.store['campaign.targetEffects'] || []).length).toBe(0);
-    expect(expirations.current).toHaveLength(0);
-    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.condition === 'Slowed')).toBeFalsy();
   });
 });

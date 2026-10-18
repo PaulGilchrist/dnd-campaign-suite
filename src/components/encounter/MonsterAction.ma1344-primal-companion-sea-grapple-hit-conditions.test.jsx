@@ -1,15 +1,22 @@
+// @maintained-by-ai
 // MA-1344: Primal Companion (Beast of the Sea) "Beast's Strike" — prose
 // carries "the target has the Grappled condition (escape DC = 8 +
 // Proficiency Bonus + WIS modifier)" but the disk row shipped WITHOUT
 // hit_conditions, so the grapple rider was structurally inert
 // (buildHitConditionClause reads hit_conditions/escape_dc keys only, NEVER
 // description; consumer live in handlePlainDamage.applyHitClauseConditions).
-// Fix split: disk authors hit_conditions:["grappled"] ONLY — escape_dc is
-// caster-dependent (8 + PB + WIS) and is folded per-caster in
-// primalCompanionHandler.resolveMonsterActions (this row is merged per-
-// caster, so NO static escape_dc may be baked here). Locks: disk row shape,
-// absence of escape_dc, clause arms grappled from disk alone with escapeDc
-// null until the fold stamps it, disk prose tokens stay unfolded.
+// Fix split: disk authors hit_conditions ["grappled"] ONLY — escape_dc is
+// caster-dependent (8 + PB + WIS) and is folded per-caster by
+// primalCompanionHandler.resolveMonsterActions (fold + caster numerics owned
+// there, :320-323; byte-inert negative :290-292). Row NOT absorbed: absent
+// from HIT_CLAUSE_ROWS (handlePlainDamage.hitClause.test.js:224-282 — no
+// static escape_dc to table-lock); clause truth-table owned there :183-215
+// and MA-0286 census. Owned here: disk bytes (exact-key-list toEqual proves
+// hit_conditions lands after damage_type_primary and NO escape_dc/save_dc/
+// save_type/hit_target_effect may ever be baked) + this row's live clause
+// arm with escapeDc null until the summon fold stamps it. Prose tokens stay
+// unfolded on disk (fold happens per-caster at summon). No static attack_bonus
+// (spell attack) — no numeric chip lane.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildHitConditionClause } from './MonsterCardHelpers.js';
@@ -19,40 +26,25 @@ const SEA = monsters.find((m) => m.index === 'primal-companion-beast-of-the-sea'
 const STRIKE = SEA.actions[0];
 
 describe('MA-1344 disk fingerprint: Beast of the Sea grapple rider fix', () => {
-  it('disk row carries hit_conditions ["grappled"] after damage_type_primary, NO static escape_dc', () => {
+  it('disk bytes arm the Grappled rider with NO baked escape_dc (folded per-caster at summon)', () => {
+    // fingerprint: exact key spell/order — absence of escape_dc/save fields
+    // is enforced by the exact list, not individual undefined checks
     expect(SEA.name).toBe('Primal Companion (Beast of the Sea)');
+    expect(Object.keys(STRIKE)).toEqual(['name', 'description', 'attack_bonus', 'reach', 'damage_dice_primary', 'damage_type_primary', 'hit_conditions']);
     expect(STRIKE.name).toBe("Beast's Strike");
-    expect(STRIKE.hit_conditions).toEqual(['grappled']);
-    expect(STRIKE.escape_dc).toBeUndefined();
-    const keys = Object.keys(STRIKE);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
     expect(STRIKE.attack_bonus).toBeNull();
     expect(STRIKE.reach).toBe('5 ft.');
     expect(STRIKE.damage_dice_primary).toBe('1d6+2+WIS modifier');
     expect(STRIKE.damage_type_primary).toBe('Bludgeoning');
-  });
-
-  it('row carries NO save fields and no baked caster numbers (escape DC is folded at summon)', () => {
-    expect(STRIKE.save_dc).toBeUndefined();
-    expect(STRIKE.save_type).toBeUndefined();
-    expect(STRIKE.hit_target_effect).toBeUndefined();
+    expect(STRIKE.hit_conditions).toEqual(['grappled']);
+    // prose stays unfolded on disk — "escape DC = 8 + Proficiency Bonus + WIS modifier"
     expect(STRIKE.description).toContain('escape DC = 8 + Proficiency Bonus + WIS modifier');
-  });
-
-  it('buildHitConditionClause arms the Grappled rider from disk (escapeDc null until the caster fold)', () => {
-    const clause = buildHitConditionClause(STRIKE);
-    expect(clause).toEqual({
+    // live clause arm from disk alone: rider non-inert, escapeDc null until the caster fold
+    expect(buildHitConditionClause(STRIKE)).toEqual({
       conditions: ['grappled'],
       escapeDc: null,
       attackName: "Beast's Strike",
       targetEffect: null,
     });
-  });
-
-  it('folded row (escape_dc stamped by primalCompanionHandler) feeds the MA-0010 seam with the caster DC', () => {
-    const folded = { ...STRIKE, escape_dc: 17 };
-    const clause = buildHitConditionClause(folded);
-    expect(clause.conditions).toEqual(['grappled']);
-    expect(clause.escapeDc).toBe(17);
   });
 });

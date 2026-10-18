@@ -1,9 +1,26 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsAutomation from './useCharActionsAutomation.js';
 
+// OWNERSHIP (trimmed 2026-10-17): this file owns the Focus Point cost lane
+// (spend / depletion refusal / skip-list / FP resolution fallbacks), the
+// after_casting_action_spell refusal lane (CLA-399), the damage_bonus +
+// defensive_tactics feature-choice gates, handleAutomationAction robustness,
+// and the handleDivineInterventionCast executeSpellCast deps seam.
+// Owned elsewhere — deleted here, verified stronger at owner:
+//   after_attack_action read gate → useCharActionsAutomation.cla143-gate.test.js
+//   Fleet Step grant → useCharActionsAutomation.fleetStep.test.js
+//   Stunning Strike gate/mark → useCharActionsAutomation.stunning-strike.test.js
+//   result-type dispatch shapes (popup/roll/attack_roll/logEntries/falsy) → useCharActionsAutomation.test.result-types.js
+//   modal routing → .test.resource-modals.js / .test.condition-modals.js / .test.class-feature-modals.js
+//   telepathicSpeech producer → .test.telepathic-speech.js (CLA-053)
+//   handleDivineInterventionCast flows → .test.divine-intervention.js
+//   cannotAct / early returns → .test.early-returns.js (flagged whole-file delete by #330;
+//   its versions of the FP-lane tests below are weaker — this file is the FP-lane owner).
+
 vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
     onSpellSelected: vi.fn(),
-    // CLA-053: the lane now loads buffHandler (confirmTelepathicSpeech), whose
+    // CLA-053: the lane loads buffHandler (confirmTelepathicSpeech), whose
     // transitive chain pulls automation/index — extend the partial mock (§45).
     handle: vi.fn(),
 }));
@@ -109,12 +126,11 @@ describe('useCharActionsAutomation', () => {
     });
 
     describe('handleAutomationAction', () => {
-        it('should return early without any side effects when cannotAct is true', async () => {
+        it('returns early without any side effects when cannotAct is true', async () => {
             const deps = createDeps({ cannotAct: true });
             const { handleAutomationAction } = getHandlers(deps);
-            const action = { name: 'Test Feature', automation: { type: 'test' } };
 
-            await handleAutomationAction(action);
+            await handleAutomationAction({ name: 'Test Feature', automation: { type: 'test' } });
 
             expect(deps.setPopupHtml).not.toHaveBeenCalled();
             expect(deps.setModalState).not.toHaveBeenCalled();
@@ -122,1412 +138,398 @@ describe('useCharActionsAutomation', () => {
             expect(deps.setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should return the two handler functions', () => {
-            const deps = createDeps();
-            const handlers = getHandlers(deps);
+        it('returns the two handler functions', () => {
+            const handlers = getHandlers(createDeps());
 
             expect(typeof handlers.handleAutomationAction).toBe('function');
             expect(typeof handlers.handleDivineInterventionCast).toBe('function');
         });
+    });
 
-        describe('damage_bonus with options', () => {
-            it('should show a modal when no choice has been made yet', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    if (key === '_Test_Feature_option') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { type: 'damage_bonus', options: ['Option A', 'Option B'] },
-                };
+    describe('feature-choice gates (damage_bonus / defensive_tactics)', () => {
+        const choiceGates = [
+            {
+                label: 'damage_bonus',
+                automation: { type: 'damage_bonus', options: ['Option A', 'Option B'] },
+                options: ['Option A', 'Option B'],
+                optionKey: '_Test_Feature_option',
+            },
+            {
+                label: 'defensive_tactics',
+                automation: { type: 'defensive_tactics' },
+                options: ['Escape the Horde', 'Multiattack Defense'],
+                optionKey: '_Test_Feature_choice',
+            },
+        ];
 
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
+        it.each(choiceGates)('opens the featureChoice modal for $label while no choice is stored', async ({ automation, options, optionKey }) => {
+            const action = { name: 'Test Feature', automation };
+            const deps = createDeps();
+            const { handleAutomationAction } = getHandlers(deps);
 
-                await handleAutomationAction(action);
+            await handleAutomationAction(action);
 
-                expect(deps.setModalState).toHaveBeenCalledWith({
-                    featureChoice: {
-                        action,
-                        options: ['Option A', 'Option B'],
-                        optionKey: '_Test_Feature_option',
-                    },
-                });
-                expect(deps.executeHandler).not.toHaveBeenCalled();
+            expect(deps.setModalState).toHaveBeenCalledWith({
+                featureChoice: { action, options, optionKey },
             });
-
-            it('should proceed to executeHandler when a choice has already been made', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    if (key === '_Test_Feature_option') return 'Option A';
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { type: 'damage_bonus', options: ['Option A', 'Option B'] },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setModalState).not.toHaveBeenCalled();
-                expect(deps.executeHandler).toHaveBeenCalledWith(
-                    action,
-                    basePlayerStats,
-                    campaignName,
-                    'test-map',
-                    []
-                );
-            });
+            expect(deps.executeHandler).not.toHaveBeenCalled();
         });
 
-        describe('defensive_tactics', () => {
-            it('should show a modal when no choice has been made yet', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    if (key === '_Test_Feature_choice') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { type: 'defensive_tactics' },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setModalState).toHaveBeenCalledWith({
-                    featureChoice: {
-                        action,
-                        options: ['Escape the Horde', 'Multiattack Defense'],
-                        optionKey: '_Test_Feature_choice',
-                    },
-                });
-                expect(deps.executeHandler).not.toHaveBeenCalled();
+        it.each(choiceGates)('dispatches directly for $label once the choice is stored', async ({ automation, optionKey }) => {
+            const action = { name: 'Test Feature', automation };
+            const grv = vi.fn((charKey, key, _cn) => {
+                if (key === 'activeBuffs') return [];
+                if (key === 'focusPoints') return 3;
+                if (key === 'lastActionSpellCast') return null;
+                if (key === optionKey) return 'Option A';
+                return undefined;
             });
-
-            it('should proceed to executeHandler when a choice has already been made', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    if (key === '_Test_Feature_choice') return 'Escape the Horde';
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { type: 'defensive_tactics' },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setModalState).not.toHaveBeenCalled();
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-        });
-
-        describe('Monk Ki features - focus point spending', () => {
-            const monkActions = [
-                'Flurry of Blows', 'Patient Defense', 'Step of the Wind',
-                'Heightened Flurry of Blows', 'Heightened Patient Defense',
-                'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike',
-            ];
-
-            it.each(monkActions)('should spend 1 focus point for %s when FP is available', async (actionName) => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 2;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: actionName, automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', 1, campaignName
-                );
-            });
-
-            it('should show popup and not spend FP when focus points are depleted', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                    '<b>Flurry of Blows</b><br/>No ki points remaining.'
-                );
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('should show popup with "Focus Points" for 2024 ruleset when depleted', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-                const playerStats = { ...basePlayerStats, rules: '2024' };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                    '<b>Flurry of Blows</b><br/>No Focus Points remaining.'
-                );
-            });
-
-            it('should NOT pre-spend FP for 2024 patient_defense actions (handler is sole FP writer)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 17;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-
-                for (const actionName of ['Patient Defense', 'Heightened Patient Defense']) {
-                    const action = {
-                        name: actionName,
-                        automation: { type: 'patient_defense', cost: { resource: 'focus_points', amount: 1 } },
-                    };
-                    const deps = createDeps({ getRuntimeValue: grv });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                        'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                    );
-                    expect(deps.executeHandler).toHaveBeenCalledWith(
-                        action, basePlayerStats, campaignName, 'test-map', []
-                    );
-                }
-            });
-
-            it('should reach executeHandler for patient_defense at FP=0 (plain Disengage pass-through, no block)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const playerStats = { ...basePlayerStats, rules: '2024' };
-                const action = {
-                    name: 'Heightened Patient Defense',
-                    automation: { type: 'patient_defense', cost: { resource: 'focus_points', amount: 1 } },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).not.toHaveBeenCalledWith(
-                    expect.stringContaining('No Focus Points remaining.')
-                );
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalledWith(
-                    action, playerStats, campaignName, 'test-map', []
-                );
-            });
-
-            it('should NOT pre-spend FP for step_of_the_wind actions (handler is sole FP writer, CLA-333)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 17;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-
-                for (const actionName of ['Step of the Wind', 'Heightened Step of the Wind']) {
-                    const action = {
-                        name: actionName,
-                        automation: { type: 'step_of_the_wind', cost: { resource: 'focus_points', amount: 1 } },
-                    };
-                    const deps = createDeps({ getRuntimeValue: grv });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                        'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                    );
-                    expect(deps.executeHandler).toHaveBeenCalledWith(
-                        action, basePlayerStats, campaignName, 'test-map', []
-                    );
-                }
-            });
-
-            it('should pass step_of_the_wind FP=0 gate down to the handler (CLA-333)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const playerStats = { ...basePlayerStats, rules: '2024' };
-                const action = {
-                    name: 'Heightened Step of the Wind',
-                    automation: { type: 'step_of_the_wind', cost: { resource: 'focus_points', amount: 1 } },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalledWith(
-                    action, playerStats, campaignName, 'test-map', []
-                );
-            });
-
-            it('should skip FP spending for Flurry of Blows when Flurry of Healing and Harm is active', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const playerStats = {
-                    ...basePlayerStats,
-                    specialActions: [{ name: 'Flurry of Healing and Harm' }],
-                };
-                const action = { name: 'Flurry of Blows', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            // CLA-159 INVERTED: the old pin "standalone Hand of Healing is free when
-            // holding Flurry of Healing and Harm" was the bug — the FP-free exemption is
-            // only for HoH used AS PART of Flurry, which lives in bonusAttacksHandler
-            // (CLA-144/CLA-158: "FP-free reactions skip in the lane providing the free
-            // use ... NEVER in shared handlers (standalone always charges)").
-            it('should spend FP for standalone Hand of Healing even when Flurry of Healing and Harm is active (CLA-159)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 2;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const playerStats = {
-                    ...basePlayerStats,
-                    specialActions: [{ name: 'Flurry of Healing and Harm' }],
-                };
-                const action = { name: 'Hand of Healing', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', 1, campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            // CLA-159: 0-FP refusal on standalone HoH must gate, popup, and log
-            // hand_of_healing_refused with zero spend (§5 refusal convention).
-            it('should refuse Hand of Healing at 0 FP with refusal log and zero spend (CLA-159)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const playerStats = {
-                    ...basePlayerStats,
-                    rules: '2024',
-                    specialActions: [{ name: 'Flurry of Healing and Harm' }],
-                };
-                const action = { name: 'Hand of Healing', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                    '<b>Hand of Healing</b><br/>No Focus Points remaining.'
-                );
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).not.toHaveBeenCalled();
-                expect(deps.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'automation',
-                    automationType: 'hand_of_healing_refused',
-                    description: expect.stringContaining('no_focus_points'),
-                }));
-            });
-
-            it('should skip FP spending for Flurry of Blows when Cloak of Shadows is active (Shadow Flurry)', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            it('should skip FP spending for Heightened Flurry of Blows when Cloak of Shadows is active', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Heightened Flurry of Blows', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', expect.any(Number), campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            it('should NOT skip FP spending for Patient Defense when Cloak of Shadows is active', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }];
-                    if (key === 'focusPoints') return 0;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Patient Defense', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).toHaveBeenCalled();
-                expect(deps.executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('should use _trackedResources fallback when focusPoints is null', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return null;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-                const playerStats = {
-                    ...basePlayerStats,
-                    _trackedResources: { focusPoints: { current: 1 } },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', 0, campaignName
-                );
-            });
-
-            it('should use maxFP from getClassFeatures when _trackedResources is missing', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return null;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-                const playerStats = {
-                    ...basePlayerStats,
-                    _trackedResources: undefined,
-                };
-                getClassFeatures.mockReturnValue({ maxFocusPoints: 2 });
-
-                const deps = createDeps({ getRuntimeValue: grv, playerStats });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                // maxFP is 2, so currentFP is 2 (not depleted), action proceeds
-                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter', 'focusPoints', 1, campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            it('should dispatch focus-points-updated event after spending', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 2;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Flurry of Blows', automation: {} };
-                const dispatchSpy = vi.spyOn(window, 'CustomEvent');
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(dispatchSpy).toHaveBeenCalledWith('focus-points-updated');
-                dispatchSpy.mockRestore();
-            });
-        });
-
-        describe('trigger conditions', () => {
-            it('should show popup and reset lastActionSpellCast when trigger is after_casting_action_spell and lastCast exists', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return 'Firebolt';
-                    return undefined;
-                });
-                const action = {
-                    name: 'War Caster',
-                    automation: { trigger: 'after_casting_action_spell' },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).not.toHaveBeenCalled();
-                expect(deps.setRuntimeValue).toHaveBeenCalledWith(
-                    'TestFighter', 'lastActionSpellCast', 0, campaignName
-                );
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            it('should show popup and NOT proceed when trigger condition is not met', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'War Caster',
-                    automation: { trigger: 'after_casting_action_spell' },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).toHaveBeenCalledWith(
-                    '<b>War Caster</b><br/>You must cast a spell with a casting time of an action first.'
-                );
-                expect(deps.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'TestFighter', 'lastActionSpellCast', 0, campaignName
-                );
-                expect(deps.executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('CLA-399: logs refusal with battle_magic_refused token when trigger gate fails', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'Battle Magic',
-                    automation: {
-                        type: 'bonus_action_attack',
-                        trigger: 'after_casting_action_spell',
-                        action: 'bonus_action',
-                        weaponAttack: true,
-                    },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-                await handleAutomationAction(action);
-
-                expect(deps.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'automation',
-                    characterName: 'TestFighter',
-                    automationType: 'battle_magic_refused',
-                }));
-                expect(deps.addEntry.mock.calls[0][1].description).toContain('no_action_spell_cast');
-                expect(deps.executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('should skip trigger check when trigger is empty string', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { trigger: '' },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).not.toHaveBeenCalled();
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-
-            it('should skip trigger check when trigger is undefined', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = {
-                    name: 'Test Feature',
-                    automation: { trigger: undefined },
-                };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(deps.setPopupHtml).not.toHaveBeenCalled();
-                expect(deps.executeHandler).toHaveBeenCalled();
-            });
-        });
-
-        describe('executeHandler result processing', () => {
-            describe('popup result type', () => {
-                it('should call setPopupHtml with the payload', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<b>Test</b><br/>Result',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setPopupHtml).toHaveBeenCalledWith('<b>Test</b><br/>Result');
-                });
-
-                it('should call onBuffsChange when popup is temp_buff type', async () => {
-                    const action = { name: 'Test Feature', automation: { type: 'temp_buff' } };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Temp HP granted</p>',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.onBuffsChange).toHaveBeenCalled();
-                });
-
-                it('should call onBuffsChange when popup is combat_stance type', async () => {
-                    const action = { name: 'Test Feature', automation: { type: 'combat_stance' } };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Stance active</p>',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.onBuffsChange).toHaveBeenCalled();
-                });
-
-                it('should NOT call onBuffsChange for non-buff popups', async () => {
-                    const action = { name: 'Test Feature', automation: { type: 'damage' } };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Damage dealt</p>',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.onBuffsChange).not.toHaveBeenCalled();
-                });
-            });
-
-            describe('modal result type', () => {
-                it('should route healingPool modal correctly', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'healingPool',
-                        payload: { amount: 10 },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        healingPoolModal: { amount: 10 },
-                    });
-                });
-
-                it('should route elementalAffinity modal with expanded payload', async () => {
-                    const action = { name: 'Elemental Affinity', automation: {} };
-                    const payload = {
-                        action,
-                        damageTypes: ['Fire', 'Cold'],
-                        existingType: 'Fire',
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'elementalAffinity',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        elementalAffinityModal: {
-                            action: payload.action,
-                            playerStats: basePlayerStats,
-                            campaignName,
-                            damageTypes: ['Fire', 'Cold'],
-                            existingType: 'Fire',
-                        },
-                    });
-                });
-
-                it('should use default damageTypes for elementalAffinity when payload lacks them', async () => {
-                    const action = { name: 'Elemental Affinity', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'elementalAffinity',
-                        payload: {},
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        elementalAffinityModal: expect.objectContaining({
-                            damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'],
-                        }),
-                    });
-                });
-
-                it('should route fiendishResilience modal with expanded payload', async () => {
-                    const action = { name: 'Fiendish Resilience', automation: {} };
-                    const payload = {
-                        action,
-                        damageTypes: ['Fire'],
-                        existingType: 'Fire',
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'fiendishResilience',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        fiendishResilienceModal: {
-                            action: payload.action,
-                            playerStats: basePlayerStats,
-                            campaignName,
-                            damageTypes: ['Fire'],
-                            existingType: 'Fire',
-                        },
-                    });
-                });
-
-                it('should use default damageTypes for fiendishResilience when payload lacks them', async () => {
-                    const action = { name: 'Fiendish Resilience', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'fiendishResilience',
-                        payload: {},
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        fiendishResilienceModal: expect.objectContaining({
-                            damageTypes: [
-                                'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning',
-                                'Necrotic', 'Piercing', 'Poison', 'Psychic',
-                                'Radiant', 'Slashing', 'Thunder',
-                            ],
-                        }),
-                    });
-                });
-
-                it('should route divineIntervention modal with action and modal payload', async () => {
-                    const action = { name: 'Divine Intervention', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'divineIntervention',
-                        payload: { spellOptions: ['Fireball'] },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        divineInterventionAction: action,
-                        divineInterventionModal: { spellOptions: ['Fireball'] },
-                    });
-                });
-
-                it('should route celestialResilienceModal with expanded payload', async () => {
-                    const action = { name: 'Celestial Resilience', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'celestialResilienceModal',
-                        payload: { resilienceType: 'fire' },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        celestialResilienceModal: {
-                            resilienceType: 'fire',
-                            playerStats: basePlayerStats,
-                            campaignName,
-                        },
-                    });
-                });
-
-                it('should route breathWeaponShape modal with expanded payload', async () => {
-                    const action = { name: 'Breath Weapon', automation: {} };
-                    const payload = {
-                        action,
-                        options: ['Cone', 'Line'],
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'breathWeaponShape',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        breathWeaponShapeModal: {
-                            action: payload.action,
-                            playerStats: basePlayerStats,
-                            campaignName,
-                            options: ['Cone', 'Line'],
-                        },
-                    });
-                });
-
-                it('should route hypnoticPatternShake modal directly', async () => {
-                    const action = { name: 'Hypnotic Pattern', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'hypnoticPatternShake',
-                        payload: { shake: true },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        hypnoticPatternShakeModal: { shake: true },
-                    });
-                });
-
-                it('should route telepathicSpeech modal with secondary target selection', async () => {
-                    const action = { name: 'Telepathic Speech', automation: {} };
-                    const payload = {
-                        action,
-                        creatureTargets: ['Goblin', 'Orc'],
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'telepathicSpeech',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setModalState).toHaveBeenCalledWith({
-                        secondaryTargetModal: expect.objectContaining({
-                            title: 'Telepathic Speech',
-                            icon: 'fa-brain',
-                            targets: ['Goblin', 'Orc'],
-                            confirmLabel: 'Establish Link',
-                            confirmIcon: 'fa-brain',
-                            description: 'Choose one creature within 30 feet to communicate with telepathically.',
-                        }),
-                    });
-                });
-
-                it('should use Charisma bonus for telepathicSpeech featureDescription', async () => {
-                    const action = { name: 'Telepathic Speech', automation: {} };
-                    const payload = {
-                        action,
-                        creatureTargets: ['Goblin'],
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'telepathicSpeech',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    const call = deps.setModalState.mock.calls[0][0].secondaryTargetModal;
-                    expect(call.featureDescription).toContain('1 mile');
-                    expect(call.featureDescription).toContain('5 minute');
-                });
-
-                it('should default telepathicSpeech featureDescription to 1 Charisma bonus when none found', async () => {
-                    const action = { name: 'Telepathic Speech', automation: {} };
-                    const payload = {
-                        action,
-                        creatureTargets: ['Goblin'],
-                    };
-                    const playerStats = { ...basePlayerStats, abilities: [] };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'modal',
-                        modalName: 'telepathicSpeech',
-                        payload,
-                    });
-
-                    const deps = createDeps({ executeHandler, playerStats });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    const call = deps.setModalState.mock.calls[0][0].secondaryTargetModal;
-                    expect(call.featureDescription).toContain('1 mile');
-                });
-            });
-
-            describe('roll result type', () => {
-                it('should call rollDamage when result type is roll with damage rollType', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'roll',
-                        payload: {
-                            rollType: 'damage',
-                            name: 'Fireball',
-                            formula: '8d6',
-                            total: 32,
-                            rolls: [6, 5, 4, 3, 2, 1, 6, 5],
-                            modifier: 0,
-                        },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.rollDamage).toHaveBeenCalledWith(
-                        { name: 'Fireball', formula: '8d6', total: 32, rolls: [6, 5, 4, 3, 2, 1, 6, 5], modifier: 0, context: {} }
-                    );
-                });
-
-                it('should pass contextConfig to rollDamage when provided', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'roll',
-                        payload: {
-                            rollType: 'damage',
-                            name: 'Fireball',
-                            formula: '8d6',
-                            total: 32,
-                            rolls: [6, 5, 4, 3, 2, 1, 6, 5],
-                            modifier: 0,
-                            contextConfig: { source: 'spell' },
-                        },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.rollDamage).toHaveBeenCalledWith(
-                        { name: 'Fireball', formula: '8d6', total: 32, rolls: [6, 5, 4, 3, 2, 1, 6, 5], modifier: 0, context: { source: 'spell' } }
-                    );
-                });
-
-                it('should NOT call rollDamage for non-damage rollTypes', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'roll',
-                        payload: {
-                            rollType: 'attack',
-                            name: 'Attack',
-                            formula: '1d20',
-                            total: 15,
-                            rolls: [15],
-                            modifier: 0,
-                        },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.rollDamage).not.toHaveBeenCalled();
-                });
-            });
-
-            describe('attack_roll result type', () => {
-                it('should call rollAttack with attack details', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const attack = {
-                        name: 'Longsword',
-                        hitBonus: 7,
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'attack_roll',
-                        payload: { attack, targetName: 'Goblin' },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.rollAttack).toHaveBeenCalledWith(
-                        'Longsword', 7, {
-                            targetName: 'Goblin',
-                            forcedMode: undefined,
-                            isOpportunityAttack: false,
-                            autoDamageFormula: null,
-                            autoDamageName: 'Longsword',
-                            damageType: 'Slashing',
-                        }
-                    );
-                });
-
-                it('should pass autoDamage fields from attack when present', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const attack = {
-                        name: 'Raven Queen\'s Grasp',
-                        hitBonus: 5,
-                        autoDamageFormula: '2d8',
-                        autoDamageName: 'Raven Queen\'s Grasp',
-                        damageType: 'Cold',
-                    };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'attack_roll',
-                        payload: { attack, targetName: 'Orc' },
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.rollAttack).toHaveBeenCalledWith(
-                        'Raven Queen\'s Grasp', 5, {
-                            targetName: 'Orc',
-                            forcedMode: undefined,
-                            isOpportunityAttack: false,
-                            autoDamageFormula: '2d8',
-                            autoDamageName: 'Raven Queen\'s Grasp',
-                            damageType: 'Cold',
-                        }
-                    );
-                });
-            });
-
-            describe('notify_buffs_changed result type', () => {
-                it('should call onBuffsChange when result type is notify_buffs_changed', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'notify_buffs_changed',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.onBuffsChange).toHaveBeenCalled();
-                });
-
-                it('should call onBuffsChange when it is provided (even as default vi.fn)', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'notify_buffs_changed',
-                    });
-
-                    const deps = createDeps({
-                        executeHandler,
-                        onBuffsChange: undefined,
-                    });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    // createDeps defaults onBuffsChange to vi.fn() when undefined, so it gets called
-                    expect(deps.onBuffsChange).toHaveBeenCalled();
-                });
-            });
-
-            describe('log entries', () => {
-                it('should call addEntry for each log entry', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Done</p>',
-                        logEntries: [
-                            { type: 'ability_use', characterName: 'TestFighter', abilityName: 'Test Feature' },
-                            { type: 'damage', amount: 10 },
-                        ],
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.addEntry).toHaveBeenNthCalledWith(
-                        1, campaignName, { type: 'ability_use', characterName: 'TestFighter', abilityName: 'Test Feature' }
-                    );
-                    expect(deps.addEntry).toHaveBeenNthCalledWith(
-                        2, campaignName, { type: 'damage', amount: 10 }
-                    );
-                });
-
-                it('should not throw when addEntry rejects', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Done</p>',
-                        logEntries: [{ type: 'test' }],
-                    });
-                    const addEntry = vi.fn().mockRejectedValue(new Error('log failed'));
-
-                    const deps = createDeps({ executeHandler, addEntry });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    // Should not throw
-                    await expect(handleAutomationAction(action)).resolves.toBeUndefined();
-                });
-
-                it('should not call addEntry when there are no log entries', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue({
-                        type: 'popup',
-                        payload: '<p>Done</p>',
-                    });
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.addEntry).not.toHaveBeenCalled();
-                });
-            });
-
-            describe('executeHandler returns falsy', () => {
-                it('should return early when executeHandler returns null', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue(null);
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setPopupHtml).not.toHaveBeenCalled();
-                    expect(deps.setModalState).not.toHaveBeenCalled();
-                    expect(deps.rollDamage).not.toHaveBeenCalled();
-                    expect(deps.rollAttack).not.toHaveBeenCalled();
-                    expect(deps.addEntry).not.toHaveBeenCalled();
-                });
-
-                it('should return early when executeHandler returns undefined', async () => {
-                    const action = { name: 'Test Feature', automation: {} };
-                    const executeHandler = vi.fn().mockResolvedValue(undefined);
-
-                    const deps = createDeps({ executeHandler });
-                    const { handleAutomationAction } = getHandlers(deps);
-
-                    await handleAutomationAction(action);
-
-                    expect(deps.setPopupHtml).not.toHaveBeenCalled();
-                    expect(deps.setModalState).not.toHaveBeenCalled();
-                    expect(deps.rollDamage).not.toHaveBeenCalled();
-                    expect(deps.rollAttack).not.toHaveBeenCalled();
-                    expect(deps.addEntry).not.toHaveBeenCalled();
-                });
-            });
-        });
-
-        describe('activeBuffs reading', () => {
-            it('should pass campaignName as third argument when reading activeBuffs', async () => {
-                const grv = vi.fn((charKey, key, cn) => {
-                    if (charKey === 'TestFighter' && key === 'activeBuffs' && cn === 'test-campaign') return [];
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Test Feature', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                await handleAutomationAction(action);
-
-                expect(grv).toHaveBeenCalledWith('TestFighter', 'activeBuffs', 'test-campaign');
-            });
-
-            it('should gracefully handle non-array activeBuffs', async () => {
-                const grv = vi.fn((charKey, key, _cn) => {
-                    if (key === 'activeBuffs') return null;
-                    if (key === 'focusPoints') return 3;
-                    if (key === 'lastActionSpellCast') return null;
-                    return undefined;
-                });
-                const action = { name: 'Test Feature', automation: {} };
-
-                const deps = createDeps({ getRuntimeValue: grv });
-                const { handleAutomationAction } = getHandlers(deps);
-
-                // Should not throw
-                await expect(handleAutomationAction(action)).resolves.toBeUndefined();
-            });
+            const deps = createDeps({ getRuntimeValue: grv });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setModalState).not.toHaveBeenCalled();
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                action, basePlayerStats, campaignName, 'test-map', []
+            );
         });
     });
 
-    describe('handleDivineInterventionCast', () => {
-        it('should clear modal at start and return early when there is no divineInterventionAction in runtime or modalState', async () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return null;
-                return undefined;
-            });
+    describe('Focus Point cost lane (owner)', () => {
+        // Mirrors MONK_KI_FEATURES in the source. 'Stunning Strike' here carries no
+        // automation.trigger, so the CLA-342 gate stays inert — the armed/blocked
+        // branches live in useCharActionsAutomation.stunning-strike.test.js.
+        const monkActions = [
+            'Flurry of Blows', 'Patient Defense', 'Step of the Wind',
+            'Heightened Flurry of Blows', 'Heightened Patient Defense',
+            'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike',
+        ];
 
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: {},
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
+        it.each(monkActions)('spends exactly 1 focus point for %s when FP is available', async (actionName) => {
+            const deps = createDeps({ focusPoints: 2 });
+            const action = { name: actionName, automation: {} };
+            const { handleAutomationAction } = getHandlers(deps);
 
-            await handleDivineInterventionCast({ name: 'Fireball' });
+            await handleAutomationAction(action);
 
-            expect(mockOnDivineInterventionSpellSelected).not.toHaveBeenCalled();
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                divineInterventionModal: null,
-                divineInterventionAction: null,
-            });
-        });
-
-        it('should clear divine intervention modal and action at the start', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                divineInterventionModal: null,
-                divineInterventionAction: null,
-            });
-        });
-
-        it('should call onDivineInterventionSpellSelected with correct args', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({});
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(mockOnDivineInterventionSpellSelected).toHaveBeenCalledWith(
-                action, basePlayerStats, campaignName, { name: 'Fireball' }
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', 'focusPoints', 1, campaignName
             );
         });
 
-        it('should return early when onDivineInterventionSpellSelected returns falsy', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue(null);
+        // Refusal convention (§5): popup + <feature>_refused log with no_focus_points,
+        // zero spend, no dispatch — ruleset wording byte-exact per lane map.
+        it.each([
+            { rules: '5e', wording: 'No ki points remaining.' },
+            { rules: '2024', wording: 'No Focus Points remaining.' },
+        ])('refuses a depleted Ki feature at FP=0 with byte-exact popup and refusal log ($rules)', async ({ rules, wording }) => {
+            const playerStats = { ...basePlayerStats, rules };
+            const action = { name: 'Flurry of Blows', automation: {} };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], 0), playerStats });
+            const { handleAutomationAction } = getHandlers(deps);
 
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
+            await handleAutomationAction(action);
 
-            await handleDivineInterventionCast({ name: 'Fireball' });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(`<b>Flurry of Blows</b><br/>${wording}`);
+            expect(deps.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                characterName: 'TestFighter',
+                automationType: 'flurry_of_blows_refused',
+                name: 'Flurry of Blows',
+                description: `Flurry of Blows refused — no_focus_points: ${wording}`,
+                timestamp: expect.any(Number),
+            });
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).not.toHaveBeenCalled();
+        });
+
+        // CLA-159 skip list: flurry rows only, via either exemption source, at FP=0
+        // (a skip must dispatch, not refuse).
+        it.each([
+            { name: 'Flurry of Blows', source: 'fhh' },
+            { name: 'Heightened Flurry of Blows', source: 'fhh' },
+            { name: 'Flurry of Blows', source: 'cloak' },
+            { name: 'Heightened Flurry of Blows', source: 'cloak' },
+        ])('skips FP cost for $name at FP=0 when $source exemption applies', async ({ name, source }) => {
+            const playerStats = source === 'fhh'
+                ? { ...basePlayerStats, specialActions: [{ name: 'Flurry of Healing and Harm' }] }
+                : basePlayerStats;
+            const activeBuffs = source === 'cloak' ? [{ effect: 'cloak_of_shadows' }] : [];
+            const action = { name, automation: {} };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV(activeBuffs, 0), playerStats });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
 
             expect(deps.setPopupHtml).not.toHaveBeenCalled();
-        });
-
-        it('should call executeSpellCast when result type is spell_selected', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({});
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(executeSpellCast).toHaveBeenCalledWith(
-                { name: 'Fireball' },
-                {},
-                expect.objectContaining({
-                    rollAttack: deps.rollAttack,
-                    rollDamage: deps.rollDamage,
-                    playerStats: basePlayerStats,
-                    campaignName,
-                    mapName: 'test-map',
-                    characters: [],
-                })
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                action, playerStats, campaignName, 'test-map', []
             );
         });
 
-        it('should pass a getTargetInfo function to executeSpellCast that uses getCombatContext', async () => {
-            const action = { name: 'Divine Intervention' };
+        it('does NOT skip FP cost for Patient Defense when Cloak of Shadows is active', async () => {
+            const action = { name: 'Patient Defense', automation: {} };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([{ effect: 'cloak_of_shadows' }], 0) });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(
+                '<b>Patient Defense</b><br/>No ki points remaining.'
+            );
+            expect(deps.executeHandler).not.toHaveBeenCalled();
+        });
+
+        // CLA-247 / CLA-333: patientDefenseHandler and stepOfTheWindHandler are the
+        // sole FP writers — the row lane never pre-spends and never blocks the
+        // plain-Disengage fallback, even at FP=0. Heightened names share the type
+        // guard (identical path), so one row per automation type suffices.
+        it.each([
+            { name: 'Patient Defense', type: 'patient_defense', focusPoints: 17 },
+            { name: 'Heightened Patient Defense', type: 'patient_defense', focusPoints: 0 },
+            { name: 'Step of the Wind', type: 'step_of_the_wind', focusPoints: 17 },
+            { name: 'Heightened Step of the Wind', type: 'step_of_the_wind', focusPoints: 0 },
+        ])('never pre-spends or blocks for $name ($type) at FP=$focusPoints', async ({ name, type, focusPoints }) => {
+            const action = {
+                name,
+                automation: { type, cost: { resource: 'focus_points', amount: 1 } },
+            };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], focusPoints) });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                action, basePlayerStats, campaignName, 'test-map', []
+            );
+        });
+
+        // CLA-159 INVERTED: the old pin "standalone Hand of Healing is free when
+        // holding Flurry of Healing and Harm" was the bug — the FP-free exemption is
+        // only for HoH used AS PART of Flurry, which lives in bonusAttacksHandler
+        // (CLA-144/CLA-158). The standalone sheet lane always charges 1 Focus Point.
+        it('spends FP for standalone Hand of Healing even when Flurry of Healing and Harm is active (CLA-159)', async () => {
+            const playerStats = {
+                ...basePlayerStats,
+                specialActions: [{ name: 'Flurry of Healing and Harm' }],
+            };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], 2), playerStats });
+            const action = { name: 'Hand of Healing', automation: {} };
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', 'focusPoints', 1, campaignName
+            );
+            expect(deps.executeHandler).toHaveBeenCalled();
+        });
+
+        it('refuses Hand of Healing at 0 FP with refusal log and zero spend (CLA-159)', async () => {
+            const playerStats = {
+                ...basePlayerStats,
+                rules: '2024',
+                specialActions: [{ name: 'Flurry of Healing and Harm' }],
+            };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], 0), playerStats });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Hand of Healing', automation: {} });
+
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(
+                '<b>Hand of Healing</b><br/>No Focus Points remaining.'
+            );
+            expect(deps.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                characterName: 'TestFighter',
+                automationType: 'hand_of_healing_refused',
+                name: 'Hand of Healing',
+                description: 'Hand of Healing refused — no_focus_points: No Focus Points remaining.',
+                timestamp: expect.any(Number),
+            });
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('falls back to _trackedResources.focusPoints when stored FP is null', async () => {
+            const playerStats = {
+                ...basePlayerStats,
+                _trackedResources: { focusPoints: { current: 1 } },
+            };
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], null), playerStats });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Flurry of Blows', automation: {} });
+
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', 'focusPoints', 0, campaignName
+            );
+        });
+
+        it('falls back to getClassFeatures maxFocusPoints when class levels lack focus_points', async () => {
+            const playerStats = { ...basePlayerStats, class: undefined, _trackedResources: undefined };
+            getClassFeatures.mockReturnValueOnce({ maxFocusPoints: 2 });
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV([], null), playerStats });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Flurry of Blows', automation: {} });
+
+            expect(getClassFeatures).toHaveBeenCalledWith(playerStats);
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', 'focusPoints', 1, campaignName
+            );
+        });
+
+        it('dispatches exactly one focus-points-updated CustomEvent after spending', async () => {
+            const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+            const deps = createDeps({ focusPoints: 2 });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Flurry of Blows', automation: {} });
+
+            expect(dispatchSpy).toHaveBeenCalledTimes(1);
+            const event = dispatchSpy.mock.calls[0][0];
+            expect(event).toBeInstanceOf(CustomEvent);
+            expect(event.type).toBe('focus-points-updated');
+            dispatchSpy.mockRestore();
+        });
+    });
+
+    describe('after_casting_action_spell trigger lane (CLA-399 owner)', () => {
+        it('proceeds and zeroes lastActionSpellCast when an action spell was cast', async () => {
             const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
+                if (key === 'activeBuffs') return [];
+                if (key === 'focusPoints') return 3;
+                if (key === 'lastActionSpellCast') return 'Firebolt';
                 return undefined;
             });
+            const action = {
+                name: 'War Caster',
+                automation: { trigger: 'after_casting_action_spell' },
+            };
+            const deps = createDeps({ getRuntimeValue: grv });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter', 'lastActionSpellCast', 0, campaignName
+            );
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                action, basePlayerStats, campaignName, 'test-map', []
+            );
+            // Positive leg dispatched, so the absence of the refusal is real gating.
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            expect(deps.addEntry).not.toHaveBeenCalled();
+        });
+
+        it('refuses with byte-exact popup and battle_magic_refused log when the gate fails (CLA-399)', async () => {
+            const action = {
+                name: 'Battle Magic',
+                automation: {
+                    type: 'bonus_action_attack',
+                    trigger: 'after_casting_action_spell',
+                    action: 'bonus_action',
+                    weaponAttack: true,
+                },
+            };
+            const deps = createDeps();
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction(action);
+
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(
+                '<b>Battle Magic</b><br/>You must cast a spell with a casting time of an action first.'
+            );
+            expect(deps.addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                characterName: 'TestFighter',
+                automationType: 'battle_magic_refused',
+                name: 'Battle Magic',
+                description: 'Battle Magic refused — no_action_spell_cast: You must cast a spell with a casting time of an action first.',
+                timestamp: expect.any(Number),
+            });
+            expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+            expect(deps.executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('skips the trigger check for an empty-string or absent trigger', async () => {
+            const deps = createDeps();
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Test Feature A', automation: { trigger: '' } });
+            await handleAutomationAction({ name: 'Test Feature B', automation: {} });
+
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            expect(deps.executeHandler).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('robustness', () => {
+        it('swallows addEntry rejections without failing the action', async () => {
+            const executeHandler = vi.fn().mockResolvedValue({
+                type: 'popup',
+                payload: '<p>Done</p>',
+                logEntries: [{ type: 'test' }],
+            });
+            const addEntry = vi.fn().mockRejectedValue(new Error('log failed'));
+            const deps = createDeps({ executeHandler, addEntry });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await expect(handleAutomationAction({ name: 'Test Feature', automation: {} })).resolves.toBeUndefined();
+            expect(addEntry).toHaveBeenCalled();
+        });
+
+        it.each([null, undefined])('dispatches nothing when executeHandler returns %s', async (falsyResult) => {
+            const executeHandler = vi.fn().mockResolvedValue(falsyResult);
+            const deps = createDeps({ executeHandler });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Test Feature', automation: {} });
+
+            expect(deps.setPopupHtml).not.toHaveBeenCalled();
+            expect(deps.setModalState).not.toHaveBeenCalled();
+            expect(deps.rollDamage).not.toHaveBeenCalled();
+            expect(deps.rollAttack).not.toHaveBeenCalled();
+            expect(deps.addEntry).not.toHaveBeenCalled();
+        });
+
+        it('threads campaignName as third argument when reading activeBuffs', async () => {
+            const grv = vi.fn((charKey, key, cn) => {
+                if (charKey === 'TestFighter' && key === 'activeBuffs' && cn === 'test-campaign') return [];
+                if (key === 'focusPoints') return 3;
+                if (key === 'lastActionSpellCast') return null;
+                return undefined;
+            });
+            const deps = createDeps({ getRuntimeValue: grv });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Test Feature', automation: {} });
+
+            expect(grv).toHaveBeenCalledWith('TestFighter', 'activeBuffs', 'test-campaign');
+            expect(deps.executeHandler).toHaveBeenCalled();
+        });
+
+        it('treats a non-array activeBuffs as empty and still dispatches', async () => {
+            const deps = createDeps({ getRuntimeValue: makeBaseGRV(null, 3) });
+            const { handleAutomationAction } = getHandlers(deps);
+
+            await handleAutomationAction({ name: 'Test Feature', automation: {} });
+
+            expect(deps.executeHandler).toHaveBeenCalledWith(
+                { name: 'Test Feature', automation: {} }, basePlayerStats, campaignName, 'test-map', []
+            );
+        });
+    });
+
+    describe('handleDivineInterventionCast deps seam (flows owned by .test.divine-intervention.js)', () => {
+        it('hands executeSpellCast the full deps payload, including a working getTargetInfo', async () => {
+            const action = { name: 'Divine Intervention' };
+            const grv = vi.fn((charKey, key, _cn) => (key === 'divineInterventionAction' ? action : undefined));
             mockOnDivineInterventionSpellSelected.mockResolvedValue({
                 type: 'spell_selected',
                 spell: { name: 'Fireball' },
@@ -1547,39 +549,28 @@ describe('useCharActionsAutomation', () => {
             await handleDivineInterventionCast({ name: 'Fireball' });
 
             expect(executeSpellCast).toHaveBeenCalledWith(
-                expect.any(Object),
+                { name: 'Fireball' },
                 {},
-                expect.objectContaining({
+                {
+                    rollAttack: deps.rollAttack,
+                    rollDamage: deps.rollDamage,
+                    playerStats: basePlayerStats,
+                    campaignName,
+                    mapName: 'test-map',
+                    characters: [],
                     getTargetInfo: expect.any(Function),
-                })
+                }
             );
 
-            // Verify the getTargetInfo function calls getCombatContext
-            const callArgs = executeSpellCast.mock.calls[0][2];
-            const targetInfo = callArgs.getTargetInfo;
-            const result = targetInfo();
-            expect(result).toBeInstanceOf(Promise);
+            const { getTargetInfo } = executeSpellCast.mock.calls[0][2];
+            await expect(getTargetInfo()).resolves.toEqual({ name: 'Goblin' });
+            expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+            expect(getTargetFromAttacker).toHaveBeenCalledWith({ creatures: [] }, 'TestFighter');
         });
 
-        it('should handle executeSpellCast result with triggerResult type modal', async () => {
+        it('falls back to modalState.divineInterventionAction when runtime returns null', async () => {
             const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({
-                triggerResult: {
-                    type: 'modal',
-                    modalName: 'wildMagicSurge',
-                    payload: { surge: 'Explosive Burst' },
-                },
-            });
+            const grv = vi.fn((charKey, key, _cn) => (key === 'divineInterventionAction' ? null : undefined));
 
             const deps = createDeps({
                 getRuntimeValue: grv,
@@ -1589,194 +580,9 @@ describe('useCharActionsAutomation', () => {
 
             await handleDivineInterventionCast({ name: 'Fireball' });
 
-            expect(deps.setModalState).toHaveBeenCalledWith({
-                wildMagicSurgeModal: { surge: 'Explosive Burst' },
-            });
-        });
-
-        it('should handle executeSpellCast result with triggerResult type popup', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({
-                triggerResult: {
-                    type: 'popup',
-                    payload: { name: 'Fireball', description: 'Burst' },
-                },
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Fireball',
-                description: 'Burst',
-            });
-        });
-
-        it('should handle executeSpellCast result with healing amount', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Cure Wounds' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({
-                healAmount: 15,
-                rawTotal: 18,
-                formula: '1d8 + 3',
-                rolls: [5, 4, 3],
-                targetName: 'Ally1',
-                bonusHeal: 5,
-                bonusDetails: [{ amount: 5, name: 'Channel Divinity' }],
-                healingRerollOriginalRolls: null,
-                healingRerollDisplayRolls: null,
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Cure Wounds' });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith({
-                type: 'heal',
-                name: 'Cure Wounds',
-                formula: '1d8 + 3',
-                rolls: [5, 4, 3],
-                total: 18,
-                targetName: 'Ally1',
-                finalHeal: 15,
-                bonusHeal: 5,
-                bonusHealDetail: '5 Channel Divinity',
-                healingRerollOriginalRolls: null,
-                healingRerollDisplayRolls: null,
-            });
-        });
-
-        it('should always show the final automation_info popup after spell execution', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({});
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Divine Intervention',
-                description: 'Divine Intervention cast Fireball. Divine Intervention recharges after a long rest',
-            });
-        });
-
-        it('should catch and log errors from executeSpellCast', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return action;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockRejectedValue(new Error('cast failed'));
-            const consoleErrorSpy = vi.spyOn(console, 'error').mockReturnValue();
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            // Wait for the .catch() microtask to run
-            await new Promise(process.nextTick);
-
-            expect(consoleErrorSpy).toHaveBeenCalledWith(
-                '[CharActions] executeSpellCast error:',
-                expect.any(Error)
+            expect(mockOnDivineInterventionSpellSelected).toHaveBeenCalledWith(
+                action, basePlayerStats, campaignName, { name: 'Fireball' }
             );
-            consoleErrorSpy.mockRestore();
-        });
-
-        it('should use modalState divineInterventionAction as fallback when runtime returns null', async () => {
-            const action = { name: 'Divine Intervention' };
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return null;
-                return undefined;
-            });
-            mockOnDivineInterventionSpellSelected.mockResolvedValue({
-                type: 'spell_selected',
-                spell: { name: 'Fireball' },
-                name: 'Divine Intervention',
-                rechargeMessage: 'after a long rest',
-            });
-            executeSpellCast.mockResolvedValue({});
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: { divineInterventionAction: action },
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(mockOnDivineInterventionSpellSelected).toHaveBeenCalled();
-        });
-
-        it('should return early when both runtime and modalState lack divineInterventionAction', async () => {
-            const grv = vi.fn((charKey, key, _cn) => {
-                if (key === 'divineInterventionAction') return null;
-                return undefined;
-            });
-
-            const deps = createDeps({
-                getRuntimeValue: grv,
-                modalState: {},
-            });
-            const { handleDivineInterventionCast } = getHandlers(deps);
-
-            await handleDivineInterventionCast({ name: 'Fireball' });
-
-            expect(mockOnDivineInterventionSpellSelected).not.toHaveBeenCalled();
         });
     });
 });

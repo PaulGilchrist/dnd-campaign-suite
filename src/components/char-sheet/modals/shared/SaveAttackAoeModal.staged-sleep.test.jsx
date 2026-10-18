@@ -1,7 +1,10 @@
+// @maintained-by-ai
 // MA-0068: Adult Brass Dragon Sleep Breath picker behavior — sleepStaging
 // arms the SP-107 staging seams on a failed save (first fail = Incapacitated
 // staged, NOT Unconscious; zero damage; roll + condition-applied logs).
 // Damageless picker copy never prints "half damage" / "null null damage".
+// Save-success seam: roll logged, nothing staged. Data byte-pins and the
+// turn-END ladder live in MonsterCardModal.sleep-breath / sleepService tests.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -41,7 +44,9 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Adult Brass Dragon 1', type: 'npc', currentHp: 172, maxHp: 172, saveBonuses: {}, resistances: [], immunities: [] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
+      // saveBonuses uses the full-lowercase key the modal reads
+      // (saveType.toLowerCase() === 'constitution'), so the +2 really lands.
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { constitution: 2 }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -100,7 +105,7 @@ let randomSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   seenPicker.current = null;
-  // Thug 1 con +2, nat 2 → 4 < 18 fails.
+  // Thug 1 constitution +2, nat 2 → total 4 < DC 18 fails.
   randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.05);
 });
 afterEach(() => randomSpy.mockRestore());
@@ -128,16 +133,23 @@ function renderSleepCone() {
 }
 
 describe('MA-0068 Sleep Breath staged picker', () => {
-  it('picker copy states staged sleep, never half-damage/null-damage', () => {
+  it('picker copy states the staged sleep ladder, never half-damage/null-damage, inert until Confirm', () => {
     renderSleepCone();
     expect(seenPicker.current.note).toContain('Incapacitated until the end of its next turn');
     expect(seenPicker.current.note).toContain('Unconscious for 10 minutes');
+    expect(seenPicker.current.note).toContain('ends if the target takes damage');
     expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
     expect(seenPicker.current.note).not.toContain('null');
+    // Caster excluded; advisory lane stages nothing before Confirm.
+    expect(seenPicker.current.targets).toHaveLength(1);
+    expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']);
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  it('failed NPC save stages Incapacitated via sleepService (CON, no concentration, 100 rounds) — no damage, no Unconscious grant', async () => {
-    const { getByText } = renderSleepCone();
+  it('failed NPC save stages Incapacitated via sleepService (CON +2 pinned, no concentration, 100 rounds) — no damage, no Unconscious grant', async () => {
+    const { getByText, container } = renderSleepCone();
     await waitFor(() => expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']));
     fireEvent.click(getByText('Confirm'));
 
@@ -152,19 +164,40 @@ describe('MA-0068 Sleep Breath staged picker', () => {
     const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
     expect(rollLog.saveResult).toBe('failure');
     expect(rollLog.saveDc).toBe(18);
-    const condLog = entries.find(e => e.type === 'condition' && e.action === 'applied');
-    expect(condLog.condition).toBe('Incapacitated');
-    expect(condLog.characterName).toBe('Thug 1');
-    expect(condLog.description).toContain('repeats the save');
-    expect(entries.some(e => e.type === 'condition' && e.condition === 'Unconscious')).toBe(false);
+    expect(rollLog.rolls).toEqual([2]);
+    expect(rollLog.bonus).toBe(2);
+
+    const conditionLogs = entries.filter(e => e.type === 'condition');
+    expect(conditionLogs).toHaveLength(1);
+    expect(conditionLogs[0].condition).toBe('Incapacitated');
+    expect(conditionLogs[0].characterName).toBe('Thug 1');
+    expect(conditionLogs[0].description).toContain('until the end of its next turn');
+    expect(conditionLogs[0].description).toContain('repeats the save');
+    expect(conditionLogs[0].description).toContain('Unconscious for 10 minutes');
+    // Staged lane never grants Unconscious directly (MA-0063 one-shot superseded).
+    expect(conditionLogs.some(e => e.condition === 'Unconscious')).toBe(false);
+
+    // Result row reads the staged ladder — no null-damage text.
+    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save'));
+    expect(container.textContent).not.toContain('null null');
   });
 
-  it('result rows show staged Incapacitated copy on fail (no null-damage text)', async () => {
+  it('successful save logs the roll but stages nothing', async () => {
+    randomSpy.mockReturnValue(0.99);
     const { getByText, container } = renderSleepCone();
     await waitFor(() => expect(seenPicker.current.targets.length).toBe(1));
     fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(stageSleepTargets).toHaveBeenCalled());
-    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save'));
-    expect(container.textContent).not.toContain('null null');
+
+    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage'));
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+
+    const entries = addEntry.mock.calls.map(c => c[1]);
+    const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
+    expect(rollLog.saveResult).toBe('success');
+    expect(rollLog.saveDc).toBe(18);
+    expect(rollLog.rolls).toEqual([20]);
+    expect(rollLog.bonus).toBe(2);
+    expect(entries.some(e => e.type === 'condition')).toBe(false);
   });
 });

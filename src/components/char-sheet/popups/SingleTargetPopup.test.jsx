@@ -1,12 +1,22 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SingleTargetPopup from './SingleTargetPopup.jsx';
+
+// Covers ONLY SingleTargetPopup's own UI lane: title/spell/target-row rendering,
+// the single-select ✓ state machine with confirm gating, the `Cast ${title}`
+// confirmLabel default, and the exact [name] confirm payload. Base surface
+// inherited from TargetPopupBase (Escape→onSkip, 'Spell' name fallback,
+// subtitle, Cancel→onSkip) is pinned in sibling popup specs (MetamagicPopup,
+// MagicMissileTargetPopup, TargetWithCheckboxesPopup) — not multiplied here.
 
 const mockSpell = { name: 'Burning Hands', level: 1 };
 const mockCreatureTargets = ['Goblin', 'Skeleton', 'Orc'];
 const mockOnConfirm = vi.fn();
 const mockOnSkip = vi.fn();
 
+// title, spell.name and confirmLabel are deliberately distinct so every
+// rendered string is attributable to exactly one prop.
 function makeProps(overrides = {}) {
   return {
     spell: mockSpell,
@@ -14,101 +24,74 @@ function makeProps(overrides = {}) {
     onConfirm: mockOnConfirm,
     onSkip: mockOnSkip,
     icon: 'fa-solid fa-fire',
-    title: 'Burning Hands',
-    school: 'Evocation',
-    defaultLevel: 1,
-    description: 'Select a target',
+    title: 'Choose a Target',
+    description: 'Select a creature',
     confirmLabel: 'Cast',
     cancelLabel: 'Cancel',
     ...overrides,
   };
 }
 
+const castButton = () => screen.getByRole('button', { name: 'Cast' });
+
 describe('SingleTargetPopup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ── Rendering ──
-
-  it('renders creature targets in the target selection list', () => {
+  it('renders the title heading, spell name, and every creature target row', () => {
     render(<SingleTargetPopup {...makeProps()} />);
-    expect(screen.getByText(/Goblin/)).toBeInTheDocument();
-    expect(screen.getByText(/Skeleton/)).toBeInTheDocument();
-    expect(screen.getByText(/Orc/)).toBeInTheDocument();
-  });
 
-  it('renders with empty creature targets list', () => {
-    render(<SingleTargetPopup {...makeProps({ creatureTargets: [] })} />);
-    expect(screen.getByRole('button', { name: 'Cast' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Choose a Target' })).toBeInTheDocument();
+    expect(screen.getByText('Burning Hands')).toBeInTheDocument();
     expect(screen.getByText('Target:')).toBeInTheDocument();
-    expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Goblin|Skeleton|Orc/)).toHaveLength(3);
   });
 
-  it('renders gracefully with null spell', () => {
-    render(<SingleTargetPopup {...makeProps({ spell: null })} />);
-    expect(screen.getByText(/Spell/)).toBeInTheDocument();
+  it('defaults the confirm label to "Cast {title}" and starts disabled', () => {
+    render(<SingleTargetPopup {...makeProps({ confirmLabel: undefined })} />);
+
+    const cast = screen.getByRole('button', { name: 'Cast Choose a Target' });
+    expect(cast).toBeInTheDocument();
+    expect(cast).toBeDisabled();
   });
 
-  it('renders gracefully with empty spell object', () => {
-    render(<SingleTargetPopup {...makeProps({ spell: {} })} />);
-    expect(screen.getByText(/Spell/)).toBeInTheDocument();
-  });
-
-  // ── Target selection ──
-
-  it('selects a target when clicking a creature row', () => {
-    render(<SingleTargetPopup {...makeProps()} />);
-    const goblinRow = screen.getByText(/Goblin/).closest('div');
-    fireEvent.click(goblinRow);
-    expect(screen.getByText(/Goblin/).textContent).toContain('\u2713');
-  });
-
-  it('switches selection to a different target', () => {
+  it('single-selects a target, moves the ✓ marker on switch, and gates confirm', () => {
     render(<SingleTargetPopup {...makeProps()} />);
 
-    const goblinRow = screen.getByText(/Goblin/).closest('div');
-    const orcRow = screen.getByText(/Orc/).closest('div');
+    // Nothing selected: no markers, confirm disabled, row clicks never confirm.
+    expect(screen.getAllByText(/Goblin|Skeleton|Orc/).every(t => !t.textContent.includes('\u2713'))).toBe(true);
+    expect(castButton()).toBeDisabled();
 
-    fireEvent.click(goblinRow);
-    expect(screen.getByText(/Goblin/).textContent).toContain('\u2713');
-    expect(screen.getByText(/Orc/).textContent).not.toContain('\u2713');
-
-    fireEvent.click(orcRow);
-    expect(screen.getByText(/Orc/).textContent).toContain('\u2713');
-    expect(screen.getByText(/Goblin/).textContent).not.toContain('\u2713');
-  });
-
-  // ── Button behavior ──
-
-  it('disables confirm when no target is selected and enables after selection', () => {
-    render(<SingleTargetPopup {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled();
-
-    const goblinRow = screen.getByText('Goblin').closest('div');
-    fireEvent.click(goblinRow);
-    expect(screen.getByRole('button', { name: 'Cast' })).not.toBeDisabled();
-  });
-
-  it('calls onConfirm with the selected target when confirm is clicked', () => {
-    render(<SingleTargetPopup {...makeProps()} />);
-    const orcRow = screen.getByText(/Orc/).closest('div');
-    fireEvent.click(orcRow);
-    fireEvent.click(screen.getByText('Cast'));
-    expect(mockOnConfirm).toHaveBeenCalledWith(['Orc']);
-  });
-
-  it('does not call onConfirm when confirm is clicked without a target', () => {
-    render(<SingleTargetPopup {...makeProps()} />);
-    fireEvent.click(screen.getByText('Cast'));
+    fireEvent.click(screen.getByText('Goblin'));
+    expect(screen.getByText('\u2713 Goblin')).toBeInTheDocument();
+    expect(screen.queryByText('\u2713 Orc')).not.toBeInTheDocument();
+    expect(castButton()).not.toBeDisabled();
     expect(mockOnConfirm).not.toHaveBeenCalled();
+
+    // Switching selection: exactly one row carries the marker.
+    fireEvent.click(screen.getByText('Orc'));
+    expect(screen.getByText('\u2713 Orc')).toBeInTheDocument();
+    expect(screen.getAllByText(/^\u2713/)).toHaveLength(1);
+    expect(castButton()).not.toBeDisabled();
   });
 
-  // ── Edge cases ──
+  it('confirms once with the single-target payload and never skips', () => {
+    render(<SingleTargetPopup {...makeProps()} />);
 
-  it('uses provided defaultLevel when spell has no level', () => {
-    render(<SingleTargetPopup {...makeProps({ spell: {}, defaultLevel: 5, school: 'Necromancy' })} />);
-    expect(screen.getByText(/Level 5/)).toBeInTheDocument();
-    expect(screen.getByText(/Necromancy/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Orc'));
+    fireEvent.click(castButton());
+
+    expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+    expect(mockOnConfirm).toHaveBeenCalledWith(['Orc']);
+    expect(mockOnSkip).not.toHaveBeenCalled();
+  });
+
+  it('renders no target rows and keeps confirm disabled with an empty target list', () => {
+    render(<SingleTargetPopup {...makeProps({ creatureTargets: [] })} />);
+
+    expect(screen.getByText('Target:')).toBeInTheDocument();
+    expect(screen.queryAllByText(/Goblin|Skeleton|Orc/)).toHaveLength(0);
+    expect(castButton()).toBeDisabled();
   });
 });

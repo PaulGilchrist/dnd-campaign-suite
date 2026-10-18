@@ -1,63 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import useModalHandlers from './useModalHandlers.js';
 
-function createDeps(overrides = {}) {
-    const playerStats = {
-        name: 'TestFighter',
-        level: 5,
-        proficiency: 3,
-        abilities: [{ name: 'Strength', bonus: 3 }],
-        ...(overrides.playerStats || {}),
-    };
-    const modalState = {
-        ...(overrides.modalState || {}),
-    };
-    return {
-        playerStats,
-        campaignName: 'test-campaign',
-        rollDamage: vi.fn(),
-        proceedWithDamage: vi.fn(),
-        pendingDamage: null,
-        setPendingDamage: vi.fn(),
-        modalState,
-        setModalState: vi.fn((updates) => {
-            if (typeof updates === 'function') {
-                return updates(modalState);
-            }
-            Object.assign(modalState, updates);
-        }),
-        setPopupHtml: vi.fn(),
-        ...overrides,
-    };
-}
+// Minimal deps by runtime probe: handleWeaponMasteryChoice (source:26-28) and
+// handleWeaponKindMasteryClose (source:200-202) are single-key modal clears that
+// reference nothing but setModalState, so every other injected collaborator,
+// playerStats fixture, and the setState-merge mock are purged from these tests.
+// Exact-match assertions on the recorded payload pin the full key set, proving
+// cross-key isolation (these clears never clobber the other mastery modal).
 
 describe('useModalHandlers - simple modal handlers', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+    it('handleWeaponMasteryChoice clears only weaponMasteryChoiceModal, ignoring the mastery name', () => {
+        const setModalState = vi.fn();
+        const { handleWeaponMasteryChoice } = useModalHandlers({ setModalState });
+
+        handleWeaponMasteryChoice('Crushing');
+        handleWeaponMasteryChoice('Sweeping');
+
+        expect(setModalState.mock.calls).toEqual([
+            [{ weaponMasteryChoiceModal: null }],
+            [{ weaponMasteryChoiceModal: null }],
+        ]);
     });
 
-    describe('handleWeaponMasteryChoice', () => {
-        it('clears the weapon mastery choice modal', () => {
-            const deps = createDeps();
-            const { handleWeaponMasteryChoice } = useModalHandlers(deps);
-            handleWeaponMasteryChoice('Crushing');
-            expect(deps.setModalState).toHaveBeenCalledWith({ weaponMasteryChoiceModal: null });
-        });
+    it('handleWeaponKindMasteryClose clears only weaponKindMasteryModal', () => {
+        const setModalState = vi.fn();
+        const { handleWeaponKindMasteryClose } = useModalHandlers({ setModalState });
 
-        it('ignores the mastery name argument with no side effects', () => {
-            const deps = createDeps();
-            const { handleWeaponMasteryChoice } = useModalHandlers(deps);
-            handleWeaponMasteryChoice('Sweeping');
-            expect(deps.setModalState).toHaveBeenCalledTimes(1);
-        });
-    });
+        handleWeaponKindMasteryClose();
 
-    describe('handleWeaponKindMasteryClose', () => {
-        it('clears the weapon kind mastery modal', () => {
-            const deps = createDeps();
-            const { handleWeaponKindMasteryClose } = useModalHandlers(deps);
-            handleWeaponKindMasteryClose();
-            expect(deps.setModalState).toHaveBeenCalledWith({ weaponKindMasteryModal: null });
-        });
+        expect(setModalState.mock.calls).toEqual([
+            [{ weaponKindMasteryModal: null }],
+        ]);
     });
 });

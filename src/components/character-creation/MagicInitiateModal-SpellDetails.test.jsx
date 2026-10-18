@@ -1,196 +1,97 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { MagicInitiateModal, createProps } from './MagicInitiateModal.test-utils.js';
-import { renderMarkdown } from '../../services/ui/sanitize.js';
 
-vi.mock('../../services/ui/sanitize.js', () => ({
-  renderMarkdown: vi.fn((md) => `<p>${md}</p>`),
-}));
+// Lane: SpellDetails slice only — detail rendering/toggling inside the editor.
+// Main save/select routing lives in MagicInitiateModal.test.*.test.jsx siblings.
 
-const findSelectByLabel = (labelText) => {
-  const label = screen.getByText(new RegExp(`^${labelText}:$`));
-  return label.nextElementSibling;
+const selectFor = (labelText) => screen.getByText(`${labelText}:`).nextElementSibling;
+
+const metaPinned = () =>
+  [...document.querySelectorAll('.mi-spell-meta span')].map(s => s.textContent);
+
+// Fresh render + fresh mocks per test via createProps factory.
+const openEditor = (className) => {
+  render(<MagicInitiateModal {...createProps()} />);
+  fireEvent.click(screen.getByRole('button', { name: /Add Another Instance/ }));
+  fireEvent.change(selectFor('Class'), { target: { value: className } });
 };
 
 describe('MagicInitiateModal - SpellDetails', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(renderMarkdown).mockReturnValue('<p>mocked</p>');
+  it('renders no details toggle until a spell is selected', () => {
+    openEditor('Wizard');
+    expect(screen.queryAllByRole('button', { name: /details/ })).toHaveLength(0);
+
+    fireEvent.change(selectFor('Level 1 Spell'), { target: { value: 'Burning Hands' } });
+    expect(screen.getByRole('button', { name: 'Burning Hands details' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Chill Touch details' })).not.toBeInTheDocument();
   });
 
-  describe('SpellDetails subcomponent', () => {
-    it('should not render spell details toggle when no spell is selected', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      expect(screen.queryByText(/details$/)).not.toBeInTheDocument();
-    });
+  // Exact full meta-line pins per spell (SpellDetails.jsx renders each field
+  // conditionally; the pinned list proves inclusion, exclusion, and order).
+  it.each([
+    ['Wizard', 'Level 1 Spell', 'Burning Hands', [
+      'School: Evocation', 'Casting: 1 action', 'Duration: Instantaneous',
+      'Components: V, S', 'Damage: Fire',
+    ]],
+    ['Cleric', 'Level 1 Spell', 'Bless', [
+      'School: Enchantment', 'Casting: 1 action', 'Concentration',
+      'Duration: Concentration, up to 1 minute', 'Components: V, S, M',
+    ]],
+    ['Wizard', 'Level 1 Spell', 'Alarm', [
+      'School: Abjuration', 'Casting: 1 action', 'Ritual', 'Duration: 8 hours',
+      'Components: V, S, M', 'Material: a small bell and 2 pins',
+    ]],
+    ['Cleric', 'Level 1 Spell', 'Command', [
+      'School: Enchantment', 'Casting: 1 action', 'Duration: 1 round',
+    ]],
+    ['Wizard', 'Cantrip 1', 'Acid Splash', [
+      'School: Conjuration', 'Casting: 1 action', 'Duration: Instantaneous',
+      'Components: V, S', 'Damage: Acid',
+    ]],
+  ])('shows exact meta for %s %s (%s)', (className, slot, spell, expected) => {
+    openEditor(className);
+    fireEvent.change(selectFor(slot), { target: { value: spell } });
+    fireEvent.click(screen.getByRole('button', { name: `${spell} details` }));
+    expect(metaPinned()).toEqual(expected);
+  });
 
-    it('should toggle spell details expanded/collapsed with caret icon', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-      const level1Select = findSelectByLabel('Level 1 Spell');
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
+  it('renders the spell description as markdown, not raw text', () => {
+    openEditor('Wizard');
+    fireEvent.change(selectFor('Level 1 Spell'), { target: { value: 'Burning Hands' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Burning Hands details' }));
 
-      const toggleBtn = screen.getByText('Burning Hands details');
-      // Initially collapsed - right caret visible, content hidden
-      expect(toggleBtn.querySelector('.fa-caret-right')).toBeInTheDocument();
-      expect(toggleBtn.querySelector('.fa-caret-down')).not.toBeInTheDocument();
-      expect(screen.queryByText('School: Evocation')).not.toBeInTheDocument();
+    const desc = document.querySelector('.mi-spell-desc');
+    expect(desc).toBeInTheDocument();
+    expect(desc.textContent).toBe('Burst of flame.\n');
+    // marked wraps output in <p> — absent if the description were inserted raw
+    expect(desc.querySelector('p')).not.toBeNull();
+  });
 
-      // Expand
-      fireEvent.click(toggleBtn);
-      expect(toggleBtn.querySelector('.fa-caret-down')).toBeInTheDocument();
-      expect(toggleBtn.querySelector('.fa-caret-right')).not.toBeInTheDocument();
-      expect(screen.getByText('School: Evocation')).toBeInTheDocument();
+  it('expands one panel at a time and flips the caret', () => {
+    openEditor('Wizard');
+    fireEvent.change(selectFor('Cantrip 1'), { target: { value: 'Acid Splash' } });
+    fireEvent.change(selectFor('Cantrip 2'), { target: { value: 'Chill Touch' } });
 
-      // Collapse
-      fireEvent.click(toggleBtn);
-      expect(toggleBtn.querySelector('.fa-caret-right')).toBeInTheDocument();
-      expect(screen.queryByText('School: Evocation')).not.toBeInTheDocument();
-    });
+    const acidToggle = screen.getByRole('button', { name: 'Acid Splash details' });
+    expect(acidToggle.querySelector('.fa-caret-right')).toBeInTheDocument();
+    expect(screen.queryByText('School: Conjuration')).not.toBeInTheDocument();
 
-    it('should render spell school, casting time, and duration in details', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
+    // Expand Acid Splash — content appears, other panel stays collapsed
+    fireEvent.click(acidToggle);
+    expect(acidToggle.querySelector('.fa-caret-down')).toBeInTheDocument();
+    expect(screen.getByText('School: Conjuration')).toBeInTheDocument();
+    expect(screen.queryByText('School: Necromancy')).not.toBeInTheDocument();
 
-      // Wizard - Burning Hands: school, casting 1 action, instantaneous duration
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-      const level1Select = findSelectByLabel('Level 1 Spell');
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
-      fireEvent.click(screen.getByText('Burning Hands details'));
-      expect(screen.getByText('School: Evocation')).toBeInTheDocument();
-      expect(screen.getByText('Casting: 1 action')).toBeInTheDocument();
-      expect(screen.getByText('Duration: Instantaneous')).toBeInTheDocument();
+    // Expanding Chill Touch collapses Acid Splash
+    const chillToggle = screen.getByRole('button', { name: 'Chill Touch details' });
+    fireEvent.click(chillToggle);
+    expect(screen.getByText('School: Necromancy')).toBeInTheDocument();
+    expect(screen.queryByText('School: Conjuration')).not.toBeInTheDocument();
 
-      // Cleric - Bless: concentration duration
-      fireEvent.change(classSelect, { target: { value: 'Cleric' } });
-      fireEvent.change(level1Select, { target: { value: 'Bless' } });
-      fireEvent.click(screen.getByText('Bless details'));
-      expect(screen.getByText('Duration: Concentration, up to 1 minute')).toBeInTheDocument();
-
-      // Sorcerer - Expeditious Retreat: bonus action
-      fireEvent.change(classSelect, { target: { value: 'Sorcerer' } });
-      fireEvent.change(level1Select, { target: { value: 'Expeditious Retreat' } });
-      fireEvent.click(screen.getByText('Expeditious Retreat details'));
-      expect(screen.getByText('Casting: bonus action')).toBeInTheDocument();
-
-      // Sorcerer - Shield: reaction
-      fireEvent.change(level1Select, { target: { value: 'Shield' } });
-      fireEvent.click(screen.getByText('Shield details'));
-      expect(screen.getByText('Casting: reaction')).toBeInTheDocument();
-    });
-
-    it('should conditionally render concentration, components, damage, material, and ritual', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-
-      // Wizard - Burning Hands: no concentration, has components, has damage, no material, no ritual
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-      const level1Select = findSelectByLabel('Level 1 Spell');
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
-      fireEvent.click(screen.getByText('Burning Hands details'));
-      expect(screen.queryByText('Concentration')).not.toBeInTheDocument();
-      expect(screen.getByText('Components: V, S')).toBeInTheDocument();
-      expect(screen.getByText('Damage: Fire')).toBeInTheDocument();
-      expect(screen.queryAllByText(/Material:/).length).toBe(0);
-      expect(screen.queryByText('Ritual')).not.toBeInTheDocument();
-
-      // Cleric - Bless: has concentration, has components, no damage, no material, no ritual
-      fireEvent.change(classSelect, { target: { value: 'Cleric' } });
-      fireEvent.change(level1Select, { target: { value: 'Bless' } });
-      fireEvent.click(screen.getByText('Bless details'));
-      expect(screen.getByText('Concentration')).toBeInTheDocument();
-      expect(screen.getByText('Components: V, S, M')).toBeInTheDocument();
-      expect(screen.queryAllByText(/Damage:/).length).toBe(0);
-      expect(screen.queryAllByText(/Material:/).length).toBe(0);
-      expect(screen.queryByText('Ritual')).not.toBeInTheDocument();
-
-      // Wizard - Alarm: no concentration, has components, no damage, has material, has ritual
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-      fireEvent.change(level1Select, { target: { value: 'Alarm' } });
-      fireEvent.click(screen.getByText('Alarm details'));
-      expect(screen.queryByText('Concentration')).not.toBeInTheDocument();
-      expect(screen.getByText(/Material.*bell/)).toBeInTheDocument();
-      expect(screen.getByText('Ritual')).toBeInTheDocument();
-
-      // Cleric - Command: no concentration, no components, no damage, no material, no ritual
-      fireEvent.change(classSelect, { target: { value: 'Cleric' } });
-      fireEvent.change(level1Select, { target: { value: 'Command' } });
-      fireEvent.click(screen.getByText('Command details'));
-      expect(screen.queryByText('Concentration')).not.toBeInTheDocument();
-      expect(screen.queryAllByText(/Components/).length).toBe(0);
-      expect(screen.queryAllByText(/Damage:/).length).toBe(0);
-      expect(screen.queryAllByText(/Material:/).length).toBe(0);
-      expect(screen.queryByText('Ritual')).not.toBeInTheDocument();
-    });
-
-    it('should render spell description via renderMarkdown', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-      const level1Select = findSelectByLabel('Level 1 Spell');
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
-
-      fireEvent.click(screen.getByText('Burning Hands details'));
-      // Mock returns '<p>mocked</p>' — verify description renders in DOM
-      expect(screen.getByText('mocked')).toBeInTheDocument();
-    });
-
-    it('should render details for cantrips too', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-
-      const cantrip1Select = findSelectByLabel('Cantrip 1');
-      fireEvent.change(cantrip1Select, { target: { value: 'Acid Splash' } });
-
-      expect(screen.getByText('Acid Splash details')).toBeInTheDocument();
-      fireEvent.click(screen.getByText('Acid Splash details'));
-      expect(screen.getByText('School: Conjuration')).toBeInTheDocument();
-    });
-
-    it('should only allow one spell details panel to be expanded at a time', () => {
-      const props = createProps();
-      render(<MagicInitiateModal {...props} />);
-      fireEvent.click(screen.getByText('Add Another Instance'));
-
-      const classSelect = document.querySelectorAll('.mi-selector-select')[0];
-      fireEvent.change(classSelect, { target: { value: 'Wizard' } });
-
-      // Select cantrip 1
-      const cantrip1Select = findSelectByLabel('Cantrip 1');
-      fireEvent.change(cantrip1Select, { target: { value: 'Acid Splash' } });
-
-      // Select cantrip 2
-      const cantrip2Select = findSelectByLabel('Cantrip 2');
-      fireEvent.change(cantrip2Select, { target: { value: 'Chill Touch' } });
-
-      // Select level 1 spell
-      const level1Select = findSelectByLabel('Level 1 Spell');
-      fireEvent.change(level1Select, { target: { value: 'Burning Hands' } });
-
-      // Expand Acid Splash
-      fireEvent.click(screen.getByText('Acid Splash details'));
-      expect(screen.getByText('School: Conjuration')).toBeInTheDocument();
-      // Other panels are collapsed
-      expect(screen.queryByText('School: Necromancy')).not.toBeInTheDocument();
-      expect(screen.queryByText('School: Evocation')).not.toBeInTheDocument();
-
-      // Expand Chill Touch — Acid Splash should collapse
-      fireEvent.click(screen.getByText('Chill Touch details'));
-      expect(screen.getByText('School: Necromancy')).toBeInTheDocument();
-      expect(screen.queryByText('School: Conjuration')).not.toBeInTheDocument();
-    });
+    // Collapsing again hides everything
+    fireEvent.click(chillToggle);
+    expect(screen.queryByText('School: Necromancy')).not.toBeInTheDocument();
   });
 });

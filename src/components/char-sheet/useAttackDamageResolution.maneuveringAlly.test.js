@@ -1,25 +1,18 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
-    rollExpressionDoubled: vi.fn(),
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
-    getTargetFromAttacker: vi.fn(),
-}));
-
-vi.mock('../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
-    loadCombatSummary: vi.fn(),
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
-    setRuntimeObject: vi.fn(),
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
@@ -27,24 +20,19 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    getEmpoweredEvocationFeatures: vi.fn(() => []),
-    getEmpoweredEvocationIntModifier: vi.fn(() => 0),
+    getEmpoweredEvocationFeatures: vi.fn(),
+    getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
 vi.mock('../../services/combat/steps/index.js', () => ({
-    buildPipelineForAction: vi.fn(() => ({
-        run: vi.fn().mockResolvedValue(undefined),
-        resume: vi.fn().mockResolvedValue(undefined),
-    })),
+    buildPipelineForAction: vi.fn(),
 }));
 
 vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
-    getAttackRiderOptions: vi.fn(),
-    getAttackRiderOptionsByContext: vi.fn(),
     executeAttackRiderManeuver: vi.fn(),
     applyManeuveringAllyGrant: vi.fn(),
 }));
@@ -54,6 +42,7 @@ import { executeAttackRiderManeuver, applyManeuveringAllyGrant } from '../../ser
 
 const mockPlayerStats = { name: 'GoliathFireGiant', level: 5, proficiency: 3, automation: {} };
 const mockCampaignName = 'test-campaign';
+const ENEMY = 'Animated Rug of Smothering 1';
 
 const maneuvering = {
     name: 'Maneuvering Attack',
@@ -63,16 +52,26 @@ const maneuvering = {
 };
 const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', weaponType: 'melee' };
 
+const GRANT_DESC = `Maneuvering Attack: HeroesFeastBard can move up to half their Speed (15 ft) using their Reaction without provoking Opportunity Attacks from ${ENEMY}.`;
+const PICKER_DESC = `Choose a willing creature within 30 feet who can see or hear you. That creature can use its Reaction to move up to half its Speed without provoking Opportunity Attacks from ${ENEMY}.`;
+
+const hitContext = (targetName = ENEMY) => ({ isMiss: false, hit: true, targetName });
+const riderPopup = (dieValue, description, name = 'Maneuvering Attack') => ({
+    type: 'popup',
+    dieValue,
+    payload: { type: 'automation_info', name, description },
+});
+
 function UseAttackDamageResolution() {
     const setPopupHtml = vi.fn();
     const modalState = {};
     const setModalState = vi.fn((updates) => Object.assign(modalState, updates));
     const resume = vi.fn(async (_ctx, ref) => { if (ref) ref.current = null; });
-    const resumeRef = { current: { pipelineStash: { pipeline: { resume }, ctx: { hit: true } }, _pausedStep: 'attackRiderManeuvers' } };
+    const stashCtx = { hit: true };
+    const resumeRef = { current: { pipelineStash: { pipeline: { resume }, ctx: stashCtx }, _pausedStep: 'attackRiderManeuvers' } };
     const api = useAttackDamageResolution({
         playerStats: mockPlayerStats,
         campaignName: mockCampaignName,
-        mapName: null,
         popupHtml: null,
         setPopupHtml,
         rollDamage: vi.fn(),
@@ -83,114 +82,112 @@ function UseAttackDamageResolution() {
         setPendingDamage: vi.fn(),
         resumeRef,
     });
-    return { api, setPopupHtml, setModalState, modalState, resumeRef, resume };
+    return { api, setPopupHtml, setModalState, modalState, resumeRef, resume, stashCtx };
 }
 
 describe('MN-011 Maneuvering Attack ally grant', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
         getCombatContext.mockResolvedValue({
             creatures: [
                 { name: 'GoliathFireGiant', type: 'player', currentHp: 49, maxHp: 49 },
                 { name: 'HeroesFeastBard', type: 'player', currentHp: 30, maxHp: 30 },
-                { name: 'Animated Rug of Smothering 1', type: 'npc', currentHp: 21, maxHp: 27 },
+                { name: ENEMY, type: 'npc', currentHp: 21, maxHp: 27 },
             ],
         });
-        applyManeuveringAllyGrant.mockResolvedValue({ halfSpeed: 15, description: 'Maneuvering Attack: HeroesFeastBard can move up to half their Speed (15 ft) using their Reaction without provoking Opportunity Attacks from Animated Rug of Smothering 1.' });
+        applyManeuveringAllyGrant.mockResolvedValue({ halfSpeed: 15, description: GRANT_DESC });
     });
 
-    it('opens an ally picker after Use Maneuver instead of only showing prose', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 6,
-            payload: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 6. Added 6 to the damage roll.' },
-        });
-        const { api, setModalState, modalState, setPopupHtml } = UseAttackDamageResolution();
-
-        await api.handleAttackRiderManeuverUse(maneuvering, attack, { isMiss: false, hit: true, targetName: 'Animated Rug of Smothering 1' });
-
-        const picker = modalState.secondaryTargetModal;
-        expect(setModalState).toHaveBeenCalledWith(expect.objectContaining({ secondaryTargetModal: expect.any(Object) }));
-        expect(picker.title).toBe('Maneuvering Attack — Choose Ally');
-        expect(picker.targets.map(t => t.name)).toEqual(['HeroesFeastBard']);
-        expect(picker.description).toContain('without provoking Opportunity Attacks from Animated Rug of Smothering 1');
-        expect(setPopupHtml).not.toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining('An ally can use its Reaction') }));
-    });
-
-    it('confirming the picker writes the grant via the service and shows the named grant popup', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 6,
-            payload: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 6.' },
-        });
+    it('opens an ally picker with exact rider-service args instead of prose-only popup', async () => {
+        executeAttackRiderManeuver.mockResolvedValue(riderPopup(6, 'Rolled d8 for 6.'));
         const { api, modalState, setPopupHtml } = UseAttackDamageResolution();
 
-        await api.handleAttackRiderManeuverUse(maneuvering, attack, { isMiss: false, hit: true, targetName: 'Animated Rug of Smothering 1' });
+        await api.handleAttackRiderManeuverUse(maneuvering, attack, hitContext());
+
+        expect(executeAttackRiderManeuver).toHaveBeenCalledWith(
+            { automation: { type: 'combat_superiority', saveDc: 'ability', saveAbility: ['STR', 'DEX'] } },
+            mockPlayerStats,
+            mockCampaignName,
+            'Maneuvering Attack',
+            { weaponType: 'melee', isUnarmedStrike: false, targetName: ENEMY },
+        );
+        const picker = modalState.secondaryTargetModal;
+        expect(picker.title).toBe('Maneuvering Attack — Choose Ally');
+        expect(picker.confirmLabel).toBe('Grant Movement');
+        expect(picker.description).toBe(PICKER_DESC);
+        // self and enemies excluded; ally HP carried through for the picker UI
+        expect(picker.targets).toEqual([{ name: 'HeroesFeastBard', currentHp: 30, maxHp: 30, type: 'player' }]);
+        expect(setPopupHtml).not.toHaveBeenCalled();
+    });
+
+    it('confirming the picker closes it, writes the grant via the service verbatim, and pops the grant description', async () => {
+        executeAttackRiderManeuver.mockResolvedValue(riderPopup(6, 'Rolled d8 for 6.'));
+        const { api, modalState, setPopupHtml } = UseAttackDamageResolution();
+
+        await api.handleAttackRiderManeuverUse(maneuvering, attack, hitContext());
         await modalState.secondaryTargetModal.onTargetSelected('HeroesFeastBard');
 
-        expect(applyManeuveringAllyGrant).toHaveBeenCalledWith('HeroesFeastBard', 'GoliathFireGiant', 'Animated Rug of Smothering 1', 'test-campaign');
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            type: 'automation_info',
-            name: 'Maneuvering Attack',
-            description: expect.stringContaining('HeroesFeastBard can move up to half their Speed'),
-        }));
+        expect(applyManeuveringAllyGrant).toHaveBeenCalledWith('HeroesFeastBard', 'GoliathFireGiant', ENEMY, mockCampaignName);
+        expect(modalState.secondaryTargetModal).toBeNull();
+        expect(setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(setPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Maneuvering Attack', description: GRANT_DESC });
     });
 
-    it('skipping the picker closes the modal and never writes the grant', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 2,
-            payload: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 2.' },
-        });
+    it('skipping the picker closes it, never writes the grant, and pops an honest no-grant tail', async () => {
+        executeAttackRiderManeuver.mockResolvedValue(riderPopup(2, 'Rolled d8 for 2.'));
         const { api, modalState, setPopupHtml } = UseAttackDamageResolution();
 
-        await api.handleAttackRiderManeuverUse(maneuvering, attack, { isMiss: false, hit: true, targetName: 'Animated Rug of Smothering 1' });
+        await api.handleAttackRiderManeuverUse(maneuvering, attack, hitContext());
         modalState.secondaryTargetModal.onSkip();
 
         expect(applyManeuveringAllyGrant).not.toHaveBeenCalled();
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining('No ally received the movement grant') }));
+        expect(modalState.secondaryTargetModal).toBeNull();
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ description: 'Rolled d8 for 2. No ally received the movement grant.' }));
     });
 
-    it('resumes the paused pipeline so base+die damage still lands with the picker open', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 6,
-            payload: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 6.' },
-        });
-        const { api, resumeRef, resume } = UseAttackDamageResolution();
+    it('resumes the paused pipeline with the stashed ctx while the picker stays open, so base+die damage is never stranded', async () => {
+        executeAttackRiderManeuver.mockResolvedValue(riderPopup(6, 'Rolled d8 for 6.'));
+        const { api, modalState, resume, resumeRef, stashCtx } = UseAttackDamageResolution();
 
-        await api.handleAttackRiderManeuverUse(maneuvering, attack, { isMiss: false, hit: true, targetName: 'Animated Rug of Smothering 1' });
+        await api.handleAttackRiderManeuverUse(maneuvering, attack, hitContext());
 
-        expect(resume).toHaveBeenCalled();
+        expect(resume).toHaveBeenCalledTimes(1);
+        expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
         expect(resumeRef.current).toBeNull();
+        // ally selection remains pending — the grant resolves independently of damage
+        expect(modalState.secondaryTargetModal).toBeTruthy();
     });
 
-    it('shows a no-allies popup when no willing allies are in the encounter', async () => {
-        getCombatContext.mockResolvedValue({ creatures: [{ name: 'GoliathFireGiant', type: 'player' }] });
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 4,
-            payload: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 4.' },
-        });
+    it.each([
+        {
+            branch: 'a non-ally_movement rider never consults combat context or opens the picker',
+            maneuver: { name: 'Goading Attack', damageBonus: true },
+            payload: riderPopup(5, 'Goading.', 'Goading Attack'),
+            noAllies: false,
+            expectedPopup: { type: 'automation_info', name: 'Goading Attack', description: 'Goading.' },
+        },
+        {
+            branch: 'ally_movement with no willing allies pops an honest no-grant message',
+            maneuver: maneuvering,
+            payload: riderPopup(4, 'Rolled d8 for 4.'),
+            noAllies: true,
+            expectedPopup: { type: 'automation_info', name: 'Maneuvering Attack', description: 'Rolled d8 for 4. No willing allies are within range to receive the movement grant.' },
+        },
+    ])('$branch', async ({ maneuver, payload, noAllies, expectedPopup }) => {
+        if (noAllies) {
+            getCombatContext.mockResolvedValue({ creatures: [{ name: 'GoliathFireGiant', type: 'player' }] });
+        }
+        executeAttackRiderManeuver.mockResolvedValue(payload);
         const { api, modalState, setPopupHtml } = UseAttackDamageResolution();
 
-        await api.handleAttackRiderManeuverUse(maneuvering, attack, { isMiss: false, hit: true, targetName: 'Goblin' });
+        await api.handleAttackRiderManeuverUse(maneuver, attack, hitContext('Goblin'));
 
         expect(modalState.secondaryTargetModal).toBeFalsy();
-        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining('No willing allies are within range') }));
-    });
-
-    it('does not open the ally picker for non-ally_movement damage riders', async () => {
-        executeAttackRiderManeuver.mockResolvedValue({
-            type: 'popup',
-            dieValue: 5,
-            payload: { type: 'automation_info', name: 'Goading Attack', description: 'Goading.' },
-        });
-        const { api, modalState, setPopupHtml } = UseAttackDamageResolution();
-
-        await api.handleAttackRiderManeuverUse({ name: 'Goading Attack', damageBonus: true }, attack, { isMiss: false, hit: true, targetName: 'Goblin' });
-
-        expect(modalState.secondaryTargetModal).toBeFalsy();
-        expect(setPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Goading Attack', description: 'Goading.' });
+        expect(setPopupHtml).toHaveBeenCalledWith(expectedPopup);
+        if (noAllies) {
+            expect(getCombatContext).toHaveBeenCalledWith(mockCampaignName);
+        } else {
+            expect(getCombatContext).not.toHaveBeenCalled();
+        }
     });
 });

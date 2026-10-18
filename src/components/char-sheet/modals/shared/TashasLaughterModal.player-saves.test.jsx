@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// TashasLaughterModal player-saves lane: prompt dispatched to the player,
+// player-chosen failure/success outcomes, Heightened-spell disadvantage flag on
+// the prompt payload (the player client rolls), detail-tolerant resolution, and
+// inertness against stray save-result events. NPC auto-roll adjudication lives in
+// TashasLaughterModal.npc-saves.test.jsx; rendering, selection, maxTargets, skip,
+// and empty-state live in TashasLaughterModal.test.jsx — not repeated here.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TashasLaughterModal from './TashasLaughterModal.jsx';
@@ -36,7 +43,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../../services/ui/logService.js';
-import { addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
@@ -69,44 +76,46 @@ function makeProps(overrides = {}) {
         campaignName,
         saveType: 'WIS',
         saveDc: 14,
+        spellSlotLevel: 1,
         onClose: vi.fn(),
         ...overrides,
     };
 }
 
-// Helper: find the index of a target row by its displayed name (robust vs index-based)
-function findTargetRowIndex(targetName) {
-    const labels = document.querySelectorAll('.secondary-target-row');
-    for (let i = 0; i < labels.length; i++) {
-        if (labels[i].textContent.includes(targetName)) return i;
-    }
-    return -1;
+const entriesOf = (filter) => addEntry.mock.calls.map(c => c[1]).filter(filter);
+const saveResultsFor = (name) =>
+    entriesOf(e => e.type === 'save_result' && e.targetName === name);
+const conditionWritesFor = (name) =>
+    setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions' && c[0] === name);
+const targetEffectWrites = () =>
+    setRuntimeValue.mock.calls
+        .filter(c => c[1] === 'targetEffects' && c[0] === 'campaign')
+        .map(c => c[2]);
+
+// Helpers: select the only player row and confirm (one prompt is dispatched)
+function targetRow(name) {
+    const rows = [...document.querySelectorAll('.secondary-target-row')];
+    const row = rows.find(r => r.textContent.includes(name));
+    if (!row) throw new Error(`target row for ${name} not found`);
+    return row;
 }
 
-// Helper: select a player target row and confirm to trigger the save prompt flow
-function selectPlayerAndConfirm() {
-    const idx = findTargetRowIndex('PlayerAlly');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    const labels = document.querySelectorAll('.secondary-target-row');
-    fireEvent.click(labels[idx]);
-    return act(async () => {
+async function selectPlayerAndConfirm() {
+    await act(async () => {
+        fireEvent.click(targetRow('PlayerAlly'));
+    });
+    await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /Tasha's Hideous Laughter \(1\)/ }));
     });
 }
 
-// Helper: dispatch a save-result event for the most recently sent prompt
-function triggerSaveResult(success, extra = {}) {
-    const savePromptCall = sendSavePrompt.mock.calls[0];
-    const promptId = savePromptCall[1].promptId;
+// Dispatch a save-result for the live prompt. Rolls default to an honest
+// failure vs DC 14 (7 + 1 = 8); pass explicit values to pin other outcomes.
+function triggerSaveResult(success, detail = {}) {
+    const promptId = sendSavePrompt.mock.calls[0][1].promptId;
     return act(async () => {
         window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId,
-                success,
-                roll: extra.roll ?? 5,
-                total: extra.total ?? 6,
-                saveBonus: extra.saveBonus ?? 1,
-            },
+            detail: { promptId, success, roll: 7, total: 8, saveBonus: 1, ...detail },
         }));
     });
 }
@@ -121,304 +130,228 @@ beforeEach(() => {
 });
 
 describe('TashasLaughterModal - Player Saves', () => {
-    describe('player save prompts', () => {
-        it('sends save prompt for player targets instead of resolving locally', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
+    it('dispatches a save prompt for a player target and stays inert until the player answers', async () => {
+        const onClose = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose })} />);
+        await selectPlayerAndConfirm();
 
-            expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                targetName: 'PlayerAlly',
-                saveType: 'WIS',
-                saveDc: 14,
-                sourceName: 'Wizard1',
-            }));
+        expect(sendSavePrompt).toHaveBeenCalledTimes(1);
+        const prompt = sendSavePrompt.mock.calls[0][1];
+        expect(prompt).toMatchObject({
+            targetName: 'PlayerAlly',
+            saveType: 'WIS',
+            saveDc: 14,
+            sourceName: 'Wizard1',
+            disadvantage: false,
+        });
+        // The prompt id is registered so the player's answer can be matched.
+        const registration = setRuntimeValue.mock.calls.find(
+            c => c[0] === 'campaign' && c[1] === 'pendingSaveListenerPrompts',
+        );
+        expect(registration[2]).toContain(prompt.promptId);
+        expect(registration[3]).toBe(campaignName);
+
+        // Nothing resolves locally while the prompt is unanswered.
+        expect(storeSpellLastAttack).toHaveBeenCalledWith(campaignName,
+            expect.objectContaining({ attackScope: 'single' }));
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(targetEffectWrites()).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(saveResultsFor('PlayerAlly')).toHaveLength(0);
+        expect(addTargetResult).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('flags disadvantage on the player save prompt when Heightened Spell targets the player', async () => {
+        render(<TashasLaughterModal {...makeProps({ metamagicHeighten: true })} />);
+        const row = targetRow('PlayerAlly');
+        await act(async () => {
+            fireEvent.click(row);
+        });
+        await act(async () => {
+            fireEvent.click(row.querySelector('input[name="heightenTarget"]'));
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Tasha's Hideous Laughter \(1\)/ }));
+        });
+
+        // The player client owns the roll — the modal's contract is the flag.
+        expect(sendSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            targetName: 'PlayerAlly',
+            disadvantage: true,
+        }));
+    });
+
+    it('applies the full failure effect set when the player fails the save', async () => {
+        const onClose = vi.fn();
+        const setPopupHtml = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose, setPopupHtml })} />);
+        await selectPlayerAndConfirm();
+        await triggerSaveResult(false, { roll: 7, total: 8, saveBonus: 1 });
+
+        await waitFor(() => {
+            expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
+        });
+        expect(saveResultsFor('PlayerAlly')[0]).toMatchObject({
+            success: false,
+            characterName: 'Wizard1',
+            saveType: 'WIS',
+            saveDc: 14,
+            roll: 7,
+            total: 8,
+            saveBonus: 1,
+            description: 'PlayerAlly failed WIS save (DC 14, rolled 7 + 1 = 8) and is Prone and Incapacitated.',
+        });
+
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(1);
+        expect(conditionWritesFor('PlayerAlly')[0][2]).toEqual(['prone', 'incapacitated']);
+        const metaWrite = setRuntimeValue.mock.calls.find(
+            c => c[1] === 'activeConditionMeta' && c[0] === 'PlayerAlly',
+        );
+        expect(metaWrite[2]).toEqual({
+            prone: { dc: 14, ability: 'wis' },
+            incapacitated: { dc: 14, ability: 'wis' },
+        });
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Wizard1',
+            targetName: 'PlayerAlly',
+            effects: [
+                { type: 'condition', condition: 'prone' },
+                { type: 'condition', condition: 'incapacitated' },
+                { type: 'tashas_laughter_expiration' },
+            ],
+            campaignName,
+        });
+        expect(targetEffectWrites()).toHaveLength(1);
+        expect(targetEffectWrites()[0]).toEqual([{
+            target: 'PlayerAlly',
+            effect: 'tashas_hideous_laughter',
+            source: 'Wizard1',
+            dc: 14,
+            duration: 'concentration',
+            conditions: ['prone', 'incapacitated'],
+        }]);
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+            targetName: 'PlayerAlly',
+            saveResult: 'failure',
+            roll: 7,
+            total: 8,
+            conditions: ['prone', 'incapacitated'],
+            appliedDamage: 0,
+        });
+        expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
+
+        const condEntry = entriesOf(e =>
+            e.type === 'condition' && e.action === 'applied' && e.characterName === 'PlayerAlly'
+        );
+        expect(condEntry).toHaveLength(1);
+        expect(condEntry[0]).toMatchObject({
+            condition: 'Prone, Incapacitated',
+            reason: "Tasha's Hideous Laughter",
+            note: expect.stringContaining("can't end the Prone condition"),
+        });
+
+        // Popup fires at 0ms, close at 500ms after the last pending prompt resolves.
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
+        expect(setPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: "Tasha's Hideous Laughter",
+            description: '1 creature(s) failed their save and are Prone and Incapacitated: PlayerAlly. 0 creature(s) saved.',
         });
     });
 
-    describe('player save failure handling', () => {
-        it('applies prone and incapacitated conditions to player on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
+    it('logs a clean success with no effect writes or popup, then closes', async () => {
+        const onClose = vi.fn();
+        const setPopupHtml = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose, setPopupHtml })} />);
+        await selectPlayerAndConfirm();
+        await triggerSaveResult(true, { roll: 15, total: 16, saveBonus: 1 });
 
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBeGreaterThan(0);
-                expect(conditionCalls[0][2]).toContain('prone');
-                expect(conditionCalls[0][2]).toContain('incapacitated');
-            });
+        await waitFor(() => {
+            expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
-
-        it('calls addExpiration with prone, incapacitated, and tashas_laughter_expiration on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Wizard1', targetName: 'PlayerAlly', effects: [
-                        { type: 'condition', condition: 'prone' },
-                        { type: 'condition', condition: 'incapacitated' },
-                        { type: 'tashas_laughter_expiration' },
-                    ], campaignName });
-            });
+        expect(saveResultsFor('PlayerAlly')[0]).toMatchObject({
+            success: true,
+            characterName: 'Wizard1',
+            roll: 15,
+            total: 16,
+            saveBonus: 1,
+            description: 'PlayerAlly succeeded on WIS save (DC 14, rolled 15 + 1 = 16)',
         });
-
-        it('sets targetEffects with tashas_hideous_laughter on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                const teCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'targetEffects' && call[0] === 'campaign',
-                );
-                expect(teCalls.length).toBeGreaterThan(0);
-                const effects = teCalls[0][2];
-                const laughterEffect = effects.find(e => e.effect === 'tashas_hideous_laughter');
-                expect(laughterEffect).toEqual(expect.objectContaining({
-                    target: 'PlayerAlly',
-                    effect: 'tashas_hideous_laughter',
-                    source: 'Wizard1',
-                }));
-            });
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+            targetName: 'PlayerAlly',
+            saveResult: 'success',
+            roll: 15,
+            total: 16,
+            conditions: [],
+            appliedDamage: 0,
         });
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(targetEffectWrites()).toHaveLength(0);
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(entriesOf(e => e.type === 'condition')).toHaveLength(0);
 
-        it('logs save_result failure with roll details and description on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false, { roll: 7, total: 8, saveBonus: 1 });
-
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === false,
-                );
-                expect(saveEntries.length).toBeGreaterThan(0);
-                expect(saveEntries[0][1].roll).toBe(7);
-                expect(saveEntries[0][1].total).toBe(8);
-                expect(saveEntries[0][1].saveBonus).toBe(1);
-                expect(saveEntries[0][1].targetName).toBe('PlayerAlly');
-                expect(saveEntries[0][1].description).toContain('PlayerAlly failed');
-                expect(saveEntries[0][1].description).toContain('rolled 7 + 1 = 8');
-            });
-        });
-
-        it('logs combined condition entry with correct properties on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                const conditionEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'condition' && call[1]?.action === 'applied' && call[1]?.characterName === 'PlayerAlly',
-                );
-                expect(conditionEntries.length).toBeGreaterThan(0);
-                expect(conditionEntries[0][1]).toEqual(expect.objectContaining({
-                    type: 'condition',
-                    action: 'applied',
-                    characterName: 'PlayerAlly',
-                    condition: 'Prone, Incapacitated',
-                }));
-                expect(conditionEntries[0][1].note).toContain("Tasha's Hideous Laughter");
-            });
-        });
-
-        it('records addTargetResult with failure and conditions on failed save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                const targetResultCalls = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly',
-                );
-                expect(targetResultCalls.length).toBe(1);
-                expect(targetResultCalls[0][1].saveResult).toBe('failure');
-                expect(targetResultCalls[0][1].conditions).toContain('prone');
-                expect(targetResultCalls[0][1].conditions).toContain('incapacitated');
-            });
-        });
-
-        it('calls persistAndNotify after player save result', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                expect(persistAndNotify).toHaveBeenCalled();
-            });
-        });
-
-        it('closes modal after player save result is processed', async () => {
-            const onClose = vi.fn();
-            render(<TashasLaughterModal {...makeProps({ onClose })} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(false);
-
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalled();
-            });
-        });
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
+        expect(setPopupHtml).not.toHaveBeenCalled();
     });
 
-    describe('player save success handling', () => {
-        it('logs save_result success entry and description when player passes save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true, { roll: 15, total: 16, saveBonus: 1 });
+    it('resolves a save-result omitting roll details, logging honest zeros', async () => {
+        const onClose = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose })} />);
+        await selectPlayerAndConfirm();
+        await triggerSaveResult(false, { roll: undefined, total: undefined, saveBonus: undefined });
 
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === true,
-                );
-                expect(saveEntries.length).toBe(1);
-                expect(saveEntries[0][1].description).toContain('PlayerAlly succeeded');
-                expect(saveEntries[0][1].description).toContain('rolled 15 + 1 = 16');
-            });
+        await waitFor(() => {
+            expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
-
-        it('records addTargetResult with success and empty conditions on save success', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                const targetResultCalls = addTargetResult.mock.calls.filter(
-                    call => call[0] === campaignName && call[1]?.targetName === 'PlayerAlly',
-                );
-                expect(targetResultCalls.length).toBe(1);
-                expect(targetResultCalls[0][1].saveResult).toBe('success');
-                expect(targetResultCalls[0][1].conditions).toEqual([]);
-            });
+        // NOTE (reported source defect, TashasLaughterModal.jsx:40): the
+        // description omits the bonus only when it is exactly 0, so a missing
+        // bonus leaks "+ undefined". Numeric fields still default to 0.
+        expect(saveResultsFor('PlayerAlly')[0]).toMatchObject({
+            success: false,
+            roll: 0,
+            total: 0,
+            saveBonus: 0,
+            description: 'PlayerAlly failed WIS save (DC 14, rolled 0 + undefined = 0) and is Prone and Incapacitated.',
         });
-
-        it('does not apply conditions when player passes save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBe(0);
-            });
-        });
-
-        it('does not call addExpiration when player passes save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            expect(addExpiration).not.toHaveBeenCalled();
-        });
-
-        it('does not set targetEffects when player passes save', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                const teCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'targetEffects' && call[0] === 'campaign',
-                );
-                const laughterEffect = teCalls.some(call => {
-                    const effects = call[2];
-                    return effects.some(e => e.target === 'PlayerAlly' && e.effect === 'tashas_hideous_laughter');
-                });
-                expect(laughterEffect).toBe(false);
-            });
-        });
-
-        it('closes modal after player save success is processed', async () => {
-            const onClose = vi.fn();
-            render(<TashasLaughterModal {...makeProps({ onClose })} />);
-            await selectPlayerAndConfirm();
-            await triggerSaveResult(true);
-
-            await waitFor(() => {
-                expect(onClose).toHaveBeenCalled();
-            });
-        });
+        // The failure leg still lands with the sparse detail.
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(1);
+        expect(conditionWritesFor('PlayerAlly')[0][2]).toEqual(['prone', 'incapacitated']);
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            saveResult: 'failure',
+            roll: 0,
+            total: 0,
+            conditions: ['prone', 'incapacitated'],
+        }));
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 1500 });
     });
 
-    describe('save result event edge cases', () => {
-        it.each([
-            { name: 'missing promptId', detail: { success: false } },
-            { name: 'unknown promptId', detail: { promptId: 'non-existent-prompt-id', success: false, roll: 5, total: 6, saveBonus: 1 } },
-        ])('ignores save-result event with $name and applies no side effects', async ({ detail }) => {
-            render(<TashasLaughterModal {...makeProps()} />);
+    it.each([
+        { name: 'null detail', detail: null },
+        { name: 'missing promptId', detail: { success: false } },
+        { name: 'unknown promptId', detail: { promptId: 'not-a-real-prompt-id', success: false, roll: 20, total: 25, saveBonus: 5 } },
+    ])('ignores a save-result event with $name and still resolves the live prompt', async ({ detail }) => {
+        const onClose = vi.fn();
+        render(<TashasLaughterModal {...makeProps({ onClose })} />);
+        await selectPlayerAndConfirm();
+        // A processed result would persist and log synchronously after the guard.
+        const persistCallsAtConfirm = persistAndNotify.mock.calls.length;
 
-            if (detail.promptId) {
-                await selectPlayerAndConfirm();
-            }
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', { detail }));
-            });
-
-            if (!detail.promptId) {
-                expect(sendSavePrompt).not.toHaveBeenCalled();
-                expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                    'campaign',
-                    'pendingSaveListenerPrompts',
-                    expect.any(Array),
-                    campaignName,
-                );
-            } else {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBe(0);
-            }
+        await act(async () => {
+            window.dispatchEvent(new CustomEvent('save-result', { detail }));
         });
 
-        it('handles save-result event with missing optional fields using default values', async () => {
-            render(<TashasLaughterModal {...makeProps()} />);
-            await selectPlayerAndConfirm();
+        expect(persistAndNotify).toHaveBeenCalledTimes(persistCallsAtConfirm);
+        expect(saveResultsFor('PlayerAlly')).toHaveLength(0);
+        expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
+        expect(addTargetResult).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
 
-            const savePromptCall = sendSavePrompt.mock.calls[0];
-            const promptId = savePromptCall[1].promptId;
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: {
-                        promptId,
-                        success: false,
-                    },
-                }));
-            });
-
-            await waitFor(() => {
-                const conditionCalls = setRuntimeValue.mock.calls.filter(
-                    call => call[1] === 'activeConditions' && call[0] === 'PlayerAlly',
-                );
-                expect(conditionCalls.length).toBeGreaterThan(0);
-            });
-
-            await waitFor(() => {
-                const saveEntries = addEntry.mock.calls.filter(
-                    call => call[1]?.type === 'save_result' && call[1]?.targetName === 'PlayerAlly' && call[1]?.success === false,
-                );
-                expect(saveEntries.length).toBeGreaterThan(0);
-                expect(saveEntries[0][1].roll).toBe(0);
-                expect(saveEntries[0][1].total).toBe(0);
-                expect(saveEntries[0][1].saveBonus).toBe(0);
-            });
-        });
-
-        it('ignores save-result event with null detail', async () => {
-            const onClose = vi.fn();
-            render(<TashasLaughterModal {...makeProps({ onClose })} />);
-
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('save-result', {
-                    detail: null,
-                }));
-            });
-
-            expect(onClose).not.toHaveBeenCalled();
+        // The stray event must not consume the pending prompt.
+        await triggerSaveResult(false);
+        await waitFor(() => {
+            expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
     });
 });

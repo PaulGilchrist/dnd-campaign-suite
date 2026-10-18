@@ -1,171 +1,128 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardStepRace from './WizardStepRace.jsx';
+import races5e from '../../../public/data/races.json';
+import races2024 from '../../../public/data/2024/races.json';
 
-const mockRacesData = [
-  { name: 'Human', speed: 30, size: 'Medium', languages: ['Common'], traits: [{ name: 'Extra Language', description: 'You can speak one extra language.' }] },
-  { name: 'Elf', speed: 30, size: 'Medium', languages: ['Common', 'Elvish'], traits: [{ name: 'Fey Ancestry', description: 'You have advantage on Wisdom saving throws against being charmed.' }], subraces: [{ name: 'High Elf', description: 'High elves are elegant and graceful.', damage_resistance: '' }] },
-  { name: 'Dwarf', speed: 25, size: 'Medium', languages: ['Common', 'Dwarvish'], traits: [{ name: 'Darkvision', description: 'You have darkvision with a range of 60 feet.' }] },
-];
+// Disk anchors — verbatim public/data/races.json and public/data/2024/races.json
+// (verified 2026-10-18). The wizard passes these exact files in per ruleset via
+// useWizardData, and racesData/allRacesData are the same file (so "missing
+// section" fallbacks are unreachable in production and are not mocked here).
+const ELF_5E = races5e.find(r => r.name === 'Elf');
+const ELF_2024 = races2024.find(r => r.name === 'Elf');
 
-const mockAllRacesData = [
-  { name: 'Human', description: '<p>Humans are versatile and ambitious.</p>' },
-  { name: 'Elf', description: '<p>Elves are magical beings.</p>' },
-  { name: 'Dwarf', description: '<p>Dwarves are tough and resilient.</p>' },
-];
-
-function createMockProps(overrides = {}) {
-  return {
-    formData: overrides.formData || { race: { name: '', subrace: { name: '' } } },
-    errors: overrides.errors || {},
-    racesData: overrides.racesData || mockRacesData,
-    allRacesData: overrides.allRacesData || mockAllRacesData,
-    ruleset: overrides.ruleset || '5e',
-    onInputChange: overrides.onInputChange || vi.fn(),
-  };
+function renderStep({ formData, racesData = races5e, allRacesData = racesData, ruleset = '5e', errors = {} } = {}) {
+  const onInputChange = vi.fn();
+  render(
+    <WizardStepRace
+      stepNumber={3}
+      formData={formData ?? { race: { name: '', subrace: { name: '' } } }}
+      errors={errors}
+      racesData={racesData}
+      allRacesData={allRacesData}
+      ruleset={ruleset}
+      onInputChange={onInputChange}
+    />
+  );
+  return { onInputChange };
 }
 
+const optionTexts = () => screen.getAllByRole('option').map(o => o.textContent);
+
 describe('WizardStepRace', () => {
-  describe('Render', () => {
-    it('should display the step heading', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
-      expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
-    });
-
-    it('should render the race dropdown with options', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
-      expect(screen.getByText('Race *')).toBeInTheDocument();
-      const select = screen.getByRole('combobox');
-      expect(select).toHaveTextContent('Select a race');
-      expect(select.querySelector('option')).toHaveValue('');
-    });
-
-    it('should show the detail card when a race is selected', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      expect(screen.getByText('Human Details')).toBeInTheDocument();
-    });
-
-    it('should not show the detail card when no race is selected', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps()} />);
-      expect(screen.queryByText('Details')).not.toBeInTheDocument();
-    });
+  it('lists every 5e race from disk as an ordered option, unselected, with no detail card', () => {
+    renderStep();
+    expect(screen.getByText('Race *')).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveValue('');
+    expect(optionTexts()).toEqual(['Select a race', ...races5e.map(r => r.name)]);
+    expect(screen.queryByText(/Details/)).not.toBeInTheDocument();
   });
 
-  describe('Expand/Collapse', () => {
-    it('should toggle details when the header is clicked', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      expect(screen.getByRole('button', { name: /Show Details/i })).toBeInTheDocument();
-      fireEvent.click(header);
-      expect(screen.getByRole('button', { name: /Hide Details/i })).toBeInTheDocument();
-      fireEvent.click(header);
-      expect(screen.getByRole('button', { name: /Show Details/i })).toBeInTheDocument();
-    });
-
-    it('should toggle details when the toggle button is clicked', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const button = screen.getByRole('button', { name: /Show Details/i });
-      expect(button).toHaveTextContent('Show Details');
-      fireEvent.click(button);
-      expect(button).toHaveTextContent('Hide Details');
-      fireEvent.click(button);
-      expect(button).toHaveTextContent('Show Details');
-    });
+  it('selecting a race reports ("race", { name, subrace reset }) — child cascade lives here, subrace options live in the Subrace step', () => {
+    const { onInputChange } = renderStep();
+    // Elf owns subraces on disk (High Elf / Wood Elf / Dark Elf); selecting it
+    // must still hand the wizard a blank subrace slot.
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Elf' } });
+    expect(onInputChange).toHaveBeenCalledTimes(1);
+    expect(onInputChange).toHaveBeenCalledWith('race', { name: 'Elf', subrace: { name: '' } });
   });
 
-  describe('Race selection', () => {
-    it('should call onInputChange when race changes', () => {
-      const mockOnChange = vi.fn();
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ onInputChange: mockOnChange })} />);
-      const select = screen.getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'Elf' } });
-      expect(mockOnChange).toHaveBeenCalledWith('race', { name: 'Elf', subrace: { name: '' } });
-    });
+  it.each([
+    ['formData.race is null', { race: null }],
+    ['the selected name is not in racesData', { race: { name: 'Aasimar', subrace: { name: '' } } }],
+  ])('mounts no detail card when %s (Aasimar is on 2024 disk only)', (_label, formData) => {
+    renderStep({ formData });
+    expect(screen.queryByText(/Details/)).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
-  describe('Error display', () => {
-    it('should render error message when race error exists', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ errors: { race: 'Race is required' } })} />);
-      expect(screen.getByText('Race is required')).toBeInTheDocument();
-    });
+  it('shows the detail card collapsed and toggles its body via the button and the header', () => {
+    renderStep({ formData: { race: { name: 'Elf', subrace: { name: '' } } } });
+    const header = screen.getByRole('heading', { name: /Elf Details/i });
+    const toggle = screen.getByRole('button', { name: 'Show Details' });
+    expect(screen.queryByText('Core Information')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveTextContent('Hide Details');
+    expect(screen.getByText('Core Information')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveTextContent('Show Details');
+    expect(screen.queryByText('Core Information')).not.toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(screen.getByText('Core Information')).toBeInTheDocument();
   });
 
-  describe('Detail card content', () => {
-    it('should render description when full race data has one', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText('Description')).toBeInTheDocument();
-      expect(screen.getByText('Humans are versatile and ambitious.')).toBeInTheDocument();
-    });
+  it('renders the expanded 5e Elf detail card verbatim from disk: description, speed/size/languages, all traits', () => {
+    renderStep({ formData: { race: { name: 'Elf', subrace: { name: '' } } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
 
-    it('should not render description section when full race data has no description', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, allRacesData: [{ name: 'Human' }] })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.queryByText('Description')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Description')).toBeInTheDocument();
+    expect(screen.getByText(ELF_5E.description)).toBeInTheDocument();
+    expect(screen.getByText('Core Information')).toBeInTheDocument();
+    expect(screen.getByText('30 ft.')).toBeInTheDocument();
+    expect(screen.getByText('Medium')).toBeInTheDocument();
+    expect(screen.getByText('Languages')).toBeInTheDocument();
+    expect(screen.getByText('Common, Elvish')).toBeInTheDocument();
 
-    it('should render core information section with speed and size', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText('Core Information')).toBeInTheDocument();
-      expect(screen.getByText('30 ft.')).toBeInTheDocument();
-      expect(screen.getByText('Medium')).toBeInTheDocument();
-    });
-
-    it('should render languages', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Elf', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Elf Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText('Languages')).toBeInTheDocument();
-      expect(screen.getByText('Common, Elvish')).toBeInTheDocument();
-    });
-
-    it('should render racial traits when they exist', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText('Racial Traits')).toBeInTheDocument();
-      expect(screen.getByText('Extra Language')).toBeInTheDocument();
-      expect(screen.getByText(/You can speak one extra language/)).toBeInTheDocument();
-    });
-
-    it('should not render racial traits section when traits are missing', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium' }] })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.queryByText('Racial Traits')).not.toBeInTheDocument();
-    });
-
-    it('should render trait descriptions with HTML', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } }, racesData: [{ name: 'Human', speed: 30, size: 'Medium', traits: [{ name: 'Trait', description: '<em>Italic trait</em>' }] }] })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText(/Italic trait/)).toBeInTheDocument();
-    });
-
-    it('should render plain trait descriptions without HTML', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: { name: 'Human', subrace: { name: '' } } } })} />);
-      const header = screen.getByRole('heading', { name: /Human Details/i });
-      fireEvent.click(header);
-      expect(screen.getByText(/You can speak one extra language/)).toBeInTheDocument();
-    });
+    expect(screen.getByText('Racial Traits')).toBeInTheDocument();
+    for (const trait of ELF_5E.traits) {
+      expect(screen.getByText(trait.name)).toBeInTheDocument();
+      expect(screen.getByText(trait.description)).toBeInTheDocument();
+    }
   });
 
-  describe('Edge cases', () => {
-    it('should render gracefully when formData.race is null, undefined, or missing', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ formData: { race: null } })} />);
-      expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
-      expect(screen.queryByText('Details')).not.toBeInTheDocument();
+  it('renders 2024 ruleset races from disk, with HTML descriptions rendered instead of escaped', () => {
+    renderStep({
+      ruleset: '2024',
+      racesData: races2024,
+      formData: { race: { name: 'Elf', subrace: { name: '' } } },
     });
+    expect(optionTexts()).toEqual(['Select a race', ...races2024.map(r => r.name)]);
 
-    it('should render gracefully with empty racesData', () => {
-      render(<WizardStepRace stepNumber={3} {...createMockProps({ racesData: [] })} />);
-      expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
-      const select = screen.getByRole('combobox');
-      expect(select.querySelector('option')).toHaveTextContent('Select a race');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
+    expect(screen.getByText('30 ft.')).toBeInTheDocument();
+    expect(screen.getByText(ELF_2024.size)).toBeInTheDocument();
+    expect(screen.getByText('Common, Elvish')).toBeInTheDocument();
+
+    // 2024 disk descriptions/traits embed real HTML (<p>, <br/>, <table>) —
+    // the prose must render, raw tags must not leak as text.
+    expect(screen.getByText(/^Created by the god Corellon, the first elves could change their forms at will\./)).toBeInTheDocument(); // first sentence of ELF_2024.description, verbatim
+    const lineage = ELF_2024.traits.find(t => t.name === 'Elfish Lineage');
+    expect(lineage.description).toContain('<'); // disk fact: this trait carries HTML
+    expect(screen.getByText(/You are part of a lineage that grants you supernatural abilities/)).toBeInTheDocument();
+    expect(screen.queryByText(/<table/)).not.toBeInTheDocument();
+    for (const trait of ELF_2024.traits) {
+      expect(screen.getByText(trait.name)).toBeInTheDocument();
+    }
+  });
+
+  it('renders the placeholder-only select with no card while races are still loading (empty racesData)', () => {
+    renderStep({ racesData: [] });
+    expect(screen.getByText('Step 3: Race')).toBeInTheDocument();
+    expect(optionTexts()).toEqual(['Select a race']);
+    expect(screen.queryByText(/Details/)).not.toBeInTheDocument();
   });
 });

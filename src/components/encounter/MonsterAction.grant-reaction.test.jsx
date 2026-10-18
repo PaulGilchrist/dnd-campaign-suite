@@ -1,73 +1,85 @@
-// MA-0882: Gnoll Pack Lord "Incite Rampage" chip — automation:{type:
-// "monster_grant_reaction", effect:"incite_rampage", range_ft:60} arms a
-// clickable .mc-dice-link-grantreaction affordance on the formerly inert row
-// (text + cosmetic <em> (5-6)</em> only), routing the modal's recharge-gated
-// grant-reaction adjudication. A spent recharge row gets the existing
-// mc-dice-link-spell-spent class and stays clickable so the click routes the
-// honest "Not Recharged" refusal (MA-0031/MA-0648 precedents).
-import { readFileSync } from 'node:fs';
-import { render, fireEvent } from '@testing-library/react';
+// @maintained-by-ai
+// MA-0882 component lane: GrantReactionLink chip in MonsterAction.jsx — automation
+// {type:"monster_grant_reaction", effect:"incite_rampage", range_ft:60} (Gnoll Pack
+// Lord "Incite Rampage") arms a clickable .mc-dice-link-grantreaction role=button
+// routing to the modal's onGrantReactionRow seam. This file owns PRESS ROUTING ONLY:
+// open arm → exactly-once dispatch of the exact authored row; closed arms (incapacitated
+// attacker, missing handler seam) → chip renders, zero dispatch (#417 closed-gate canon
+// — the source keeps the span with onClick undefined); spent recharge on the live
+// MA-0031 monsterRecharge map → mc-dice-link-spell-spent class but spent≠disabled,
+// the click still routes the honest "Not Recharged" refusal once (MA-0031/MA-0648
+// precedent — refusal adjudication lives in the resolver). Gate COMPUTATION and the
+// spend/te/clock/refusal economy are owned by monsterGrantReaction.test.js and the
+// MonsterCardHelpers recharge/gated-reaction helper lanes — never restated here.
+import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
+import monsters from '../../../public/data/monsters.json';
 
-const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const packLord = monsters.find(m => m.index === 'gnoll-pack-lord');
-const INCITE_ROW = packLord.actions[3];
+const PACK_LORD = monsters.find(m => m.index === 'gnoll-pack-lord');
+const INCITE_ROW = PACK_LORD.actions.find(a => a.name === 'Incite Rampage');
 
-function renderRow(action, overrides = {}) {
-  const onGrantReactionRow = vi.fn();
+// Fresh vi.fn() seam per render (#362); omitHandler drops the grant seam entirely
+// to exercise the handlerless closed arm without a vacuous no-op assertion.
+function renderGrantRow({ action = INCITE_ROW, attackerCannotAct = false, rechargeState = {}, handler = vi.fn(), omitHandler = false } = {}) {
+  const onGrantReactionRow = omitHandler ? undefined : handler;
   const utils = render(
     <MonsterAction
       action={action}
       index={0}
-      attackerCannotAct={false}
+      attackerCannotAct={attackerCannotAct}
       onAttack={vi.fn()}
       onDamage={vi.fn()}
       onSaveRoll={vi.fn()}
       onSpellCast={vi.fn()}
       reactionUsesUsed={{}}
       onGatedReaction={vi.fn()}
-      rechargeState={{}}
+      rechargeState={rechargeState}
       onGrantReactionRow={onGrantReactionRow}
-      {...overrides}
     />
   );
   return { ...utils, onGrantReactionRow };
 }
 
-describe('MA-0882 Incite Rampage chip', () => {
-  it('arms a clickable grant-reaction chip on the row', () => {
-    const { container, onGrantReactionRow } = renderRow(INCITE_ROW);
-    const chip = container.querySelector('.mc-dice-link-grantreaction');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Incite');
-    expect(chip.getAttribute('title')).toContain('incite_rampage');
-    expect(chip.getAttribute('title')).toContain('60');
+describe('MA-0882 Incite Rampage grant-reaction chip (MonsterAction press lane)', () => {
+  it('open arm press: one dispatch of the exact row, chip armed unspent with data-verbatim title', () => {
+    const { onGrantReactionRow } = renderGrantRow();
+    const chip = screen.getByRole('button', { name: /Incite/ });
+    expect(chip.className).toContain('mc-dice-link-grantreaction');
+    expect(chip.className).not.toContain('mc-dice-link-spell-spent');
+    // Title strings read verbatim off the authored monsters.json row (#387).
+    expect(chip.getAttribute('title')).toContain(INCITE_ROW.automation.effect);
+    expect(chip.getAttribute('title')).toContain(`${INCITE_ROW.automation.range_ft} ft`);
+    expect(chip.getAttribute('title')).toContain(`Recharge ${INCITE_ROW.recharge}`);
     fireEvent.click(chip);
     expect(onGrantReactionRow).toHaveBeenCalledTimes(1);
     expect(onGrantReactionRow.mock.calls[0][0]).toBe(INCITE_ROW);
   });
 
-  it('spent recharge: spent class, still clickable for honest refusal', () => {
-    const { container, onGrantReactionRow } = renderRow(INCITE_ROW, { rechargeState: { 'Incite Rampage': { recharged: false, threshold: 5 } } });
-    const chip = container.querySelector('.mc-dice-link-grantreaction');
+  it('spent recharge: spent class armed but spent≠disabled — click still routes refusal once', () => {
+    const { onGrantReactionRow } = renderGrantRow({ rechargeState: { [INCITE_ROW.name]: { recharged: false, threshold: 5 } } });
+    const chip = screen.getByRole('button', { name: /Incite/ });
     expect(chip.className).toContain('mc-dice-link-spell-spent');
     fireEvent.click(chip);
     expect(onGrantReactionRow).toHaveBeenCalledTimes(1);
+    expect(onGrantReactionRow.mock.calls[0][0]).toBe(INCITE_ROW);
   });
 
-  it('incapacitated attacker: chip inert', () => {
-    const { container, onGrantReactionRow } = renderRow(INCITE_ROW, { attackerCannotAct: true });
-    const chip = container.querySelector('.mc-dice-link-grantreaction');
-    expect(chip).toBeTruthy();
+  it('closed arm (incapacitated attacker): chip renders but zero dispatch', () => {
+    const { onGrantReactionRow } = renderGrantRow({ attackerCannotAct: true });
+    const chip = screen.getByRole('button', { name: /Incite/ });
     fireEvent.click(chip);
     expect(onGrantReactionRow).not.toHaveBeenCalled();
   });
 
-  it('attack rows arm no grant-reaction chip (Bone Whip byte-inert)', () => {
-    const whip = packLord.actions.find(a => a.name === 'Bone Whip');
-    const { container } = renderRow(whip);
+  it('closed arm (missing handler seam): chip renders, click never throws', () => {
+    const { getByRole } = renderGrantRow({ omitHandler: true });
+    expect(() => fireEvent.click(getByRole('button', { name: /Incite/ }))).not.toThrow();
+  });
+
+  it('non-grant rows arm zero grant-reaction affordance (Bone Whip)', () => {
+    const whip = PACK_LORD.actions.find(a => a.name === 'Bone Whip');
+    const { container } = renderGrantRow({ action: whip });
     expect(container.querySelector('.mc-dice-link-grantreaction')).toBeNull();
   });
 });

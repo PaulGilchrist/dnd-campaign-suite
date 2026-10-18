@@ -1,528 +1,230 @@
+// @maintained-by-ai
+/* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx:395-413).
+ * handleReset touches ONLY component-local useState (EncounterBuilder.jsx:184-214) —
+ * it never calls save/update/delete endpoints and never writes localStorage. The load
+ * precondition uses the management-hook mock below (not the real
+ * useEncounterManagement/useSyncedState) precisely so that server isolation is provable:
+ * no real network layer exists in this file at all.
+ * Runs the REAL header, filter panel, summary panel, monster table, selected panel,
+ * PreviewToggle and EncounterModal (#406 pattern — hand-written panel replicas deleted).
+ * Owned elsewhere — do NOT duplicate: load hydrate/reconcile (#403 load-encounter),
+ * sort/Join dispatch/save-modal commit (#399 additional-interactions), XP bands (#400
+ * gameplay-flows), localStorage/filter persistence (#401 helpers), row chrome/clear-all
+ * (#406 panel-interactions), generator-apply/header gate/default-no-Reset chrome (#407
+ * remaining). Reset-button-absent-when-no-encounter is green in remaining.test.jsx:163;
+ * its post-reset counterpart (setCurrentEncounterName(null)) is pinned here. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import EncounterBuilder from './EncounterBuilder.jsx';
+
+// Stubbed seams: data hooks, network, heavy stat-block modal. The management mock
+// uses real useState so opening/closing the load modal triggers genuine re-renders
+// (no getter + forced-render hacks). XP math constants keep this lane independent
+// of the #400/#401 bands.
+const h = vi.hoisted(() => ({
+  loadEncounterData: vi.fn(),
+  updateEncounter: vi.fn(),
+  saveEncounter: vi.fn(),
+  openSaveModal: vi.fn(),
+}));
 
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({
-  useMonstersData: vi.fn(() => ({ monsters: [], loading: false })),
+  useMonstersData: vi.fn(),
 }));
 
-vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
-  default: vi.fn(() => ({
-    modalOpen: false,
-    modalMode: null,
-    encounters: [],
-    loading: false,
-    openSaveModal: vi.fn(),
-    openLoadModal: vi.fn(),
-    closeModal: vi.fn(),
-    saveEncounter: vi.fn(),
-    updateEncounter: vi.fn(),
-    loadEncounterData: vi.fn(),
-    deleteEncounterAction: vi.fn(),
-    renameEncounterAction: vi.fn(),
-  })),
-}));
+vi.mock('../../hooks/management/useEncounterManagement.js', async () => {
+  const React = await import('react');
+  // Named `use...` so rules-of-hooks accepts the internal useState calls.
+  function useEncounterManagement() {
+    const [modalMode, setModalMode] = React.useState(null);
+    return {
+      modalOpen: modalMode !== null,
+      modalMode,
+      encounters: [{ name: 'test-encounter' }],
+      loading: false,
+      openSaveModal: () => { setModalMode('save'); h.openSaveModal(); },
+      openLoadModal: () => setModalMode('load'),
+      closeModal: () => setModalMode(null),
+      saveEncounter: h.saveEncounter,
+      updateEncounter: h.updateEncounter,
+      loadEncounterData: h.loadEncounterData,
+      deleteEncounterAction: vi.fn(),
+      renameEncounterAction: vi.fn(),
+    };
+  }
+  return { default: useEncounterManagement };
+});
 
-vi.mock('./EncounterFilterPanel.jsx', () => ({
-  default: (props) => (
-    <div data-testid="encounter-filter-panel">
-      <select
-        data-testid="difficulty-select"
-        value={props.filter?.difficulty}
-        onChange={props.onDifficultyChange}
-      >
-        <option value={0}>Easy</option>
-        <option value={1}>Medium</option>
-        <option value={2}>Hard</option>
-        <option value={3}>Deadly</option>
-      </select>
-      <div data-testid="player-levels">
-        {props.filter?.playerLevels?.map((level, i) => (
-          <div key={i} data-testid={`player-level-${i}`}>
-            <input
-              data-testid={`player-level-input-${i}`}
-              type="number"
-              value={level}
-              onChange={(e) => props.onPlayerLevelChange(i, Number(e.target.value))}
-            />
-            <button
-              data-testid={`remove-player-${i}`}
-              disabled={props.filter?.playerLevels?.length <= 1}
-              onClick={() => props.onRemovePlayer(i)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-      </div>
-      <button data-testid="add-player" onClick={props.onAddPlayer}>Add Player</button>
-      {props.onEnvironmentChange && (
-        <select
-          data-testid="environment-select"
-          value={props.filter?.environment || ''}
-          onChange={(e) => props.onEnvironmentChange(e)}
-        >
-          <option value="">All Environments</option>
-          <option value="forest">Forest</option>
-          <option value="hill">Hill</option>
-          <option value="mountain">Mountain</option>
-        </select>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock('./EncounterSummaryPanel.jsx', () => ({
-  default: (props) => (
-    <div data-testid="encounter-summary-panel">
-      <span data-testid="total-xp">{props.totalMonsterXP.toLocaleString()}</span>
-      <span data-testid="monster-count">{props.monsterCount}</span>
-      <span data-testid="difficulty-multiplier">{props.difficultyMultiplier}</span>
-      <span data-testid="effective-xp">{props.effectiveXP.toLocaleString()}</span>
-      <span data-testid="difficulty-label">{props.difficultyLabels?.[props.difficultyIndex]}</span>
-      {props.selectedMonsters?.length > 0 && (
-        <button data-testid="clear-all" onClick={props.onClearMonsters}>Clear All</button>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock('./EncounterMonsterTable.jsx', () => ({
-  default: (props) => (
-    <div data-testid="encounter-monster-table">
-      <input
-        data-testid="search-input"
-        value={props.searchQuery}
-        onChange={(e) => props.onSearchQueryChange(e.target.value)}
-        placeholder="Search by name, type, or subtype..."
-      />
-      <select
-        data-testid="type-filter"
-        value={props.typeFilter || ''}
-        onChange={(e) => props.onTypeChange(e.target.value)}
-      >
-        <option value="">All Types</option>
-        <option value="humanoid">Humanoid</option>
-        <option value="dragon">Dragon</option>
-        <option value="beast">Beast</option>
-      </select>
-      <select
-        data-testid="size-filter"
-        value={props.sizeFilter || ''}
-        onChange={(e) => props.onSizeChange(e.target.value)}
-      >
-        <option value="">All Sizes</option>
-        <option value="small">Small</option>
-        <option value="medium">Medium</option>
-        <option value="large">Large</option>
-      </select>
-      <input
-        data-testid="cr-min"
-        type="number"
-        value={props.crMin ?? ''}
-        onChange={(e) => props.onCRMinChange(e.target.value)}
-        placeholder="Any"
-      />
-      <input
-        data-testid="cr-max"
-        type="number"
-        value={props.crMax ?? ''}
-        onChange={(e) => props.onCRMaxChange(e.target.value)}
-        placeholder="Any"
-      />
-      {props.filteredMonsters?.map((monster) => {
-        const selected = props.selectedMonsters.some((m) => m.index === monster.index);
-        const qty = (props.selectedMonsters.find((m) => m.index === monster.index)?.qty) || 0;
-        return (
-          <div
-            key={monster.index}
-            data-testid={`monster-row-${monster.index}`}
-            className={selected ? 'monster-row-selected' : ''}
-            onClick={() => props.onToggleMonster(monster)}
-          >
-            <input
-              type="checkbox"
-              data-testid={`monster-checkbox-${monster.index}`}
-              checked={selected}
-              onChange={(e) => { e.stopPropagation(); props.onToggleMonster(monster); }}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <span data-testid={`monster-name-${monster.index}`}>{monster.name}</span>
-            {qty > 0 && (
-              <>
-                <span data-testid={`monster-qty-${monster.index}`}>{qty}</span>
-                <button
-                  data-testid={`decrease-qty-${monster.index}`}
-                  onClick={(e) => { e.stopPropagation(); props.onDecreaseQty(monster.index); }}
-                >
-                  -
-                </button>
-                <button
-                  data-testid={`increase-qty-${monster.index}`}
-                  onClick={(e) => { e.stopPropagation(); props.onIncreaseQty(monster.index); }}
-                >
-                  +
-                </button>
-                <button
-                  data-testid={`remove-monster-${monster.index}`}
-                  onClick={(e) => { e.stopPropagation(); props.onRemoveMonster(monster.index); }}
-                >
-                  Remove
-                </button>
-              </>
-            )}
-            {props.onViewDetails && (
-              <button
-                data-testid={`details-btn-${monster.index}`}
-                onClick={(e) => { e.stopPropagation(); props.onViewDetails(monster); }}
-              >
-                Details
-              </button>
-            )}
-          </div>
-        );
-      })}
-      {props.sortField && (
-        <div data-testid="sort-field">{props.sortField}</div>
-      )}
-      {props.sortDirection && (
-        <div data-testid="sort-direction">{props.sortDirection}</div>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock('./EncounterSelectedMonsters.jsx', () => ({
-  default: (props) => {
-    if (!props.selectedMonsters || props.selectedMonsters.length === 0) {
-      return null;
-    }
-    const totalMonsters = props.selectedMonsters.reduce((sum, m) => sum + (m.qty || 1), 0);
-    return (
-      <div data-testid="encounter-selected-monsters">
-        <div data-testid="selected-count">{totalMonsters}</div>
-        {props.selectedMonsters.map((monster) => (
-          <div key={monster.index} data-testid={`selected-item-${monster.index}`}>
-            <span data-testid={`selected-name-${monster.index}`}>{monster.name}</span>
-            <span data-testid={`selected-xp-${monster.index}`}>
-              {(monster.xp * (monster.qty || 1)).toLocaleString()} XP
-            </span>
-            <button
-              data-testid={`remove-selected-${monster.index}`}
-              onClick={() => props.onRemoveMonster(monster.index)}
-            >
-              Remove
-            </button>
-            {props.onViewDetails && (
-              <button
-                data-testid={`view-details-selected-${monster.index}`}
-                onClick={() => props.onViewDetails(monster)}
-              >
-                View
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  },
-}));
-
-vi.mock('./EncounterModal.jsx', () => ({
-  default: (props) => {
-    if (!props.isOpen) return null;
-    return (
-      <div data-testid="encounter-modal">
-        <button data-testid="modal-close" onClick={props.onClose}>Close</button>
-        {props.mode === 'save' && (
-          <div>
-            <input
-              data-testid="encounter-name-input"
-              placeholder="e.g., Goblin Ambush"
-            />
-            <button data-testid="modal-save" onClick={() => props.onSave('Test Encounter')}>
-              Save
-            </button>
-          </div>
-        )}
-        {props.mode === 'load' && (
-          <div>
-            {props.encounters?.map((enc) => (
-              <button
-                key={enc.name}
-                data-testid={`load-encounter-${enc.name}`}
-                onClick={() => props.onLoad(enc.name)}
-              >
-                Load {enc.name}
-              </button>
-            ))}
-            {props.onDelete && props.encounters?.length > 0 && (
-              <button
-                data-testid={`delete-encounter-${props.encounters[0].name}`}
-                onClick={() => props.onDelete(props.encounters[0].name)}
-              >
-                Delete
-              </button>
-            )}
-            {props.onRename && props.encounters?.length > 0 && (
-              <button
-                data-testid={`rename-encounter-${props.encounters[0].name}`}
-                onClick={() => props.onRename(props.encounters[0].name, 'Renamed Encounter')}
-              >
-                Rename
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock('./EncounterGeneratorModal.jsx', () => ({
-  default: (props) => {
-    if (!props.onClose) return null;
-    return (
-      <div data-testid="encounter-generator-modal">
-        <button data-testid="generator-close" onClick={props.onClose}>Close</button>
-        <button
-          data-testid="generator-apply"
-          onClick={() => props.onApply([
-            { index: 'suggested-goblin', name: 'Suggested Goblin', xp: 50, challenge_rating: 0.25 },
-          ])}
-        >
-          Apply
-        </button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('./MonsterCardModal.jsx', () => ({
-  default: (props) => {
-    if (!props.monster) return null;
-    return (
-      <div data-testid="monster-card-modal">
-        <span data-testid="monster-card-name">{props.monster.name}</span>
-        <button data-testid="monster-card-close" onClick={props.onClose}>Close</button>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../common/PreviewToggle.jsx', () => ({
-  default: (props) => (
-    <div data-testid="preview-toggle">
-      <textarea
-        data-testid="description-textarea"
-        value={props.value || ''}
-        onChange={(e) => props.onChange(e.target.value)}
-        placeholder={props.placeholder}
-      />
-    </div>
-  ),
-}));
-
-vi.mock('../../services/encounters/encountersService.js', () => ({
-  formatEncounterName: vi.fn((name) => `Encounter: ${name}`),
-}));
-
-vi.mock('../../services/encounters/encounterToInitiative.js', () => ({
-  addMonstersToInitiative: vi.fn().mockResolvedValue(undefined),
-}));
+// viewingMonster lives in the runtime store but is never driven by this lane
+// (same local passthrough as remaining.test.jsx).
+vi.mock('../../hooks/runtime/useSyncedState.js', async () => {
+  const React = await import('react');
+  return {
+    useSyncedState: (_key, _prop, initial) => React.useState(initial),
+  };
+});
 
 vi.mock('../../services/encounters/encounterGenerator.js', () => ({
   calculateXPThreshold: vi.fn(() => 100),
   calculateDifficultyMultiplier: vi.fn(() => 1),
 }));
 
-vi.mock('../../config/encounterConfig.js', () => ({
-  ENCOUNTER_CONFIG: { defaultDifficulty: 1 },
+vi.mock('./MonsterCardModal.jsx', () => ({ default: () => null }));
+
+vi.mock('../../services/encounters/encounterToInitiative.js', () => ({
+  addMonstersToInitiative: vi.fn(async () => {}),
 }));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-  const store = new Map();
-  let syncedStateValue = null;
-  const syncedStateSetter = vi.fn((val) => { syncedStateValue = val; });
-
-  return {
-    getStore: vi.fn(() => store),
-    useSyncedState: vi.fn((key, prop, defaultValue) => {
-      if (key === 'campaign' && prop === 'encounter-viewingMonster') {
-        return [syncedStateValue, syncedStateSetter];
-      }
-      return [defaultValue, vi.fn()];
-    }),
-    listeners: new Map(),
-    getRuntimeValue: vi.fn(() => 0),
-    setRuntimeValue: vi.fn(),
-  };
-});
-
 vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
+  addEntry: vi.fn(async () => {}),
 }));
 
-const mockCampaignName = 'test-campaign';
-const defaultCharacters = [
-  { name: 'Thorin', level: 5 },
-  { name: 'Elara', level: 3 },
-];
-const sampleMonsters = [
+import EncounterBuilder from './EncounterBuilder.jsx';
+import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
+
+const CAMPAIGN = 'test-campaign';
+const CHARACTERS = [{ name: 'Thorin', level: 5 }, { name: 'Elara', level: 3 }];
+const MONSTERS = [
   { index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25, type: 'humanoid', environments: ['forest'] },
   { index: 'orc', name: 'Orc', xp: 100, challenge_rating: 0.5, type: 'humanoid', environments: ['hill', 'mountain'] },
   { index: 'dragon', name: 'Young Dragon', xp: 120, challenge_rating: 2, type: 'dragon', environments: ['underground'] },
 ];
 
-function createManagement(loadEncounterData, extra = {}) {
-  let modalOpen = false;
-  let modalMode = null;
-
-  const management = {
-    get modalOpen() { return modalOpen; },
-    get modalMode() { return modalMode; },
-    encounters: [{ name: 'test-encounter' }],
+function mountBuilder() {
+  // Fresh prop copies per render so mutations never bleed between tests.
+  useMonstersData.mockReturnValue({
+    monsters: MONSTERS.map((m) => ({ ...m, environments: [...m.environments] })),
     loading: false,
-    openSaveModal: vi.fn(() => { modalOpen = true; modalMode = 'save'; }),
-    openLoadModal: vi.fn(() => { modalOpen = true; modalMode = 'load'; }),
-    closeModal: vi.fn(() => { modalOpen = false; modalMode = null; }),
-    saveEncounter: vi.fn(),
-    updateEncounter: vi.fn(),
-    loadEncounterData,
-    deleteEncounterAction: vi.fn(),
-    renameEncounterAction: vi.fn(),
-    ...extra,
-  };
-
-  return management;
+  });
+  return render(
+    <EncounterBuilder
+      campaignName={CAMPAIGN}
+      characters={CHARACTERS.map((c) => ({ ...c }))}
+      onJoinEncounter={vi.fn()}
+    />
+  );
 }
 
-async function renderWithLoadEncounter(loadEncounterData, extra = {}) {
-  const { useMonstersData } = await import('../../hooks/ui/useMonstersData.js');
-  useMonstersData.mockReturnValue({ monsters: sampleMonsters, loading: false });
-
-  const management = createManagement(loadEncounterData, extra);
-
-  const { default: useEncounterManagement } = await import('../../hooks/management/useEncounterManagement.js');
-  useEncounterManagement.mockReturnValue(management);
-
-  render(<EncounterBuilder campaignName={mockCampaignName} characters={defaultCharacters} onJoinEncounter={vi.fn()} />);
-}
-
-async function setupLoadFlow() {
-  const loadBtn = screen.getByText('Load');
-  fireEvent.click(loadBtn);
-
-  // Click any monster checkbox to trigger a React re-render
-  // (modalOpen is a getter, not setState, so fireEvent alone doesn't flush)
-  const checkbox = screen.getByTestId('monster-checkbox-goblin');
-  fireEvent.click(checkbox);
-
+// Opens the real load modal and loads 'test-encounter' (only as the precondition
+// that makes the Reset button appear — hydration itself is owned by #403).
+async function loadEncounter(data) {
+  h.loadEncounterData.mockResolvedValue(data);
+  fireEvent.click(screen.getByRole('button', { name: 'Load encounter' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load test-encounter' }));
   await waitFor(() => {
-    expect(screen.getByTestId('encounter-modal')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset encounter' })).toBeInTheDocument();
   });
-
-  const loadEncounterBtn = screen.getByTestId('load-encounter-test-encounter');
-  fireEvent.click(loadEncounterBtn);
 }
 
-describe('EncounterBuilder - handleReset', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
+const summaryValue = (label) => {
+  const item = Array.from(document.querySelectorAll('.summary-item'))
+    .find((el) => el.querySelector('.summary-label')?.textContent === label);
+  return item?.querySelector('.summary-value')?.textContent;
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+});
+
+describe('EncounterBuilder - Reset wipes state to defaults (handleReset)', () => {
+  it('clicking Reset after loading and dirtying the builder restores every field to pristine defaults without touching the server', async () => {
+    mountBuilder();
+    // effectiveXP matches recomputed value (350 × mult 1) so no reconcile write fires.
+    await loadEncounter({
+      selectedMonsters: [
+        { index: 'goblin', qty: 1 },
+        { index: 'orc', qty: 3 },
+      ],
+      description: 'Ambush at dawn',
+      effectiveXP: 350,
+    });
+    expect(h.loadEncounterData).toHaveBeenCalledWith('test-encounter');
+    expect(h.updateEncounter).not.toHaveBeenCalled();
+
+    // Dirty every resettable field: selection, qty, dropdown filters, CR bound,
+    // party composition, search, description.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Young Dragon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Young Dragon' }));
+    fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'dragon' } });
+    fireEvent.change(screen.getByLabelText('CR Min'), { target: { value: '0.5' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add player/ }));
+    fireEvent.change(screen.getByLabelText('PC 1'), { target: { value: '20' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search monsters' }), { target: { value: 'orc' } });
+    fireEvent.change(screen.getByPlaceholderText('Describe this encounter...'), { target: { value: 'New description' } });
+
+    // Mutations actually took hold (guards the wipe assertions below from vacuity).
+    expect(screen.getByRole('heading', { level: 2, name: /Test Encounter/ })).toBeInTheDocument();
+    expect(summaryValue('Total XP')).toBe('590'); // 50 + 300 + 2×120
+    expect(screen.getByLabelText('PC 1')).toHaveValue(20);
+    expect(screen.getByLabelText('CR Min')).toHaveValue(0.5);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset encounter' }));
+
+    // Title + encounter binding wiped (setCurrentEncounterName(null) observable:
+    // Reset button gone, Save reverts from "Update" to fresh "Save").
+    expect(screen.getByRole('heading', { level: 2, name: 'Encounter Builder' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset encounter' })).toBeNull();
+    const saveBtn = screen.getByRole('button', { name: 'Save encounter' });
+    expect(saveBtn).toHaveTextContent('Save');
+    expect(saveBtn).toHaveAttribute('title', 'Save encounter');
+
+    // Selection wiped: selected panel, Join gate, and Clear All all gone;
+    // summary recomputed by the real panel wiring to zeros.
+    expect(document.querySelector('.encounter-selected')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Join Encounter' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Clear All/ })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Select Young Dragon' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Goblin' })).not.toBeChecked();
+    expect(summaryValue('Total XP')).toBe('0');
+    expect(summaryValue('Monster Count')).toBe('0');
+    expect(summaryValue('Effective XP')).toBe('0');
+
+    // Filters back to defaults; party re-derived from characters (Thorin 5, Elara 3).
+    expect(screen.getByLabelText('Difficulty')).toHaveValue('1');
+    expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('Size')).toHaveValue('');
+    // CR bounds are number inputs — empty state reads back as null, not ''.
+    expect(screen.getByLabelText('CR Min')).toHaveValue(null);
+    expect(screen.getByLabelText('CR Max')).toHaveValue(null);
+    const levels = document.querySelectorAll('.player-level-input');
+    expect(levels).toHaveLength(2);
+    expect(levels[0]).toHaveValue(5);
+    expect(levels[1]).toHaveValue(3);
+
+    // Search and description wiped.
+    expect(screen.getByRole('textbox', { name: 'Search monsters' })).toHaveValue('');
+    expect(screen.getByPlaceholderText('Describe this encounter...')).toHaveValue('');
+
+    // Honest boundary: reset is purely local — the only server-ish call across
+    // the whole flow is the initial load GET; no writes, no initiative, no log.
+    expect(h.updateEncounter).not.toHaveBeenCalled();
+    expect(h.saveEncounter).not.toHaveBeenCalled();
+    expect(h.loadEncounterData).toHaveBeenCalledTimes(1);
+    const { addMonstersToInitiative } = await import('../../services/encounters/encounterToInitiative.js');
+    expect(addMonstersToInitiative).not.toHaveBeenCalled();
+    const { addEntry } = await import('../../services/ui/logService.js');
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('resets encounter state when Reset is clicked', async () => {
-    const loadEncounterData = vi.fn().mockResolvedValue({
+  it('after reset, Save routes as a brand-new encounter (pendingEncounterData cleared, encounter unbound)', async () => {
+    mountBuilder();
+    await loadEncounter({
       selectedMonsters: [{ index: 'goblin', qty: 1 }],
       description: 'Old description',
       effectiveXP: 50,
     });
 
-    await renderWithLoadEncounter(loadEncounterData);
-    await setupLoadFlow();
+    // In the loaded state a save would update in place (#399); prove the reset
+    // severs that binding instead of merely hiding the Reset button.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Goblin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset encounter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save encounter' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Encounter: test-encounter')).toBeInTheDocument();
-    });
-
-    // Mutate all resettable fields
-    const dragonCheckbox = screen.getByTestId('monster-checkbox-dragon');
-    fireEvent.click(dragonCheckbox);
-    expect(screen.getByTestId('selected-item-dragon')).toBeInTheDocument();
-
-    const searchInput = screen.getByTestId('search-input');
-    fireEvent.change(searchInput, { target: { value: 'orc' } });
-
-    const textarea = screen.getByTestId('description-textarea');
-    fireEvent.change(textarea, { target: { value: 'New description' } });
-
-    const difficultySelect = screen.getByTestId('difficulty-select');
-    fireEvent.change(difficultySelect, { target: { value: '2' } });
-
-    const resetBtn = screen.getByText('Reset');
-    fireEvent.click(resetBtn);
-
-    // Title resets to default
-    expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    // Selected monsters cleared
-    expect(screen.queryByTestId('selected-item-dragon')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('selected-item-goblin')).not.toBeInTheDocument();
-    // Search query cleared
-    expect(searchInput.value).toBe('');
-    // Description cleared
-    expect(textarea.value).toBe('');
+    expect(screen.getByRole('heading', { name: 'Save Encounter' })).toBeInTheDocument();
+    expect(h.openSaveModal).toHaveBeenCalledTimes(1);
+    expect(h.updateEncounter).not.toHaveBeenCalled();
+    expect(h.saveEncounter).not.toHaveBeenCalled();
+    // The save modal is fresh — no stale name carried over from the loaded encounter.
+    expect(screen.getByRole('textbox', { name: 'Encounter Name' })).toHaveValue('');
   });
-
-  it('resets all filter fields to empty defaults', async () => {
-    const loadEncounterData = vi.fn().mockResolvedValue({
-      selectedMonsters: [],
-      description: '',
-      effectiveXP: 0,
-    });
-
-    await renderWithLoadEncounter(loadEncounterData);
-    await setupLoadFlow();
-
-    await waitFor(() => {
-      expect(screen.getByText('Encounter: test-encounter')).toBeInTheDocument();
-    });
-
-    // Set various filter values
-    const typeFilter = screen.getByTestId('type-filter');
-    fireEvent.change(typeFilter, { target: { value: 'dragon' } });
-
-    const sizeFilter = screen.getByTestId('size-filter');
-    fireEvent.change(sizeFilter, { target: { value: 'medium' } });
-
-    const crMin = screen.getByTestId('cr-min');
-    fireEvent.change(crMin, { target: { value: '0.5' } });
-
-    const crMax = screen.getByTestId('cr-max');
-    fireEvent.change(crMax, { target: { value: '2' } });
-
-    const resetBtn = screen.getByText('Reset');
-    fireEvent.click(resetBtn);
-
-    expect(typeFilter).toHaveValue('');
-    expect(sizeFilter).toHaveValue('');
-    expect(crMin.value).toBe('');
-    expect(crMax.value).toBe('');
-  });
-
-  // Consolidated tests 1-4 (title, monsters, search, description reset) into one
-  // comprehensive reset test. These previously each followed the identical pattern:
-  // load encounter -> modify one field -> reset -> verify that field cleared.
-  // The handler resets all fields atomically, so testing each individually is
-  // redundant and adds ~4x the DOM setup for no additional behavioral confidence.
-  //
-  // Removed test "hides Reset button after resetting" — this tests conditional
-  // rendering ({currentEncounterName && <Reset>}) not the handleReset handler.
-  // That rendering contract is verified in EncounterBuilder.interactions.test.jsx
-  // via "does not render reset button when no encounter is loaded".
-  //
-  // Removed tests 5-6 (filter/player level reset) — these duplicate
-  // EncounterBuilder.additional-interactions.test.jsx and
-  // EncounterBuilder.remaining.test.jsx which already verify default filter
-  // values and player level initialization.
 });

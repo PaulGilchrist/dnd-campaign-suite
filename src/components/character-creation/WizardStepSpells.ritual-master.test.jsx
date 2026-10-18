@@ -1,7 +1,10 @@
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @maintained-by-ai
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './WizardStepSpells.jsx';
 
+// Ritual Master step-wiring lane only: modal internals belong to a RitualMasterModal lane,
+// generic summary/counts to WizardStepSpells.test.jsx, MI/FT/ST dispatch to .feature-touched.
 vi.mock('./MagicInitiateModal.jsx', () => ({
   default: vi.fn(() => <div data-testid="magic-initiate-modal" />),
 }));
@@ -14,7 +17,6 @@ vi.mock('./FeyTouchedModal.jsx', () => ({
 vi.mock('./RitualMasterModal.jsx', () => ({
   default: vi.fn(({ onClose }) => (
     <div data-testid="ritual-master-modal">
-      <span>Ritual Spells</span>
       <button onClick={onClose}>CloseRitualModal</button>
     </div>
   )),
@@ -34,67 +36,66 @@ vi.mock('../../services/rules/spells/spellValidation.js', async (importOriginal)
   getSpellValidationInfo: vi.fn(async () => ({ warnings: [] })),
 }));
 
-function makeFormData(overrides = {}) {
-  return {
-    level: 14,
-    rules: '2024',
-    class: { name: 'Warlock' },
-    abilities: [],
-    spells: [],
-    feats: ['Ritual Master'],
-    ...overrides,
-  };
-}
-
-const allSpells = [
-  { name: 'Eldritch Blast', index: 'eldritch-blast', level: 0, ritual: false, school: 'Evocation', description: ['x'] },
+// Real 2024 Ritual Master choice: two ritual spells (feat grants 2)
+const RITUAL_SPELLS = [
   { name: 'Alarm', index: 'alarm', level: 1, ritual: true, school: 'Abjuration', description: ['x'] },
-  { name: 'Identify', index: 'identify', level: 1, ritual: true, school: 'Divination', description: ['x'] },
+  { name: 'Detect Magic', index: 'detect-magic', level: 1, ritual: true, school: 'Divination', description: ['x'] },
 ];
 
-describe('WizardStepSpells — FT-068 Ritual Master picker', () => {
+const makeProps = (formData = {}) => ({
+  stepNumber: 14,
+  formData: {
+    class: { name: 'Warlock' },
+    level: 14,
+    rules: '2024',
+    abilities: [],
+    spells: [],
+    feats: [],
+    ...formData,
+  },
+  allSpells: RITUAL_SPELLS,
+  onArrayFieldChange: vi.fn(),
+});
+
+describe('WizardStepSpells — FT-068 Ritual Master wiring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  afterEach(() => {
-    cleanup();
-  });
 
-  it('auto-opens the Ritual Master modal when the feat is held with no chosen spells (pitfall 34 mirror)', () => {
-    render(
-      <WizardStepSpells stepNumber={14}
-        formData={makeFormData()}
-        allSpells={allSpells}
-        onArrayFieldChange={vi.fn()}
-      />
-    );
+  it.each([
+    { label: 'field missing', spells: undefined },
+    { label: 'empty array', spells: [] },
+  ])('auto-opens the modal for a holder with unconfigured spells ($label), and closing it stays banner-free until configured', ({ spells }) => {
+    const formData = spells === undefined
+      ? { feats: ['Ritual Master'] }
+      : { feats: ['Ritual Master'], ritualMasterSpells: spells };
+    render(<WizardStepSpells {...makeProps(formData)} />);
 
     expect(screen.getByTestId('ritual-master-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'CloseRitualModal' }));
+    expect(screen.queryByTestId('ritual-master-modal')).not.toBeInTheDocument();
+
+    // Unlike Magic Initiate, the RM banner gates on chosen spells —
+    // an unconfigured holder who closes the modal must not see the banner
+    expect(screen.queryByRole('button', { name: /Edit Ritual Spells/ })).not.toBeInTheDocument();
   });
 
-  it('shows the Edit Ritual Spells banner once spells are chosen and reopens the modal on click', () => {
-    render(
-      <WizardStepSpells stepNumber={14}
-        formData={makeFormData({ ritualMasterSpells: ['Alarm', 'Identify', 'Comprehend Languages', 'Detect Magic', 'Purify Food and Drink'] })}
-        allSpells={allSpells}
-        onArrayFieldChange={vi.fn()}
-      />
-    );
+  it('shows the Edit Ritual Spells banner with the chosen count once configured, and clicking it reopens the modal', () => {
+    render(<WizardStepSpells {...makeProps({
+      feats: ['Ritual Master'],
+      ritualMasterSpells: ['Alarm', 'Detect Magic'],
+    })} />);
 
     expect(screen.queryByTestId('ritual-master-modal')).not.toBeInTheDocument();
-    const banner = screen.getByRole('button', { name: /Edit Ritual Spells/ });
-    fireEvent.click(banner);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Ritual Spells (2)' }));
     expect(screen.getByTestId('ritual-master-modal')).toBeInTheDocument();
   });
 
-  it('does not render the ritual picker for non-holders', () => {
-    render(
-      <WizardStepSpells stepNumber={14}
-        formData={makeFormData({ feats: ['Poisoner'] })}
-        allSpells={allSpells}
-        onArrayFieldChange={vi.fn()}
-      />
-    );
+  it('renders no ritual modal or banner for a non-holder even with chosen ritual spells on file', () => {
+    render(<WizardStepSpells {...makeProps({
+      feats: ['Poisoner'],
+      ritualMasterSpells: ['Alarm', 'Detect Magic'],
+    })} />);
 
     expect(screen.queryByTestId('ritual-master-modal')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit Ritual Spells/ })).not.toBeInTheDocument();

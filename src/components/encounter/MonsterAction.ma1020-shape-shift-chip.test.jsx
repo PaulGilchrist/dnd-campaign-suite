@@ -1,25 +1,27 @@
-// MA-1020: Imp "Shape-Shift" chip — the formerly-dead prose row (MA-1020
-// audit: 0 buttons / 0 mc-dice-link / 0 pointer-cursor children in the open
-// stat modal) now arms ShapeShiftLink off automation.type ===
-// "monster_shape_shift" (MonsterAction.jsx), mirroring the MA-0655
-// SelfBuffLink mount pattern at :224+. SelfBuffLink stays gated to
-// monster_self_buff (byte-verified below); no other chip lane arms the row
-// (no attack_bonus / save_dc / dice / Spellcasting name / zone / rays —
-// every pre-existing gate stays byte-inert). At Will: no uses counter, no
-// spent class. Click routes onShapeShiftRow(action) → the modal's
-// ShapeShiftModal chooser → monsterShapeShift resolver (cs Speed stamp).
+// @maintained-by-ai
+// MA-1020: Imp "Shape-Shift" chip — COMPONENT lane only. ShapeShiftLink
+// (MonsterAction.jsx:321) arms one .mc-dice-link-shapeshift chip off the
+// disk row's automation; this lane pins chip render, the clickable guard
+// (:323), and exact onShapeShiftRow(action) payload identity into the
+// modal's chooser seam. Owned elsewhere — NOT restated here:
+// - predicate gate + disk data + Speed dict + apply/refusals/modal seam:
+//   services/encounters/monsterShapeShift.ma1020-imp.test.js
+//   (isMonsterShapeShiftRow :114/:126-129, apply §163, refusals §224)
+// - self-buff lane discrimination (imp Invisibility, isMonsterSelfBuffRow):
+//   services/encounters/monsterSelfBuff.imp-invisibility.test.js :96/:113
+//   and its chip affordance in MonsterAction.self-buff.test.jsx
+// - chooser UI: ShapeShiftModal.test.jsx
+// At Will: no uses counter, no spent class. No timers.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
-import { isMonsterShapeShiftRow } from '../../services/encounters/monsterShapeShift.js';
-import { isMonsterSelfBuffRow } from '../../services/encounters/monsterSelfBuff.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const imp = monsters.find(m => m.index === 'imp');
-const SHAPE_ROW = imp.actions[2];
-const STING_ROW = imp.actions[0];
-const INVIS_ROW = imp.actions[1];
+const SHAPE_ROW = imp.actions.find(a => a.name === 'Shape-Shift');
+const INVIS_ROW = imp.actions.find(a => a.name === 'Invisibility');
+const STING_ROW = imp.actions.find(a => a.name === 'Sting');
 
 function renderRow(action, overrides = {}) {
   const onShapeShiftRow = vi.fn();
@@ -43,51 +45,41 @@ function renderRow(action, overrides = {}) {
 }
 
 describe('MA-1020 Shape-Shift chip', () => {
-  it('arms one chip "Shape-Shift" (mc-dice-link-shapeshift); click routes onShapeShiftRow(action)', () => {
+  it('arms one chip "Shape-Shift" beside the prose, At Will; click routes onShapeShiftRow(SHAPE_ROW)', () => {
     const { container, onShapeShiftRow } = renderRow(SHAPE_ROW);
     const chips = [...container.querySelectorAll('.mc-dice-link-shapeshift')];
     expect(chips.length).toBe(1);
     expect(chips[0].textContent.trim()).toBe('Shape-Shift');
     expect(chips[0].getAttribute('role')).toBe('button');
     expect(chips[0].getAttribute('title')).toContain('Rat / Raven / Spider / True Form');
-    fireEvent.click(chips[0]);
-    expect(onShapeShiftRow).toHaveBeenCalledTimes(1);
-    expect(onShapeShiftRow.mock.calls[0]).toEqual([SHAPE_ROW]);
-  });
-
-  it('prose stays rendered beside the chip; At Will — no uses counter, no spent class', () => {
-    const { container } = renderRow(SHAPE_ROW);
+    // prose stays rendered beside the chip; At Will — no uses counter, no spent class
     expect(container.textContent).toContain('shape-shifts');
     expect(container.textContent).not.toContain('left)');
-    expect(container.querySelector('.mc-dice-link-shapeshift').className).not.toContain('mc-dice-link-spell-spent');
+    expect(chips[0].className).not.toContain('mc-dice-link-spell-spent');
+    fireEvent.click(chips[0]);
+    expect(onShapeShiftRow).toHaveBeenCalledTimes(1);
+    expect(onShapeShiftRow.mock.calls[0][0]).toBe(SHAPE_ROW);
   });
 
-  it('incapacitated attacker: chip visible, click inert', () => {
+  it('clickable guard (:323): incapacitated or missing handler — chip visible, click inert, no throw', () => {
     const { container, onShapeShiftRow } = renderRow(SHAPE_ROW, { attackerCannotAct: true });
     const chip = container.querySelector('.mc-dice-link-shapeshift');
     expect(chip).toBeTruthy();
     fireEvent.click(chip);
     expect(onShapeShiftRow).not.toHaveBeenCalled();
+
+    const unhandled = renderRow(SHAPE_ROW, { onShapeShiftRow: undefined });
+    const chip2 = unhandled.container.querySelector('.mc-dice-link-shapeshift');
+    expect(chip2).toBeTruthy();
+    expect(() => fireEvent.click(chip2)).not.toThrow();
   });
 
-  it('no handler: chip visible, click inert (no throw — clickable guard matches SelfBuffLink)', () => {
-    const { container } = renderRow(SHAPE_ROW, { onShapeShiftRow: undefined });
-    const chip = container.querySelector('.mc-dice-link-shapeshift');
-    expect(chip).toBeTruthy();
-    expect(() => fireEvent.click(chip)).not.toThrow();
-  });
-
-  it('SelfBuffLink stays gated to monster_self_buff — imp Invisibility row never arms the shape-shift chip', () => {
-    expect(isMonsterSelfBuffRow(INVIS_ROW)).toBe(true);
-    expect(isMonsterShapeShiftRow(INVIS_ROW)).toBe(false);
-    const { container } = renderRow(INVIS_ROW);
-    expect(container.querySelectorAll('.mc-dice-link-shapeshift').length).toBe(0);
-    expect(container.querySelectorAll('.mc-dice-link-selfbuff').length).toBe(1);
-  });
-
-  it('byte-inert siblings: Sting and other-automation rows render zero shape-shift chips', () => {
+  it('other lanes never arm the chip: Invisibility self-buff row, Sting prose row — zero shape-shift chips', () => {
+    // predicate discrimination owned by monsterShapeShift.ma1020-imp.test.js:126-129
+    // and monsterSelfBuff.imp-invisibility.test.js:96 — here only the mount gate.
+    const invis = renderRow(INVIS_ROW);
+    expect(invis.container.querySelectorAll('.mc-dice-link-shapeshift').length).toBe(0);
+    expect(invis.container.querySelectorAll('.mc-dice-link-selfbuff').length).toBe(1);
     expect(renderRow(STING_ROW).container.querySelectorAll('.mc-dice-link-shapeshift').length).toBe(0);
-    const summon = monsters.find(m => m.index === 'drow-mage').actions.find(a => a.name === 'Summon Demon');
-    expect(renderRow(summon).container.querySelectorAll('.mc-dice-link-shapeshift').length).toBe(0);
   });
 });

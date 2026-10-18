@@ -1,7 +1,10 @@
+// @maintained-by-ai
 // MA-0031: monster cone rows reuse the PC-spell AoE area picker — each
 // picked creature rolls its OWN save at DC 18; fail = full, success = half
-// (existing per-target math untouched); attacker excluded; advisory
-// isWithinRange coverage gate filters; no spell-origin lastAttack stamped.
+// (existing per-target math untouched); attacker excluded via excludeNames;
+// advisory isWithinRange 30-ft coverage gate filters candidates (this file is
+// the only lane that gates PARTIALLY); no spell-origin lastAttack stamped.
+// Line-shape twin of this math lives in SaveAttackAoeModal.monster-line.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -95,7 +98,8 @@ let randomSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   seenTargets.current = [];
-  // Thug 1 nat 2 (fails DC 18 with +2); Thug 2 nat 19 (21 ≥ 18 succeeds).
+  // Two draws consumed per NPC save (raw1, raw2). Thug 1 nat 2 (+2 CON = 4,
+  // fails DC 18); Thug 2 nat 20 (+2 = 22, succeeds).
   let i = 0;
   const seq = [0.05, 0.05, 0.95, 0.95];
   randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
@@ -123,47 +127,35 @@ function renderMonsterCone() {
 }
 
 describe('MA-0031 area picker as monster cone save', () => {
-  it('labels the cone picker, excludes the attacker, range-gate filters out-of-coverage creature', async () => {
+  it('cone candidates: title shown, attacker excluded, out-of-coverage creature range-gated out; inert until confirm', async () => {
     renderMonsterCone();
+    // Only Thug 1: Yeti is the attacker (excludeNames), Thug 2 fails the
+    // 30-ft advisory isWithinRange gate despite being in the encounter.
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1']));
     expect(document.querySelector('.sp-header').textContent).toContain('30-ft Cone (GM positions tokens; selection advisory)');
-    expect(seenTargets.current.some(t => t.name === 'Abominable Yeti 1')).toBe(false);
+    // Browsing the picker rolls, logs and damages nothing.
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('N picks → N own saves at DC 18: fail full 40, success half 20, per-target logs, no spell lastAttack', async () => {
-    const { getByText } = renderMonsterCone();
-    await waitFor(() => expect(seenTargets.current.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(1));
-    expect(storeSpellLastAttack).not.toHaveBeenCalled();
-    // Thug 1 fails: full 40 Cold
-    const call = applyDamageToTarget.mock.calls[0];
-    expect(call[1]).toBe('Thug 1');
-    expect(call[2]).toBe(40);
-    const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage');
-    expect(logs.length).toBe(1);
-    expect(logs[0].saveDc).toBe(18);
-    expect(logs[0].saveResult).toBe('failure');
-    expect(logs[0].finalDamage).toBe(40);
-    expect(logs[0].characterName).toBe('Abominable Yeti 1');
-    expect(logs[0].targetName).toBe('Thug 1');
-  });
-
-  it('save-success target takes exactly half (floor)', async () => {
-    // coverage gate open for both → pick both, second succeeds.
+  it('confirm 2 picks → each rolls its OWN save at DC 18: fail full 40, success half 20, per-target logs, no spell lastAttack', async () => {
+    // Coverage gate opens → both Thugs eligible; one save each, own outcome.
     const rangeCheck = await import('../../../../services/rules/combat/rangeCheck.js');
     rangeCheck.isWithinRange.mockImplementation(async () => true);
-    let i = 0;
-    const seq = [0.05, 0.05, 0.95, 0.95];
-    randomSpy.mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
     const { getByText } = renderMonsterCone();
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
+    expect(storeSpellLastAttack).not.toHaveBeenCalled();
     const byTarget = Object.fromEntries(applyDamageToTarget.mock.calls.map(c => [c[1], c[2]]));
-    expect(byTarget['Thug 1']).toBe(40);
-    expect(byTarget['Thug 2']).toBe(20);
+    expect(byTarget['Thug 1']).toBe(40); // nat 2 + 2 = 4 < 18 → full 40 Cold
+    expect(byTarget['Thug 2']).toBe(20); // nat 20 + 2 = 22 ≥ 18 → floor-half
     const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage');
-    expect(logs.map(l => [l.targetName, l.saveResult, l.finalDamage].join(':')).sort()).toEqual(['Thug 1:failure:40', 'Thug 2:success:20']);
+    expect(logs).toHaveLength(2);
+    expect(logs.map(l => [l.targetName, l.saveDc, l.saveResult, l.saveRoll, l.finalDamage].join(':')).sort()).toEqual([
+      'Thug 1:18:failure:2:40',
+      'Thug 2:18:success:20:20',
+    ]);
+    expect(logs.map(l => l.characterName)).toEqual(['Abominable Yeti 1', 'Abominable Yeti 1']);
   });
 });

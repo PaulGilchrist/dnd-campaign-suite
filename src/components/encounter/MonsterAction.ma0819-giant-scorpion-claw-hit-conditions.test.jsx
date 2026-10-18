@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0819: Giant Scorpion "Claw" — prose carries "If the target is a Large or
 // smaller creature, it has the Grappled condition (escape DC 13) from one of
 // two claws" but the row shipped WITHOUT hit_conditions/escape_dc, so the
@@ -5,51 +6,59 @@
 // hit_conditions/escape_dc keys only, NEVER description; consumer live in
 // handlePlainDamage.applyHitClauseConditions). Two-field DATA fix mirroring
 // the giant-frog/giant-octopus twins (MA-0807/MA-0812, MA-0010 seam):
-// hit_conditions:["grappled"] + escape_dc:13 placed after damage_type_primary.
-// Locks: disk row shape + key placement, clause arms with escapeDc:13, "+5"
-// attack chip stays live, no save fields on row. Escape DC 13 = description
-// authority ("escape DC 13" byte-carried).
+// hit_conditions:["grappled"] + escape_dc:13 placed after damage_type_primary
+// (MA-0010 byte-shape). giant-scorpion is NOT in handlePlainDamage.hitClause
+// HIT_CLAUSE_ROWS :224-282 (grep-verified) and no other lane pins this chip,
+// so THIS file is the sole byte-owner: one fused test locks disk row shape +
+// key placement + full row bytes (exact-bytes toEqual absorbs the no-save-
+// fields absence check and every numerics pin), then the "+5" chip press
+// delivers that exact row through onAttack (identity — payload IS the disk
+// object). Clause arm for a conditions+escapeDc row is owned generically by
+// the hitClause mega-lane (generic clause shapes :183-216 escape_dc
+// passthrough + table data-locks :289-301 via grappled-escape siblings
+// ankheg Bite :232, otyugh Tentacle :269); per-census (#419/#434, cf.
+// ma0799:20) no local buildHitConditionClause/attackRowMissingToHit
+// re-derivation here — exact bytes + live chip are the tighter pin.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const CLAW = monsters.find((m) => m.index === 'giant-scorpion').actions[1];
 
+const CLAW_EXACT = {
+  name: 'Claw',
+  description: 'Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage. If the target is a Large or smaller creature, it has the <strong>Grappled</strong> condition (escape DC 13) from one of two claws.',
+  attack_bonus: 5,
+  reach: '5 ft.',
+  damage_dice_primary: '1d6 + 3',
+  damage_type_primary: 'Bludgeoning',
+  hit_conditions: ['grappled'],
+  escape_dc: 13,
+};
+
 describe('MA-0819 disk fingerprint: giant-scorpion Claw grapple rider fix', () => {
-  it('disk row carries hit_conditions ["grappled"] + escape_dc 13 after damage_type_primary (MA-0010 byte-shape)', () => {
-    expect(CLAW.name).toBe('Claw');
-    expect(CLAW.hit_conditions).toEqual(['grappled']);
-    expect(CLAW.escape_dc).toBe(13);
-    const keys = Object.keys(CLAW);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
-    expect(CLAW.attack_bonus).toBe(5);
-    expect(CLAW.reach).toBe('5 ft.');
-    expect(CLAW.damage_dice_primary).toBe('1d6 + 3');
-    expect(CLAW.damage_type_primary).toBe('Bludgeoning');
-  });
+  it('sole-owner row fingerprint + live "+5" chip presses exact row through onAttack', () => {
+    // Byte-shape: keys BY NAME in transport order, hit_conditions + escape_dc
+    // sit immediately after damage_type_primary (MA-0010 byte-shape).
+    expect(Object.keys(CLAW)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+      'escape_dc',
+    ]);
+    // Exact bytes: any added save_dc/save_type/hit_target_effect or drifted
+    // numeric (+5 attack bonus, 5 ft. reach, 1d6 + 3 Bludgeoning, escape
+    // DC 13) breaks this one assertion (absorbs field-absence).
+    expect(CLAW).toEqual(CLAW_EXACT);
 
-  it('row carries NO save fields (attack ride, no save leg)', () => {
-    expect(CLAW.save_dc).toBeUndefined();
-    expect(CLAW.save_type).toBeUndefined();
-    expect(CLAW.hit_target_effect).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Grappled rider with escapeDc 13 (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(CLAW);
-    expect(clause).toEqual({
-      conditions: ['grappled'],
-      escapeDc: 13,
-      attackName: 'Claw',
-      targetEffect: null,
-    });
-  });
-
-  it('attack half stays live: one "+5" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(CLAW)).toBe(false);
+    // Chip-level dispatch: exactly one "+5" attack chip (no damage chip —
+    // attack_bonus arms the attack lane), press routes name/bonus/row once.
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -67,6 +76,11 @@ describe('MA-0819 disk fingerprint: giant-scorpion Claw grapple rider fix', () =
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+5']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Claw', 5, expect.objectContaining({ name: 'Claw' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Claw', 5, CLAW_EXACT);
+    // Identity: the payload IS the disk row — hit_conditions + escape_dc
+    // bytes ride the attack lane untouched (no copy/strip) into the clause
+    // consumer.
+    expect(onAttack.mock.calls[0][2]).toBe(CLAW);
   });
 });

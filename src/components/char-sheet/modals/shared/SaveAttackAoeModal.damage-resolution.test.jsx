@@ -1,13 +1,33 @@
+// @maintained-by-ai
+// SaveAttackAoeModal damage-resolution lanes (picker route).
+// Family roles kept distinct from siblings:
+//   - creature-selection.test.jsx  → picker rendering / metamagic
+//   - damage-edge-cases.test.jsx   → Careful Spell zeroing, multi-target rows
+//   - overlay.test.jsx             → AreaEffectTargetModalBase lane
+// Here: the NPC auto-resolve round trip, the PC prompt half-on-save round
+// trip, CLA-109 disadvantage consume, and MA-0563 dual damage pools.
+//
+// Picker-lane tests use the REAL CreatureSelectionModal (proven inert in
+// creature-selection.test.jsx — no campaignName/attackerName passed, its
+// overlay lookup early-returns). AreaEffectTargetModalBase is never mounted
+// here (requires an 'overlay-' targetName), so it is not stubbed.
+//
+// Determinism: computeNpcSave draws exactly TWO Math.random values per NPC
+// (min taken on disadvantage), and resolvePcTarget draws one per promptId —
+// the spy stream keeps promptIds unique and lets the disadvantage test prove
+// min() is taken (raw 20 would beat the DC, raw 2 must not). DC 999 is the
+// family unconditional-NPC-fail seam.
+
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
-// ── Mocked modules ──
+// ── Mocked modules (data seams only — honest half-on-save semantics) ──
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20', maximized: true })),
+  rollExpression: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
 }));
 
 vi.mock('../../../../services/combat/automation/automationExpressions.js', () => ({
@@ -25,13 +45,8 @@ vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
 
 vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
-  computeDamageAfterSave: vi.fn((raw, _success, dcSuccess) => {
-    if (!_success) return raw;
-    return dcSuccess === 'half' ? Math.floor(raw / 2) : 0;
-  }),
-  computeDamageAfterEvasion: vi.fn((raw, _success, dcSuccess) => {
-    return dcSuccess === 'half' ? Math.floor(raw / 2) : raw;
-  }),
+  // Honest half-on-save semantics (fail pays full).
+  computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess) => (success && dcSuccess === 'half' ? Math.floor(raw / 2) : raw)),
   computeDamageAfterResistancesWithDetails: vi.fn(({ rawDamage }) => ({ finalDamage: rawDamage })),
   hasEvasionForSave: vi.fn(() => false),
   normalizeSaveType: vi.fn((t) => t),
@@ -44,9 +59,10 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
-      { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
-      { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { con: 4 } },
+      { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { dex: 2 }, resistances: [], immunities: [] },
+      { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { dex: 2 }, resistances: [], immunities: [] },
+      { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { dex: 4 } },
+      { name: 'Player Two', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { dex: 4 } },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -61,166 +77,20 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
   addTargetResult: vi.fn(),
 }));
 
-vi.mock('./CreatureSelectionModal.jsx', () => {
-  const { useState, useCallback } = require('react');
-  function MockCreatureSelectionModal({
-    title, icon, targets, description, note, confirmLabel, confirmIcon, onConfirm, onSkip,
-    metamagicHeighten, heightenTarget, setHeightenTarget,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-    return (
-      <div className="sp-overlay" onClick={() => {}}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={`fa-solid ${icon}`}></i> {title}
-          </div>
-          <div className="sp-body">
-            <div dangerouslySetInnerHTML={{ __html: description }} />
-            {note && <p className="sp-note">{note}</p>}
-            <div className="secondary-target-list">
-              {targets.length === 0 && <p className="sp-note">No targets available.</p>}
-              {targets.map((t) => {
-                const obj = typeof t === 'object' ? t : { name: t };
-                return (
-                  <label key={obj.name} className={`secondary-target-row ${selected.has(obj.name) ? 'secondary-target-selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(obj.name)}
-                      onChange={() => toggleTarget(obj.name)}
-                    />
-                    {obj.name}
-                    {metamagicHeighten && (
-                      <span>
-                        <input
-                          type="radio"
-                          name="heightenTarget"
-                          checked={heightenTarget === obj.name}
-                          onChange={() => setHeightenTarget(heightenTarget === obj.name ? null : obj.name)}
-                        />
-                        Heighten
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          <div className="sp-actions">
-            <button
-              className="sp-roll-btn"
-              onClick={() => onConfirm(Array.from(selected))}
-              disabled={selected.size === 0}
-              type="button"
-            >
-              <i className={`fa-solid ${confirmIcon}`}></i> {confirmLabel} ({selected.size})
-            </button>
-            <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockCreatureSelectionModal };
-});
-
-vi.mock('./AreaEffectTargetModalBase.jsx', () => {
-  const { useState, useCallback, useMemo } = require('react');
-  function MockAreaEffectTargetModalBase({
-    combatSummary, _saveDc, campaignName: _campaignName, featureName, _saveType, _rangeFeet,
-    onClose, icon, _handleApplyOverride, _handleSaveResultOverride, extraState,
-    renderBody, renderActions,
-  }) {
-    const [selected, setSelected] = useState(new Set());
-    const [processing, setProcessing] = useState(false);
-    const [pendingPrompts, setPendingPrompts] = useState([]);
-    const [heightenTarget, setHeightenTarget] = useState(null);
-
-    const eligibleTargets = useMemo(() => {
-      if (!combatSummary?.creatures) return [];
-      return combatSummary.creatures.filter(c => c.name !== 'Cleric1');
-    }, [combatSummary]);
-
-    const toggleTarget = useCallback((name) => {
-      setSelected(prev => {
-        const next = new Set(prev);
-        next.has(name) ? next.delete(name) : next.add(name);
-        return next;
-      });
-    }, []);
-
-    const ctx = {
-      processing,
-      allResolved: false,
-      selected,
-      eligibleTargets,
-      pendingPrompts,
-      toggleTarget,
-      setProcessing,
-      setPendingPrompts,
-      setSelected,
-      setHeightenTarget,
-      heightenTarget,
-    };
-
-    if (extraState?.setSelected) extraState.setSelected = setSelected;
-    if (extraState?.toggleTarget) extraState.toggleTarget = toggleTarget;
-    if (extraState?.heightenTarget !== undefined) extraState.heightenTarget = heightenTarget;
-    if (extraState?.setHeightenTarget) extraState.setHeightenTarget = setHeightenTarget;
-
-    return (
-      <div className="sp-overlay" onClick={onClose}>
-        <div className="sp-modal" onClick={e => e.stopPropagation()}>
-          <div className="sp-header">
-            <i className={icon}></i> {featureName}
-          </div>
-          <div className="sp-body">
-            {renderBody ? renderBody(ctx) : null}
-          </div>
-          <div className="sp-actions">
-            {renderActions ? renderActions(ctx) : null}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return { default: MockAreaEffectTargetModalBase };
-});
-
 // ── Re-import mocked modules ──
 
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as combatData from '../../../../services/encounters/combatData.js';
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
-import * as allySelection from '../../../../hooks/useAllySelection.js';
-import * as automationExpressions from '../../../../services/combat/automation/automationExpressions.js';
 import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 import * as savePromptService from '../../../../services/combat/conditions/savePromptService.js';
 import * as logService from '../../../../services/ui/logService.js';
 import * as applyDamage from '../../../../services/rules/combat/applyDamage.js';
 
-// ── Test fixtures ──
-
-const mockOnClose = vi.fn();
-
-const mockPlayerStats = { name: 'Cleric1', level: 12 };
-
-const mockAction = {
-  name: 'Fireball',
-  automation: {
-    scaling: { damage: '8d6' },
-  },
-};
+// ── Fixtures ──
 
 const baseProps = {
-  action: mockAction,
-  playerStats: mockPlayerStats,
+  action: { name: 'Fireball', automation: { scaling: { damage: '8d6' } } },
+  playerStats: { name: 'Cleric1', level: 12 },
   campaignName: 'test-campaign',
   range: 20,
   damage: '8d6',
@@ -228,272 +98,200 @@ const baseProps = {
   saveType: 'DEX',
   saveDc: 15,
   dcSuccess: 'half',
-  onClose: mockOnClose,
+  onClose: vi.fn(),
 };
 
 function makeProps(overrides) {
   return { ...baseProps, ...overrides };
 }
 
-function getCheckboxByName(name) {
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  for (const cb of checkboxes) {
-    const label = cb.closest('label');
-    if (label && label.textContent.includes(name)) {
-      return cb;
-    }
-  }
-  throw new Error(`Checkbox for "${name}" not found`);
+// ── Helpers ──
+
+function checkboxFor(name) {
+  const row = [...document.querySelectorAll('.secondary-target-row')].find(r => r.textContent.includes(name));
+  return row.querySelector('input[type="checkbox"]');
 }
 
-function confirmSelection(targetName) {
-  fireEvent.click(getCheckboxByName(targetName));
-  const confirmBtn = screen.getByRole('button', { name: /Fireball \(\d+\)/ });
+function pick(...names) {
+  names.forEach(n => fireEvent.click(checkboxFor(n)));
+  const confirmBtn = screen.getByRole('button', { name: new RegExp(`Fireball \\(${names.length}\\)`) });
   return act(async () => {
     fireEvent.click(confirmBtn);
   });
 }
 
+function rollbackRow(targetName) {
+  return damageRollback.addTargetResult.mock.calls.map(c => c[1]).find(r => r && r.targetName === targetName);
+}
+
+function saveDamageLogs(targetName) {
+  return logService.addEntry.mock.calls
+    .map(c => c[1])
+    .filter(e => e && e.rollType === 'save-damage' && (!targetName || e.targetName === targetName));
+}
+
+function dispatchSaveResult(promptId, detail) {
+  return act(async () => {
+    window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId, ...detail } }));
+  });
+}
+
+// ── RNG stream ──
+
+let randomSpy;
+let randomDraws = [];
+let randomCursor = 0;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  randomDraws = [];
+  randomCursor = 0;
+  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => {
+    if (randomDraws.length) return randomDraws.shift();
+    // Raw rolls always 19; the unique decimal keeps per-prompt promptIds distinct.
+    randomCursor = (randomCursor % 10) + 1;
+    return 0.9 + randomCursor / 1000;
+  });
+  diceRoller.rollExpression.mockImplementation((f) => ({
+    total: f === '8d6' ? 12 : 7,
+    rolls: [f === '8d6' ? 12 : 7],
+    modifier: 0,
+  }));
+});
+
+afterEach(() => randomSpy.mockRestore());
+
 // ── Tests ──
 
 describe('SaveAttackAoeModal - Damage resolution', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    diceRoller.rollExpression.mockReturnValue({ total: 12, rolls: [12], modifier: 0, formula: '1d20' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-    combatData.getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Goblin A', type: 'npc', currentHp: 5, maxHp: 10, saveBonuses: { con: 2, dex: 2 }, resistances: [], immunities: [] },
-        { name: 'Goblin B', type: 'npc', currentHp: 3, maxHp: 10, saveBonuses: { con: 2, dex: 2 }, resistances: [], immunities: [] },
-        { name: 'Player One', type: 'player', currentHp: 20, maxHp: 30, saveBonuses: { con: 4, dex: 4 } },
-      ],
+  it('auto-resolves an NPC save: lastAttack stamp, full damage applied, rollback row, results summary closes', async () => {
+    const onClose = vi.fn();
+    // DC 999: unconditional fail (family RNG seam) — fail pays the FULL 12.
+    render(<SaveAttackAoeModal {...makeProps({ onClose, saveDc: 999 })} />);
+    await pick('Goblin A');
+
+    expect(damageRollback.storeSpellLastAttack).toHaveBeenCalledWith('test-campaign', {
+      casterName: 'Cleric1',
+      spellName: 'Fireball',
+      saveType: 'DEX',
+      saveDc: 999,
+      attackScope: 'aoe',
+      spellSchool: null,
     });
-    allySelection.getAllyList.mockReturnValue(null);
-    automationExpressions.resolveScaling.mockReturnValue({});
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin A', 12, ['Fire'], expect.anything());
+
+    const logs = saveDamageLogs('Goblin A');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ formula: '8d6', damageType: 'Fire', saveResult: 'failure', mode: 'normal', finalDamage: 12 });
+    expect(rollbackRow('Goblin A')).toMatchObject({ saveResult: 'failure', roll: 19, total: 21, appliedDamage: 12 });
+
+    // Every automation logs its cast to the campaign log.
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'ability_use',
+      abilityName: 'Fireball',
+    }));
+
+    // Summary replaces the picker with the resolved row, Close dismisses.
+    await waitFor(() => expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument());
+    expect(screen.getByText('Goblin A').closest('.abjure-result').textContent).toContain('Failed — takes 12 Fire damage');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // ── CreatureSelectionModal confirm path ──
+  it('prompts each PC and halves on a successful save / pays full on a failed save, per target', async () => {
+    render(<SaveAttackAoeModal {...makeProps({ characters: [{ name: 'Player One' }, { name: 'Player Two' }] })} />);
+    await pick('Player One', 'Player Two');
 
-  describe('creature selection confirm', () => {
-    it('stores spell attack scope and calls addTargetResult for NPC with failed save', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d20' });
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Goblin A');
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(2);
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      targetName: 'Player One',
+      saveType: 'DEX',
+      saveDc: 15,
+      sourceName: 'Cleric1',
+      rawDamage: 12,
+      dcSuccess: 'half',
+      disadvantage: false,
+    }));
 
-      expect(damageRollback.storeSpellLastAttack).toHaveBeenCalledWith('test-campaign', {
-        casterName: 'Cleric1',
-        spellName: 'Fireball',
-        saveType: 'DEX',
-        saveDc: 15,
-        attackScope: 'aoe',
-        spellSchool: null,
-      });
+    const [p1, p2] = savePromptService.sendSavePrompt.mock.calls.map(c => c[1]);
+    await dispatchSaveResult(p1.promptId, { success: false, saveBonus: 4, rawDamage: 12, total: 5, roll: 1, saveType: 'DEX', dcSuccess: 'half' });
+    await dispatchSaveResult(p2.promptId, { success: true, saveBonus: 4, rawDamage: 12, total: 19, roll: 19, saveType: 'DEX', dcSuccess: 'half' });
 
-      expect(damageRollback.addTargetResult).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        targetName: 'Goblin A',
-      }));
-    });
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Player One', 12, ['Fire'], expect.anything());
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Player Two', 6, ['Fire'], expect.anything());
+    expect(rollbackRow('Player One')).toMatchObject({ saveResult: 'failure', appliedDamage: 12 });
+    expect(rollbackRow('Player Two')).toMatchObject({ saveResult: 'success', appliedDamage: 6 });
 
-    it('sends save prompt for player target and logs ability_use entry', async () => {
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Player One');
-
-      expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        targetName: 'Player One',
-        saveType: 'DEX',
-        saveDc: 15,
-        sourceName: 'Cleric1',
-        disadvantage: false,
-      }));
-
-      const abilityCalls = logService.addEntry.mock.calls.filter(
-        c => c[0]?.type === 'ability_use' || (c[1] && c[1].type === 'ability_use')
-      );
-      expect(abilityCalls.length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument());
+    expect(screen.getByText('Player One').closest('.abjure-result').textContent).toContain('Failed — takes 12 Fire damage');
+    expect(screen.getByText('Player Two').closest('.abjure-result').textContent).toContain('Saved — takes 6 Fire damage');
   });
 
-  // ── Results display (summary path) ──
+  it('CLA-109 disadvantage_on_next_save: NPC rolls two dice at min (would-pass roll becomes fail), pays full, effect consumed', async () => {
+    // raw1=20 (20+2 beats DC 15) then raw2=2 — min(20,2)=2 fails, proving
+    // the disadvantage branch is live, not just that a roll happened.
+    randomDraws = [0.95, 0.05];
+    useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => (
+      key === 'campaign' && prop === 'targetEffects'
+        ? [{ target: 'Goblin A', effect: 'disadvantage_on_next_save' }]
+        : null
+    ));
 
-  describe('results display (summary path)', () => {
-    it('renders results summary with target names after NPC resolution', async () => {
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d20' });
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Goblin A');
+    render(<SaveAttackAoeModal {...makeProps()} />);
+    await pick('Goblin A');
 
-      await waitFor(() => {
-        expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument();
-      }, { timeout: 200 });
-
-      expect(screen.getByText(/Goblin A/)).toBeInTheDocument();
+    const logs = saveDamageLogs('Goblin A');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      saveResult: 'failure',
+      mode: 'disadvantage',
+      saveRawRolls: [20, 2],
+      saveRoll: 2,
+      finalDamage: 12,
     });
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin A', 12, ['Fire'], expect.anything());
 
-    it('renders close button in results summary and calls onClose when clicked', async () => {
-      const onClose = vi.fn();
-      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d20' });
-      render(<SaveAttackAoeModal {...makeProps({ onClose })} />);
-      await confirmSelection('Goblin A');
-
-      await waitFor(() => {
-        expect(screen.getByText(/Goblin A/)).toBeInTheDocument();
-      }, { timeout: 200 });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-  });
-
-  // ── handleSaveResult (player save path) ──
-
-  describe('handleSaveResult', () => {
-    async function triggerSaveResult(success, extra = {}) {
-      const promptCall = savePromptService.sendSavePrompt.mock.calls[0][1];
-      const promptId = promptCall.promptId;
-
-      await act(async () => {
-        window.dispatchEvent(new CustomEvent('save-result', {
-          detail: {
-            promptId,
-            success,
-            saveBonus: 4,
-            rawDamage: 12,
-            total: 16,
-            roll: 12,
-            ...extra,
-          },
-        }));
-      });
-
-      await waitFor(() => {
-        const playerCalls = damageRollback.addTargetResult.mock.calls.filter(
-          c => c[1] && c[1].targetName === 'Player One'
-        );
-        expect(playerCalls.length).toBeGreaterThan(0);
-      }, { timeout: 200 });
-    }
-
-    it('records failure when player fails save', async () => {
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Player One');
-      await triggerSaveResult(false);
-
-      const playerCalls = damageRollback.addTargetResult.mock.calls.filter(
-        c => c[1] && c[1].targetName === 'Player One'
-      );
-      expect(playerCalls[0][1].saveResult).toBe('failure');
-    });
-
-    it('records success when player succeeds save with half damage', async () => {
-      render(<SaveAttackAoeModal {...makeProps({ dcSuccess: 'half' })} />);
-      await confirmSelection('Player One');
-      await triggerSaveResult(true);
-
-      const playerCalls = damageRollback.addTargetResult.mock.calls.filter(
-        c => c[1] && c[1].targetName === 'Player One'
-      );
-      expect(playerCalls[0][1].saveResult).toBe('success');
-    });
-
-  });
-
-  // ── CLA-109: Eldritch Strike disadvantage_on_next_save regression ──
-
-  describe('disadvantage_on_next_save targetEffect', () => {
-    it('rolls NPC save with disadvantage when target has disadvantage_on_next_save', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'campaign' && prop === 'targetEffects') {
-          return [{ target: 'Goblin A', effect: 'disadvantage_on_next_save' }];
-        }
-        return null;
-      });
-
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Goblin A');
-
-      const npcCalls = damageRollback.addTargetResult.mock.calls.filter(
-        c => c[1] && c[1].targetName === 'Goblin A'
-      );
-      expect(npcCalls.length).toBeGreaterThan(0);
-    });
-
-    it('consumes disadvantage_on_next_save effect after NPC save', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'campaign' && prop === 'targetEffects') {
-          return [{ target: 'Goblin A', effect: 'disadvantage_on_next_save' }];
-        }
-        return null;
-      });
-
-      render(<SaveAttackAoeModal {...makeProps()} />);
-      await confirmSelection('Goblin A');
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        [],
-        'test-campaign'
-      );
-    });
+    // One-shot effect: the te is stripped after the save.
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], 'test-campaign');
   });
 
   // ── MA-0563: dual-pool AoE save rows (Death Knight Hellfire Orb) ──
 
   describe('MA-0563 secondary damage pool', () => {
-    const REAL_HALF = (raw, success, dcSuccess) => {
-      if (!success) return raw;
-      return dcSuccess === 'half' ? Math.floor(raw / 2) : 0;
-    };
-    const formulaRoll = (total) => ({ total, rolls: [total], modifier: 0 });
-
     function dualProps(overrides) {
       return makeProps({ damage: '8d6', damageType: 'Fire', secondaryDamage: '10d6', secondaryDamageType: 'Necrotic', ...overrides });
-    }
-
-    function mockDualDice() {
-      diceRoller.rollExpression.mockImplementation((f) => formulaRoll(f === '8d6' ? 12 : 7));
-      applyDamage.computeDamageAfterEvasion.mockImplementation(REAL_HALF);
     }
 
     function damageLogCalls() {
       return logService.addEntry.mock.calls.map(c => c[1]).filter(e => e && e.rollType === 'save-damage' && e.formula);
     }
 
-    it('failed save rolls BOTH pools full and logs one save-damage entry per type', async () => {
-      mockDualDice();
+    it('failed save rolls BOTH pools full, applies each type separately, logs one save-damage entry per type', async () => {
       // DC 999 → guaranteed NPC fail, both legs full (floor-halving untaken).
       render(<SaveAttackAoeModal {...dualProps({ saveDc: 999 })} />);
-      await confirmSelection('Goblin A');
+      await pick('Goblin A');
 
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Goblin A', 12, ['Fire'], expect.anything());
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Goblin A', 7, ['Necrotic'], expect.anything());
+      const targetCalls = applyDamage.applyDamageToTarget.mock.calls.filter(c => c[1] === 'Goblin A');
+      expect(targetCalls).toHaveLength(2);
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin A', 12, ['Fire'], expect.anything());
+      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin A', 7, ['Necrotic'], expect.anything());
 
       const logs = damageLogCalls();
       const primary = logs.find(e => e.formula === '8d6');
       const secondary = logs.find(e => e.formula === '10d6');
-      expect(primary).toBeTruthy();
-      expect(primary.damageType).toBe('Fire');
-      expect(primary.finalDamage).toBe(12);
-      expect(primary.saveResult).toBe('failure');
-      expect(secondary).toBeTruthy();
-      expect(secondary.damageType).toBe('Necrotic');
-      expect(secondary.finalDamage).toBe(7);
-      expect(secondary.saveResult).toBe('failure');
+      expect(primary).toMatchObject({ damageType: 'Fire', finalDamage: 12, saveResult: 'failure' });
+      expect(secondary).toMatchObject({ damageType: 'Necrotic', finalDamage: 7, saveResult: 'failure' });
 
-      const rollback = damageRollback.addTargetResult.mock.calls.find(c => c[1]?.targetName === 'Goblin A');
-      expect(rollback[1].appliedDamage).toBe(19);
+      expect(rollbackRow('Goblin A').appliedDamage).toBe(19);
 
       await waitFor(() => {
         expect(screen.getByText(/takes 12 Fire \+ 7 Necrotic damage/)).toBeInTheDocument();
-      }, { timeout: 200 });
+      });
     });
 
-    it('successful save halves EACH pool independently (floor each leg)', async () => {
-      mockDualDice();
-      render(<SaveAttackAoeModal {...dualProps({ dcSuccess: 'half' })} />);
-      await confirmSelection('Player One');
+    it('PC prompt carries both raw pools and a successful save halves EACH pool independently (floor each leg)', async () => {
+      render(<SaveAttackAoeModal {...dualProps({ characters: [{ name: 'Player One' }] })} />);
+      await pick('Player One');
 
       expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
         targetName: 'Player One',
@@ -503,35 +301,28 @@ describe('SaveAttackAoeModal - Damage resolution', () => {
       }));
 
       const promptCall = savePromptService.sendSavePrompt.mock.calls[0][1];
-      await act(async () => {
-        window.dispatchEvent(new CustomEvent('save-result', {
-          detail: { promptId: promptCall.promptId, success: true, saveBonus: 4, rawDamage: 12, total: 16, roll: 12 },
-        }));
-      });
+      await dispatchSaveResult(promptCall.promptId, { success: true, saveBonus: 4, rawDamage: 12, total: 16, roll: 16, saveType: 'DEX', dcSuccess: 'half' });
 
       await waitFor(() => {
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-          expect.anything(), 'Player One', 6, ['Fire'], expect.anything());
-        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-          expect.anything(), 'Player One', 3, ['Necrotic'], expect.anything());
-      }, { timeout: 200 });
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Player One', 6, ['Fire'], expect.anything());
+        expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Player One', 3, ['Necrotic'], expect.anything());
+      });
 
       const logs = damageLogCalls();
       expect(logs.some(e => e.formula === '8d6' && e.finalDamage === 6 && e.saveResult === 'success')).toBe(true);
       expect(logs.some(e => e.formula === '10d6' && e.finalDamage === 3 && e.saveResult === 'success')).toBe(true);
+      expect(rollbackRow('Player One').appliedDamage).toBe(9);
     });
 
     it('single-damage rows stay byte-identical: one roll, one type, one log, no secondary fields', async () => {
-      diceRoller.rollExpression.mockImplementation((f) => formulaRoll(f === '8d6' ? 12 : 7));
-      applyDamage.computeDamageAfterEvasion.mockImplementation(REAL_HALF);
       render(<SaveAttackAoeModal {...makeProps({ saveDc: 999 })} />);
       // picker copy byte-check BEFORE confirm swaps the view to the summary.
       expect(screen.getByText('On a failed save, target takes 8d6 Fire damage. On a successful save, target takes half damage.')).toBeInTheDocument();
       expect(screen.queryByText(/plus 10d6/)).toBeNull();
-      await confirmSelection('Goblin A');
+      await pick('Goblin A');
 
       const targetCalls = applyDamage.applyDamageToTarget.mock.calls.filter(c => c[1] === 'Goblin A');
-      expect(targetCalls.length).toBe(1);
+      expect(targetCalls).toHaveLength(1);
       expect(targetCalls[0][2]).toBe(12);
       expect(targetCalls[0][3]).toEqual(['Fire']);
 
@@ -540,9 +331,8 @@ describe('SaveAttackAoeModal - Damage resolution', () => {
       expect(logs.every(e => e.damageType === 'Fire')).toBe(true);
       expect(logs.every(e => !('secondaryFinalDamage' in e) && !('secondaryDamageType' in e))).toBe(true);
 
-      const rollback = damageRollback.addTargetResult.mock.calls.find(c => c[1]?.targetName === 'Goblin A');
-      expect(rollback[1].appliedDamage).toBe(12);
-      expect('secondaryFinalDamage' in rollback[1]).toBe(false);
+      expect(rollbackRow('Goblin A').appliedDamage).toBe(12);
+      expect('secondaryFinalDamage' in rollbackRow('Goblin A')).toBe(false);
     });
 
     it('Death Knight + Aspirant twin data-lock: Hellfire Orb dual pools on disk', () => {

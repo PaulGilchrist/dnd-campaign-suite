@@ -1,16 +1,38 @@
-// MA-0648: Drow Mage "Summon Demon" chip — automation:{type:"monster_summon"}
-// arms a clickable .mc-dice-link-summon affordance on the formerly inert row,
-// routing the modal's coin-flip summon adjudication. The 1/Day counter rides
-// the MA-0020 monsterSpellUses gate; exhausted chips keep the spent class and
-// stay clickable so the click routes the honest refusal (zone-aura precedent).
-import { readFileSync } from 'node:fs';
+// @maintained-by-ai
+// SummonLink chip lane (MonsterAction.jsx:256-268): one press pattern, once.
+// Arms exactly ONE .mc-dice-link-summon per monster_summon row with the exact
+// honest tooltip (options + chance %, constant count when authored, range,
+// duration_minutes or 'GM-adjudicated' — never a fabricated "10 min", §70),
+// the numeric uses counter when the MA-0020 gate arms (silent on the
+// recharge-economy row), fa-hat-wizard icon, and routes the press to
+// onSummonRow(action) with row identity, zero misroute (no "+0" junk chip on
+// MA-1215's attack_bonus-less row). MA-0648/0651/0757/0759/1604/1215 folded
+// into one it.each over distinct fixture shapes; galib-duhr is galeb-duhr's
+// byte-twin whose chip renders identically — twin data + resolution owned by
+// monsterSummon.test.js:520/646. Spent forks: exhausted-uses OR spent-recharge
+// chips keep the spent class (rechargeOut fork) and stay clickable for the
+// resolver's honest refusal; a met-recharge map entry de-spents; attackerCannotAct
+// and handlerless render inert; non-summon rows arm zero chips. Disk shape,
+// isMonsterSummonRow, coin-flip/spawn/self-damage resolution, gateSummonRecharge,
+// and refusal copy/logs are owned by services/encounters/monsterSummon.test.js
+// (+ siblings); counter arithmetic by services/encounters/monsterAbilityUses.test.js:33-35.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
+import monsters from '../../../public/data/monsters.json';
 
-const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const drowMage = monsters.find(m => m.index === 'drow-mage');
+const galebDuhr = monsters.find(m => m.index === 'galeb-duhr');
+const treant = monsters.find(m => m.index === 'treant');
+const sovereign = monsters.find(m => m.index === 'myconid-sovereign');
+
 const SUMMON_ROW = drowMage.actions.find(a => a.name === 'Summon Demon');
+const STAFF_ROW = drowMage.actions.find(a => a.name === 'Staff');
+const PRIESTESS_ROW = monsters.find(m => m.index === 'drow-priestess-of-lolth').actions.find(a => a.name === 'Summon Demon');
+const ANIMATE_ROW = galebDuhr.actions.find(a => a.name === 'Animate Boulders');
+const AVALANCHE_ROW = galebDuhr.actions.find(a => a.name === 'Avalanche Slam');
+const TREANT_ANIMATE_ROW = treant.actions.find(a => a.name === 'Animate Trees');
+const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
 
 function renderRow(action, overrides = {}) {
   const onSummonRow = vi.fn();
@@ -32,279 +54,76 @@ function renderRow(action, overrides = {}) {
   return { ...utils, onSummonRow };
 }
 
-describe('MA-0648 Summon Demon chip', () => {
-  it('arms a clickable summon chip with the 1/Day counter', () => {
-    const { container, onSummonRow } = renderRow(SUMMON_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
+describe('summon chip — armed + press', () => {
+  // Distinct fixture shapes folded: multi-option coin-flip vs single chance
+  // option vs constant-count self-summon (galeb byte-twin galib dropped) vs
+  // recharge-economy ungated row; exact title proves count omission, chance
+  // %, range default, honest 'GM-adjudicated' silence on unauthored clocks.
+  it.each([
+    { name: 'Drow Mage Summon Demon (coin-flip options)', row: SUMMON_ROW, counter: '(1/Day · 1 left)', title: 'Summon quasit or shadow-demon (50%) — 60 ft, 10 min' },
+    { name: 'Priestess Summon Demon (single 30% chance, 3/Day)', row: PRIESTESS_ROW, counter: '(3/Day · 3 left)', title: 'Summon yochlol (30%) — 60 ft, 10 min' },
+    { name: 'Galeb Duhr Animate Boulders (constant count)', row: ANIMATE_ROW, counter: '(1/Day · 1 left)', title: 'Summon galeb-duhr — count 2, 60 ft, 1 min' },
+    { name: 'Treant Animate Trees (count + 1-day clock)', row: TREANT_ANIMATE_ROW, counter: '(1/Day · 1 left)', title: 'Summon treant — count 2, 60 ft, 1440 min' },
+    { name: 'Myconid Sovereign Animating Spores (recharge economy)', row: ANIMATING_ROW, counter: null, title: 'Summon myconid-spore-servant — 5 ft, GM-adjudicated', rowNote: '(3)' },
+  ])('arms ONE chip, exact honest tooltip, routes press with row identity: $name', ({ row, counter, title, rowNote }) => {
+    const { container, onSummonRow } = renderRow(row);
+    const chips = container.querySelectorAll('.mc-dice-link-summon');
+    expect(chips).toHaveLength(1);
+    const chip = chips[0];
     expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(SUMMON_ROW);
-  });
-
-  it('spent row shows 0 left + spent class and stays clickable for honest refusal', () => {
-    const { container, onSummonRow } = renderRow(SUMMON_ROW, { spellUsesUsed: { 'Summon Demon': 1 } });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-  });
-
-  it('incapacitated attacker: chip inert', () => {
-    const { container, onSummonRow } = renderRow(SUMMON_ROW, { attackerCannotAct: true });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onSummonRow).not.toHaveBeenCalled();
-  });
-
-  it('non-summon rows arm no summon chip (Staff row byte-inert)', () => {
-    const staff = drowMage.actions.find(a => a.name === 'Staff');
-    const { container } = renderRow(staff);
-    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
-  });
-});
-
-// MA-0651: Drow Priestess of Lolth "Summon Demon" rides the SAME
-// monster_summon seam — single chance-option (yochlol 30%) with self-damage
-// on fail. Chip arms identically; the 3/Day counter reads uses/maxUses.
-const priestess = monsters.find(m => m.index === 'drow-priestess-of-lolth');
-const PRIESTESS_ROW = priestess.actions.find(a => a.name === 'Summon Demon');
-
-describe('MA-0651 Priestess Summon Demon chip', () => {
-  it('data authors single yochlol chance-option + self-damage + 3/Day', () => {
-    expect(PRIESTESS_ROW.automation).toEqual({
-      type: 'monster_summon',
-      options: [{ monster: 'yochlol', chance: 0.3 }],
-      self_damage_formula: '1d10',
-      self_damage_type: 'psychic',
-      range_ft: 60,
-      duration_minutes: 10,
-    });
-    expect(PRIESTESS_ROW.uses).toBe(3);
-    expect(PRIESTESS_ROW.maxUses).toBe(3);
-    expect(PRIESTESS_ROW.description).toContain('1d10');
-    expect(PRIESTESS_ROW.description).not.toContain('1dlO');
-  });
-
-  it('arms a clickable summon chip counting down from 3/Day', () => {
-    const { container, onSummonRow } = renderRow(PRIESTESS_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).toContain('(3/Day · 3 left)');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(PRIESTESS_ROW);
-  });
-
-  it('two uses spent: 1 left; exhausted: spent class + still clickable', () => {
-    const { container } = renderRow(PRIESTESS_ROW, { spellUsesUsed: { 'Summon Demon': 2 } });
-    expect(container.querySelector('.mc-dice-link-summon').textContent).toContain('1 left');
-    const spent = renderRow(PRIESTESS_ROW, { spellUsesUsed: { 'Summon Demon': 3 } });
-    const chip = spent.container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(spent.onSummonRow).toHaveBeenCalledTimes(1);
-  });
-});
-
-// MA-0757: Galeb Duhr "Animate Boulders" — the formerly zero-affordance
-// OTHER-type row (usage-only + ignored uses:"1/Day" STRING) now authors
-// monster_summon automation with a CONSTANT numeric count:2 (RAW "one or
-// two" GM choice; no chooser seam app-wide → adjudicable max spawns two).
-// Chip arms off automation.type with the numeric 1/Day counter; exhausted
-// chips stay clickable so the click routes the honest refusal (MA-0648
-// precedent). The Avalanche Slam attack row arms NO summon chip.
-const galebDuhr = monsters.find(m => m.index === 'galeb-duhr');
-const ANIMATE_ROW = galebDuhr.actions.find(a => a.name === 'Animate Boulders');
-
-describe('MA-0757 Galeb Duhr Animate Boulders chip', () => {
-  it('arms a clickable summon chip counting 1/Day with honest boulder tooltip', () => {
-    const { container, onSummonRow } = renderRow(ANIMATE_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
-    const title = chip.getAttribute('title');
-    expect(title).toContain('galeb-duhr');
-    expect(title).toContain('count 2');
-    expect(title).not.toContain('demon');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(ANIMATE_ROW);
-  });
-
-  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
-    const { container, onSummonRow } = renderRow(ANIMATE_ROW, { spellUsesUsed: { 'Animate Boulders': 1 } });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-  });
-
-  it('incapacitated duhr: chip inert', () => {
-    const { container, onSummonRow } = renderRow(ANIMATE_ROW, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
-    expect(onSummonRow).not.toHaveBeenCalled();
-  });
-
-  it('Avalanche Slam row arms no summon chip', () => {
-    const slam = galebDuhr.actions.find(a => a.name === 'Avalanche Slam');
-    const { container } = renderRow(slam);
-    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
-  });
-});
-
-// MA-0759: Galib Duhr "Animate Boulders" — galeb-duhr twin chip test. The
-// formerly zero-affordance row (usage DICT rendering cosmetic "(1/Day)"
-// only, §241 discriminator) now arms the same summon chip with the numeric
-// gate counter; its Slam attack row arms no summon chip.
-const galibDuhr = monsters.find(m => m.index === 'galib-duhr');
-const GALIB_ANIMATE_ROW = galibDuhr.actions.find(a => a.name === 'Animate Boulders');
-
-describe('MA-0759 Galib Duhr Animate Boulders chip', () => {
-  it('arms a clickable summon chip counting 1/Day with honest boulder tooltip', () => {
-    const { container, onSummonRow } = renderRow(GALIB_ANIMATE_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
-    const title = chip.getAttribute('title');
-    expect(title).toContain('galib-duhr');
-    expect(title).toContain('count 2');
-    expect(title).not.toContain('demon');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(GALIB_ANIMATE_ROW);
-  });
-
-  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
-    const { container, onSummonRow } = renderRow(GALIB_ANIMATE_ROW, { spellUsesUsed: { 'Animate Boulders': 1 } });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-  });
-
-  it('Slam attack row arms no summon chip', () => {
-    const slam = galibDuhr.actions.find(a => a.name === 'Slam');
-    const { container } = renderRow(slam);
-    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
-  });
-});
-
-// MA-1604: Treant "Animate Trees" (actions[3]) — MA-0757 byte-twin. The
-// formerly zero-affordance row (uses:"1/Day" STRING rendering NOTHING,
-// §240) now authors monster_summon automation with the self-block option +
-// stat_override int/cha 1, constant count:2, 60 ft range, 1-day duration;
-// numeric uses/maxUses arm the 1/Day counter. Its Slam attack row arms no
-// summon chip.
-const treant = monsters.find(m => m.index === 'treant');
-const TREANT_ANIMATE_ROW = treant.actions.find(a => a.name === 'Animate Trees');
-
-describe('MA-1604 Treant Animate Trees chip', () => {
-  it('arms a clickable summon chip counting 1/Day with honest tree tooltip', () => {
-    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
-    const title = chip.getAttribute('title');
-    expect(title).toContain('treant');
-    expect(title).toContain('count 2');
-    expect(title).toContain('60 ft');
-    expect(title).toContain('1440 min');
-    expect(title).not.toContain('demon');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(TREANT_ANIMATE_ROW);
-  });
-
-  it('spent row: 0 left + spent class, stays clickable for honest refusal', () => {
-    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW, { spellUsesUsed: { 'Animate Trees': 1 } });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(onSummonRow).toHaveBeenCalledTimes(1);
-  });
-
-  it('incapacitated treant: chip inert', () => {
-    const { container, onSummonRow } = renderRow(TREANT_ANIMATE_ROW, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
-    expect(onSummonRow).not.toHaveBeenCalled();
-  });
-
-  it('Slam attack row arms no summon chip', () => {
-    const slam = treant.actions.find(a => a.name === 'Slam');
-    const { container } = renderRow(slam);
-    expect(container.querySelector('.mc-dice-link-summon')).toBeNull();
-  });
-});
-
-// MA-1215: Myconid Sovereign "Animating Spores" — the junk "+0" chip is dead
-// (attack_bonus:null); the row now arms the canonical MA-0648 summon chip.
-// Recharge-3 (no uses/maxUses) drives the spent class from the live recharge
-// map; exhausted chips stay clickable so the click routes the honest
-// "Not Recharged" refusal. Unauthored duration_minutes never renders a
-// fabricated "10 min" in the tooltip — the RAW clocks are GM-adjudicated.
-const sovereign = monsters.find(m => m.index === 'myconid-sovereign');
-const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
-
-describe('MA-1215 Animating Spores chip', () => {
-  it('arms a clickable summon chip for the disk spore servant — NO "+0" junk chip, no uses counter', () => {
-    const { container, onSummonRow } = renderRow(ANIMATING_ROW);
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Summon');
-    expect(chip.textContent).not.toContain('1/Day');
+    expect(chip.getAttribute('title')).toBe(title);
+    expect(chip.querySelector('i').className).toContain('fa-hat-wizard');
+    if (counter) {
+      expect(chip.textContent).toContain(counter);
+    } else {
+      expect(chip.textContent).not.toContain('/Day');
+      expect(container.textContent).toContain(rowNote);
+    }
+    // no "+0" junk chip misrouted onto a summon row (MA-1215)
     expect([...container.querySelectorAll('span')].some(s => /^\+0/.test(s.textContent.trim()))).toBe(false);
-    const title = chip.getAttribute('title');
-    expect(title).toContain('myconid-spore-servant');
-    expect(title).toContain('5 ft');
-    expect(title).toContain('GM-adjudicated');
-    expect(title).not.toContain('10 min');
     fireEvent.click(chip);
     expect(onSummonRow).toHaveBeenCalledTimes(1);
-    expect(onSummonRow.mock.calls[0][0]).toBe(ANIMATING_ROW);
+    expect(onSummonRow.mock.calls[0][0]).toBe(row);
   });
 
-  it('fresh recharge: plain Recharge note "(3)", no spent class', () => {
-    const { container } = renderRow(ANIMATING_ROW, { rechargeState: {} });
+  // Both spent-class sources (MonsterAction.jsx:260): exhausted uses gate and
+  // the live recharge map; spent ≠ disabled — the click routes the honest
+  // refusal (zone-aura precedent). "1 left" partial arithmetic is gate-service
+  // territory (monsterAbilityUses.test.js:34), not restated here.
+  it.each([
+    { name: 'uses gate exhausted (1/Day spent)', row: SUMMON_ROW, overrides: { spellUsesUsed: { 'Summon Demon': 1 } }, spent: true, chipNote: '0 left' },
+    { name: 'recharge spent', row: ANIMATING_ROW, overrides: { rechargeState: { 'Animating Spores': { recharged: false, threshold: 3 } } }, spent: true, rowNote: 'Recharge 3 — unavailable' },
+    { name: 'recharge met at own turn-start: de-spent', row: ANIMATING_ROW, overrides: { rechargeState: { 'Animating Spores': { recharged: true, threshold: 3 } } }, spent: false },
+  ])('spent fork renders honestly, chip stays clickable for refusal: $name', ({ row, overrides, spent, chipNote, rowNote }) => {
+    const { container, onSummonRow } = renderRow(row, overrides);
     const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).not.toContain('mc-dice-link-spell-spent');
-    expect(container.textContent).toContain('(3)');
-    expect(container.textContent).not.toContain('unavailable');
-  });
-
-  it('spent recharge: chip gets the spent class + "(Recharge 3 — unavailable)" note, stays clickable for honest refusal', () => {
-    const { container, onSummonRow } = renderRow(ANIMATING_ROW, { rechargeState: { 'Animating Spores': { recharged: false, threshold: 3 } } });
-    const chip = container.querySelector('.mc-dice-link-summon');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(container.textContent).toContain('Recharge 3 — unavailable');
+    expect(chip.className.includes('mc-dice-link-spell-spent')).toBe(spent);
+    if (chipNote) expect(chip.textContent).toContain(chipNote);
+    if (rowNote) expect(container.textContent).toContain(rowNote);
+    else expect(container.textContent).not.toContain('unavailable');
     fireEvent.click(chip);
     expect(onSummonRow).toHaveBeenCalledTimes(1);
+    expect(onSummonRow.mock.calls[0][0]).toBe(row);
   });
+});
 
-  it('recharged map entry (d6 3+ at own turn-start): chip de-spent', () => {
-    const { container } = renderRow(ANIMATING_ROW, { rechargeState: { 'Animating Spores': { recharged: true, threshold: 3 } } });
-    expect(container.querySelector('.mc-dice-link-summon').className).not.toContain('mc-dice-link-spell-spent');
-  });
-
-  it('incapacitated sovereign: summon chip inert', () => {
-    const { container, onSummonRow } = renderRow(ANIMATING_ROW, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-summon'));
+describe('summon chip — gate forks', () => {
+  it.each([
+    { name: 'incapacitated attacker', overrides: { attackerCannotAct: true } },
+    { name: 'handlerless row', overrides: { onSummonRow: undefined } },
+  ])('chip renders but click dispatches nothing: $name', ({ overrides }) => {
+    const { container, onSummonRow } = renderRow(SUMMON_ROW, overrides);
+    const chip = container.querySelector('.mc-dice-link-summon');
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip);
     expect(onSummonRow).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'Drow Mage Staff (STR weapon row)', row: STAFF_ROW },
+    { name: 'Galeb Duhr Avalanche Slam (attack row)', row: AVALANCHE_ROW },
+  ])('arms no summon chip: $name', ({ row }) => {
+    const { container } = renderRow(row);
+    expect(container.querySelectorAll('.mc-dice-link-summon')).toHaveLength(0);
   });
 });

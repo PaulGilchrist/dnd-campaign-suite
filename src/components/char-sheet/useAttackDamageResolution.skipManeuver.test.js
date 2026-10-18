@@ -1,153 +1,169 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// handleAttackRiderManeuverSkip guard matrix — this file owns ONLY the skip lane's
+// gates: prompt close + exactly when the paused pipeline may resume (step gate,
+// stash-exists gate, and the `stash.ctx.hit !== false` key-absent semantics).
+// Lane ownership (do not duplicate here):
+// - skip hit/miss dispatch with byte-exact resume args → useAttackDamageResolution.maneuvers.test.js
+// - handleAttackRiderOptionSelect full lane → useAttackDamageResolution.optionSelect.test.js
+// - applyPauseState stash shapes byte-exact → useAttackDamageResolution.pausedStates.test.js
+//
+// Mocking: the hook's eight static imports are stubbed only to stop the real
+// steps/services graph from loading — nothing in them is invoked on the skip path
+// (the old combatData/buffToggle/applyDamage/attackCalc/setRuntimeObject mocks were
+// dead here once steps/index was stubbed; purged). clearAllMocks-vs-resetAllMocks
+// is moot: no mock factory holds state and every relevant fake (setModalState,
+// setPendingDamage, resume, resumeRef) is created fresh per mount.
+import { describe, it, expect, vi } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
-
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
-}));
-
-vi.mock('../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
-}));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
-    setRuntimeObject: vi.fn(),
 }));
-
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-    getActiveBuffs: vi.fn(),
+vi.mock('../../services/dice/diceRoller.js', () => ({
+    rollExpression: vi.fn(),
 }));
-
 vi.mock('../../services/combat/automation/automationService.js', () => ({
-    collectWeaponMastery: vi.fn(),
     evaluateAutoExpression: vi.fn(),
-    hasTwoWeaponFighting: vi.fn(),
 }));
-
-vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    applyDamageToTarget: vi.fn(),
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(),
 }));
-
-vi.mock('../../services/rules/core/attackCalc.js', () => ({
-    parseMagicItemName: vi.fn((name) => ({ baseName: name })),
+vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
+    getEmpoweredEvocationFeatures: vi.fn(),
+    getEmpoweredEvocationIntModifier: vi.fn(),
 }));
-
 vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
     executeAttackRiderManeuver: vi.fn(),
     applyManeuveringAllyGrant: vi.fn(),
 }));
-
-vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    getEmpoweredEvocationFeatures: vi.fn(() => []),
-    getEmpoweredEvocationIntModifier: vi.fn(() => 0),
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
-
 vi.mock('../../services/combat/steps/index.js', () => ({
-    buildPipelineForAction: vi.fn(() => ({
-        run: vi.fn().mockResolvedValue(undefined),
-    })),
+    buildPipelineForAction: vi.fn(),
 }));
 
-vi.mock('../../services/ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
-}));
+const ATTACK = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
 
-const mockPlayerStats = {
-    name: 'TestFighter',
-    level: 5,
-    abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 2 }],
-    proficiency: 3,
-    class: { name: 'Barbarian', class_levels: [{ level: 5, rage_damage: 2 }] },
-    automation: { actions: [], passives: [] },
-};
-
-const mockCampaignName = 'test-campaign';
-
-const mockSetPopupHtml = vi.fn();
-const mockRollDamage = vi.fn();
-const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-const modalState = {};
-const mockSetModalState = vi.fn((updates) => {
-    if (typeof updates === 'function') {
-        return updates(modalState);
-    }
-    Object.assign(modalState, updates);
-});
-
-function UseAttackDamageResolution(overrides = {}) {
-    const deps = {
-        playerStats: mockPlayerStats,
-        campaignName: mockCampaignName,
-        mapName: null,
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-        rollDamage: mockRollDamage,
-        buildCtx: mockBuildCtx,
-        buildCtxSync: mockBuildCtxSync,
-        modalState,
-        setModalState: mockSetModalState,
-        pendingDamage: null,
-        setPendingDamage: vi.fn(),
-        resumeRef: { current: null },
-        ...overrides,
-    };
-    return useAttackDamageResolution(deps);
+function tick() {
+    return new Promise((r) => setTimeout(r, 0));
 }
 
-describe('useAttackDamageResolution', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        Object.keys(modalState).forEach((k) => delete modalState[k]);
-        mockSetModalState.mockClear();
+// Fresh deps + resumeRef per mount — no cross-test bleed. (Capitalized: rules-of-hooks.)
+function Harness(resumeRef) {
+    const setModalState = vi.fn();
+    const setPendingDamage = vi.fn();
+    const api = useAttackDamageResolution({
+        playerStats: { name: 'TestFighter' },
+        campaignName: 'test-campaign',
+        mapName: null,
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollDamage: vi.fn(),
+        setModalState,
+        setPendingDamage,
+        resumeRef,
     });
+    return { api, setModalState, setPendingDamage };
+}
 
-    describe('handleAttackRiderManeuverSkip', () => {
-        it('sets attackRiderManeuverPrompt to null in modal state', () => {
-            const { handleAttackRiderManeuverSkip } = UseAttackDamageResolution();
-            handleAttackRiderManeuverSkip();
-            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
-        });
-
-        it('returns undefined', () => {
-            const { handleAttackRiderManeuverSkip } = UseAttackDamageResolution();
-            const result = handleAttackRiderManeuverSkip();
-            expect(result).toBeUndefined();
-        });
+// resumeRef contract as the pipeline leaves it; `resume` records its exact args.
+function refPausedAt({ step = 'attackRiderManeuvers', stashCtx = { hit: true }, repauseWith = null } = {}) {
+    const resume = vi.fn(async (_ctx, ref) => {
+        ref.current = repauseWith; // null = pipeline completed through the seam
     });
+    return {
+        resume,
+        stashCtx,
+        resumeRef: { current: { _pausedStep: step, pipelineStash: { pipeline: { resume }, ctx: stashCtx } } },
+    };
+}
 
-    describe('handleAttackRiderOptionSelect', () => {
-        it('resets attackRiderOptionsModal and sets brutalStrike flags', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const modalPayload = {
-                maneuver: { name: 'Brutal Strike', automation: { options: [] } },
-                targetName: 'Goblin',
-                description: 'Test description',
-            };
+describe('useAttackDamageResolution — handleAttackRiderManeuverSkip gates', () => {
+    it.each([
+        {
+            branch: 'hit resumes the stashed pipeline so base damage lands',
+            setup: () => refPausedAt({ stashCtx: { hit: true } }),
+            shouldResume: true,
+        },
+        {
+            branch: 'ctx.hit key absent still resumes (guard is `!== false`, honest key-absent pin)',
+            setup: () => refPausedAt({ stashCtx: {} }),
+            shouldResume: true,
+        },
+        {
+            branch: 'miss never resumes (no damage to land)',
+            setup: () => refPausedAt({ stashCtx: { hit: false } }),
+            shouldResume: false,
+        },
+        {
+            branch: 'a cunningStrike pause is untouched (skip is maneuver-prompt-only, even though resumeAttackPipeline would allow it)',
+            setup: () => refPausedAt({ step: 'cunningStrike', stashCtx: { hit: true } }),
+            shouldResume: false,
+        },
+        {
+            branch: 'maneuvers pause with no stash is a safe no-op',
+            setup: () => {
+                const resume = vi.fn();
+                return { resume, stashCtx: null, resumeRef: { current: { _pausedStep: 'attackRiderManeuvers', pipelineStash: null } } };
+            },
+            shouldResume: false,
+        },
+        {
+            branch: 'nothing paused is a safe no-op',
+            setup: () => ({ resume: vi.fn(), stashCtx: null, resumeRef: { current: null } }),
+            shouldResume: false,
+        },
+        {
+            branch: 'downstream re-pause surfaces its modal + pending damage instead of stranding it',
+            setup: () => refPausedAt({
+                stashCtx: { hit: true },
+                repauseWith: {
+                    _pausedStep: 'damageTypeChoice',
+                    _modalType: 'damageTypeChoice',
+                    _modalProps: { options: ['fire', 'cold'] },
+                    attack: ATTACK,
+                    formula: '1d8+3 + 2d6',
+                    total: 12,
+                    rolls: [5, 3, 4],
+                    modifier: 3,
+                },
+            }),
+            shouldResume: true,
+            surfacesModal: true,
+        },
+    ])('$branch', async ({ setup, shouldResume, surfacesModal = false }) => {
+        const { resume, stashCtx, resumeRef } = setup();
+        const { api, setModalState, setPendingDamage } = Harness(resumeRef);
 
-            await handleAttackRiderOptionSelect('brutal', modalPayload);
+        api.handleAttackRiderManeuverSkip();
+        await tick(); // flush the fire-and-forget resumeAttackPipeline tail
 
-            expect(mockSetModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
-        });
+        // The prompt closes unconditionally, and it is the ONLY unconditional modal write.
+        expect(setModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
 
-        it('sets popupHtml with automation info', async () => {
-            const { handleAttackRiderOptionSelect } = UseAttackDamageResolution();
-            const modalPayload = {
-                maneuver: { name: 'Brutal Strike', automation: { options: [] } },
-                targetName: 'Goblin',
-                description: 'Test description',
-            };
+        if (shouldResume) {
+            expect(resume).toHaveBeenCalledTimes(1);
+            expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
+        } else {
+            expect(resume).not.toHaveBeenCalled();
+        }
 
-            await handleAttackRiderOptionSelect('brutal', modalPayload);
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith(
-                expect.objectContaining({ type: 'automation_info' })
-            );
-        });
+        if (surfacesModal) {
+            // Shape pin lives in pausedStates.test.js; here: skip reaches the
+            // applyPauseState tail so the re-paused damage is not stranded.
+            expect(setModalState).toHaveBeenCalledWith({ damageTypeChoice: { options: ['fire', 'cold'] } });
+            expect(setPendingDamage).toHaveBeenCalledWith(expect.objectContaining({
+                attack: ATTACK,
+                formula: '1d8+3 + 2d6',
+                total: 12,
+            }));
+        } else {
+            // Damage semantics: skip either resumes (damage rides the pipeline to
+            // rollDamage) or strands nothing — never a silent pendingDamage stash.
+            expect(setModalState).toHaveBeenCalledTimes(1);
+            expect(setPendingDamage).not.toHaveBeenCalled();
+        }
     });
 });

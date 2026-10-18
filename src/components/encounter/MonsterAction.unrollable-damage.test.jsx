@@ -1,22 +1,34 @@
-// MA-0014: damage chips for unparseable formulas (e.g. Aberrant Spirit
-// (Beholderkin) Eye Ray "1d8+3+spell level") must not render as clickable
-// affordances — MV-6: static text only, no dead links. Parseable numeric
-// formulas must still render and roll.
+// @maintained-by-ai
+// MA-0014/MA-0015 unrollable-damage lane: rows whose damage formula fails
+// canRollExpression (dynamic tokens "spell level"/"spell attack modifier"/
+// "spellcasting modifier"/"WIS modifier", empty/null) must render as static
+// text only — never a clickable chip that dies silently (MV-6: no dead links).
+// Discriminator here is ROLLABILITY alone: the synthetic legs carry NO attack
+// wording (attackRowMissingToHit false) so zero-chip is attributable to
+// canRollExpression only. The attack-row suppression gate is owned by
+// MA-0286 (MonsterAction.ma0286-slam-suppression.test.jsx) whose census
+// SKIPS unrollable formulas ("if (!rollable) continue") — the two lanes are
+// disjoint complements. Deleted twins (covered stronger by the owner):
+//   - Club attack-row suppression leg → MA-0286 ON leg :45 (disk verbatim,
+//     byte description-pin + exact rollable precondition + zero chips +
+//     zero role=button + zero dispatch).
+//   - Heat Aura rollable-rolls-positive leg → MA-0286 OFF leg :61 (disk
+//     giant-frog Swallow: exact chip count + exact payload + identity +
+//     single dispatch, vs fabricated fixture + objectContaining here).
+// canRollExpression direct-call census kept (ONE test): diceRoller.test.js
+// has no canRollExpression coverage and every other caller pins only its own
+// feature formula string — the empty/null + token-family false legs live here.
+// Huge/Large Animated Object slam formula false-legs: summonSpiritHandler.mao-huge-slam.
 import { readFileSync } from 'node:fs';
-import { render, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
+import { attackRowMissingToHit } from './MonsterCardHelpers.js';
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 
-const EYE_RAY = {
-  name: 'Eye Ray',
-  description: 'Ranged Spell Attack: +spell attack modifier, range 150 ft. Hit: 1d8+3+spell level Psychic damage.',
-  attack_bonus: null,
-  damage_dice_primary: '1d8+3+spell level',
-  damage_type_primary: 'Psychic',
-  damage_dice_secondary: null,
-  range: '150 ft.',
-};
+const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+const diskRow = (monsterIndex, actionName) =>
+  monsters.find(m => m.index === monsterIndex).actions.find(a => a.name === actionName);
 
 function renderRow(action, overrides = {}) {
   const onDamage = vi.fn();
@@ -38,86 +50,50 @@ function renderRow(action, overrides = {}) {
   return { ...utils, onDamage, onAttack };
 }
 
-describe('MA-0014 canRollExpression', () => {
-  it('rejects dynamic-token formulas and empty/null input', () => {
-    expect(canRollExpression('1d8+3+spell level')).toBe(false);
-    expect(canRollExpression('+spell attack modifier')).toBe(false);
-    expect(canRollExpression('')).toBe(false);
-    expect(canRollExpression(null)).toBe(false);
-  });
-
-  it('accepts numeric dice formulas', () => {
-    expect(canRollExpression('1d6+2')).toBe(true);
-    expect(canRollExpression('2d6')).toBe(true);
-    expect(canRollExpression('1d8+3')).toBe(true);
-    expect(canRollExpression('1d6 [fire]')).toBe(true);
+describe('MA-0014 canRollExpression lane census (owner: no unit coverage in diceRoller.test.js)', () => {
+  it('dynamic-token/prose/empty formulas unrollable; numeric formulas rollable', () => {
+    // False legs: the four token families of the 32 unrollable disk rows.
+    for (const formula of ['1d8+3+spell level', '+spell attack modifier', '2d6+3+spellcasting modifier', '1d8+2+WIS modifier', '1d4+spell level', '', null]) {
+      expect(canRollExpression(formula)).toBe(false);
+    }
+    for (const formula of ['1d6+2', '2d6', '1d8+3', '1d6 [fire]']) {
+      expect(canRollExpression(formula)).toBe(true);
+    }
   });
 });
 
-describe('MA-0014 MonsterAction damage chip gating', () => {
-  it('does not render a clickable chip for unparseable damage_dice_primary', () => {
-    const { container } = renderRow(EYE_RAY);
-    const chips = [...container.querySelectorAll('.mc-dice-link')];
-    expect(chips.some(el => el.textContent.includes('spell level'))).toBe(false);
-    expect(container.textContent).toContain('Ranged Spell Attack');
-  });
-
-  it('does not render a clickable chip for unparseable damage_dice_secondary', () => {
-    const { container } = renderRow({ ...EYE_RAY, damage_dice_secondary: '1d4+spell level' });
-    const chips = [...container.querySelectorAll('.mc-dice-link')];
-    expect(chips.some(el => el.textContent.includes('1d4'))).toBe(false);
-  });
-
-  // MA-0286 flip (same-pass): the original MA-0014 fixture here was an
-  // ATTACK row ("Melee Weapon Attack") with null attack_bonus and a rollable
-  // formula — the very auto-hit defect MA-0286 suppresses. Damage-only rows
-  // (no attack wording) keep rolling; attack rows without a to-hit bonus
-  // render text only.
-  it('still renders and rolls parseable numeric damage chips on damage-only rows', () => {
-    const { container, onDamage } = renderRow({
-      name: 'Heat Aura',
-      description: 'At the end of each of its turns, each creature nearby takes 11 (1d6+2) fire damage.',
-      attack_bonus: null,
-      damage_dice_primary: '1d6+2',
-      damage_type_primary: 'Fire',
-    });
-    const chip = [...container.querySelectorAll('.mc-dice-link')].find(el => el.textContent.includes('1d6+2'));
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onDamage).toHaveBeenCalledWith('Heat Aura', '1d6+2', 'Fire', expect.objectContaining({ name: 'Heat Aura' }));
-  });
-
-  it('MA-0286: attack row with null attack_bonus and rollable formula renders text only — no auto-hit chip', () => {
-    const { container, onDamage } = renderRow({
-      name: 'Club',
-      description: 'Melee Weapon Attack. Hit: 1 (1d6+2) bludgeoning damage.',
-      attack_bonus: null,
-      damage_dice_primary: '1d6+2',
-      damage_type_primary: 'Bludgeoning',
-    });
+describe('MA-0014 unrollable formula never arms a damage chip (rollability-isolated legs)', () => {
+  // attackRowMissingToHit false on every leg → if canRollExpression ever
+  // accepted a token formula, a chip WOULD appear; zero chips discriminates
+  // the rollability gate alone (the MA-0286 attack-row gate cannot mask it).
+  it.each([
+    ['unrollable primary', { name: 'Psychic Barrage', description: 'The target takes 1d8+3+spell level Psychic damage.', attack_bonus: null, damage_dice_primary: '1d8+3+spell level', damage_type_primary: 'Psychic' }, '1d8+3+spell level'],
+    ['unrollable secondary', { name: 'Mind Blast Echo', description: 'The target takes 1d4+spell level Psychic damage.', attack_bonus: null, damage_dice_primary: null, damage_dice_secondary: '1d4+spell level', damage_type_primary: 'Psychic' }, '1d4+spell level'],
+  ])('%s renders static text only — zero chips, zero dispatch', (_leg, row, formula) => {
+    expect(attackRowMissingToHit(row)).toBe(false);
+    expect(canRollExpression(formula)).toBe(false);
+    const { container, onDamage } = renderRow(row);
     expect(container.querySelectorAll('.mc-dice-link').length).toBe(0);
-    expect(container.textContent).toContain('1d6+2');
+    expect(container.textContent).toContain(formula);
     expect(onDamage).not.toHaveBeenCalled();
   });
 });
 
-describe('MA-0015 Aberrant Spirit (Mind Flayer) Psychic Slam', () => {
-  const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-  const spirit = monsters.find(m => m.index === 'aberrant-spirit-mind-flayer');
-  const psychicSlam = spirit.actions.find(a => a.name === 'Psychic Slam');
-
-  it('authored row keeps caster-dependent tokens (no fabricated numerics)', () => {
-    expect(psychicSlam.attack_bonus).toBeNull();
-    expect(psychicSlam.damage_dice_primary).toBe('1d8+3+spell level');
-    expect(canRollExpression(psychicSlam.damage_dice_primary)).toBe(false);
-  });
-
-  it('renders the row as fully static text — no to-hit link, no damage chip', () => {
-    const { container, onDamage, onAttack } = renderRow(psychicSlam);
+describe('MA-0014/MA-0015 unrollable disk rows verbatim — fully static, zero affordance', () => {
+  it.each([
+    ['aberrant-spirit-beholderkin', 'Eye Ray'],
+    ['aberrant-spirit-mind-flayer', 'Psychic Slam'],
+  ])('%s / %s — caster-dependent tokens kept as authored, no fabricated numerics, no clickable affordance', (monsterIndex, actionName) => {
+    const row = diskRow(monsterIndex, actionName);
+    expect(row.attack_bonus).toBeNull();
+    expect(row.damage_dice_primary).toBe('1d8+3+spell level');
+    expect(canRollExpression(row.damage_dice_primary)).toBe(false);
+    const { container, onDamage, onAttack } = renderRow(row);
     expect(container.querySelectorAll('.mc-dice-link').length).toBe(0);
     expect(container.querySelectorAll('[role="button"]').length).toBe(0);
-    expect(container.textContent).toContain('Psychic Slam');
+    expect(container.textContent).toContain(actionName);
     expect(container.textContent).toContain('+spell attack modifier');
+    expect(container.textContent).toContain('1d8+3+spell level');
     expect(onDamage).not.toHaveBeenCalled();
     expect(onAttack).not.toHaveBeenCalled();
   });

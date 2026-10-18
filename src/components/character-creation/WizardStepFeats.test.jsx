@@ -1,19 +1,37 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @maintained-by-ai
+// WizardStepFeats owns: the feat-step wiring over SelectableList (SelectableList.test.jsx
+// owns the shared list/search/toggle internals), the exact onArrayFieldChange payloads
+// through this component's checkbox/Add Another/Remove One controls, the selection-count
+// summary sentence, the pre-selected lock (this component's DOM guards), the
+// repeatable-badge/Remove-One gates (RepeatableFeatActions lives here), the
+// computedBuffs summary, warning display, and the 2024 Versatile-trait panel.
+// Prereq/description rendering rules live in FeatItemDetails; prerequisite *formats on
+// disk are dict-or-null only (public/data/2024/feats.json), so fixtures stay disk-faithful.
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepFeats from './WizardStepFeats.jsx';
 import * as featValidation from '../../services/character/featValidation.js';
 
-vi.mock('../../services/character/featValidation.js', () => ({
-  validateFeats: vi.fn(() => Promise.resolve([])),
-  getFeatLimits: vi.fn(() => Promise.resolve({ allowed: 2, originRequired: false, details: 'Test rules' })),
-  normalizeFeatDescription: vi.fn((feat) => ({ text: feat.description || (feat.desc && feat.desc[0]) || '', isHtml: !!feat.description })),
-  getRaceFeatChoices: vi.fn(() => Promise.resolve([])),
+// Async rule services hit the network via dataLoader — mocked with disk-faithful
+// outputs for level 8 '2024' (public/data/rules-validation.json feats.available_levels
+// [4,8,12,16,19] → allowed 2; details copied verbatim from featValidation.getFeatLimits).
+// normalizeFeatDescription is pure and stays REAL via importActual.
+vi.mock('../../services/character/featValidation.js', async (importActual) => ({
+  ...(await importActual()),
+  validateFeats: vi.fn(async () => []),
+  getFeatLimits: vi.fn(async () => ({
+    allowed: 2,
+    originRequired: true,
+    details: 'Level 1 2024 characters get 1 Origin feat from their background, plus additional feats at levels 4, 8, 12, 16, 19',
+  })),
+  getRaceFeatChoices: vi.fn(async () => []),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
+  sanitizeHtml: (html) => html,
 }));
 
+// Per-feat buff math is owned by featBuffService's own test suites; keep it inert here.
 vi.mock('../../services/character/featBuffService.js', () => ({
   computeFeatBuffs: vi.fn(() => ({
     abilityScoreIncreases: [],
@@ -23,28 +41,47 @@ vi.mock('../../services/character/featBuffService.js', () => ({
   })),
 }));
 
-const mockFeats = [
-  { index: 'great-weapon-master', name: 'Great Weapon Master', type: 'Combat', description: 'Bonus attack' },
-  { index: 'sharpshooter', name: 'Sharpshooter', desc: ['No disadvantage on long range'] },
-  { index: 'lucky', name: 'Lucky', prerequisites: { level: 4 } },
-  { index: 'magic-initiate', name: 'Magic Initiate', type: 'General', description: '<p>Learn two cantrips</p>', prerequisites: ['Spellcasting feature', '4th level'] },
-  { index: 'actor', name: 'Actor', type: 'General', desc: ['You master disguise and mimicry'], prerequisites: 'Charisma 13 or higher' },
-  { index: 'observant', name: 'Observant', type: 'General', desc: ['Keen observation'], prerequisites: { name: 'Proficiency with Perception' } },
-  { index: 'weapon-master', name: 'Weapon Master', type: 'Combat', description: '<p><strong>Master</strong> all weapons</p>' },
-];
-
-const mockFormData = {
-  feats: [],
-  level: 4,
-  rules: '5e',
+// Faithful excerpts of public/data/2024/feats.json (names, types, descriptions,
+// prerequisites dict-or-null, repeatable flags all match disk exactly).
+const ASI = {
+  index: 'ability-score-improvement',
+  name: 'Ability Score Improvement',
+  type: 'General Feat',
+  description: '<p>Increase one ability score of your choice by 2, or increase two ability scores of your choice by 1. This feat can’t increase an ability score above 20.</p>',
+  prerequisites: { level: 4 },
+  repeatable: true,
 };
+const ALERT = {
+  index: 'alert',
+  name: 'Alert',
+  description: 'Always on the lookout for danger, you gain the following benefits:',
+};
+const LUCKY = {
+  index: 'lucky',
+  name: 'Lucky',
+  type: 'Origin Feat',
+  description: '<p><b>Luck Points.</b> You have a number of Luck Points equal to your Proficiency Bonus and can spend the points on the benefits below.</p>',
+  prerequisites: null,
+};
+const MAGIC_INITIATE = {
+  index: 'magic-initiate',
+  name: 'Magic Initiate',
+  type: 'Origin Feat',
+  description: '<p><b>Two Cantrips.</b> You learn two cantrips of your choice from the Cleric, Druid, or Wizard spell list.</p>',
+  prerequisites: null,
+};
+const DISK_FEATS = [ASI, ALERT, LUCKY, MAGIC_INITIATE];
 
-function renderComponent(props) {
+const HUMAN_VERSATILE_FROM = ['Crafter', 'Fey Touched', 'Healer', 'Lucky', 'Magic Initiate', 'Musician', 'Savage Attacker', 'Shadow Touched', 'Skilled', 'Tavern Brawler', 'Tough'];
+
+const baseFormData = () => ({ feats: [], level: 8, rules: '2024' });
+
+function renderComponent(props = {}) {
   return render(
-    <WizardStepFeats stepNumber={8}
+    <WizardStepFeats
       stepNumber={8}
-      formData={mockFormData}
-      allFeats={mockFeats}
+      formData={baseFormData()}
+      allFeats={DISK_FEATS}
       onArrayFieldChange={vi.fn()}
       preSelectedFeats={[]}
       {...props}
@@ -52,305 +89,195 @@ function renderComponent(props) {
   );
 }
 
+const featRow = (name) => screen.getByText(name).closest('.list-item');
+
 describe('WizardStepFeats', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    featValidation.getRaceFeatChoices.mockReset().mockResolvedValue([]);
   });
 
-  describe('Rendering — pre-selected feats', () => {
-    it('should mark pre-selected feats with a pre-selected label', () => {
-      renderComponent({ preSelectedFeats: ['Great Weapon Master'] });
-      expect(screen.getByText('(Pre-selected)')).toBeInTheDocument();
-    });
+  it('renders step title, disk feat list with type badges, rules details and zero-count summary — and the loading message when allFeats is missing', async () => {
+    const { unmount } = renderComponent();
 
-    it('should not allow toggling pre-selected feats', () => {
-      const mockOnChange = vi.fn();
-      renderComponent({
-        formData: { ...mockFormData, feats: ['Great Weapon Master'] },
-        preSelectedFeats: ['Great Weapon Master'],
-        onArrayFieldChange: mockOnChange,
-      });
-      const preSelectedBody = document.querySelector('.list-item.pre-selected .list-item-body');
-      fireEvent.click(preSelectedBody);
-      expect(mockOnChange).not.toHaveBeenCalled();
-    });
+    expect(screen.getByRole('heading', { name: 'Step 8: Feats' })).toBeInTheDocument();
+    DISK_FEATS.forEach((feat) => expect(screen.getByText(feat.name)).toBeInTheDocument());
+    expect(within(featRow('Ability Score Improvement')).getByText('General Feat')).toBeInTheDocument();
+    expect(within(featRow('Lucky')).getByText('Origin Feat')).toBeInTheDocument();
+    expect(featRow('Alert').querySelector('.feat-type')).toBeNull(); // disk Alert has no type
+    await screen.findByText(/plus additional feats at levels 4, 8, 12, 16, 19/);
+    expect(screen.getByText('You have selected 0 of 2 allowed feat(s).')).toBeInTheDocument();
+    expect(document.querySelector('.warning-container')).toBeNull();
+    unmount();
+
+    renderComponent({ allFeats: null });
+    expect(screen.getByText('Feat data not yet loaded. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Ability Score Improvement')).not.toBeInTheDocument();
   });
 
-  describe('Rendering — expanded details', () => {
-    it('should show expanded content when "Show More" is clicked', async () => {
-      renderComponent();
-      const toggleBtns = screen.getAllByRole('button', { name: 'Show More' });
-      fireEvent.click(toggleBtns[0]);
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Show Less' })).toBeInTheDocument();
-      });
-    });
-
-    it('should render text descriptions from a feat with a desc field', async () => {
-      renderComponent();
-      const featName = 'Sharpshooter';
-      const featRow = screen.getByText(featName).closest('.list-item');
-      const toggleBtn = featRow.querySelector('.toggle-details-btn');
-      fireEvent.click(toggleBtn);
-
-      await waitFor(() => {
-        expect(screen.getByText('No disadvantage on long range')).toBeInTheDocument();
-      });
-    });
+  it.each([
+    [[], [], 'You have selected 0 of 2 allowed feat(s).'],
+    [['Alert', 'Lucky'], [], 'You have selected 2 of 2 allowed feat(s).'],
+    [['Alert', 'Lucky'], ['Alert'], 'You have selected 1 of 2 allowed feat(s) (plus 1 pre-selected feat).'],
+  ])('summary counts %j selected with %j pre-selected as the exact sentence', async (feats, preSelected, sentence) => {
+    renderComponent({ formData: { ...baseFormData(), feats }, preSelectedFeats: preSelected });
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
   });
 
-  describe('Rendering — prerequisites', () => {
-    it('should render prerequisites for feats with various prerequisite formats', async () => {
-      renderComponent();
-
-      // String prerequisite: "Charisma 13 or higher"
-      const actorRow = screen.getByText('Actor').closest('.list-item');
-      fireEvent.click(actorRow.querySelector('.toggle-details-btn'));
-      await waitFor(() => {
-        expect(actorRow.querySelector('.feat-prerequisites').textContent).toContain('Charisma 13 or higher');
-      });
-
-      // Object prerequisite: { level: 4 }
-      const luckyRow = screen.getByText('Lucky').closest('.list-item');
-      fireEvent.click(luckyRow.querySelector('.toggle-details-btn'));
-      await waitFor(() => {
-        expect(luckyRow.querySelector('.feat-prerequisites').textContent).toContain('Prerequisites:');
-        expect(luckyRow.querySelector('.feat-prerequisites').textContent).toContain('4');
-      });
-
-      // Array prerequisites: ['Spellcasting feature', '4th level']
-      const magicInitiateRow = screen.getByText('Magic Initiate').closest('.list-item');
-      fireEvent.click(magicInitiateRow.querySelector('.toggle-details-btn'));
-      await waitFor(() => {
-        expect(magicInitiateRow.querySelector('.feat-prerequisites').textContent).toContain('Spellcasting feature');
-        expect(magicInitiateRow.querySelector('.feat-prerequisites').textContent).toContain('4th level');
-      });
-
-      // Object with name: { name: 'Proficiency with Perception' }
-      const observantRow = screen.getByText('Observant').closest('.list-item');
-      fireEvent.click(observantRow.querySelector('.toggle-details-btn'));
-      await waitFor(() => {
-        expect(observantRow.querySelector('.feat-prerequisites').textContent).toContain('Proficiency with Perception');
-      });
+  it.each([
+    ['ticks a feat', [], 'Alert', ['Alert']],
+    ['ticks Ability Score Improvement alongside others', ['Magic Initiate'], 'Ability Score Improvement', ['Magic Initiate', 'Ability Score Improvement']],
+    ['un-ticks Ability Score Improvement (FT-001 serialization)', ['Alert', 'Ability Score Improvement'], 'Ability Score Improvement', ['Alert']],
+  ])('checkbox click %s emits the exact onChange payload', (_case, selected, clickName, expected) => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats: selected },
+      allFeats: DISK_FEATS,
+      onArrayFieldChange,
     });
-
-    it('should not render prerequisites when the feat has none', async () => {
-      const featsNoPrereqs = [
-        { index: 'no-prereq-feat', name: 'No Prereqs Feat' },
-      ];
-      renderComponent({ allFeats: featsNoPrereqs });
-      const featRow = screen.getByText('No Prereqs Feat').closest('.list-item');
-      fireEvent.click(featRow.querySelector('.toggle-details-btn'));
-
-      await waitFor(() => {
-        expect(screen.queryByText('Prerequisites:')).not.toBeInTheDocument();
-      });
-    });
+    fireEvent.click(featRow(clickName).querySelector('.list-item-checkbox'));
+    expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
+    expect(onArrayFieldChange).toHaveBeenCalledWith('feats', expected);
   });
 
-  describe('Rendering — buffs and summary', () => {
-    it('should render buff counts in summary when buffs are provided', async () => {
-      renderComponent({
-        allFeats: [{ index: 'asi-feat', name: 'ASI Feat' }],
-        formData: { ...mockFormData, feats: ['ASI Feat'] },
-        computedBuffs: {
-          abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
-          proficiencies: [{ name: 'Longswords' }],
-          resistances: ['Fire'],
-          features: [{ name: 'Darkvision' }],
+  it('marks pre-selected feats and locks them: label shown, checkbox and body clicks are inert', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats: ['Lucky'] },
+      preSelectedFeats: ['Lucky'],
+      onArrayFieldChange,
+    });
+
+    const row = featRow('Lucky');
+    expect(row).toHaveClass('pre-selected');
+    expect(within(row).getByText('(Pre-selected)')).toBeInTheDocument();
+    expect(row.querySelector('.list-item-checkbox')).toHaveClass('checked');
+
+    fireEvent.click(row.querySelector('.list-item-body'));
+    fireEvent.click(row.querySelector('.list-item-checkbox'));
+    expect(onArrayFieldChange).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Luck Points/)).not.toBeInTheDocument(); // body click did not expand
+  });
+
+  it('expands a feat on body click with disk prerequisite text and description, and omits the prerequisites block when disk has none', () => {
+    renderComponent();
+
+    const asiRow = featRow('Ability Score Improvement');
+    fireEvent.click(asiRow.querySelector('.list-item-body'));
+    expect(asiRow.querySelector('.feat-prerequisites').textContent).toBe('Prerequisites: {"level":4}'); // disk shape: { level: 4 }
+    expect(asiRow.querySelector('.feat-description').textContent).toContain('increase two ability scores of your choice by 1');
+    expect(within(asiRow).getByRole('button', { name: 'Show Less' })).toBeInTheDocument();
+
+    const alertRow = featRow('Alert');
+    fireEvent.click(alertRow.querySelector('.list-item-body'));
+    expect(alertRow.querySelector('.feat-description').textContent).toContain('Always on the lookout for danger');
+    expect(alertRow.querySelector('.feat-prerequisites')).toBeNull();
+  });
+
+  it.each([
+    ['selected twice by the user', ['Ability Score Improvement', 'Ability Score Improvement'], [], true, ['Ability Score Improvement']],
+    ['selected once by the user', ['Ability Score Improvement'], [], true, []],
+    ['pre-selected twice', ['Ability Score Improvement', 'Ability Score Improvement'], ['Ability Score Improvement'], false, null],
+  ])('repeatable feat %s shows badge and gates Remove One behind %s', (_case, feats, preSelected, removeAllowed, removePayload) => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats },
+      preSelectedFeats: preSelected,
+      onArrayFieldChange,
+    });
+
+    const row = featRow('Ability Score Improvement');
+    if (feats.length > 1) {
+      expect(within(row).getByText('(2)')).toBeInTheDocument();
+    } else {
+      expect(within(row).queryByText(/\(\d+\)/)).not.toBeInTheDocument();
+    }
+    expect(row.querySelector('.add-another-btn')).toBeInTheDocument();
+    expect(!!row.querySelector('.remove-feat-btn')).toBe(removeAllowed);
+
+    if (removeAllowed) {
+      fireEvent.click(row.querySelector('.remove-feat-btn'));
+      expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
+      expect(onArrayFieldChange).toHaveBeenCalledWith('feats', removePayload);
+    } else {
+      expect(onArrayFieldChange).not.toHaveBeenCalled();
+    }
+  });
+
+  // Pins CURRENT wiring defect: "Add Another" routes through SelectableList's generic
+  // toggle, which REMOVES all instances of an already-selected repeatable instead of
+  // adding one. When the defect is fixed this pin must flip to expect another copy added.
+  it('Add Another currently re-toggles instead of adding — clicking it drops the whole repeatable selection', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats: ['Magic Initiate', 'Ability Score Improvement'] },
+      onArrayFieldChange,
+    });
+    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
+    expect(onArrayFieldChange).toHaveBeenCalledWith('feats', ['Magic Initiate']);
+  });
+
+  it('summarizes computedBuffs by category, filtering "any" ASI choices, and omits the section when everything is empty', () => {
+    const { unmount } = renderComponent({
+      formData: { ...baseFormData(), feats: ['Ability Score Improvement'] },
+      computedBuffs: {
+        abilityScoreIncreases: [{ name: 'Wisdom', amount: 2 }, { name: 'any', amount: 2 }],
+        proficiencies: [{ name: 'Medium Armor' }],
+        resistances: ['Necrotic'],
+        features: [{ name: 'Darkvision' }],
+      },
+    });
+
+    const summary = document.querySelector('.feat-buffs-summary');
+    expect(summary).toHaveTextContent('Applied Buffs');
+    expect(within(summary).getByText('• 1 ability score increase(s)')).toBeInTheDocument();
+    expect(within(summary).getByText('• 1 proficiency/proficiencie(s)')).toBeInTheDocument();
+    expect(within(summary).getByText('• 1 resistance(s)')).toBeInTheDocument();
+    expect(within(summary).getByText('• 1 passive/feature buff(s)')).toBeInTheDocument();
+    unmount();
+
+    renderComponent({
+      computedBuffs: { abilityScoreIncreases: [{ name: 'any', amount: 2 }], proficiencies: [], resistances: [], features: [] },
+    });
+    expect(document.querySelector('.feat-buffs-summary')).toBeNull();
+  });
+
+  it('renders validateFeats warnings and infos inside typed warning messages', async () => {
+    featValidation.validateFeats.mockResolvedValueOnce([
+      { message: 'Rules allow 2 feat(s) at level 8. You have selected 3.', type: 'warning' },
+      { message: 'Lucky requires: Charisma 13 or higher. Verify your character meets this requirement.', type: 'info' },
+    ]);
+
+    renderComponent({ formData: { ...baseFormData(), feats: ['Alert', 'Lucky', 'Magic Initiate'] } });
+
+    const messages = await screen.findAllByText(/Rules allow 2 feat\(s\) at level 8|Lucky requires: Charisma 13/);
+    expect(messages).toHaveLength(2);
+    expect(document.querySelectorAll('.warning-message.warning')).toHaveLength(1);
+    expect(document.querySelectorAll('.warning-message.info')).toHaveLength(1);
+  });
+
+  it('shows 2024 Versatile-trait Origin feat choices from disk, and stays silent for 5e or races without choices', async () => {
+    const { unmount } = renderComponent({ formData: { ...baseFormData(), rules: '5e' } });
+    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument();
+    expect(featValidation.getRaceFeatChoices).not.toHaveBeenCalled(); // 5e guard
+    unmount();
+
+    renderComponent({ formData: { ...baseFormData(), rules: '2024', race: null } });
+    await screen.findByRole('heading', { name: 'Step 8: Feats' });
+    expect(screen.queryByText(/Versatile Trait:/)).not.toBeInTheDocument(); // 2024 but no choices
+    unmount();
+
+    featValidation.getRaceFeatChoices.mockResolvedValueOnce(HUMAN_VERSATILE_FROM);
+    renderComponent({
+      formData: {
+        ...baseFormData(),
+        race: {
+          name: 'Human',
+          traits: [{ name: 'Versatile', description: 'You gain an Origin feat of your choice (see chapter 5). Skilled is recommended.', proficiency_choices: { choose: 1, from: HUMAN_VERSATILE_FROM } }],
         },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Applied Buffs/)).toBeInTheDocument();
-        expect(screen.getByText(/1 ability score increase/)).toBeInTheDocument();
-        expect(screen.getByText(/1 proficiency/)).toBeInTheDocument();
-        expect(screen.getByText(/1 resistance/)).toBeInTheDocument();
-        expect(screen.getByText('• 1 passive/feature buff(s)')).toBeInTheDocument();
-      });
+      },
     });
 
-    it('should display the rules details from featLimits', async () => {
-      featValidation.getFeatLimits.mockResolvedValueOnce({
-        allowed: 5,
-        originRequired: false,
-        details: 'Feats at levels 4, 8, 12, 16, 19',
-      });
-      renderComponent();
-
-      await waitFor(() => {
-        expect(screen.getByText(/Feats at levels/)).toBeInTheDocument();
-      });
-    });
-
-    it('should display the correct count of user-selected vs allowed feats', async () => {
-      renderComponent({ formData: { ...mockFormData, feats: ['Great Weapon Master', 'Lucky'] } });
-      await waitFor(() => {
-        expect(screen.getByText(/2 of 2 allowed/)).toBeInTheDocument();
-      });
-    });
-
-    it('should display user-selected count excluding pre-selected feats', async () => {
-      renderComponent({
-        formData: { ...mockFormData, feats: ['Great Weapon Master', 'Lucky'] },
-        preSelectedFeats: ['Great Weapon Master'],
-      });
-      await waitFor(() => {
-        expect(screen.getByText(/1 of 2 allowed/)).toBeInTheDocument();
-        expect(screen.getByText(/plus 1 pre-selected feat/)).toBeInTheDocument();
-      });
-    });
-
-    it('should not mention background feat count when there are none', async () => {
-      renderComponent({ formData: { ...mockFormData, feats: ['Lucky'] } });
-      await waitFor(() => {
-        expect(screen.getByText(/1 of 2 allowed/)).toBeInTheDocument();
-        expect(screen.queryByText(/plus/)).not.toBeInTheDocument();
-      });
-    });
-
-    it('should display zero selected when no feats are chosen', async () => {
-      renderComponent();
-      await waitFor(() => {
-        expect(screen.getByText(/0 of 2 allowed/)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Rendering — warnings', () => {
-    it('should display validation warnings when validateFeats returns warnings', async () => {
-      featValidation.validateFeats.mockResolvedValueOnce([
-        { message: 'Too many feats selected', type: 'warning' },
-        { message: 'Consider an Origin feat', type: 'info' },
-      ]);
-
-      renderComponent({ formData: { ...mockFormData, feats: ['Great Weapon Master', 'Sharpshooter', 'Lucky'] } });
-
-      await waitFor(() => {
-        expect(screen.getByText('Too many feats selected')).toBeInTheDocument();
-        expect(screen.getByText('Consider an Origin feat')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Race feat choices for 2024 ruleset', () => {
-    it('should display versatile trait info when race has Versatile trait and choices are available', async () => {
-      featValidation.getRaceFeatChoices.mockResolvedValueOnce(['Skilled', 'Observant']);
-      const { container } = renderComponent({
-        formData: {
-          ...mockFormData,
-          rules: '2024',
-          race: { name: 'Human', traits: [{ name: 'Versatile', proficiency_choices: { from: ['Skilled', 'Observant'] } }] },
-        },
-      });
-
-      await waitFor(() => {
-        const versatileSection = container.querySelector('.versatile-trait-info');
-        expect(versatileSection).toBeInTheDocument();
-        expect(versatileSection).toHaveTextContent('Skilled');
-        expect(versatileSection).toHaveTextContent('Observant');
-      });
-    });
-
-    it('should not display versatile trait info for 5e ruleset', async () => {
-      renderComponent({ formData: { ...mockFormData, rules: '5e' } });
-
-      await waitFor(() => {
-        expect(screen.queryByText(/Versatile Trait/)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Repeatable feats', () => {
-    it('should show a count badge for repeatable feats with multiple selections', () => {
-      const repeatableFeats = [
-        { index: 'war-chant', name: 'War Chant', repeatable: true },
-      ];
-      renderComponent({
-        allFeats: repeatableFeats,
-        formData: { ...mockFormData, feats: ['War Chant', 'War Chant', 'War Chant'] },
-      });
-
-      expect(screen.getByText('(3)')).toBeInTheDocument();
-    });
-
-    it('should render "Add Another" button for selected repeatable feats', () => {
-      const repeatableFeats = [
-        { index: 'war-chant', name: 'War Chant', repeatable: true },
-      ];
-      renderComponent({
-        allFeats: repeatableFeats,
-        formData: { ...mockFormData, feats: ['War Chant'] },
-      });
-
-      expect(screen.getByText('Add Another')).toBeInTheDocument();
-    });
-
-    it('should render "Remove One" button for selected repeatable feats with count >= 1', () => {
-      const repeatableFeats = [
-        { index: 'war-chant', name: 'War Chant', repeatable: true },
-      ];
-      renderComponent({
-        allFeats: repeatableFeats,
-        formData: { ...mockFormData, feats: ['War Chant', 'War Chant'] },
-      });
-
-      expect(screen.getByText('Remove One')).toBeInTheDocument();
-    });
-
-    it('should call onArrayFieldChange with empty array when "Add Another" is clicked on a selected repeatable feat', () => {
-      const mockOnChange = vi.fn();
-      const repeatableFeats = [
-        { index: 'war-chant', name: 'War Chant', repeatable: true },
-      ];
-      renderComponent({
-        allFeats: repeatableFeats,
-        formData: { ...mockFormData, feats: ['War Chant'] },
-        onArrayFieldChange: mockOnChange,
-      });
-
-      fireEvent.click(screen.getByText('Add Another'));
-      expect(mockOnChange).toHaveBeenCalledWith('feats', []);
-    });
-  });
-
-  describe('FT-001 Ability Score Improvement serialization', () => {
-    const asiFeat = { index: 'ability-score-improvement', name: 'Ability Score Improvement', type: 'General Feat', prerequisites: { level: 4 }, repeatable: true };
-
-    it('adds Ability Score Improvement to feats when ticked', () => {
-      const mockOnChange = vi.fn();
-      renderComponent({
-        allFeats: [asiFeat],
-        formData: { ...mockFormData, rules: '2024', level: 8, feats: ['Magic Initiate'] },
-        onArrayFieldChange: mockOnChange,
-      });
-      const row = [...document.querySelectorAll('.list-item')].find(el => el.textContent.includes('Ability Score Improvement'));
-      fireEvent.click(row.querySelector('.list-item-checkbox'));
-      expect(mockOnChange).toHaveBeenCalledWith('feats', ['Magic Initiate', 'Ability Score Improvement']);
-    });
-
-    it('removes Ability Score Improvement from feats when un-ticked', () => {
-      const mockOnChange = vi.fn();
-      renderComponent({
-        allFeats: [asiFeat],
-        formData: { ...mockFormData, rules: '2024', level: 8, feats: ['Magic Initiate', 'Ability Score Improvement'] },
-        onArrayFieldChange: mockOnChange,
-      });
-      const row = [...document.querySelectorAll('.list-item')].find(el => el.textContent.includes('Ability Score Improvement'));
-      fireEvent.click(row.querySelector('.list-item-checkbox'));
-      expect(mockOnChange).toHaveBeenCalledWith('feats', ['Magic Initiate']);
-    });
-  });
-
-  describe('Edge cases', () => {
-    it('should render the wizard step title when allFeats is null or undefined', () => {
-      const { rerender } = render(<WizardStepFeats stepNumber={8} formData={mockFormData} allFeats={null} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
-      expect(screen.getByText('Step 8: Feats')).toBeInTheDocument();
-
-      rerender(<WizardStepFeats stepNumber={8} formData={mockFormData} allFeats={undefined} onArrayFieldChange={vi.fn()} preSelectedFeats={[]} />);
-      expect(screen.getByText('Step 8: Feats')).toBeInTheDocument();
-    });
+    const section = await screen.findByText(/Available options: Crafter, Fey Touched, Healer, Lucky, Magic Initiate, Musician, Savage Attacker, Shadow Touched, Skilled, Tavern Brawler, Tough\. Skilled is recommended\./);
+    expect(section.closest('.versatile-trait-info')).toBeInTheDocument();
   });
 });

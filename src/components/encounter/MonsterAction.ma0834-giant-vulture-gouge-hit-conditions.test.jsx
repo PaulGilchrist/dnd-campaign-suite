@@ -2,54 +2,49 @@
 // condition until the end of its next turn" but the row shipped WITHOUT
 // hit_conditions, so the poisoned rider was structurally inert
 // (buildHitConditionClause reads hit_conditions/escape_dc keys only, NEVER
-// description; consumer live in handlePlainDamage.applyHitClauseConditions).
+// description; consumer live in handlePlainDamage.applyHitClauseConditions,
+// which stamps meta{source} only — duration residual stays GM-advisory, §70).
 // One-field DATA fix mirroring the dracolich MA-0621 byte-shape twin and the
-// ma0807/ma0819 template (MA-0010 seam): hit_conditions:["poisoned"] placed
-// after damage_type_primary. No escape_dc (no escape clause). Duration
-// residual ("until the end of its next turn") stays GM-advisory (§70 — the
-// hit-clause consumer stamps meta{source} only, no rounds clock).
-// Locks: disk row shape + key placement, clause arms with escapeDc:null,
-// "+4" attack chip stays live, no save fields on row.
+// ma0807/ma0819 template (MA-0010 seam): hit_conditions:["poisoned"] after
+// damage_type_primary. giant-vulture is deliberately NOT in the mega
+// HIT_CLAUSE_ROWS table (handlePlainDamage.hitClause.test.js:224-282), so
+// this file is the row's only lane — disk fingerprint + chip press, exact
+// bytes, nothing else. No escape_dc, no save fields, no escape clause.
+// @maintained-by-ai
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const GOUGE = monsters.find((m) => m.index === 'giant-vulture').actions[0];
 
-describe('MA-0834 disk fingerprint: giant-vulture Gouge poisoned rider fix', () => {
-  it('disk row carries hit_conditions ["poisoned"] after damage_type_primary (MA-0621 byte-shape)', () => {
-    expect(GOUGE.name).toBe('Gouge');
-    expect(GOUGE.hit_conditions).toEqual(['poisoned']);
-    const keys = Object.keys(GOUGE);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(GOUGE.attack_bonus).toBe(4);
-    expect(GOUGE.reach).toBe('5 ft.');
-    expect(GOUGE.damage_dice_primary).toBe('2d6 + 2');
-    expect(GOUGE.damage_type_primary).toBe('Piercing');
-  });
-
-  it('row carries NO escape_dc and NO save fields (no escape clause, attack ride, no save leg)', () => {
-    expect(GOUGE.escape_dc).toBeUndefined();
-    expect(GOUGE.save_dc).toBeUndefined();
-    expect(GOUGE.save_type).toBeUndefined();
-    expect(GOUGE.hit_target_effect).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Poisoned rider with escapeDc null (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(GOUGE);
-    expect(clause).toEqual({
-      conditions: ['poisoned'],
-      escapeDc: null,
-      attackName: 'Gouge',
-      targetEffect: null,
+describe('MA-0834 giant-vulture Gouge poisoned rider', () => {
+  it('disk fingerprint: exact row bytes, exact key order, hit_conditions ["poisoned"] after damage_type_primary, no escape/save fields', () => {
+    expect(GOUGE).toEqual({
+      name: 'Gouge',
+      description: 'Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d6 + 2) Piercing damage, and the target has the <strong>Poisoned</strong> condition until the end of its next turn.',
+      attack_bonus: 4,
+      reach: '5 ft.',
+      damage_dice_primary: '2d6 + 2',
+      damage_type_primary: 'Piercing',
+      hit_conditions: ['poisoned'],
     });
+    expect(Object.keys(GOUGE)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+    ]);
+    // Clause arming (escapeDc:null) + suppression + chip class of this exact
+    // row are owned generically by the mega lane
+    // (handlePlainDamage.hitClause.test.js:183-334) — not repeated here.
   });
 
-  it('attack half stays live: one "+4" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(GOUGE)).toBe(false);
+  it('chip press: one "+4" chip routes the exact disk row through onAttack by identity', () => {
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -64,9 +59,13 @@ describe('MA-0834 disk fingerprint: giant-vulture Gouge poisoned rider fix', () 
         onGatedReaction={vi.fn()}
       />
     );
-    const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
-    expect(chips).toEqual(['+4']);
-    fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Gouge', 4, expect.objectContaining({ name: 'Gouge' }));
+    const chips = [...container.querySelectorAll('.mc-dice-link')];
+    expect(chips.map((c) => c.textContent.trim())).toEqual(['+4']);
+    fireEvent.click(chips[0]);
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    const [name, bonus, row] = onAttack.mock.calls[0];
+    expect(name).toBe('Gouge');
+    expect(bonus).toBe(4);
+    expect(row).toBe(GOUGE);
   });
 });

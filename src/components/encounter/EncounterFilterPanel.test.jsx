@@ -1,155 +1,133 @@
+// @maintained-by-ai
+// Component-unit lane for EncounterFilterPanel: the panel's own render surface and
+// callback payloads. Filter STATE / filterMonsters lives in EncounterBuilder.helpers
+// (#401); builder-level filter-change dispatch wiring lives in builder lanes
+// (#399/#403/#406/#407) — do not duplicate those here.
+// NOTE (verified): EncounterFilterPanel.jsx:6 receives onEnvironmentChange but renders
+// NO environment control, so no env callback prop is even passed in this fixture.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
 
+// Fixture mirrors the props EncounterBuilder.jsx passes verbatim
+// (difficultyLabels at EncounterBuilder.jsx:20, colors at :581).
+const defaultFilter = {
+  difficulty: 2,
+  playerLevels: [5, 5],
+  totalThreshold: 600,
+  difficultyIndex: 2,
+  difficultyLabels: ['Easy', 'Medium', 'Hard', 'Deadly'],
+  difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
+};
+
 describe('EncounterFilterPanel', () => {
   let props;
 
-  const defaultFilter = {
-    difficulty: 2,
-    playerLevels: [5, 5],
-    totalThreshold: 600,
-    difficultyIndex: 2,
-    difficultyLabels: ['Easy', 'Medium', 'Hard', 'Deadly'],
-    difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
-  };
-
   beforeEach(() => {
-    vi.clearAllMocks();
     props = {
       filter: defaultFilter,
       onDifficultyChange: vi.fn(),
-      onEnvironmentChange: vi.fn(),
       onAddPlayer: vi.fn(),
       onRemovePlayer: vi.fn(),
       onPlayerLevelChange: vi.fn(),
     };
   });
 
-  describe('rendering', () => {
-    it('renders the difficulty select, party label, and add player button', () => {
-      render(<EncounterFilterPanel {...props} />);
-      expect(screen.getByRole('combobox', { name: /difficulty/i })).toBeInTheDocument();
-      expect(screen.getByText('Difficulty')).toBeInTheDocument();
-      expect(screen.getByText('Party')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /add player/i })).toBeInTheDocument();
-    });
-
-    it('renders player level rows with inputs and remove buttons', () => {
-      render(<EncounterFilterPanel {...props} />);
-      expect(screen.getByText('PC 1')).toBeInTheDocument();
-      expect(screen.getByText('PC 2')).toBeInTheDocument();
-      expect(screen.getByLabelText('PC 1')).toHaveValue(5);
-      expect(screen.getByLabelText('PC 2')).toHaveValue(5);
-      expect(screen.getByLabelText('Remove player 1')).toBeInTheDocument();
-      expect(screen.getByLabelText('Remove player 2')).toBeInTheDocument();
-    });
-
-    it('renders all four difficulty options', () => {
-      render(<EncounterFilterPanel {...props} />);
-      const options = screen.getAllByRole('option');
-      expect(options.map((o) => o.value)).toEqual(['0', '1', '2', '3']);
-      expect(options[0]).toHaveTextContent('Easy');
-      expect(options[1]).toHaveTextContent('Medium');
-      expect(options[2]).toHaveTextContent('Hard');
-      expect(options[3]).toHaveTextContent('Deadly');
-    });
-
-    it('renders no player rows when playerLevels is empty', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [] }} />);
-      expect(screen.queryByText(/^PC \d+$/)).not.toBeInTheDocument();
-    });
-
-    it('disables the remove button when only one player remains', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [5] }} />);
-      expect(screen.getByLabelText('Remove player 1')).toBeDisabled();
-    });
-
-    it('sets min and max attributes on player level inputs', () => {
-      render(<EncounterFilterPanel {...props} />);
-      const input = screen.getByLabelText('PC 1');
-      expect(input).toHaveAttribute('min', '1');
-      expect(input).toHaveAttribute('max', '20');
-    });
+  it('renders the difficulty select, party controls, and level rows reflecting the filter (min 1, max 20)', () => {
+    render(<EncounterFilterPanel {...props} />);
+    expect(screen.getByRole('combobox', { name: 'Difficulty' })).toBeInTheDocument();
+    expect(screen.getByText('Party')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add player' })).toBeInTheDocument();
+    expect(screen.getByLabelText('PC 1')).toHaveValue(5);
+    expect(screen.getByLabelText('PC 2')).toHaveValue(5);
+    expect(screen.getByLabelText('PC 1')).toHaveAttribute('min', '1');
+    expect(screen.getByLabelText('PC 1')).toHaveAttribute('max', '20');
+    expect(screen.getByLabelText('Remove player 1')).toBeEnabled();
+    expect(screen.getByLabelText('Remove player 2')).toBeEnabled();
   });
 
-  describe('difficulty dropdown', () => {
-    it('renders with the correct difficulty value selected', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficulty: 0 }} />);
-      expect(screen.getByRole('combobox', { name: /difficulty/i })).toHaveValue('0');
-    });
+  it('offers exactly Easy/Medium/Hard/Deadly options, reflects the selected difficulty, and emits the change event', () => {
+    const emitted = [];
+    props.onDifficultyChange = vi.fn((e) => emitted.push(e.target.value));
+    render(<EncounterFilterPanel {...props} />);
+    const select = screen.getByRole('combobox', { name: 'Difficulty' });
+    const options = select.querySelectorAll('option');
+    expect(options).toHaveLength(4);
+    expect([...options].map((o) => [o.value, o.textContent])).toEqual([
+      ['0', 'Easy'],
+      ['1', 'Medium'],
+      ['2', 'Hard'],
+      ['3', 'Deadly'],
+    ]);
+    expect(select).toHaveValue('2');
 
-    it('calls onDifficultyChange when selection changes', () => {
-      render(<EncounterFilterPanel {...props} />);
-      const select = screen.getByRole('combobox', { name: /difficulty/i });
-      fireEvent.change(select, { target: { value: '3' } });
-      expect(props.onDifficultyChange).toHaveBeenCalled();
-    });
+    // Value must be read inside the handler: the panel is controlled, so React
+    // restores the select to the unchanged prop value after dispatch.
+    fireEvent.change(select, { target: { value: '3' } });
+    expect(emitted).toEqual(['3']);
   });
 
-  describe('player actions', () => {
-    it('calls onAddPlayer when Add Player is clicked', () => {
-      render(<EncounterFilterPanel {...props} />);
-      fireEvent.click(screen.getByRole('button', { name: /add player/i }));
-      expect(props.onAddPlayer).toHaveBeenCalled();
-    });
+  it('renders no party rows for an empty party, and pins the remove button disabled with one player left', () => {
+    const { rerender } = render(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [] }} />);
+    expect(screen.queryByLabelText(/^PC \d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Remove player \d+$/)).not.toBeInTheDocument();
 
-    it('calls onRemovePlayer with the correct index', () => {
-      render(<EncounterFilterPanel {...props} />);
-      fireEvent.click(screen.getByLabelText('Remove player 1'));
-      expect(props.onRemovePlayer).toHaveBeenCalledWith(0);
-      fireEvent.click(screen.getByLabelText('Remove player 2'));
-      expect(props.onRemovePlayer).toHaveBeenCalledWith(1);
-    });
-
-    it('calls onPlayerLevelChange with numeric index and converted number value', () => {
-      render(<EncounterFilterPanel {...props} />);
-      const input = screen.getByLabelText('PC 1');
-      fireEvent.change(input, { target: { value: '10' } });
-      expect(props.onPlayerLevelChange).toHaveBeenCalledWith(0, 10);
-    });
-
-    it('updates player level inputs when filter changes', () => {
-      const { rerender } = render(<EncounterFilterPanel {...props} />);
-      const input1 = screen.getByLabelText('PC 1');
-      const input2 = screen.getByLabelText('PC 2');
-      expect(input1).toHaveValue(5);
-      expect(input2).toHaveValue(5);
-
-      rerender(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [8, 12] }} />);
-      expect(input1).toHaveValue(8);
-      expect(input2).toHaveValue(12);
-    });
+    rerender(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [7] }} />);
+    expect(screen.getByLabelText('PC 1')).toHaveValue(7);
+    expect(screen.getByLabelText('Remove player 1')).toBeDisabled();
   });
 
-  describe('threshold display', () => {
-    it('shows the threshold value formatted with toLocaleString', () => {
-      render(<EncounterFilterPanel {...props} />);
-      expect(screen.getByText(/600 XP/)).toBeInTheDocument();
-    });
+  it('dispatches onAddPlayer and onRemovePlayer with the exact row index', () => {
+    render(<EncounterFilterPanel {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add player' }));
+    expect(props.onAddPlayer).toHaveBeenCalledTimes(1);
 
-    it('shows the difficulty label in the threshold display', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyIndex: 0 }} />);
-      expect(screen.getByText(/Target:.*Easy/)).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByLabelText('Remove player 1'));
+    expect(props.onRemovePlayer).toHaveBeenCalledWith(0);
+    fireEvent.click(screen.getByLabelText('Remove player 2'));
+    expect(props.onRemovePlayer).toHaveBeenCalledWith(1);
+  });
 
-    it('shows Unknown when difficultyLabels is null or out of bounds', () => {
-      const { filter } = props;
-      const { rerender } = render(<EncounterFilterPanel {...props} filter={{ ...filter, difficultyLabels: null }} />);
-      expect(screen.getByText(/Unknown/)).toBeInTheDocument();
+  it('emits onPlayerLevelChange with numeric index and number-converted level for each row', () => {
+    render(<EncounterFilterPanel {...props} />);
+    fireEvent.change(screen.getByLabelText('PC 1'), { target: { value: '10' } });
+    expect(props.onPlayerLevelChange).toHaveBeenCalledWith(0, 10);
 
-      rerender(<EncounterFilterPanel {...props} filter={{ ...filter, difficultyIndex: 10 }} />);
-      expect(screen.getByText(/Unknown/)).toBeInTheDocument();
-    });
+    fireEvent.change(screen.getByLabelText('PC 2'), { target: { value: '3' } });
+    expect(props.onPlayerLevelChange).toHaveBeenCalledWith(1, 3);
+  });
 
-    it('formats large thresholds with commas', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, totalThreshold: 15000 }} />);
-      expect(screen.getByText(/15,000 XP/)).toBeInTheDocument();
-    });
+  it('keeps level inputs controlled — new playerLevels props update the displayed values', () => {
+    const { rerender } = render(<EncounterFilterPanel {...props} />);
+    expect(screen.getByLabelText('PC 1')).toHaveValue(5);
+    expect(screen.getByLabelText('PC 2')).toHaveValue(5);
 
-    it('falls back to default color when difficultyColors is null', () => {
-      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyColors: null }} />);
-      expect(screen.getByText(/600 XP/)).toBeInTheDocument();
+    rerender(<EncounterFilterPanel {...props} filter={{ ...props.filter, playerLevels: [8, 12] }} />);
+    expect(screen.getByLabelText('PC 1')).toHaveValue(8);
+    expect(screen.getByLabelText('PC 2')).toHaveValue(12);
+  });
+
+  it('displays the target threshold with locale formatting and the difficulty label and border color', () => {
+    const { rerender } = render(<EncounterFilterPanel {...props} />);
+    const display = screen.getByText(/Target:/);
+    expect(display.textContent).toBe('Target: 600 XP (Hard)');
+    expect(display.getAttribute('style')).toContain('border-left-color: rgb(253, 126, 20)');
+
+    rerender(<EncounterFilterPanel {...props} filter={{ ...props.filter, totalThreshold: 15000 }} />);
+    expect(screen.getByText(/Target:/).textContent).toBe('Target: 15,000 XP (Hard)');
+  });
+
+  // jsdom serializes hex colors to rgb(); the source value stays the
+  // builder's verbatim '#fd7e14' (EncounterBuilder.jsx:581).
+  describe.each([
+    ['null labels', { difficultyLabels: null }, 'Unknown', 'rgb(253, 126, 20)'],
+    ['out-of-bounds index', { difficultyIndex: 10 }, 'Unknown', 'var(--color-text)'],
+    ['null colors', { difficultyColors: null }, 'Hard', 'var(--color-text)'],
+  ])('falls back to %s', (_case, patch, expectedLabel, expectedBorder) => {
+    it(`renders label "${expectedLabel}" with border ${expectedBorder}`, () => {
+      render(<EncounterFilterPanel {...props} filter={{ ...props.filter, ...patch }} />);
+      expect(screen.getByText(/Target:/).textContent).toContain(`(${expectedLabel})`);
+      expect(screen.getByText(/Target:/).getAttribute('style')).toContain(`border-left-color: ${expectedBorder}`);
     });
   });
 });

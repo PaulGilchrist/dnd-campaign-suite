@@ -1,9 +1,15 @@
-// MA-1212: zoneOnly picker CONFIRM with the rapport_spores zoneTe — te
-// registered per picker-SELECTED creature (effect rapport_spores, source=
-// caster, dc null), caster tracking `_rapport_spores_<caster>` with duration
-// '1 hour', GM-enforced. NO save rolled, NO damage applied, NO expression
-// rolled (saveDc null → saveNote "no save"). MA-0042/MA-0595 byte-twin
-// consumer path, untouched code — this pins the rapport payload through it.
+// @maintained-by-ai
+// MA-1212/1217/1220: zoneOnly picker CONFIRM through the rapport_spores lane.
+// Rapport-specific semantics pinned here (zone fundamentals live in lair-zone
+// #217, save-less zero-roll guard in lair-darkness #215): the ONLY engine
+// exemption is the caster (INT≥2 / non-Construct/Elemental/Undead inclusion
+// stays GM-advisory — every board creature is selectable); te is registered
+// per picker-SELECTED creature (effect rapport_spores, source=caster, dc
+// null, duration until_end_of_zone); caster tracking `_rapport_spores_<caster>`
+// carries duration '1 hour' + affectedNames; log is honest ("no save",
+// "Duration 1 hour — GM-enforced"). NO save prompt, NO rolls, NO damage.
+// Sovereign/sprout rows are disk byte-twins of adult (identical zone object)
+// — run as one parameterized twin lane to prove caster-name derivation.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -72,23 +78,15 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 }));
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
+import { sendSavePrompt } from '../../../../services/combat/conditions/savePromptService.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import { rollExpression } from '../../../../services/dice/diceRoller.js';
 
-const RAPPORT = monstersData.find(m => m.index === 'myconid-adult').actions[2];
-const ACTION = { ...RAPPORT, save_dc: null };
-// MA-1217: sovereign byte-twin row — same payload through the same consumer.
-const SOV_RAPPORT = monstersData.find(m => m.index === 'myconid-sovereign').actions[4];
-// MA-1220: sprout byte-twin row — same payload through the same consumer.
-const SPR_RAPPORT = monstersData.find(m => m.index === 'myconid-sprout').actions[1];
+function rapportAction(meta) {
+  return { ...monstersData.find(m => m.index === meta.index).actions[meta.actionIdx], save_dc: null };
+}
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  seenTargets.current = [];
-});
-
-function renderRapportZone(action = ACTION, caster = 'Myconid Adult 1') {
+function renderRapportZone(action, caster) {
   return render(
     <SaveAttackAoeModal
       action={action}
@@ -111,105 +109,75 @@ function renderRapportZone(action = ACTION, caster = 'Myconid Adult 1') {
   );
 }
 
+function armedLog() {
+  return addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('rapport_spores zone armed'));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  seenTargets.current = [];
+});
+
+const ADULT = { index: 'myconid-adult', actionIdx: 2, caster: 'Myconid Adult 1' };
+const TWINS = [
+  { index: 'myconid-sovereign', actionIdx: 4, caster: 'Myconid Sovereign 1' },
+  { index: 'myconid-sprout', actionIdx: 1, caster: 'Myconid Sprout 1' },
+];
+
 describe('MA-1212 rapport_spores zoneOnly confirm: te grant, zero rolls, zero damage', () => {
-  it('confirm registers rapport_spores te per selected creature (dc null, radius 30) with NO save/attack/damage rolls', async () => {
-    const { getByText } = renderRapportZone();
+  it('adult caster is the only exemption — confirm grants dc-null te to every selected creature, writes 1-hour tracking + honest "no save" log, zero prompts/rolls/damage', async () => {
+    const { getByText } = renderRapportZone(rapportAction(ADULT), ADULT.caster);
+    // Rapport inclusion is GM-advisory (INT/type exclusions NOT engine-enforced):
+    // every board creature is selectable except the caster.
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Bandit', 'Thug 1']));
+    // Pre-confirm inertness: picker open, zero writes, zero rolls.
+    expect(runtime.store['campaign.targetEffects']).toBeFalsy();
+    expect(addEntry).not.toHaveBeenCalled();
+
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
-    const te = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
-    expect(te.map(t => t.target).sort()).toEqual(['Bandit', 'Thug 1']);
-    expect(te[0].source).toBe('Myconid Adult 1');
-    expect(te[0].dc ?? null).toBeNull();
-    expect(te[0].radiusFt).toBe(30);
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-  });
+    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
+    expect(tes.map(t => t.target).sort()).toEqual(['Bandit', 'Thug 1']);
+    expect(tes.every(t => t.source === ADULT.caster && (t.dc ?? null) === null && t.radiusFt === 30 && t.duration === 'until_end_of_zone')).toBe(true);
 
-  it('caster tracking `_rapport_spores_Myconid_Adult_1` carries affectedNames + duration 1 hour; log says "no save" + GM-enforced clause', async () => {
-    const { getByText } = renderRapportZone();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Myconid Adult 1._rapport_spores_Myconid_Adult_1']).toBeTruthy());
+    // Caster tracking: save-less, damageless, 1-hour duration, affected roster.
     const tracking = runtime.store['Myconid Adult 1._rapport_spores_Myconid_Adult_1'];
-    expect(tracking.saveDc).toBeNull();
-    expect(tracking.radiusFt).toBe(30);
-    expect(tracking.damage).toBeNull();
-    expect(tracking.duration).toBe('1 hour');
+    expect(tracking).toMatchObject({ saveDc: null, damage: null, radiusFt: 30, duration: '1 hour' });
     expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Thug 1']);
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('rapport_spores zone armed'));
+
+    // Honest arm log: no save, duration clause is GM-enforced (no clock).
+    const log = armedLog();
     expect(log).toBeTruthy();
     expect(log.description).toMatch(/no save/);
     expect(log.description).toMatch(/Duration 1 hour — GM-enforced/);
-    expect(log.description).toMatch(/GM-enforced/);
-  });
 
-  // MA-1217: sovereign byte-twin confirm — same te grant through the same consumer.
-  it('MA-1217 sovereign confirm registers rapport_spores te per selected creature (source sovereign, dc null) with NO save/attack/damage rolls', async () => {
-    const { getByText } = renderRapportZone({ ...SOV_RAPPORT, save_dc: null }, 'Myconid Sovereign 1');
-    // sovereign is not on the mocked board — only it would be excluded, so all 3 stand
-    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
-    const te = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
-    expect(te.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-    expect(te[0].source).toBe('Myconid Sovereign 1');
-    expect(te[0].dc ?? null).toBeNull();
-    expect(te[0].radiusFt).toBe(30);
+    expect(sendSavePrompt).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
     expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
   });
 
-  // MA-1220: sprout byte-twin confirm — same te grant through the same consumer.
-  // §183 honesty: sprout caster is NOT on the mocked combat board, so only it
-  // is excluded — adult/Thug 1/Bandit all remain selectable (3).
-  it('MA-1220 sprout confirm registers rapport_spores te per selected creature (source sprout, dc null) with NO save/attack/damage rolls', async () => {
-    const { getByText } = renderRapportZone({ ...SPR_RAPPORT, save_dc: null }, 'Myconid Sprout 1');
-    await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
-    const te = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
-    expect(te.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-    expect(te[0].source).toBe('Myconid Sprout 1');
-    expect(te[0].dc ?? null).toBeNull();
-    expect(te[0].radiusFt).toBe(30);
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-  });
-
-  it('MA-1220 sprout caster tracking + grant log: "no save", GM-enforced clause, zero rolls', async () => {
-    const { getByText } = renderRapportZone({ ...SPR_RAPPORT, save_dc: null }, 'Myconid Sprout 1');
-    await waitFor(() => expect(seenTargets.current.length).toBe(3));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Myconid Sprout 1._rapport_spores_Myconid_Sprout_1']).toBeTruthy());
-    const tracking = runtime.store['Myconid Sprout 1._rapport_spores_Myconid_Sprout_1'];
-    expect(tracking.saveDc).toBeNull();
-    expect(tracking.radiusFt).toBe(30);
-    expect(tracking.damage).toBeNull();
-    expect(tracking.duration).toBe('1 hour');
-    expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('rapport_spores zone armed'));
-    expect(log).toBeTruthy();
-    expect(log.description).toMatch(/no save/);
-    expect(log.description).toMatch(/GM-enforced/);
-    expect(rollExpression).not.toHaveBeenCalled();
-  });
-
-  it('MA-1217 sovereign caster tracking + grant log: "no save", GM-enforced clause, zero rolls', async () => {
-    const { getByText } = renderRapportZone({ ...SOV_RAPPORT, save_dc: null }, 'Myconid Sovereign 1');
-    await waitFor(() => expect(seenTargets.current.length).toBe(3));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(runtime.store['Myconid Sovereign 1._rapport_spores_Myconid_Sovereign_1']).toBeTruthy());
-    const tracking = runtime.store['Myconid Sovereign 1._rapport_spores_Myconid_Sovereign_1'];
-    expect(tracking.saveDc).toBeNull();
-    expect(tracking.radiusFt).toBe(30);
-    expect(tracking.damage).toBeNull();
-    expect(tracking.duration).toBe('1 hour');
-    expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
-    const log = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && (e.description || '').includes('rapport_spores zone armed'));
-    expect(log).toBeTruthy();
-    expect(log.description).toMatch(/no save/);
-    expect(log.description).toMatch(/GM-enforced/);
-    expect(rollExpression).not.toHaveBeenCalled();
-  });
+  // MA-1217/MA-1220: sovereign + sprout are disk byte-twins of adult (identical
+  // zone object). Twin lane: caster is off the mocked board so nothing is
+  // excluded (all 3 granted); source and tracking key derive from caster name.
+  for (const twin of TWINS) {
+    it(`${twin.caster} confirm: all 3 selectable, te/tracking derive from caster name, zero rolls/damage`, async () => {
+      const { getByText } = renderRapportZone(rapportAction(twin), twin.caster);
+      await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Myconid Adult 1', 'Bandit', 'Thug 1']));
+      fireEvent.click(getByText('Confirm'));
+      const trackingKey = `${twin.caster}._rapport_spores_${twin.caster.replace(/\s+/g, '_')}`;
+      await waitFor(() => expect(runtime.store[trackingKey]).toBeTruthy());
+      const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'rapport_spores');
+      expect(tes.map(t => t.target).sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+      expect(tes.every(t => t.source === twin.caster && (t.dc ?? null) === null && t.radiusFt === 30 && t.duration === 'until_end_of_zone')).toBe(true);
+      const tracking = runtime.store[trackingKey];
+      expect(tracking).toMatchObject({ saveDc: null, damage: null, radiusFt: 30, duration: '1 hour' });
+      expect(tracking.affectedNames.sort()).toEqual(['Bandit', 'Myconid Adult 1', 'Thug 1']);
+      expect(armedLog().description).toMatch(/no save/);
+      expect(armedLog().description).toMatch(/GM-enforced/);
+      expect(sendSavePrompt).not.toHaveBeenCalled();
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+  }
 });

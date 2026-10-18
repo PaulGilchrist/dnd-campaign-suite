@@ -1,13 +1,15 @@
-import { render } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// First-paint lane for WeaponKindMasteryModal: exact header + instruction copy before any
+// selection (meleeOnly distinctness via prop omission, zero-selection count, default maxKinds 2).
+// Other lanes: maxKinds computation → WeaponKindMasteryModalMaxKinds.test.jsx, weapon rows →
+// WeaponKindMasteryModalWeaponList.test.jsx, selection/payload → ...Selection.test.jsx,
+// result view/close → ...Result.test.jsx, payload production → weaponKindMasteryHandler.test.js.
+
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../services/automation/index.js', () => ({
   applyWeaponKindMastery: vi.fn(),
-}));
-
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
 }));
 
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
@@ -22,54 +24,46 @@ const mockPlayerStats = {
     ],
   },
 };
-const mockCampaignName = 'test-campaign';
 
 const mockWeapons = [
   { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
   { name: 'Blowgun', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Ranged', mastery: 'Sap' },
   { name: 'Club', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
-  { name: 'Longbow', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Ranged', mastery: 'Vex' },
-  { name: 'Shortsword', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Vex' },
 ];
 
-const baseProps = {
-  action: undefined,
-  playerStats: mockPlayerStats,
-  campaignName: mockCampaignName,
-  onClose: vi.fn(),
-};
-
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
+function renderModal(props = {}) {
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    json: () => Promise.resolve(mockWeapons),
+  });
+  return render(
+    <WeaponKindMasteryModal
+      action={undefined}
+      playerStats={mockPlayerStats}
+      campaignName="test-campaign"
+      onClose={vi.fn()}
+      {...props}
+    />
+  );
 }
 
-function renderWithWeapons(overrides, weaponsToMock = mockWeapons) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    json: () => Promise.resolve(weaponsToMock),
-  });
-  globalThis.fetch = fetchMock;
-  return render(<WeaponKindMasteryModal {...makeProps(overrides)} />);
+function getInstruction() {
+  return screen.getByText((content, el) =>
+    el.tagName === 'P' && content.startsWith('Choose up to'));
 }
 
-describe('WeaponKindMasteryModal', () => {
+describe('WeaponKindMasteryModal — first paint', () => {
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('shows the mastery-choice header and zero-selection state before anything is picked', () => {
+    renderModal();
+    expect(screen.getByText(/Weapon Mastery — Choose Weapon Kinds/)).toBeInTheDocument();
+    expect(screen.getByText('Selected: 0/2')).toBeInTheDocument();
   });
 
-  describe('initial render', () => {
-    it('renders the instruction text with the correct maxKinds count and pluralization', () => {
-      renderWithWeapons();
-      const bodyP = document.querySelector('.sp-body p');
-      expect(bodyP.textContent).toContain('Choose up to');
-      expect(bodyP.textContent).toContain('2');
-      expect(bodyP.textContent).toContain('weapons');
-    });
-
-    it('renders the instruction text with "(Melee only)" suffix when meleeOnly is true', () => {
-      renderWithWeapons({ meleeOnly: true });
-      const bodyP = document.querySelector('.sp-body p');
-      expect(bodyP.textContent).toContain('Melee only');
-    });
+  it.each([
+    [false, 'Choose up to 2 weapons to apply Weapon Mastery:'],
+    [true, 'Choose up to 2 weapons to apply Weapon Mastery (Melee only):'],
+  ])('renders exact instruction copy with meleeOnly=%s', (meleeOnly, expectedCopy) => {
+    renderModal({ meleeOnly });
+    expect(getInstruction().textContent).toBe(expectedCopy);
   });
 });

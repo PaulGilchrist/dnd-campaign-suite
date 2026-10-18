@@ -1,39 +1,38 @@
+// @maintained-by-ai
+// Render/selection lane for SaveAttackHealModal: the pre-apply selection screen —
+// instruction text (save type/DC/range, damage preview, heal preview), the checkbox
+// list built from combatSummary (attacker excluded), count + apply-button gating
+// through the toggle path, and Cancel-to-close. Nothing here rolls dice or prompts
+// saves (dice mock throws on drift to pin that). Sibling lanes:
+// saveFlows.test.jsx owns save routing/arithmetic/persistence;
+// healFlows.test.jsx owns radio arbitration/report/Done;
+// npc-heal.test.jsx owns CLA-208 real HP restoration;
+// AreaEffectTargetModalBase.targets/.utils tests own eligible-target filtering
+// (incl. null/empty combatSummary and the "No valid targets in range." empty row).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackHealModal from './SaveAttackHealModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(() => 10),
-}));
-
+// Transport guard: this lane never applies, so these must stay uncalled.
 vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
 
+// Throw-on-drift dice: any roll here means apply/save/heal flow leaked into the
+// render/selection lane.
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
+  rollExpression: vi.fn((expr) => {
+    throw new Error(`Render/selection lane must not roll dice (asked for "${expr}")`);
+  }),
 }));
 
-vi.mock('../../../../services/ui/utils.js', () => ({
-  default: {
-    guid: vi.fn(() => 'test-guid-123'),
-  },
-}));
+// ── Re-import mocked modules ──
 
-vi.mock('../../../../services/ui/storage.js', () => ({
-  default: {
-    set: vi.fn(),
-    get: vi.fn(() => null),
-  },
-}));
-
-vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
-  applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
-  logHealingToSSE: vi.fn(),
-}));
+import * as savePromptService from '../../../../services/combat/conditions/savePromptService.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
 
 // ── Test fixtures ──
 
@@ -45,97 +44,86 @@ function getApplyButton() {
   return screen.getByRole('button', { name: /Divine Smite/ });
 }
 
+// The names the modal shows in its target rows, in render order.
+function getCheckboxNames() {
+  return Array.from(document.querySelectorAll('.abjure-target-row .abjure-target-name'))
+    .map(el => el.textContent);
+}
+
 // ── Tests ──
 
-describe('SaveAttackHealModal', () => {
+describe('SaveAttackHealModal — render/selection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // ── Initial render / display ──
+  it('displays save, damage, and heal instructions with zero targets selected', () => {
+    render(<SaveAttackHealModal {...makeProps()} />);
 
-  describe('initial render', () => {
-    it('displays save type and DC in the body instructions', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('CON');
-      expect(body.textContent).toContain('saving throw');
-      expect(body.textContent).toContain('DC 10');
-    });
-
-    it('displays the range in the instructions', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(screen.getByText(/Select creatures within 30 feet/)).toBeInTheDocument();
-    });
-
-    it('displays damage expression and type in the warning text', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(screen.getByText(/On a failed save.*4d6.*Radiant.*damage/)).toBeInTheDocument();
-    });
-
-    it('displays heal expression in the instruction text', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(screen.getByText(/heal for.*2d8.*HP/)).toBeInTheDocument();
-    });
-
-    it('displays target count with initial zero selection', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(screen.getByText(/Targets selected: 0\/3/)).toBeInTheDocument();
-    });
+    const body = document.querySelector('.sp-body');
+    expect(body.textContent).toContain('Select creatures within 30 feet');
+    expect(body.textContent).toContain('CON');
+    expect(body.textContent).toContain('saving throw (DC 10)');
+    expect(screen.getByText(/On a failed save.*4d6.*Radiant.*damage/)).toBeInTheDocument();
+    expect(screen.getByText(/half damage/)).toBeInTheDocument();
+    expect(screen.getByText(/heal for.*2d8.*HP/)).toBeInTheDocument();
+    expect(screen.getByText(/Targets selected: 0\/3/)).toBeInTheDocument();
   });
 
-  // ── Target selection ──
+  it('lists every creature except the attacker as a checkbox, all unchecked', () => {
+    const { unmount } = render(<SaveAttackHealModal {...makeProps()} />);
+    expect(getCheckboxNames()).toEqual(['Goblin A', 'Goblin B', 'Player One']);
+    expect(document.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(0);
+    unmount();
 
-  describe('target selection', () => {
-    it('renders all eligible creatures as checkboxes', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(getCheckboxByName('Goblin A')).toBeInTheDocument();
-      expect(getCheckboxByName('Goblin B')).toBeInTheDocument();
-      expect(getCheckboxByName('Player One')).toBeInTheDocument();
-    });
-
-    it('excludes the attacker from eligible targets', () => {
-      render(<SaveAttackHealModal {...makeProps({ attackerName: 'Goblin A' })} />);
-      expect(screen.queryByLabelText('Goblin A')).not.toBeInTheDocument();
-    });
-
-    it('toggles a checkbox on and off', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      const checkbox = getCheckboxByName('Goblin A');
-      expect(checkbox.checked).toBe(false);
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(true);
-      fireEvent.click(checkbox);
-      expect(checkbox.checked).toBe(false);
-    });
-
-    it('updates target count and button label when targets are selected', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      fireEvent.click(getCheckboxByName('Goblin A'));
-      expect(screen.getByText(/Targets selected: 1\/3/)).toBeInTheDocument();
-    });
-
-    it('enables the apply button and updates label when targets are selected', () => {
-      render(<SaveAttackHealModal {...makeProps()} />);
-      expect(getApplyButton()).toBeDisabled();
-      fireEvent.click(getCheckboxByName('Goblin A'));
-      expect(getApplyButton()).toBeEnabled();
-      expect(getApplyButton()).toHaveTextContent('Divine Smite (1 target)');
-      fireEvent.click(getCheckboxByName('Goblin B'));
-      expect(getApplyButton()).toHaveTextContent('Divine Smite (2 targets)');
-    });
+    // Attacker joins the roster: exactly the other two remain selectable.
+    render(<SaveAttackHealModal {...makeProps({ attackerName: 'Goblin A' })} />);
+    expect(getCheckboxNames()).toEqual(['Goblin B', 'Player One']);
+    expect(screen.getByText(/Targets selected: 0\/2/)).toBeInTheDocument();
   });
 
-  // ── No eligible targets ──
+  it('tracks selection through the toggle path: checkboxes, count, and apply button', () => {
+    render(<SaveAttackHealModal {...makeProps()} />);
 
-  describe('no eligible targets', () => {
-    it.each([
-      { label: 'empty creatures array', combatSummary: { creatures: [] } },
-      { label: 'null combatSummary', combatSummary: null },
-      { label: 'undefined creatures array', combatSummary: {} },
-    ])('shows "No valid targets in range." when %s', ({ combatSummary }) => {
-      render(<SaveAttackHealModal {...makeProps({ combatSummary })} />);
-      expect(screen.getByText('No valid targets in range.')).toBeInTheDocument();
-    });
+    // Nothing selected: apply is inert with a zero-count label.
+    expect(getApplyButton()).toBeDisabled();
+    expect(getApplyButton()).toHaveTextContent('Divine Smite (0 targets)');
+
+    const goblinA = getCheckboxByName('Goblin A');
+    fireEvent.click(goblinA);
+    expect(goblinA.checked).toBe(true);
+    expect(screen.getByText(/Targets selected: 1\/3/)).toBeInTheDocument();
+    expect(getApplyButton()).toBeEnabled();
+    expect(getApplyButton()).toHaveTextContent('Divine Smite (1 target)');
+
+    fireEvent.click(getCheckboxByName('Goblin B'));
+    expect(screen.getByText(/Targets selected: 2\/3/)).toBeInTheDocument();
+    expect(getApplyButton()).toHaveTextContent('Divine Smite (2 targets)');
+
+    // Toggle off decrements rather than clearing, and re-click restores.
+    fireEvent.click(goblinA);
+    expect(goblinA.checked).toBe(false);
+    expect(screen.getByText(/Targets selected: 1\/3/)).toBeInTheDocument();
+
+    fireEvent.click(getCheckboxByName('Goblin B'));
+    expect(screen.getByText(/Targets selected: 0\/3/)).toBeInTheDocument();
+    expect(getApplyButton()).toBeDisabled();
+
+    // Selection alone must not touch dice, save prompts, or results.
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
+    expect(document.querySelector('.abjure-results-list')).not.toBeInTheDocument();
+  });
+
+  it('Cancel closes the modal without rolling, prompting, or applying', () => {
+    const onClose = vi.fn();
+    render(<SaveAttackHealModal {...makeProps({ onClose })} />);
+
+    fireEvent.click(getCheckboxByName('Goblin A'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
   });
 });

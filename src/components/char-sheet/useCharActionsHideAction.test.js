@@ -1,514 +1,199 @@
+// @maintained-by-ai
+// Base Hide lane for handleHideAction (useCharActionsBaseActions): cannotAct gate,
+// already-hidden refusal (case-insensitive), the success/failure channel with
+// byte-exact popup/log canon and Invisible + advantage_on_stealth stamping
+// (+ dedupe/preserve), checkContext channel resolution (dis/hex/advantage/peerless
+// precedence, Skulker gate), Stealth bonus arithmetic (exhaustion, Pass Without
+// Trace, Jack of All Trades), and Skulker fog-of-war copy on both legs.
+// Naturally Stealthy trait branches are owned by
+// useCharActionsHideAction.naturallyStealthy.test.js; Hide/Dodge button click
+// wiring is owned by CharActions.baseActionsHide.test.jsx — not restated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import { createHooks, mockSetPopupHtml, mockRollSkillCheck, mockAddEntry, campaignName, basePlayerStats } from './useCharActionsBaseActions.test-utils.js';
 
-function makeGrv(activeConditions = [], lastAttack = null, activeBuffs = []) {
-    return vi.fn((_charKey, key, _cn) => {
-        if (key === 'activeConditions') return activeConditions;
+// Fresh channels stub per test (no fixture aliasing between mounts).
+function grv({ conditions = [], lastAttack = null, buffs = [] } = {}) {
+    return vi.fn((_charKey, key) => {
+        if (key === 'activeConditions') return conditions;
         if (key === 'lastAttack') return lastAttack;
-        if (key === 'activeBuffs') return activeBuffs;
+        if (key === 'activeBuffs') return buffs;
         return undefined;
     });
 }
 
-describe('useCharActionsBaseActions - handleHideAction', () => {
+describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('handleHideAction', () => {
-        it('should return early without side effects when cannotAct is true', async () => {
-            const hooks = createHooks({ cannotAct: true });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
+    it('cannotAct gate refuses without reading state, rolling, popping, writing, or logging', async () => {
+        const hooks = createHooks({ cannotAct: true });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-            expect(hooks.getRuntimeValue).not.toHaveBeenCalled();
-            expect(mockRollSkillCheck).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).not.toHaveBeenCalled();
-            expect(mockAddEntry).not.toHaveBeenCalled();
+        expect(hooks.getRuntimeValue).not.toHaveBeenCalled();
+        expect(hooks.setRuntimeValue).not.toHaveBeenCalled();
+        expect(mockRollSkillCheck).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+        expect(mockAddEntry).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { name: 'exact lowercase', condition: 'invisible' },
+        { name: 'uppercase (case-insensitive match)', condition: 'INVISIBLE' },
+    ])('refuses with the already-hidden popup when the condition is $name — no roll, write, or log', async ({ condition }) => {
+        const srw = vi.fn().mockResolvedValue(undefined);
+        const hooks = createHooks({ getRuntimeValue: grv({ conditions: [condition] }), setRuntimeValue: srw });
+        await useCharActionsBaseActions(hooks).handleHideAction();
+
+        expect(mockRollSkillCheck).not.toHaveBeenCalled();
+        expect(srw).not.toHaveBeenCalled();
+        expect(mockAddEntry).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Hide',
+            description: 'You are already hidden (Invisible condition active).',
         });
+    });
 
-        it('should show "already hidden" popup and skip check when invisible condition is active', async () => {
-            const grv = makeGrv(['invisible']);
-            const hooks = createHooks({ getRuntimeValue: grv });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
+    // Success fixture sits exactly on DC 15 to pin the >= boundary.
+    it.each([
+        {
+            name: 'success on the DC 15 boundary',
+            lastAttack: { total: 15, d20: 13 },
+            stamps: true,
+            popup: 'Hide successful! (d20: 13 + 0 = 15) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.',
+            log: 'Stealth check: 15 (d20: 13 + 0) vs DC 15 — Success. Gained Invisible condition and advantage on Stealth checks.',
+        },
+        {
+            name: 'failure below DC 15',
+            lastAttack: { total: 10, d20: 8 },
+            stamps: false,
+            popup: 'Hide failed! (d20: 8 + 0 = 10) You remain visible.',
+            log: 'Stealth check: 10 (d20: 8 + 0) vs DC 15 — Failure. Did not gain the Invisible condition.',
+        },
+        {
+            name: 'missing lastAttack data reads as a failure',
+            lastAttack: null,
+            stamps: false,
+            popup: 'Hide failed! (d20: ? + 0 = undefined) You remain visible.',
+            log: 'Stealth check: undefined (d20: ? + 0) vs DC 15 — Failure. Did not gain the Invisible condition.',
+        },
+    ])('rolls Stealth once and reports on $name', async ({ lastAttack, stamps, popup, log }) => {
+        const srw = vi.fn().mockResolvedValue(undefined);
+        const hooks = createHooks({ getRuntimeValue: grv({ lastAttack }), setRuntimeValue: srw });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-            expect(mockRollSkillCheck).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('already hidden'),
-            });
-            expect(mockAddEntry).not.toHaveBeenCalled();
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, {});
+        const conditionWrites = srw.mock.calls.filter(c => c[1] === 'activeConditions');
+        const buffWrites = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
+        if (stamps) {
+            expect(conditionWrites).toEqual([['TestFighter', 'activeConditions', ['invisible'], campaignName]]);
+            expect(buffWrites).toEqual([['TestFighter', 'activeBuffs', [{ name: 'Hide', effect: 'advantage_on_stealth' }], campaignName]]);
+        } else {
+            expect(conditionWrites).toEqual([]);
+            expect(buffWrites).toEqual([]);
+        }
+        expect(mockSetPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Hide', description: popup });
+        expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: 'TestFighter',
+            abilityName: 'Hide',
+            description: log,
         });
+    });
 
-        it.each([
-            { name: 'case-insensitive Invisible', condition: 'Invisible' },
-            { name: 'lowercase invisible', condition: 'invisible' },
-            { name: 'uppercase INVISIBLE', condition: 'INVISIBLE' },
-        ])('should treat "%s" as already hidden', async ({ condition }) => {
-            const grv = makeGrv([condition]);
-            const hooks = createHooks({ getRuntimeValue: grv });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
+    // Fresh-append on empty buffs is pinned by the canonical success row above;
+    // these rows cover the two remaining activeBuffs branches on a success roll.
+    it.each([
+        {
+            name: 'unrelated buffs are preserved and Hide is appended',
+            buffs: [{ name: 'Bless', effect: 'bless' }],
+            expected: [{ name: 'Bless', effect: 'bless' }, { name: 'Hide', effect: 'advantage_on_stealth' }],
+        },
+        {
+            name: 'an existing advantage_on_stealth buff is not duplicated',
+            buffs: [{ name: 'Hide', effect: 'advantage_on_stealth' }],
+            expected: [{ name: 'Hide', effect: 'advantage_on_stealth' }],
+        },
+    ])('writes activeBuffs exactly once with byte-exact contents when $name', async ({ buffs, expected }) => {
+        const srw = vi.fn().mockResolvedValue(undefined);
+        const hooks = createHooks({ getRuntimeValue: grv({ lastAttack: { total: 18, d20: 12 }, buffs }), setRuntimeValue: srw });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-            expect(mockRollSkillCheck).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).toHaveBeenCalled();
+        const buffWrites = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
+        expect(buffWrites).toEqual([['TestFighter', 'activeBuffs', expected, campaignName]]);
+    });
+
+    // resolveStealthCheckContext channels: every conditionEffects/feats channel,
+    // one row per guard branch; bonus is 0 throughout (base sheet, no exhaustion).
+    it.each([
+        { name: 'abilityCheckDisadvantage forces disadvantage', ce: { abilityCheckDisadvantage: true }, ctx: { forcedMode: 'disadvantage' } },
+        { name: 'hexAbilityCheckDisadvantage on DEX forces disadvantage', ce: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'DEX' }, ctx: { forcedMode: 'disadvantage' } },
+        { name: 'hexAbilityCheckDisadvantage on STR is ignored', ce: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'STR' }, ctx: {} },
+        { name: 'skill-scoped abilityCheckAdvantage matches Stealth', ce: { abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Stealth' }, ctx: { forcedMode: 'advantage' } },
+        { name: 'skill-scoped abilityCheckAdvantage for Athletics is ignored', ce: { abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Athletics' }, ctx: {} },
+        { name: 'abilityCheckAdvantage without a skill applies to Stealth', ce: { abilityCheckAdvantage: true }, ctx: { forcedMode: 'advantage' } },
+        { name: 'peerlessAthleteAdvantageSkills matches Stealth', ce: { peerlessAthleteAdvantageSkills: ['Stealth'] }, ctx: { forcedMode: 'advantage' } },
+        { name: 'peerlessAthleteAdvantageSkills without Stealth is ignored', ce: { peerlessAthleteAdvantageSkills: ['Athletics'] }, ctx: {} },
+        { name: 'advantage cancels disadvantage to neutral', ce: { abilityCheckDisadvantage: true, abilityCheckAdvantage: true }, ctx: { forcedMode: undefined } },
+        { name: 'Skulker advantage requires 2024 rules (5e ignored)', stats: { rules: '5e', feats: ['Skulker'] }, ctx: {} },
+        { name: '2024 without the Skulker feat rolls plain', stats: { rules: '2024', feats: [] }, ctx: {} },
+    ])('resolves checkContext $name', async ({ ce, stats, ctx }) => {
+        const hooks = createHooks({
+            getRuntimeValue: grv({ lastAttack: { total: 18, d20: 12 } }),
+            ...(ce ? { conditionEffects: ce } : {}),
+            ...(stats ? { playerStats: { ...basePlayerStats, ...stats } } : {}),
         });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-        it('should perform stealth check and add invisible condition on success (rollTotal >= DC 15)', async () => {
-            const stealthSkill = { name: 'Stealth', bonus: 4 };
-            const grv = makeGrv([], { total: 18, d20: 12 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = { ...basePlayerStats, skills: [stealthSkill], skillProficiencies: ['Stealth'] };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, ctx);
+    });
 
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-            expect(srw).toHaveBeenCalledWith('TestFighter', 'activeConditions', expect.arrayContaining(['invisible']), campaignName);
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('Hide successful'),
-            });
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Hide',
-            }));
+    it.each([
+        {
+            name: 'success',
+            lastAttack: { total: 18, d20: 12 },
+            popup: 'Hide successful! (Advantage from Skulker - Fog of War) (d20: 12 + 0 = 18) You gain the Invisible condition and advantage on Dexterity (Stealth) checks until you attack, take damage, or use Lesser Restoration to remove the condition.',
+            log: 'Stealth check: 18 (Advantage from Skulker - Fog of War) (d20: 12 + 0) vs DC 15 — Success. Gained Invisible condition and advantage on Stealth checks.',
+        },
+        {
+            name: 'failure',
+            lastAttack: { total: 10, d20: 8 },
+            popup: 'Hide failed! (Advantage from Skulker - Fog of War) (d20: 8 + 0 = 10) You remain visible.',
+            log: 'Stealth check: 10 (Advantage from Skulker - Fog of War) (d20: 8 + 0) vs DC 15 — Failure. Did not gain the Invisible condition.',
+        },
+    ])('cites Skulker - Fog of War byte-exact in popup and log on $name', async ({ lastAttack, popup, log }) => {
+        const hooks = createHooks({
+            getRuntimeValue: grv({ lastAttack }),
+            playerStats: { ...basePlayerStats, rules: '2024', feats: ['Skulker'] },
         });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-        it('should NOT add invisible condition on failure (rollTotal < DC 15)', async () => {
-            const grv = makeGrv([], { total: 10, d20: 8 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalled();
-            const conditionCalls = srw.mock.calls.filter(c => c[1] === 'activeConditions');
-            expect(conditionCalls.length).toBe(0);
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('Hide failed'),
-            });
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Hide',
-            }));
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, { forcedMode: 'advantage' });
+        expect(mockSetPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Hide', description: popup });
+        expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: 'TestFighter',
+            abilityName: 'Hide',
+            description: log,
         });
+    });
 
-        it('should add advantage_on_stealth buff on success when not already present', async () => {
-            const grv = makeGrv([], { total: 18, d20: 12 }, []);
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            const buffCalls = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
-            expect(buffCalls.length).toBeGreaterThanOrEqual(1);
-            const lastBuffCall = buffCalls[buffCalls.length - 1];
-            const buffs = lastBuffCall[2];
-            const stealthBuffs = buffs.filter(b => b && b.effect === 'advantage_on_stealth');
-            expect(stealthBuffs.length).toBe(1);
-            expect(stealthBuffs[0].name).toBe('Hide');
+    it.each([
+        { name: 'exhaustion penalty subtracts from the bonus', exhaustionPenalty: 2, expected: -2 },
+        { name: 'Pass Without Trace adds its bonus', ce: { passWithoutTraceBonus: 10 }, expected: 10 },
+        { name: 'Jack of All Trades adds half proficiency when not proficient', stats: { skillProficiencies: [], automation: { passives: [{ type: 'jack_of_all_trades' }] } }, expected: 1 },
+        { name: 'Jack of All Trades is skipped when proficient', stats: { skillProficiencies: ['Stealth'], automation: { passives: [{ type: 'jack_of_all_trades' }] } }, expected: 0 },
+    ])('computes the Stealth bonus: $name', async ({ exhaustionPenalty, ce, stats, expected }) => {
+        const hooks = createHooks({
+            getRuntimeValue: grv({ lastAttack: { total: 18, d20: 12 } }),
+            exhaustionPenalty: exhaustionPenalty ?? 0,
+            ...(ce ? { conditionEffects: ce } : {}),
+            ...(stats ? { playerStats: { ...basePlayerStats, ...stats } } : {}),
         });
+        await useCharActionsBaseActions(hooks).handleHideAction();
 
-        it('should NOT duplicate advantage_on_stealth buff when already active', async () => {
-            const existingBuff = { name: 'Hide', effect: 'advantage_on_stealth' };
-            const grv = makeGrv([], { total: 18, d20: 12 }, [existingBuff]);
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            const buffCalls = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
-            expect(buffCalls.length).toBeGreaterThanOrEqual(1);
-            const lastBuffCall = buffCalls[buffCalls.length - 1];
-            const buffs = lastBuffCall[2];
-            const stealthBuffs = buffs.filter(b => b && b.effect === 'advantage_on_stealth');
-            expect(stealthBuffs.length).toBe(1);
-        });
-
-        it('should add advantage_on_stealth buff alongside existing non-stealth buffs', async () => {
-            const existingBuff = { name: 'Bless', effect: 'bless' };
-            const grv = makeGrv([], { total: 18, d20: 12 }, [existingBuff]);
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            const buffCalls = srw.mock.calls.filter(c => c[1] === 'activeBuffs');
-            const lastBuffCall = buffCalls[buffCalls.length - 1];
-            const buffs = lastBuffCall[2];
-            expect(buffs).toHaveLength(2);
-            expect(buffs.some(b => b.effect === 'advantage_on_stealth')).toBe(true);
-            expect(buffs.some(b => b.effect === 'bless')).toBe(true);
-        });
-
-        it('should apply passWithoutTraceBonus to stealth bonus when conditionEffects has it', async () => {
-            const grv = makeGrv([], { total: 20, d20: 15 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { passWithoutTraceBonus: 10 },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // Base bonus is 0 (no stealth skill found in abilities) + 10 (passWithoutTrace) = 10
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 10, {});
-        });
-
-        it('should apply forced disadvantage from conditionEffects.abilityCheckDisadvantage', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { abilityCheckDisadvantage: true },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'disadvantage' });
-        });
-
-        it('should apply forced disadvantage from hexAbilityCheckDisadvantage when ability is DEX', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'DEX' },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'disadvantage' });
-        });
-
-        it('should NOT apply hexAbilityCheckDisadvantage when ability is not DEX', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { hexAbilityCheckDisadvantage: true, hexAbilityCheckDisadvantageAbility: 'STR' },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-        });
-
-        it('should clear forcedMode when both abilityCheckDisadvantage and abilityCheckAdvantage are set', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: {
-                    abilityCheckDisadvantage: true,
-                    abilityCheckAdvantage: true,
-                },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // Code behavior: when disadvantage is set and advantage clears it, forcedMode becomes undefined
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: undefined });
-        });
-
-        it('should apply advantage from peerlessAthleteAdvantageSkills for Stealth', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { peerlessAthleteAdvantageSkills: ['Stealth'] },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'advantage' });
-        });
-
-        it('should NOT apply peerlessAthleteAdvantageSkills for non-listed skill', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { peerlessAthleteAdvantageSkills: ['Athletics'] },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-        });
-
-        it('should apply Skulker feat advantage for 2024 rules', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                rules: '2024',
-                feats: ['Skulker'],
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'advantage' });
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('Skulker - Fog of War'),
-            });
-        });
-
-        it('should NOT apply Skulker advantage for 5e rules', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                rules: '5e',
-                feats: ['Skulker'],
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-        });
-
-        it('should NOT apply Skulker advantage when feat is missing', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                rules: '2024',
-                feats: [],
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-        });
-
-        it('should apply exhaustionPenalty reducing stealth bonus', async () => {
-            const grv = makeGrv([], { total: 12, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, exhaustionPenalty: 2 });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // Base bonus is 0 (no stealth skill in abilities) - exhaustion 2 = -2
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', -2, {});
-        });
-
-        it('should use 0 stealth bonus when character has no stealth skill', async () => {
-            const grv = makeGrv([], { total: 10, d20: 8 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                skills: [],
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, {});
-        });
-
-        it('should apply abilityCheckAdvantage when abilityCheckAdvantageSkill matches Stealth', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Stealth' },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'advantage' });
-        });
-
-        it('should NOT apply abilityCheckAdvantage when abilityCheckAdvantageSkill does not match Stealth', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { abilityCheckAdvantage: true, abilityCheckAdvantageSkill: 'Athletics' },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), {});
-        });
-
-        it('should apply abilityCheckAdvantage when abilityCheckAdvantageSkill is undefined (applies to all)', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: { abilityCheckAdvantage: true },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'advantage' });
-        });
-
-        it('should include Skulker description on failure popup', async () => {
-            const grv = makeGrv([], { total: 10, d20: 8 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                rules: '2024',
-                feats: ['Skulker'],
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('Skulker - Fog of War'),
-            });
-        });
-
-        it('should include d20 roll value in success popup description', async () => {
-            const grv = makeGrv([], { total: 18, d20: 15 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('d20: 15'),
-            });
-        });
-
-        it('should include d20 roll value in failure popup description', async () => {
-            const grv = makeGrv([], { total: 10, d20: 5 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('d20: 5'),
-            });
-        });
-
-        it('should log ability_use with correct type and abilityName on success', async () => {
-            const grv = makeGrv([], { total: 18, d20: 12 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: 'TestFighter',
-                abilityName: 'Hide',
-                description: expect.stringContaining('Success'),
-            });
-        });
-
-        it('should log ability_use with correct type and abilityName on failure', async () => {
-            const grv = makeGrv([], { total: 10, d20: 8 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: 'TestFighter',
-                abilityName: 'Hide',
-                description: expect.stringContaining('Failure'),
-            });
-        });
-
-        it('should apply Jack of All Trades bonus when character has the passive and is not proficient', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                skillProficiencies: [],
-                automation: { passives: [{ type: 'jack_of_all_trades' }] },
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // Base bonus is 0 (skill not in abilities) + floor(prof/2) where prof = floor((5-1)/4 + 2) = 3, floor(3/2) = 1 => 1
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 1, {});
-        });
-
-        it('should NOT apply Jack of All Trades when character is proficient in Stealth', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const playerStats = {
-                ...basePlayerStats,
-                skillProficiencies: ['Stealth'],
-                automation: { passives: [{ type: 'jack_of_all_trades' }] },
-            };
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw, playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // No JotAT bonus since proficient; base is 0 (skill not found in abilities array)
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', 0, {});
-        });
-
-        it('should apply combined disadvantage from both abilityCheckDisadvantage and hexAbilityCheckDisadvantage', async () => {
-            const grv = makeGrv([], { total: 16, d20: 10 });
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({
-                getRuntimeValue: grv,
-                setRuntimeValue: srw,
-                conditionEffects: {
-                    abilityCheckDisadvantage: true,
-                    hexAbilityCheckDisadvantage: true,
-                    hexAbilityCheckDisadvantageAbility: 'DEX',
-                },
-            });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // First sets disadvantage, hex also sets disadvantage => stays disadvantage
-            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expect.any(Number), { forcedMode: 'disadvantage' });
-        });
-
-        it('should handle nonexistent lastAttack data gracefully (rollTotal undefined => fail)', async () => {
-            const grv = makeGrv([], null);
-            const srw = vi.fn().mockResolvedValue(undefined);
-            const hooks = createHooks({ getRuntimeValue: grv, setRuntimeValue: srw });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleHideAction();
-
-            // undefined total < 15 => failure
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Hide',
-                description: expect.stringContaining('Hide failed'),
-            });
-        });
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expected, {});
     });
 });

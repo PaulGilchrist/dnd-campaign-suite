@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1016: Ice Mephit "Fog Cloud" — innate utility row (spellcasting_ability
 // Charisma, NO spell_save_dc, 1/Day) formerly rendered ZERO affordance (the
 // MA-1014 predicate required spell_save_dc != null). Fix lane: predicate
@@ -5,9 +6,21 @@
 // and the row DATA-gated with MA-0633 numerics (usage:"1/Day" cosmetic +
 // uses:1 + maxUses:1 — the old uses:"1/Day" STRING reads Number() NaN = no
 // gate, §169). Chip rides the MA-1014 SpellCastLinks fork with the MA-0020
-// row-level counter; fake-chip guard (§161) lives in utilitySpellNamesFor —
-// bold NON-spell words never arm. imp/Invisibility is the named RAW-honest
-// innate twin (self-cast, at will, ungated by design §230).
+// row-level counter; fake-chip guard (§161) lives in utilitySpellNamesFor.
+// OWNED here (cited by the MA-1014 header): this row's BY-name disk
+// fingerprint, the noDC/emphasis predicate arms (unresolved names, bold
+// NON-spell words, bare no-ability+no-DC rows), the spent-USES gate
+// (spellUsesUsed exhausts the maxUses gate → spent class, click keeps
+// routing the honest refusal — Fog Cloud is USES-based; the recharge
+// spent-shape is MA-1014's), exact onSpellCast payload, and the MA-1019
+// imp/Invisibility self-buff migration (§216: automation monster_self_buff
+// drops it from isUtilitySpellCastRow onto the live .mc-dice-link-selfbuff
+// seam; At Will stays ungated §230).
+// OWNED elsewhere (never re-run here): app-wide isUtilitySpellCastRow census
+// + discriminator arms AND the legendary-gate/incapacitated rollability
+// precedents (MonsterAction.ma1014-ice-wall-chip.test.jsx), adjudication
+// fresh-spend/refused (services/encounters/monsterUtilitySpellCast.ma1016-fog-cloud.test.js),
+// modal seam press→cast→refuse (MonsterCardModal.ma1016-fog-cloud-spellcast.test.jsx).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
@@ -44,8 +57,8 @@ function renderRow(action, overrides = {}) {
   return { ...utils, onSpellCast };
 }
 
-describe('MA-1016 disk fingerprint — Ice Mephit Fog Cloud', () => {
-  it('row arms on Charisma alone and the 1/Day gate is NUMERIC (MA-0633 byte-shape)', () => {
+describe('MA-1016 Fog Cloud chip — fingerprint, uses gate, fake-chip guard', () => {
+  it('disk fingerprint: arms on Charisma alone (NO DC) and the 1/Day gate is NUMERIC (MA-0633 byte-shape)', () => {
     expect(FOG_ROW.name).toBe('Fog Cloud');
     expect(FOG_ROW.spellcasting_ability).toBe('Charisma');
     expect(FOG_ROW.spell_save_dc ?? null).toBeNull();
@@ -60,6 +73,41 @@ describe('MA-1016 disk fingerprint — Ice Mephit Fog Cloud', () => {
     expect(extractSpellNamesFromSpellcasting(FOG_ROW.description)).toEqual(['Fog Cloud']);
     expect(SPELL_INDEX.has('Fog Cloud')).toBe(true);
     expect(isUtilitySpellCastRow(FOG_ROW)).toBe(true);
+  });
+
+  it('fresh chip "Fog Cloud (1/Day · 1 left)" routes onSpellCast(action, name); spent USES → 0 left + spent class, click routes the honest refusal', () => {
+    const fresh = renderRow(FOG_ROW, { spellNameIndex: SPELL_INDEX });
+    const chips = [...fresh.container.querySelectorAll('.mc-dice-link-spell')];
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent.trim()).toBe('Fog Cloud (1/Day · 1 left)');
+    expect(chips[0].className).not.toContain('mc-dice-link-spell-spent');
+    expect(fresh.container.textContent).toContain('(1/Day)');
+    fireEvent.click(chips[0]);
+    expect(fresh.onSpellCast).toHaveBeenCalledTimes(1);
+    expect(fresh.onSpellCast.mock.calls[0]).toEqual([FOG_ROW, 'Fog Cloud']);
+    // USES-based (no recharge field on this row): spellUsesUsed keyed by
+    // abilitySaveUseKey(action) = "Fog Cloud" exhausts the maxUses:1 gate.
+    const { container, onSpellCast } = renderRow(FOG_ROW, {
+      spellNameIndex: SPELL_INDEX,
+      spellUsesUsed: { 'Fog Cloud': 1 },
+    });
+    const chip = container.querySelector('.mc-dice-link-spell');
+    expect(chip.textContent.trim()).toBe('Fog Cloud (1/Day · 0 left)');
+    expect(chip.className).toContain('mc-dice-link-spell-spent');
+    fireEvent.click(chip);
+    expect(onSpellCast).toHaveBeenCalledTimes(1);
+  });
+
+  it('no index / unresolved names / bold NON-spell words / no ability+no DC → zero chips', () => {
+    expect(renderRow(FOG_ROW).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
+    expect(renderRow(FOG_ROW, { spellNameIndex: new Set(['Fireball']) }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
+    const fake = { name: 'Misty Veil', description: 'The mephit shivers, maintaining <strong>Concentration</strong> as mist curls out.', spellcasting_ability: 'Charisma' };
+    expect(isUtilitySpellCastRow(fake)).toBe(true);
+    expect(extractSpellNamesFromSpellcasting(fake.description).some(n => SPELL_INDEX.has(n))).toBe(false);
+    expect(renderRow(fake, { spellNameIndex: SPELL_INDEX }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
+    const bare = { name: 'Fog Cloud', description: 'The mephit casts <strong>Fog Cloud</strong>.', recharge: '6' };
+    expect(isUtilitySpellCastRow(bare)).toBe(false);
+    expect(renderRow(bare, { spellNameIndex: SPELL_INDEX }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
   });
 
   // MA-1019 (§216 stale-pin inversion): imp/Invisibility was the named innate
@@ -84,52 +132,5 @@ describe('MA-1016 disk fingerprint — Ice Mephit Fog Cloud', () => {
     expect(chip.textContent).not.toMatch(/\/Day/);
     fireEvent.click(chip);
     expect(onSelfBuffRow).toHaveBeenCalledWith(IMP_ROW);
-  });
-});
-
-describe('MA-1016 Fog Cloud spell chip + 1/Day counter', () => {
-  it('fresh row: chip "Fog Cloud (1/Day · 1 left)", click routes onSpellCast(action, name)', () => {
-    const { container, onSpellCast } = renderRow(FOG_ROW, { spellNameIndex: SPELL_INDEX });
-    const chips = [...container.querySelectorAll('.mc-dice-link-spell')];
-    expect(chips.length).toBe(1);
-    expect(chips[0].textContent.trim()).toBe('Fog Cloud (1/Day · 1 left)');
-    expect(chips[0].className).not.toContain('mc-dice-link-spell-spent');
-    fireEvent.click(chips[0]);
-    expect(onSpellCast).toHaveBeenCalledTimes(1);
-    expect(onSpellCast.mock.calls[0]).toEqual([FOG_ROW, 'Fog Cloud']);
-    expect(container.textContent).toContain('(1/Day)');
-  });
-
-  it('spent row: 0 left + spent class, chip stays clickable and routes the honest refusal', () => {
-    const { container, onSpellCast } = renderRow(FOG_ROW, {
-      spellNameIndex: SPELL_INDEX,
-      spellUsesUsed: { 'Fog Cloud': 1 },
-    });
-    const chip = container.querySelector('.mc-dice-link-spell');
-    expect(chip.textContent.trim()).toBe('Fog Cloud (1/Day · 0 left)');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    fireEvent.click(chip);
-    expect(onSpellCast).toHaveBeenCalledTimes(1);
-  });
-
-  it('no index / unresolved names / bold NON-spell words / no ability+no DC → zero chips', () => {
-    expect(renderRow(FOG_ROW).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-    expect(renderRow(FOG_ROW, { spellNameIndex: new Set(['Fireball']) }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-    const fake = { name: 'Misty Veil', description: 'The mephit shivers, maintaining <strong>Concentration</strong> as mist curls out.', spellcasting_ability: 'Charisma' };
-    expect(isUtilitySpellCastRow(fake)).toBe(true);
-    expect(extractSpellNamesFromSpellcasting(fake.description).some(n => SPELL_INDEX.has(n))).toBe(false);
-    expect(renderRow(fake, { spellNameIndex: SPELL_INDEX }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-    const bare = { name: 'Fog Cloud', description: 'The mephit casts <strong>Fog Cloud</strong>.', recharge: '6' };
-    expect(isUtilitySpellCastRow(bare)).toBe(false);
-    expect(renderRow(bare, { spellNameIndex: SPELL_INDEX }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-  });
-
-  it('legendary-gated and incapacitated variants match MA-1014 precedents', () => {
-    expect(renderRow(FOG_ROW, { spellNameIndex: SPELL_INDEX, legendaryGate: vi.fn() }).container.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-    const { container, onSpellCast } = renderRow(FOG_ROW, { spellNameIndex: SPELL_INDEX, attackerCannotAct: true });
-    const chip = container.querySelector('.mc-dice-link-spell');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onSpellCast).not.toHaveBeenCalled();
   });
 });

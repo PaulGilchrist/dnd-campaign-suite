@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1357: Purple Worm "Bite" — prose carries "If the target is a Large or
 // smaller creature, it has the Grappled condition (escape DC 19), and it has
 // the Restrained condition until the grapple ends" but the row shipped WITHOUT
@@ -7,52 +8,68 @@
 // Two-field DATA fix mirroring aberrant-cultist Tentacle Lash byte-shape
 // (MA-0010): hit_conditions:["grappled","restrained"] + escape_dc:19 placed
 // after damage_type_primary. Size-gate stays GM-advisory (isLargeOrSmaller-
-// Target). Locks: disk row shape + key placement, clause arms both conditions
-// with escapeDc 19, "+14" attack chip stays live, save decoys stay 0/"".
+// Target). purple-worm is NOT in handlePlainDamage.hitClause HIT_CLAUSE_ROWS
+// :224-282 (grep-verified), so THIS file is the sole byte-owner: one fused
+// test locks disk row keys-by-name in transport order + exact bytes (toEx-
+// act toEqual absorbs the save-decoy 0/"" check and hit_target_effect ab-
+// sence), then the "+14" chip press delivers that exact row through onAttack
+// (identity — payload IS the disk object, MonsterAction.jsx:480 passthrough).
+// Clause arm for the ["grappled","restrained"]+escapeDc shape and the attack
+// suppression gate are owned generically: hitClause mega-lane data-locks via
+// byte-twin aberrant-cultist Tentacle Lash :224 (escapeDc 14) + clause arm
+// :289-301, suppression census ma0286:95-121 — per-census (#419, cf.
+// ma0795:4-20) no local buildHitConditionClause/attackRowMissingToHit
+// re-derivation here — exact-bytes + live chip are the tighter pin.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const WORM = monsters.find((m) => m.index === 'purple-worm');
-const BITE = WORM.actions[1];
+const BITE = monsters.find((m) => m.index === 'purple-worm').actions[1];
+
+const BITE_EXACT = {
+  name: 'Bite',
+  description: 'Melee Attack Roll: +14, reach 10 ft. Hit: 22 (3d8 + 9) Piercing damage. If the target is a Large or smaller creature, it has the <strong>Grappled</strong> condition (escape DC 19), and it has the <strong>Restrained</strong> condition until the grapple ends.',
+  attack_bonus: 14,
+  save_dc: 0,
+  save_type: '',
+  save_effect: '',
+  range: '',
+  reach: '10 ft.',
+  recharge: '',
+  damage_dice_primary: '3d8 + 9',
+  damage_type_primary: 'Piercing',
+  hit_conditions: ['grappled', 'restrained'],
+  escape_dc: 19,
+};
 
 describe('MA-1357 disk fingerprint: purple-worm Bite grapple rider fix', () => {
-  it('disk row carries hit_conditions ["grappled","restrained"] + escape_dc 19 after damage_type_primary (MA-0010 byte-shape)', () => {
-    expect(WORM.name).toBe('Purple Worm');
-    expect(BITE.name).toBe('Bite');
-    expect(BITE.hit_conditions).toEqual(['grappled', 'restrained']);
-    expect(BITE.escape_dc).toBe(19);
-    const keys = Object.keys(BITE);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('hit_conditions') + 1);
-    expect(BITE.attack_bonus).toBe(14);
-    expect(BITE.reach).toBe('10 ft.');
-    expect(BITE.damage_dice_primary).toBe('3d8 + 9');
-    expect(BITE.damage_type_primary).toBe('Piercing');
-  });
+  it('sole-owner row fingerprint + live "+14" chip presses exact row through onAttack', () => {
+    // Byte-shape: keys BY NAME in transport order, hit_conditions + escape_dc
+    // sit immediately after damage_type_primary (MA-0010 byte-shape twin of
+    // aberrant-cultist Tentacle Lash); no save/hit_target_effect leg added.
+    expect(Object.keys(BITE)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'save_dc',
+      'save_type',
+      'save_effect',
+      'range',
+      'reach',
+      'recharge',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+      'escape_dc',
+    ]);
+    // Exact bytes: any drifted numeric, save decoy, or added/dropped key
+    // breaks this one assertion (absorbs field-absence checks).
+    expect(BITE).toEqual(BITE_EXACT);
 
-  it('row carries NO save leg (attack-only ride, decoy save keys stay 0/"")', () => {
-    expect(BITE.save_dc).toBe(0);
-    expect(BITE.save_type).toBe('');
-    expect(BITE.save_effect).toBe('');
-    expect(BITE.hit_target_effect).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Grappled/Restrained rider with escapeDc 19 (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(BITE);
-    expect(clause).toEqual({
-      conditions: ['grappled', 'restrained'],
-      escapeDc: 19,
-      attackName: 'Bite',
-      targetEffect: null,
-    });
-  });
-
-  it('attack half stays live: one "+14" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(BITE)).toBe(false);
+    // Chip-level dispatch: exactly one "+14" attack chip (no damage chip —
+    // attack_bonus arms the attack lane), press routes name/bonus/row once.
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -70,6 +87,10 @@ describe('MA-1357 disk fingerprint: purple-worm Bite grapple rider fix', () => {
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+14']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Bite', 14, expect.objectContaining({ name: 'Bite' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Bite', 14, BITE_EXACT);
+    // Identity: the payload IS the disk row — hit_conditions/escape_dc bytes
+    // ride the attack lane untouched (no copy/strip) into the clause consumer.
+    expect(onAttack.mock.calls[0][2]).toBe(BITE);
   });
 });

@@ -1,12 +1,13 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import FlurryOfBlowsTargetPopup from './FlurryOfBlowsTargetPopup.jsx';
 
 describe('FlurryOfBlowsTargetPopup', () => {
-  const getSummaryText = (container) =>
-    container.querySelector('.flurry-summary').textContent.trim();
+  const getSummaryText = () =>
+    screen.getByText(/^Assigned:/).textContent.replace(/\s+/g, ' ').trim();
 
-  it('auto-assigns all attacks to current target on mount', () => {
+  it('auto-assigns all attacks to the current target on mount', () => {
     render(
       <FlurryOfBlowsTargetPopup
         totalAttacks={3}
@@ -17,16 +18,18 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    const inputs = screen.getAllByRole('spinbutton');
-    expect(inputs[1]).toHaveValue(3);
-    expect(inputs[0]).toHaveValue(0);
-    expect(inputs[2]).toHaveValue(0);
+    // Current-target marker is part of the accessible label name.
+    expect(screen.getByRole('spinbutton', { name: 'Orc (Current)' })).toHaveValue(3);
+    expect(screen.getByRole('spinbutton', { name: 'Goblin' })).toHaveValue(0);
+    expect(screen.getByRole('spinbutton', { name: 'Skeleton' })).toHaveValue(0);
+    expect(getSummaryText()).toBe('Assigned: 3 / 3');
+    expect(screen.getByRole('button', { name: 'Strike All' })).not.toBeDisabled();
   });
 
-  it('does not auto-assign when current target is not in the creature list', () => {
+  it('assigns nothing when the current target is not among the creature targets', () => {
     render(
       <FlurryOfBlowsTargetPopup
-        totalAttacks={3}
+        totalAttacks={2}
         creatureTargets={['Goblin', 'Orc']}
         currentTargetName="Unknown"
         onConfirm={vi.fn()}
@@ -34,12 +37,15 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    const inputs = screen.getAllByRole('spinbutton');
-    expect(inputs[0]).toHaveValue(0);
-    expect(inputs[1]).toHaveValue(0);
+    // No "(Current)" marker on any target (positive leg pinned in mount test).
+    expect(screen.getByRole('spinbutton', { name: 'Goblin' })).toHaveValue(0);
+    expect(screen.getByRole('spinbutton', { name: 'Orc' })).toHaveValue(0);
+    expect(screen.queryByRole('spinbutton', { name: /\(Current\)/ })).not.toBeInTheDocument();
+    expect(getSummaryText()).toBe('Assigned: 0 / 2');
+    expect(screen.getByRole('button', { name: 'Strike All' })).toBeDisabled();
   });
 
-  it('allows changing distribution', () => {
+  it('tracks manual distribution in the summary and enables Strike All once all attacks are assigned', () => {
     render(
       <FlurryOfBlowsTargetPopup
         totalAttacks={3}
@@ -49,66 +55,44 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '2' } });
-    fireEvent.change(inputs[1], { target: { value: '1' } });
+    const strikeAll = screen.getByRole('button', { name: 'Strike All' });
+    expect(getSummaryText()).toBe('Assigned: 0 / 3');
+    expect(strikeAll).toBeDisabled();
 
-    expect(inputs[0]).toHaveValue(2);
-    expect(inputs[1]).toHaveValue(1);
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Goblin' }), { target: { value: '2' } });
+    expect(getSummaryText()).toBe('Assigned: 2 / 3');
+    expect(strikeAll).toBeDisabled();
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Orc' }), { target: { value: '1' } });
+    expect(getSummaryText()).toBe('Assigned: 3 / 3');
+    expect(screen.getByRole('spinbutton', { name: 'Goblin' })).toHaveValue(2);
+    expect(screen.getByRole('spinbutton', { name: 'Orc' })).toHaveValue(1);
+    expect(strikeAll).not.toBeDisabled();
   });
 
-  it('enables confirm button when all attacks are assigned and disables when not', () => {
-    const { rerender } = render(
+  it('clamps over-allocation by reducing targets listed after the edited one', () => {
+    render(
       <FlurryOfBlowsTargetPopup
-        totalAttacks={3}
-        creatureTargets={['Goblin', 'Orc']}
+        totalAttacks={2}
+        creatureTargets={['Goblin', 'Orc', 'Skeleton']}
         onConfirm={vi.fn()}
         onSkip={vi.fn()}
       />
     );
 
-    expect(screen.getByRole('button', { name: /Strike All/ })).toBeDisabled();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Goblin' }), { target: { value: '1' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Orc' }), { target: { value: '1' } });
+    expect(getSummaryText()).toBe('Assigned: 2 / 2');
 
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '2' } });
-    fireEvent.change(inputs[1], { target: { value: '1' } });
-
-    expect(screen.getByRole('button', { name: /Strike All/ })).not.toBeDisabled();
-
-    rerender(
-      <FlurryOfBlowsTargetPopup
-        totalAttacks={3}
-        creatureTargets={['Goblin', 'Orc']}
-        currentTargetName="Goblin"
-        onConfirm={vi.fn()}
-        onSkip={vi.fn()}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: /Strike All/ })).not.toBeDisabled();
+    // Bumping Goblin to 2 overflows: excess is clawed back from later rows.
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Goblin' }), { target: { value: '2' } });
+    expect(screen.getByRole('spinbutton', { name: 'Goblin' })).toHaveValue(2);
+    expect(screen.getByRole('spinbutton', { name: 'Orc' })).toHaveValue(0);
+    expect(screen.getByRole('spinbutton', { name: 'Skeleton' })).toHaveValue(0);
+    expect(getSummaryText()).toBe('Assigned: 2 / 2');
   });
 
-  it('updates assigned count summary as inputs change', () => {
-    const { container } = render(
-      <FlurryOfBlowsTargetPopup
-        totalAttacks={3}
-        creatureTargets={['Goblin', 'Orc']}
-        onConfirm={vi.fn()}
-        onSkip={vi.fn()}
-      />
-    );
-
-    expect(getSummaryText(container)).toBe('Assigned: 0 / 3');
-
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '1' } });
-    expect(getSummaryText(container)).toBe('Assigned: 1 / 3');
-
-    fireEvent.change(inputs[1], { target: { value: '2' } });
-    expect(getSummaryText(container)).toBe('Assigned: 3 / 3');
-  });
-
-  it('calls onConfirm with distribution when confirmed', () => {
+  it('confirms with the exact distribution payload', () => {
     const onConfirm = vi.fn();
     render(
       <FlurryOfBlowsTargetPopup
@@ -119,33 +103,17 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '1' } });
-    fireEvent.change(inputs[1], { target: { value: '2' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Goblin' }), { target: { value: '1' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Orc' }), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Strike All' }));
 
-    fireEvent.click(screen.getByRole('button', { name: /Strike All/ }));
-
+    expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledWith({
       distribution: { Goblin: 1, Orc: 2 },
     });
   });
 
-  it('does not call onConfirm when not all attacks are assigned', () => {
-    const onConfirm = vi.fn();
-    render(
-      <FlurryOfBlowsTargetPopup
-        totalAttacks={3}
-        creatureTargets={['Goblin', 'Orc']}
-        onConfirm={onConfirm}
-        onSkip={vi.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /Strike All/ }));
-    expect(onConfirm).not.toHaveBeenCalled();
-  });
-
-  it('calls onSkip when canceling via button or Escape key', () => {
+  it('calls onSkip from the Cancel button and the Escape key', () => {
     const onSkip = vi.fn();
     render(
       <FlurryOfBlowsTargetPopup
@@ -158,31 +126,13 @@ describe('FlurryOfBlowsTargetPopup', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onSkip).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onSkip).toHaveBeenCalledTimes(2);
   });
 
-  it('clamps total assigned attacks across all targets', () => {
-    const { container } = render(
-      <FlurryOfBlowsTargetPopup
-        totalAttacks={2}
-        creatureTargets={['Goblin', 'Orc', 'Skeleton']}
-        onConfirm={vi.fn()}
-        onSkip={vi.fn()}
-      />
-    );
-
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '1' } });
-    fireEvent.change(inputs[1], { target: { value: '1' } });
-    expect(getSummaryText(container)).toBe('Assigned: 2 / 2');
-
-    fireEvent.change(inputs[0], { target: { value: '2' } });
-    expect(getSummaryText(container)).toBe('Assigned: 2 / 2');
-    expect(inputs[0]).toHaveValue(2);
-    expect(inputs[1]).toHaveValue(0);
-  });
-
-  it('handles single attack with singular wording', () => {
-    const { container } = render(
+  it('uses singular copy for a single attack and plural copy otherwise', () => {
+    const { unmount } = render(
       <FlurryOfBlowsTargetPopup
         totalAttacks={1}
         creatureTargets={['Goblin', 'Orc']}
@@ -191,27 +141,27 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    expect(screen.getByText(/1 Attack to Assign/)).toBeInTheDocument();
-    expect(getSummaryText(container)).toBe('Assigned: 0 / 1');
-  });
+    // Copy lives across a <strong>, so pin its two text parts.
+    expect(screen.getByText('Heightened Flurry of Blows')).toBeInTheDocument();
+    expect(screen.getByText(/^— 1 Attack to Assign$/)).toBeInTheDocument();
+    expect(screen.getByText(/Assign all 1 attack across targets:/)).toBeInTheDocument();
+    expect(getSummaryText()).toBe('Assigned: 0 / 1');
+    unmount();
 
-  it('auto-assigns to current target even with single attack', () => {
     render(
       <FlurryOfBlowsTargetPopup
-        totalAttacks={1}
-        creatureTargets={['Goblin', 'Orc']}
-        currentTargetName="Goblin"
+        totalAttacks={3}
+        creatureTargets={['Goblin']}
         onConfirm={vi.fn()}
         onSkip={vi.fn()}
       />
     );
 
-    const inputs = screen.getAllByRole('spinbutton');
-    expect(inputs[0]).toHaveValue(1);
-    expect(inputs[1]).toHaveValue(0);
+    expect(screen.getByText(/^— 3 Attacks to Assign$/)).toBeInTheDocument();
+    expect(screen.getByText(/Assign all 3 attacks across targets:/)).toBeInTheDocument();
   });
 
-  it('renders with empty creature targets', () => {
+  it('renders no target inputs but keeps the plural copy and disabled confirm when targets are empty', () => {
     render(
       <FlurryOfBlowsTargetPopup
         totalAttacks={3}
@@ -221,7 +171,9 @@ describe('FlurryOfBlowsTargetPopup', () => {
       />
     );
 
-    expect(screen.getByText(/3 Attacks to Assign/)).toBeInTheDocument();
     expect(screen.queryAllByRole('spinbutton')).toHaveLength(0);
+    expect(screen.getByText(/^— 3 Attacks to Assign$/)).toBeInTheDocument();
+    expect(getSummaryText()).toBe('Assigned: 0 / 3');
+    expect(screen.getByRole('button', { name: 'Strike All' })).toBeDisabled();
   });
 });

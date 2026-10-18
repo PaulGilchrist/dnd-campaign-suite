@@ -1,14 +1,47 @@
-// Removed 5 tests:
-//   - "passes the character ruleset to validateStep" (2024) + "passes the character ruleset to validateStep for 5e" -> consolidated into "passes the character ruleset to validateStep"
-//   - "uses 'Save Changes' button text when isEditing is true" -> button label is WizardFooter concern (covered in WizardFooter.test.jsx)
-//   - "uses 'Create Character' button text when isEditing is false" -> same as above
-//   - "calls onComplete with the formData from the wizard form hook" -> merged into the happy-path test (asserts same onComplete call + setFormData not called)
-//   - "does not call setErrors when validation succeeds" -> implied by the happy-path test calling onComplete
+// @maintained-by-ai
+/**
+ * Submission lane for CharacterCreationWizard — isolates the handleSubmit
+ * boundary (CharacterCreationWizard.jsx handleSubmit) by mocking every hook,
+ * validator and chrome. Pins what the integration lane (#363, real
+ * validators) cannot see: submit-chain ordering, byte-exact validator-call
+ * args, and the three early-return branches (step / final / ability-cap).
+ *
+ * Owned elsewhere (do not restate here):
+ *  - edit-flow onComplete byte-exact payload with real validators
+ *    -> CharacterCreationWizard.integration.test.jsx test 3
+ *  - footer button labels / disabled states -> WizardFooter.test.jsx
+ *  - per-step field behavior -> WizardStep*.test.jsx
+ *
+ * There is no create-vs-edit API dispatch, no fetch POST assembly, and no
+ * double-submit guard in the source — submit runs the same
+ * validateStep -> validateFinalFormData -> validateAbilityTotals chain and
+ * calls onComplete(formData) in both modes — so nothing is pinned for those.
+ *
+ * Trim log vs previous revision:
+ *  - "calls onComplete with formData when all validations pass" folded into
+ *    the chain test below (the standalone happy payload is strictly weaker
+ *    than #363's real-validator edit-flow pin; the chain test keeps the
+ *    call wiring that #363 cannot spy).
+ *  - "passes the character ruleset to validateStep" + "calls
+ *    validateFinalFormData after validateStep passes" consolidated into one
+ *    byte-exact chain test (same execution path, both validator calls).
+ *  - "does not call validateFinalFormData when step validation fails"
+ *    merged into "blocks submit when step validation fails" (identical
+ *    setup and assertions split across two tests).
+ *  - dead mocks purged: updateClass (component never destructures it),
+ *    sidebar goToStep buttons / step-1 ruleset buttons / header close
+ *    (nothing in this lane clicks them), getTotalSteps/getDisplayNumber
+ *    (never imported by the component), calculateTotalPointsSpent
+ *    (never destructured), per-step mock components for steps 1-11
+ *    (unreachable — currentStep is always the last canonical step here).
+ *  - useWizardData mock now supplies every destructured key
+ *    (allRacesData / allClassesData were missing); useWizardFeatAbilityChoices
+ *    mock supplies the missing handleFeatAbilityModeChange.
+ */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { validateStep, validateFinalFormData, validateAbilityTotals } from '../../config/utils.js';
-import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 
 const mockFormData = {
   name: '',
@@ -33,6 +66,8 @@ const mockFormData = {
   rules: '5e',
 };
 
+// Stable identities so the wizard's real effects (duplicate-name guard,
+// inventory sync) never see churn from re-created mock objects.
 const mockErrors = {};
 const mockSetFormData = vi.fn();
 const mockSetErrors = vi.fn();
@@ -40,13 +75,19 @@ const mockUpdateField = vi.fn();
 const mockUpdateArrayField = vi.fn();
 const mockUpdateAbility = vi.fn();
 const mockUpdateInventory = vi.fn();
-const mockUpdateClass = vi.fn();
 const mockResetErrors = vi.fn();
 
-const mockGoToStep = vi.fn();
-const mockNavigateNext = vi.fn();
-const mockNavigatePrevious = vi.fn();
-const mockGetStepEnabled = vi.fn(() => true);
+// Submit lives on the last canonical step (12); nav is a fixed fixture —
+// navigation itself belongs to the integration / navigation-hook lanes.
+const navState = {
+  currentStep: 12,
+  isNextDisabled: false,
+  navigateNext: () => Promise.resolve(true),
+  navigatePrevious: () => {},
+  goToStep: () => {},
+  getStepEnabled: () => true,
+  isSaveEnabled: true,
+};
 
 vi.mock('../../hooks/wizard/useWizardForm.js', () => ({
   default: vi.fn(() => ({
@@ -58,7 +99,6 @@ vi.mock('../../hooks/wizard/useWizardForm.js', () => ({
     updateArrayField: mockUpdateArrayField,
     updateAbility: mockUpdateAbility,
     updateInventory: mockUpdateInventory,
-    updateClass: mockUpdateClass,
     resetErrors: mockResetErrors,
   })),
 }));
@@ -67,23 +107,16 @@ vi.mock('../../hooks/wizard/useWizardData.js', () => ({
   default: vi.fn(() => ({
     backgrounds: [],
     racesData: [],
+    allRacesData: [],
     classSubtypes: [],
+    allClassesData: [],
     feats: [],
     magicItems: [],
-    isDataLoading: false,
   })),
 }));
 
 vi.mock('../../hooks/wizard/useWizardNavigation.js', () => ({
-  default: vi.fn(() => ({
-    currentStep: 1,
-    isNextDisabled: false,
-    navigateNext: mockNavigateNext,
-    navigatePrevious: mockNavigatePrevious,
-    goToStep: mockGoToStep,
-    getStepEnabled: mockGetStepEnabled,
-    isSaveEnabled: true,
-  })),
+  default: vi.fn(() => navState),
 }));
 
 vi.mock('../../hooks/wizard/useWizardSkills.js', () => ({
@@ -113,21 +146,15 @@ vi.mock('../../hooks/wizard/useWizardResistances.js', () => ({
 }));
 
 vi.mock('../../hooks/wizard/useWizardFeats.js', () => ({
-  default: vi.fn(() => ({
-    preSelectedFeats: [],
-  })),
+  default: vi.fn(() => ({ preSelectedFeats: [] })),
 }));
 
 vi.mock('../../hooks/wizard/useWizardFeatBuffs.js', () => ({
-  default: vi.fn(() => ({
-    computedBuffs: {},
-  })),
+  default: vi.fn(() => ({ computedBuffs: {} })),
 }));
 
 vi.mock('../../hooks/wizard/useWizardSpells.js', () => ({
-  default: vi.fn(() => ({
-    preSelectedSpells: [],
-  })),
+  default: vi.fn(() => ({ preSelectedSpells: [] })),
 }));
 
 vi.mock('../../hooks/wizard/useWizardBackgroundAbility.js', () => ({
@@ -141,7 +168,6 @@ vi.mock('../../hooks/wizard/useWizardBackgroundAbility.js', () => ({
 
 vi.mock('../../hooks/wizard/useWizardAbilities.js', () => ({
   default: vi.fn(() => ({
-    calculateTotalPointsSpent: vi.fn(),
     onAbilityBaseScoreChange: vi.fn(),
     onAbilityMiscIncreaseChange: vi.fn(),
   })),
@@ -160,40 +186,27 @@ vi.mock('../../hooks/wizard/useWizardFeatAbilityChoices.js', () => ({
     featAbilityChoices: [],
     featAbilityAssignments: {},
     handleFeatAbilityChoice: vi.fn(),
+    handleFeatAbilityModeChange: vi.fn(),
   })),
 }));
 
 vi.mock('./WizardHeader.jsx', () => ({
-  default: function WizardHeaderMock({ title, onClose }) {
-    return (
-      <div data-testid="wizard-header">
-        <h2>{title}</h2>
-        <button className="close-btn" onClick={onClose}>×</button>
-      </div>
-    );
+  default: function WizardHeaderMock({ title }) {
+    return <h2>{title}</h2>;
   },
 }));
 
 vi.mock('./WizardProgressBar.jsx', () => ({
-  default: function WizardProgressBarMock({ currentStep, totalSteps, isEditing }) {
-    return (
-      <div data-testid="wizard-progress-bar">
-        <span>Step {currentStep} of {totalSteps}</span>
-        <span data-testid="is-editing-flag">{isEditing ? 'true' : 'false'}</span>
-      </div>
-    );
-  },
+  default: () => null,
 }));
 
+// Submit button oracle for this lane; labels themselves are owned by
+// WizardFooter.test.jsx.
 vi.mock('./WizardFooter.jsx', () => ({
   default: function WizardFooterMock({ isFirstStep, isLastStep, onCancel, onPrevious, onNext, onSubmit, isNextDisabled, isEditing }) {
     return (
       <div data-testid="wizard-footer">
-        <button
-          className="btn btn-secondary"
-          onClick={isFirstStep ? onCancel : onPrevious}
-          disabled={isFirstStep}
-        >
+        <button className="btn btn-secondary" onClick={isFirstStep ? onCancel : onPrevious} disabled={isFirstStep}>
           {isFirstStep ? 'Cancel' : 'Previous'}
         </button>
         {isLastStep ? (
@@ -210,48 +223,25 @@ vi.mock('./WizardFooter.jsx', () => ({
   },
 }));
 
+// isSaveEnabled span is the cap-gate prop oracle for the FT-001 test.
 vi.mock('./WizardSidebar.jsx', () => ({
-  default: function WizardSidebarMock({ currentStep, goToStep, isSaveEnabled }) {
+  default: function WizardSidebarMock({ isSaveEnabled }) {
     return (
       <div data-testid="wizard-sidebar">
-        <span data-testid="sidebar-step">{currentStep}</span>
         <span data-testid="sidebar-save-enabled">{isSaveEnabled ? 'true' : 'false'}</span>
-        <button onClick={() => goToStep(1)}>Go Step 1</button>
-        <button onClick={() => goToStep(6)}>Go Step 6</button>
       </div>
     );
   },
 }));
 
 vi.mock('../../config/steps-config.js', () => {
-  const StepComponent = ({
-    onRulesetChange,
-    onTempInventoryChange,
-    tempInventory,
-  }) => (
-    <div data-testid="step-ruleset">
-      <button onClick={() => onRulesetChange('2024')}>Change Ruleset</button>
-      <button onClick={() => onRulesetChange('5e')}>Ruleset 5e</button>
-      <button onClick={() => onTempInventoryChange?.('backpack', ['Sword'])}>Update Inventory</button>
-      <span data-testid="temp-inventory-count">{tempInventory?.backpack?.length ?? 0}</span>
-    </div>
-  );
-  StepComponent.displayName = 'StepComponent';
-
-  const mockSteps = [
-    { step: 1, title: 'Ruleset', component: StepComponent, getProps: (props) => props },
-    { step: 2, title: 'Basic Information', component: () => <div data-testid="step-basic">Basic Step</div>, getProps: () => ({}) },
-    { step: 3, title: 'Race & Class', component: () => <div data-testid="step-race-class">Race & Class Step</div>, getProps: () => ({}) },
-    { step: 4, title: 'Feats', component: () => <div data-testid="step-feats">Feats Step</div>, getProps: () => ({}) },
-    { step: 5, title: 'Ability Scores', component: () => <div data-testid="step-abilities">Abilities Step</div>, getProps: () => ({}) },
-    { step: 6, title: 'Skill Proficiencies', component: () => <div data-testid="step-skills">Skills Step</div>, getProps: () => ({}) },
-    { step: 7, title: 'Languages & Fighting Styles', component: () => <div data-testid="step-languages">Languages Step</div>, getProps: () => ({}) },
-    { step: 8, title: 'Resistances & Immunities', component: () => <div data-testid="step-resistances">Resistances Step</div>, getProps: () => ({}) },
-    { step: 9, title: 'Spells', component: () => <div data-testid="step-spells">Spells Step</div>, getProps: () => ({}) },
-    { step: 10, title: 'Magic Items', component: () => <div data-testid="step-magic-items">Magic Items Step</div>, getProps: () => ({}) },
-    { step: 11, title: 'Inventory', component: () => <div data-testid="step-inventory">Inventory Step</div>, getProps: () => ({}) },
-    { step: 12, title: 'Special Actions', component: () => <div data-testid="step-special">Special Step</div>, getProps: () => ({}) },
-  ];
+  const Placeholder = () => <div data-testid="wizard-step-placeholder" />;
+  const mockSteps = Array.from({ length: 12 }, (_, i) => ({
+    step: i + 1,
+    title: `Step ${i + 1}`,
+    component: Placeholder,
+    getProps: () => ({}),
+  }));
 
   const mockGetVisibleSteps = ({ isEditing = false, ruleset } = {}) =>
     mockSteps
@@ -260,9 +250,7 @@ vi.mock('../../config/steps-config.js', () => {
 
   return {
     WIZARD_STEPS: mockSteps,
-    getTotalSteps: vi.fn(() => 12),
     getVisibleSteps: vi.fn(mockGetVisibleSteps),
-    getDisplayNumber: vi.fn((stepNumber, opts) => mockGetVisibleSteps(opts).find((s) => s.step === stepNumber)?.displayNumber),
   };
 });
 
@@ -275,149 +263,102 @@ vi.mock('../../config/utils.js', () => ({
 }));
 
 describe('CharacterCreationWizard - Submission', () => {
-  const mockOnComplete = vi.fn();
-  const mockOnCancel = vi.fn();
-
-  const defaultProps = {
-    onComplete: mockOnComplete,
-    onCancel: mockOnCancel,
-    allClasses: [],
-    allSpells: [],
-    characterData: null,
-    isEditing: false,
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGoToStep.mockReset();
-    mockNavigateNext.mockReset();
-    mockNavigatePrevious.mockReset();
-    mockGetStepEnabled.mockReset();
-    mockGetStepEnabled.mockImplementation(() => true);
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 1,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
     validateStep.mockImplementation(() => Promise.resolve({}));
     validateFinalFormData.mockImplementation(() => ({}));
     validateAbilityTotals.mockImplementation(() => Promise.resolve({}));
   });
 
   function renderWizard(props = {}) {
-    useWizardNavigation.mockImplementation(() => ({
-      currentStep: 12,
-      isNextDisabled: false,
-      navigateNext: mockNavigateNext,
-      navigatePrevious: mockNavigatePrevious,
-      goToStep: mockGoToStep,
-      getStepEnabled: mockGetStepEnabled,
-      isSaveEnabled: true,
-    }));
-    return render(<CharacterCreationWizard {...defaultProps} {...props} />);
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <CharacterCreationWizard
+        onComplete={onComplete}
+        onCancel={onCancel}
+        allClasses={[]}
+        characterData={{ rules: '5e' }}
+        isEditing={false}
+        campaignName="test-campaign"
+        existingCharacters={[]}
+        {...props}
+      />
+    );
+    return { onComplete };
   }
 
-  it('calls onComplete with formData when all validations pass', async () => {
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
+  it('routes create-flow submit through the validation chain and completes with the live form state', async () => {
+    const { onComplete } = renderWizard({ existingCharacters: ['Brutus'] });
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
+      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
     });
 
-    await waitFor(() => {
-      expect(localOnComplete).toHaveBeenCalledWith(mockFormData);
-      expect(mockSetFormData).not.toHaveBeenCalled();
-      expect(mockSetErrors).not.toHaveBeenCalled();
-    });
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith(mockFormData));
+    // Byte-exact wiring #363 cannot spy (its validators are real): submit
+    // runs each validator exactly once against the live step, live form
+    // state, the character's ruleset, and the campaign name list.
+    expect(validateStep).toHaveBeenCalledTimes(1);
+    expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e', allFeats: [] });
+    expect(validateFinalFormData).toHaveBeenCalledTimes(1);
+    expect(validateFinalFormData).toHaveBeenCalledWith(mockFormData, ['Brutus']);
+    expect(mockSetErrors).not.toHaveBeenCalled();
+    expect(mockSetFormData).not.toHaveBeenCalled();
   });
 
-  it('passes the character ruleset to validateStep', async () => {
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
-    });
-
-    await waitFor(() => {
-      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, { racesData: [], classSubtypes: [], ruleset: '5e', allFeats: expect.any(Array) });
-    });
-  });
-
-  it('calls validateFinalFormData after validateStep passes', async () => {
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
-    });
-
-    await waitFor(() => {
-      expect(validateFinalFormData).toHaveBeenCalledWith(mockFormData, []);
-    });
-  });
-
-  it('does not call validateFinalFormData when step validation fails', async () => {
+  it('blocks submit when step validation fails: surfaces step errors without running later validators', async () => {
     validateStep.mockImplementation(() => Promise.resolve({ name: 'Name is required' }));
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
+    const { onComplete } = renderWizard();
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
-    });
-
-    await waitFor(() => {
-      expect(validateFinalFormData).not.toHaveBeenCalled();
-    });
-  });
-
-  it('sets step errors and does not call onComplete when step validation fails', async () => {
-    validateStep.mockImplementation(() => Promise.resolve({ name: 'Name is required' }));
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
+      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
     });
 
     await waitFor(() => {
       expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
-      expect(localOnComplete).not.toHaveBeenCalled();
     });
+    expect(validateFinalFormData).not.toHaveBeenCalled();
+    // Only the render-time cap-gate effect may have called it — submit
+    // returns before the ability check.
+    expect(validateAbilityTotals).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('sets final validation errors and does not call onComplete when final validation fails', async () => {
-    validateFinalFormData.mockImplementation(() => ({ name: 'Name is required' }));
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '5e' } });
+  it('blocks submit when final validation fails: surfaces final errors before the ability-cap check', async () => {
+    validateFinalFormData.mockImplementation(() => ({ name: 'Name collides with an existing character' }));
+    const { onComplete } = renderWizard();
 
     await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
+      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
     });
 
     await waitFor(() => {
-      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
-      expect(localOnComplete).not.toHaveBeenCalled();
+      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name collides with an existing character' });
     });
+    // Only the render-time cap-gate effect may have called it — submit
+    // returns before the ability check.
+    expect(validateAbilityTotals).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('FT-001: refuses submit and surfaces errors when an ability total exceeds the cap', async () => {
-    validateAbilityTotals.mockImplementation(() => Promise.resolve({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' }));
-    const localOnComplete = vi.fn();
-    renderWizard({ onComplete: localOnComplete, characterData: { rules: '2024' } });
+  it('FT-001: blocks submit and keeps sidebar save disabled when an ability total exceeds the cap', async () => {
+    const capErrors = { ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' };
+    validateAbilityTotals.mockImplementation(() => Promise.resolve(capErrors));
+    const { onComplete } = renderWizard({ characterData: { rules: '2024' } });
 
+    // Cap-gate effect closes the sidebar save gate (isSaveEnabled prop)...
+    await waitFor(() => {
+      expect(screen.getByTestId('sidebar-save-enabled')).toHaveTextContent('false');
+    });
+    // ...and handleSubmit re-checks the cap on click, refusing to complete.
     await act(async () => {
-      fireEvent.click(screen.getByText('Create Character'));
+      fireEvent.click(screen.getByRole('button', { name: 'Create Character' }));
     });
 
     await waitFor(() => {
-      expect(mockSetErrors).toHaveBeenCalledWith({ ability_4_totalScore: 'Wisdom total 21 exceeds the maximum of 20' });
-      expect(localOnComplete).not.toHaveBeenCalled();
+      expect(mockSetErrors).toHaveBeenCalledWith(capErrors);
     });
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });

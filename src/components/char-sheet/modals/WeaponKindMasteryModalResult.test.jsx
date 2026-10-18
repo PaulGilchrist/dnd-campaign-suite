@@ -1,13 +1,9 @@
+// @maintained-by-ai
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/automation/index.js', () => ({
   applyWeaponKindMastery: vi.fn(),
-}));
-
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
 }));
 
 import * as automation from '../../../services/automation/index.js';
@@ -33,152 +29,84 @@ const mockWeapons = [
   { name: 'Shortsword', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Vex' },
 ];
 
-const baseProps = {
-  action: undefined,
-  playerStats: mockPlayerStats,
-  campaignName: mockCampaignName,
-  onClose: vi.fn(),
-};
+// Exact copy produced by weaponKindMasteryHandler.applySelections
+const RESULT_DESCRIPTION = 'Weapon kinds set to: Battleaxe, Club. Mastery properties will be available when attacking with these weapons.';
 
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
-}
-
-function renderWithWeapons(overrides, weaponsToMock = mockWeapons) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    json: () => Promise.resolve(weaponsToMock),
+function renderWithWeapons(overrides) {
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    json: () => Promise.resolve(mockWeapons),
   });
-  globalThis.fetch = fetchMock;
-  return render(<WeaponKindMasteryModal {...makeProps(overrides)} />);
+  return render(<WeaponKindMasteryModal
+    action={undefined}
+    playerStats={mockPlayerStats}
+    campaignName={mockCampaignName}
+    onClose={vi.fn()}
+    {...(overrides || {})}
+  />);
 }
 
 async function waitForWeapons() {
-  await waitFor(() => screen.getByText('Battleaxe'));
+  await waitFor(() => screen.getByRole('checkbox', { name: /Battleaxe/ }));
 }
 
-describe('WeaponKindMasteryModal', () => {
+async function selectAndApply() {
+  fireEvent.click(screen.getByRole('checkbox', { name: /Battleaxe/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: /Club/ }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+  });
+  await waitFor(() => screen.getByRole('button', { name: 'Done' }));
+}
+
+describe('WeaponKindMasteryModal — result state', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('result state', () => {
-    it('shows the result description after applying', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe, Club.',
-        },
-      });
-      renderWithWeapons();
-      await waitForWeapons();
-
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      battleaxeCheckbox.click();
-
-      const clubCheckbox = screen.getByRole('checkbox', { name: /Club/ });
-      clubCheckbox.click();
-
-      await fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Weapon kinds set to/)).toBeInTheDocument();
-      });
-    });
-
-    it('replaces the weapon list with a Done button after applying', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      renderWithWeapons();
-      await waitForWeapons();
-
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      battleaxeCheckbox.click();
-
-      await fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-
-      await waitFor(() => {
-        expect(screen.queryByLabelText('Battleaxe')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
-      });
-    });
-
-    it('renders result payload description as HTML via dangerouslySetInnerHTML', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: '<strong>Battleaxe</strong> selected.',
-        },
-      });
-      renderWithWeapons();
-      await waitForWeapons();
-
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      battleaxeCheckbox.click();
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Battleaxe/)).toBeInTheDocument();
-        expect(screen.getByText(/selected/)).toBeInTheDocument();
-      });
+    automation.applyWeaponKindMastery.mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Weapon Mastery',
+        description: RESULT_DESCRIPTION,
+      },
     });
   });
 
-  describe('close behavior', () => {
-    it('calls onClose when Done button is clicked in result state', async () => {
-      const onClose = vi.fn();
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe.',
-        },
-      });
-      renderWithWeapons({ onClose });
-      await waitForWeapons();
+  it('replaces the selection UI with the applied result copy and a Done button', async () => {
+    renderWithWeapons();
+    await waitForWeapons();
 
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      battleaxeCheckbox.click();
+    await selectAndApply();
 
-      await fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      await waitFor(() => screen.getByRole('button', { name: 'Done' }));
-      await fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+    expect(screen.getByText(RESULT_DESCRIPTION)).toBeInTheDocument();
+    // selection UI is gone, replaced by Done
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  });
 
-    it('calls onClose when Skip button is clicked', async () => {
-      const onClose = vi.fn();
-      renderWithWeapons({ onClose });
-      await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+  it('calls onClose when Done is clicked in the result state', async () => {
+    const onClose = vi.fn();
+    renderWithWeapons({ onClose });
+    await waitForWeapons();
 
-    it('does not call applyWeaponKindMastery when Skip is clicked', async () => {
-      renderWithWeapons();
-      await waitForWeapons();
+    await selectAndApply();
 
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      battleaxeCheckbox.click();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-      await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-      expect(automation.applyWeaponKindMastery).not.toHaveBeenCalled();
-    });
+  it('closes without applying when Skip is clicked, even with a selection made', async () => {
+    const onClose = vi.fn();
+    renderWithWeapons({ onClose });
+    await waitForWeapons();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Battleaxe/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(automation.applyWeaponKindMastery).not.toHaveBeenCalled();
   });
 
 });

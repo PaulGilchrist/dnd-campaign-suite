@@ -1,6 +1,12 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
+// Mock audit vs useAttackDamageResolution.js import graph (its 8 static imports):
+// every module it imports is stubbed so nothing loads; the pipeline is stubbed
+// so the exact ctx that reaches pipeline.run is observable as consumer call args.
+// No dice roll happens on this path (rollExpression is stubbed only to satisfy
+// the module import, never invoked nor asserted).
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -9,32 +15,9 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
-}));
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
-    setRuntimeObject: vi.fn(),
-}));
-
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-    getActiveBuffs: vi.fn(),
-}));
-
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-    collectWeaponMastery: vi.fn(),
-    evaluateAutoExpression: vi.fn(),
-    hasTwoWeaponFighting: vi.fn(),
-}));
-
-vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    applyDamageToTarget: vi.fn(),
-}));
-
-vi.mock('../../services/rules/core/attackCalc.js', () => ({
-    parseMagicItemName: vi.fn((name) => ({ baseName: name })),
 }));
 
 vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
@@ -43,279 +26,171 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    getEmpoweredEvocationFeatures: vi.fn(() => []),
-    getEmpoweredEvocationIntModifier: vi.fn(() => 0),
+    getEmpoweredEvocationFeatures: vi.fn(),
+    getEmpoweredEvocationIntModifier: vi.fn(),
+}));
+
+vi.mock('../../services/combat/automation/automationService.js', () => ({
+    evaluateAutoExpression: vi.fn(),
 }));
 
 vi.mock('../../services/combat/steps/index.js', () => ({
-    buildPipelineForAction: vi.fn(() => mockPipeline),
+    buildPipelineForAction: vi.fn(),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(),
 }));
 
-import { rollExpression } from '../../services/dice/diceRoller.js';
-import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
+import { buildPipelineForAction } from '../../services/combat/steps/index.js';
 
-const mockPipeline = {
-    run: vi.fn().mockResolvedValue(undefined),
-};
+const pipelineRun = vi.fn(() => Promise.resolve());
 
-const mockPlayerStats = {
-    name: 'TestWizard',
-    level: 10,
-    abilities: [{ name: 'Intelligence', bonus: 4 }],
-    proficiency: 5,
-    class: { name: 'Wizard', class_levels: [{ level: 10 }] },
-    automation: { actions: [], passives: [] },
-};
+const LONGSWORD = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
+const mockPlayerStats = { name: 'TestWizard', level: 10 };
 
-const mockCampaignName = 'test-campaign';
-
-const modalState = {};
-const mockSetModalState = vi.fn((updates) => {
-    if (typeof updates === 'function') {
-        return updates(modalState);
-    }
-    Object.assign(modalState, updates);
-});
-
-const mockPendingDamageRef = { current: null };
-
-function UseAttackDamageResolution(overrides = {}) {
-    const deps = {
+function useResolution(overrides = {}) {
+    return useAttackDamageResolution({
         playerStats: mockPlayerStats,
-        campaignName: mockCampaignName,
+        campaignName: 'test-campaign',
         mapName: null,
         popupHtml: null,
         setPopupHtml: vi.fn(),
         rollDamage: vi.fn(),
-        buildCtx: vi.fn(() => Promise.resolve({ targetName: 'Goblin' })),
-        buildCtxSync: vi.fn(() => Promise.resolve({ targetName: 'Goblin' })),
-        modalState,
-        setModalState: mockSetModalState,
-        pendingDamage: mockPendingDamageRef.current,
+        buildCtx: vi.fn(),
+        buildCtxSync: vi.fn(),
+        setModalState: vi.fn(),
         setPendingDamage: vi.fn(),
-        resumeRef: mockPendingDamageRef,
+        resumeRef: { current: null },
         ...overrides,
-    };
-    return useAttackDamageResolution(deps);
+    });
 }
 
-function getCtx() {
-    const runCalls = mockPipeline.run.mock.calls;
-    return runCalls.length > 0 ? runCalls[runCalls.length - 1][1] : null;
+function lastCtx() {
+    expect(pipelineRun.mock.calls.length).toBeGreaterThan(0);
+    return pipelineRun.mock.calls[pipelineRun.mock.calls.length - 1][1];
 }
 
-describe('useAttackDamageResolution - ctxOverrides and popupHtml fallbacks', () => {
+describe('useAttackDamageResolution ctxOverrides: override-vs-derived precedence at the pipeline seam', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 3 });
-        getActiveBuffs.mockReturnValue([]);
-        hasTwoWeaponFighting.mockReturnValue(false);
-        Object.keys(modalState).forEach(k => delete modalState[k]);
-        mockSetModalState.mockClear();
-        mockPendingDamageRef.current = null;
-        mockPipeline.run.mockClear();
+        vi.resetAllMocks();
+        buildPipelineForAction.mockReturnValue({ run: pipelineRun, resume: vi.fn() });
     });
 
-    describe('popupHtml fallbacks for hit/crit flags', () => {
-        it('uses popupHtml.isCrit to set hit when popupHtml.hit is not provided', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { isCrit: true, hit: undefined },
-            });
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.hit).toBe(true);
-            expect(ctx.isCrit).toBe(true);
-        });
-
-        it('prefers ctxOverrides.hit over popupHtml.isCrit', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { isCrit: true, hit: true },
-            });
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack, { hit: false });
-            const ctx = getCtx();
-            expect(ctx.hit).toBe(false);
-            expect(ctx.isCrit).toBe(true);
-        });
-
-        it('defaults hit to false when popupHtml is null', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.hit).toBe(false);
-            expect(ctx.isCrit).toBe(false);
-            expect(ctx.isNatural20).toBe(false);
-            expect(ctx.targetName).toBe(null);
-            expect(ctx.isBonusActionAttack).toBe(false);
-            expect(ctx.overchannelActive).toBe(false);
-            expect(ctx.overchannelUseCount).toBe(0);
-            expect(ctx.overchannelSpellLevel).toBe(1);
-            expect(ctx.empoweredEvocationModifier).toBe(0);
-        });
-
-        it('defaults all fields to false/null/zero when popupHtml is empty object', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: {},
-            });
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.hit).toBe(false);
-            expect(ctx.isCrit).toBe(false);
-            expect(ctx.isNatural20).toBe(false);
-            expect(ctx.targetName).toBe(null);
-        });
-    });
-
-    describe('isBonusActionAttack detection', () => {
-        it('detects bonus action from attack.type', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.isBonusActionAttack).toBe(true);
-        });
-
-        it('does not detect bonus action for non-bonus action attack types', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', type: 'Action' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.isBonusActionAttack).toBe(false);
-        });
-
-        it('does not detect bonus action when attack.type is missing', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.isBonusActionAttack).toBe(false);
-        });
-
-        it('prefers ctxOverrides.isBonusActionAttack over attack.type', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action' };
-
-            await resolveAttackDamage(attack, { isBonusActionAttack: false });
-            const ctx = getCtx();
-            expect(ctx.isBonusActionAttack).toBe(false);
-        });
-    });
-
-    describe('overchannelActive overrides', () => {
-        it('passes overchannel overrides through to ctx', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' };
-
-            await resolveAttackDamage(attack, {
-                overchannelActive: true,
-                overchannelUseCount: 2,
-                overchannelSpellLevel: 3,
-            });
-            const ctx = getCtx();
-            expect(ctx.overchannelActive).toBe(true);
-            expect(ctx.overchannelUseCount).toBe(2);
-            expect(ctx.overchannelSpellLevel).toBe(3);
-        });
-
-        it('defaults overchannel values when not in ctxOverrides', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.overchannelActive).toBe(false);
-            expect(ctx.overchannelUseCount).toBe(0);
-            expect(ctx.overchannelSpellLevel).toBe(1);
-        });
-    });
-
-    describe('empoweredEvocationModifier override', () => {
-        it('passes empoweredEvocationModifier through to ctx and defaults to 0', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' };
-
-            await resolveAttackDamage(attack, { empoweredEvocationModifier: 4 });
-            let ctx = getCtx();
-            expect(ctx.empoweredEvocationModifier).toBe(4);
-
-            mockPipeline.run.mockClear();
-            await resolveAttackDamage(attack);
-            ctx = getCtx();
-            expect(ctx.empoweredEvocationModifier).toBe(0);
-        });
-    });
-
-    describe('resolveAttackDamage returns', () => {
-        it('returns a promise that resolves when pipeline completes', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            const result = resolveAttackDamage(attack);
-            expect(result).toBeInstanceOf(Promise);
-
-            await result;
-            expect(mockPipeline.run).toHaveBeenCalled();
-        });
-
-        it('adds resolveAttackDamage to context for nested attacks', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack);
-            const ctx = getCtx();
-            expect(ctx.resolveAttackDamage).toBe(resolveAttackDamage);
-        });
-    });
-
-    describe('ctxOverrides spread into pipeline context', () => {
-        it('spreads all ctxOverrides into the pipeline context', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
-
-            await resolveAttackDamage(attack, {
+    // resolveDamageContextFlags uses ?? so explicit false/0 overrides must beat
+    // truthy popup-derived values; unknown keys arrive via the raw ...ctxOverrides spread.
+    it.each([
+        {
+            name: 'popupHtml.isCrit derives hit=true when popupHtml.hit is absent',
+            popupHtml: { isCrit: true },
+            attack: LONGSWORD,
+            overrides: {},
+            expected: { hit: true, isCrit: true, isNatural20: false, targetName: null, isBonusActionAttack: false },
+        },
+        {
+            name: 'ctxOverrides.hit=false beats popup-derived hit=true (?? not ||)',
+            popupHtml: { hit: true, isCrit: true },
+            attack: LONGSWORD,
+            overrides: { hit: false },
+            expected: { hit: false, isCrit: true },
+        },
+        {
+            name: 'ctxOverrides override popup per-field; un-overridden isNatural20 still derived',
+            popupHtml: { hit: false, isCrit: false, targetName: 'Orc', isNatural20: true },
+            attack: LONGSWORD,
+            overrides: { hit: true, isCrit: true, targetName: 'Goblin' },
+            expected: { hit: true, isCrit: true, targetName: 'Goblin', isNatural20: true },
+        },
+        {
+            name: 'null/empty popupHtml defaults every derived flag to false/null/0/1',
+            popupHtml: null,
+            attack: LONGSWORD,
+            overrides: {},
+            expected: {
+                hit: false, isCrit: false, isNatural20: false, targetName: null,
+                isBonusActionAttack: false, overchannelActive: false, overchannelUseCount: 0,
+                overchannelSpellLevel: 1, empoweredEvocationModifier: 0,
+            },
+        },
+        {
+            name: 'attack.type "Bonus Action" derives isBonusActionAttack=true',
+            popupHtml: null,
+            attack: { ...LONGSWORD, type: 'Bonus Action' },
+            overrides: {},
+            expected: { isBonusActionAttack: true },
+        },
+        {
+            name: 'non-bonus attack.type derives isBonusActionAttack=false',
+            popupHtml: null,
+            attack: { ...LONGSWORD, type: 'Action' },
+            overrides: {},
+            expected: { isBonusActionAttack: false },
+        },
+        {
+            name: 'missing attack.type derives isBonusActionAttack=false',
+            popupHtml: null,
+            attack: LONGSWORD,
+            overrides: {},
+            expected: { isBonusActionAttack: false },
+        },
+        {
+            name: 'ctxOverrides.isBonusActionAttack=false beats attack.type "Bonus Action"',
+            popupHtml: null,
+            attack: { ...LONGSWORD, type: 'Bonus Action' },
+            overrides: { isBonusActionAttack: false },
+            expected: { isBonusActionAttack: false },
+        },
+        {
+            name: 'overchannel numeric overrides pass through to ctx',
+            popupHtml: null,
+            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
+            overrides: { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 },
+            expected: { overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 3 },
+        },
+        {
+            name: 'ctxOverrides.empoweredEvocationModifier=4 passes through (and stays 0 without it)',
+            popupHtml: null,
+            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
+            overrides: { empoweredEvocationModifier: 4 },
+            expected: { empoweredEvocationModifier: 4 },
+        },
+        {
+            name: 'arbitrary ctxOverrides keys reach ctx via raw spread',
+            popupHtml: null,
+            attack: LONGSWORD,
+            overrides: {
                 sneakDice: 4,
                 effectiveSneakDice: 4,
                 isMeleeOrUnarmed: true,
                 autoFormulaOverride: 'custom formula',
                 autoDamageSaveDc: 16,
                 attackerName: 'Custom Attacker',
-            });
-            const ctx = getCtx();
-            expect(ctx.sneakDice).toBe(4);
-            expect(ctx.effectiveSneakDice).toBe(4);
-            expect(ctx.isMeleeOrUnarmed).toBe(true);
-            expect(ctx.autoFormulaOverride).toBe('custom formula');
-            expect(ctx.autoDamageSaveDc).toBe(16);
-            expect(ctx.attackerName).toBe('Custom Attacker');
-        });
+            },
+            expected: {
+                sneakDice: 4,
+                effectiveSneakDice: 4,
+                isMeleeOrUnarmed: true,
+                autoFormulaOverride: 'custom formula',
+                autoDamageSaveDc: 16,
+                attackerName: 'Custom Attacker',
+            },
+        },
+    ])('$name', async ({ popupHtml, attack, overrides, expected }) => {
+        const { resolveAttackDamage } = useResolution({ popupHtml });
+        await resolveAttackDamage(attack, overrides);
+        expect(lastCtx()).toMatchObject(expected);
+    });
 
-        it('ctxOverrides override popupHtml values for the same field', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution({
-                popupHtml: { hit: false, isCrit: false, targetName: 'Orc', isNatural20: true },
-            });
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing' };
+    it('kicks pipeline with housekeeping:do, passes the resumeRef seam, and ctx self-references resolveAttackDamage for nested attacks', async () => {
+        const resumeRef = { current: null };
+        const { resolveAttackDamage } = useResolution({ resumeRef });
 
-            await resolveAttackDamage(attack, { hit: true, isCrit: true, targetName: 'Goblin' });
-            const ctx = getCtx();
-            expect(ctx.hit).toBe(true);
-            expect(ctx.isCrit).toBe(true);
-            expect(ctx.targetName).toBe('Goblin');
-            expect(ctx.isNatural20).toBe(true);
-        });
+        await resolveAttackDamage(LONGSWORD);
+
+        expect(pipelineRun).toHaveBeenCalledTimes(1);
+        const [event, ctx, ref] = pipelineRun.mock.calls[0];
+        expect(event).toBe('housekeeping:do');
+        expect(ref).toBe(resumeRef);
+        expect(ctx.resolveAttackDamage).toBe(resolveAttackDamage);
     });
 });

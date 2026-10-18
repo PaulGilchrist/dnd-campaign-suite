@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0590: Demilich Howl emanation picker — CON DC 19, 20d6 Psychic, half on
 // save. The DATA-marked save_effect ("Failure or Success: The target has the
 // Frightened condition …") arms parseBothOutcomesClause, so SUCCESSFUL saves
@@ -170,12 +171,19 @@ describe('MA-0590 Demilich Howl emanation picker', () => {
     expect(expirations.current.filter(e => e.targetName === 'Bandit 1')).toHaveLength(0);
   });
 
-  it('guardrail: bothOutcomesClause null + successful save grants NO condition (half damage only)', async () => {
-    spyRandom([0.99, 0.99]);
+  it('guardrail: bothOutcomesClause null — successful save pays half damage, NO condition/clock/log granted', async () => {
+    spyRandom([0.99, 0.99]); // nat 20 each: Bandit 1 fails (20-19<19, full dmg), Bandit 2 succeeds (half)
     const { getByText } = renderHowl({ bothOutcomesClause: null, saveConditions: [] });
     await waitFor(() => expect(seenTargets.current.length).toBe(2));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
+
+    // Damage adjudication stays intact — the guardrail must disarm ONLY the
+    // success-leg condition grant.
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 1', 10, expect.anything(), expect.anything());
+    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Bandit 2', 5, expect.anything(), expect.anything());
+    expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage' && e.targetName === 'Bandit 2' && e.saveResult === 'success' && e.finalDamage === 5)).toHaveLength(1);
+
     expect(runtime.store['Bandit 1.activeConditions'] ?? null).toBeNull();
     expect(runtime.store['Bandit 2.activeConditions'] ?? null).toBeNull();
     expect(expirations.current).toHaveLength(0);

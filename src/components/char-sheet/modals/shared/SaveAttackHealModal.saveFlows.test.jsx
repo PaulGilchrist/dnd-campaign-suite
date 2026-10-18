@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Save-routing lane for SaveAttackHealModal: NPC auto-resolve vs player prompt routing,
+// NPC save arithmetic (lowercase saveBonuses key, total = roll + bonus vs DC, honest
+// half-on-success / full-on-failure mocks), pending-player UI, save-result event
+// resolution/inertness, roll logging, and combatSummary persistence (cache + storage +
+// window event). Sibling lanes: SaveAttackHealModal.test.jsx owns initial render and
+// target selection; healFlows.test.jsx owns heal-radio arbitration/report/Done
+// (applyHealing mocked); npc-heal.test.jsx owns real HP restoration via applyHealing.js.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackHealModal from './SaveAttackHealModal.jsx';
@@ -18,7 +26,7 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
+  rollExpression: vi.fn(),
 }));
 
 vi.mock('../../../../services/ui/utils.js', () => {
@@ -37,13 +45,20 @@ vi.mock('../../../../services/ui/storage.js', () => ({
   },
 }));
 
-vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
-  applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
-  logHealingToSSE: vi.fn(),
-}));
-
 vi.mock('../../../../services/encounters/combatData.js', () => ({
   setCombatSummaryCache: vi.fn(),
+}));
+
+// Transport only — lastAttack POSTs are not this lane's subject.
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+// logHealingToSSE is the only healingRoll import in this modal's graph; the heal
+// itself is never clicked here (healFlows/npc-heal lanes own it).
+vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
+  logHealingToSSE: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
@@ -63,7 +78,6 @@ import { makeProps, getCheckboxByName } from './SaveAttackHealModal.test-utils.j
 
 /**
  * Select the given target name(s) and click the apply button.
- * Returns the rendered result for further queries.
  */
 async function applySaves(getByRole, targetNames) {
   for (const name of targetNames) {
@@ -74,326 +88,199 @@ async function applySaves(getByRole, targetNames) {
   });
 }
 
+// Throw-on-drift dice: this lane rolls only the CON save (1d20) and feature
+// damage (4d6); a heal roll here would mean the flow leaked into heal territory.
+function diceFor(saveRoll) {
+  return (expr) => {
+    if (expr === '1d20') return { total: saveRoll, rolls: [saveRoll], modifier: 0 };
+    if (expr === '4d6') return { total: 10, rolls: [1, 2, 3, 4], modifier: 0 };
+    throw new Error(`Unexpected roll expression: ${expr}`);
+  };
+}
+
 // ── Tests ──
 
 describe('SaveAttackHealModal — save flows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0, formula: '1d20' });
+    diceRoller.rollExpression.mockImplementation(diceFor(12));
   });
 
-  // ── Apply saves flow: NPC vs player routing ──
+  // ── Apply saves: type routing, dice scope, logging, persistence ──
 
-  it('sends save result for NPC targets and save prompt for player targets', async () => {
+  it('routes by creature type: auto-resolves NPC saves, prompts players, and persists the summary', async () => {
+    const listener = vi.fn();
+    window.addEventListener('combat-summary-updated', listener);
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A', 'Player One']);
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledTimes(1);
+    await applySaves(getByRole, ['Goblin A', 'Goblin B', 'Player One']);
+
+    // NPCs self-resolve (in selection order); players get prompts instead.
+    expect(savePromptService.sendSaveResult.mock.calls.map(c => c[1])).toEqual(['Goblin A', 'Goblin B']);
     expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(1);
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      promptId: expect.stringMatching(/test-guid-\d+/),
+      targetName: 'Player One',
+      saveType: 'CON',
+      saveDc: 10,
+      sourceName: 'Cleric1',
+    }));
+
+    // Dice roll only for NPC save + damage rounds — none for the prompted player.
+    expect(diceRoller.rollExpression).toHaveBeenCalledTimes(4);
+
+    // Resolved NPC rows show alongside the pending-player row.
+    const resultsList = document.querySelector('.abjure-results-list');
+    expect(resultsList.textContent).toContain('Saved — takes 5 Radiant damage (rolled 10, halved)');
+    expect(resultsList.textContent).toContain('Player One');
+    expect(resultsList.textContent).toContain('Waiting for save roll');
+
+    // One save log + one damage log per NPC; nothing logged for pending players.
+    const rollLogs = logService.addEntry.mock.calls.filter(c => c[1].type === 'roll');
+    expect(rollLogs).toHaveLength(4);
+    expect(rollLogs.filter(c => c[1].targetName === 'Player One')).toHaveLength(0);
+
+    // Combat summary persists at the apply seam: cache + storage (dispatch of the
+    // broadcast itself is pinned by AreaEffectTargetModalBase.utils.test.jsx; the
+    // real damage engine also fires it per NPC, so no count pin here).
+    expect(combatData.setCombatSummaryCache).toHaveBeenCalledTimes(1);
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+    expect(listener).toHaveBeenCalled();
+    window.removeEventListener('combat-summary-updated', listener);
   });
 
-  it('sends save prompt for all player targets when multiple are selected', async () => {
+  // ── NPC save arithmetic (saveBonuses lookup, DC comparison, damage halving) ──
+
+  it.each([
+    { label: 'meets DC exactly', roll: 7, saveBonus: 3, expectedSuccess: true, expectedText: 'Saved — takes 5 Radiant damage (rolled 10, halved)' },
+    { label: 'misses DC', roll: 6, saveBonus: 3, expectedSuccess: false, expectedText: 'Failed — takes 10 Radiant damage (rolled 10)' },
+  ])('NPC save %s: total = roll + saveBonus vs DC 10', async ({ roll, saveBonus, expectedSuccess, expectedText }) => {
+    diceRoller.rollExpression.mockImplementation(diceFor(roll));
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({
-      combatSummary: {
-        creatures: [
-          { name: 'Player One', type: 'player' },
-          { name: 'Player Two', type: 'player' },
-        ],
-      },
+      // saveBonuses keys are lowercase by contract — uppercase 'CON' lookup must not silently +0.
+      combatSummary: { creatures: [{ name: 'Goblin A', type: 'npc', maxHp: 82, saveBonuses: { con: saveBonus } }] },
     })} />);
-    await applySaves(getByRole, ['Player One', 'Player Two']);
-    expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(2);
+    await applySaves(getByRole, ['Goblin A']);
+
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledTimes(1);
+    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith('test-campaign', 'Goblin A', expect.objectContaining({
+      promptId: expect.stringMatching(/test-guid-\d+/),
+      success: expectedSuccess,
+      total: roll + saveBonus,
+      saveBonus,
+    }));
+
+    expect(document.querySelector('.abjure-results-list').textContent).toContain(expectedText);
+
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'roll',
+      rollType: 'save-damage',
+      name: 'Divine Smite',
+      characterName: 'Cleric1',
+      targetName: 'Goblin A',
+      saveType: 'CON',
+      saveDc: 10,
+      saveResult: expectedSuccess ? 'success' : 'failure',
+    }));
   });
 
-  // ── Apply saves flow: processing state & UI changes ──
+  // ── Apply button flow: selection UI replaced by results view ──
 
-  it('sets processing state, hides checkboxes and apply button, shows cancel after apply', async () => {
+  it('replaces the selection UI with the results view after apply', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applySaves(getByRole, ['Goblin A']);
+
     expect(screen.getByText(/Resolving.*CON.*saving throws/)).toBeInTheDocument();
     expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(0);
     expect(screen.queryByRole('button', { name: /Divine Smite/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  // ── Apply saves flow: dice rolling & service calls ──
-
-  it('rolls dice for both save and damage per NPC target', async () => {
-    diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps({
-      combatSummary: { creatures: [{ name: 'Goblin A', type: 'npc', saveBonuses: { con: 0 } }, { name: 'Goblin B', type: 'npc', saveBonuses: { con: 0 } }] },
-    })} />);
-    await applySaves(getByRole, ['Goblin A', 'Goblin B']);
-    expect(diceRoller.rollExpression).toHaveBeenCalledTimes(4);
-  });
-
-  it('does not call rollExpression for player targets', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
-  });
-
-  it('calls sendSaveResult with correct campaign name, target name, promptId, and saveBonus', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps({
-      combatSummary: { creatures: [{ name: 'Goblin A', type: 'npc', saveBonuses: { con: 3 } }] },
-    })} />);
-    await applySaves(getByRole, ['Goblin A']);
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith(
-      'test-campaign',
-      'Goblin A',
-      expect.objectContaining({
-        promptId: expect.stringMatching(/test-guid-\d+/),
-        saveBonus: 3,
-      })
-    );
-  });
-
-  it('calls sendSaveResult with correct target name per target', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A', 'Goblin B']);
-    const calledTargets = savePromptService.sendSaveResult.mock.calls.map(c => c[1]);
-    expect(calledTargets).toContain('Goblin A');
-    expect(calledTargets).toContain('Goblin B');
-  });
+  // ── Save-result events: pending player resolution ──
 
   it.each([
-    { label: 'success', roll: 12, expectedSuccess: true },
-    { label: 'failure', roll: 5, expectedSuccess: false },
-  ])('calls sendSaveResult with %s when roll is %s', async ({ roll, expectedSuccess }) => {
-    diceRoller.rollExpression.mockReturnValue({ total: roll, rolls: [roll], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A']);
-    expect(savePromptService.sendSaveResult).toHaveBeenCalledWith(
-      'test-campaign',
-      'Goblin A',
-      expect.objectContaining({ success: expectedSuccess, total: roll })
-    );
-  });
-
-  it('calls sendSavePrompt with correct parameters for player targets', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-    expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({
-        promptId: expect.stringMatching(/test-guid-\d+/),
-        targetName: 'Player One',
-        saveType: 'CON',
-        saveDc: 10,
-        sourceName: 'Cleric1',
-      })
-    );
-  });
-
-  // ── Apply saves flow: log entries ──
-
-  it('adds a roll log entry for NPC save result with saveResult, saveDc, and timestamp', async () => {
-    diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A']);
-    const rollCall = logService.addEntry.mock.calls.find(c => c[1].type === 'roll' && c[1].targetName === 'Goblin A');
-    expect(rollCall[1]).toEqual(expect.objectContaining({
-      type: 'roll',
-      name: 'Divine Smite',
-      characterName: 'Cleric1',
-      rollType: 'save-damage',
-      targetName: 'Goblin A',
-      saveDc: 10,
-      saveResult: 'failure',
-      timestamp: expect.any(Number),
-    }));
-  });
-
-  it('does not log save entry for pending player targets', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-    const rollCalls = logService.addEntry.mock.calls.filter(c => c[1].type === 'roll' && c[1].targetName === 'Player One');
-    expect(rollCalls).toHaveLength(0);
-  });
-
-  it('adds one log entry per NPC target', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A', 'Goblin B']);
-    const rollEntries = logService.addEntry.mock.calls.filter(c => c[1].type === 'roll');
-    // 2 save entries + 2 damage entries = 4 (damage rolled for all targets)
-    expect(rollEntries).toHaveLength(4);
-  });
-
-  // ── NPC save results display ──
-
-  it.each([
-    { label: 'success', roll: 15, expectedText: ['Saved', 'halved'] },
-    { label: 'failure', roll: 5, expectedText: ['Failed'] },
-  ])('displays NPC save %s with roll details', async ({ roll, expectedText }) => {
-    diceRoller.rollExpression.mockReturnValue({ total: roll, rolls: [roll], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A']);
-    await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Goblin A');
-      expect(resultsList.textContent).toContain(`rolled ${roll}`);
-      for (const text of expectedText) {
-        expect(resultsList.textContent).toContain(text);
-      }
-    });
-  });
-
-  it('displays save bonus in roll display when non-zero', async () => {
-    diceRoller.rollExpression.mockReturnValue({ total: 17, rolls: [17], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps({
-      combatSummary: { creatures: [{ name: 'Goblin A', type: 'npc', saveBonuses: { con: 2 } }] },
-    })} />);
-    await applySaves(getByRole, ['Goblin A']);
-    await waitFor(() => {
-      expect(screen.getByText(/takes 8/)).toBeInTheDocument();
-      expect(screen.getByText(/rolled 17/)).toBeInTheDocument();
-    });
-  });
-
-  it('displays pending status for player targets', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-    await waitFor(() => {
-      expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows both NPC results and pending player prompts together', async () => {
-    diceRoller.rollExpression.mockReturnValue({ total: 12, rolls: [12], modifier: 0, formula: '1d20' });
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A', 'Player One']);
-    await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Goblin A');
-      expect(resultsList.textContent).toContain('Saved');
-      expect(resultsList.textContent).toContain('Player One');
-      expect(resultsList.textContent).toContain('Waiting for save roll');
-    });
-  });
-
-  // ── Save result event handling (player saves) ──
-
-  it.each([
-    { label: 'success', success: true, expectedText: 'Saved', expectNoWaiting: true },
-    { label: 'failure', success: false, expectedText: 'Failed', expectNoWaiting: false },
-  ])('handles save-result event for pending player target with %s', async ({ success, expectedText, expectNoWaiting }) => {
-    const spy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: 0 });
+    { label: 'success', success: true, expectedText: 'Saved' },
+    { label: 'failure', success: false, expectedText: 'Failed' },
+  ])('resolves a pending player on save-result event (%s)', async ({ success, expectedText }) => {
+    // Deterministic damage sink — the resistance engine is not this lane's subject
+    // (npc-heal.test.jsx covers its write-back integration).
+    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: success ? 0 : 10 });
 
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applySaves(getByRole, ['Player One']);
-
     const promptId = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
+    // Flush apply-phase calls so every assertion below is caused by the event alone.
+    vi.clearAllMocks();
 
     await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      const saveEvent = new CustomEvent('save-result', {
-        detail: { promptId, success, total: success ? 12 : 5, roll: success ? 10 : 3, saveBonus: 2 },
-      });
-      window.dispatchEvent(saveEvent);
+      window.dispatchEvent(new CustomEvent('save-result', {
+        detail: { promptId, success, total: success ? 12 : 8, roll: success ? 9 : 5, saveBonus: 3 },
+      }));
     });
 
     await waitFor(() => {
       const resultsList = document.querySelector('.abjure-results-list');
       expect(resultsList.textContent).toContain('Player One');
       expect(resultsList.textContent).toContain(expectedText);
-      if (expectNoWaiting) {
-        expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument();
-      }
+      expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument();
     });
 
-    const rollCall = logService.addEntry.mock.calls.find(c => c[1].targetName === 'Player One' && c[1].saveResult === (success ? 'success' : 'failure'));
-    expect(rollCall).toBeDefined();
-    if (!success) {
-      expect(rollCall[1].rollType).toBe('save-damage');
+    // Save logged with the event's numbers, and the summary persists at this seam.
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'roll',
+      rollType: 'save-damage',
+      targetName: 'Player One',
+      saveResult: success ? 'success' : 'failure',
+      total: success ? 12 : 8,
+      bonus: 3,
+    }));
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+    expect(combatData.setCombatSummaryCache).toHaveBeenCalledTimes(1);
+
+    // Damage is applied to the player only on a failed save — full rolled 4d6 damage.
+    if (success) {
+      expect(applySpy).not.toHaveBeenCalled();
+      expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
+    } else {
+      expect(applySpy).toHaveBeenCalledTimes(1);
+      expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', 10, ['Radiant'], expect.objectContaining({ campaignName: 'test-campaign' }));
     }
-
-    spy.mockRestore();
+    applySpy.mockRestore();
   });
 
-  it('adds roll log entry when save-result event is received for success', async () => {
+  it('ignores a save-result event with an unknown promptId — player stays pending and nothing fires', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applySaves(getByRole, ['Player One']);
-
-    const promptId = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      const saveEvent = new CustomEvent('save-result', {
-        detail: { promptId, success: true, total: 12, roll: 10, saveBonus: 2 },
-      });
-      window.dispatchEvent(saveEvent);
-    });
-
-    await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Player One');
-    });
-    const rollCall = logService.addEntry.mock.calls.find(c => c[1].targetName === 'Player One' && c[1].saveResult === 'success');
-    expect(rollCall).toBeDefined();
-  });
-
-  it('ignores save-result event with unknown promptId', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      const saveEvent = new CustomEvent('save-result', {
-        detail: { promptId: 'wrong-id', success: false, total: 5, roll: 3, saveBonus: 2 },
-      });
-      window.dispatchEvent(saveEvent);
-    });
-
-    await waitFor(() => {
-      const resultsList = document.querySelector('.abjure-results-list');
-      expect(resultsList.textContent).toContain('Waiting for save roll');
-    });
-  });
-
-  // ── Save result event storage dispatch ──
-
-  it('saves combatSummary and dispatches event on apply and save-result event', async () => {
-    const listener = vi.fn();
-    window.addEventListener('combat-summary-updated', listener);
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Goblin A']);
-    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
-    expect(combatData.setCombatSummaryCache).toHaveBeenCalled();
-    expect(listener).toHaveBeenCalled();
-    window.removeEventListener('combat-summary-updated', listener);
-
-    // Also verify storage/event on save-result event
     vi.clearAllMocks();
-    const { getByRole: getByRole2 } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole2, ['Player One']);
-
-    const promptId = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
 
     await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      const saveEvent = new CustomEvent('save-result', {
-        detail: { promptId, success: true, total: 12, roll: 10, saveBonus: 2 },
-      });
-      window.dispatchEvent(saveEvent);
+      window.dispatchEvent(new CustomEvent('save-result', {
+        detail: { promptId: 'wrong-id', success: false, total: 5, roll: 3, saveBonus: 2 },
+      }));
     });
 
-    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
-    window.removeEventListener('combat-summary-updated', listener);
+    expect(document.querySelector('.abjure-results-list').textContent).toContain('Waiting for save roll');
+    // Inert: the stale event must not log or persist anything.
+    expect(logService.addEntry).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
   });
 
-  // ── Save result edge cases ──
+  // ── Pending-prompt edge cases ──
 
-  it('treats creature with no type as player (pending) rather than NPC', async () => {
+  it('treats a creature with no type as a player (pending prompt), never an auto-resolved NPC', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({
       combatSummary: { creatures: [{ name: 'Mystery Creature' }] },
     })} />);
     await applySaves(getByRole, ['Mystery Creature']);
-    await waitFor(() => {
-      expect(screen.getByText(/Mystery Creature/)).toBeInTheDocument();
-      expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
-    });
+
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(1);
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ targetName: 'Mystery Creature' }));
+    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
+    expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
   });
 
-  it('shows pending status when not all player targets have responded', async () => {
+  it('keeps an unanswered player pending while another player responds', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({
       combatSummary: {
         creatures: [
@@ -403,37 +290,22 @@ describe('SaveAttackHealModal — save flows', () => {
       },
     })} />);
     await applySaves(getByRole, ['Player One', 'Player Two']);
-
     const promptId1 = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
+    vi.clearAllMocks();
 
     await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
       window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId: promptId1, success: true, total: 12, roll: 10, saveBonus: 2 },
-      }));
-    });
-
-    // One target responded, the other is still pending
-    await waitFor(() => {
-      expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows all resolved message when a single player target responds', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await applySaves(getByRole, ['Player One']);
-
-    const promptId = savePromptService.sendSavePrompt.mock.calls[0][1].promptId;
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-      window.dispatchEvent(new CustomEvent('save-result', {
-        detail: { promptId, success: true, total: 12, roll: 10, saveBonus: 2 },
+        detail: { promptId: promptId1, success: true, total: 12, roll: 9, saveBonus: 3 },
       }));
     });
 
     await waitFor(() => {
-      expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
+      const resultsList = document.querySelector('.abjure-results-list');
+      expect(resultsList.textContent).toContain('Saved');
+      expect(resultsList.textContent).toContain('Player Two');
+      expect(resultsList.textContent).toContain('Waiting for save roll');
     });
+    expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
   });
 });

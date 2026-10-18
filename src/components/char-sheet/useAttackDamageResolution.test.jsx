@@ -1,6 +1,35 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
+// BASE LANE — only surface no sibling lane owns, verified against the real
+// buildPipelineForAction chain: public API shape, default no-op manual-click
+// run (housekeeping + plain-damage seam bytes), the mapName buildCtx/buildCtxSync
+// ternary, crit-doubling seam + popup clear, dice-fail halt, two-weapon-fighting
+// fold, runtime targetEffects damage_bonus rider, and Hunter's Prey horde-breaker
+// latches. TWF (hasTwoWeaponFighting) and the runtime damage_bonus targetEffects
+// step are exercised byte-exactly nowhere else in the cluster.
+// Owned elsewhere: normalizeAutoDamage.test.js (#283 normalizer canon),
+// advancedAutomations #298, automationDamage #299, automations #300 (automation
+// action riders — distinct from the runtime targetEffects rider here),
+// classFeatures #301 (feature dispatch, pendingSuddenStrike ARM; the null CLEAR
+// from attackRollHousekeeping is pinned here because no lane asserts it),
+// ctxOverrides #302 (override-vs-derived table), feats #304 (mastery gating —
+// the old base "no mastery modal" negative never reached collectWeaponMastery
+// and was vacuous), maneuvers/mn014 #306/#307 (die math), pausedStates #311,
+// optionSelect #310, tacticalMaster #316, resume lanes #303/#312/#314,
+// standalone #315, opportunity-transport #309, skipManeuver #313,
+// maneuveringAlly #305, mn015SaveDc #308.
+
+// Mock audit vs. this seam's live transitive graph:
+// - diceRoller: rollExpression + rollExpressionDoubled — both invoked (rollBaseDamage).
+// - combatData: getCurrentCombatRound — horde-breaker latch reads it.
+// - useRuntimeState: read/written by housekeeping, targetEffects, superiority steps.
+// - choiceStorage: getChosenRuntimeValue — applyElementalAffinity reads it every roll.
+// - automationService: hasTwoWeaponFighting — TWF legs. evaluateAutoExpression is
+//   NOT accessed here (only maneuver handlers use it; maneuvers/mn014 lanes own it).
+// - logService: addEntry kept as network isolation for transitive post-damage logs;
+//   never asserted on this seam.
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionDoubled: vi.fn(),
@@ -32,22 +61,30 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 
-const defaultRollResult = { total: 5, rolls: [5], modifier: 3 };
-const doubleRollResult = { total: 10, rolls: [5, 5], modifier: 6 };
+const CAMPAIGN = 'test-campaign';
+const PLAYER = 'TestFighter';
 
-function createMockDeps(overrides = {}) {
-    const mockPlayerStats = {
-        name: 'TestFighter',
+// Keyed dice mocks: every die rolls 5 (non-crit) / 5+5 (crit). All expected
+// formulas/totals below are exact pins derived from these, never expect.any.
+const plainRoll = { total: 5, rolls: [5], modifier: 3 };
+const critRoll = { total: 10, rolls: [5, 5], modifier: 6 };
+
+function makePlayerStats(overrides = {}) {
+    return {
+        name: PLAYER,
         level: 5,
         abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 2 }],
         proficiency: 3,
         class: { name: 'Barbarian', class_levels: [{ level: 5, rage_damage: 2 }] },
         automation: { actions: [], passives: [] },
+        ...overrides,
     };
+}
 
+function createMockDeps(overrides = {}) {
     return {
-        playerStats: mockPlayerStats,
-        campaignName: 'test-campaign',
+        playerStats: makePlayerStats(),
+        campaignName: CAMPAIGN,
         mapName: null,
         popupHtml: null,
         setPopupHtml: vi.fn(),
@@ -65,236 +102,196 @@ function makeAttack(overrides = {}) {
     return { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', properties: [], ...overrides };
 }
 
-describe('useAttackDamageResolution', () => {
+// Exact merged ctx the hook hands rollDamage on a manual click with no
+// overrides — the mergeDamagePipelineCtx null-shape (attackRollPostDamage:338
+// passes critLabels: undefined, so no crit keys appear).
+const BASE_DAMAGE_CTX = {
+    targetName: 'Goblin',
+    autoDamageSecondaryFormula: null,
+    autoDamageSecondaryName: null,
+    autoDamageSecondaryDamageType: null,
+    saveDc: null,
+    saveType: null,
+    dcSuccess: null,
+    tavernBrawlerRerolls: null,
+};
+
+const latchWrites = (key) => setRuntimeValue.mock.calls.filter((c) => c[1] === key);
+
+describe('useAttackDamageResolution — base hook seam', () => {
     let deps;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        rollExpression.mockReturnValue(defaultRollResult);
-        rollExpressionDoubled.mockReturnValue(doubleRollResult);
+        rollExpression.mockReturnValue(plainRoll);
+        rollExpressionDoubled.mockReturnValue(critRoll);
         getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
-        hasTwoWeaponFighting.mockReturnValue(false);
         getCurrentCombatRound.mockReturnValue(1);
+        hasTwoWeaponFighting.mockReturnValue(false);
         deps = createMockDeps();
     });
 
-    describe('return value', () => {
-        it('returns resolveAttackDamage and proceedWithDamage functions', () => {
-            const { resolveAttackDamage, proceedWithDamage } = useAttackDamageResolution(deps);
+    it('exposes the exact public API: the six handlers, nothing less', () => {
+        const api = useAttackDamageResolution(deps);
 
-            expect(typeof resolveAttackDamage).toBe('function');
-            expect(typeof proceedWithDamage).toBe('function');
-        });
+        expect(Object.keys(api).sort()).toEqual([
+            'handleAttackRiderManeuverSkip',
+            'handleAttackRiderManeuverUse',
+            'handleAttackRiderOptionSelect',
+            'proceedWithDamage',
+            'resolveAttackDamage',
+            'resumeAttackPipeline',
+        ].sort());
     });
 
-    describe('basic damage click', () => {
-        it('rolls damage and calls rollDamage with correct parameters', async () => {
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
+    describe('resolveAttackDamage over the real pipeline', () => {
+        it.each([
+            {
+                scenario: 'mapName null → buildCtxSync rebuild',
+                mapName: null,
+                expectCalled: 'buildCtxSync',
+            },
+            {
+                scenario: 'mapName truthy → buildCtx rebuild',
+                mapName: 'test-map',
+                expectCalled: 'buildCtx',
+            },
+        ])('$scenario with byte-exact rollDamage payload', async ({ mapName, expectCalled }) => {
+            const testDeps = createMockDeps({ mapName });
+            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
             const attack = makeAttack();
 
             await resolveAttackDamage(attack);
 
             expect(rollExpression).toHaveBeenCalledWith('1d8+3 [slashing]');
-            expect(deps.buildCtxSync).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
-            expect(deps.rollDamage).toHaveBeenCalledWith(
-                { name: 'Longsword', formula: expect.any(String), total: 5, rolls: [5], modifier: 3, context: expect.any(Object) },
-            );
+            expect(rollExpressionDoubled).not.toHaveBeenCalled();
+            expect(testDeps[expectCalled]).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
+            expect(testDeps[expectCalled === 'buildCtx' ? 'buildCtxSync' : 'buildCtx']).not.toHaveBeenCalled();
+            expect(testDeps.rollDamage).toHaveBeenCalledTimes(1);
+            expect(testDeps.rollDamage).toHaveBeenCalledWith({
+                name: 'Longsword',
+                formula: '1d8+3 [slashing]',
+                total: 5,
+                rolls: [5],
+                modifier: 3,
+                context: BASE_DAMAGE_CTX,
+            });
         });
 
-        it('double-rolls damage when isCrit is true', async () => {
-            deps = createMockDeps({ popupHtml: { isCrit: true } });
+        it('runs housekeeping on every attack: pendingSuddenStrike keys clear to null', async () => {
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack();
 
-            await resolveAttackDamage(attack);
+            await resolveAttackDamage(makeAttack());
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrike', null, CAMPAIGN);
+            expect(setRuntimeValue).toHaveBeenCalledWith(PLAYER, 'pendingSuddenStrikeTarget', null, CAMPAIGN);
+        });
+
+        it('critical popup doubles the dice and clears the popup before damage lands', async () => {
+            const critDeps = createMockDeps({ popupHtml: { isCrit: true, isNatural20: true } });
+            const { resolveAttackDamage } = useAttackDamageResolution(critDeps);
+
+            await resolveAttackDamage(makeAttack());
 
             expect(rollExpressionDoubled).toHaveBeenCalledWith('1d8+3 [slashing]');
             expect(rollExpression).not.toHaveBeenCalled();
-            expect(deps.rollDamage).toHaveBeenCalledWith(
-                { name: 'Longsword', formula: expect.any(String), total: 10, rolls: [5, 5], modifier: 6, context: expect.any(Object) },
-            );
+            expect(critDeps.setPopupHtml).toHaveBeenCalledWith(null);
+            expect(critDeps.rollDamage).toHaveBeenCalledWith({
+                name: 'Longsword',
+                formula: '1d8+3 [slashing]',
+                total: 10,
+                rolls: [5, 5],
+                modifier: 6,
+                context: BASE_DAMAGE_CTX,
+            });
         });
 
-        it('clears popupHtml on critical hit', async () => {
-            deps = createMockDeps({ popupHtml: { isCrit: true, isNatural20: true } });
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack();
-
-            await resolveAttackDamage(attack);
-
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(null);
-        });
-
-        it('returns early when dice roll returns null', async () => {
+        it('halts the chain when the damage roll returns null — no rebuild, no rollDamage', async () => {
             rollExpression.mockReturnValue(null);
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack();
 
-            await resolveAttackDamage(attack);
+            await resolveAttackDamage(makeAttack());
 
-            expect(deps.rollDamage).not.toHaveBeenCalled();
             expect(deps.buildCtxSync).not.toHaveBeenCalled();
+            expect(deps.rollDamage).not.toHaveBeenCalled();
         });
 
-        it('uses buildCtx when mapName is truthy', async () => {
-            const testDeps = createMockDeps({ mapName: 'test-map' });
-            const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
-            const attack = makeAttack({ name: 'Fire Bolt', damage: '1d10', damageType: 'fire' });
+        it('appends the runtime damage_bonus targetEffect once and writes the remaining list back empty', async () => {
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === 'targetEffects' ? [{ effect: 'damage_bonus', damageExpression: '1d4', damageType: 'fire' }] : null
+            );
+            const { resolveAttackDamage } = useAttackDamageResolution(deps);
 
-            await resolveAttackDamage(attack);
+            await resolveAttackDamage(makeAttack({ damage: '1d8' }));
 
-            expect(testDeps.buildCtx).toHaveBeenCalledWith(attack, { consumeAttackTe: false });
-            expect(testDeps.buildCtxSync).not.toHaveBeenCalled();
+            expect(deps.rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+                formula: '1d8 [slashing] + 1d4 [fire]',
+                total: 10,
+                rolls: [5, 5],
+            }));
+            expect(latchWrites('targetEffects')).toEqual([['campaign', 'targetEffects', [], CAMPAIGN]]);
         });
     });
 
-    describe('two weapon fighting modifier', () => {
+    describe('two-weapon fighting fold', () => {
+        beforeEach(() => {
+            hasTwoWeaponFighting.mockReturnValue(true);
+        });
+
         it.each([
-            { scenario: 'appends modifier', attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' }, expected: /\+ 3 \[Strength\]/ },
-            { scenario: 'no modifier for non-light', attack: { name: 'Warhammer', damage: '1d8', damageType: 'bludgeoning', type: 'Bonus Action', properties: [], abilityName: 'Strength' }, expected: null },
-            { scenario: 'no modifier when abilityName missing', attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'] }, expected: null },
-        ])('TWF: $scenario', async ({ attack, expected }) => {
-            hasTwoWeaponFighting.mockReturnValue(true);
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            await resolveAttackDamage(makeAttack(attack));
-            const formula = deps.rollDamage.mock.calls[0][0].formula;
-            if (expected) {
-                expect(formula).toMatch(expected);
-            } else {
-                expect(formula).not.toMatch(/\+ \d+ \[Strength\]/);
-            }
-        });
-
-        it('does not append when ability modifier is zero', async () => {
-            hasTwoWeaponFighting.mockReturnValue(true);
-            const stats = { ...deps.playerStats, abilities: [{ name: 'Strength', bonus: 0 }] };
-            const testDeps = createMockDeps({ playerStats: stats });
+            {
+                scenario: 'appends STR mod for a Light off-hand bonus attack',
+                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
+                expected: { formula: '1d6 [slashing] + 3 [Strength]', total: 8, rolls: [5, 3] },
+            },
+            {
+                scenario: 'appends exactly once when the mod is already in the base formula',
+                attack: { name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
+                expected: { formula: '1d6+3 [slashing] + 3 [Strength]', total: 8, rolls: [5, 3] },
+            },
+            {
+                scenario: 'no append for a non-Light bonus attack',
+                attack: { name: 'Warhammer', damage: '1d8', damageType: 'bludgeoning', type: 'Bonus Action', properties: [], abilityName: 'Strength' },
+                expected: { formula: '1d8 [bludgeoning]', total: 5, rolls: [5] },
+            },
+            {
+                scenario: 'no append when abilityName is missing',
+                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'] },
+                expected: { formula: '1d6 [slashing]', total: 5, rolls: [5] },
+            },
+            {
+                scenario: 'no append when the ability modifier is zero',
+                attack: { name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' },
+                stats: makePlayerStats({ abilities: [{ name: 'Strength', bonus: 0 }] }),
+                expected: { formula: '1d6 [slashing]', total: 5, rolls: [5] },
+            },
+        ])('$scenario', async ({ attack, stats, expected }) => {
+            const testDeps = createMockDeps({ playerStats: stats || makePlayerStats() });
             const { resolveAttackDamage } = useAttackDamageResolution(testDeps);
-            const attack = makeAttack({ name: 'Handaxe', damage: '1d6', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' });
-            await resolveAttackDamage(attack);
-            const formula = testDeps.rollDamage.mock.calls[0][0].formula;
-            expect(formula).not.toMatch(/\+ 0 \[Strength\]/);
-        });
 
-        it('does not duplicate modifier already in formula', async () => {
-            hasTwoWeaponFighting.mockReturnValue(true);
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({ name: 'Handaxe', damage: '1d6+3', damageType: 'slashing', type: 'Bonus Action', properties: ['Light'], abilityName: 'Strength' });
-            await resolveAttackDamage(attack);
-            const formula = deps.rollDamage.mock.calls[0][0].formula;
-            const matches = formula.match(/\+ 3 \[Strength\]/g);
-            expect(matches).toHaveLength(1);
+            await resolveAttackDamage(makeAttack(attack));
+
+            expect(testDeps.rollDamage).toHaveBeenCalledTimes(1);
+            expect(testDeps.rollDamage).toHaveBeenCalledWith(expect.objectContaining(expected));
         });
     });
 
-    describe('rider damage effects', () => {
-        it('applies damage_bonus targetEffects to formula and total', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (prop === 'targetEffects') {
-                    return [{ effect: 'damage_bonus', damageExpression: '1d4', damageType: 'fire' }];
-                }
-                return null;
-            });
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({ damage: '1d8' });
+    describe("Hunter's Prey horde breaker latch", () => {
+        const hordeBreaker = { name: 'Horde Breaker', damage: '1d6', damageType: 'force', type: 'Bonus Action' };
 
-            await resolveAttackDamage(attack);
-
-            const formula = deps.rollDamage.mock.calls[0][0].formula;
-            expect(formula).toContain('1d4');
-            expect(deps.rollDamage.mock.calls[0][0].total).toBeGreaterThan(5);
-        });
-
-        it('skips rider effects when targetEffects is absent', async () => {
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({ damage: '1d8' });
-
-            await resolveAttackDamage(attack);
-
-            const formula = deps.rollDamage.mock.calls[0][0].formula;
-            expect(formula).toBe('1d8 [slashing]');
-            expect(deps.rollDamage.mock.calls[0][0].total).toBe(5);
-        });
-    });
-
-    describe('sudden strike handling', () => {
-        it('clears pendingSuddenStrike for all attacks', async () => {
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({
-                name: 'Sudden Strike',
-                damage: '1d6',
-                damageType: 'psychic',
-                type: 'Bonus Action',
-            });
-
-            await resolveAttackDamage(attack);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                'pendingSuddenStrike',
-                null,
-                'test-campaign',
+        it.each([
+            { choice: 'Horde Breaker', expectLatch: true },
+            { choice: 'Colossus Slayer', expectLatch: false },
+        ])('choice $choice → latch $expectLatch', async ({ choice, expectLatch }) => {
+            getRuntimeValue.mockImplementation((_name, key) =>
+                key === "_Hunter's_Prey_choice" ? choice : null
             );
-        });
-    });
-
-    describe('horde breaker handling', () => {
-        it('marks horde breaker as used for the current round', async () => {
-            getRuntimeValue.mockReturnValueOnce("Horde Breaker");
             const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({
-                name: 'Horde Breaker',
-                damage: '1d6',
-                damageType: 'force',
-                type: 'Bonus Action',
-            });
 
-            await resolveAttackDamage(attack);
+            await resolveAttackDamage(makeAttack(hordeBreaker));
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestFighter',
-                '_Hunters_Prey_HordeBreaker_UsedRound',
-                1,
-                'test-campaign',
-            );
-        });
-
-        it('does not mark when hunter prey choice is different', async () => {
-            getRuntimeValue.mockReturnValueOnce(null).mockReturnValueOnce('Colossus Slayer');
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({
-                name: 'Horde Breaker',
-                damage: '1d6',
-                damageType: 'force',
-                type: 'Bonus Action',
-            });
-
-            await resolveAttackDamage(attack);
-
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'TestFighter',
-                '_Hunters_Prey_HordeBreaker_UsedRound',
-                expect.any(Number),
-                'test-campaign',
-            );
-        });
-    });
-
-    describe('weapon mastery modal', () => {
-        it('does not open weapon mastery modal when no mastery is available', async () => {
-            const { resolveAttackDamage } = useAttackDamageResolution(deps);
-            const attack = makeAttack({
-                name: 'Longsword',
-                damage: '1d8+3',
-                damageType: 'slashing',
-                weaponType: 'melee',
-            });
-
-            await resolveAttackDamage(attack);
-
-            expect(deps.setModalState).not.toHaveBeenCalledWith(
-                expect.objectContaining({ weaponMasteryModal: expect.anything() }),
+            expect(latchWrites('_Hunters_Prey_HordeBreaker_UsedRound')).toEqual(
+                expectLatch ? [[PLAYER, '_Hunters_Prey_HordeBreaker_UsedRound', 1, CAMPAIGN]] : []
             );
         });
     });

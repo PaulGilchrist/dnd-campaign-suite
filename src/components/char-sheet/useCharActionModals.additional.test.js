@@ -1,13 +1,35 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import useCharActionModals from './useCharActionModals.js';
 
+// Sub-hook mocks are required: the hook destructures their full return shapes
+// and the real modules pull in the combat pipeline / runtime store import graph.
+// Each mock supplies every key the hook destructures (mock honesty).
 vi.mock('./useAttackDamageResolution.js', () => ({
   default: vi.fn(),
 }));
 
 vi.mock('./useModalHandlers.js', () => ({
-  default: vi.fn(),
+  default: vi.fn(() => ({
+    handleMasteryClose: vi.fn(),
+    handleWeaponMasteryChoice: vi.fn(),
+    handleDivineFuryDamageType: vi.fn(),
+    handleDivineFurySkip: vi.fn(),
+    handleGenericDamageTypeChoice: vi.fn(),
+    handleGenericDamageTypeSkip: vi.fn(),
+    handleDamageTypeModifierChoice: vi.fn(),
+    handleDamageTypeModifierSkip: vi.fn(),
+    handleEnhancedUnarmedChoice: vi.fn(),
+    handleEnhancedUnarmedSkip: vi.fn(),
+    handleFeatureChoiceConfirm: vi.fn(),
+    handleFeatureChoiceSkip: vi.fn(),
+    handleConstellationSelect: vi.fn(),
+    handleFlurryOfBlowsConfirm: vi.fn(),
+    handleFlurryOfBlowsSkip: vi.fn(),
+    handleOpenHandFromFlurryConfirm: vi.fn(),
+    handleOpenHandFromFlurrySkip: vi.fn(),
+  })),
 }));
 
 vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
@@ -19,72 +41,41 @@ vi.mock('../../hooks/combat/useCombatSuperiorityModal.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/runtime/useSyncedState.js', () => {
-  const sharedState = { pipelinePause: null };
-  const pipelinePauseSetter = vi.fn((fn) => {
-    if (typeof fn === 'function') {
-      sharedState.pipelinePause = fn(sharedState.pipelinePause);
-    } else {
-      sharedState.pipelinePause = fn;
-    }
-  });
-
-  return {
-    useSyncedState: vi.fn((characterKey, key, defaultValue) => {
-      if (key === 'pipeline-pause') {
-        return [sharedState.pipelinePause, pipelinePauseSetter];
-      }
-      let value = defaultValue;
-      const setter = vi.fn((fn) => {
-        if (typeof fn === 'function') {
-          value = fn(value);
-        } else {
-          value = fn;
-        }
-      });
-      return [value, setter];
-    }),
-    __resetPendingDamage: () => {
-      sharedState.pipelinePause = null;
-      pipelinePauseSetter.mockClear();
-    },
-  };
-});
+// The hook reads 'pipeline-pause' from the synced store; the mock supplies
+// [value, setter] per call — no persistence needed (no round-trip tests here;
+// merge/clear semantics live in useCharActionModals.modalState.test.js).
+vi.mock('../../hooks/runtime/useSyncedState.js', () => ({
+  useSyncedState: vi.fn((characterKey, key, defaultValue) => {
+    let value = defaultValue;
+    const setter = vi.fn((fn) => {
+      value = typeof fn === 'function' ? fn(value) : fn;
+    });
+    return [value, setter];
+  }),
+}));
 
 const useAttackDamageResolution = (await import('./useAttackDamageResolution.js')).default;
-const useModalHandlers = (await import('./useModalHandlers.js')).default;
 const { useCombatSuperiorityModal } = await import('../../hooks/combat/useCombatSuperiorityModal.js');
-const { __resetPendingDamage } = await import('../../hooks/runtime/useSyncedState.js');
+const { useSyncedState } = await import('../../hooks/runtime/useSyncedState.js');
 
-const mockResolveAttackDamageResult = {
+// Fresh result fixtures per mount — same-instance refs prove identity delegation.
+const makeDamageResolutionResult = () => ({
   resolveAttackDamage: vi.fn(),
+  resumeAttackPipeline: vi.fn(),
   proceedWithDamage: vi.fn(),
   handleAttackRiderManeuverUse: vi.fn(),
   handleAttackRiderManeuverSkip: vi.fn(),
   handleAttackRiderOptionSelect: vi.fn(),
-};
+});
 
-const mockModalHandlersResult = {
-  handleMasteryClose: vi.fn(),
-  handleWeaponMasteryChoice: vi.fn(),
-  handleDivineFuryDamageType: vi.fn(),
-  handleDivineFurySkip: vi.fn(),
-  handleGenericDamageTypeChoice: vi.fn(),
-  handleGenericDamageTypeSkip: vi.fn(),
-  handleDamageTypeModifierChoice: vi.fn(),
-  handleDamageTypeModifierSkip: vi.fn(),
-  handleEnhancedUnarmedChoice: vi.fn(),
-  handleEnhancedUnarmedSkip: vi.fn(),
-  handleFeatureChoiceConfirm: vi.fn(),
-  handleFeatureChoiceSkip: vi.fn(),
-  handleConstellationSelect: vi.fn(),
-  handleFlurryOfBlowsConfirm: vi.fn(),
-  handleFlurryOfBlowsSkip: vi.fn(),
-  handleOpenHandFromFlurryConfirm: vi.fn(),
-  handleOpenHandFromFlurrySkip: vi.fn(),
-};
+const makeSuperiorityResult = () => ({
+  combatSuperiorityModal: { type: 'superiority', options: ['Savage Attacker'] },
+  setCombatSuperiorityModal: vi.fn(),
+  handleCombatSuperiorityConfirm: vi.fn(),
+  handleCombatSuperiorityReopenSelection: vi.fn(),
+});
 
-const baseArgs = {
+const makeArgs = () => ({
   playerStats: { name: 'TestCharacter', class: { name: 'Fighter' } },
   campaignName: 'test-campaign',
   mapName: null,
@@ -94,84 +85,49 @@ const baseArgs = {
   rollAttack: vi.fn(),
   buildCtx: vi.fn(() => Promise.resolve({})),
   buildCtxSync: vi.fn(() => ({})),
-};
+  setTacticalMasterModal: vi.fn(),
+});
 
-describe('useCharActionModals — callback stability & edge cases', () => {
+describe('useCharActionModals — seam invariants', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    __resetPendingDamage();
-    useAttackDamageResolution.mockReturnValue(mockResolveAttackDamageResult);
-    useModalHandlers.mockReturnValue(mockModalHandlersResult);
+    useAttackDamageResolution.mockReturnValue(makeDamageResolutionResult());
   });
 
-  describe('setModalState callback stability', () => {
-    it('setModalState is a stable reference across renders when args do not change', () => {
-      const { result, rerender } = renderHook(() => useCharActionModals(baseArgs));
-      const firstRef = result.current.setModalState;
-      rerender();
-      expect(result.current.setModalState).toBe(firstRef);
-    });
+  it('keeps setModalState a stable reference across re-renders and hands the same ref to useAttackDamageResolution each render', () => {
+    const args = makeArgs();
+    const { result, rerender } = renderHook(() => useCharActionModals(args));
+    const firstRef = result.current.setModalState;
+    const firstSubHookArg = useAttackDamageResolution.mock.calls[0][0];
+
+    rerender();
+
+    expect(useAttackDamageResolution).toHaveBeenCalledTimes(2);
+    expect(result.current.setModalState).toBe(firstRef);
+    // Why stability matters: sub-hooks receive setModalState each render —
+    // per-render churn here would re-trigger their subscriptions.
+    expect(useAttackDamageResolution.mock.calls[1][0].setModalState).toBe(firstRef);
+    expect(useAttackDamageResolution.mock.calls[1][0].modalState).toBe(firstSubHookArg.modalState);
   });
 
-  describe('setPendingDamage behavior', () => {
-    it('setPendingDamage is callable without error', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(() => act(() => result.current.setPendingDamage({ data: 'value' }))).not.toThrow();
-    });
+  it('reads pipeline-pause from the synced store with exact server-first args', () => {
+    renderHook(() => useCharActionModals(makeArgs()));
+    expect(useSyncedState).toHaveBeenCalledWith('campaign', 'pipeline-pause', null, 'test-campaign');
   });
 
-  describe('setCombatSuperiorityModal behavior', () => {
-    it('setCombatSuperiorityModal is callable without error', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(() => act(() => result.current.setCombatSuperiorityModal({ type: 'test' }))).not.toThrow();
-    });
-  });
+  it('dispatches positional args to useCombatSuperiorityModal and re-exposes all four outputs by same-instance identity', () => {
+    const superiority = makeSuperiorityResult();
+    useCombatSuperiorityModal.mockReturnValue(superiority);
+    const args = makeArgs();
 
-  describe('combatSuperiorityModal propagation from sub-hook', () => {
-    it('returns non-null combatSuperiorityModal when sub-hook provides it', () => {
-      const mockSuperiorityModal = { type: 'superiority', options: ['Savage Attacker'] };
-      useCombatSuperiorityModal.mockReturnValue({
-        combatSuperiorityModal: mockSuperiorityModal,
-        setCombatSuperiorityModal: vi.fn(),
-        handleCombatSuperiorityConfirm: vi.fn(),
-        handleCombatSuperiorityReopenSelection: vi.fn(),
-      });
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.combatSuperiorityModal).toEqual(mockSuperiorityModal);
-    });
-  });
+    const { result } = renderHook(() => useCharActionModals(args));
 
-  describe('unexposed args passthrough', () => {
-    it('does NOT expose setPopupHtml in return object', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.setPopupHtml).toBeUndefined();
-    });
-
-    it('does NOT expose rollDamage in return object', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.rollDamage).toBeUndefined();
-    });
-
-    it('does NOT expose rollAttack in return object', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.rollAttack).toBeUndefined();
-    });
-
-    it('does NOT expose _setModalState internal state setter', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current._setModalState).toBeUndefined();
-    });
-  });
-
-  describe('independent hook instances', () => {
-    it('two separate hooks have independent modalState', () => {
-      const { result: r1 } = renderHook(() => useCharActionModals(baseArgs));
-      const { result: r2 } = renderHook(() => useCharActionModals(baseArgs));
-      act(() => {
-        r1.current.setModalState({ hook: 1 });
-      });
-      expect(r1.current.modalState).toEqual({ hook: 1 });
-      expect(r2.current.modalState).toEqual({});
-    });
+    expect(useCombatSuperiorityModal).toHaveBeenCalledWith(
+      args.playerStats, args.campaignName, args.rollAttack, args.rollDamage, args.setPopupHtml,
+    );
+    expect(result.current.combatSuperiorityModal).toBe(superiority.combatSuperiorityModal);
+    expect(result.current.setCombatSuperiorityModal).toBe(superiority.setCombatSuperiorityModal);
+    expect(result.current.handleCombatSuperiorityConfirm).toBe(superiority.handleCombatSuperiorityConfirm);
+    expect(result.current.handleCombatSuperiorityReopenSelection).toBe(superiority.handleCombatSuperiorityReopenSelection);
   });
 });

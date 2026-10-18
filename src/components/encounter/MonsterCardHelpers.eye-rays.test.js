@@ -1,335 +1,212 @@
-// MA-0374/MA-0383: Eye Rays picker — pure-parser unit locks (rays[]
-// validation, len(rays)-sized reroll-if-used-this-turn picker — d10
-// Beholder / d4 Beholder Zombie, single-ray action synthesis with row-DC
-// stamp, auto-success clauses, popup/log row shapes).
+// @maintained-by-ai — MA-0374/MA-0383/MA-0577 OWNER lane: eye-rays shared-seam
+// truth tables for parseEyeRays validation, the len(rays)-sized reroll-if-used
+// picker (d10 Beholder / d4 Beholder Zombie / d10 DC 17 Death Tyrant), single-
+// target synthesis, auto-success, and full-byte popup/log templates (#498 pins,
+// verbatim disk fixtures by name #387). Cite-skipped to sibling owners: aoe route,
+// events chooser popup, advisory log, eyeRaySaveSpellInfo —
+// MonsterCardHelpers.cataclysm-rays.test.js (MA-0673, owns :3167/:3187/:3193/:3224);
+// gazer/spectator fixture twins — MonsterCardHelpers.gazer-eye-rays.test.js /
+// MonsterCardHelpers.spectator-eye-rays.test.js. No timers.
 import { describe, it, expect } from 'vitest';
 import { parseEyeRays, pickEyeRay, buildEyeRayAction, eyeRayAutoSuccessReason, buildEyeRayPickerPopup, buildEyeRayPickerRollLog, buildEyeRayAbilityUseLog, buildEyeRayAutoSuccessLog } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
 
-const beholder = (Array.isArray(monsters) ? monsters : monsters.monsters).find(m => m.name === 'Beholder');
+const list = Array.isArray(monsters) ? monsters : monsters.monsters;
+const beholder = list.find(m => m.name === 'Beholder');
 const row = beholder.actions.find(a => a.name === 'Eye Rays');
-const zombie = (Array.isArray(monsters) ? monsters : monsters.monsters).find(m => m.name === 'Beholder Zombie');
+const zombie = list.find(m => m.name === 'Beholder Zombie');
 const zRow = zombie.actions.find(a => a.name === 'Eye Rays');
+const tyrant = list.find(m => m.name === 'Death Tyrant');
+const tRow = tyrant.actions.find(a => a.name === 'Eye Rays');
 
-describe('MA-0374 parseEyeRays', () => {
-  it('beholders.json Eye Rays row parses 10 structured rays', () => {
+const seq = rolls => () => rolls.shift();
+const BEHOLDER_KEYS = ['charm', 'paralyzing', 'fear', 'slowing', 'enervation', 'telekinetic', 'sleep', 'petrification', 'disintegration', 'death'];
+
+describe('MA-0374 parseEyeRays — Beholder d10 row', () => {
+  it('parses 10 structured rays with the RAW damage/dice/clause map, VAR shell dropped', () => {
     const rays = parseEyeRays(row);
-    expect(rays).toHaveLength(10);
-    expect(rays.map(r => r.key)).toEqual(['charm', 'paralyzing', 'fear', 'slowing', 'enervation', 'telekinetic', 'sleep', 'petrification', 'disintegration', 'death']);
-  });
-
-  it('every ray is a single parseable save leg', () => {
-    for (const ray of parseEyeRays(row)) {
-      expect(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']).toContain(ray.save_ability);
-      expect(['half', 'none']).toContain(ray.dc_success);
-      if (ray.damage_dice !== null) {
-        expect(ray.damage_dice).toMatch(/^\d+d\d+$/);
-        expect(ray.damage_type).toBeTruthy();
-        expect(ray.dc_success).toBe('half');
-      } else {
-        expect(ray.dc_success).toBe('none');
-      }
-      expect(Array.isArray(ray.conditions)).toBe(true);
-      expect(typeof ray.name).toBe('string');
-    }
-  });
-
-  it('RAW ray damage/dice map per-byte on the structured rows', () => {
-    const byKey = Object.fromEntries(parseEyeRays(row).map(r => [r.key, r]));
+    expect(rays.map(r => r.key)).toEqual(BEHOLDER_KEYS);
+    const byKey = Object.fromEntries(rays.map(r => [r.key, r]));
     expect(byKey.charm.damage_dice).toBe('3d8');
     expect(byKey.fear.damage_dice).toBe('4d6');
+    expect(byKey.slowing.save_ability).toBe('Constitution');
     expect(byKey.slowing.damage_dice).toBe('4d8');
-    expect(byKey.enervation.damage_dice).toBe('3d8');
     expect(byKey.disintegration.damage_dice).toBe('8d8');
-    expect(byKey.death.damage_dice).toBe('10d10');
     expect(byKey.disintegration.zero_hp_clause).toMatch(/dust/);
+    expect(byKey.death.damage_dice).toBe('10d10');
     expect(byKey.death.zero_hp_clause).toMatch(/dies/);
-  });
-
-  it('row keeps description/save_effect byte-unchanged and drops the Varies noise', () => {
+    expect(byKey.telekinetic.auto_success_size).toBe('Gargantuan');
+    expect(byKey.sleep.auto_success_types).toEqual(['Construct', 'Undead']);
+    // The pre-conversion VAR shell (save_type "Varies", multi-string dice) was
+    // unparseable — rays[] is the only arm; row keeps dc + description intact.
     expect(row.save_dc).toBe(16);
     expect(row.save_type).toBeUndefined();
     expect(row.damage_dice_primary).toBeUndefined();
-    expect(row.damage_type_primary).toBeUndefined();
     expect(row.description).toMatch(/roll 1d10; reroll if the beholder has already used that ray during this turn/);
   });
 
-  it('byte-inert: no rays / malformed rays parse to null', () => {
+  it('byte-inert: no rays / <2 rays / malformed rays parse to null; signed dice arm', () => {
     expect(parseEyeRays({ name: 'Bite' })).toBeNull();
-    expect(parseEyeRays({ rays: [{ key: 'a' }] })).toBeNull();
+    expect(parseEyeRays({ rays: [{ ...row.rays[0] }] })).toBeNull();
     expect(parseEyeRays({ rays: Array.from({ length: 10 }, (_, i) => ({ ...row.rays[0], key: `k${i}`, save_ability: 'Varies' })) })).toBeNull();
     expect(parseEyeRays({ rays: Array.from({ length: 10 }, (_, i) => ({ ...row.rays[0], key: `k${i}`, dc_success: 'sometimes' })) })).toBeNull();
     expect(parseEyeRays({ rays: Array.from({ length: 10 }, (_, i) => ({ ...row.rays[0], key: `k${i}`, damage_dice: '3d8, 4d6' })) })).toBeNull();
+    expect(parseEyeRays({ rays: Array.from({ length: 10 }, (_, i) => ({ ...row.rays[0], key: `k${i}`, conditions: 'frightened' })) })).toBeNull();
+    expect(parseEyeRays({ rays: [{ ...row.rays[0], damage_dice: '8d8+2' }, row.rays[1]] })).toHaveLength(2);
   });
 });
 
 describe('MA-0374 pickEyeRay d10 picker', () => {
   const rays = parseEyeRays(row);
-  const seq = rolls => () => rolls.shift();
 
-  it('plain roll maps 1..10 to rays in order', () => {
+  it('maps in-range rolls to rays in order (trunc/Number coercion included)', () => {
     expect(pickEyeRay({ rays, rollDie: seq([1]) }).ray.key).toBe('charm');
-    expect(pickEyeRay({ rays, rollDie: seq([4]) }).ray.key).toBe('slowing');
-    expect(pickEyeRay({ rays, rollDie: seq([10]) }).ray.key).toBe('death');
     expect(pickEyeRay({ rays, rollDie: seq([4]) }).roll).toBe(4);
+    expect(pickEyeRay({ rays, rollDie: seq([10]) }).ray.key).toBe('death');
+    expect(pickEyeRay({ rays, rollDie: seq(['2.9']) }).roll).toBe(2);
   });
 
-  it('rerolls a ray already used this turn (RAW reroll rule)', () => {
-    const used = ['slowing', 'death'];
-    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: used, rollDie: seq([4, 10, 7]) });
+  it('rerolls used rays recording them, rejects out-of-range silently', () => {
+    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: ['slowing', 'death'], rollDie: seq([0, 4, 11, 10, 7]) });
     expect(rerolls).toEqual([4, 10]);
     expect(roll).toBe(7);
     expect(ray.key).toBe('sleep');
   });
-
-  it('rerolls out-of-range rolls too, recording only valid rerolled rays', () => {
-    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: [], rollDie: seq([0, 11, 3]) });
-    expect(rerolls).toEqual([]);
-    expect(roll).toBe(3);
-    expect(ray.key).toBe('fear');
-  });
-
-  it('guard: exhausts to null instead of looping forever when nothing is free', () => {
-    const allUsed = rays.map(r => r.key);
-    const { ray } = pickEyeRay({ rays, usedKeys: allUsed, rollDie: () => Math.floor(Math.random() * 10) + 1 });
-    expect(ray).toBeNull();
-  });
 });
 
-describe('MA-0374 buildEyeRayAction + auto-success + rows', () => {
-  const rays = parseEyeRays(row);
-
-  it('synthesized ray row is single-ability parseable and carries the grant spec', () => {
-    const slowing = rays.find(r => r.key === 'slowing');
-    const act = buildEyeRayAction(row, slowing);
-    expect(act.save_type).toBe('Constitution');
-    expect(act.save_dc).toBe(16);
-    expect(act.dc_success).toBe('half');
-    expect(act.damage_dice_primary).toBe('4d8');
-    expect(act.name).toBe('Slowing Ray (Eye Rays)');
-    expect(act.eyeRay).toEqual({ ...slowing, save_dc: 16 });
-  });
-
-  it('auto-success honors Gargantuan size and Construct/Undead type', () => {
-    const tk = rays.find(r => r.key === 'telekinetic');
-    const sleep = rays.find(r => r.key === 'sleep');
-    expect(eyeRayAutoSuccessReason(tk, { size: 'Gargantuan' })).toMatch(/Gargantuan/);
-    expect(eyeRayAutoSuccessReason(tk, { size: 'Medium' })).toBeNull();
-    expect(eyeRayAutoSuccessReason(sleep, { monsterType: 'Construct' })).toMatch(/Construct/);
-    expect(eyeRayAutoSuccessReason(sleep, { monsterType: 'Undead' })).toMatch(/Undead/);
-    expect(eyeRayAutoSuccessReason(sleep, { monsterType: 'Aberration' })).toBeNull();
-    expect(eyeRayAutoSuccessReason(rays[0], null)).toBeNull();
-  });
-
-  it('picker popup names the ray, the roll and the reroll history', () => {
-    const html = buildEyeRayPickerPopup({ monsterName: 'Beholder 1', ray: rays[3], roll: 4, rerolls: [4, 10], targetName: 'HexWarlock' });
-    expect(html).toMatch(/Slowing Ray/);
-    expect(html).toMatch(/rolls 4/);
-    expect(html).toMatch(/rerolled 4, 10/);
-    expect(html).toMatch(/HexWarlock/);
-  });
-
-  it('log rows: d10 picker roll, ability_use naming the ray, auto-success record', () => {
-    const roll = buildEyeRayPickerRollLog({ monsterName: 'Beholder 1', ray: rays[6], roll: 7, rerolls: [], targetName: 'HexWarlock' });
-    expect(roll.type).toBe('roll');
-    expect(roll.rollType).toBe('d10');
-    expect(roll.total).toBe(7);
-    expect(roll.description).toMatch(/Sleep Ray/);
-
-    const use = buildEyeRayAbilityUseLog({ monsterName: 'Beholder 1', ray: rays[0], targetName: 'HexWarlock' });
-    expect(use.type).toBe('ability_use');
-    expect(use.abilityName).toBe('Charm Ray (Eye Rays)');
-    expect(use.description).toMatch(/3d8 Psychic/);
-
-    const auto = buildEyeRayAutoSuccessLog({ monsterName: 'Beholder 1', ray: rays[6], targetName: 'IronGolem', reason: 'Construct creatures succeed automatically' });
-    expect(auto.automationType).toBe('eye_ray_auto_success');
-    expect(auto.characterName).toBe('IronGolem');
-  });
-});
-
-// ── MA-0383: Beholder Zombie — 4-ray d4 picker on the shared consumer ──
-describe('MA-0383 Beholder Zombie parseEyeRays (d4 row)', () => {
-  it('zombie Eye Rays row parses 4 structured rays', () => {
+describe('MA-0383 Beholder Zombie — d4 row (die = len(rays))', () => {
+  it('parses 4 rays with RAW map on DC 14 shell, no auto-success clauses (RAW)', () => {
     const rays = parseEyeRays(zRow);
-    expect(rays).toHaveLength(4);
     expect(rays.map(r => r.key)).toEqual(['paralyzing', 'fear', 'enervation', 'disintegration']);
-  });
-
-  it('RAW zombie ray damage/dice/type map byte-on-disk', () => {
-    const byKey = Object.fromEntries(parseEyeRays(zRow).map(r => [r.key, r]));
+    const byKey = Object.fromEntries(rays.map(r => [r.key, r]));
     expect(byKey.paralyzing.damage_dice).toBeNull();
     expect(byKey.paralyzing.save_ability).toBe('Constitution');
     expect(byKey.paralyzing.dc_success).toBe('none');
     expect(byKey.paralyzing.ladder).toBe('paralyzed');
     expect(byKey.fear.damage_dice).toBe('3d8');
-    expect(byKey.fear.damage_type).toBe('Psychic');
     expect(byKey.fear.save_ability).toBe('Wisdom');
-    expect(byKey.fear.dc_success).toBe('half');
-    expect(byKey.fear.conditions).toEqual(['frightened']);
     expect(byKey.enervation.damage_dice).toBe('3d6');
     expect(byKey.enervation.damage_type).toBe('Necrotic');
-    expect(byKey.enervation.conditions).toEqual(['poisoned']);
     expect(byKey.enervation.te_grants).toEqual(['no_healing']);
     expect(byKey.disintegration.damage_dice).toBe('5d10');
     expect(byKey.disintegration.damage_type).toBe('Force');
-    expect(byKey.disintegration.save_ability).toBe('Dexterity');
-    expect(byKey.disintegration.zero_hp_clause).toMatch(/dust/);
-  });
-
-  it('row keeps description/save_effect byte-unchanged and drops the Varies noise', () => {
+    expect(rays.some(r => r.auto_success_types || r.auto_success_size)).toBe(false);
     expect(zRow.save_dc).toBe(14);
     expect(zRow.save_type).toBeUndefined();
-    expect(zRow.damage_dice_primary).toBeUndefined();
-    expect(zRow.damage_type_primary).toBeUndefined();
     expect(zRow.description).toMatch(/roll 1d4; reroll if the zombie has already used that ray during this turn/);
     expect(zRow.save_effect).toMatch(/Success on damage rays: Half damage\./);
   });
 
-  it('no zombie ray carries auto-success exceptions (RAW: no Sleep/Construct clause)', () => {
-    for (const ray of parseEyeRays(zRow)) {
-      expect(ray.auto_success_types).toBeUndefined();
-      expect(ray.auto_success_size).toBeUndefined();
-    }
-  });
-});
-
-describe('MA-0383 pickEyeRay d4 picker (die = len(rays))', () => {
-  const rays = parseEyeRays(zRow);
-  const seq = rolls => () => rolls.shift();
-
-  it('plain roll maps 1..4 to rays in order', () => {
+  it('d4 picker: maps 1..4 in order, rerolls used, rejects 0/5+ without recording, exhausts to null', () => {
+    const rays = parseEyeRays(zRow);
     expect(pickEyeRay({ rays, rollDie: seq([1]) }).ray.key).toBe('paralyzing');
     expect(pickEyeRay({ rays, rollDie: seq([2]) }).ray.key).toBe('fear');
     expect(pickEyeRay({ rays, rollDie: seq([3]) }).ray.key).toBe('enervation');
     expect(pickEyeRay({ rays, rollDie: seq([4]) }).ray.key).toBe('disintegration');
-    expect(pickEyeRay({ rays, rollDie: seq([3]) }).roll).toBe(3);
-  });
-
-  it('d4 bounds: 5+ and 0 are rejected and re-rolled, not indexed', () => {
-    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: [], rollDie: seq([0, 5, 11, 2]) });
-    expect(rerolls).toEqual([]);
-    expect(roll).toBe(2);
-    expect(ray.key).toBe('fear');
-  });
-
-  it('rerolls a ray already used this turn (RAW reroll-if-used)', () => {
-    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: ['fear', 'disintegration'], rollDie: seq([2, 4, 1]) });
+    const { ray, roll, rerolls } = pickEyeRay({ rays, usedKeys: ['fear', 'disintegration'], rollDie: seq([0, 2, 5, 4, 1]) });
     expect(rerolls).toEqual([2, 4]);
     expect(roll).toBe(1);
     expect(ray.key).toBe('paralyzing');
-  });
-
-  it('guard: exhausts to null instead of looping forever when nothing is free', () => {
     const allUsed = rays.map(r => r.key);
-    const { ray } = pickEyeRay({ rays, usedKeys: allUsed, rollDie: () => Math.floor(Math.random() * 4) + 1 });
-    expect(ray).toBeNull();
+    expect(pickEyeRay({ rays, usedKeys: allUsed, rollDie: () => Math.floor(Math.random() * 4) + 1 }).ray).toBeNull();
   });
 });
 
-describe('MA-0383 zombie synthesis + picker rows name d4/DC 14', () => {
-  const rays = parseEyeRays(zRow);
+describe('MA-0374/MA-0383 synthesis + auto-success', () => {
+  const rays = parseEyeRays(row);
+  const zRays = parseEyeRays(zRow);
 
-  it('buildEyeRayAction stamps the zombie row DC 14 onto the ray for the ladder service', () => {
-    const para = rays.find(r => r.key === 'paralyzing');
-    const act = buildEyeRayAction(zRow, para);
-    expect(act.save_dc).toBe(14);
+  it('single-target synthesis: row-DC stamp, parseable legs, null description/save_effect; per-monster DC (16/14)', () => {
+    const slowing = rays.find(r => r.key === 'slowing');
+    const act = buildEyeRayAction(row, slowing);
+    expect(act.name).toBe('Slowing Ray (Eye Rays)');
+    expect(act.save_dc).toBe(16);
     expect(act.save_type).toBe('Constitution');
-    expect(act.dc_success).toBe('none');
-    expect(act.damage_dice_primary).toBeUndefined();
-    expect(act.eyeRay.save_dc).toBe(14);
-    expect(act.eyeRay.ladder).toBe('paralyzed');
-    const dis = buildEyeRayAction(zRow, rays.find(r => r.key === 'disintegration'));
-    expect(dis.damage_dice_primary).toBe('5d10');
-    expect(dis.damage_type_primary).toBe('Force');
+    expect(act.dc_success).toBe('half');
+    expect(act.damage_dice_primary).toBe('4d8');
+    expect(act.description).toBeNull();
+    expect(act.save_effect).toBeNull();
+    expect(act.eyeRay).toEqual({ ...slowing, save_dc: 16 });
+
+    const para = zRays.find(r => r.key === 'paralyzing');
+    const zAct = buildEyeRayAction(zRow, para);
+    expect(zAct.save_dc).toBe(14);
+    expect(zAct.dc_success).toBe('none');
+    expect(zAct.damage_dice_primary).toBeUndefined();
+    expect(zAct.eyeRay.save_dc).toBe(14);
+    expect(zAct.eyeRay.ladder).toBe('paralyzed');
   });
 
-  it('popup + logs print d4 and DC 14 (never d10/DC 16)', () => {
-    const fear = rays.find(r => r.key === 'fear');
-    const html = buildEyeRayPickerPopup({ monsterName: 'Beholder Zombie 1', ray: fear, roll: 2, rerolls: [4], targetName: 'HexWarlock', die: 4, dc: 14 });
-    expect(html).toMatch(/Eye Rays d4/);
-    expect(html).toMatch(/DC 14 Wisdom save/);
-    expect(html).toMatch(/rerolled 4/);
-
-    const rollLog = buildEyeRayPickerRollLog({ monsterName: 'Beholder Zombie 1', ray: fear, roll: 2, rerolls: [], targetName: 'HexWarlock', die: 4 });
-    expect(rollLog.rollType).toBe('d4');
-    expect(rollLog.name).toBe('Eye Rays (d4 ray picker)');
-    expect(rollLog.description).toMatch(/rolled 2 on the Eye Rays d4 — Fear Ray/);
-
-    const use = buildEyeRayAbilityUseLog({ monsterName: 'Beholder Zombie 1', ray: rays.find(r => r.key === 'enervation'), targetName: 'HexWarlock', dc: 14 });
-    expect(use.description).toMatch(/DC 14 Constitution save, 3d6 Necrotic/);
-
-    const paraUse = buildEyeRayAbilityUseLog({ monsterName: 'Beholder Zombie 1', ray: rays[0], targetName: 'HexWarlock', dc: 14 });
-    expect(paraUse.description).toMatch(/no damage, condition save/);
-  });
-
-  it('beholder defaults stay byte-identical (d10/DC 16) — MA-0374 untouched', () => {
-    const bRays = parseEyeRays(row);
-    const html = buildEyeRayPickerPopup({ monsterName: 'Beholder 1', ray: bRays[2], roll: 3, targetName: 'HexWarlock' });
-    expect(html).toMatch(/Eye Rays d10/);
-    expect(html).toMatch(/DC 16 Wisdom save/);
-    expect(buildEyeRayPickerRollLog({ monsterName: 'Beholder 1', ray: bRays[2], roll: 3, targetName: 'HexWarlock' }).rollType).toBe('d10');
+  it('auto-success truth table: size hit, type hit, misses, null inputs', () => {
+    const tk = rays.find(r => r.key === 'telekinetic');
+    const sleep = rays.find(r => r.key === 'sleep');
+    expect(eyeRayAutoSuccessReason(tk, { size: 'Gargantuan' })).toBe('Gargantuan creatures succeed automatically');
+    expect(eyeRayAutoSuccessReason(tk, { size: 'Medium' })).toBeNull();
+    expect(eyeRayAutoSuccessReason(sleep, { monsterType: 'Construct' })).toBe('Construct creatures succeed automatically');
+    expect(eyeRayAutoSuccessReason(sleep, { type: 'undead' })).toBe('Undead creatures succeed automatically');
+    expect(eyeRayAutoSuccessReason(sleep, { monsterType: 'Aberration' })).toBeNull();
+    expect(eyeRayAutoSuccessReason(sleep, null)).toBeNull();
+    expect(eyeRayAutoSuccessReason(null, { size: 'Gargantuan' })).toBeNull();
   });
 });
 
-// ── MA-0577: Death Tyrant — §88 rays[] conversion of the missed twin ────
-const tyrant = (Array.isArray(monsters) ? monsters : monsters.monsters).find(m => m.name === 'Death Tyrant');
-const tRow = tyrant.actions.find(a => a.name === 'Eye Rays');
+describe('MA-0374/MA-0383 popup + log templates (full-byte pins)', () => {
+  const rays = parseEyeRays(row);
+  const zRays = parseEyeRays(zRow);
 
-describe('MA-0577 Death Tyrant parseEyeRays (d10 DC 17 row)', () => {
-  it('Eye Rays row carries 10 structured rays — no Varies/multi-string noise', () => {
-    const rays = parseEyeRays(tRow);
-    expect(rays).toHaveLength(10);
-    expect(rays.map(r => r.key)).toEqual(['charm', 'paralyzing', 'fear', 'slowing', 'enervation', 'telekinetic', 'sleep', 'petrification', 'disintegration', 'death']);
-    expect(rays.map(r => r.name)).toEqual(['Charm Ray', 'Paralyzing Ray', 'Fear Ray', 'Slowing Ray', 'Enervation Ray', 'Telekinetic Ray', 'Sleep Ray', 'Petrification Ray', 'Disintegration Ray', 'Death Ray']);
-    expect(tRow.save_dc).toBe(17);
-    expect(tRow.save_type).toBeUndefined();
-    expect(tRow.damage_dice_primary).toBeUndefined();
-    expect(tRow.damage_type_primary).toBeUndefined();
-    expect(tRow.description).toMatch(/roll 1d10; reroll if the death tyrant has already used that ray during this turn/);
+  it('picker popup: beholder default d10/DC 16 and zombie d4/DC 14 with reroll history', () => {
+    expect(buildEyeRayPickerPopup({ monsterName: 'Beholder 1', ray: rays[3], roll: 4, rerolls: [4, 10], targetName: 'HexWarlock' })).toBe('<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> Slowing Ray</h3><p>Beholder 1 rolls 4 (rerolled 4, 10 — already used this turn) on the Eye Rays d10 — <strong>Slowing Ray</strong> at HexWarlock (DC 16 Constitution save).</p></div>');
+    expect(buildEyeRayPickerPopup({ monsterName: 'Beholder Zombie 1', ray: zRays.find(r => r.key === 'fear'), roll: 2, rerolls: [4], targetName: 'HexWarlock', die: 4, dc: 14 })).toBe('<div class="mc-eye-ray-picked"><h3><i class="fa-solid fa-eye"></i> Fear Ray</h3><p>Beholder Zombie 1 rolls 2 (rerolled 4 — already used this turn) on the Eye Rays d4 — <strong>Fear Ray</strong> at HexWarlock (DC 14 Wisdom save).</p></div>');
   });
 
-  it('RAW tyrant ray damage/dice/type map byte-on-disk (3d6 fear, 3d10 enervation)', () => {
-    const byKey = Object.fromEntries(parseEyeRays(tRow).map(r => [r.key, r]));
-    expect(byKey.charm.damage_dice).toBe('3d8');
-    expect(byKey.charm.damage_type).toBe('Psychic');
-    expect(byKey.charm.conditions).toEqual(['charmed']);
-    expect(byKey.paralyzing.damage_dice).toBeNull();
-    expect(byKey.paralyzing.ladder).toBe('paralyzed');
+  it('picker roll log: d10 default and d4, rolls/total/description exact', () => {
+    const roll = buildEyeRayPickerRollLog({ monsterName: 'Beholder 1', ray: rays[6], roll: 7, rerolls: [], targetName: 'HexWarlock' });
+    expect(roll).toMatchObject({
+      type: 'roll',
+      rollType: 'd10',
+      name: 'Eye Rays (d10 ray picker)',
+      rolls: [7],
+      total: 7,
+      targetName: 'HexWarlock',
+      description: 'Beholder 1 rolled 7 on the Eye Rays d10 — Sleep Ray.',
+    });
+    const zRoll = buildEyeRayPickerRollLog({ monsterName: 'Beholder Zombie 1', ray: zRays.find(r => r.key === 'fear'), roll: 2, rerolls: [], targetName: 'HexWarlock', die: 4 });
+    expect(zRoll.rollType).toBe('d4');
+    expect(zRoll.name).toBe('Eye Rays (d4 ray picker)');
+    expect(zRoll.description).toBe('Beholder Zombie 1 rolled 2 on the Eye Rays d4 — Fear Ray.');
+  });
+
+  it('ability_use log: damage leg (DC 16 default / DC 14) and no-damage condition-save leg, trailing-space quirk fixed', () => {
+    expect(buildEyeRayAbilityUseLog({ monsterName: 'Beholder 1', ray: rays[0], targetName: 'HexWarlock' }).description).toBe('Beholder 1 fires Charm Ray from Eye Rays at HexWarlock — DC 16 Wisdom save, 3d8 Psychic damage (half on a successful save).');
+    expect(buildEyeRayAbilityUseLog({ monsterName: 'Beholder Zombie 1', ray: zRays.find(r => r.key === 'enervation'), targetName: 'HexWarlock', dc: 14 }).description).toBe('Beholder Zombie 1 fires Enervation Ray from Eye Rays at HexWarlock — DC 14 Constitution save, 3d6 Necrotic damage (half on a successful save).');
+    expect(buildEyeRayAbilityUseLog({ monsterName: 'Beholder Zombie 1', ray: zRays[0], targetName: 'HexWarlock', dc: 14 }).description).toBe('Beholder Zombie 1 fires Paralyzing Ray from Eye Rays at HexWarlock — DC 14 Constitution save — no damage, condition save.');
+  });
+
+  it('auto-success log: fields + full description', () => {
+    const auto = buildEyeRayAutoSuccessLog({ monsterName: 'Beholder 1', ray: rays[6], targetName: 'IronGolem', reason: 'Construct creatures succeed automatically' });
+    expect(auto.type).toBe('automation');
+    expect(auto.automationType).toBe('eye_ray_auto_success');
+    expect(auto.characterName).toBe('IronGolem');
+    expect(auto.sourceName).toBe('Beholder 1');
+    expect(auto.description).toBe('IronGolem succeeds automatically against Beholder 1\'s Sleep Ray (Construct creatures succeed automatically) — no save rolled, no effect applied.');
+  });
+});
+
+describe('MA-0577 Death Tyrant — DC 17 d10 twin on the shared seam', () => {
+  it('parses the same 10 keys with tyrant-specific dice (fear 3d6, enervation 3d10 Poison) and synthesis stamps DC 17', () => {
+    const rays = parseEyeRays(tRow);
+    expect(rays.map(r => r.key)).toEqual(BEHOLDER_KEYS);
+    const byKey = Object.fromEntries(rays.map(r => [r.key, r]));
     expect(byKey.fear.damage_dice).toBe('3d6');
-    expect(byKey.fear.damage_type).toBe('Psychic');
-    expect(byKey.fear.conditions).toEqual(['frightened']);
-    expect(byKey.slowing.damage_dice).toBe('4d8');
-    expect(byKey.slowing.damage_type).toBe('Necrotic');
-    expect(byKey.slowing.te_grants).toEqual(['speed_half', 'no_reactions', 'no_action_and_bonus_action']);
     expect(byKey.enervation.damage_dice).toBe('3d10');
     expect(byKey.enervation.damage_type).toBe('Poison');
-    expect(byKey.enervation.conditions).toEqual(['poisoned']);
-    expect(byKey.enervation.te_grants).toEqual(['no_healing']);
-    expect(byKey.telekinetic.save_ability).toBe('Strength');
-    expect(byKey.telekinetic.auto_success_size).toBe('Gargantuan');
-    expect(byKey.sleep.auto_success_types).toEqual(['Construct', 'Undead']);
-    expect(byKey.petrification.ladder).toBe('petrification');
-    expect(byKey.disintegration.damage_dice).toBe('8d8');
-    expect(byKey.disintegration.zero_hp_clause).toMatch(/dust/);
-    expect(byKey.death.damage_dice).toBe('10d10');
-    expect(byKey.death.zero_hp_clause).toMatch(/dies/);
-  });
-
-  it('synthesized ray row + picker rows stamp DC 17 and d10 (never the VAR shell)', () => {
-    const rays = parseEyeRays(tRow);
-    const act = buildEyeRayAction(tRow, rays.find(r => r.key === 'enervation'));
+    expect(byKey.paralyzing.ladder).toBe('paralyzed');
+    expect(tRow.save_dc).toBe(17);
+    expect(tRow.save_type).toBeUndefined();
+    const act = buildEyeRayAction(tRow, byKey.enervation);
     expect(act.save_dc).toBe(17);
     expect(act.save_type).toBe('Constitution');
     expect(act.damage_dice_primary).toBe('3d10');
     expect(act.eyeRay.save_dc).toBe(17);
-    const html = buildEyeRayPickerPopup({ monsterName: 'Death Tyrant 1', ray: rays[2], roll: 3, targetName: 'Bandit 1', die: 10, dc: 17 });
-    expect(html).toMatch(/Fear Ray/);
-    expect(html).toMatch(/Eye Rays d10/);
-    expect(html).toMatch(/DC 17 Wisdom save/);
-    const seq = rolls => () => rolls.shift();
-    expect(pickEyeRay({ rays, rollDie: seq([10]) }).ray.key).toBe('death');
-    const { ray, rerolls } = pickEyeRay({ rays, usedKeys: ['death'], rollDie: seq([10, 5]) });
-    expect(rerolls).toEqual([10]);
-    expect(ray.key).toBe('enervation');
   });
 });

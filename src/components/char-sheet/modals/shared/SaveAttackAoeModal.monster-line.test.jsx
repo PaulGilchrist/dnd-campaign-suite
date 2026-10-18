@@ -1,9 +1,16 @@
-// MA-0035: line-shaped breath rows reuse the SAME area picker as MA-0031
-// cones — multi-target picks, each picked creature rolls its OWN save at the
-// authored DC 18 Dexterity; fail = full, success = half (per-target math
-// untouched). Label aligned with the cone rendering ("60-ft Line ...").
-import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @maintained-by-ai
+// MA-0035 monster LINE breath row — modal-side consumption ONLY: header
+// shows the "60-ft Line" label, the row's 60-ft line geometry flows through
+// the canonical isWithinRange gate from the attacker (the mock passes ONLY
+// at exactly 60 ft, so a dropped or mis-sized gate empties the candidate
+// list), excludeNames drops the dragon, browsing stays inert. Generic
+// confirm-time adjudication (own save each, fail=full/success=half,
+// per-target logs, no spell lastAttack) is owned by monster-cone.test.jsx
+// (#223) — shape is label-only in the modal (_shape is unused at :1418).
+// Row→picker data pins (saveDc/saveType/damage/props) are owned by
+// MonsterCardModal.line-breath.test.jsx.
+import { render, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
@@ -57,8 +64,11 @@ vi.mock('../../../../services/automation/common/damageRollback.js', () => ({
   addTargetResult: vi.fn(),
 }));
 
+// Line-geometry-specific gate: candidates survive ONLY when the modal asks
+// isWithinRange at the row's authored 60-ft line length. Dropping the gate
+// (never called) or mis-sizing it empties the picker → non-vacuous pin.
 vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(async () => true),
+  isWithinRange: vi.fn(async (_src, _name, ft) => ft === 60),
   isDistanceInRange: vi.fn(() => true),
 }));
 
@@ -87,20 +97,14 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
-import { storeSpellLastAttack } from '../../../../services/automation/common/damageRollback.js';
+import { isWithinRange } from '../../../../services/rules/combat/rangeCheck.js';
 
 const ACTION = { name: 'Acid Breath (Recharge 5-6)', save_dc: 18, save_type: 'Dexterity', recharge: '5-6', damage_dice_primary: '12d8', damage_type_primary: 'Acid' };
 
-let randomSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   seenTargets.current = [];
-  // Thug 1 nat 2 (fails DC 18); Thug 2 nat 19 (succeeds) → half 27.
-  let i = 0;
-  const seq = [0.05, 0.05, 0.95, 0.95];
-  randomSpy = vi.spyOn(Math, 'random').mockImplementation(() => seq[Math.min(i++, seq.length - 1)]);
 });
-afterEach(() => randomSpy.mockRestore());
 
 function renderMonsterLine() {
   return render(
@@ -123,27 +127,21 @@ function renderMonsterLine() {
 }
 
 describe('MA-0035 area picker as monster line save', () => {
-  it('labels the line picker and excludes the dragon from multi-target picks', async () => {
+  it('opens the labelled 60-ft Line picker: gate queried from the dragon at 60 ft, attacker excluded, inert until confirm', async () => {
     renderMonsterLine();
+    // Survivors prove the 60-ft line gate fired at exactly the authored range.
     await waitFor(() => expect(seenTargets.current.map(t => t.name)).toEqual(['Thug 1', 'Thug 2']));
     expect(document.querySelector('.sp-header').textContent).toContain('60-ft Line (GM positions tokens; selection advisory)');
+    expect(isWithinRange).toHaveBeenCalledTimes(2);
+    expect(isWithinRange.mock.calls).toEqual(expect.arrayContaining([
+      ['Adult Black Dragon 1', 'Thug 1', 60],
+      ['Adult Black Dragon 1', 'Thug 2', 60],
+    ]));
+    // Both thug rows must carry the attacker-exclusion (dragon never queried, never listed).
+    expect(isWithinRange.mock.calls.every(c => c[1] !== 'Adult Black Dragon 1')).toBe(true);
     expect(seenTargets.current.some(t => t.name === 'Adult Black Dragon 1')).toBe(false);
-  });
-
-  it('two picks → two own saves at DC 18 Dexterity: fail full 54, success half 27, no spell lastAttack', async () => {
-    const { getByText } = renderMonsterLine();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
-    expect(storeSpellLastAttack).not.toHaveBeenCalled();
-    const byTarget = Object.fromEntries(applyDamageToTarget.mock.calls.map(c => [c[1], c[2]]));
-    expect(byTarget['Thug 1']).toBe(54);
-    expect(byTarget['Thug 2']).toBe(27);
-    const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage');
-    expect(logs.map(l => [l.targetName, l.saveResult, l.finalDamage, l.saveDc, l.saveType].join(':')).sort()).toEqual([
-      'Thug 1:failure:54:18:Dexterity',
-      'Thug 2:success:27:18:Dexterity',
-    ]);
-    expect(logs[0].characterName).toBe('Adult Black Dragon 1');
+    // Browsing the picker rolls, logs and damages nothing.
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });

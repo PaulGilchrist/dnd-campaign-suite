@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1100: Lizard King/Queen Trident versatile "or 7 (1d8 + 3) piercing
 // damage if used with two hands to make a melee attack" had NO authored
 // damage_dice_two_handed transport field — buildTwoHandedVariantOffer
@@ -7,10 +8,17 @@
 // MA-1063 kuo-toa Spear / MA-0959 half-ogre Battleaxe placement (after
 // damage_dice_primary, before damage_type_primary). The ranged band "20/60"
 // stays prose (§150/§193 no-seam family) — no damage_dice_ranged in scope.
+// Twin audit: ONE disk row only — index "lizard-king-queen" carries King AND
+// Queen in a single block (not two byte-twin rows); its two_handed literal
+// "1d8 + 3" is disk-unique. Generic lane legs cite-skip and are dropped:
+// offer build + sibling inertness + select logs → two-handed.test.js:23-55;
+// builder null-guardrail → MonsterCardModal.two-handed.test.jsx:213-223;
+// byte-inert null secondary transport triple →
+// MonsterCardModal.cultist-flat-secondary.test.js:36-39. Remaining per-row:
+// disk lock + ONE derived press + no-double-charge guard (secondary ABSENT).
 import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
-import { buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog } from './MonsterCardHelpers.js';
-import { buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
+import { buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
 
 describe('MA-1100 data lock (monsters.json Lizard King/Queen Trident)', () => {
   const tridentRow = () => {
@@ -20,22 +28,21 @@ describe('MA-1100 data lock (monsters.json Lizard King/Queen Trident)', () => {
     return trident;
   };
 
-  it('actions[3] Trident authors damage_dice_two_handed "1d8 + 3" beside the 1d6 + 3 primary (MA-1063/0959 placement)', () => {
+  it('disk lock: actions[3] Trident authors damage_dice_two_handed "1d8 + 3" beside the 1d6 + 3 primary (MA-1063/0959 placement), prose byte-intact, no-double-charge guard — additive secondary ABSENT', () => {
     const trident = tridentRow();
     expect(trident.attack_bonus).toBe(5);
     expect(trident.damage_dice_primary).toBe('1d6 + 3');
     expect(trident.damage_dice_two_handed).toBe('1d8 + 3');
     expect(trident.damage_type_primary).toBe('Piercing');
     expect(trident.description).toMatch(/1d8 \+ 3\) piercing damage if used with two hands to make a melee attack/);
-  });
-
-  it('no additive/ranged misfire fields on the row: damage_dice_secondary ABSENT', () => {
-    const trident = tridentRow();
     expect(trident.damage_dice_secondary).toBeUndefined();
     expect(trident.flat_damage_secondary).toBeUndefined();
+    const keys = Object.keys(trident);
+    expect(keys.indexOf('damage_dice_two_handed')).toBeGreaterThan(keys.indexOf('damage_dice_primary'));
+    expect(keys.indexOf('damage_dice_two_handed')).toBeLessThan(keys.indexOf('damage_type_primary'));
   });
 
-  it('buildTwoHandedVariantOffer arms the Trident HIT-popup chooser with both formulas', () => {
+  it('ONE derived press: buildTwoHandedVariantOffer arms the Trident HIT-popup chooser with both formulas', () => {
     const offer = buildTwoHandedVariantOffer(tridentRow(), 'Trident');
     expect(offer).toMatchObject({
       formula: '1d8 + 3',
@@ -44,34 +51,5 @@ describe('MA-1100 data lock (monsters.json Lizard King/Queen Trident)', () => {
       attackName: 'Trident',
     });
     expect(offer.label).toContain('1d8 + 3');
-  });
-
-  it('buildSecondaryDamageTransport stays byte-inert — no additive secondary pool', () => {
-    expect(buildSecondaryDamageTransport(tridentRow(), 'Trident')).toEqual({
-      autoDamageSecondaryFormula: null,
-      autoDamageSecondaryName: null,
-      autoDamageSecondaryDamageType: null,
-    });
-  });
-
-  it('select logs: two-handed rides 1d8 + 3, unpicked default is one-handed 1d6 + 3 only', () => {
-    const offer = buildTwoHandedVariantOffer(tridentRow(), 'Trident');
-    const two = buildTwoHandedVariantSelectLog({ monsterName: 'Lizard King/Queen 1', offer, hands: 'two-handed' });
-    expect(two.automationType).toBe('two_handed_variant_selected');
-    expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain('1d8 + 3');
-    const one = buildTwoHandedVariantSelectLog({ monsterName: 'Lizard King/Queen 1', offer, hands: 'one-handed', defaulted: true });
-    expect(one.automationType).toBe('one_handed_variant_selected');
-    expect(one.description).toContain('default');
-    expect(one.description).toContain('1d6 + 3');
-  });
-
-  it('Bite/Claws siblings stay byte-inert — no chooser, no secondary transport', () => {
-    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
-    const lizard = monsters.find((m) => m.index === 'lizard-king-queen');
-    expect(buildTwoHandedVariantOffer(lizard.actions[1], 'Bite')).toBeNull();
-    expect(buildSecondaryDamageTransport(lizard.actions[1], 'Bite').autoDamageSecondaryFormula).toBeNull();
-    expect(buildTwoHandedVariantOffer(lizard.actions[2], 'Claws')).toBeNull();
-    expect(buildSecondaryDamageTransport(lizard.actions[2], 'Claws').autoDamageSecondaryFormula).toBeNull();
   });
 });

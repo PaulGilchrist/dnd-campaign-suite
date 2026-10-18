@@ -1,182 +1,125 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TargetWithTypePopup from './TargetWithTypePopup.jsx';
 
-// ── Test fixtures ──
+// Covers ONLY TargetWithTypePopup's own UI lane: the two-list single-select
+// state machine (target ✓ and damage-type ✓ move independently within their
+// lists), the two-gate confirm (target AND damage type), the 'Cast {title}'
+// label default computed by this component, and the exact
+// { targetName, damageType } payload. Base surface inherited from
+// TargetPopupBase (Escape→onSkip, 'Spell' name fallback, subtitle, the
+// 'Cancel' fallback that base re-supplies) is not pinned here — strongest
+// skip pins live in MultiTargetCountPopup.test.jsx, pending a dedicated
+// TargetPopupBase spec. Rows are clickable <div>s with no roles; getByText
+// is honest there.
 
-const baseSpell = { name: 'Protection from Energy', level: 1 };
+// ── Fixtures (copy distinct per source for attribution) ──
+
+const mockSpell = { name: 'Protection from Energy', level: 2 };
 const creatureTargets = ['Ally1', 'Ally2', 'Ally3'];
 const damageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
 
 function makeProps(overrides = {}) {
   return {
-    spell: baseSpell,
+    spell: mockSpell,
     creatureTargets,
     damageTypes,
     onConfirm: vi.fn(),
     onSkip: vi.fn(),
     icon: 'fa-solid fa-shield',
-    title: 'Protection from Energy',
+    title: 'Ward the Company', // distinct from spell.name for copy attribution
     school: 'Abjuration',
-    defaultLevel: 1,
-    description: 'Select a target and damage type',
+    defaultLevel: 2,
+    description: 'Pick an ally and an energy to ward',
     confirmLabel: 'Cast',
-    cancelLabel: 'Cancel',
+    cancelLabel: 'Nope', // distinct from the 'Cancel' default
     ...overrides,
   };
 }
 
-// ── Helpers ──
-
-function selectTarget(allyName) {
-  const row = screen.getByText(new RegExp(`^\\u2713 ${allyName}$|^${allyName}$`)).closest('div[style*="pointer"]')
-    ?? screen.getByText(allyName).closest('div');
-  fireEvent.click(row);
-}
-
-function selectDamageType(typeName) {
-  const row = screen.getByText(typeName).closest('div');
-  fireEvent.click(row);
-}
-
-// ── Tests ──
-
 describe('TargetWithTypePopup', () => {
-  // ── Rendering ──
-
-  it('renders creature targets and damage type labels', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    expect(screen.getByText('Target:')).toBeInTheDocument();
-    expect(screen.getByText('Damage Type:')).toBeInTheDocument();
+  beforeEach(() => {
+    vi.resetAllMocks();
   });
 
-  it('renders all creature targets and damage types', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
+  it('renders section labels, both lists, and button copy with confirm gated off', () => {
+    const { rerender } = render(<TargetWithTypePopup {...makeProps()} />);
+
+    expect(screen.getByRole('heading', { name: 'Ward the Company' })).toBeInTheDocument();
+    expect(screen.getByText('Target:')).toBeInTheDocument();
+    expect(screen.getByText('Damage Type:')).toBeInTheDocument();
     for (const name of creatureTargets) expect(screen.getByText(name)).toBeInTheDocument();
     for (const type of damageTypes) expect(screen.getByText(type)).toBeInTheDocument();
+    expect(screen.queryAllByText(/✓/)).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Nope' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled(); // neither leg selected
+
+    // This popup's own fallback expression `Cast ${title}` (base would render
+    // 'Confirm' if it broke, so this pin is attributable).
+    rerender(<TargetWithTypePopup {...makeProps({ confirmLabel: undefined })} />);
+    expect(screen.getByRole('button', { name: 'Cast Ward the Company' })).toBeInTheDocument();
   });
 
-  it('renders no creature names when creatureTargets is empty', () => {
-    render(<TargetWithTypePopup {...makeProps({ creatureTargets: [] })} />);
-    for (const name of creatureTargets) expect(screen.queryByText(name)).not.toBeInTheDocument();
-    expect(screen.getByText('Target:')).toBeInTheDocument();
-  });
-
-  it('renders no damage type names when damageTypes is empty', () => {
-    render(<TargetWithTypePopup {...makeProps({ damageTypes: [] })} />);
-    for (const type of damageTypes) expect(screen.queryByText(type)).not.toBeInTheDocument();
-    expect(screen.getByText('Damage Type:')).toBeInTheDocument();
-  });
-
-  it('uses default confirmLabel "Cast {title}" when confirmLabel is not provided', () => {
-    render(<TargetWithTypePopup {...makeProps({ confirmLabel: undefined })} />);
-    expect(screen.getByText('Cast Protection from Energy')).toBeInTheDocument();
-  });
-
-  it('uses default cancelLabel "Cancel" when cancelLabel is not provided', () => {
-    render(<TargetWithTypePopup {...makeProps({ cancelLabel: undefined })} />);
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-  });
-
-  // ── Confirm button state ──
-
-  it('disables confirm button when no target is selected', () => {
+  it('selects one target at a time, leaves confirm gated until a damage type joins, and fires nothing on row clicks', () => {
     render(<TargetWithTypePopup {...makeProps()} />);
-    expect(screen.getByText('Cast')).toBeDisabled();
+    const cast = screen.getByRole('button', { name: 'Cast' });
+
+    fireEvent.click(screen.getByText('Ally1'));
+    expect(screen.getByText('✓ Ally1')).toBeInTheDocument();
+    expect(screen.queryAllByText(/✓/)).toHaveLength(1); // single-target marker only
+    expect(cast).toBeDisabled(); // target leg met, damage-type gate still open
+
+    fireEvent.click(screen.getByText('Ally2'));
+    expect(screen.getByText('✓ Ally2')).toBeInTheDocument();
+    expect(screen.queryByText('✓ Ally1')).not.toBeInTheDocument(); // marker moved, not duplicated
+    expect(screen.queryAllByText(/✓/)).toHaveLength(1);
+
+    expect(cast).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Nope' })).not.toBeDisabled();
   });
 
-  it('disables confirm button when target is selected but no damage type', () => {
+  it('selects one damage type at a time, enabling confirm only when the target leg also holds', () => {
     render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    expect(screen.getByText('Cast')).toBeDisabled();
+    const cast = screen.getByRole('button', { name: 'Cast' });
+
+    fireEvent.click(screen.getByText('Acid'));
+    expect(screen.getByText('✓ Acid')).toBeInTheDocument();
+    expect(cast).toBeDisabled(); // damage-type leg met, target gate still open
+
+    fireEvent.click(screen.getByText('Ally1'));
+    expect(cast).not.toBeDisabled(); // both legs selected
+    expect(screen.getByText('✓ Ally1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Cold'));
+    expect(screen.getByText('✓ Cold')).toBeInTheDocument();
+    expect(screen.queryByText('✓ Acid')).not.toBeInTheDocument(); // type marker moved
+    expect(screen.getByText('✓ Ally1')).toBeInTheDocument(); // target selection survives
+    expect(screen.queryAllByText(/✓/)).toHaveLength(2); // exactly one ✓ per list
+    expect(cast).not.toBeDisabled();
   });
 
-  it('disables confirm button when damage type is selected but no target', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectDamageType('Acid');
-    expect(screen.getByText('Cast')).toBeDisabled();
+  it('confirms once with the exact { targetName, damageType } payload', () => {
+    const props = makeProps();
+    render(<TargetWithTypePopup {...props} />);
+
+    fireEvent.click(screen.getByText('Ally2'));
+    fireEvent.click(screen.getByText('Fire'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
+
+    expect(props.onConfirm).toHaveBeenCalledTimes(1);
+    expect(props.onConfirm).toHaveBeenCalledWith({ targetName: 'Ally2', damageType: 'Fire' });
+    expect(props.onSkip).not.toHaveBeenCalled();
   });
 
-  it('enables confirm button after selecting both target and damage type', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    selectDamageType('Acid');
-    expect(screen.getByText('Cast')).not.toBeDisabled();
+  it('Cancel button fires onSkip exactly once', () => {
+    // Escape→onSkip is TargetPopupBase surface, pinned with count semantics
+    // in MultiTargetCountPopup.test.jsx — not duplicated here.
+    const props = makeProps();
+    render(<TargetWithTypePopup {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nope' }));
+    expect(props.onSkip).toHaveBeenCalledTimes(1);
+    expect(props.onConfirm).not.toHaveBeenCalled();
   });
-
-  // ── Selection behavior ──
-
-  it('marks the selected target with a checkmark', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    expect(screen.getByText(/\u2713 Ally1/)).toBeInTheDocument();
-  });
-
-  it('marks the selected damage type with a checkmark', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectDamageType('Acid');
-    expect(screen.getByText(/\u2713 Acid/)).toBeInTheDocument();
-  });
-
-  it('switches target selection to a different target', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    expect(screen.getByText(/\u2713 Ally1/)).toBeInTheDocument();
-    expect(screen.queryByText(/\u2713 Ally2/)).not.toBeInTheDocument();
-
-    selectTarget('Ally2');
-    expect(screen.getByText(/\u2713 Ally2/)).toBeInTheDocument();
-    expect(screen.queryByText(/\u2713 Ally1/)).not.toBeInTheDocument();
-  });
-
-  it('switches damage type selection to a different damage type', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectDamageType('Acid');
-    expect(screen.getByText(/\u2713 Acid/)).toBeInTheDocument();
-
-    selectDamageType('Cold');
-    expect(screen.getByText(/\u2713 Cold/)).toBeInTheDocument();
-    expect(screen.queryByText(/\u2713 Acid/)).not.toBeInTheDocument();
-  });
-
-  it('keeps damage type selected when switching targets', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    selectDamageType('Acid');
-    expect(screen.getByText(/\u2713 Acid/)).toBeInTheDocument();
-
-    selectTarget('Ally2');
-    expect(screen.getByText(/\u2713 Ally2/)).toBeInTheDocument();
-    expect(screen.getByText(/\u2713 Acid/)).toBeInTheDocument();
-  });
-
-  it('keeps target selected when switching damage types', () => {
-    render(<TargetWithTypePopup {...makeProps()} />);
-    selectTarget('Ally1');
-    selectDamageType('Acid');
-    expect(screen.getByText(/\u2713 Ally1/)).toBeInTheDocument();
-
-    selectDamageType('Cold');
-    expect(screen.getByText(/\u2713 Ally1/)).toBeInTheDocument();
-    expect(screen.getByText(/\u2713 Cold/)).toBeInTheDocument();
-  });
-
-  // ── Confirm behavior ──
-
-  it('calls onConfirm with selected target and damage type', () => {
-    const onConfirm = vi.fn();
-    render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
-    selectTarget('Ally2');
-    selectDamageType('Fire');
-    fireEvent.click(screen.getByText('Cast'));
-    expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Ally2', damageType: 'Fire' });
-  });
-
-  // ── Edge cases ──
-
-  it('disables confirm when both lists are empty', () => {
-    render(<TargetWithTypePopup {...makeProps({ creatureTargets: [], damageTypes: [] })} />);
-    expect(screen.getByText('Cast')).toBeDisabled();
-  });
-
 });

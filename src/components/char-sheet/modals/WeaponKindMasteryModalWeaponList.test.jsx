@@ -1,5 +1,18 @@
+// @maintained-by-ai
+// Weapon-list lane for WeaponKindMasteryModal: rows rendered from the fetched equipment list
+// (meleeOnly filter, alphabetical sort, invalid-row filtering), row metadata copy including the
+// "no mastery" dash, toggle ↔ Select-button ↔ Selected-counter gating, and disable-at-cap
+// enforcement (multiple unchecked disabled, clicks on disabled are inert).
+// Other lanes: first-paint copy → ...Initial.test.jsx, maxKinds computation → ...MaxKinds.test.jsx,
+// deselect-frees-slot / preselect / exact payload order / backdrop → ...Selection.test.jsx,
+// result view / Done / Skip → ...Result.test.jsx, payload production → weaponKindMasteryHandler.test.js.
+
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../../../services/automation/index.js', () => ({
+  applyWeaponKindMastery: vi.fn(),
+}));
 
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
 import { resetWeaponsCache } from './weapon-kind-mastery-cache.js';
@@ -24,164 +37,143 @@ const mockWeapons = [
   { name: 'Shortsword', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Vex' },
 ];
 
-const baseProps = {
-  action: undefined,
-  playerStats: mockPlayerStats,
-  campaignName: mockCampaignName,
-  onClose: vi.fn(),
-};
-
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
-}
-
-function renderWithWeapons(overrides, weaponsToMock = mockWeapons) {
-  const fetchMock = vi.fn().mockResolvedValue({
+function renderWithWeapons(overrides = {}, weaponsToMock = mockWeapons) {
+  globalThis.fetch = vi.fn().mockResolvedValue({
     json: () => Promise.resolve(weaponsToMock),
   });
-  globalThis.fetch = fetchMock;
-  return render(<WeaponKindMasteryModal {...makeProps(overrides)} />);
+  return render(
+    <WeaponKindMasteryModal
+      action={undefined}
+      playerStats={mockPlayerStats}
+      campaignName={mockCampaignName}
+      onClose={vi.fn()}
+      {...overrides}
+    />
+  );
+}
+
+function checkboxFor(name) {
+  return screen.getByRole('checkbox', { name: new RegExp(`^${name}`) });
 }
 
 async function waitForWeapons() {
-  await waitFor(() => screen.getByText('Battleaxe'));
+  await waitFor(() => screen.getByRole('checkbox', { name: /^Battleaxe/ }));
 }
 
-describe('WeaponKindMasteryModal', () => {
+describe('WeaponKindMasteryModal — weapon list', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
     resetWeaponsCache();
   });
 
-  describe('weapon list', () => {
-    it('renders all weapons when meleeOnly is false', async () => {
-      renderWithWeapons();
-      await waitForWeapons();
+  it.each([
+    ['meleeOnly=false', false, ['Battleaxe', 'Blowgun', 'Club', 'Longbow', 'Shortsword'], []],
+    ['meleeOnly=true', true, ['Battleaxe', 'Club', 'Shortsword'], ['Blowgun', 'Longbow']],
+  ])('renders one checkbox row per weapon, meleeOnly=%s', async (_label, meleeOnly, expected, absent) => {
+    renderWithWeapons({ meleeOnly });
+    await waitFor(() => screen.getAllByRole('checkbox', { name: new RegExp(`^${expected[0]}`) }));
 
-      expect(screen.getByRole('checkbox', { name: /Battleaxe/ })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /Blowgun/ })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /Club/ })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /Longbow/ })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /Shortsword/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(expected.length);
+    expected.forEach(name => {
+      expect(checkboxFor(name)).toBeInTheDocument();
+    });
+    absent.forEach(name => {
+      expect(screen.queryByRole('checkbox', { name: new RegExp(`^${name}`) })).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders category, range, and mastery on each row, dashing missing mastery', async () => {
+    const weapons = [
+      ...mockWeapons,
+      { name: 'Test Weapon', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee' },
+    ];
+    renderWithWeapons({}, weapons);
+    await waitFor(() => screen.getByRole('checkbox', { name: /^Test Weapon/ }));
+
+    const battleaxeLabel = checkboxFor('Battleaxe').closest('label');
+    expect(battleaxeLabel.textContent).toContain('[Martial Melee]');
+    expect(battleaxeLabel.textContent).toContain('Mastery: Topple');
+
+    const testLabel = checkboxFor('Test Weapon').closest('label');
+    expect(testLabel.textContent).toContain('[Simple Melee]');
+    expect(testLabel.textContent).toContain('Mastery: —');
+  });
+
+  it('sorts weapons alphabetically regardless of fetch order', async () => {
+    const unsorted = [
+      { name: 'Zweihander', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Push' },
+      { name: 'Axe', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
+      { name: 'Mace', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Topple' },
+    ];
+    renderWithWeapons({}, unsorted);
+    await waitFor(() => screen.getByRole('checkbox', { name: /^Axe/ }));
+
+    const expectedOrder = ['Axe', 'Mace', 'Zweihander'];
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(expectedOrder.length);
+    expectedOrder.forEach((name, i) => {
+      expect(checkboxes[i]).toBe(checkboxFor(name));
+    });
+  });
+
+  it('filters out non-weapon and incomplete rows', async () => {
+    const mixedItems = [
+      { name: 'Potion', equipment_category: 'Adventuring Gear' },
+      { name: 'Test Weapon', equipment_category: 'Weapon', weapon_range: 'Melee' },
+      { name: 'Test Weapon 2', equipment_category: 'Weapon', weapon_category: 'Simple' },
+      { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
+    ];
+    renderWithWeapons({}, mixedItems);
+    await waitFor(() => screen.getByRole('checkbox', { name: /^Battleaxe/ }));
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    ['Potion', 'Test Weapon', 'Test Weapon 2'].forEach(name => {
+      expect(screen.queryByRole('checkbox', { name: new RegExp(`^${name}\\b`) })).not.toBeInTheDocument();
+    });
+  });
+
+  it('toggles selection, Select button state, and the Selected counter together', async () => {
+    renderWithWeapons({ meleeOnly: false });
+    await waitForWeapons();
+
+    const battleaxe = checkboxFor('Battleaxe');
+    expect(battleaxe.checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Select' })).toBeDisabled();
+    expect(screen.getByText('Selected: 0/2')).toBeInTheDocument();
+
+    fireEvent.click(battleaxe);
+    expect(battleaxe.checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Select' })).toBeEnabled();
+    expect(screen.getByText('Selected: 1/2')).toBeInTheDocument();
+
+    fireEvent.click(battleaxe);
+    expect(battleaxe.checked).toBe(false);
+    expect(screen.getByRole('button', { name: 'Select' })).toBeDisabled();
+    expect(screen.getByText('Selected: 0/2')).toBeInTheDocument();
+  });
+
+  it('disables every unchecked weapon at the maxKinds cap and ignores clicks on them', async () => {
+    renderWithWeapons({ meleeOnly: false, action: { automation: { maxKinds: 2 } } });
+    await waitForWeapons();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+
+    fireEvent.click(checkboxFor('Battleaxe'));
+    fireEvent.click(checkboxFor('Club'));
+
+    expect(screen.getByText('Selected: 2/2')).toBeInTheDocument();
+    ['Battleaxe', 'Club'].forEach(name => {
+      const cb = checkboxFor(name);
+      expect(cb.checked).toBe(true);
+      expect(cb).toBeEnabled();
+    });
+    ['Blowgun', 'Longbow', 'Shortsword'].forEach(name => {
+      expect(checkboxFor(name)).toBeDisabled();
     });
 
-    it('renders only melee weapons when meleeOnly is true', async () => {
-      const meleeWeapons = [
-        { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
-        { name: 'Blowgun', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Ranged', mastery: 'Sap' },
-        { name: 'Club', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
-      ];
-      renderWithWeapons({ meleeOnly: true }, meleeWeapons);
-      await waitFor(() => screen.getByText('Battleaxe'));
-
-      expect(screen.getByRole('checkbox', { name: /Battleaxe/ })).toBeInTheDocument();
-      expect(screen.getByRole('checkbox', { name: /Club/ })).toBeInTheDocument();
-      expect(screen.queryByRole('checkbox', { name: /Blowgun/ })).not.toBeInTheDocument();
-    });
-
-    it('renders weapon category, range, and mastery info for each weapon', async () => {
-      renderWithWeapons();
-      await waitForWeapons();
-
-      const battleaxeLabel = screen.getByRole('checkbox', { name: /Battleaxe/ }).closest('label');
-      expect(battleaxeLabel.textContent).toContain('[Martial Melee]');
-      expect(battleaxeLabel.textContent).toContain('Topple');
-    });
-
-    it('renders "—" when a weapon has no mastery property', async () => {
-      const weaponsWithNoMastery = [
-        { name: 'Test Weapon', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee' },
-      ];
-      renderWithWeapons({}, weaponsWithNoMastery);
-      await waitFor(() => screen.getByText('Test Weapon'));
-
-      const label = screen.getByRole('checkbox', { name: /Test Weapon/ }).closest('label');
-      expect(label.textContent).toContain('—');
-    });
-
-    it('renders weapons sorted alphabetically by name', async () => {
-      const unsortedWeapons = [
-        { name: 'Zweihander', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Push' },
-        { name: 'Axe', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Slow' },
-        { name: 'Mace', equipment_category: 'Weapon', weapon_category: 'Simple', weapon_range: 'Melee', mastery: 'Topple' },
-      ];
-      renderWithWeapons({}, unsortedWeapons);
-      await waitFor(() => screen.getByText('Axe'));
-
-      const checkboxes = screen.getAllByRole('checkbox');
-      const names = checkboxes.map(cb => {
-        const strong = cb.parentElement?.querySelector('strong');
-        return strong?.textContent?.trim() || '';
-      });
-      expect(names).toEqual(['Axe', 'Mace', 'Zweihander']);
-    });
-
-    it('filters out non-weapon and incomplete items', async () => {
-      const mixedItems = [
-        { name: 'Potion', equipment_category: 'Adventuring Gear' },
-        { name: 'Test Weapon', equipment_category: 'Weapon', weapon_range: 'Melee' },
-        { name: 'Test Weapon 2', equipment_category: 'Weapon', weapon_category: 'Simple' },
-        { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
-      ];
-      renderWithWeapons({}, mixedItems);
-      await waitFor(() => screen.getByText('Battleaxe'));
-
-      expect(screen.getByText('Battleaxe')).toBeInTheDocument();
-      expect(screen.queryByText('Potion')).not.toBeInTheDocument();
-      expect(screen.queryByText('Test Weapon')).not.toBeInTheDocument();
-      expect(screen.queryByText('Test Weapon 2')).not.toBeInTheDocument();
-    });
-
-    it('toggles weapon selection and Select button state when checkbox is clicked', async () => {
-      renderWithWeapons();
-      await waitForWeapons();
-
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      expect(battleaxeCheckbox.checked).toBe(false);
-      expect(screen.getByRole('button', { name: 'Select' })).toBeDisabled();
-
-      await fireEvent.click(battleaxeCheckbox);
-      expect(battleaxeCheckbox.checked).toBe(true);
-      expect(screen.getByRole('button', { name: 'Select' })).toBeEnabled();
-
-      await fireEvent.click(battleaxeCheckbox);
-      expect(battleaxeCheckbox.checked).toBe(false);
-      expect(screen.getByRole('button', { name: 'Select' })).toBeDisabled();
-    });
-
-    it('disables unchecked weapons when max kinds limit is reached', async () => {
-      const props = makeProps({
-        action: { automation: { maxKinds: 2 } },
-      });
-      renderWithWeapons(props);
-      await waitForWeapons();
-
-      const checkboxes = screen.getAllByRole('checkbox');
-      expect(checkboxes).toHaveLength(5);
-
-      await fireEvent.click(checkboxes[0]);
-      await fireEvent.click(checkboxes[1]);
-
-      expect(checkboxes[2].disabled).toBe(true);
-      expect(checkboxes[3].disabled).toBe(true);
-      expect(checkboxes[4].disabled).toBe(true);
-    });
-
-    it('renders "Selected: X/Y" count after selecting weapons', async () => {
-      const props = makeProps({
-        action: { automation: { maxKinds: 3 } },
-      });
-      renderWithWeapons(props);
-      await waitForWeapons();
-
-      const battleaxeCheckbox = screen.getByRole('checkbox', { name: /Battleaxe/ });
-      await fireEvent.click(battleaxeCheckbox);
-
-      const clubCheckbox = screen.getByRole('checkbox', { name: /Club/ });
-      await fireEvent.click(clubCheckbox);
-
-      expect(screen.getByText(/Selected: 2\/3/)).toBeInTheDocument();
-    });
+    // Clicking a disabled row must not add a third kind (deselect-frees-slot lives in Selection lane)
+    fireEvent.click(checkboxFor('Blowgun'));
+    expect(checkboxFor('Blowgun').checked).toBe(false);
+    expect(screen.getByText('Selected: 2/2')).toBeInTheDocument();
   });
 });

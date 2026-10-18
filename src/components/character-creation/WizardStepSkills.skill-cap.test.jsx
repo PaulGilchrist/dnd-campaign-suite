@@ -1,130 +1,99 @@
-// Regression tests for FT-002: WizardStepSkills proficiency checkboxes
-// previously let users check beyond the allowed cap (counter showed
-// "3 of 2 allowed" and the over-cap selection persisted). The third
-// checkbox must refuse to toggle on while at the cap, mirroring the
-// expertise blockReason refusal flow in the same component.
-import { render, fireEvent, waitFor } from '@testing-library/react';
+// @maintained-by-ai
+// FT-002 regression lane: skill-proficiency cap enforcement in
+// WizardStepSkills — over-cap selections must be refused at the checkbox
+// (previously the counter showed "3 of 2 allowed" and the over-cap
+// selection persisted). The component keeps over-cap checkboxes clickable
+// and refuses via onChange feedback, mirroring the expertise blockReason
+// flow (WizardStepSkills.jsx getProficiencyCapBlockReason).
+// Fixtures verified verbatim against disk: public/data/classes.json Wizard
+// proficiency_choices "choose: 2" and public/data/ability-scores.json
+// (Arcana, History, Religion → Intelligence — the { name, ability } shape
+// loadSkills produces). Generic skills rendering/toggle/expertise lanes
+// live in WizardStepSkills.test.jsx.
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSkills from './WizardStepSkills.jsx';
 
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSkills: vi.fn(),
-}));
+vi.mock('../../services/ui/dataLoader.js', () => {
+  return { loadSkills: vi.fn() };
+});
 
 import { loadSkills } from '../../services/ui/dataLoader.js';
 
-const defaultSkillsData = [
+const wizardSkillsFixture = [
   { name: 'Arcana', ability: 'Intelligence' },
   { name: 'History', ability: 'Intelligence' },
   { name: 'Religion', ability: 'Intelligence' },
 ];
 
-const baseProps = {
-  formData: {
-    skillProficiencies: ['Arcana', 'History'],
-    expertSkills: [],
-  },
-  errors: {},
-  skillLimits: { allowed: 2, details: 'Choose 2 skills.' },
-  expertiseLimits: null,
-  preSelectedSkills: [],
-  warnings: [],
-  onSkillToggle: vi.fn(),
-  onSkillExpertiseToggle: vi.fn(),
-};
+// Wizard cap from public/data/classes.json: proficiency_choices choose 2.
+const ALLOWED = 2;
 
-async function waitForSkillsLoaded() {
+function makeProps(overrides = {}) {
+  return {
+    stepNumber: 10,
+    formData: { skillProficiencies: ['Arcana', 'History'], expertSkills: [] },
+    errors: {},
+    skillLimits: { allowed: ALLOWED, details: 'Choose 2 skills.' },
+    expertiseLimits: null,
+    preSelectedSkills: [],
+    warnings: [],
+    onSkillToggle: vi.fn(),
+    onSkillExpertiseToggle: vi.fn(),
+    ...overrides,
+  };
+}
+
+async function renderStep(overrides) {
+  const props = makeProps(overrides);
+  render(<WizardStepSkills {...props} />);
   await waitFor(() => {
-    expect(document.querySelectorAll('.multi-select-item').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(wizardSkillsFixture.length);
   });
+  return props;
 }
 
-function checkboxFor(container, name) {
-  const label = Array.from(container.querySelectorAll('.multi-select-item'))
-    .find(l => l.textContent.includes(name));
-  return label.querySelector('input[type="checkbox"]');
-}
+// Accessible name is the wrapping label's text ("History Elevate", ...),
+// so anchor with a prefix regex on the skill name.
+const checkboxFor = (skill) => screen.getByRole('checkbox', { name: new RegExp(`^${skill}`) });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useRealTimers();
-  loadSkills.mockResolvedValue(defaultSkillsData);
+  loadSkills.mockResolvedValue(wizardSkillsFixture);
 });
 
 describe('WizardStepSkills proficiency cap', () => {
-  it('refuses to toggle on a third skill when at the allowed cap', async () => {
-    const onSkillToggle = vi.fn();
-    const { container } = render(<WizardStepSkills {...baseProps} onSkillToggle={onSkillToggle} />);
-    await waitForSkillsLoaded();
+  it('refuses to check a third skill at the cap: no handler call, stays unchecked, refusal shown', async () => {
+    const { onSkillToggle } = await renderStep();
+    const religionCheckbox = checkboxFor('Religion');
 
-    fireEvent.click(checkboxFor(container, 'Religion'));
+    fireEvent.click(religionCheckbox);
 
     expect(onSkillToggle).not.toHaveBeenCalled();
-    await waitFor(() => {
-      const feedback = document.querySelector('.expertise-feedback');
-      expect(feedback).toBeInTheDocument();
-      expect(feedback).toHaveClass('error');
-      expect(feedback.textContent).toContain('only select 2');
-    });
+    expect(religionCheckbox).not.toBeChecked();
+
+    const feedback = document.querySelector('.expertise-feedback');
+    expect(feedback).toBeInTheDocument();
+    expect(feedback).toHaveClass('error');
+    expect(feedback).toHaveTextContent(
+      `You can only select ${ALLOWED} allowed skill proficiency/ies. Deselect one first.`
+    );
+    // FT-002: the counter must never report more selected than allowed.
+    expect(document.querySelector('.skill-count-text').textContent).toMatch(/selected 2 of 2/);
   });
 
-  it('allows toggling on a skill while below the cap', async () => {
-    const onSkillToggle = vi.fn();
-    const { container } = render(
-      <WizardStepSkills stepNumber={10}
-        {...baseProps}
-        formData={{ skillProficiencies: ['Arcana'], expertSkills: [] }}
-        onSkillToggle={onSkillToggle}
-      />
-    );
-    await waitForSkillsLoaded();
+  it.each([
+    ['below the cap', { formData: { skillProficiencies: ['Arcana'], expertSkills: [] } }, 'History'],
+    ['to deselect a skill at the cap', {}, 'Arcana'],
+    ['when skillLimits is null (still loading)', { skillLimits: null }, 'Religion'],
+    ['for a pre-selected skill at the cap', { preSelectedSkills: ['Religion'] }, 'Religion'],
+  ])('calls onSkillToggle when toggling %s', async (_case, overrides, skill) => {
+    const { onSkillToggle } = await renderStep(overrides);
 
-    fireEvent.click(checkboxFor(container, 'History'));
+    fireEvent.click(checkboxFor(skill));
 
-    expect(onSkillToggle).toHaveBeenCalledWith('History');
+    expect(onSkillToggle).toHaveBeenCalledTimes(1);
+    expect(onSkillToggle).toHaveBeenCalledWith(skill);
     expect(document.querySelector('.expertise-feedback')).not.toBeInTheDocument();
-  });
-
-  it('allows toggling off a skill while at the cap', async () => {
-    const onSkillToggle = vi.fn();
-    const { container } = render(<WizardStepSkills {...baseProps} onSkillToggle={onSkillToggle} />);
-    await waitForSkillsLoaded();
-
-    fireEvent.click(checkboxFor(container, 'Arcana'));
-
-    expect(onSkillToggle).toHaveBeenCalledWith('Arcana');
-  });
-
-  it('does not gate toggle-on when skillLimits is null (still loading)', async () => {
-    const onSkillToggle = vi.fn();
-    const { container } = render(
-      <WizardStepSkills stepNumber={10}
-        {...baseProps}
-        skillLimits={null}
-        formData={{ skillProficiencies: ['Arcana', 'History'], expertSkills: [] }}
-        onSkillToggle={onSkillToggle}
-      />
-    );
-    await waitForSkillsLoaded();
-
-    fireEvent.click(checkboxFor(container, 'Religion'));
-
-    expect(onSkillToggle).toHaveBeenCalledWith('Religion');
-  });
-
-  it('does not gate a pre-selected skill at the cap', async () => {
-    const onSkillToggle = vi.fn();
-    const { container } = render(
-      <WizardStepSkills stepNumber={10}
-        {...baseProps}
-        preSelectedSkills={['Religion']}
-        onSkillToggle={onSkillToggle}
-      />
-    );
-    await waitForSkillsLoaded();
-
-    fireEvent.click(checkboxFor(container, 'Religion'));
-
-    expect(onSkillToggle).toHaveBeenCalledWith('Religion');
   });
 });

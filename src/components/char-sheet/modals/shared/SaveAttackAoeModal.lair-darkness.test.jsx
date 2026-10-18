@@ -1,10 +1,15 @@
-// MA-0043: zoneOnly picker seam — Shroud of Darkness (canonical darkness lair
-// action, NO save). Confirm writes a zone te per covered creature
-// (`lair_darkness`, source=caster, dc null), the caster tracking key
-// `_lair_darkness_<caster>` {radiusFt:15, no save}, and an ability_use log
-// carrying the advisory light/dispel clause ("dispel only by 2nd-level+
-// light — GM-enforced"). ZERO save prompts, ZERO damage writes, ZERO
-// lastAttack stamp. Saves stay canonically absent, not silently resolved.
+// @maintained-by-ai
+// MA-0043 zoneOnly picker seam — Shroud of Darkness (canonical darkness lair
+// action, NO save). Render is inert: save-less copy (15-foot darkness, no DC
+// wording, GM-enforced dispel clause), caster excluded, ZERO writes. Confirm
+// writes a zone te per covered creature (`lair_darkness`, source=caster,
+// dc null, duration until_end_of_zone), the caster tracking key
+// `_lair_darkness_<caster>` {radiusFt:15, saveDc null, no repeat}, one
+// ability_use log carrying the advisory dispel clause, and the summary
+// "armed over" note. ZERO save prompts, ZERO damage, ZERO dice rolls,
+// ZERO lastAttack stamp — saves stay canonically absent, not silently
+// resolved. zoneTe payload shape is disk-pinned by the MonsterCardModal.
+// lair-darkness lane; here it is a hand-authored fixture through the seam.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -75,6 +80,7 @@ vi.mock('./CreatureSelectionModal.jsx', () => ({
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 
 const ACTION = { name: 'Shroud of Darkness' };
 const ZONE_TE = {
@@ -86,14 +92,6 @@ const ZONE_TE = {
   duration: 'until dismissed or used again (advisory)',
   clause: 'No saving throw (canonical darkness lair action). Darkvision blocking and light-spell overlap — dispel only by 2nd-level+ light — GM-enforced (no light model in this engine).',
 };
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  seen.targets = [];
-  seen.description = '';
-  seen.note = '';
-});
 
 function renderDarkness() {
   return render(
@@ -118,50 +116,63 @@ function renderDarkness() {
   );
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  seen.targets = [];
+  seen.description = '';
+  seen.note = '';
+});
+
 describe('MA-0043 zoneOnly darkness picker', () => {
-  it('picker shows the 15-ft advisory text, no save/DC wording', async () => {
+  it('render is inert: save-less copy (15-foot darkness, no DC), caster excluded, zero writes', () => {
     renderDarkness();
-    await waitFor(() => expect(seen.targets.map(t => t.name)).toEqual(['Thug 1', 'ElderPaladin']));
+    expect(seen.targets.map(t => t.name)).toEqual(['Thug 1', 'ElderPaladin']);
     expect(seen.description).toMatch(/15-foot.*darkness/i);
     expect(seen.description).toMatch(/No saving throw/i);
     expect(seen.description).not.toMatch(/DC/);
     expect(seen.note).toMatch(/dispel only by 2nd-level\+ light — GM-enforced/);
+    expect(runtime.store['campaign.targetEffects']).toBeFalsy();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(savePrompts.sendSavePrompt).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
   });
 
-  it('confirm arms lair_darkness te per covered creature + tracking key, zero saves, zero damage', async () => {
+  it('confirm arms lair_darkness te + tracking + one advisory log with the summary note — zero saves, damage, rolls, lastAttack', async () => {
     const { getByText } = renderDarkness();
     await waitFor(() => expect(seen.targets.length).toBe(2));
     fireEvent.click(getByText('Confirm'));
     await waitFor(() => expect(runtime.store['campaign.targetEffects']).toBeTruthy());
-    const te = runtime.store['campaign.targetEffects'];
-    expect(te.filter(t => t.effect === 'lair_darkness').map(t => t.target).sort()).toEqual(['ElderPaladin', 'Thug 1']);
-    const darkTe = te.find(t => t.effect === 'lair_darkness');
-    expect(darkTe.source).toBe('Adult Black Dragon 1');
-    expect(darkTe.dc).toBeNull();
-    expect(darkTe.radiusFt).toBe(15);
-    expect(darkTe.duration).toBe('until_end_of_zone');
-    expect(savePrompts.sendSavePrompt).not.toHaveBeenCalled();
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
-    expect(lastAttacks.storeSpellLastAttack).not.toHaveBeenCalled();
+
+    const te = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_darkness');
+    expect(te.map(t => t.target).sort()).toEqual(['ElderPaladin', 'Thug 1']);
+    expect(te[0].source).toBe('Adult Black Dragon 1');
+    expect(te[0].dc).toBeNull();
+    expect(te[0].radiusFt).toBe(15);
+    expect(te[0].duration).toBe('until_end_of_zone');
+
     const tracking = runtime.store['Adult Black Dragon 1._lair_darkness_Adult_Black_Dragon_1'];
     expect(tracking.saveDc).toBeNull();
     expect(tracking.radiusFt).toBe(15);
     expect(tracking.repeatTurnEnd).toBe(false);
+    expect(tracking.damage).toBeNull();
+    expect(tracking.duration).toBe('until dismissed or used again (advisory)');
     expect(tracking.affectedNames.sort()).toEqual(['ElderPaladin', 'Thug 1']);
-  });
 
-  it('spell-named ability_use log carries radius, no-save note, and the GM-enforced dispel clause', async () => {
-    const { getByText } = renderDarkness();
-    await waitFor(() => expect(seen.targets.length).toBe(2));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
     expect(logs.length).toBe(1);
-    const log = logs[0];
-    expect(log.characterName).toBe('Adult Black Dragon 1');
-    expect(log.abilityName).toBe('Shroud of Darkness');
-    expect(log.description).toMatch(/lair_darkness zone armed \(radius 15 ft, no save\)/);
-    expect(log.description).toMatch(/dispel only by 2nd-level\+ light — GM-enforced/);
-    expect(log.description).toMatch(/Duration until dismissed or used again \(advisory\) — GM-enforced/);
+    expect(logs[0].characterName).toBe('Adult Black Dragon 1');
+    expect(logs[0].abilityName).toBe('Shroud of Darkness');
+    expect(logs[0].description).toMatch(/lair_darkness zone armed \(radius 15 ft, no save\)/);
+    expect(logs[0].description).toMatch(/dispel only by 2nd-level\+ light — GM-enforced/);
+    expect(logs[0].description).toMatch(/Duration until dismissed or used again \(advisory\) — GM-enforced/);
+
+    expect(getByText(/lair_darkness armed over/)).toBeTruthy();
+
+    expect(savePrompts.sendSavePrompt).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(lastAttacks.storeSpellLastAttack).not.toHaveBeenCalled();
   });
 });

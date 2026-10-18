@@ -1,7 +1,24 @@
-// Regression tests for CLA-188: Cunning Strike pipeline pause must resume on modal close
-// and apply weapon + Sneak Attack damage (minus dice spent on Cunning Strike options).
+// @maintained-by-ai
+// Cunning Strike (Rogue 2024) resume-after-choice seam — CLA-188: a hit with
+// sneak dice available pauses the REAL pipeline at _pausedStep:'cunningStrike'
+// (the modal is opened by the step via setAttackRiderModal; the hook must hold
+// all damage back). resumeAttackPipeline (fired when the modal closes) must run
+// the stashed pipeline so weapon + Sneak Attack damage lands EXACTLY once,
+// minus dice spent via _cunningStrikeCostUsed, with bookkeeping writes pinned.
+//
+// Lane ownership (do not duplicate here):
+// - Step-level pause trigger/modal/once-per-turn suppression → steps/attackRollRiders.test.js
+// - Sneak dice subtraction/clamp/reset formula → steps/attackRollDamageSteps-damageRolling.test.js
+// - Modal close invoking resumeAttackPipeline → CharActionModals.cunningStrike-resume.test.jsx
+// - resumeAttackPipeline guard no-ops for non-approved pauses → useAttackDamageResolution.tacticalMaster.test.js
+//   (damageTypeChoice) and .shieldBashResume.test.js (featureRiders, asserts pipeline.resume not called)
+// - Other modal-type pause dispatch → useAttackDamageResolution.pausedStates.test.js
+// No game-state timers: the pause waits indefinitely for the player's choice;
+// resume is user-triggered only.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Key-based deterministic dice table: every d6 rolls (sides/2)+1 = 4, so
+// formula → total arithmetic is exact and pinnable (no Math.random anywhere).
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => {
     if (!formula) return null;
@@ -102,6 +119,9 @@ vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
+const TARGET = 'Animated Rug of Smothering 1';
+const CHAR = 'AasimarTest';
+
 const attack = {
   name: 'Shortsword',
   damage: '1d6+2',
@@ -112,7 +132,7 @@ const attack = {
 };
 
 const playerStats = {
-  name: 'AasimarTest',
+  name: CHAR,
   level: 14,
   proficiency: 5,
   abilities: [{ name: 'Dexterity', bonus: 5 }],
@@ -125,22 +145,19 @@ function setup(values = {}) {
 }
 
 function makeDeps(resumeRef) {
-  const modalState = {};
+  const ctx = { sneakAttackDice: 7, targetName: TARGET };
   return {
-    deps: {
-      playerStats,
-      campaignName: 'test-campaign',
-      mapName: null,
-      popupHtml: { hit: true, targetName: 'Animated Rug of Smothering 1' },
-      setPopupHtml: vi.fn(),
-      rollDamage: vi.fn(),
-      buildCtx: vi.fn(() => Promise.resolve({ sneakAttackDice: 7, targetName: 'Animated Rug of Smothering 1' })),
-      buildCtxSync: vi.fn(() => Promise.resolve({ sneakAttackDice: 7, targetName: 'Animated Rug of Smothering 1' })),
-      setModalState: vi.fn((updates) => Object.assign(modalState, updates)),
-      modalState,
-      setPendingDamage: vi.fn(),
-      resumeRef,
-    },
+    playerStats,
+    campaignName: 'test-campaign',
+    mapName: null,
+    popupHtml: { hit: true, targetName: TARGET },
+    setPopupHtml: vi.fn(),
+    rollDamage: vi.fn(),
+    buildCtx: vi.fn(() => Promise.resolve(ctx)),
+    buildCtxSync: vi.fn(() => Promise.resolve(ctx)),
+    setModalState: vi.fn(),
+    setPendingDamage: vi.fn(),
+    resumeRef,
   };
 }
 
@@ -149,71 +166,57 @@ describe('useAttackDamageResolution — Cunning Strike pipeline resume (CLA-188)
     vi.clearAllMocks();
   });
 
-  it('pauses the pipeline without dealing damage while the Cunning Strike modal is open', async () => {
-    setup({ lastAttack: { hit: true } });
+  it.each([
+    {
+      choice: 'spent 2d6 Sneak Attack on Cunning Strike options',
+      cunningStrikeCostUsed: 2,
+      expectedFormula: '1d6+2 [piercing] + 5d6 [Sneak Attack]',
+      expectedTotal: 26,
+    },
+    {
+      choice: 'closed the modal without spending any Sneak Attack dice',
+      cunningStrikeCostUsed: 0,
+      expectedFormula: '1d6+2 [piercing] + 7d6 [Sneak Attack]',
+      expectedTotal: 34,
+    },
+  ])('resumes after the player $choice: weapon + Sneak damage lands exactly once with exact payload', async ({ cunningStrikeCostUsed, expectedFormula, expectedTotal }) => {
+    setup({ lastAttack: { hit: true }, _cunningStrikeCostUsed: cunningStrikeCostUsed });
     const resumeRef = { current: null };
-    const { deps } = makeDeps(resumeRef);
-    const { resolveAttackDamage } = useAttackDamageResolution(deps);
+    const deps = makeDeps(resumeRef);
+    const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
 
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Animated Rug of Smothering 1' });
+    await resolveAttackDamage(attack, { hit: true, targetName: TARGET });
 
+    // Pause: step opens the modal, hook holds ALL damage back until the choice.
     expect(resumeRef.current?._pausedStep).toBe('cunningStrike');
+    expect(resumeRef.current?._modalType).toBe('cunningStrike');
+    expect(deps.setModalState).toHaveBeenCalledWith(expect.objectContaining({
+      attackRiderModal: expect.objectContaining({ targetName: TARGET, campaignName: 'test-campaign' }),
+    }));
     expect(deps.rollDamage).not.toHaveBeenCalled();
-  });
-
-  it('resumes on modal close and applies weapon + reduced Sneak Attack damage', async () => {
-    setup({ lastAttack: { hit: true }, _cunningStrikeCostUsed: 2 });
-    const resumeRef = { current: null };
-    const { deps } = makeDeps(resumeRef);
-    const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
-    const rollDamage = deps.rollDamage;
-
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Animated Rug of Smothering 1' });
-    expect(rollDamage).not.toHaveBeenCalled();
-
-    await resumeAttackPipeline();
-
-    expect(rollDamage).toHaveBeenCalledTimes(1);
-    const [{ name, formula, total }] = rollDamage.mock.calls[0];
-    expect(name).toBe('Shortsword');
-    expect(formula).toContain('[Sneak Attack]');
-    expect(formula).toContain('5d6');
-    expect(total).toBeGreaterThan(3);
-
-    const usedRoundWrite = setRuntimeValue.mock.calls.find(c => c[1] === '_SneakAttack_usedRound');
-    expect(usedRoundWrite).toBeTruthy();
-    const costReset = setRuntimeValue.mock.calls.find(c => c[1] === '_cunningStrikeCostUsed');
-    expect(costReset[2]).toBe(0);
+    // Cunning Strike pauses without a pendingDamage stash (unlike damageTypeChoice).
     expect(deps.setPendingDamage).not.toHaveBeenCalled();
+
+    // Choice recorded → resume. A stray second resume must not double-apply.
+    await resumeAttackPipeline();
+    await resumeAttackPipeline();
+
+    expect(deps.rollDamage).toHaveBeenCalledTimes(1);
+    const payload = deps.rollDamage.mock.calls[0][0];
+    expect(payload.name).toBe('Shortsword');
+    expect(payload.formula).toBe(expectedFormula);
+    expect(payload.total).toBe(expectedTotal);
+    expect(payload.modifier).toBe(2);
+    expect(payload.context.targetName).toBe(TARGET);
+
+    // Bookkeeping: sneak marked used this round (round pinned to mocked 1);
+    // the cost accumulator is reset only when dice were actually spent.
+    expect(setRuntimeValue).toHaveBeenCalledWith(CHAR, '_SneakAttack_usedRound', 1, 'test-campaign');
+    if (cunningStrikeCostUsed > 0) {
+      expect(setRuntimeValue).toHaveBeenCalledWith(CHAR, '_cunningStrikeCostUsed', 0, 'test-campaign');
+    } else {
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(CHAR, '_cunningStrikeCostUsed', 0, 'test-campaign');
+    }
     expect(resumeRef.current).toBeNull();
-  });
-
-  it('applies full Sneak Attack damage when the rider modal is closed without spending dice', async () => {
-    setup({ lastAttack: { hit: true } });
-    const resumeRef = { current: null };
-    const { deps } = makeDeps(resumeRef);
-    const { resolveAttackDamage, resumeAttackPipeline } = useAttackDamageResolution(deps);
-    const rollDamage = deps.rollDamage;
-
-    await resolveAttackDamage(attack, { hit: true, targetName: 'Animated Rug of Smothering 1' });
-    await resumeAttackPipeline();
-
-    expect(rollDamage).toHaveBeenCalledTimes(1);
-    expect(rollDamage.mock.calls[0][0].formula).toContain('7d6 [Sneak Attack]');
-  });
-
-  it('resumeAttackPipeline is a no-op when the pipeline is not paused at cunningStrike', async () => {
-    setup({ lastAttack: { hit: true } });
-    const resumeRef = { current: null };
-    const { deps } = makeDeps(resumeRef);
-    const { resumeAttackPipeline } = useAttackDamageResolution(deps);
-    const rollDamage = deps.rollDamage;
-
-    await resumeAttackPipeline();
-    expect(rollDamage).not.toHaveBeenCalled();
-
-    resumeRef.current = { _pausedStep: 'damageTypeChoice', pipelineStash: { pipeline: { resume: vi.fn() }, ctx: {} } };
-    await resumeAttackPipeline();
-    expect(rollDamage).not.toHaveBeenCalled();
   });
 });

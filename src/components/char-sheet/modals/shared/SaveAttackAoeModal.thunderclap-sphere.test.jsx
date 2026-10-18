@@ -1,9 +1,14 @@
+// @maintained-by-ai
 // MA-0084: Adult Bronze Dragon Thunderclap picker — 20-ft Radius, DC 17
 // CON, 3d6 Thunder, dc_success NONE. Copy never carries the half-damage
-// boilerplate (success = no damage). Failed NPC saves apply full damage +
-// Deafened with the AUTHORED duration clause ("until the end of its next
-// turn", MA-0084 conditionDurationNote seam) — the MA-0063 1-minute
-// repeat-save copy only survives on rows without an authored until-clause.
+// boilerplate (success = no damage), and the picker stays inert until the
+// GM confirms. Each failed NPC save applies full damage + Deafened with the
+// AUTHORED duration clause ("until the end of its next turn", MA-0084
+// conditionDurationNote seam) — the MA-0063 1-minute repeat-save copy only
+// survives on rows without an authored until-clause (byte-exact, MA-0063
+// family canon incl. the literal 'Blinded' variant). Per-target adjudication
+// rides the mixed-confirm RNG seam (2 draws/target: fail, fail, save, save).
+// Data-pins + routing live in MonsterCardModal.thunderclap-sphere.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -113,64 +118,88 @@ function renderClap(props = {}) {
   );
 }
 
+function conditionLogsFor(targetName) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.characterName === targetName);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
 });
 
-describe('MA-0084 Thunderclap picker — copy honesty (dc_success none)', () => {
-  it('damage row copy states success = no damage, never the half-damage boilerplate', async () => {
+describe('MA-0084 Thunderclap picker — copy honesty (dc_success none) + inert until confirm', () => {
+  it('damage row copy states success = no damage, never the half-damage boilerplate; nothing fires pre-confirm', async () => {
     spyRandom([0.5]);
     renderClap();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
     expect(document.querySelector('.sp-header').textContent).toMatch(/20-ft Radius/);
-    expect(document.querySelector('.sp-desc').textContent).toMatch(/Constitution/);
-    expect(document.querySelector('.sp-desc').textContent).toMatch(/DC 17/);
+    expect(document.querySelector('.sp-desc').textContent).toMatch(/<strong>Constitution<\/strong> saving throw \(DC 17\)/);
     const copy = document.querySelector('.sp-note-copy').textContent;
     expect(copy).toMatch(/takes 3d6 Thunder damage/);
     expect(copy).toMatch(/On a successful save, target takes no damage\./);
     expect(copy).not.toMatch(/half/i);
+    // Pre-confirm inertness: the picker alone never damages or grants conditions.
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(runtime.store['Thug 1.activeConditions']).toBeUndefined();
+    expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
   });
 });
 
 describe('MA-0084 Thunderclap picker — save math + Deafened duration honesty', () => {
-  it('failed CON save: full 3d6 damage + Deafened with the authored until-clause', async () => {
+  it('mixed CON saves: failed target pays FULL 3d6 + Deafened with the authored until-clause; saved target takes nothing', async () => {
+    // Mixed-confirm seam (2 draws/target, target order): Thug 1 rolls 1 (1 − 1 = 0)
+    // and FAILS DC 17; Brute 2 rolls 19 (19 + 7 = 26) and SUCCEEDS.
     spyRandom([0.01, 0.01, 0.9, 0.9]);
     renderClap();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
     fireEvent.click(document.querySelector('.sp-roll-btn'));
     await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalled());
-    const failCall = applyDamageToTarget.mock.calls.find(c => c[1] === 'Thug 1' && c[2] === 10);
-    expect(failCall).toBeTruthy();
-    const condLog = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && /Thug 1/.test(String(e.description)));
+    // dc_success none: the failed save pays the full mock total — no halving.
+    expect(applyDamageToTarget.mock.calls.filter(c => c[2] === 10).map(c => c[1])).toEqual(['Thug 1']);
+    const results = document.querySelector('.abjure-results-list').textContent;
+    expect(results).toMatch(/Thug 1.*Failed — takes .* damage \(rolled 1\)/s);
+    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19\)/s);
+    const condLog = conditionLogsFor('Thug 1')[0];
     expect(condLog.description).toMatch(/Deafened until the end of its next turn \(GM-enforced\)/);
     expect(condLog.description).not.toMatch(/1 minute/);
     expect(runtime.store['Thug 1.activeConditions']).toEqual(['deafened']);
+    // Per-target grant (positive leg above): the saving throw succeeds, nothing lands.
+    expect(conditionLogsFor('Brute 2')).toHaveLength(0);
+    expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
   });
 
-  it('succeeded CON save: zero damage, no Deafened grant', async () => {
+  it('succeeded CON saves: zero damage, no Deafened grant, honest "no damage" result rows', async () => {
+    // d20 pinned to 19: Thug 1 (19 − 1 = 18) and Brute 2 (19 + 7 = 26) both beat DC 17.
     spyRandom([0.9, 0.9]);
     renderClap();
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
     fireEvent.click(document.querySelector('.sp-roll-btn'));
     await waitFor(() => expect(document.querySelector('.abjure-result-success')).toBeTruthy());
-    expect(document.querySelector('.abjure-results-list').textContent).toMatch(/Saved — takes no damage \(rolled 19\)/);
+    const results = document.querySelector('.abjure-results-list').textContent;
+    expect(results).toMatch(/Thug 1.*Saved — takes no damage \(rolled 19\)/s);
+    expect(results).toMatch(/Brute 2.*Saved — takes no damage \(rolled 19\)/s);
+    expect(results).not.toMatch(/Failed/);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
     expect(runtime.store['Thug 1.activeConditions']).toBeUndefined();
     expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
   });
 
-  it('byte-identical guard: no authored duration keeps the MA-0063 1-minute repeat-save copy', async () => {
-    spyRandom([0.01, 0.01, 0.9, 0.9]);
+  it('byte-exact guard: no authored duration keeps the MA-0063 1-minute repeat-save copy', async () => {
+    spyRandom([0.01, 0.01, 0.9, 0.9]); // Thug 1 fails, Brute 2 saves (per-target grant)
     renderClap({ saveConditions: ['blinded'], conditionDurationNote: undefined });
-    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    await waitFor(() => expect(seenTargets.current).toHaveLength(2));
     fireEvent.click(document.querySelector('.sp-roll-btn'));
     const condLog = await waitFor(() => {
-      const e = addEntry.mock.calls.map(c => c[1]).find(x => x.type === 'condition' && /Thug 1/.test(String(x.description)));
+      const e = conditionLogsFor('Thug 1')[0];
       expect(e).toBeTruthy();
       return e;
     });
-    expect(condLog.description).toMatch(/Blinded 1 minute; repeats the save at the end of each of its turns/);
+    expect(condLog.description).toBe(
+      "Thug 1 failed the Constitution save (DC 17) in Adult Bronze Dragon 1's Thunderclap — Blinded 1 minute; repeats the save at the end of each of its turns (success ends it on itself). NPC turn-end auto-repeat and 1-minute expiry GM-enforced."
+    );
+    expect(runtime.store['Thug 1.activeConditions']).toEqual(['blinded']);
+    expect(conditionLogsFor('Brute 2')).toHaveLength(0);
+    expect(runtime.store['Brute 2.activeConditions']).toBeUndefined();
   });
 });

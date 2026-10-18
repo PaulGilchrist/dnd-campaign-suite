@@ -1,11 +1,12 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useAttackDamageResolution from './useAttackDamageResolution.js';
 
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-    rollExpressionDoubled: vi.fn(),
-}));
-
+// Only true externals are mocked (runtime store, combat round, combat context,
+// network log, damage application, mastery queries). diceRoller and the whole
+// attack damage pipeline run REAL — blanket-mocking rollExpression fabricates
+// phantom legs (e.g. flat 'rage_damage' → '2' is NOT rollable by the real
+// dice grammar; only canonical 'rage_damage_d6' lands on the formula).
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
@@ -25,13 +26,14 @@ vi.mock('../../services/automation/common/buffToggle.js', () => ({
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
-    collectWeaponMastery: vi.fn(),
-    evaluateAutoExpression: vi.fn(),
-    hasTwoWeaponFighting: vi.fn(),
+    collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
+    // Honest evaluator: resolves pure constants only, falsy for everything else.
+    evaluateAutoExpression: vi.fn((expr) => /^\d+$/.test(String(expr).trim()) ? Number(expr) : null),
+    hasTwoWeaponFighting: vi.fn(() => false),
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    applyDamageToTarget: vi.fn(),
+    applyDamageToTarget: vi.fn(() => Promise.resolve({ total: 0 })),
 }));
 
 vi.mock('../../services/rules/core/attackCalc.js', () => ({
@@ -42,11 +44,11 @@ vi.mock('../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
+import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+
+const mockCampaignName = 'test-campaign';
 
 const mockPlayerStats = {
     name: 'TestFighter',
@@ -61,317 +63,276 @@ const mockPlayerStats = {
     automation: { actions: [], passives: [] },
 };
 
-const mockCampaignName = 'test-campaign';
+const RAGING_BUFFS = [
+    { effect: 'advantage_attacks_advantage_against' }, // Reckless Attack marker
+    { damageBonusExpression: '2' },                      // Rage damage marker
+];
 
-const modalState = {};
-const mockSetModalState = vi.fn((updates) => {
-    if (typeof updates === 'function') {
-        return updates(modalState);
-    }
-    Object.assign(modalState, updates);
-});
+// CLA-147 canon (public/data/classes.json Frenzy, Path of the Berserker):
+// rage_damage_d6 resolves via resolveDiceExpression tokens → '2d6' (rage_damage 2).
+const FRENZY_ACTION = {
+    name: 'Frenzy',
+    type: 'damage_bonus',
+    trigger: 'reckless_attack_hit_while_raging',
+    damageExpression: 'rage_damage_d6',
+    damageType: 'same_as_weapon',
+    oncePerTurn: true,
+};
 
-const mockPendingDamageRef = { current: null };
-const mockSetPendingDamage = vi.fn();
-const mockRollDamage = vi.fn();
-const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
+function defaultRuntimeValue(_name, key) {
+    if (key === 'activeBuffs') return RAGING_BUFFS;
+    return null;
+}
 
-function UseAttackDamageResolution(overrides = {}) {
-    const deps = {
-        playerStats: mockPlayerStats,
+function runtimeDefaults() {
+    getRuntimeValue.mockImplementation(defaultRuntimeValue);
+}
+
+function UseAttackDamageResolution(stats = mockPlayerStats, mapName = null) {
+    const setModalState = vi.fn();
+    const setPopupHtml = vi.fn();
+    const rollDamage = vi.fn();
+    const resumeRef = { current: null };
+    const buildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
+    const hook = useAttackDamageResolution({
+        playerStats: stats,
         campaignName: mockCampaignName,
-        mapName: null,
+        mapName,
         popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollDamage: mockRollDamage,
-        buildCtx: mockBuildCtx,
-        buildCtxSync: mockBuildCtxSync,
-        modalState,
-        setModalState: mockSetModalState,
-        pendingDamage: mockPendingDamageRef.current,
-        setPendingDamage: mockSetPendingDamage,
-        resumeRef: mockPendingDamageRef,
-        ...overrides,
-    };
-    return useAttackDamageResolution(deps);
+        setPopupHtml,
+        rollDamage,
+        buildCtx: mapName ? vi.fn(() => Promise.resolve({ targetName: 'Goblin' })) : undefined,
+        buildCtxSync,
+        setModalState,
+        setPendingDamage: vi.fn(),
+        resumeRef,
+    });
+    return { hook, rollDamage, setModalState, setPopupHtml, resumeRef, buildCtxSync };
 }
 
-function tick() {
-    return new Promise((r) => setTimeout(r, 0));
-}
-
-function resetModalState() {
-    Object.keys(modalState).forEach((k) => delete modalState[k]);
-    mockSetModalState.mockClear();
-}
-
-describe('useAttackDamageResolution - automation damage bonuses', () => {
+describe('useAttackDamageResolution - automation damage trigger dispatch', () => {
+    // Deterministic RNG: Math.random() → 0.99 makes diceRoller's
+    // floor(Math.random() * sides) + 1 land every die on its max face
+    // (IEEE-754: floor(0.99*12)=11 → 12, floor(0.99*6)=5 → 6, floor(0.99*4)=3 → 4),
+    // so totals are exact pins rather than expect.any(Number).
     beforeEach(() => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
         vi.clearAllMocks();
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        rollExpressionDoubled.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
-        getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
-        getActiveBuffs.mockReturnValue([]);
-        hasTwoWeaponFighting.mockReturnValue(false);
-        collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
-        evaluateAutoExpression.mockReturnValue(5);
-        resetModalState();
-        mockPendingDamageRef.current = null;
+        getCurrentCombatRound.mockReturnValue(1);
+        runtimeDefaults();
     });
 
     afterEach(() => {
-        resetModalState();
+        vi.restoreAllMocks();
     });
 
-    describe('monk weapon / unarmed strike damage bonus', () => {
-        it('applies monk weapon damage bonus with fire type by default', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: 'fire' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
+    describe('monk weapon / unarmed strike rider (monk_weapon_or_unarmed_hit)', () => {
+        const monkAttack = {
+            name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
+            weaponType: 'unarmed', properties: [],
+        };
 
-            await resolveAttackDamage(attack);
-            await tick();
+        it.each([
+            {
+                label: 'defaults to fire when no Elemental Attunement is set',
+                attunement: null,
+                expected: { formula: '1d6 [bludgeoning] + 1d6 [fire]', total: 12, rolls: [6, 6] },
+            },
+            {
+                label: 'uses the attuned Cold type when set',
+                attunement: 'Cold',
+                expected: { formula: '1d6 [bludgeoning] + 1d6 [cold]', total: 12, rolls: [6, 6] },
+            },
+            {
+                label: 'absent rider never touches the formula (trigger discrimination)',
+                absentAction: true,
+                expected: { formula: '1d6 [bludgeoning]', total: 6, rolls: [6] },
+            },
+        ])('$label', async ({ attunement, absentAction, expected }) => {
+            if (attunement) {
+                getRuntimeValue.mockImplementation((_name, key) =>
+                    key === '_Elemental_Attunement_option' ? attunement : null);
+            }
+            const actions = absentAction ? [] : [
+                { type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: 'fire' },
+            ];
+            const { hook, rollDamage, setModalState } = UseAttackDamageResolution({ ...mockPlayerStats, automation: { actions, passives: [] } });
 
-            expect(mockSetModalState).not.toHaveBeenCalledWith(
-                expect.objectContaining({ damageTypeChoice: expect.anything() })
-            );
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                { name: 'Unarmed Strike', formula: expect.stringContaining('1d6 [fire]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
-            );
-        });
+            await hook.resolveAttackDamage(monkAttack);
+            await Promise.resolve();
 
-        it('applies monk weapon damage bonus with elemental attunement type when set', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === '_Elemental_Attunement_option') return 'Cold';
-                return null;
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith({
+                name: 'Unarmed Strike',
+                formula: expected.formula,
+                total: expected.total,
+                rolls: expected.rolls,
+                modifier: 0,
+                context: expect.any(Object),
             });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'monk_weapon_or_unarmed_hit', damageExpression: '1d6', damageType: 'fire' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                { name: 'Unarmed Strike', formula: expect.stringContaining('1d6 [cold]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
-            );
-        });
-
-        it('does not apply monk weapon bonus when no matching automation action exists', async () => {
-            const { resolveAttackDamage } = UseAttackDamageResolution();
-            const attack = {
-                name: 'Unarmed Strike', damage: '1d6', damageType: 'bludgeoning',
-                weaponType: 'unarmed', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][0].formula;
-            expect(formula).toContain('1d6');
-            expect(formula).not.toContain('[fire]');
+            // fire-by-default is a single-type rider — never opens the type-choice modal
+            expect(setModalState).not.toHaveBeenCalledWith(expect.objectContaining({ damageTypeChoice: expect.anything() }));
         });
     });
 
-    describe('Great Weapon Master heavy weapon hit', () => {
-        it('applies GWM damage bonus with explicit force type', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: 'Force' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                { name: 'Greataxe', formula: expect.stringContaining('1d4 [force]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
-            );
-        });
-
-        it('applies GWM damage bonus with weapon damage type when bonusDamageType is same_as_weapon', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: 'same_as_weapon' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                { name: 'Greataxe', formula: expect.stringContaining('1d4 [slashing]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
-            );
-        });
-
-        it('does not apply GWM bonus when weapon is not heavy', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType: 'Force' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
-
-            await resolveAttackDamage(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalled();
-            const formula = mockRollDamage.mock.calls[0][0].formula;
-            expect(formula).toContain('1d8+3');
-            expect(formula).not.toContain('1d4 [force]');
-        });
-    });
-
-    describe('Frenzy damage bonus', () => {
-        function makeFrenzyStats(overrides = {}) {
-            return {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'reckless_attack_hit_while_raging', damageExpression: 'rage_damage', damageType: 'necrotic' },
-                    ],
-                    passives: [],
-                },
-                ...overrides,
-            };
-        }
-
-        it('applies Frenzy damage when reckless, raging, and strength-based', async () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { effect: 'advantage_attacks_advantage_against' },
-                    { damageBonusExpression: '2' },
-                ];
-                return null;
-            });
-            const stats = makeFrenzyStats();
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
-            };
-
-            await resolveAttackDamage(attack, { hit: true });
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                { name: 'Greataxe', formula: expect.stringContaining('2 [necrotic]'), total: expect.any(Number), rolls: expect.any(Array), modifier: expect.any(Number), context: expect.any(Object) },
-            );
+    describe('GWM heavy weapon rider (melee_heavy_weapon_hit)', () => {
+        const heavyAttack = {
+            name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+            weaponType: 'melee', properties: ['Heavy'],
+        };
+        const gwmAction = (damageType) => ({
+            type: 'damage_bonus', trigger: 'melee_heavy_weapon_hit', damageExpression: '1d4', damageType,
         });
 
         it.each([
-            { scenario: 'skips when already used this round', _frenzyUsedRound: 1, expectDamage: false },
-            { scenario: 're-enables when round changes', _frenzyUsedRound: 1, expectDamage: true, round: 2 },
-            { scenario: 'skips when rage buff is missing', _frenzyUsedRound: null, expectDamage: false, buffs: [] },
-        ])('Frenzy: $scenario', async ({ _frenzyUsedRound, expectDamage, round, buffs }) => {
-            if (round) getCurrentCombatRound.mockReturnValue(round);
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === '_frenzyUsedRound') return _frenzyUsedRound;
-                if (key === 'activeBuffs') return buffs ?? [
-                    { effect: 'advantage_attacks_advantage_against' },
-                    { damageBonusExpression: '2' },
-                ];
-                return null;
+            { label: 'explicit Force type', action: gwmAction('Force'), expected: { formula: '1d12+3 [slashing] + 1d4 [force]', total: 19 } },
+            { label: 'same_as_weapon borrows the weapon type', action: gwmAction('same_as_weapon'), expected: { formula: '1d12+3 [slashing] + 1d4 [slashing]', total: 19 } },
+        ])('applies $label on a Heavy weapon', async ({ action, expected }) => {
+            const { hook, rollDamage } = UseAttackDamageResolution({ ...mockPlayerStats, automation: { actions: [action], passives: [] } });
+
+            await hook.resolveAttackDamage(heavyAttack);
+
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith({
+                name: 'Greataxe',
+                formula: expected.formula,
+                total: expected.total,
+                rolls: [12, 4],
+                modifier: 3,
+                context: expect.any(Object),
             });
-            const stats = makeFrenzyStats();
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
-            };
+        });
 
-            await resolveAttackDamage(attack, { hit: true });
-            await tick();
+        it('never rolls the rider die when the weapon is not Heavy', async () => {
+            const { hook, rollDamage } = UseAttackDamageResolution({
+                ...mockPlayerStats,
+                automation: { actions: [gwmAction('Force')], passives: [] },
+            });
 
-            const rollDamageCalls = mockRollDamage.mock.calls.map(c => c[0]);
-            const formula = rollDamageCalls.length > 0 ? rollDamageCalls[0].formula : '';
-            if (expectDamage) {
-                expect(formula).toContain('2 [necrotic]');
+            await hook.resolveAttackDamage({
+                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: [],
+            });
+
+            // positive leg is pinned above — here the Heavy gate keeps 1d4 unspent
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+                formula: '1d8+3 [slashing]',
+                total: 11,
+            }));
+            expect(evaluateAutoExpression).not.toHaveBeenCalledWith('1d4', expect.anything());
+        });
+    });
+
+    describe('Frenzy rider (reckless_attack_hit_while_raging)', () => {
+        const frenzyAttack = {
+            name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+            weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
+        };
+
+        it('hits raging+reckless+Strength: rolls 2d6 once, stamps _frenzyUsedRound, no modal', async () => {
+            const { hook, rollDamage, setModalState } = UseAttackDamageResolution({
+                ...mockPlayerStats,
+                automation: { actions: [FRENZY_ACTION], passives: [] },
+            });
+
+            await hook.resolveAttackDamage(frenzyAttack, { hit: true });
+
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith({
+                name: 'Greataxe',
+                formula: '1d12+3 [slashing] + 2d6 [slashing]',
+                total: 27,
+                rolls: [12, 6, 6],
+                modifier: 3,
+                context: expect.objectContaining({ hit: true }),
+            });
+            // featureRiders step null-clears unrelated keys on every attack —
+            // pin the one frenzy latch write it must make.
+            const stampCalls = setRuntimeValue.mock.calls.filter(c => c[1] === '_frenzyUsedRound');
+            expect(stampCalls).toEqual([['TestFighter', '_frenzyUsedRound', 1, mockCampaignName]]);
+            // inline rider: no modal may open on the triggering hit
+            const modalOpens = setModalState.mock.calls.filter(([u]) => Object.values(u || {}).some(Boolean));
+            expect(modalOpens).toHaveLength(0);
+        });
+
+        it.each([
+            {
+                label: 'skips when already used this round, latch untouched',
+                setup: () => getRuntimeValue.mockImplementation((_n, key) => {
+                    if (key === '_frenzyUsedRound') return 1;
+                    return defaultRuntimeValue(_n, key);
+                }),
+                formula: '1d12+3 [slashing]', total: 15, stamped: false,
+            },
+            {
+                label: 're-arms when the round advanced',
+                setup: () => {
+                    getCurrentCombatRound.mockReturnValue(2);
+                    getRuntimeValue.mockImplementation((_n, key) => {
+                        if (key === '_frenzyUsedRound') return 1;
+                        return defaultRuntimeValue(_n, key);
+                    });
+                },
+                formula: '1d12+3 [slashing] + 2d6 [slashing]', total: 27, stamped: true, round: 2,
+            },
+            {
+                label: 'skips when the rage buff is missing (no damageBonusExpression)',
+                setup: () => getRuntimeValue.mockImplementation((_n, key) => {
+                    if (key === 'activeBuffs') return [{ effect: 'advantage_attacks_advantage_against' }];
+                    return null;
+                }),
+                formula: '1d12+3 [slashing]', total: 15, stamped: false,
+            },
+            {
+                label: 'skips on a miss',
+                setup: () => runtimeDefaults(),
+                hit: false,
+                formula: '1d12+3 [slashing]', total: 15, stamped: false,
+            },
+        ])('Frenzy: $label', async ({ setup, hit, formula, total, stamped, round }) => {
+            setup();
+            const { hook, rollDamage } = UseAttackDamageResolution({
+                ...mockPlayerStats,
+                automation: { actions: [FRENZY_ACTION], passives: [] },
+            });
+
+            await hook.resolveAttackDamage(frenzyAttack, { hit: hit ?? true });
+
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith(expect.objectContaining({ formula, total }));
+            const stampCalls = setRuntimeValue.mock.calls.filter(c => c[1] === '_frenzyUsedRound');
+            if (stamped) {
+                expect(stampCalls).toEqual([['TestFighter', '_frenzyUsedRound', round ?? 1, mockCampaignName]]);
             } else {
-                expect(formula).not.toContain('2 [necrotic]');
+                expect(stampCalls).toHaveLength(0);
             }
         });
     });
 
     describe('empty automation', () => {
-        it('does not crash when automation actions array is empty or missing', async () => {
-            const stats = {
-                ...mockPlayerStats,
-                automation: { actions: [], passives: [] },
-            };
-            const { resolveAttackDamage } = UseAttackDamageResolution({ playerStats: stats });
-            const attack = {
-                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
-                weaponType: 'melee', properties: [],
-            };
+        const plainAttack = {
+            name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+            weaponType: 'melee', properties: [],
+        };
 
-            await resolveAttackDamage(attack);
-            await tick();
+        it.each([
+            { label: 'empty actions[]', automation: { actions: [], passives: [] } },
+            { label: 'automation missing entirely', automation: undefined },
+        ])('delivers base weapon damage only when $label', async ({ automation }) => {
+            const { hook, rollDamage } = UseAttackDamageResolution({ ...mockPlayerStats, automation });
 
-            expect(mockRollDamage).toHaveBeenCalled();
+            await hook.resolveAttackDamage(plainAttack);
 
-            setRuntimeValue.mockClear();
-            const statsNoAutomation = {
-                ...mockPlayerStats,
-                automation: undefined,
-            };
-            const { resolveAttackDamage: resolveAttackDamage2 } = UseAttackDamageResolution({ playerStats: statsNoAutomation });
-
-            await resolveAttackDamage2(attack);
-            await tick();
-
-            expect(mockRollDamage).toHaveBeenCalledTimes(2);
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            expect(rollDamage).toHaveBeenCalledWith({
+                name: 'Longsword',
+                formula: '1d8+3 [slashing]',
+                total: 11,
+                rolls: [8],
+                modifier: 3,
+                context: expect.any(Object),
+            });
         });
     });
 });

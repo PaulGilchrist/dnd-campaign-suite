@@ -1,17 +1,36 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
+// Lane map: this file owns the buff-clearing MECHANICS of the initiative seam —
+// clearBuffByName exact-name matching, clearActiveBuffsWhere predicate matching,
+// the starry_form clearSourceEffects campaign lane, the write-only-if-changed
+// guard, and the buff-absent no-write negatives (per the #346/#347 lane map:
+// activeStateClearing:52 and batchResets:10 cite this file as their owner).
+// Event guard clauses (null playerStats/detail, name mismatch) are pinned, with
+// stronger whole-handler negatives, in useInitiativeEffects.initiativeRolled.test.js:84-131;
+// byte-exact active-state snapshots + tracker loop in activeStateClearing.test.js;
+// exact batch payloads in batchResets.test.js; concentration / invisibility /
+// regenerate lanes in their own siblings.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getStore: vi.fn(() => new Map()),
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
-    listeners: new Map(),
+    // Exactly the four exports live in this import graph: useInitiativeEffects.js
+    // and its only real collaborator, boonOfCombatProwess.js, import
+    // getRuntimeValue/setRuntimeValue/setRuntimeBatch/getAllStoreKeys
+    // (probed: lines 2 of useInitiativeEffects.js, line 2 of boonOfCombatProwess.js).
+    // Dead-mock purge: getStore/useSyncedState/listeners were never read through
+    // any module loaded here.
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     setRuntimeBatch: vi.fn(),
     getAllStoreKeys: vi.fn(() => []),
 }));
 
+// Each factory supplies every named binding useInitiativeEffects.js imports;
+// inert defaults keep the non-buff lanes (concentration, invisibility,
+// shapechange, regenerate, storage) inert so only the buff seam is observed.
+// combatData also exports getCurrentCombatRound (boonOfCombatProwess.js:1) but
+// it is never called on this lane, so an undefined binding is honest here.
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
@@ -47,9 +66,17 @@ vi.mock('../../services/automation/handlers/spells/shapechangeService.js', () =>
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-describe('useInitiativeEffects - buff clearing', () => {
+describe('useInitiativeEffects - buff clearing mechanics', () => {
     const campaignName = 'test-campaign';
-    const defaultPlayerStats = {
+    const BUFFS_KEY = 'activeBuffs';
+    const TE_KEY = 'targetEffects';
+    const buff = (name, effect) => ({ name, effect });
+    // Prop-distinct survivor so cleared-vs-preserved bytes are distinguishable
+    const PRESERVED = buff('Mage Armor', 'mage_armor');
+    const OWN_STARRY_TE = { effect: 'starry_form', source: 'TestMonk', target: 'Enemy1' };
+    const ALLY_STARRY_TE = { effect: 'starry_form', source: 'Ally', target: 'Enemy2' };
+
+    const playerStats = {
         name: 'TestMonk',
         level: 15,
         class: {
@@ -64,439 +91,174 @@ describe('useInitiativeEffects - buff clearing', () => {
         actions: [],
     };
 
+    // Fake store mirroring production semantics: setRuntimeValue updates the
+    // value the NEXT getRuntimeValue sees (useRuntimeState.js:99 writes
+    // synchronously), so each clear pass in the handler filters fresh data —
+    // unlike a static mock, which lets stale payloads pass a resurrection bug.
+    let store;
+
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
+        store = new Map();
+        getRuntimeValue.mockImplementation((name, key) =>
+            store.has(`${name}|${key}`) ? store.get(`${name}|${key}`) : null
+        );
+        setRuntimeValue.mockImplementation((name, key, value) => {
+            store.set(`${name}|${key}`, value);
+        });
     });
 
-    function renderHookWithStats(stats = defaultPlayerStats) {
+    function renderHookWithStats(stats = playerStats) {
         return renderHook(() =>
             useInitiativeEffects(stats, campaignName, vi.fn())
         );
     }
 
-    function dispatchInitiativeRoll(detail) {
+    function rollInitiative() {
         window.dispatchEvent(
-            new CustomEvent('initiative-rolled', { detail })
+            new CustomEvent('initiative-rolled', {
+                detail: { characterName: 'TestMonk', roll: 15 },
+            })
         );
     }
 
-    function activeBuffsCalls() {
-        return vi.mocked(setRuntimeValue).mock.calls.filter(
-            call => call[0] === 'TestMonk' && call[1] === 'activeBuffs'
+    const activeBuffs = () => getRuntimeValue('TestMonk', BUFFS_KEY);
+    const targetEffects = () => getRuntimeValue('campaign', TE_KEY);
+    const activeBuffsWrites = () =>
+        setRuntimeValue.mock.calls.filter(
+            ([name, key]) => name === 'TestMonk' && key === BUFFS_KEY
         );
-    }
+    const targetEffectsWrites = () =>
+        setRuntimeValue.mock.calls.filter(
+            ([name, key]) => name === 'campaign' && key === TE_KEY
+        );
 
-    describe('Revelation in Flesh buff clearing', () => {
-        it('removes Revelation in Flesh from activeBuffs on initiative', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Revelation in Flesh', effect: 'revelation' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
+    describe('clearBuffByName exact-name matching', () => {
+        it.each([
+            ['Revelation in Flesh', 'revelation'],
+            ['Starry Form', 'starry_form'],
+            ['Haste', 'haste'],
+            ['Superior Defense', 'superior_defense'],
+        ])('clears %s and writes the survivors byte-exactly', (name, effect) => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff(name, effect), PRESERVED]);
             renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+            rollInitiative();
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
+                'TestMonk', BUFFS_KEY, [PRESERVED], campaignName
             );
+            expect(activeBuffs()).toEqual([PRESERVED]);
         });
 
-        it('removes all Revelation in Flesh entries when multiple exist', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Revelation in Flesh', effect: 'revelation' },
-                    { name: 'Revelation in Flesh', effect: 'revelation' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('does not clear a buff with a similar but different name', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Revelation in Flesh Enhanced', effect: 'revelation_enhanced' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('does nothing when no Revelation in Flesh buff is present', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('does nothing when activeBuffs is null', () => {
-            getRuntimeValue.mockReturnValue(null);
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('does nothing when activeBuffs is undefined', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('clears all buffs when only Revelation in Flesh exists', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Revelation in Flesh', effect: 'revelation' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [],
-                campaignName
-            );
-        });
-    });
-
-    describe('Starry Form buff and effect clearing', () => {
-        it('removes Starry Form from activeBuffs and starry_form effects from targetEffects on initiative', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Starry Form', effect: 'starry_form' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                if (key === 'targetEffects') return [
-                    { effect: 'starry_form', source: 'TestMonk', target: 'Enemy1' },
-                    { effect: 'other_effect', source: 'Ally', target: 'Enemy2' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'other_effect', source: 'Ally', target: 'Enemy2' }],
-                campaignName,
-                true
-            );
-        });
-
-        it('preserves starry_form effects from other sources (no setRuntimeValue call when filtered length unchanged)', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Starry Form', effect: 'starry_form' },
-                ];
-                if (key === 'targetEffects') return [
-                    { effect: 'starry_form', source: 'Ally', target: 'Enemy1' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [],
-                campaignName
-            );
-            // No targetEffects call because the filtered array has the same length as the original
-            // (the Ally's starry_form effect is preserved by the filter)
-            const teCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(teCalls.length).toBe(0);
-        });
-
-        it('does nothing when no Starry Form buff is present', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                if (key === 'targetEffects') return [];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('clears Starry Form buff even when no targetEffects exist', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Starry Form', effect: 'starry_form' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            const teCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(teCalls.length).toBe(0);
-        });
-
-        it('does not call setRuntimeValue for targetEffects when no starry_form effects exist', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Starry Form', effect: 'starry_form' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                if (key === 'targetEffects') return [
-                    { effect: 'other_effect', source: 'Ally' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-            const teCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-                call => call[0] === 'campaign' && call[1] === 'targetEffects'
-            );
-            expect(teCalls.length).toBe(0);
-        });
-    });
-
-    describe('Haste buff clearing', () => {
-        it('removes Haste from activeBuffs on initiative', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Haste', effect: 'haste' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('removes all Haste entries when multiple exist', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Haste', effect: 'haste' },
-                    { name: 'Haste', effect: 'haste' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('does nothing when no Haste buff is present', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('clears all buffs when only Haste exists', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Haste', effect: 'haste' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [],
-                campaignName
-            );
-        });
-    });
-
-    describe('See Invisibility buff clearing', () => {
-        it('removes See Invisibility by effect property on initiative', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'See Invisibility', effect: 'see_invisibility' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('removes See Invisibility even when effect differs from name', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Some Other Buff', effect: 'see_invisibility' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('does nothing when no See Invisibility effect is present', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-    });
-
-    describe('Superior Defense buff clearing', () => {
-        it('removes Superior Defense from activeBuffs on initiative', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Superior Defense', effect: 'superior_defense' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestMonk',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                campaignName
-            );
-        });
-
-        it('does nothing when no Superior Defense buff is present', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-    });
-
-    describe('Guard clauses', () => {
-        it('does not clear any buffs when event characterName does not match player name', () => {
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'OtherPlayer', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-
-        it('does not clear any buffs when playerStats is null', () => {
-            renderHookWithStats(null);
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-            expect(activeBuffsCalls().length).toBe(0);
-        });
-    });
-
-    describe('Multiple buff clearing interactions', () => {
-        it('clears both Revelation in Flesh and Starry Form in the same initiative event', () => {
-            getRuntimeValue.mockImplementation((_name, key) => {
-                if (key === 'activeBuffs') return [
-                    { name: 'Revelation in Flesh', effect: 'revelation' },
-                    { name: 'Starry Form', effect: 'starry_form' },
-                    { name: 'Haste', effect: 'haste' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                if (key === 'targetEffects') return [
-                    { effect: 'starry_form', source: 'TestMonk', target: 'Enemy1' },
-                ];
-                return null;
-            });
-            renderHookWithStats();
-            dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
-
-            // Each buff type is cleared in its own filter pass, so setRuntimeValue is called
-            // for activeBuffs once per buff type that was found (Revelation, Starry Form, Haste)
-            const buffCalls = activeBuffsCalls();
-            expect(buffCalls.length).toBe(3);
-
-            // First call: Revelation in Flesh removed from original list
-            expect(buffCalls[0][2]).toEqual([
-                { name: 'Starry Form', effect: 'starry_form' },
-                { name: 'Haste', effect: 'haste' },
-                { name: 'Mage Armor', effect: 'mage_armor' },
+        it('removes every matching entry in one byte-exact write', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [
+                buff('Revelation in Flesh', 'revelation'),
+                buff('Revelation in Flesh', 'revelation_stacked'),
+                PRESERVED,
             ]);
-
-            // Second call: Starry Form removed from original list (mock always returns fresh data)
-            expect(buffCalls[1][2]).toEqual([
-                { name: 'Revelation in Flesh', effect: 'revelation' },
-                { name: 'Haste', effect: 'haste' },
-                { name: 'Mage Armor', effect: 'mage_armor' },
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toEqual([
+                ['TestMonk', BUFFS_KEY, [PRESERVED], campaignName],
             ]);
+        });
 
-            // Third call: Haste removed from original list
-            expect(buffCalls[2][2]).toEqual([
-                { name: 'Revelation in Flesh', effect: 'revelation' },
-                { name: 'Starry Form', effect: 'starry_form' },
-                { name: 'Mage Armor', effect: 'mage_armor' },
+        it.each([
+            'Revelation in Flesh',
+            'Starry Form',
+            'Haste',
+            'Superior Defense',
+        ])('leaves %s Enhanced (similar name, no exact match) unwritten', (name) => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff(`${name} Enhanced`, 'unrelated_effect')]);
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toHaveLength(0);
+            expect(activeBuffs()).toEqual([buff(`${name} Enhanced`, 'unrelated_effect')]);
+        });
+
+        it('writes nothing when no buff matches any cleared name or effect', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [PRESERVED]);
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toHaveLength(0);
+        });
+
+        it('writes nothing when activeBuffs is unset (store default null)', () => {
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toHaveLength(0);
+        });
+
+        it('writes a byte-exact empty array when the only buff is cleared', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff('Haste', 'haste')]);
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toEqual([
+                ['TestMonk', BUFFS_KEY, [], campaignName],
             ]);
+            expect(activeBuffs()).toEqual([]);
+        });
+    });
+
+    describe('clearActiveBuffsWhere predicate matching (See Invisibility)', () => {
+        it.each([
+            ['its matching name', 'See Invisibility'],
+            ['an unrelated name', 'Owl Sight'],
+        ])('clears see_invisibility held under %s via the effect predicate', (_label, name) => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff(name, 'see_invisibility'), PRESERVED]);
+            renderHookWithStats();
+            rollInitiative();
+            expect(activeBuffsWrites()).toEqual([
+                ['TestMonk', BUFFS_KEY, [PRESERVED], campaignName],
+            ]);
+        });
+    });
+
+    describe('starry_form campaign targetEffects (clearSourceEffects)', () => {
+        it('clears the buff and caster-sourced starry_form effects, skipSync=true byte-exact', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff('Starry Form', 'starry_form'), PRESERVED]);
+            store.set(`campaign|${TE_KEY}`, [OWN_STARRY_TE, ALLY_STARRY_TE]);
+            renderHookWithStats();
+            rollInitiative();
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestMonk', BUFFS_KEY, [PRESERVED], campaignName
+            );
+            expect(targetEffectsWrites()).toEqual([
+                ['campaign', TE_KEY, [ALLY_STARRY_TE], campaignName, true],
+            ]);
+        });
+
+        it.each([
+            ['same effect sourced from another caster', [ALLY_STARRY_TE]],
+            ['only unrelated effects', [{ effect: 'bane_penalty', source: 'TestMonk', target: 'Enemy1' }]],
+            ['no stored effects at all', null],
+        ])('writes no campaign targetEffects when it holds %s', (_label, stored) => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [buff('Starry Form', 'starry_form')]);
+            store.set(`campaign|${TE_KEY}`, stored);
+            renderHookWithStats();
+            rollInitiative();
+            expect(targetEffectsWrites()).toHaveLength(0);
+            expect(targetEffects()).toEqual(stored);
+        });
+    });
+
+    describe('multi-buff interaction final state', () => {
+        it('clears every initiative-cleared buff type in one event without resurrecting any', () => {
+            store.set(`TestMonk|${BUFFS_KEY}`, [
+                buff('Revelation in Flesh', 'revelation'),
+                buff('Starry Form', 'starry_form'),
+                buff('Haste', 'haste'),
+                buff('Superior Defense', 'superior_defense'),
+                buff('Owl Sight', 'see_invisibility'),
+                PRESERVED,
+            ]);
+            store.set(`campaign|${TE_KEY}`, [OWN_STARRY_TE, ALLY_STARRY_TE]);
+            renderHookWithStats();
+            rollInitiative();
+            // Each pass re-reads the previous write (production store is synchronous),
+            // so ONE final-state assertion proves the whole five-clear chain: any
+            // dropped clear or stale-write resurrection breaks these bytes.
+            expect(activeBuffs()).toEqual([PRESERVED]);
+            expect(targetEffects()).toEqual([ALLY_STARRY_TE]);
         });
     });
 });

@@ -1,24 +1,21 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import ShortRestButton from './ShortRestButton.jsx';
 
 describe('ShortRestButton', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders a button with the correct label text', () => {
-    render(<ShortRestButton onClick={vi.fn()} />);
-
-    const button = screen.getByRole('button', { name: /short rest/i });
-    expect(button).toBeInTheDocument();
-  });
-
-  it('calls onClick when clicked', () => {
+  it('renders an enabled "Short Rest" button with rest tooltip and dispatches onClick once', () => {
     const onClick = vi.fn();
     render(<ShortRestButton onClick={onClick} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
+    const button = screen.getByRole('button', { name: /short rest/i });
+    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute(
+      'title',
+      'Short Rest: spend Hit Dice and restore short-rest resources'
+    );
+
+    fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

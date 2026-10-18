@@ -1,188 +1,115 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import MultiTargetCountPopup from './MultiTargetCountPopup.jsx';
 
-const mockSpell = { name: 'Scorching Ray', level: 2 };
-const mockCreatureTargets = ['Goblin', 'Skeleton', 'Orc'];
-const mockOnConfirm = vi.fn();
-const mockOnSkip = vi.fn();
+const spell = { name: 'Scorching Ray', level: 2 };
+const creatureTargets = ['Goblin', 'Skeleton', 'Orc'];
+const onConfirm = vi.fn();
+const onSkip = vi.fn();
 
-function makeProps(overrides) {
-  return {
-    spell: mockSpell,
-    creatureTargets: mockCreatureTargets,
-    maxTargets: 3,
-    onConfirm: mockOnConfirm,
-    onSkip: mockOnSkip,
-    icon: 'fa-solid fa-fire',
-    title: 'Scorching Ray',
-    school: 'Evocation',
-    defaultLevel: 2,
-    description: 'Create three rays of fire.',
-    confirmLabel: 'Cast Scorching Ray',
-    cancelLabel: 'Cancel',
-    ...(overrides || {}),
-  };
+// Title is prop-distinct from spell.name so header vs spell-line copy is attributable.
+function renderPopup(overrides = {}) {
+  return render(
+    <MultiTargetCountPopup
+      spell={spell}
+      creatureTargets={creatureTargets}
+      maxTargets={3}
+      onConfirm={onConfirm}
+      onSkip={onSkip}
+      icon="fa-solid fa-fire"
+      title="Choose Targets"
+      school="Evocation"
+      defaultLevel={2}
+      description="Create three rays of fire."
+      {...overrides}
+    />
+  );
 }
 
+// Copy lives across a <strong>, so pin the whole paragraph from its strong node.
+const spellLine = () =>
+  screen.getByText('Scorching Ray').closest('p').textContent.replace(/\s+/g, ' ').trim();
+
+// Selected rows render as "✓ Name"; match both states by name.
+const targetRow = (name) => screen.getByText(new RegExp(`^✓? ?${name}$`));
+const counter = () => screen.getByText(/^Targets \(\d\/\d\):/);
+
 describe('MultiTargetCountPopup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('renders title, spell brief, description, one selectable row per target, and labelled actions', () => {
+    renderPopup({ confirmLabel: 'Cast Scorching Ray', cancelLabel: 'Keep Casting Elsewhere' });
+
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Choose Targets');
+    expect(spellLine()).toBe('Scorching Ray — Level 2 Evocation');
+    expect(screen.getByText('Create three rays of fire.')).toBeInTheDocument();
+    expect(screen.getAllByText(/^✓? ?(Goblin|Skeleton|Orc)$/)).toHaveLength(3);
+    expect(counter().textContent).toBe('Targets (0/3):');
+    expect(screen.getByRole('button', { name: 'Cast Scorching Ray' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Keep Casting Elsewhere' })).toBeInTheDocument();
   });
 
-  describe('rendering', () => {
-    it('renders header, spell info, description, targets list, counter, and buttons', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Scorching Ray');
-      expect(screen.getByText(/— Level 2 Evocation/)).toBeInTheDocument();
-      expect(screen.getByText('Create three rays of fire.')).toBeInTheDocument();
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByText('Skeleton')).toBeInTheDocument();
-      expect(screen.getByText('Orc')).toBeInTheDocument();
-      expect(screen.getByText(/Targets \(0\/3\):/)).toBeInTheDocument();
-      expect(screen.getByText('Cast Scorching Ray')).toBeInTheDocument();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
+  it('defaults confirm label to "Cast <title>" and cancel label to "Cancel"', () => {
+    renderPopup();
 
-    it('uses default labels when confirmLabel and cancelLabel are not provided', () => {
-      const props = makeProps();
-      delete props.confirmLabel;
-      delete props.cancelLabel;
-      render(<MultiTargetCountPopup {...props} />);
-      expect(screen.getByText('Cast Scorching Ray')).toBeInTheDocument();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('button', { name: 'Cast Choose Targets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
-  describe('target selection', () => {
-    it('updates counter when a target is selected', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText('Goblin'));
-      expect(screen.getByText(/Targets \(1\/3\):/)).toBeInTheDocument();
-    });
+  it('toggles targets on click, marking selected rows and updating the counter', () => {
+    renderPopup();
 
-    it('toggles target selection off when clicked again', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      const goblinBtn = screen.getByText(/Goblin/);
-      fireEvent.click(goblinBtn);
-      expect(screen.getByText(/Targets \(1\/3\):/)).toBeInTheDocument();
-      fireEvent.click(goblinBtn);
-      expect(screen.getByText(/Targets \(0\/3\):/)).toBeInTheDocument();
-    });
+    fireEvent.click(targetRow('Goblin'));
+    expect(screen.getByText('✓ Goblin')).toBeInTheDocument();
+    expect(counter().textContent).toBe('Targets (1/3):');
 
-    it('selects multiple targets independently', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText(/Goblin/));
-      fireEvent.click(screen.getByText(/Skeleton/));
-      expect(screen.getByText(/Targets \(2\/3\):/)).toBeInTheDocument();
-    });
+    fireEvent.click(targetRow('Skeleton'));
+    expect(counter().textContent).toBe('Targets (2/3):');
+
+    fireEvent.click(screen.getByText('✓ Goblin'));
+    expect(screen.queryByText('✓ Goblin')).not.toBeInTheDocument();
+    expect(screen.getByText('✓ Skeleton')).toBeInTheDocument();
+    expect(counter().textContent).toBe('Targets (1/3):');
   });
 
-  describe('max targets limit', () => {
-    it('does not allow selecting beyond maxTargets', () => {
-      render(<MultiTargetCountPopup {...makeProps({ maxTargets: 2 })} />);
-      fireEvent.click(screen.getByText(/Goblin/));
-      fireEvent.click(screen.getByText(/Skeleton/));
-      expect(screen.getByText(/Targets \(2\/2\):/)).toBeInTheDocument();
-      fireEvent.click(screen.getByText(/Orc/));
-      expect(screen.getByText(/Targets \(2\/2\):/)).toBeInTheDocument();
-    });
+  it('clamps selection at maxTargets', () => {
+    renderPopup({ maxTargets: 2 });
 
-    it('allows selecting fewer than maxTargets', () => {
-      render(<MultiTargetCountPopup {...makeProps({ maxTargets: 5 })} />);
-      fireEvent.click(screen.getByText('Goblin'));
-      expect(screen.getByText(/Targets \(1\/5\):/)).toBeInTheDocument();
-    });
-
-    it('does not allow selecting any target when maxTargets is 0', () => {
-      render(<MultiTargetCountPopup {...makeProps({ maxTargets: 0 })} />);
-      fireEvent.click(screen.getByText('Goblin'));
-      expect(screen.getByText(/Targets \(0\/0\):/)).toBeInTheDocument();
-    });
+    fireEvent.click(targetRow('Goblin'));
+    fireEvent.click(targetRow('Skeleton'));
+    fireEvent.click(targetRow('Orc'));
+    expect(counter().textContent).toBe('Targets (2/2):');
+    expect(screen.queryByText('✓ Orc')).not.toBeInTheDocument();
   });
 
-  describe('confirm button state', () => {
-    it('is disabled when no targets are selected, enabled when one is selected, and disabled again when deselected', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      expect(screen.getByText('Cast Scorching Ray')).toBeDisabled();
-      const goblinBtn = screen.getByText(/Goblin/);
-      fireEvent.click(goblinBtn);
-      expect(screen.getByText('Cast Scorching Ray')).not.toBeDisabled();
-      fireEvent.click(goblinBtn);
-      expect(screen.getByText('Cast Scorching Ray')).toBeDisabled();
-    });
+  it('keeps confirm disabled until at least one target is selected', () => {
+    renderPopup({ confirmLabel: 'Cast Scorching Ray' });
+    const cast = () => screen.getByRole('button', { name: 'Cast Scorching Ray' });
+
+    expect(cast()).toBeDisabled();
+    fireEvent.click(targetRow('Goblin'));
+    expect(cast()).not.toBeDisabled();
+    fireEvent.click(screen.getByText('✓ Goblin'));
+    expect(cast()).toBeDisabled();
   });
 
-  describe('confirm behavior', () => {
-    it('calls onConfirm with selected targets in selection order', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText('Goblin'));
-      fireEvent.click(screen.getByText('Skeleton'));
-      fireEvent.click(screen.getByText('Cast Scorching Ray'));
-      expect(mockOnConfirm).toHaveBeenCalledWith(['Goblin', 'Skeleton']);
-    });
+  it('confirms the exact selection in click order, exactly once', () => {
+    renderPopup({ confirmLabel: 'Cast Scorching Ray' });
 
-    it('calls onConfirm with all selected targets in non-sequential order', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText('Skeleton'));
-      fireEvent.click(screen.getByText('Orc'));
-      fireEvent.click(screen.getByText('Goblin'));
-      fireEvent.click(screen.getByText('Cast Scorching Ray'));
-      expect(mockOnConfirm).toHaveBeenCalledWith(['Skeleton', 'Orc', 'Goblin']);
-    });
+    fireEvent.click(targetRow('Skeleton'));
+    fireEvent.click(targetRow('Orc'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cast Scorching Ray' }));
 
-    it('does not call onConfirm when clicked with no targets selected', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText('Cast Scorching Ray'));
-      expect(mockOnConfirm).not.toHaveBeenCalled();
-    });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(['Skeleton', 'Orc']);
   });
 
-  describe('skip behavior', () => {
-    it('calls onSkip when cancel button is clicked', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.click(screen.getByText('Cancel'));
-      expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    });
+  it('dismisses via cancel button and Escape key, firing onSkip once each', () => {
+    renderPopup();
 
-    it('calls onSkip when Escape key is pressed', () => {
-      render(<MultiTargetCountPopup {...makeProps()} />);
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(mockOnSkip).toHaveBeenCalledTimes(1);
-    });
-  });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onSkip).toHaveBeenCalledTimes(1);
 
-  describe('empty creature targets', () => {
-    it('renders with no creature options and disabled confirm button when creatureTargets is empty', () => {
-      render(<MultiTargetCountPopup {...makeProps({ creatureTargets: [] })} />);
-      expect(screen.getByText(/Targets \(0\/3\):/)).toBeInTheDocument();
-      expect(screen.getByText('Cast Scorching Ray')).toBeDisabled();
-    });
-  });
-
-  describe('spell fallback', () => {
-    it('shows "Spell" fallback when spell is null', () => {
-      render(<MultiTargetCountPopup {...makeProps({ spell: null })} />);
-      expect(screen.getByText('Spell')).toBeInTheDocument();
-    });
-
-    it('shows spell name when provided', () => {
-      render(<MultiTargetCountPopup {...makeProps({ spell: { name: 'Burning Hands' } })} />);
-      expect(screen.getByText('Burning Hands')).toBeInTheDocument();
-    });
-  });
-
-  describe('default level fallback', () => {
-    it('uses spell level when spell has a level', () => {
-      render(<MultiTargetCountPopup {...makeProps({ spell: { name: 'Fireball', level: 3 } })} />);
-      expect(screen.getByText(/— Level 3/)).toBeInTheDocument();
-    });
-
-    it('uses defaultLevel when spell has no level or is null', () => {
-      render(<MultiTargetCountPopup {...makeProps({ spell: { name: 'Cantrip' }, defaultLevel: 0 })} />);
-      expect(screen.getByText(/— Level 0/)).toBeInTheDocument();
-      render(<MultiTargetCountPopup {...makeProps({ spell: null, defaultLevel: 1 })} />);
-      expect(screen.getByText(/— Level 1/)).toBeInTheDocument();
-    });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onSkip).toHaveBeenCalledTimes(2);
   });
 });

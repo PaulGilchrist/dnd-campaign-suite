@@ -975,3 +975,328 @@ run2#206: modals/shared/SaveAttackAoeModal.cold-gale.test.jsx -> maintained (4->
 run2#207: modals/shared/SaveAttackAoeModal.crackling-wave.test.jsx -> maintained (3->1): mixed-confirm reuse; guardrail dedup to demilich/kraken owners [rec->kraken null-clause twin]
 run2#208: modals/shared/SaveAttackAoeModal.creature-selection.test.jsx -> maintained (6->3): real picker rework (.careful-flag artifact gone); base stub+7 mocks removed [recs: base test.jsx DELETE; shared test-utils kit]
 run2#209: modals/shared/SaveAttackAoeModal.damage-edge-cases.test.jsx -> maintained (1->2): careful NPC+PC lanes NEW; dishonest mock honesty-fixed; #201/#208 carries applied [recs->damage-resolution :403 merge, :319 subsumed]
+## Batch #138 GREEN-canon — 2761 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36574 passed. Lint clean. Evidence /tmp/batch138.log
+run2#210: modals/shared/SaveAttackAoeModal.damage-resolution.test.jsx -> maintained (9->7): #209 recs applied (:403 weak teeth merged, :319 subsumed); CLA-109 min() proof via RNG stream; honest evasion-mock fix; RNG seam family pattern adopted [rec->overlay: same dishonest evasion mock]
+run2#211: modals/shared/SaveAttackAoeModal.demilich-howl.test.jsx -> maintained (2->2): vacuous null-clause guardrail fixed (full-10/half-5 legs pinned, only success-leg disarmed). Rec->kraken merge consumed @#214
+run2#212: modals/shared/SaveAttackAoeModal.fey-melody-variant.test.jsx -> maintained (4->4 strengthened): mixed-confirm negatives discriminate save-vs-fail; guardrail pins exactly !saveVariant; abbrev wis removed per 🔴
+run2#213: modals/shared/SaveAttackAoeModal.freezing-burst-ancient-white.test.jsx -> maintained (3->2): data-canon folded into picker-path byte pin; RNG-legitimacy comments; dc_success default pin dropped (MA-0259 owns)
+run2#214: modals/shared/SaveAttackAoeModal.kraken-toxic-ink.test.jsx -> maintained (4->1): fail+success+null-clause twins -> one mixed-confirm; data-pins dropped (legendary-uses-kraken owns bytes)
+run2#215: modals/shared/SaveAttackAoeModal.lair-darkness.test.jsx -> maintained (3->2): confirm consolidated te+tracking+log clauses; pre-confirm inert + zero-roll + ZoneArmedNote owner pins NEW
+run2#216: modals/shared/SaveAttackAoeModal.lair-sand-cloud.test.jsx -> maintained (3->2): owns save+zone composite (zone arms ALL, condition fail-only); vacuous grant-on-success fixed w/ negative legs
+run2#217: modals/shared/SaveAttackAoeModal.lair-zone.test.jsx -> maintained (4->2): MA-0042 zone canon single mixed-confirm; te.saveType/duration + tracking.duration NEW; non-mutating sort [🔴->ledger :595 recurringDie clobber]
+run2#218: modals/shared/SaveAttackAoeModal.ma0875-thp-grant.test.jsx -> maintained (4->3): THP-pool dupes dropped (bolsteringTreats owner); exact log count; non-vacuous inertness [rec->saveProcessing:137-148]
+run2#219: modals/shared/SaveAttackAoeModal.ma1212-rapport-zone-grant.test.jsx -> maintained (6->3): adult lane 1-confirm; byte-twin sovereign+sprout loop; duration+zero-prompt pins NEW; it.each object-spread gotcha noted
+run2#220: modals/shared/SaveAttackAoeModal.ma1673-vrock-spores.test.jsx -> maintained (6->2): faces->mixed-confirm per row; dc_success standalone dropped (logic-dup); every()-vacuity fixed via results rows
+run2#221: modals/shared/SaveAttackAoeModal.ma2059-ymir-glacier-wave.test.jsx -> maintained (3->2): isolated rosters->mixed-confirm ±fold; disk-pins dropped (monsterRecharge owner); len(1) grant guardrail [recs->ma2063 @#222]
+run2#222: modals/shared/SaveAttackAoeModal.ma2063-ymir-frost-geyser.test.jsx -> maintained (10->3): WAVE-twin pins dropped; faces consolidated; 5 disk fingerprints->1; predicate-re-derivation unit pins deleted
+run2#223: modals/shared/SaveAttackAoeModal.monster-cone.test.jsx -> maintained (3->2): per-target dice pinned (2 vs 20); range-gate unique here + inertness; nat-19-vs-20 IEEE comment fixed
+run2#224: modals/shared/SaveAttackAoeModal.monster-line.test.jsx -> maintained (2->1): #223 rec applied — generic adjudication dropped (cone owns); non-vacuous 60-ft gate pin (mutation-checked); RNG spy surface removed
+## Batch #139 GREEN-canon — 2761 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36542 passed. Lint clean. Evidence /tmp/batch139.log
+## Batch #139 — PROGRESS: completed 1378 / remaining 1315 (total 2693)
+run2#225: modals/shared/SaveAttackAoeModal.overchannel.test.jsx -> maintained (4->3): inactive control tautology FIXED (live maximized contrast + dex:-5 fold proof); misnamed first-use test consolidated (gate=handler owner); real modal per canon [rec->cla120: persistAndNotify should stay live]
+run2#226: modals/shared/SaveAttackAoeModal.overlay.test.jsx -> maintained (3->2): dishonest evasion mock FIXED; ~130ln mock clones deleted, live base+picker; honest math+deterministic RNG [🔴->ledger overlay allResolved race=empty summary, reproduced+pinned]
+run2#227: modals/shared/SaveAttackAoeModal.radiantSoul.test.jsx -> maintained (4->3): fold-once canon; guardrails non-vacuous it.each; mock clone deleted; honest evasion [rec->base DELETE consumed @#236]
+run2#228: modals/shared/SaveAttackAoeModal.repulsion-breath.test.jsx -> maintained (5->2): data-lock dup dropped; damageless 3-lane mixed-confirm IEEE; dishonest abbrev saveBonuses->{} fixed [rec->cold-gale same re-key]
+run2#229: modals/shared/SaveAttackAoeModal.slowed-breath.test.jsx -> maintained (3->2): mixed-confirm per-target branching; full rider sentence + inertness; abbrev mock fixed [rec->weakening-breath consumed @#237]
+run2#230: modals/shared/SaveAttackAoeModal.soulstitch.test.jsx -> maintained (6->3): identical-path quad merged, RNG 0.01 asymmetry proof; PC legs full-shape + gate-bypass negatives. No bugs
+run2#231: modals/shared/SaveAttackAoeModal.speed-reduce.test.jsx -> maintained (4->3): dedupe merged; gated-absence pattern; flat spyRandom streams anti-drift. No bugs
+run2#232: modals/shared/SaveAttackAoeModal.speed-zero.test.jsx -> maintained (3->2): success-leg dropped (ancient-white:172 owner); positive-leg-gated inertness. [rec->ancient trim clock re-statements]
+run2#233: modals/shared/SaveAttackAoeModal.staged-paralysis.test.jsx -> maintained (5->3): wyrmling twins deleted (modal never reads staged_paralysis); success-seam NEW; {con:2}->{constitution:2} honesty fix [recs: re-key abbrev harnesses family-wide]
+run2#234: modals/shared/SaveAttackAoeModal.staged-petrify.test.jsx -> maintained (5->3): data/extractor byte-pins dropped (owners verified); ladder-semantics legs honest full-key [🔴->ledger picker copy contradicts ladder :1298/:1995; resultRowText no petrify branch :1189]
+run2#235: modals/shared/SaveAttackHeal... staged-sleep -> maintained (3->3 stronger): con-key fixed w/ bonus:2 pinned both legs; success-seam pin NEW; result-rows folded. Obs->sleepService key audit
+run2#236: modals/shared/SaveAttackAoeModal.test.jsx -> DELETED (vacuous expect(true) placeholder, flagged #208/#227; 5 owner lanes re-verified green)
+run2#237: modals/shared/SaveAttackAoeModal.weakening-breath.test.jsx -> maintained (4->4 rebuild): RNG floods->mixed-confirm; {str:1}->{strength:1} saveBonus:1 consulted proof; MA-0212 mis-target accident fixed; RAW both-leg source-scoped
+run2#238: modals/shared/SaveAttackHealModal.healFlows.test.jsx -> maintained (8->4): radio-arbitration 2-target unique test; report+Done folded; toHaveLength phase-gating; throw-on-drift dice [recs->saveFlows :312 dup, applyHealingDirectly mocks]
+run2#239: modals/shared/SaveAttackHealModal.npc-heal.test.jsx -> maintained (2->2 broadened): clamp-dup->it.each incl NEW non-clamp actual===roll leg; exact SSE object pin; test-utils dedupe [📌 inline styles .jsx:275,286; recs->base:102/saveFlows:354]
+## Batch #140 GREEN-canon — 2760 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36520 passed. Lint clean. Evidence /tmp/batch140.log
+## Batch #140 — PROGRESS: completed 1392 / remaining 1300 (total 2692)
+run2#240: modals/shared/SaveAttackAoeModal.thunderclap-sphere.test.jsx -> maintained (4->4 strengthened): test2's 'all-fail' comment fiction exposed (mixed fail/save live) -> both legs pinned; MA-0063 byte-exact toBe + store pin; inertness folded. No bugs
+run2#249: modals/shared/TashasLaughterModal.player-saves.test.jsx -> maintained (19->8): 8-fail/5-success identical paths folded; edge it.each runs WITH live prompt (was trivial); heightened disadvantage NEW; [🔴->ledger :40 '+undefined', ⚠ :91 NaN slot]
+run2#250: modals/shared/TashasLaughterModal.test.jsx -> maintained (20->12): smoke render fold; cap test pos+neg; inertness NEW; honest NaN pin (:91 KNOWN DEFECT); heighten radios->CreatureSelectionModal owner
+run2#251: modals/ShieldBashChoiceModal.test.jsx -> maintained (13->8): payload/result/Done fold per option; error test now asserts visible text; invented action.options mock killed [📌->ledger inline styles + hardcoded Push copy]
+run2#252: modals/SilenceModal.test.jsx -> maintained (21->13): 7 picker-owned tests dropped (CreatureSelectionModal owner); zone 4-paths table-driven; leaky cross-lane mocks fixed; dedup branch NEW [🔴->ledger :163 hardcoded 20ft copy vs aoeRadius; 🗑 :56-62 unreachable reset]
+run2#253: modals/SingleResistanceSelectionModal.test.jsx -> maintained (21->11): radio-exclusivity sequence pin; result quartet->1; unfaithful logService mock removed [📌 inline styles :30,:36,:39,:77]
+run2#254: modals/StepsOfTheFeyTauntModal.bewitching.test.jsx -> maintained (3->2): CLA-037 never-uses-gated guardrail NEW; exact payloads; decline pos-leg-gated [recs->choiceStep+tauntingStep DELETE]
+run2#255: modals/StepsOfTheFeyTauntModal.choiceStep.test.jsx -> DELETED (vacuous expect(true); behavior owned by render/integration/step lanes, folder green pre-delete)
+run2#256: modals/StepsOfTheFeyTauntModal.disappearingStep.test.jsx -> maintained (3->2): exact double-payload accept test; already-invisible branch exact call-counts (was any-call); .closest brittle fixed [rec->integration:110-117 null-key consumed @#258 kept-unique]
+run2#257: modals/StepsOfTheFeyTauntModal.dreadfulStep.test.jsx -> maintained (12->4): save-result damage seam NEW family coverage IEEE; family mock bug confirmed (createSaveListener arg0 destructure -> prompt-undefined, passed broken) [🔴->ledger :129 wrong skip label; ⚠ :278-289 listener leak; rec noUses/refreshingStep honest mocks]
+run2#258: modals/StepsOfTheFeyTauntModal.integration.test.jsx -> maintained (5->4): click-through fold; CLA-037 skip log + no-consume negative; honest savePrompt mock per #257 [⚠->ledger COVERAGE GAP taunting confirm lane -> restorer at tauntingStep turn]
+run2#259: modals/StepsOfTheFeyTauntModal.noUses.test.jsx -> maintained (2->2 strengthened): exact copy + toHaveLength(4) gate; skip-at-zero escape hatch NEW lane behavior; dishonest createSaveListener mock FIXED (honest args[1]+unique promptIds); counter key present so zero-decrement detectable [recs->render.test.jsx header dupes :73-78/:114-118 consolidate]
+## Batch #141 GREEN-canon — 2759 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36372 passed. Lint clean. Evidence /tmp/batch141.log
+## Batch #141 — PROGRESS: completed 1411 / remaining 1280 (total 2691)
+run2#260: modals/StepsOfTheFeyTauntModal.refreshingStep.test.jsx -> maintained (7->2): IEEE d10 bounds replace expect.any(Number); exact result innerHTML; dishonest createSaveListener fixed family-pattern; Done-closes seam retained [🔴->ledger :99-108 refreshing + :110-126 disappearing never log addEntry — no-timers rule violation]
+run2#261: modals/StepsOfTheFeyTauntModal.render.test.jsx -> maintained (7->3/5 runs): title/fallback differentiated (title!=featureName, opposite-absence); skip-label it.each 3 distinct cases; toHaveLength(4) cards; dishonest listener mock fixed [rec->integration:76-78 click non-interactive <p> simplify]
+run2#262: modals/StepsOfTheFeyTauntModal.tauntingStep.test.jsx -> REBUILT from vacuous placeholder (0->2): CLOSED #258 coverage gap — taunting confirm mega-test (exact listener payloads, unique promptIds, taunting_step upsert-in-place preserving hunter_mark, indefinite wait) + all-save inertness (foreign promptId ignored, zero writes)
+run2#263: modals/StrideOfTheElementsModal.test.jsx -> maintained (12->8/13 runs): verbatim CONFIRM_PINS it.each per handler delegation + alignment guardrail; role queries; cancel discards pending NEW; header it.each distinct [🗑 overlay+content click negatives vacuous, no handler]
+run2#264: modals/SummonSpiritModal.test.jsx -> maintained (10->5): vacuous description-negative removed; toHaveAccessibleName exact; inertness NEW; exact payload sequence; overlay test deleted (no handler); no post-unmount internals pin
+run2#265: modals/TacticalMasterModal.test.jsx -> maintained (21->11/15 runs): option rules one-render fallback-distinct; desc priority mislabel FIXED; featureName prop NEW; refusal truth-table it.each 2 new branches; overlay dead pins deleted [rec->~10 CharActions.* shared mock factory]
+run2#266: modals/TeleportModal.test.jsx -> maintained (16->8): fallback exercises by omission (real 60/150 ft); isExtendedAvailable args pinned; confirmTeleport-never-call elemental distinction NEW; 3 vacuous no-result removed; fake label query killed
+run2#267: modals/TruePolymorphPathModal.test.jsx -> maintained (8->6): role queries + toHaveLength(4) + inertness; non-Escape negative NEW; vacuous overlay + unreachable onCancel-edge removed [recs->AnimalShapes family audit; useSpellMetamagicFlow shared fixture]
+run2#268: modals/VitalityOfTheTreeModal.test.jsx -> maintained (3->2): thin-wrapper canon: exact full-props toEqual + callback identity; mock-internals test deleted (owner CreatureSelectionModal 24/24 green); tempHp=0 edge pinned
+run2#269: modals/WarBondChooserModal.test.jsx -> maintained (5->4): existing-prop seed + cap disable/release NEW; instruction distinctness negative; survivor-checkbox pin; ordered 2-pick payload; overlay/Escape verified no handlers
+run2#270: modals/WarMagicCantripModal.test.jsx -> maintained (9->5): last-clicked exact 4-arg payload (switching now observable); cast-time fallback by omission; vacuous concat-string assertion killed; mock trimmed to casting_time
+run2#271: modals/WarMagicSpellModal.test.jsx -> maintained (12->5): 4 render->1 guardrailed; rerender instruction distinctness; real <b> innerHTML legit (handler :313); mocks honest-trim [🔴->ledger handler :31 no casting_time filter offers reactions]
+run2#272: modals/WarpingImplosionModal.test.jsx -> maintained (6->6 hardened): canRestore:false branch NEW; exact toEqual child-modal props + onClose identity; refusal popup honest shape
+run2#273: modals/WeaponKindMasteryModalInitial.test.jsx -> maintained (2->3 cases): pluralization dup dropped (MaxKinds owner); exact full-copy + omission distinctness; header+0/2 count NEW; dishonest useRuntimeState mock deleted [recs->Result:116 HTML test, WeaponList:154/Selection:58 override-signature normalize]
+run2#274: modals/WeaponKindMasteryModalMaxKinds.test.jsx -> maintained (5->4/7 runs): default-2 dup dropped (Initial owns); exact copies + denominator propagation pins; level-mismatch fallback case NEW (discriminates find-by-level)
+run2#275: modals/WeaponKindMasteryModalResult.test.jsx -> maintained (6->3): invented dangerouslySetInnerHTML test DELETED (handler emits plain text, verified); handler exact full-copy pin; apply-flow twins consolidated pos-leg-gated; useRuntimeState mock deleted (unimported) [rec->Selection role-query rewrite consumed @#276]
+run2#276: modals/WeaponKindMasteryModalSelection.test.jsx -> maintained (4->4 rewritten): recs #273/#275 all applied (role/name queries, overrides-signature, full-copy fixture, spread removed); non-alphabetical click pins order-preservation; resetWeaponsCache determinism NEW; backdrop guard kept unique [rec->WeaponList lane: unmarked sibling, index-ordinal + cap-disable merge]
+run2#284: modals/popups/FlurryOfBlowsTargetPopup.test.jsx -> maintained (12->8): Escape-misnamed FIXED (presses real guard now); a11y names pin (Current) marker; honest <strong> split copies; clamp stored-vs-rendered; phantom-click removed
+run2#285: modals/popups/MagicMissileTargetPopup.test.jsx -> maintained (20->7): exact copy split <strong>; clamp flow + summary oracle; exact payload zero-row serialization; 4 equivalent it.each twins folded; void props trimmed; over-assign quirk honestly pinned
+run2#286: modals/popups/MetamagicPopup.test.jsx -> maintained (34->14): dishonest totalCost:0 mock replaced producer-faithful; misnamed cap test FIXED; mock-tautology cost test deleted (metamagicRules owner); Psionic 7->3 CLA-271 boundary; exact (N SP) pins
+run2#287: modals/popups/MultiTargetCountPopup.test.jsx -> maintained (16->7): copy attribution prop-distinctness (old fixture aliased title/name/label); ✓selected marker NEW; base-fallback x4 dropped (TargetPopupBase owner) [🔴->ledger dead export + base-spec gap]
+run2#288: modups/popups/MultiTargetPopup.test.jsx -> maintained (6->4): live component confirmed (SpellTargetPopups:90); routing seam exact payload cross-non-fire; 4th base-fallback dup dropped; void props trimmed [🗑 _playerStats dead destructure]
+run2#289: modals/popups/SingleTargetPopup.test.jsx -> maintained (10->5): single-select state machine fold; confirmLabel-default branch NEW; base fallback/subtitle/phantom dropped [🔴->ledger SingleTargetPopup.jsx dead export zero importers]
+run2#290: modals/popups/TargetWithCheckboxesPopup.test.jsx -> maintained (16->6): distinct-prop smoke; multi-select-not-radio unique lane; exact payload selectionData!=label order!=list-order; mock-tautology default-copy FIXED (source default never pinned before); Escape+Spell-fallback dups dropped per plan [⚠->ledger base fallback/keydown now NO direct pin anywhere — TargetPopupBase spec priority raised]
+run2#301: modals/../char-sheet/useAttackDamageResolution.classFeatures.test.js -> maintained (25->15): exact rollDamage payloads key-based MOCK_DICE+drift guard; latch round-trips; fixture deep-clone (stealthAttackCost in-place mutation fix); pause-before-damage pin [🔴->ledger superiorHuntersPrey :74-79 un-awaited async]
+run2#302: char-sheet/useAttackDamageResolution.ctxOverrides.test.js -> maintained (15->2 blocks/12 runs): precedence it.each 11 branches on pipeline.run args; ??-vs-|| explicit pins; 4 dead module mocks purged; TDZ-risky factory closure fixed
+run2#303: char-sheet/useAttackDamageResolution.cunningStrikeResume.test.js -> maintained (4->1/2 branches): exact sneak formulas 26/34 (was toContain+total>3); latch pin; owners verified (tacticalMaster:71/shieldBash:154); transitive mock audit zero-dead
+run2#304: char-sheet/useAttackDamageResolution.feats.test.js -> maintained (17->14): DC-branch distinguishing Shield Master it.each (fallback 19 vs buildSaveDc 14); Crusher latch round-trip+byte shape; vacuous Charger-te removed (step could never fire); gate-branch skips deferred to shieldBash.test.js owner [noted piercer.js:20 bare Math.random]
+## Batch #144 GREEN-CHECK PENDING record follows
+run2#305: char-sheet/useAttackDamageResolution.maneuveringAlly.test.js -> maintained (6->5): exact seam args byte-exact popups (was stringContaining/bare toHaveBeenCalled); picker-stays-open-after-resume NEW (name-claimed-never-verified fix); dead encounters/combatData mock purged (never imported); passthrough twins it.each [rec->maneuvers:439-456 subsumed]
+## Batch #144 GREEN-canon — 2759 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36098 passed. Lint clean. Evidence /tmp/batch144.log
+## Batch #144 — PROGRESS: completed 1456 / remaining 1235 (total 2691)
+run2#313: char-sheet/useAttackDamageResolution.skipManeuver.test.js -> maintained (5->1 it.each/7 branches): optionSelect dup block deleted (rec #310); guard matrix resume-identity + byte-exact addEntry + objectKeys ctx pins; maneuver-dice cleanup NEW unique; 5 dead mocks purged [rec consumed @#306/#310]
+run2#314: char-sheet/useAttackDamageResolution.stalkersFlurryResume.test.js -> maintained (3->1): pause-entry+double-resume deleted (#311/#312 owners verified); affirmative completion exact resume identity + byte-exact post-resume rollDamage + no-auto-resolve pin; dead mocks purged
+run2#315: char-sheet/useAttackDamageResolution.standalone.test.js -> maintained (12->5): 🗑 :288-481 dup block DELETED (rec consumed, #283 canon verified); twins -> exact minimalCtx it.each; vacuous setter test -> real cold-dep contract; 5 dead mocks purged [🔴 :371-383 OA asymmetry KNOWN DEFECT pinned honestly]
+run2#317: char-sheet/useAttackDamageResolution.test.jsx -> maintained (17->14): API key-set pin; byte-formula seam/crit/TWF/latch folds; vacuous mastery-gate removed (never reached); sudden-strike CLEAR pin NEW; brittle Once->key-based
+run2#318: char-sheet/useCharActionModals.additional.test.js -> maintained (8->3): 5 vacuous/dup dropped (owners mapped); pipeline-pause synced-store byte pin NEW owner; dishonest mock fixed (resumeAttackPipeline) [3 recs->ledger]
+run2#319: char-sheet/useCharActionModals.integration.test.js -> maintained (16->6): 24-key toBe identity loop (resumeAttackPipeline NEW pin); byte-exact sub-hook args describe.each mapName; title defect 31->32 fixed; superiority typeof->owner #318 [rec->maneuverHandlers DELETE outright]
+run2#320: modals/useCharActionModals.maneuverHandlers.test.js -> DELETED (rec #319 confirmed: plain re-exposure zero logic; all 5 tests vacuous/typeof/superseded; consumer dispatch lanes verified green)
+## Batch #145 GREEN-canon check + run2#321
+## Batch #145 GREEN-canon — 2759 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 36043 passed. Lint clean. NOTE: 3rd file-level "fail" = maneuverHandlers.test.js Cannot-find-module race (deleted mid-suite by run2#320 AFTER collection) — benign, absent on disk, excluded from future runs. Evidence /tmp/batch145.log
+## Batch #145 — PROGRESS: completed 1471 / remaining 1220 (total 2691)
+run2#321: modals/useCharActionModals.modalState.test.js -> maintained (13->8/6 blocks): merge twins -> 3-act byte-exact incl wholesale-shallow-replacement pin (lodash hazard); falsy-clears it.each; updater-rejection honest counter pin; dead mocks purged; typeof :112 dropped (rec consumed)
+run2#322: char-sheet/useCharActionsAttackHandlers-2.test.js -> maintained (21->14): exhaustion-twins folded into happy-path rolls; byte-exact buffs/expiries/logs; cancel-nevers-arm negatives NEW; dead mocks purged [recs->brutalGate subset deletes + base legacy marker strip]
+run2#327: handlers.psychicBlade.test.js -> maintained (8->5/7): gatePsychicBladeAttack unique seam; stringContaining('manifest') ambiguity FIXED (byte popups); zero-write refusals
+run2#328: automation.cla143-gate.test.js -> maintained (5->2/4): refusal it.each attributable live-round; casting-dup dropped (base owner); zero-total-writes + FP=19 single-charge
+run2#329: automation.fleetStep.test.js -> maintained (6->4/5): grant OR-leg it.each full byte seam + latch; Step-of-Wind service-dup dropped (owner fleetStepService:84); all absences pos-leg-gated
+run2#330: automation.stunning-strike.test.js -> maintained (6->2/8): 6-branch refusal it.each byte popups; ordered spend->latch->dispatch; vi.hoisted round footgun fix [rec->test.early-returns.js whole delete]
+run2#331: automation.test.js BASE -> maintained (45 blocks/~70->22/40, 1782->588 lines): result-types/modal-routing/divine-dups dropped (owners green); vacuous fallback+notify FIXED; loops->it.each rec consumed
+run2#332: baseActions.dodge-2024.test.js -> maintained (3->1): byte dual-sink pin (byte equality implies Dex-clause absence); 5e-dup deleted (owner dodge:90-101 green)
+run2#333: baseActions.grapple-contest-math.test.js -> maintained (8->3/11): channel-precedence it.each exact; tie boundary mutation pin; JoAT-half+exhaustion real pins; stamp-dup + dead getMonsterData purged [3 recs->GrappleAction lane]
+run2#334: useCharActionsCleave.test.js -> maintained (16 it->12 blocks/16 cases): Math.random coin-flip FIX (AC-boundary provable hit/miss); topple 4-log byte chain + DC14 derivation; raw-formula fallback pins NEW; dead logService mock purged [obs: cleave rolls raw Math.random bypassing dice infra]
+## Batch #146 GREEN-canon + run2#335
+## Batch #146 GREEN-canon — 2758 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35982 passed. Lint clean. Evidence /tmp/batch146.log
+## Batch #146 — PROGRESS: completed 1485 / remaining 1205 (total 2690)
+run2#335: useCharActionsDodgeAction.test.js -> maintained (5->2/4): Dex-clause canon consolidated it.each both sinks one run (rec #332 consumed); cannotAct absence legs NEW; single-fire pins [recs->baseActionsHide:381-416, grapple:573 typeof]
+run2#336: useCharActionsGrappleAction.test.js -> maintained (24->21/9 defs): 4 recs consumed (vacuous JoAT/exhaustion deleted post-green; sign-dups folded; smelly fixture rewritten; typeof dropped); adv/dis exact it.each
+run2#337: hideAction.naturallyStealthy.test.js -> maintained (5->3/5): size-fallback same-branch fold; cites it.each byte; boundary-vs-control distinguishable; dead mock purged
+run2#338: hideAction.test.js BASE -> maintained (34->25/7): forcedMode 10->channel table x11; 6 twins->boundary-pinned table; Skulker/bonus folds [🔴->ledger :52 ?? precedence drops exhaustion; 🗑 :53-58 tautologies]
+run2#339: modalHandlers.areaEffects.test.js -> maintained (12->9/16->17): vacuous refusal gates FIXED (never isolated); popup positive legs NEW; exact arity mapName-vs-not pins; 15->3 mocks
+run2#340: modalHandlers.buffs.test.js -> maintained (25->17/34->29): refusal vacuity fixed isolated; CLA-200 nth latch-order pins; real campaignName fixtures; 14->3 mocks mandatory-keys probed [rec->inspiration mirror]
+run2#341: modalHandlers.combatSuperiority.test.js -> maintained (21->4 it.each/18): table-driven routing map; flush table honest campaign; handle-keys probed [🔴->ledger commanderStrike never flushes logEntries]
+run2#342: modalHandlers.healing.test.js -> maintained (510->349 lines, 39->31): store-ownership pins (modalState vs mergedModalState wrong-store refusals); arity/leak-guards byte; 7 dead mocks purged
+run2#343: modalHandlers.inspiration.test.js -> maintained (18->12/3 tables): 12/14 mocks purged (handle+applyD20Modifier probed); wrong-store pins; popup strict-type honesty NEW
+run2#344: modalHandlers.oceanicGift.test.js -> maintained (8->4/9): CLA-240 ?? precedence pinned (false-over-true, old ||-passing); 16/17 mocks purged
+run2#345: modalHandlers.test.js BASE -> rewritten (2 shape+20 mocks -> 3 tests/10): exact 27-key set; 3 orphan routings (Bulwark/Zealous/Psychic) covered w/ tables
+run2#346: initiativeEffects.activeStateClearing -> maintained (12->4/5): full snapshot byte pin (tracker-loop sole owner); misnamed-opposite tests FIXED; vow guard real pin [🔴 clearLivingLegend x2; ⚠ vow unconditional rewrite]
+run2#347: initiativeEffects.batchResets -> maintained (4->2): exact 9/10-key batch payloads (projectedWardDamage was missed); guard-dup dropped [🗑 :410 dead guard]
+run2#348: initiativeEffects.buffClearing -> maintained (21->19/8): production-faithful fake store (resurrection-contradiction FIXED); guard blocks dropped (owner green) [🔴 :111 skipSync arg ignored]
+run2#349: initiativeEffects.cleanup -> maintained (3->2): listener-ref plumbing spies -> behavioral teardown (canary surviving-listener proofs)
+## Batch #147 GREEN-canon check + run2#350 record follows
+## Batch #147 GREEN-canon — 2758 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35926 passed. Lint clean. Evidence /tmp/batch147.log
+## Batch #147 — PROGRESS: completed 1500 / remaining 1190 (total 2690)
+run2#350: initiativeEffects.concentrationClearing -> maintained (16->7/15): prod-faithful fake store adopted; source-filtering within same key + skipSync byte pins NEW; guards seeded non-empty [recs->edgeCases :324/:426-453]
+run2#350: initiativeEffects.concentrationClearing -> maintained (16->7/15): fake store adopted; source-filter + skipSync byte pins; seeded guards [recs->edgeCases]
+run2#351: initiativeEffects.concentrationClearing2 -> maintained (20->6/12): disjoint lanes verified; sequential-append proof; guards non-vacuous [🔴->ledger :163-171 Calm multi-condition clobber; rec->edgeCases Calm]
+run2#352: initiativeEffects.edgeCases -> maintained (14->4, 455->215 lines): recs applied w/ disk verification (falsy-on-found was UNOWNED -> kept); 10 owned dups dropped
+run2#353: initiativeEffects.effectClearing -> maintained (14->4): INITIATIVE_CLEARED sweep sole owner; write-sequence fake-store canon; batch completion pin
+run2#354: initiativeEffects.initiativeRolled -> maintained (22->19/4 tables): guards+batch-past-guard pins; fake-store final states; superior-defense dropped (rec consumed)
+run2#355: initiativeEffects.invisibilityRegen -> maintained (15->6): sole-owner regen lane; getAllStoreKeys loop-source pin (old vacuous); != null vs 0 semantics distinct legs; typeof guard seeded-biting; 3 guard-dups dropped (owner #354)
+run2#356: initiativeEffects.turnUndeadResult -> maintained (20->6/19): guard tables + rollExpression-not pins; unverifiable-fixture FIX (Radiant fallback now real); CLA-303+5 context dups folded byte-exact; dead exports purged
+run2#357: useModalHandlers-damage -> maintained (28->10/25): sole-owner 8 damage-confirm handlers; guard table strong-form; first-bracket-only rewrite pin; [same_as_weapon] fallback NEW; mocks removal-probed [🔴->ledger :102 unconditional formula rewrite]
+run2#358: useModalHandlers-features -> maintained (11->8): dead-branch falsy-tests deleted (real callees return popup unconditionally); boundary constellation pins + identity; vacuous gate fixed [2 recs->base:70/-simple:47 folds]
+run2#359: useModalHandlers-flurry -> maintained (20->13/19): CLA-144 heal/harm routing NEW coverage (zero before); unreachable-shape removals vs real callees; key-isolation gates; mocks removal-probed
+run2#360: useModalHandlers-simple -> maintained (3->2): rec :47 folded (stronger: two-name arg-ignore + full call-array deep-equal); mocks purged to setModalState-only (proved refs); base :70 rec stands
+run2#361: useModalHandlers.test.js BASE -> maintained (rec :70 folded w/ identity upgrade + invocationCallOrder seam-order; registry 18-key contract NEW sole-owner; createDeps factory purged, 4-dep minimal) [useModalHandlers family CLOSED #357-#361]
+run2#362: character-creation/CascadingSelect -> maintained (13->11/20): shared-mock-leak FIX (makeProps factory); cascade rerender contract NEW; error twins folded; orphan-component noted
+run2#363: character-creation/Wizard.integration -> REBUILT from vacuous expect(true) (1 fake -> 3 real): first true-wizard integration lane (create-walk+gates, dup-name guard state-only, byte-exact submit); stable-fixture OOM gotcha documented [🔴 :61 languageWarnings->getProps gap = canon FIXME owner]
+run2#364: character-creation/Wizard.submission -> maintained (7->4): validator-chain byte pins; happy-path dropped (owner #363 real-validator); FT-001 cap + sidebar-prop pin kept; mock-preamble purged w/ honest-fill fixes
+## Batch #148 GREEN-canon — 2758 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35862 passed. Lint clean. Evidence /tmp/batch148.log
+## Batch #148 — PROGRESS: completed 1515 / remaining 1175 (total 2690)
+run2#365: character-creation/EquipmentSearchModal -> maintained (20->10): filter-logic NOT re-derived (owner useEquipmentSearch lane); exact rows/text-set pins; vacuous-guard rerender FIX; close-paths folded
+run2#366: character-creation/FeyTouchedModal -> maintained (40->20): byte-exact mock.calls save-sequence; handlerless-overlay vacuous deletions [rec: MagicInitiateModal overlay twins same pattern]; fixture ??-swallow-null FIX
+run2#367: char-creation/MagicInitiate-SpellDetails -> maintained (7->3/8): unmocked markdown byte-pins; exact meta span-lists; vacuous-empty-state FIX [rec->core overlay vacuits confirmed]
+run2#368: char-creation/MagicInitiate-validation -> maintained (10->4/10): 6 distinct validateInstance branches it.each exact error-sets + zero-write; valid-submit real gate-open proof [recs->core/save]
+run2#369: char-creation/MagicInitiate.core -> maintained (14->7/8): overlay vacuits DELETED (recs consumed); dedupe near-vacuous FIXED; onClose gap closed in render-contract [recs->summary:91, save:11-58]
+run2#370: char-creation/MagicInitiate.save -> maintained (5->3): nth-sequence fold (rec #369); onClose-on-success NEW family gap-closer; union oracle; error-dups dropped (rec #368) [rec->summary:91 stands]
+run2#371: char-creation/MagicInitiate.summary -> maintained (6->1 it.each/4): exact ordered rows + dash-counts + button-counts; recs :91/:25/:53/:39/:17 all folded; remove-cites core [MagicInitiateModal family CLOSED #367-#371]
+run2#372: char-creation/SelectableList -> maintained (24->13/18): onRemove contract NEW (was untested); dead-ternary smoke -> rerender flow; class->role queries; 6 smokes->1 contract [🗑->ledger :198-204 dead ternary]
+run2#373: char-creation/WizardFooter -> maintained (11->2 tables/11): full position truth-table exact pins; click-routing isolation (target-once + siblings-never); owned label keeper confirmed
+run2#374: char-creation/WizardHeader -> maintained (2->2 hardened floor): prop-distinct titles; pre-click negative; handler verified wired (no vacuits)
+run2#375: char-creation/WizardProgressBar -> maintained (3->1 table/7): width truth-table exact quartiles; editing-shift contrast kept; source-verified pure presentational (no handlers)
+run2#376: char-creation/WizardSidebar -> maintained (10->6/9): ordered title truth-table ruleset x isEditing; disabled-click vacuits -> toBeDisabled pins; canonical-step click payload pin
+run2#378: char-creation/WizardStepAbilities BASE -> maintained (20->14): disk-calibration FIX 24->27; localStorage order-dep FIX; exact-badge pins x5; rec :174 consumed (misc-only); handlerless-negative dropped
+run2#379: char-creation/WizardStepBackground -> maintained (12->6/9): disk-faithful fixtures (fake-disk fixtures replaced); collapsed-negatives NEW; validator-copy cites utils:320; heading-cites Numbering [obs: backgrounds.json OCR typos]
+## Batch #149 GREEN-canon check + run2#380 record
+## Batch #149 GREEN-canon — 2758 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35772 passed. Lint clean. Evidence /tmp/batch149.log
+## Batch #149 — PROGRESS: completed 1530 / remaining 1160 (total 2690)
+run2#380: char-creation/WizardStepBasic -> maintained (19->16): portrait src-branch it.each x4; real FileReader (mock dropped); disk-faithful alignments 9/9; level falsy-legs distinct failure modes [📌->ledger response.ok unchecked]
+run2#383: char-creation/WizardStepInventory -> maintained (23->13/23): modal-open routing proven (only-selected flags, setter-isolation); exact merged itemMeta payloads; textarea targeting FIX; mock trimmed to wiring seam (#365 split respected)
+run2#384: char-creation/WizardStepLanguages -> maintained (16->8/14): disk-verbatim fixtures (fake 'Dwarfish' gone); mutation-checked disabled pin; auto-select it.each; [re-confirm: languageWarnings->step12 canon FIXME owner]
+run2#385: char-creation/WizardStepMagicItems -> maintained (15->7/17): disk-verbatim fixtures (fake rarities/2024-subtitle fixed); CLA-374 8-branch gate matrix both-ways boundaries; vacuous index-count test deleted; 3 mutation-checks reverted clean
+run2#386: char-creation/WizardStepNumbering -> maintained (8->9/4): exhaustive 4-flow numbering table (owner contract, 2024-editing NEW); sidebar minimal (rec #376 consumed); dup 2024-heading dropped
+run2#388: char-creation/WizardStepResistances -> maintained (12->7): disk JSON verbatim fetch; onImmunityToggle isolation NEW (zero cov before); CSS-class/unreachable-fallback deletions; 2 mutation-checks clean
+run2#389: char-creation/WizardStepRules -> maintained (7->4/8): twin-mount fold render-contract disk-verbatim; it.each click/payload no-double-fire; 3 mutation-checks clean; dead stepNumber dropped
+run2#391: char-creation/WizardStepSkills BASE -> maintained (35->28/12): 13-gating->10-row matrix exact msg+feedback; rec :340+:321 deleted; disk-verified fixtures; 2 mutation-checks clean [🔴->ledger :255-257 unreachable guard]
+run2#394: char-creation/WizardStepSpells.ritual-master -> maintained (3->3/4): full auto-open/close/reopen cycle + banner-gate distinction pin; exact '(2)' count interpolation kill; boundary non-holder [🔴->ledger :105 string-length bogus banner; recs: FT negative extend, RitualMasterModal own lane MISSING queue]
+run2#395: char-creation/WizardStepSpells BASE -> maintained (16->15): rec #393 folded; exact count-string breakdown; slot-filter fold; class-filter tautology -> real derivation [feat lanes respected]
+## Batch #150 GREEN-canon — 2758 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35724 passed. Lint clean. Evidence /tmp/batch150.log
+## Batch #150 — PROGRESS: completed 1545 / remaining 1145 (total 2690)
+run2#396: char-creation/WizardStepSubclass -> maintained (12->8/6): disk-import fixtures (fake 'Barbarian-no-subclasses' deleted); class-change cascade repopulation pin; mutation-checks x3 clean; disk dead-fallback deletions
+run2#398: char-creation/WizardStepTools -> maintained (26->7): disk-verbatim fixtures everywhere; 19 fiction-states deleted post-disk-verify; locked-tool + exact rules sentences [rec->computeSkilledToolUsage dead export]
+run2#400: encounter/EncounterBuilder.gameplay-flows -> SALVAGED from vacuous (citation audit: XP-recalc chain provably uncovered repo-wide): 1 honest real-builder XP/qty/multiplier flow test, real generator math [4-placeholder deletions pending own lanes: interactions/modal-flows/modal-interactions/rendering-candidate]
+run2#401: encounter/EncounterBuilder.helpers -> REBUILT (15 verbatim-helper-copies = zero coverage -> 8 real-code): localStorage-filter owner NEW; band-boundary 0.5x strict<; [🔴->ledger EncounterFilterPanel env-unreachable; config:39 stale comment]
+run2#402: encounter/EncounterBuilder.interactions -> DELETED (rec 3x-confirmed vacuous tombstone; behavior-map -> live owners panel/additional/gameplay verified green)
+run2#403: encounter/Wizard? no -- encounter/load-encounter -> maintained (7->5/7): exact-payload reconcile it.each; corrupt-path restored state-preservation; race waitFor FIX; ~200L mock trim [rec->shared encounterTestUtils extraction]
+run2#404: encounter/EncounterBuilder.modal-flows -> DELETED (vacuous tombstone; 4 citations spot-verified live uncovered-handlers/additional; siblings green post-delete)
+run2#405: encounter/EncounterBuilder.modal-interactions -> DELETED (vacuous tombstone 23L; siblings panel/gameplay green; circular-consumer claim debunked)
+run2#407: encounter/remaining -> maintained (12->6, 723->189L): 2 recs consumed owner-green; replica-block dropped REAL panels; generator-apply sole owner NEW [recs->test-utils orphan; reset/rendering rebuild]
+run2#408: encounter/rendering -> DELETED (sole assertion mock-scaffolded vacuous; panel-interactions L178 byte-canon strictly stronger real-gate; owners 15/15 green)
+run2#409: encounter/reset-encounter -> maintained (528->230L, 2->2 stronger): replica-block->real panels; full-wipe byte pin + no-server honest; NEW unbind-consequence pin (Save routes new post-reset) [rec->test-utils zero-importers DELETE]
+## Batch #151 GREEN-canon check + run2#410 record
+## Batch #151 GREEN-canon — 2754 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35651 passed. Lint clean. Evidence /tmp/batch151.log
+## Batch #151 — PROGRESS: completed 1556 / remaining 1130 (total 2686)
+run2#410: encounter/uncovered-handlers -> maintained (507->161L, 3->2/3): all 8 replica blocks -> real panels; delete-confirm it.each byte; [🔴x2->ledger double delete-confirm; rename UI unreachable dead path]
+run2#411: encounter/EncounterFilterPanel -> maintained (15->10): vacuous color test FIXED (real border); byte difficulty/level dispatch; env-prop purged (source-confirmed unwired); disk/JSX verbatim options
+run2#411: encounter/EncounterFilterPanel -> maintained (15->10): vacuous color-test FIXED (real border); byte difficulty/level dispatch; env-prop purged (source-confirmed unwired)
+run2#412: encounter/EncounterGeneratorModal -> maintained (20->13): byte payloads + exact counts; tautological-diff fixed; handlerless backdrop deleted [🗑->ledger :49-61 sync generating flag dead spinner]
+run2#413: encounter/EncounterModal -> maintained (25->12): rename-mode tests DELETED (mode='rename' unreachable — useEncounterManagement sets save|load only); real formatEncounterName (identity mock purged); delete-confirm relabeled honest vs #410 double-fire; aria-role sort queries
+run2#414: encounter/EncounterMonsterTable -> maintained (24->22): vacuous zero-assert test + 4 internal-testid pins DELETED; toggle stopPropagation no-double-dispatch pin; sel/xp/env sort dispatch sole owner (#399 name/cr only)
+run2#415: encounter/EncounterSelectedMonsters -> maintained (9->5/7): exact span-set render contract + qty-suffix negatives; qty0/null collapse-deletions; fixture trap FIX; clear-all owned summary panel
+run2#416: encounter/EncounterSummaryPanel -> maintained (17->8/5): props->output contract no-math; CSS-cited class pins; fallback-semantics conflation FIXED; dead difficultyColors prop dropped [📌->ledger :51 inline style]
+run2#417: encounter/MonsterAction.gated-reaction -> maintained (4->table/4): NEW closed-gate zero-dispatch leg; spent!=disabled contract pinned; base-row echo dup removed; registry reads verbatim
+run2#418: encounter/MonsterAction.grant-reaction -> maintained (4->5): verbatim disk titles; refused-route payload byte-identity (spent!=disabled source-verified); NEW handlerless closed arm
+run2#419: encounter/MonsterAction.ma0286 -> maintained (10->9): gate ON/OFF/boundary byte-table; zero-cov unrollable siblings deleted (owners cited); census uses production extractor
+run2#420: encounter/MonsterAction.ma0294-rock-chip -> maintained (3->2/3): disk-verbatim Ape row byte-preconditions; chip-present-iff-rollable via role-length; recharge-twins fold; refusal-lane cites [rec: unrollable-damage:90 Club weaker twin delete stands]
+run2#421: encounter/MonsterAction.ma0300 -> maintained (3->1 it.each/2): 999-sentinel lane registry verbatim; call-count+spent leg NEW; [rec ma0305/ma1120 byte-twins fold]
+run2#422: encounter/ma0305-arch-hag-chip -> DELETED (byte-twin of ma0300 owner #421 diff-verified; helper ma0305-counterspell data-lock incl. row->chip resolution covers all; owners 24/24 green pre+post)
+run2#423: encounter/ma0762-gas-spore-touch -> kept-minimal (5->1): twin hypothesis rejected disk-evidenced (attack_bonus:0 outside #419 census, sole fingerprint); byte chips ['+0','DC 10 Constitution'] + zero-condition advisory guard; 4 helper re-derivations pruned
+run2#424: encounter/ma0763-fungus-tendril -> kept-minimal (4->1): sole disk fingerprint lock (full key-order); +0 chip + exact-row payload carries hit_conditions; MA-0762 cross-lock retired (absorbed #423); owners 151/151 green
+run2#425: encounter/ma0775-ghast-gravecaller-claw -> kept-minimal (4->1): sole row fingerprint (absent hitClause mega-lane); exact-row payload upgrade; cross-lock retired self-ownership precedent; owners 156/156 green
+run2#426: encounter/ma0776-necrosis -> kept-minimal (3->1 fused): sole-owner fingerprint strengthened full-keys; exact-row rider payload; MA-1084 mirror non-overlap confirmed; owners 156/156 green
+run2#427: encounter/ma0791-giant-axe-beak -> kept-minimal (4->3 fused): sole-owner dual-weapon fingerprint; it.each exact-row chip payloads (+8 twins rider-distinct); generics pruned owners 146/146 green
+run2#428: encounter/ma0794-giant-boar-gore -> kept-minimal (4->1 fused): giant-boar absent mega-lane (sole owner); payload-identity upgrade toBe(GORE) locks passthrough; helper imports dropped; owner 138/138
+run2#428 note: marker stamped by orchestrator (subagent reported green, file unmarked — gate protocol)
+run2#429: encounter/ma0795-giant-centipede-bite -> fused (4->1): sole-owner fingerprint+identity pin; helper re-derivations+imports dropped; owners 138/138
+run2#430: encounter/ma0799-giant-crab-claw -> fused (4->1): sole-owner; escape_dc clause generic-owned cited; identity upgrade; owners 138/138
+run2#431: encounter/ma0801-giant-crocodile-bite -> fused (4->1): sole byte-owner (crocodile-twin in mega-lane only; ma0802 guards bytes-but-Tail-chip); identity upgrade; owners green
+run2#432: encounter/ma0802-giant-crocodile-tail -> fused (4->1): Bite twin-guard deleted (ma0801 owner green); sole Tail byte-owner; imports dropped
+run2#433: encounter/ma0807-giant-frog-bite -> fused (4->1): disjoint from ma0286 Swallow lock; sole byte-owner; owners 152/152
+run2#434: encounter/ma0812-giant-octopus-tentacles -> fused (4->1): bytes/clause absorbed mega :261; kept sole unowned chip-dispatch identity; owners 138/138
+run2#435: encounter/ma0819-giant-scorpion-claw -> fused (4->1): unowned row full template; identity upgrade; owners 137/137
+run2#436: encounter/ma0829-giant-squid-tentacle -> fused (4->1): unowned full template (octopus-twin distinct); owners 147/147
+run2#437: encounter/ma0831-giant-toad-bite -> fused (5->1): unowned full template; secondary-leg bytes inside toEqual; owners 138/138
+run2#438: encounter/ma0834-giant-vulture-gouge -> fused (4->2): unowned exact-bytes lock (guessed-shape corrected to disk); identity press; owners 137/137
+run2#439: encounter/ma0838-gibbering-mouther-bite -> fused (4->2): verbatim disk read (decoy save_effect preserved); helpers pruned cited; marker header
+## Batch #153 flush after run2#439 (15 files #425-#439, all MA fused-canon)
+## Batch #153 GREEN-canon check pending record
+run2#440: encounter/ma0841-githyanki-dracomancer-strike -> fused (5->2): unowned verbatim disk fingerprint (frightened rider no escape_dc); clause generic-owned cited (hit-choice owners x2 green); identity press
+## Batch #153 GREEN-canon — 2753 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35545 passed. Lint clean. Evidence /tmp/batch153.log
+## Batch #153 — PROGRESS: completed 1585 / remaining 1100 (total 2685)
+run2#441: encounter/ma0863-glabrezu-pincer -> fused (4->1): sole owner confirmed (chuul pincer twin in mega, glabrezu absent); byte-lock + identity; owner 137/137
+run2#442: encounter/ma0877-gnoll-fang-bite -> fused (5->1): sole byte-lock (no twins); index FIX actions[1]; identity payload; owners 137/137
+run2#443: encounter/ma0909-revenant-suffocate -> fused (5->1): sole lane (no suffocate mechanics lane anywhere); BY-name fix; owners 137/137
+run2#444: encounter/ma0927-grell-tentacles -> maintained (7->2): save-chip row confirmed; chips ['+4','DC 11 Constitution'] + onSaveRoll formula:null riderOnly byte; save-plan re-derivations pruned (MA-1000/1867 owners); owners 157/157
+run2#445: encounter/ma0930-grick-tentacles -> fused (5->1): bytes+clause self-owned (grick absent mega); zero-save-chip fork pin NEW; owners 160/160
+run2#446: encounter/ma0984-hill-giant-trash-lob -> fused (5->1): bytes owned mega :264; key-lock+verbatim+zero-save-chip+identity kept; owner green
+run2#447: encounter/ma0995-hobgoblin-javelin-te -> maintained (6->2): te byte-slot adjacency sole owner; te-only gate identity; registry/def pins pruned (defs lane owners); owners 586/586
+run2#448: encounter/ma1012-ice-devil-spear-te -> maintained (6->2): #447 template mirrored; mega :263 absorbed fingerprint kept byte-slot pins; owners 584/584
+run2#449: encounter/ma1014-ice-wall-chip -> maintained (9->5): sole census of isUtilitySpellCastRow discriminator arms; utility chip fresh/spent/never-rollable legs fused; inert/owned dups pruned (ma1016); owners 31/31
+run2#450: encounter/ma1016-fog-cloud-chip -> maintained (5->4): #449 restatement dropped; twins folded; spent-USES gate source-verified; imp MA-1019 sole pin; owners 9/9
+run2#451: encounter/ma1020-shape-shift-chip -> maintained (6->3): service-lane internals pruned cited; guard-twins + exclusions folded; BY-name fix; owners 47/47
+run2#452: encounter/ma1071-pincer-staff-dc0 -> maintained (8->3): <=0 suppression gate pinned honestly; buildSaveOptions dc0/dcSuccess null sole owner; 5 owned-dups pruned; owners 44/44
+run2#453: encounter/ma1084-lich-paralyzing-touch -> maintained (5->2): mega :265 tuple absorbed numerics/clause; kept tuple-miss deltas + sole press identity + DC0-gate zero-chip; owners green
+run2#454: encounter/ma1111-lizardfolk-shaman-bite -> fused (5->1): sole byte-owner (crocodile twin cited); fused-1 identity; owners 148/148
+run2#455: encounter/ma1113-shape-shift-chip -> maintained (4->1): distinct shaman row kept (formsText title NEW pin); guards cited #451; owners green
+run2#456: encounter/ma1116-sovereign-earthen-maul -> fused (5->1): unowned plain fused-1 (dao twin cited); decoy-save structural lock; identity press; owners 141/141
+## Batch #154 GREEN-canon — 2753 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35487 passed. Lint clean. Evidence /tmp/batch154.log
+## Batch #154 — PROGRESS: completed 1600 / remaining 1085 (total 2685)
+run2#457: encounter/ma1120-mage-chip -> DELETED (rec #421 consumed; mage row byte-parity MA-0300 sentinel, helper ma1120-counterspell lock exhaustive; owners 90/90 green)
+run2#458: encounter/ma1125-magmin-touch-te -> maintained (5->2): te-only template; fingerprint sole-owner; grant absorbed generic; owners 595/595
+run2#459: encounter/ma1141-mastiff-bite -> fused (4->1): unowned plain fused-1; clause arm + chip-set subsumption; owners 141/141
+run2#460: encounter/ma1147-ocean-spear-te -> maintained (8->2): te template; skirmisher unabsorbed fingerprint+arm kept; owners 592/592
+run2#461: encounter/ma1149-aquatic-burst -> fused (4->1): unowned plain; identity push; owners 147/147 + 12/12
+run2#462: encounter/ma1153-merrow-bite -> fused (4->1): sole-owner 7-lock recipe (ma1141 mirror); owners 149/149
+run2#463: encounter/ma1157-mezzoloth-claws -> fused (5->1): sole-owner fused lock DC14 clause; owners 149/149
+run2#464: encounter/ma1161-mimic-pseudopod -> fused (6->1): plain fused-1 verified; DC13 grapple clause; owners 155/155
+run2#465: encounter/ma1162-mind-flayer-tentacles -> fused (5->1): fused-1 disk-keys; grappled+stunned DC14; owners 151/151
+run2#466: encounter/ma1212-rapport-spores-zone -> maintained (12->6): sole isZonePickerRow guard matrix; cited DC0 owner kept; twin renders->modal owner; owners 22+333
+run2#467: encounter/ma1223-nalfeshnee-teleport-advisory -> maintained (8->4): advisory locks->service owner; chip routing+gate forks kept; owners 41/41
+run2#468: encounter/ma1224-nalfeshnee-pursuit-advisory -> maintained (9->2): reaction-category fork distinct; verbatim restatements->service/#467 owners; owners 36/36
+run2#469: encounter/ma1260-shape-shift-chip -> maintained (5->1): oni suppression-leg sole regression pin (junk attack_bonus re-add fails here); restatements->#451/#455/service owners
+run2#470: encounter/ma1344-primal-companion-sea-grapple -> fused (4->1): per-caster-fold invariant sole lock; clause live-arm kept; fold->handler owner cited; owners 176/176
+## Batch #155 GREEN-canon check + run2#471 record
+run2#471: encounter/ma1357-purple-worm-bite -> fused (4->1): sole byte-owner (not mega; no secondary on Bite); identity press; owners 147/147
+## Batch #155 GREEN-canon — 2752 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35419 passed. Lint clean. Evidence /tmp/batch155.log
+## Batch #155 — PROGRESS: completed 1614 / remaining 1070 (total 2684)
+run2#472: encounter/ma1368-quasit-rend -> fused (5->1): unowned byte-lock+clause; ma1371 collision-check clear; owners 171/171
+run2#473: encounter/ma1371-shape-shift-chip -> maintained (5->1): core +Rend inert-sibling kept; patterns->#451/#455/#469 cited; owners 15/15
+run2#474: encounter/ma1378-rakshasa-cursed-touch -> fused (6->1): unowned fused-1; sole render+clause arm owner; owners 422/422
+run2#475: encounter/ma1389-remorhaz-bite -> fused (5->1): sole byte-owner; riders-after-secondary shape; owners 147/147
+run2#476: encounter/ma1397-roc-talons -> fused (5->1): byte-twin fused-1; owners 148/148
+run2#477: encounter/ma1400-roper-tentacle -> fused (6->2): zero-damage '0' arm retained (consumer delegates shape); owners 7/7
+run2#478: encounter/ma1402-rug-smother -> fused (6->2): sole-owner (distinct animated-rug twin :231); dispatch-arm cited-owned kept; owners 150/150
+run2#479: encounter/ma1450-seahorse-advisory -> maintained (5->2): cited suppression leg kept (key-absent shape); resolver verbatim->service; owners 49/49
+run2#480: encounter/ma1520-sprite-enchanting-bow -> fused (7->1): plain fused-1 honest (no save decoys on disk); sole byte-owner; charmed clause->mega twins cited; owners 180/180
+run2#481: encounter/ma1534-stone-giant-boulder -> maintained (6->2): tuple-absent deltas own lane; fingerprint merge + sole press identity; owners 137/137
+run2#482: encounter/ma1541-storm-giant-thunderbolt -> maintained (6->2): unowned fingerprint + blinded/deafened clause; owners 149/149
+run2#483: encounter/ma1546-succubus-charm -> fused-2 (8->2): sole verbatim Charm lock; DC 15 Charisma chips + onSaveRoll byte payload; extractors->MA-1000/1867 cited; owners 32+1xfail canon
+run2#484: encounter/ma1620-t-rex-bite -> fused (6->1): sole byte-owner (no grappled+17 tuple); clause arm tuple-miss; identity upgrade; owners 153/153
+run2#485: encounter/ma1621-t-rex-tail -> fused (7->1): inverted-Bite pin deleted (ma1620 verbatim stronger); sole prone-TAIL lock + identity; owners green
+run2#486: encounter/ma1638-vampire-grave-strike -> fused (6->1): sole byte-owner (spawn :273 distinct); clause tuple-miss + identity; owners 166/166
+## Batch #156 GREEN-canon — evidence /tmp/batch156.log
+## Batch #156 — PROGRESS: completed 1629 / remaining 1055 (total 2684)
+run2#487: encounter/ma1680-commander-longbow-te -> maintained (10->2): te template; twins self-owned deleted; key-order byte-slot + Greatsword trap sole; owners 587/587 [📌->ledger ma0995 stale xref]
+run2#488: encounter/ma1723-winter-wolf-bite -> fused (6->1): mega :280 absorbed; key-slot + inverted siblings kept; owners 153+11
+run2#489: encounter/ma1726-wolf-bite -> fused (6->1): mega :281 absorbed; 4 tuple-miss deltas kept; owners 148/148
+run2#490: encounter/ma1732-wyvern-sting -> fused (6->1): tuple-miss verbatim fingerprint + press identity; owners 17/17
+run2#491: encounter/ma1846-apep-sting-legendary -> maintained (7->2): gate pass-through resolved; sole Coils delegates_to lock; gate-open identity; forks->kraken/ma1847 owners; owners 175/175
+run2#492: encounter/ma1847-apep-devour-save -> maintained (6->2): fused-2 save shape; gate/transport->modal owner; storage mock dropped; owners 10/10
+run2#493: encounter/MonsterAction.self-buff -> maintained (12->9): it.each fixture-shape fold; NEW MA-0694 legendaryGate suppression fork; service restatements pruned cited; owners 54/54
+run2#494: encounter/MonsterAction.summon -> maintained (23->12): 5-shape it.each fold, exact tooltips+chance+honest adjudication; galib byte-twin deleted; services owners cited
+run2#495: encounter/MonsterAction.unrollable-damage -> maintained (7->5): Club+HeatAura twins deleted (rec #419 applied); canRoll census sole owner; gate-fixture flaw fixed; owners 14/14
+run2#496: encounter/MonsterCard.ma1971-wing-defense -> maintained (11->2): verbatim row lock + render contract; parry-gate comments->ma1203 owner; owners 62/62 [📌->ledger ma1071 stale xref :95->:71]
+run2#497: encounter/MonsterCardHelpers.ac-penalty -> maintained (5->6/4): owner truth-table folded; Ancient twin data lock NEW; consumer direct-call recs [->ledger]
+run2#498: encounter/MonsterCardHelpers.animal-spirit -> maintained: owner truth-table; default-collision fiction justified; unreachable guards deleted; owners 20/20
+run2#499: encounter/MonsterCardHelpers.banish-transport -> maintained (6->2): truth-table + verbatim Adult/Ancient locks; half-vacuous 'Death kiss' fixture deleted (nonexistent monster); owners 589 green
+## Batch #157 flush after run2#499 (15 files #485-#499)
+run2#500: encounter/MonsterCardHelpers.berserk-lashing -> maintained (14 its->9 units/34): owner tables x4 + resolve branch-per-leg; NEW coverage gate-ceiling/fire-check; [🔴->ledger :2529 null->0 fold hole TRIPWIRE]
+## Batch #157 GREEN-canon check pending — see below
+## Batch #157 GREEN-canon — 2752 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35286 passed. Lint clean. Evidence /tmp/batch157.log
+## Batch #157 — PROGRESS: completed 1644 / remaining 1040 (total 2684)
+run2#501: encounter/MonsterCardHelpers.both-outcomes -> maintained (8->5/11): truth-table + guardrail scan; echoes pruned cited; owners 19/19
+run2#502: encounter/MonsterCardHelpers.cataclysm-rays -> maintained (12->7): NEW spellInfo-gate + advisory-log coverage; picker echoes pruned; owners 67/67
+run2#503: encounter/MonsterCardHelpers.concentration-disadv -> maintained (5->4): truncated-fixture FIX re-pull BY NAME; guard branch completed; owners 2/2
+run2#504: encounter/MonsterCardHelpers.damageless-spell-save-leg -> maintained (11->8): self-referential expected FIX; zone-guard kill-fixture justified; owners 21/21
+run2#505: encounter/MonsterCardHelpers.exhaustion-clause -> maintained (8->4): clamp 0->1 pin NEW; data-lock + self-ref threading pruned; owners green
+run2#506: encounter/MonsterCardHelpers.eye-rays -> maintained (27->13): owner tables + trunc/new branches; #502 popup rec APPLIED (toBe); siblings 55/55
+run2#507: encounter/MonsterCardHelpers.flat-hit-damage -> maintained (23->9): BY-name disk fixtures replace 6 hand-transcripts; owner table branches; MA-0747 echo block pruned; owners 13/13
+run2#508: encounter/MonsterCardHelpers.gated-reaction -> maintained (76->32): triple-null fixed; 10 parry twins it.each e2e; self-ref FIX; recs [->ledger]
+run2#509: encounter/MonsterCardHelpers.gaze-immunity -> maintained (7->3): unpinned gaps FIXED (default/slug-fallback/wrong-target); registry echo pruned; owners 358
+run2#510: encounter/MonsterCardHelpers.gazer-eye-rays -> maintained (13->6): #506 seam rec applied; gazer-distinct legs kept; BY-name anchors; owners 19/19
+run2#511: encounter/MonsterCardHelpers.grapple-ongoing-damage -> maintained (8->5): 2 new parser branches covered; stale mislabeled byte-lock cut (ma1939 owner); owners 15/15
+run2#512: encounter/MonsterCardHelpers.heal-reaction -> maintained (9->7): 4 new branches covered; vacuous order FIX; twin/disk echoes pruned cited; owners 84
+run2#513: encounter/MonsterCardHelpers.hellish-rebuke -> maintained (12->7): null-neg rec applied; spec-guard/dead-attacker/range NEW; self-ref FIX; owners 39/39
+run2#514: encounter/MonsterCardHelpers.hit-choice -> maintained (9->6): vacuous description-echo FIX; 4 new offer-builder branches; index-gymnastics->BY-name; owners 22/22
+## Batch #158 flush after run2#514 (15 files #500-#514)
+run2#515: encounter/MonsterCardHelpers.infernal-wound -> maintained (5->3): override/normalization branches NEW; misnamed 'Cornugon' header FIX (Horned Devil :37751); raw-shape non-call cut; owners 16/16
+## Batch #158 GREEN-canon check — see below
+## Batch #158 CANON BREACH ALERT — NEW FAIL: ElementalAttunementModal.player-save 'Lightning failure' exact-roll-row. Not caused by window #500-#515 (encounter helper lanes only). Needs diagnosis at next relevant queue turn or manual probe.
+## Batch #158 — PROGRESS: completed 1659 / remaining 1025 (total 2684). Evidence /tmp/batch158.log
+run2#516: encounter/MonsterCardHelpers.limited-foresight -> maintained (8->6): once-only-null canon; recharge re-arm wiring kept; d6-cite-skip; owners 58/58
+run2#517: encounter/MonsterCardHelpers.ma0300-counterspell -> maintained (9->2): sole At-Will-spend ladder kept; re-derivations->#508 owner; self-ref FIX; owners 45/45
+run2#518: encounter/MonsterCardHelpers.ma0305-counterspell -> maintained (7->2): disk lock + SOLE usage-less seam kept (honest grep); twins->owners; owners 53/53
+run2#519: encounter/MonsterCardHelpers.ma0314-archmage-counterspell -> maintained (8->3): 3/Day economy distinct; vacuous-mod-injection FIX; owners 52/52
+run2#520: encounter/MonsterCardHelpers.ma0853-psionic-defense -> maintained (7->3): sequential limit-2 economy earned-state; null-copies->owner; owners 35+16
+run2#521: encounter/MonsterCardHelpers.ma0857-psion-defense -> maintained (7->2): distinct 999 At-Will economy sole 998->997; recs applied; owners 37/37
+run2#522: encounter/MonsterCardHelpers.ma0861-zerth-defense -> maintained (8->1): disk byte-twin confirmed->pure BY-name lock; press skip #422 precedent; owners 36/36
+run2#523: encounter/MonsterCardHelpers.ma0871-gnoll-spear -> maintained (6->2): byte-twin grep honest; disk lock + no-double-charge wiring; owners 40/40
+run2#524: encounter/MonsterCardHelpers.ma0875-thp-clause -> maintained: exact 4-branch table + guard-isolation fiction census-justified; #498 cross-pin kept; owners 26/26
+run2#525: encounter/MonsterCardHelpers.ma0959-half-ogre-battleaxe -> maintained (5->2): distinct 2d10+3 row lock; ma0871 pattern applied; owners 36/36
+run2#526: encounter/MonsterCardHelpers.ma0965-hrd-veteran-longsword -> maintained (5->2): rec #523 applied; distinct desc-prefix lock kept; owners 42/42
+run2#527: encounter/MonsterCardHelpers.ma0989-hobgoblin-longsword -> maintained (5->2): rec #523 applied; unique 1d10+1 disk-wide lock; owners 32/32
+run2#528: encounter/MonsterCardHelpers.ma1063-kuo-toa-spear -> maintained (6->2): distinct-bytes verified; S118 misfile lock; owners 40/40
+run2#529: encounter/MonsterCardHelpers.ma1100-lizard-king-queen -> maintained (6->2): single-row truth; unique trident literal; owners 34/34
+## Batch #159 flush after run2#529 (15 files #515-#529)

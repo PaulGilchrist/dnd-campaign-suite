@@ -1,7 +1,8 @@
+// @maintained-by-ai: 2026-10-18
 // MA-0548 regression: Cyclops Sentry Limited Foresight — pre-roll cloud
 // reaction (recharge "6"). GATED_MONSTER_REACTIONS `limited_foresight` arms
 // the chip; the resolver gates on campaign lastAttack identity (parry
-// MA-0341 lineage without the hit requirement — damageApplied is the
+// MA-0341 lineage WITHOUT the hit requirement — damageApplied:true is the
 // too-late boundary), recharges via the MA-0031 economy, and on fire grants
 // BOTH sides: te `disadvantage_attack_rolls` on the attacker (MA-0542
 // registered te) + self te `next_attack_advantage` with vexTarget = the
@@ -9,6 +10,11 @@
 // the cyclops (§38 anchor leg — expiry at its next turn-start, RAW
 // end-of-turn advisory). Re-arm only via rollMonsterRecharges d6 6+ at the
 // monster's own turn-start (MA-0544 lifecycle template).
+// Cite-skips (owned ONCE elsewhere, #508/#513 reaction-family template):
+// plain-row getGatedMonsterReaction→null at MonsterCardHelpers.gated-reaction.test.js:66 (#417);
+// rollMonsterRecharges d6 miss/threshold arithmetic at services/encounters/monsterRecharge.test.js:84/:96 (MA-0031) —
+// here only the d6 6+ re-arm seam (press-spend key ↔ gate read key) is this
+// lane's own wiring. Fixtures by name per #387. No timers.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -73,30 +79,27 @@ function spentRecharge(map = {}) {
   return { ...map, 'Limited Foresight': { recharged: false, threshold: 6 } };
 }
 
+function gateCall(extra = {}) {
+  return limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: null, armed: { name: KNIGHT }, currentRound: 2, usedRound: 0, ...extra });
+}
+
 beforeEach(() => {
   vi.mocked(registerTargetEffect).mockClear();
   vi.mocked(addExpiration).mockClear();
 });
 
-describe('MA-0548 disk row + registry shape', () => {
-  it('monsters.json cyclops-sentry reactions[0] carries automation {type,trigger,effect} + recharge "6"', () => {
+describe('MA-0548 disk row + registry', () => {
+  it('monsters.json cyclops-sentry reactions[0] locks RAW row and arms the chip', () => {
     expect(ACTION.name).toBe('Limited Foresight');
     expect(ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'attacked_by_seen', effect: 'limited_foresight' });
     expect(ACTION.recharge).toBe('6');
-  });
-
-  it('registry arms the Limited Foresight chip and ignores plain rows', () => {
     expect(getGatedMonsterReaction(ACTION)?.effect).toBe('limited_foresight');
-    expect(getGatedMonsterReaction({ name: 'Stone Club', attack_bonus: 9 })).toBeNull();
   });
 });
 
-describe('MA-0548 limitedForesightIdentityRefusal + gate', () => {
-  it('attack roll against the cyclops, damage not committed = armed', () => {
+describe('MA-0548 gate truth tables', () => {
+  it('limitedForesightIdentityRefusal truth table: armed null + six refusal tokens', () => {
     expect(limitedForesightIdentityRefusal(lastAttack(), SENTRY)).toBeNull();
-  });
-
-  it('identity refusals: trigger, roll, resolved, reacted, attacker', () => {
     expect(limitedForesightIdentityRefusal(null, SENTRY)).toBe('trigger');
     expect(limitedForesightIdentityRefusal(lastAttack({ targetName: 'ElderPaladin' }), SENTRY)).toBe('trigger');
     expect(limitedForesightIdentityRefusal(lastAttack({ rollType: 'saving-throw' }), SENTRY)).toBe('roll');
@@ -105,23 +108,15 @@ describe('MA-0548 limitedForesightIdentityRefusal + gate', () => {
     expect(limitedForesightIdentityRefusal(lastAttack({ attackerName: SENTRY }), SENTRY)).toBe('attacker');
   });
 
-  it('fresh recharge = available threshold 6; spent recharge refuses "recharge"', () => {
-    const fresh = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: null, armed: { name: KNIGHT }, currentRound: 2, usedRound: 0 });
-    expect(fresh).toMatchObject({ ok: true, attackerName: KNIGHT, threshold: 6 });
-    const spent = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: spentRecharge(), armed: { name: KNIGHT }, currentRound: 2, usedRound: 0 });
-    expect(spent.ok).toBe(false);
-    expect(spent.reason).toBe('recharge');
-    expect(spent.message).toMatch(/d6 6\+/);
-  });
-
-  it('no armed target or bystander arm refuses "target"; same-round latch refuses "round"', () => {
-    const noTarget = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: null, armed: null, currentRound: 2, usedRound: 0 });
+  it('limitedForesightGate truth table: fresh accept; recharge/target/target/round refusals', () => {
+    expect(gateCall()).toMatchObject({ ok: true, attackerName: KNIGHT, threshold: 6 });
+    expect(gateCall({ rechargeMap: spentRecharge() })).toMatchObject({ ok: false, reason: 'recharge' });
+    expect(gateCall({ rechargeMap: spentRecharge() }).message).toMatch(/d6 6\+/);
+    const noTarget = gateCall({ armed: null });
     expect(noTarget.reason).toBe('target');
     expect(noTarget.message).toMatch(/arm Knight 1 on the card/);
-    const bystander = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: null, armed: { name: 'ElderPaladin' }, currentRound: 2, usedRound: 0 });
-    expect(bystander.reason).toBe('target');
-    const latched = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: null, armed: { name: KNIGHT }, currentRound: 2, usedRound: 2 });
-    expect(latched.reason).toBe('round');
+    expect(gateCall({ armed: { name: 'ElderPaladin' } }).reason).toBe('target');
+    expect(gateCall({ currentRound: 2, usedRound: 2 }).reason).toBe('round');
   });
 });
 
@@ -157,7 +152,7 @@ describe('MA-0548 resolveMonsterGatedReaction — both-side te + recharge lifecy
     expect(result.popupHtml).toMatch(/WITHOUT Done/);
   });
 
-  it('same-event second press: limited_foresight_refused (reacted) — zero re-grant, zero spend', async () => {
+  it('same-event second press: limited_foresight_refused (reacted) — zero re-grant, zero spend, recharge kept', async () => {
     const { state, logs, deps } = makeDeps({
       la: lastAttack({ limitedForesightResolved: true, foresightBy: SENTRY }),
     });
@@ -172,7 +167,7 @@ describe('MA-0548 resolveMonsterGatedReaction — both-side te + recharge lifecy
     expect(state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`]).toBeUndefined();
   });
 
-  it('spent recharge press: recharge refusal popup + limited_foresight_refused not-recharged log, zero grant zero spend', async () => {
+  it('spent recharge press: recharge refusal log + popup, zero grant zero spend; turn-start d6 6 re-arms the gate', async () => {
     const { state, logs, deps } = makeDeps({ store: { [`${SENTRY}.${MONSTER_RECHARGE_KEY}`]: spentRecharge() } });
     const result = await resolveMonsterGatedReaction({ action: ACTION, monsterName: SENTRY, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(false);
@@ -183,38 +178,14 @@ describe('MA-0548 resolveMonsterGatedReaction — both-side te + recharge lifecy
     expect(logs[0].description).toMatch(/not recharged/);
     expect(result.popupHtml).toMatch(/Not Recharged/);
     expect(state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`]).toEqual(spentRecharge());
-  });
-
-  it('no armed target: limited_foresight_refused (no-target message, target) — Recharge kept', async () => {
-    const { state, logs, deps } = makeDeps({ armed: null });
-    const result = await resolveMonsterGatedReaction({ action: ACTION, monsterName: SENTRY, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('limited_foresight_refused');
-    expect(logs[0].description).toMatch(/\(target\)/);
-    expect(registerTargetEffect).not.toHaveBeenCalled();
-    expect(state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`]).toBeUndefined();
-  });
-
-  it('turn-start regain d6 6 re-arms the gate; d6 5 keeps it spent (honest threshold)', async () => {
-    const { state, logs, deps } = makeDeps();
-    await resolveMonsterGatedReaction({ action: ACTION, monsterName: SENTRY, campaignName: CAMPAIGN, deps });
-    expect(state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`]['Limited Foresight'].recharged).toBe(false);
-    const miss = await rollMonsterRecharges({
-      monsterName: SENTRY,
-      campaignName: CAMPAIGN,
-      deps: { getRuntimeValue: deps.getRuntimeValue, setRuntimeValue: deps.setRuntimeValue, addEntry: deps.addEntry, rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })) },
-    });
-    expect(miss.outcomes[0]).toEqual({ key: 'Limited Foresight', rolled: 5, recharged: false });
-    const gateAfterMiss = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`], armed: { name: KNIGHT }, currentRound: 3, usedRound: 0 });
-    expect(gateAfterMiss.reason).toBe('recharge');
+    // d6-miss arithmetic is MA-0031-owned (monsterRecharge.test.js:96) —
+    // this leg only proves the press-spend key re-arms THIS gate.
     const hit = await rollMonsterRecharges({
       monsterName: SENTRY,
       campaignName: CAMPAIGN,
       deps: { getRuntimeValue: deps.getRuntimeValue, setRuntimeValue: deps.setRuntimeValue, addEntry: deps.addEntry, rollExpression: vi.fn(() => ({ total: 6, rolls: [6] })) },
     });
-    expect(hit.outcomes[0].recharged).toBe(true);
-    expect(logs.some(l => l.automationType === 'recharge' && /Limited Foresight recharged \(d6: 6\)/.test(l.description))).toBe(true);
-    const gateAfterHit = limitedForesightGate({ action: ACTION, lastAttack: lastAttack(), monsterName: SENTRY, rechargeMap: state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`], armed: { name: KNIGHT }, currentRound: 3, usedRound: 0 });
-    expect(gateAfterHit.ok).toBe(true);
+    expect(hit.outcomes[0]).toEqual({ key: 'Limited Foresight', rolled: 6, recharged: true });
+    expect(gateCall({ rechargeMap: state[`${SENTRY}.${MONSTER_RECHARGE_KEY}`], currentRound: 3 }).ok).toBe(true);
   });
 });

@@ -1,13 +1,20 @@
+// @maintained-by-ai
+// maxKinds computation lane for WeaponKindMasteryModal: the derived cap rendered in the
+// instruction copy and the Selected counter across prop variations (numeric override,
+// class_level_scaling derivation, missing-class fallbacks, singular/plural boundary).
+// Other lanes: first-paint copy incl. default maxKinds 2 → ...Initial.test.jsx, rows /
+// meleeOnly filter / toggle / disabled-cap → ...WeaponList.test.jsx, deselect / preselect /
+// payload → ...Selection.test.jsx, result view / close → ...Result.test.jsx, payload
+// production → weaponKindMasteryHandler.test.js.
+
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../services/automation/index.js', () => ({
   applyWeaponKindMastery: vi.fn(),
 }));
 
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
-
-const mockCampaignName = 'test-campaign';
 
 const mockWeapons = [
   { name: 'Battleaxe', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Topple' },
@@ -17,7 +24,9 @@ const mockWeapons = [
   { name: 'Shortsword', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Vex' },
 ];
 
-const basePlayerStats = {
+// Level-5 entry (weapon_mastery 3) is distinct from the modal's default cap of 2 so any
+// derivation, fallback, or wrong-entry shortcut is visible in the rendered copy.
+const scalingStats = {
   name: 'Fighter1',
   level: 5,
   class: {
@@ -28,75 +37,55 @@ const basePlayerStats = {
   },
 };
 
-const baseProps = {
-  action: undefined,
-  playerStats: basePlayerStats,
-  campaignName: mockCampaignName,
-  onClose: vi.fn(),
-};
-
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
-}
-
-function renderModal(overrides, weapons = mockWeapons) {
+function renderModal(props = {}) {
   globalThis.fetch = vi.fn().mockResolvedValue({
-    json: () => Promise.resolve(weapons),
+    json: () => Promise.resolve(mockWeapons),
   });
-  return { ...render(<WeaponKindMasteryModal {...makeProps(overrides)} />) };
+  return render(
+    <WeaponKindMasteryModal
+      action={undefined}
+      playerStats={scalingStats}
+      campaignName="test-campaign"
+      onClose={vi.fn()}
+      {...props}
+    />
+  );
 }
 
-describe('WeaponKindMasteryModal', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+function getInstruction() {
+  return screen.getByText((content, el) =>
+    el.tagName === 'P' && content.startsWith('Choose up to'));
+}
+
+describe('WeaponKindMasteryModal — maxKinds computation', () => {
+
+  it('renders numeric action.automation.maxKinds in the instruction and the Selected counter', () => {
+    renderModal({ action: { automation: { maxKinds: 4 } } });
+    expect(getInstruction().textContent).toBe('Choose up to 4 weapons to apply Weapon Mastery:');
+    expect(screen.getByText('Selected: 0/4')).toBeInTheDocument();
   });
 
-  describe('maxKinds computation', () => {
-    function findInstructionParagraph(expectedText) {
-      return screen.findByText((content, element) => {
-        if (element && element.tagName === 'P') {
-          return expectedText.test(element.textContent);
-        }
-        return false;
-      });
-    }
+  it('derives maxKinds from the class_levels entry matching playerStats.level', () => {
+    renderModal({ action: { automation: { maxKinds: 'class_level_scaling' } } });
+    expect(getInstruction().textContent).toBe('Choose up to 3 weapons to apply Weapon Mastery:');
+    expect(screen.getByText('Selected: 0/3')).toBeInTheDocument();
+  });
 
-    it('displays default maxKinds of 2 when action is undefined', async () => {
-      renderModal();
-      await findInstructionParagraph(/Choose up to 2 weapons/);
-    });
+  it('uses singular "weapon" and matching counter when maxKinds is 1', () => {
+    renderModal({ action: { automation: { maxKinds: 1 } } });
+    expect(getInstruction().textContent).toBe('Choose up to 1 weapon to apply Weapon Mastery:');
+    expect(screen.getByText('Selected: 0/1')).toBeInTheDocument();
+  });
 
-    it('uses numeric maxKinds from action.automation.maxKinds', async () => {
-      renderModal({ action: { automation: { maxKinds: 4 } } });
-      await findInstructionParagraph(/Choose up to 4 weapons/);
-    });
-
-    it('derives maxKinds from class_level_scaling using playerStats', async () => {
-      renderModal({ action: { automation: { maxKinds: 'class_level_scaling' } } });
-      await findInstructionParagraph(/Choose up to 3 weapons/);
-    });
-
-    it('falls back to 2 when class_level_scaling encounters missing class data', async () => {
-      const fallbackCases = [
-        { playerStats: { name: 'Fighter1', level: 10, class: { class_levels: [] } } },
-        { playerStats: { name: 'Fighter1', level: 5 } },
-        { playerStats: { name: 'Fighter1', level: 5, class: {} } },
-      ];
-      for (const { playerStats } of fallbackCases) {
-        const { unmount } = renderModal({
-          action: { automation: { maxKinds: 'class_level_scaling' } },
-          playerStats,
-        });
-        await findInstructionParagraph(/Choose up to 2 weapons/);
-        unmount();
-      }
-    });
-
-    it('shows singular "weapon" when maxKinds is 1', async () => {
-      renderModal({ action: { automation: { maxKinds: 1 } } });
-      const el = await findInstructionParagraph(/Choose up to 1 weapon[^s]/);
-      expect(el.textContent).toContain('weapon');
-      expect(el.textContent).not.toContain('weapons');
-    });
+  it.each([
+    ['empty class_levels', { name: 'Fighter1', level: 10, class: { class_levels: [] } }],
+    ['no class object', { name: 'Fighter1', level: 5 }],
+    ['empty class object', { name: 'Fighter1', level: 5, class: {} }],
+    // no entry matches level 5 — cap must fall back to 2, not adopt the level-1 entry's 4
+    ['no entry matching level', { name: 'Fighter1', level: 5, class: { class_levels: [{ level: 1, weapon_mastery: 4 }] } }],
+  ])('class_level_scaling falls back to 2 when class data has %s', (_label, playerStats) => {
+    renderModal({ action: { automation: { maxKinds: 'class_level_scaling' } }, playerStats });
+    expect(getInstruction().textContent).toBe('Choose up to 2 weapons to apply Weapon Mastery:');
+    expect(screen.getByText('Selected: 0/2')).toBeInTheDocument();
   });
 });

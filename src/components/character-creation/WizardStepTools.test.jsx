@@ -1,522 +1,214 @@
-// Removed 6 redundant/low-value tests:
-//   - "should hide rules info when toolLimits is null" + "should hide rules info when toolLimits is an empty object"
-//     -> consolidated into "should hide rules info when toolLimits is falsy or empty" (single test, both cases)
-//   - "should NOT show skilled info when skilledUsesAvailable is 0" + "should show skilled info when skilledUsesAvailable > 0"
-//     -> consolidated into "should conditionally show skilled info based on skilledUsesAvailable"
-//   - "should render all tools from all categories" -> redundant with "should render all four tool categories" + "should render tools within each category"
-//   - "should render category sections with correct structure" -> asserts internal CSS class names (tool-category-header, tool-category-section)
-//   - "should render multi-select-container with compact class" -> asserts internal CSS class names (multi-select-compact)
-//   - "should render without crashing when all props are minimal" -> trivially simple component, no unique behavioral coverage
+// @maintained-by-ai
+// WizardStepTools component lane: disk-faithful tool grid (equipment.json Tools rows are
+// imported VERBATIM and served through the getToolsByCategory seam exactly as prod filters
+// them — 33 rows across the 4 wizard categories, every row has an `ability`, so empty-grid
+// and missing-ability states are fiction and are NOT pinned). Selection/expand, locked
+// pre-selected checkboxes (#289: disabled + inert click), exact onToolToggle name payloads,
+// rules-panel counts, and the Skilled pool row. Fresh makeProps per test (#362).
+// Reachability audit against the feeding hooks (useWizardTools/useWizardArrayToggle):
+// - toolLimits starts null (useWizardConfig slot initial) and then always carries
+//   { categoryLimits, preSelected, skilledUsesAvailable } — "{}" and missing-categoryLimits
+//   props are unreachable and unpinned; zero-count map entries never enter the Map
+//   (addCategoryLimit only adds positive parsed counts).
+// - pre-selected ⊆ selected: useWizardConfig batches preSelectedTools + formData merge, and
+//   useWizardArrayToggle refuses to un-toggle pre-selected items — so the only stable
+//   pre-selected state is checked+disabled, pinned once below.
+// - "N from:" placeholders live in `proficiencies` (campaign JSON, CharSummary lane), never
+//   in the wizard's toolProficiencies (toggle pushes raw card names only) — unpinned here.
+// Step-number display is owned by WizardStepNumbering.test.jsx; warnings rendering is owned
+// by WarningList.test.jsx — only the step's pass-through of `warnings`/`errors` is pinned.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepTools from './WizardStepTools.jsx';
+import DISK_EQUIPMENT from '../../../public/data/equipment.json';
 
-// Mock toolValidation so we don't need it for unit tests of the UI component
 vi.mock('../../services/character/toolValidation.js', () => ({
   getToolsByCategory: vi.fn(),
 }));
 
 import { getToolsByCategory } from '../../services/character/toolValidation.js';
 
-// Sample tool data for categories
-const artisanTools = [
-  { name: "Alchemist's Supplies", ability: 'Intelligence', utilize: 'Identify substance', craft: 'Acid' },
-  { name: "Brewer's Supplies", ability: 'Intelligence', utilize: 'Detect poisoned drink', craft: 'Antitoxin' },
-  { name: "Carver's Tools", ability: 'Dexterity', utilize: 'Carve stone', craft: 'Statue' },
-];
+// The four categories the step loads, in the component's loop order.
+const TOOL_CATEGORIES = ["Artisan's Tools", 'Gaming Sets', 'Musical Instrument', 'Other Tools'];
 
-const gamingSets = [
-  { name: 'Dice Set', ability: 'Charisma', utilize: 'Play a game', craft: '' },
-  { name: 'Playing Card Set', ability: 'Dexterity', utilize: 'Play cards', craft: '' },
-];
+// Verbatim disk rows (name/ability/utilize/craft straight from equipment.json).
+const diskTools = DISK_EQUIPMENT.filter(e => e.equipment_category === 'Tools');
+const diskToolsIn = cat => diskTools.filter(t => t.tool_category === cat);
+const diskRow = name => diskTools.find(t => t.name === name);
 
-const musicalInstruments = [
-  { name: 'Bagpipes', ability: 'Charisma', utilize: 'Play a known tune', craft: '' },
-  { name: 'Drum', ability: 'Wisdom', utilize: 'Set tempo', craft: '' },
-  { name: 'Viol', ability: 'Charisma', utilize: 'Play a melody', craft: '' },
-];
+// Disk-anchored prop sets (Bard "Choose 3 Musical Instruments", Soldier "Choose one kind of
+// Gaming Set", Chef's fixed "Cook's Utensils", Skilled pool of 3) — shapes exactly as
+// useWizardTools/getToolLimitsByCategory deliver them.
+const BARD_SOLDIER_LIMITS = extra => ({
+  categoryLimits: new Map([['Gaming Sets', 1], ['Musical Instrument', 3]]),
+  preSelected: [],
+  skilledUsesAvailable: 0,
+  ...extra,
+});
 
-const otherTools = [
-  { name: "Disguise Kit", ability: 'Charisma', utilize: 'Alter appearance', craft: '' },
-  { name: 'Forgery Kit', ability: 'Intelligence', utilize: 'Create forgery', craft: '' },
-];
+function makeProps(overrides = {}) {
+  const { formData, ...rest } = overrides;
+  return {
+    stepNumber: 11,
+    formData: { toolProficiencies: [], ...formData },
+    errors: {},
+    onToolToggle: vi.fn(),
+    toolLimits: BARD_SOLDIER_LIMITS(),
+    toolWarnings: [],
+    preSelectedTools: [],
+    skillLimits: { skilledUsesUsed: 0 },
+    ...rest,
+  };
+}
 
-const mockToolData = {
-  "Artisan's Tools": artisanTools,
-  'Gaming Sets': gamingSets,
-  'Musical Instrument': musicalInstruments,
-  'Other Tools': otherTools,
-};
+async function renderStep(overrides = {}) {
+  const props = makeProps(overrides);
+  const utils = render(<WizardStepTools {...props} />);
+  await waitFor(() => {
+    expect(document.querySelectorAll('.tool-card')).toHaveLength(diskTools.length);
+  });
+  return { props, ...utils };
+}
 
-const baseProps = {
-  formData: { toolProficiencies: [] },
-  errors: {},
-  onToolToggle: vi.fn(),
-  toolLimits: {
-    categoryLimits: new Map([["Artisan's Tools", 2]]),
-    skilledUsesAvailable: 0,
-  },
-  toolWarnings: [],
-  preSelectedTools: [],
-  skillLimits: { skilledUsesUsed: 0 },
-};
+const cardFor = name =>
+  Array.from(document.querySelectorAll('.tool-card'))
+    .find(c => c.querySelector('.tool-name').textContent === name);
+
+const checkboxFor = name => cardFor(name).querySelector('input[type="checkbox"]');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getToolsByCategory.mockImplementation(async (cat) => {
-    return mockToolData[cat] || [];
-  });
+  // Prod-shaped seam: getToolsByCategory filters equipment.json by tool_category.
+  getToolsByCategory.mockImplementation(async cat => diskToolsIn(cat));
 });
 
-async function waitForTools() {
-  await waitFor(() => {
-    expect(document.querySelectorAll('.tool-card').length).toBeGreaterThan(0);
-  }, { timeout: 5000 });
-}
-
-function getCardByName(name) {
-  return Array.from(document.querySelectorAll('.tool-card')).find(
-    (c) => c.textContent.includes(name)
-  );
-}
-
 describe('WizardStepTools', () => {
-  describe('rendering', () => {
-    it('should render step header', async () => {
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitForTools();
-      expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
-    });
+  it('renders the grid: header, four categories in wizard order, every disk tool with its abbreviated ability badge', async () => {
+    await renderStep();
 
-    it('should render all four tool categories', async () => {
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitForTools();
-      expect(screen.getByText("Artisan's Tools")).toBeInTheDocument();
-      expect(screen.getByText('Gaming Sets')).toBeInTheDocument();
-      expect(screen.getByText('Musical Instrument')).toBeInTheDocument();
-      expect(screen.getByText('Other Tools')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('heading', { name: 'Step 11: Tool Proficiencies' })).toBeInTheDocument();
 
-    it('should render tools within each category', async () => {
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitForTools();
-      expect(screen.getByText("Alchemist's Supplies")).toBeInTheDocument();
-      expect(screen.getByText("Brewer's Supplies")).toBeInTheDocument();
-      expect(screen.getByText('Bagpipes')).toBeInTheDocument();
-      expect(screen.getByText("Disguise Kit")).toBeInTheDocument();
-    });
+    // Ordered exact set of category headers.
+    expect(
+      Array.from(document.querySelectorAll('.tool-category-header')).map(h => h.textContent)
+    ).toEqual(TOOL_CATEGORIES);
 
-    it('should render ability badges mapped from full ability names', async () => {
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitForTools();
-      // Intelligence -> INT, Dexterity -> DEX, Wisdom -> WIS, Charisma -> CHA
-      expect(document.querySelectorAll('.tool-ability-badge').length).toBeGreaterThan(0);
-      expect(document.querySelectorAll('.tool-ability-badge').length).toBe(10);
-    });
+    // Exact ordered tool names per category — verbatim disk rows, nothing dropped or invented.
+    for (const cat of TOOL_CATEGORIES) {
+      const section = cardFor(diskToolsIn(cat)[0].name).closest('.tool-category-section');
+      expect(
+        Array.from(section.querySelectorAll('.tool-name')).map(n => n.textContent)
+      ).toEqual(diskToolsIn(cat).map(t => t.name));
+    }
 
-    it('should NOT render ability badge for tools without an ability field', async () => {
-      const toolsWithoutAbility = [
-        { name: 'Simple Hammer', utilize: 'Hit things', craft: 'Nail' },
-      ];
-      getToolsByCategory.mockImplementation(async (cat) => {
-        if (cat === "Artisan's Tools") return toolsWithoutAbility;
-        return mockToolData[cat] || [];
-      });
-
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitForTools();
-
-      const card = getCardByName('Simple Hammer');
-      expect(card).toBeInTheDocument();
-      expect(card.querySelector('.tool-ability-badge')).not.toBeInTheDocument();
-    });
-
-    it('should render tool details (utilize/craft) when tool is selected', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
-      />);
-      await waitForTools();
-
-      const alchemistCard = getCardByName("Alchemist's Supplies");
-      expect(alchemistCard).toHaveClass('selected');
-      expect(alchemistCard.querySelector('.tool-card-details')).toBeInTheDocument();
-      expect(alchemistCard).toHaveTextContent('Utilize: Identify substance');
-      expect(alchemistCard).toHaveTextContent('Craft: Acid');
-    });
-
-    it('should NOT render tool details for unselected tools', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: [] }}
-      />);
-      await waitForTools();
-
-      const allCards = document.querySelectorAll('.tool-card');
-      allCards.forEach((card) => {
-        expect(card.querySelector('.tool-card-details')).toBeNull();
-      });
-    });
-
-    it('should render warnings when provided', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolWarnings={[{ type: 'warning', message: 'Too many tools selected' }]}
-      />);
-      await waitForTools();
-      expect(screen.getByText('Too many tools selected')).toBeInTheDocument();
-    });
-
-    it('should render error message when provided', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        errors={{ toolProficiencies: 'Tool proficiency error' }}
-      />);
-      await waitForTools();
-      expect(screen.getByText('Tool proficiency error')).toBeInTheDocument();
-    });
-
-    it('should hide rules info when toolLimits is falsy or empty', async () => {
-      render(<WizardStepTools stepNumber={11} {...baseProps} toolLimits={null} />);
-      await waitForTools();
-      expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
-
-      render(<WizardStepTools stepNumber={11} {...baseProps} toolLimits={{}} />);
-      await waitForTools();
-      expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
-    });
-
-    it('should show rules info when toolLimits exists but categoryLimits is undefined', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{ skilledUsesAvailable: 0 }}
-      />);
-      await waitForTools();
-      // toolLimits has keys so rules info still shows
-      expect(screen.getByText(/Rules:/)).toBeInTheDocument();
-      // But category limits line should be empty since categoryLimits is undefined
-      const ruleInfo = document.querySelector('.rule-info');
-      expect(ruleInfo.textContent).not.toContain('Artisan');
-    });
-
-    it('should render empty tool list when getToolsByCategory returns empty arrays', async () => {
-      getToolsByCategory.mockResolvedValue([]);
-
-      render(<WizardStepTools stepNumber={11} {...baseProps} />);
-      await waitFor(() => {
-        expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
-      });
-      expect(screen.queryByText('.tool-card')).not.toBeInTheDocument();
-      expect(document.querySelectorAll('.tool-card')).toHaveLength(0);
-    });
+    // Every disk Tools row carries an ability -> full-name abbreviations on all cards.
+    const badges = Array.from(document.querySelectorAll('.tool-ability-badge'));
+    expect(badges).toHaveLength(diskTools.length);
+    expect(badges.map(b => b.textContent)).not.toContain('Intelligence');
+    expect(cardFor("Alchemist's Supplies").querySelector('.tool-ability-badge').textContent).toBe('INT');
+    expect(cardFor('Dice Set').querySelector('.tool-ability-badge').textContent).toBe('WIS');
+    expect(cardFor("Smith's Tools").querySelector('.tool-ability-badge').textContent).toBe('STR');
+    expect(cardFor('Bagpipes').querySelector('.tool-ability-badge').textContent).toBe('CHA');
   });
 
-  describe('selection state', () => {
-    it('should mark selected tools with "selected" class', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies", 'Dice Set'] }}
-      />);
-      await waitForTools();
-
-      const alchemistCard = getCardByName("Alchemist's Supplies");
-      expect(alchemistCard).toHaveClass('selected');
-
-      const diceCard = getCardByName('Dice Set');
-      expect(diceCard).toHaveClass('selected');
+  it('expands only selected tools with their verbatim disk utilize/craft details', async () => {
+    await renderStep({
+      formData: { toolProficiencies: ["Alchemist's Supplies", 'Dice Set'] },
     });
 
-    it('should mark pre-selected tools with "pre-selected" class', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        preSelectedTools={['Brewer\'s Supplies']}
-      />);
-      await waitForTools();
+    const alchemist = cardFor("Alchemist's Supplies");
+    expect(alchemist).toHaveClass('selected');
+    expect(checkboxFor("Alchemist's Supplies").checked).toBe(true);
+    expect(alchemist.querySelector('.tool-utilize').textContent)
+      .toBe(`Utilize: ${diskRow("Alchemist's Supplies").utilize}`);
+    expect(alchemist.querySelector('.tool-craft').textContent)
+      .toBe(`Craft: ${diskRow("Alchemist's Supplies").craft}`);
 
-      const brewerCard = getCardByName("Brewer's Supplies");
-      expect(brewerCard).toHaveClass('pre-selected');
-    });
+    // Dice Set has no craft field on disk -> only the utilize row renders inside details.
+    const dice = cardFor('Dice Set');
+    expect(dice.querySelector('.tool-utilize').textContent).toBe(`Utilize: ${diskRow('Dice Set').utilize}`);
+    expect(dice.querySelector('.tool-craft')).toBeNull();
 
-    it('should mark tools that are both pre-selected and selected with both classes', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
-        preSelectedTools={['Brewer\'s Supplies']}
-      />);
-      await waitForTools();
-
-      const brewerCard = getCardByName("Brewer's Supplies");
-      expect(brewerCard).toHaveClass('selected');
-      expect(brewerCard).toHaveClass('pre-selected');
-    });
-
-    it('should render checkboxes with checked state matching formData', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
-      />);
-      await waitForTools();
-
-      const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
-      const alchemistCheckbox = Array.from(allCheckboxes).find((cb) => {
-        const label = cb.closest('.tool-card');
-        return label && label.textContent.includes("Alchemist's Supplies");
-      });
-      expect(alchemistCheckbox.checked).toBe(true);
-
-      const diceCheckbox = Array.from(allCheckboxes).find((cb) => {
-        const label = cb.closest('.tool-card');
-        return label && label.textContent.includes('Dice Set');
-      });
-      expect(diceCheckbox.checked).toBe(false);
-    });
-
-    it('should disable checkbox for pre-selected + selected tools', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
-        preSelectedTools={['Brewer\'s Supplies']}
-      />);
-      await waitForTools();
-
-      const brewerCard = getCardByName("Brewer's Supplies");
-      const checkbox = brewerCard.querySelector('input[type="checkbox"]');
-      expect(checkbox.disabled).toBe(true);
-    });
-
-    it('should NOT disable checkbox for pre-selected but NOT selected tools', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: [] }}
-        preSelectedTools={['Brewer\'s Supplies']}
-      />);
-      await waitForTools();
-
-      const brewerCard = getCardByName("Brewer's Supplies");
-      const checkbox = brewerCard.querySelector('input[type="checkbox"]');
-      expect(checkbox.disabled).toBe(false);
-      expect(brewerCard).toHaveClass('pre-selected');
-      expect(brewerCard).not.toHaveClass('selected');
-    });
+    // Unselected tools: no details, unchecked, no selected class.
+    const bagpipes = cardFor('Bagpipes');
+    expect(bagpipes).not.toHaveClass('selected');
+    expect(bagpipes.querySelector('.tool-card-details')).toBeNull();
+    expect(checkboxFor('Bagpipes').checked).toBe(false);
   });
 
-  describe('tool toggling', () => {
-    it('should call onToolToggle when toggling a non-pre-selected tool on', async () => {
-      const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        onToolToggle={mockOnToolToggle}
-      />);
-      await waitForTools();
-
-      const diceCard = getCardByName('Dice Set');
-      const checkbox = diceCard.querySelector('input[type="checkbox"]');
-      fireEvent.click(checkbox);
-
-      expect(mockOnToolToggle).toHaveBeenCalledWith('Dice Set');
+  it('locks granted tools: pre-selected + selected renders checked+disabled and inert to clicks', async () => {
+    const { props } = await renderStep({
+      formData: { toolProficiencies: ["Cook's Utensils"] },
+      preSelectedTools: ["Cook's Utensils"],
     });
 
-    it('should NOT call onToolToggle when clicking a pre-selected + selected tool', async () => {
-      const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ['Brewer\'s Supplies'] }}
-        preSelectedTools={['Brewer\'s Supplies']}
-        onToolToggle={mockOnToolToggle}
-      />);
-      await waitForTools();
+    const cook = cardFor("Cook's Utensils");
+    expect(cook).toHaveClass('selected', 'pre-selected');
+    const locked = checkboxFor("Cook's Utensils");
+    expect(locked.checked).toBe(true);
+    expect(locked.disabled).toBe(true);
 
-      const brewerCard = getCardByName("Brewer's Supplies");
-      const checkbox = brewerCard.querySelector('input[type="checkbox"]');
-      fireEvent.click(checkbox);
+    fireEvent.click(locked);
+    expect(props.onToolToggle).not.toHaveBeenCalled();
 
-      expect(mockOnToolToggle).not.toHaveBeenCalled();
-    });
-
-    it('should call onToolToggle when toggling off a non-pre-selected tool', async () => {
-      const mockOnToolToggle = vi.fn();
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
-        onToolToggle={mockOnToolToggle}
-      />);
-      await waitForTools();
-
-      const alchemistCard = getCardByName("Alchemist's Supplies");
-      const checkbox = alchemistCard.querySelector('input[type="checkbox"]');
-      fireEvent.click(checkbox);
-
-      expect(mockOnToolToggle).toHaveBeenCalledWith("Alchemist's Supplies");
-    });
+    // Only the granted tool is locked; all others stay toggleable.
+    expect(document.querySelectorAll('input[type="checkbox"]:disabled')).toHaveLength(1);
+    expect(checkboxFor('Forgery Kit').disabled).toBe(false);
   });
 
-  describe('rules info display', () => {
-    it('should display selected tool count including pre-selected', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies", 'Dice Set'] }}
-        preSelectedTools={['Brewer\'s Supplies']}
-      />);
-      await waitForTools();
-
-      // realToolCount = 2 (non-placeholder), preSelected = 1, chosen = 1
-      expect(screen.getByText(/You have selected 2 tool proficiency/)).toBeInTheDocument();
-      expect(screen.getByText(/1 pre-selected/)).toBeInTheDocument();
-      expect(screen.getByText(/1 chosen/)).toBeInTheDocument();
+  it('calls onToolToggle with exactly the tool name when toggling on and off', async () => {
+    const { props } = await renderStep({
+      formData: { toolProficiencies: ['Dice Set'] },
     });
 
-    it('should display category limits from toolLimits', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{
-          categoryLimits: new Map([["Artisan's Tools", 2], ['Gaming Sets', 1]]),
-          skilledUsesAvailable: 0,
-        }}
-      />);
-      await waitForTools();
+    fireEvent.click(checkboxFor('Bagpipes'));
+    expect(props.onToolToggle).toHaveBeenCalledTimes(1);
+    expect(props.onToolToggle).toHaveBeenCalledWith('Bagpipes');
 
-      expect(screen.getByText(/2 Artisan's Tools/)).toBeInTheDocument();
-      expect(screen.getByText(/1 Gaming Sets/)).toBeInTheDocument();
-    });
-
-    it('should filter out zero-count categories from the display', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{
-          categoryLimits: new Map([["Artisan's Tools", 2], ['Gaming Sets', 0]]),
-          skilledUsesAvailable: 0,
-        }}
-      />);
-      await waitForTools();
-
-      expect(screen.getByText(/2 Artisan's Tools/)).toBeInTheDocument();
-      expect(screen.queryByText(/0 Gaming Sets/)).not.toBeInTheDocument();
-    });
+    fireEvent.click(checkboxFor('Dice Set'));
+    expect(props.onToolToggle).toHaveBeenCalledTimes(2);
+    expect(props.onToolToggle).toHaveBeenLastCalledWith('Dice Set');
   });
 
-  describe('skilled tool usage display', () => {
-    it('should conditionally show skilled info based on skilledUsesAvailable', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 0 }}
-      />);
-      await waitForTools();
-      expect(screen.queryByText(/Skilled/)).not.toBeInTheDocument();
+  it('shows granted choice limits and exact selection counts in the rules panel, hidden until limits load', async () => {
+    const { rerender } = await renderStep({ toolLimits: null });
 
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 3 }}
-        skillLimits={{ skilledUsesUsed: 2 }}
-      />);
-      await waitForTools();
-      expect(screen.getByText(/Skilled/)).toBeInTheDocument();
-      expect(screen.getByText(/2 of 3 uses used for tools/)).toBeInTheDocument();
+    // useWizardConfig slot starts null -> no rules panel at all.
+    expect(screen.queryByText(/Rules:/)).not.toBeInTheDocument();
 
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        toolLimits={{ categoryLimits: new Map(), skilledUsesAvailable: 3 }}
-        skillLimits={{ skilledUsesUsed: 0 }}
-      />);
-      await waitForTools();
-      expect(screen.getByText(/0 of 3 uses used for tools/)).toBeInTheDocument();
-    });
+    rerender(<WizardStepTools {...makeProps({
+      toolLimits: BARD_SOLDIER_LIMITS({ preSelected: ["Cook's Utensils"] }),
+      preSelectedTools: ["Cook's Utensils"],
+      formData: { toolProficiencies: ["Cook's Utensils", 'Bagpipes', 'Dice Set'] },
+    })} />);
+
+    // Insertion order preserved in the choice sentence (background grant before class grant).
+    expect(screen.getByText(/You may choose 1 Gaming Sets, 3 Musical Instrument\./)).toBeInTheDocument();
+    expect(screen.getByText(/You have selected 3 tool proficiency\/ies \(1 pre-selected, 2 chosen\)/)).toBeInTheDocument();
   });
 
-  describe('placeholder tool handling', () => {
-    it('should exclude placeholder tools from realToolCount', async () => {
-      // Placeholder format: "2 from: SomeTool"
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies", "2 from: Brewer's Supplies"] }}
-      />);
-      await waitForTools();
+  it('shows the Skilled pool row only when skilledUsesAvailable > 0', async () => {
+    const { rerender } = await renderStep();
+    expect(screen.queryByText(/Skilled/)).not.toBeInTheDocument();
 
-      // Only 1 real tool (the "2 from:" entry is a placeholder)
-      expect(screen.getByText(/You have selected 1 tool proficiency/)).toBeInTheDocument();
-    });
-
-    it('should exclude placeholder tools from skilled tool tracking', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{ toolProficiencies: ["Alchemist's Supplies", "2 from: Brewer's Supplies"] }}
-        toolLimits={{
-          categoryLimits: new Map(),
-          skilledUsesAvailable: 3,
-        }}
-        skillLimits={{ skilledUsesUsed: 1 }}
-        allTools={[]}
-      />);
-      await waitForTools();
-
-      // Only 1 real tool, so 1 tool from skilled
-      expect(screen.getByText(/1 of 3 uses used for tools/)).toBeInTheDocument();
-    });
+    rerender(<WizardStepTools {...makeProps({
+      toolLimits: BARD_SOLDIER_LIMITS({ skilledUsesAvailable: 3 }),
+      skillLimits: { skilledUsesUsed: 2 },
+    })} />);
+    expect(screen.getByText('Skilled')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3 uses used for tools')).toBeInTheDocument();
   });
 
-  describe('empty state', () => {
-    it('should render without crashing when formData has no toolProficiencies key', async () => {
-      render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        formData={{}}
-      />);
-      await waitForTools();
-      expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
+  it('surfaces toolWarnings and field errors verbatim', async () => {
+    await renderStep({
+      toolWarnings: [{
+        type: 'warning',
+        message: 'You have selected 2 from Gaming Sets, but your class/background/feats only grant 1 proficiency/ies from Gaming Sets.',
+      }],
+      errors: { toolProficiencies: 'Tool proficiency error' },
     });
 
-  });
-
-  describe('memoization (areEqual)', () => {
-    it('should skip re-render when props are reference-equal', async () => {
-      const mockOnToolToggle = vi.fn();
-      const limits = {
-        categoryLimits: new Map([["Artisan's Tools", 2]]),
-        skilledUsesAvailable: 0,
-      };
-      const skillLimits = { skilledUsesUsed: 0 };
-
-      const { rerender } = render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        onToolToggle={mockOnToolToggle}
-        toolLimits={limits}
-        skillLimits={skillLimits}
-      />);
-      await waitForTools();
-
-      // Rerender with identical props (same references) should use memo
-      rerender(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        onToolToggle={mockOnToolToggle}
-        toolLimits={limits}
-        skillLimits={skillLimits}
-      />);
-
-      expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
-    });
-
-    it('should re-render when formData changes', async () => {
-      const mockOnToolToggle = vi.fn();
-      const limits = {
-        categoryLimits: new Map([["Artisan's Tools", 2]]),
-        skilledUsesAvailable: 0,
-      };
-
-      const { rerender } = render(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        onToolToggle={mockOnToolToggle}
-        toolLimits={limits}
-        formData={{ toolProficiencies: [] }}
-      />);
-      await waitForTools();
-
-      rerender(<WizardStepTools stepNumber={11}
-        {...baseProps}
-        onToolToggle={mockOnToolToggle}
-        toolLimits={limits}
-        formData={{ toolProficiencies: ["Alchemist's Supplies"] }}
-      />);
-
-      expect(screen.getByText('Step 11: Tool Proficiencies')).toBeInTheDocument();
-      expect(screen.getByText("Alchemist's Supplies")).toBeInTheDocument();
-    });
+    expect(screen.getByText('You have selected 2 from Gaming Sets, but your class/background/feats only grant 1 proficiency/ies from Gaming Sets.')).toBeInTheDocument();
+    expect(screen.getByText('Tool proficiency error')).toBeInTheDocument();
   });
 });

@@ -1,282 +1,178 @@
+// @maintained-by-ai
+// Routing-seam lane: inspiration ally-pick confirms in useCharActionsModalHandlers.
+// Pins gate refusals on isolated legs (modal only in the WRONG store vs falsy target
+// WITH the modal open — never modalState={} vacuity), byte-exact object payloads with
+// arity to each routed service (creatureTargets never leaks), real campaignName
+// forwarded, popup gated on result.type === 'popup' (not mere payload presence — a
+// payload without the popup type and a null result must both stay silent), and that
+// the modal clears BEFORE the target gate fires.
+// Service internals (temp-HP/insp-marker writes) are owned by bardicInspirationHandler
+// and reactionBonusHandler suites; modal UI wiring lives in the CharActionModals
+// suites — not restated here.
+// Mocks purged to the two routed handler modules; buffToggle/tempHpService/
+// useRuntimeState/logService and every non-inspiration handler load for real and are
+// never invoked by these two handlers (mirrors the healing/buffs/areaEffects lanes
+// which verify the same real graph is side-effect-free at import).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
 
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-  toggleBuff: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
-  setTempHp: vi.fn(),
-}));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
-  handle: vi.fn(),
-  handleCombatSuperiorityBonusAction: vi.fn(),
-  handleCombatSuperiorityReaction: vi.fn(),
-  handleCombatSuperiorityGrantAttack: vi.fn(),
-  handleCombatSuperiorityMovement: vi.fn(),
-  handleCombatSuperioritySkillCheck: vi.fn(),
-  handleCombatSuperiorityCommandingPresenceReaction: vi.fn(),
-  handleCombatSuperioritySweepingAttack: vi.fn(),
-  handleAttackRiderPrompt: vi.fn(),
-  handleSkillCheckPrompt: vi.fn(),
-  executeSweepingAttack: vi.fn(),
-  executeBaitAndSwitchChoice: vi.fn(),
-  executeCommanderStrikeChoice: vi.fn(),
-  executeRallyChoice: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js', () => ({
-  handle: vi.fn(),
-  activateBulwarkOfForce: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js', () => ({
-  handle: vi.fn(),
-  confirmZealousPresence: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massHealHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHeal: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-sorcerer/clockworkCavalcadeHandler.js', () => ({
-  handle: vi.fn(),
-  confirmClockworkCavalcadeHeal: vi.fn(),
-  confirmClockworkCavalcadeDispel: vi.fn(),
-  confirmClockworkCavalcadeRepair: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massCureWoundsHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassCureWounds: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/prayerOfHealingHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPrayerOfHealing: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/powerWordFortifyHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPowerWordFortify: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massHealingWordHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHealingWord: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js', () => ({
-  handle: vi.fn(),
-  handleMove: vi.fn(),
-  activateNaturesSanctuary: vi.fn(),
-  moveNaturesSanctuary: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js', () => ({
-  handle: vi.fn(),
-  activateCoronaOfLight: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js', () => ({
-  handle: vi.fn(),
-  confirmRadianceOfDawn: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/tempHpBuffHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMantleOfInspiration: vi.fn(),
-  confirmVitalityOfTheTree: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-warlock/celestialResilienceHandler.js', () => ({
-  handle: vi.fn(),
-  confirmCelestialResilience: vi.fn(),
-  skipCelestialResilience: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-druid/oceanicGiftHandler.js', () => ({
-  handle: vi.fn(),
-  confirmOceanicGift: vi.fn(),
-}));
-
 vi.mock('../../services/automation/handlers/class-bard/bardicInspirationHandler.js', () => ({
-  handle: vi.fn(),
   applyBardicInspiration: vi.fn(),
+  // handle destructured by services/automation/index.js in the live graph (#318;
+  // runtime-probed: removing it fails this suite's import with "No handle export")
+  handle: vi.fn(),
 }));
 
 vi.mock('../../services/automation/handlers/reactions/reactionBonusHandler.js', () => ({
-  handle: vi.fn(),
   applyInspiringMovement: vi.fn(),
+  // handle destructured by services/automation/index.js; applyD20Modifier destructured
+  // by its real importee boonOfFateHandler.js — both mandatory at module load (#318)
+  handle: vi.fn(),
+  applyD20Modifier: vi.fn(),
 }));
 
 const { applyBardicInspiration } = await import('../../services/automation/handlers/class-bard/bardicInspirationHandler.js');
 const { applyInspiringMovement } = await import('../../services/automation/handlers/reactions/reactionBonusHandler.js');
 
-const mockSetPopupHtml = vi.fn();
-const mockSetModalState = vi.fn();
+const CAMPAIGN = 'test-campaign';
 
-function getHandlers(modalState = {}, mergedModalState = {}) {
+function stats() {
+  return { name: 'TestChar', class: { name: 'Bard' } };
+}
+
+function mount(modalState, mergedModalState) {
+  const setPopupHtml = vi.fn();
+  const setModalState = vi.fn();
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCharActionsModalHandlers({
-    setPopupHtml: mockSetPopupHtml,
-    setModalState: mockSetModalState,
+  const handlers = useCharActionsModalHandlers({
+    setPopupHtml,
+    setModalState,
     modalState,
     mergedModalState,
   });
+  return { handlers, setPopupHtml, setModalState };
 }
 
-function makePlayerStats() {
-  return { name: 'TestChar', class: { name: 'Fighter' } };
-}
+// One row per inspiration ally-pick route: both gates read modalState (not
+// mergedModalState), object payload dispatch, distinct values catch key swaps.
+// creatureTargets lives in modal data but must NOT leak to the service payload.
+const ROUTES = [
+  {
+    name: 'Bardic Inspiration',
+    service: applyBardicInspiration,
+    modalKey: 'bardicInspirationTargetModal',
+    arg: 'Ally1',
+    data: () => ({
+      action: { name: 'Bardic Inspiration' },
+      playerStats: stats(),
+      campaignName: CAMPAIGN,
+      dieSize: 'd8',
+      hasCombatOptions: false,
+      creatureTargets: [{ name: 'Ally1' }, { name: 'Ally2' }],
+    }),
+    invoke: (h, arg) => h.handleBardicInspirationConfirm(arg),
+    // single object payload, exact 6 keys — targetName is the picked ally
+    expected: (d, arg) => [{
+      action: d.action,
+      playerStats: d.playerStats,
+      campaignName: CAMPAIGN,
+      targetName: arg,
+      dieSize: 'd8',
+      hasCombatOptions: false,
+    }],
+  },
+  {
+    name: 'Inspiring Movement',
+    service: applyInspiringMovement,
+    modalKey: 'inspiringMovementAllyModal',
+    arg: 'Ally2',
+    data: () => ({
+      action: { name: 'Inspiring Movement' },
+      playerStats: stats(),
+      campaignName: CAMPAIGN,
+      halfSpeed: true,
+      noOAs: false,
+      creatureTargets: [{ name: 'Ally1' }, { name: 'Ally2' }],
+    }),
+    invoke: (h, arg) => h.handleInspiringMovementConfirm(arg),
+    // single object payload, exact 6 keys — allyName is the picked ally
+    expected: (d, arg) => [{
+      action: d.action,
+      playerStats: d.playerStats,
+      campaignName: CAMPAIGN,
+      allyName: arg,
+      halfSpeed: true,
+      noOAs: false,
+    }],
+  },
+];
 
-function makeBaseModalData(overrides = {}) {
-  return {
-    action: { name: 'Test Action' },
-    playerStats: makePlayerStats(),
-    campaignName: 'test-campaign',
-    ...overrides,
-  };
-}
+const openModal = (route) => ({ [route.modalKey]: route.data() });
 
-describe('useCharActionsModalHandlers - inspiration', () => {
+describe('useCharActionsModalHandlers - inspiration routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetPopupHtml.mockClear();
-    mockSetModalState.mockClear();
   });
 
-  describe('handleBardicInspirationConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when bardicInspirationTargetModal is %s', async (modalValue) => {
-      const handlers = getHandlers({ bardicInspirationTargetModal: modalValue });
-      await handlers.handleBardicInspirationConfirm('Ally1');
-      expect(applyBardicInspiration).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
+  // Modal present only in the WRONG store — pins both gates read modalState, and
+  // doubles as the absent-modal refusal (identical truthiness gate, no vacuity).
+  it.each(ROUTES.map(r => ({ desc: `${r.name}`, route: r })))(
+    '$route.name: refuses when modal is only in mergedModalState',
+    async ({ route }) => {
+      const { handlers, setPopupHtml, setModalState } = mount({}, openModal(route));
 
-    it.each([null, undefined, ''])('returns early when targetName is %s but still clears modal state', async (targetName) => {
-      const handlers = getHandlers({
-        bardicInspirationTargetModal: makeBaseModalData({ dieSize: 'd8', hasCombatOptions: false }),
-      });
-      await handlers.handleBardicInspirationConfirm(targetName);
-      expect(applyBardicInspiration).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ bardicInspirationTargetModal: null });
-    });
+      await route.invoke(handlers, route.arg);
 
-    it('delegates to applyBardicInspiration with all parameters and clears the modal', async () => {
-      applyBardicInspiration.mockResolvedValue({ type: 'popup', payload: '<p>Inspired!</p>' });
-      const modalState = {
-        bardicInspirationTargetModal: {
-          action: { name: 'Bardic Inspiration' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
-          dieSize: 'd8',
-          hasCombatOptions: false,
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleBardicInspirationConfirm('Ally1');
-      expect(applyBardicInspiration).toHaveBeenCalledWith({
-            action: modalState.bardicInspirationTargetModal.action,
-            playerStats: modalState.bardicInspirationTargetModal.playerStats,
-            campaignName: modalState.bardicInspirationTargetModal.campaignName,
-            targetName: 'Ally1',
-            dieSize: 'd8',
-            hasCombatOptions: false,
-        });
-      expect(mockSetModalState).toHaveBeenCalledWith({ bardicInspirationTargetModal: null });
-    });
+      expect(route.service).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
+    }
+  );
 
-    it('shows popup when applyBardicInspiration returns a payload', async () => {
-      applyBardicInspiration.mockResolvedValue({ type: 'popup', payload: '<p>Inspired!</p>' });
-      const handlers = getHandlers({
-        bardicInspirationTargetModal: makeBaseModalData({ dieSize: 'd8', hasCombatOptions: false }),
-      });
-      await handlers.handleBardicInspirationConfirm('Ally1');
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Inspired!</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ bardicInspirationTargetModal: null });
-    });
+  // Falsy target WITH the modal open — isolates the target gate. The modal clears
+  // BEFORE the target gate: refusal must still close the modal, never dispatch.
+  it.each(ROUTES.flatMap(r => [null, ''].map(target => ({
+    desc: `${r.name}: target ${JSON.stringify(target)}`,
+    route: r,
+    target,
+  }))))(
+    '$desc with modal open clears the modal without dispatching',
+    async ({ route, target }) => {
+      const modalState = openModal(route);
+      const { handlers, setPopupHtml, setModalState } = mount(modalState, {});
 
-    it('skips popup when applyBardicInspiration returns no payload but still clears modal', async () => {
-      applyBardicInspiration.mockResolvedValue({});
-      const handlers = getHandlers({
-        bardicInspirationTargetModal: makeBaseModalData({ dieSize: 'd8', hasCombatOptions: false }),
-      });
-      await handlers.handleBardicInspirationConfirm('Ally1');
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ bardicInspirationTargetModal: null });
-    });
-  });
+      await route.invoke(handlers, target);
 
-  describe('handleInspiringMovementConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when inspiringMovementAllyModal is %s', async (modalValue) => {
-      const handlers = getHandlers({ inspiringMovementAllyModal: modalValue });
-      await handlers.handleInspiringMovementConfirm('Ally1');
-      expect(applyInspiringMovement).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
+      expect(route.service).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ [route.modalKey]: null });
+    }
+  );
 
-    it.each([null, undefined, ''])('returns early when allyName is %s but still clears modal state', async (allyName) => {
-      const handlers = getHandlers({
-        inspiringMovementAllyModal: makeBaseModalData({ halfSpeed: true, noOAs: false }),
-      });
-      await handlers.handleInspiringMovementConfirm(allyName);
-      expect(applyInspiringMovement).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringMovementAllyModal: null });
-    });
+  // Popup gate is result.type === 'popup', NOT payload presence: a payload without
+  // the popup type and a null result must both stay silent. Dispatch and modal clear
+  // happen in every leg.
+  it.each(ROUTES.flatMap(route => [
+    { desc: `${route.name}: popup result`, route, result: { type: 'popup', payload: `<p>${route.name}!</p>` }, expectPopup: true },
+    { desc: `${route.name}: payload without popup type`, route, result: { payload: '<p>silent</p>' }, expectPopup: false },
+    { desc: `${route.name}: null result`, route, result: null, expectPopup: false },
+  ]))(
+    '$desc dispatches byte-exact payload and clears the modal',
+    async ({ route, result, expectPopup }) => {
+      route.service.mockResolvedValue(result);
+      const modalState = openModal(route);
+      const { handlers, setPopupHtml, setModalState } = mount(modalState, {});
 
-    it('delegates to applyInspiringMovement with all parameters and clears the modal', async () => {
-      applyInspiringMovement.mockResolvedValue({ type: 'popup', payload: '<p>Moving!</p>' });
-      const modalState = {
-        inspiringMovementAllyModal: {
-          action: { name: 'Inspiring Movement' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
-          halfSpeed: true,
-          noOAs: false,
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleInspiringMovementConfirm('Ally1');
-      expect(applyInspiringMovement).toHaveBeenCalledWith({
-            action: modalState.inspiringMovementAllyModal.action,
-            playerStats: modalState.inspiringMovementAllyModal.playerStats,
-            campaignName: modalState.inspiringMovementAllyModal.campaignName,
-            allyName: 'Ally1',
-            halfSpeed: true,
-            noOAs: false,
-        });
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringMovementAllyModal: null });
-    });
+      await route.invoke(handlers, route.arg);
 
-    it('shows popup when applyInspiringMovement returns a payload', async () => {
-      applyInspiringMovement.mockResolvedValue({ type: 'popup', payload: '<p>Moving!</p>' });
-      const handlers = getHandlers({
-        inspiringMovementAllyModal: makeBaseModalData({ halfSpeed: true, noOAs: false }),
-      });
-      await handlers.handleInspiringMovementConfirm('Ally1');
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Moving!</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringMovementAllyModal: null });
-    });
-
-    it('skips popup when applyInspiringMovement returns no payload but still clears modal', async () => {
-      applyInspiringMovement.mockResolvedValue({});
-      const handlers = getHandlers({
-        inspiringMovementAllyModal: makeBaseModalData({ halfSpeed: true, noOAs: false }),
-      });
-      await handlers.handleInspiringMovementConfirm('Ally1');
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringMovementAllyModal: null });
-    });
-  });
+      expect(route.service).toHaveBeenCalledTimes(1);
+      expect(route.service).toHaveBeenCalledWith(...route.expected(modalState[route.modalKey], route.arg));
+      if (expectPopup) {
+        expect(setPopupHtml).toHaveBeenCalledWith(result.payload);
+      } else {
+        expect(setPopupHtml).not.toHaveBeenCalled();
+      }
+      expect(setModalState).toHaveBeenCalledWith({ [route.modalKey]: null });
+    }
+  );
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0260: Ancient White Dragon Freezing Burst sphere picker — CON DC 20,
 // canonical 4d6 Cold (data drift: save_effect previously said 17/5d6 and
 // omitted the Speed-0 clause). Confirms the authored row: canonical
@@ -124,21 +125,20 @@ beforeEach(() => {
   expirations.current = [];
 });
 
-describe('MA-0260 Ancient White Freezing Burst canonical data', () => {
-  it('save_effect rewritten to canonical 4d6 + Speed-0 clause, dc_success default half', () => {
+describe('MA-0260 Ancient White Freezing Burst picker speed-zero lane', () => {
+  it('failed NPC CON save: canonical row (4d6 Cold DC 20 + Speed-0 clause) arms speed_zero te + activeCondition + rounds:2 clock + Speed 0 log, full damage', async () => {
+    // Canonical data pin (MA-0260 owns these dice/save_effect — data drift
+    // previously said DC 17 / 5d6 with no Speed-0 clause; the picker below
+    // consumes this exact row, so a byte drift fails here too).
     expect(BURST.damage_dice_primary).toBe('4d6');
     expect(BURST.save_dc).toBe(20);
     expect(BURST.save_type).toBe('Constitution');
     expect(BURST.save_effect).toBe("Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Success: Half damage.");
     expect(BURST.save_effect).not.toMatch(/5d6/);
-    expect(BURST.dc_success ?? 'half').toBe('half');
     expect(parseSpeedZeroClause(BURST.save_effect)).toEqual({ effect: 'speed_zero' });
     expect(getEffectDefinition('speed_zero')).toBeTruthy();
-  });
-});
 
-describe('MA-0260 Ancient White Freezing Burst picker speed-zero grant', () => {
-  it('failed NPC CON save takes full 4d6 and grants speed_zero te + activeCondition + rounds:2 clock + Speed 0 log', async () => {
+    // Thug con:+10 vs DC 20: nat-1 (11) fails, nat-20 (30) succeeds.
     spyRandom([0.01, 0.01, 0.01, 0.01]);
     const { getByText } = renderBurst();
     await waitFor(() => expect(seenTargets.current.length).toBe(1));

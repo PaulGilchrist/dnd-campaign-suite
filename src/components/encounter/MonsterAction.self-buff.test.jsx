@@ -1,19 +1,32 @@
-// MA-0655: Duergar "Enlarge" chip — automation:{type:"monster_self_buff"}
-// arms a clickable .mc-dice-link-selfbuff self-grant affordance on the
-// formerly inert row, routing the modal's resolveMonsterSelfBuffRow
-// (te enlarged on self + spend + one merged clock). The uses counter rides
-// the MA-0020 monsterSpellUses gate; exhausted chips keep the spent class
-// and stay clickable so the click routes the honest refusal (summon twin).
-import { readFileSync } from 'node:fs';
+// @maintained-by-ai
+// Self-buff CHIP component lane (SelfBuffLink, MonsterAction.jsx:280-293):
+// one press pattern, once. Arms exactly one .mc-dice-link-selfbuff per
+// monster_self_buff row (icon per effect, uses counter or honest At Will
+// silence, tooltip carries te + rounds) and routes the press to
+// onSelfBuffRow(action) with row identity + zero misroute junk chips
+// (MA-0655/0658/0780/1449 folded into one it.each over distinct fixture
+// shapes). Gate forks: exhausted chip stays clickable for the resolver's
+// honest refusal; attackerCannotAct / handlerless render inert; non-self-buff
+// and legendary-gated rows arm zero chips (MA-0694 — economy rides the
+// single "Expend Legendary" chip). Disk data shape, predicates, resolver,
+// enders, and log/popup copy are owned by services/encounters/
+// monsterSelfBuff.test.js + per-monster monsterSelfBuff.* siblings.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MonsterAction } from './MonsterAction.jsx';
-import { isMonsterSelfBuffRow, selfBuffRounds } from '../../services/encounters/monsterSelfBuff.js';
+import monsters from '../../../public/data/monsters.json';
 
-const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const duergar = monsters.find(m => m.index === 'duergar');
-const ENLARGE_ROW = duergar.actions[0];
+const ghost = monsters.find(m => m.index === 'ghost');
+const seaHag = monsters.find(m => m.index === 'sea-hag');
+const empyrean = monsters.find(m => m.index === 'empyrean');
+
+const ENLARGE_ROW = duergar.actions.find(a => a.name === 'Enlarge');
 const WAR_PICK = duergar.actions.find(a => a.name === 'War Pick');
+const INVIS_ROW = duergar.actions.find(a => a.name === 'Invisibility');
+const ETHEREALITY_ROW = ghost.actions.find(a => a.name === 'Ethereality');
+const ILLUSORY_ROW = seaHag.actions.find(a => a.name === 'Illusory Appearance');
+const BOLSTER_ROW = empyrean.legendary_actions.find(a => a.name === 'Bolster');
 
 function renderRow(action, overrides = {}) {
   const onSelfBuffRow = vi.fn();
@@ -35,162 +48,66 @@ function renderRow(action, overrides = {}) {
   return { ...utils, onSelfBuffRow };
 }
 
-describe('MA-0655 Enlarge self-buff chip', () => {
-  it('arms a clickable self-buff chip with the uses counter', () => {
-    const { container, onSelfBuffRow } = renderRow(ENLARGE_ROW);
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
+describe('self-buff chip — armed + press', () => {
+  // Distinct fixture shapes folded: uses-gated (Enlarge, Invisibility) vs
+  // At Will ungated (Ethereality, Illusory Appearance); default vs
+  // effect-mapped icons (invisible/ethereal/disguised).
+  it.each([
+    { name: 'Duergar Enlarge (gated)', row: ENLARGE_ROW, icon: 'fa-up-right-and-down-left-from-center', counter: '(1/Day · 1 left)', titleNote: 'te enlarged on self, 10 rounds' },
+    { name: 'Duergar Invisibility (gated)', row: INVIS_ROW, icon: 'fa-eye-slash', counter: '(1/Day · 1 left)', titleNote: 'te invisible on self, 600 rounds' },
+    { name: 'Ghost Ethereality (At Will)', row: ETHEREALITY_ROW, icon: 'fa-ghost', counter: null, titleNote: 'te ethereal on self, 4800 rounds' },
+    { name: 'Sea Hag Illusory Appearance (At Will)', row: ILLUSORY_ROW, icon: 'fa-user-secret', counter: null, titleNote: 'te disguised on self, 14400 rounds' },
+  ])('arms ONE chip and routes press with row identity: $name', ({ row, icon, counter, titleNote }) => {
+    const { container, onSelfBuffRow } = renderRow(row);
+    const chips = container.querySelectorAll('.mc-dice-link-selfbuff');
+    expect(chips).toHaveLength(1);
+    const chip = chips[0];
     expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.textContent).toContain('Enlarge');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
+    expect(chip.textContent).toContain(row.name);
+    if (counter) {
+      expect(chip.textContent).toContain(counter);
+    } else {
+      expect(chip.textContent).not.toContain('/Day');
+    }
+    expect(chip.querySelector('i').className).toContain(icon);
+    expect(chip.getAttribute('title')).toContain(titleNote);
+    // no misroute/forced-save junk chip on a self-buff row (MA-1449/§490)
+    expect(container.querySelector('.mc-dice-link-save-clickable')).toBeNull();
     fireEvent.click(chip);
     expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
-    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ENLARGE_ROW);
+    expect(onSelfBuffRow.mock.calls[0][0]).toBe(row);
   });
 
-  it('spent row shows 0 left + spent class and stays clickable for honest refusal', () => {
+  it('exhausted chip: spent class + 0 left, stays clickable for honest refusal', () => {
     const { container, onSelfBuffRow } = renderRow(ENLARGE_ROW, { spellUsesUsed: { Enlarge: 1 } });
     const chip = container.querySelector('.mc-dice-link-selfbuff');
     expect(chip.className).toContain('mc-dice-link-spell-spent');
     expect(chip.textContent).toContain('0 left');
     fireEvent.click(chip);
     expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
+    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ENLARGE_ROW);
   });
+});
 
-  it('incapacitated attacker: chip inert', () => {
-    const { container, onSelfBuffRow } = renderRow(ENLARGE_ROW, { attackerCannotAct: true });
+describe('self-buff chip — gate forks', () => {
+  it.each([
+    { name: 'incapacitated attacker', overrides: { attackerCannotAct: true } },
+    { name: 'handlerless row', overrides: { onSelfBuffRow: undefined } },
+  ])('chip renders but click dispatches nothing: $name', ({ overrides }) => {
+    const { container, onSelfBuffRow } = renderRow(ENLARGE_ROW, overrides);
     const chip = container.querySelector('.mc-dice-link-selfbuff');
     expect(chip).toBeTruthy();
     fireEvent.click(chip);
     expect(onSelfBuffRow).not.toHaveBeenCalled();
   });
 
-  it('STR weapon rows arm no self-buff chip', () => {
-    const { container } = renderRow(WAR_PICK);
-    expect(container.querySelector('.mc-dice-link-selfbuff')).toBeNull();
-  });
-});
-
-// MA-0658: Duergar "Invisibility" rides the SAME self-buff chip seam —
-// automation:{type:"monster_self_buff", effect:"invisible", rounds:600}
-// arms .mc-dice-link-selfbuff with the eye-slash icon + uses counter,
-// routing the modal's resolveMonsterSelfBuffRow (te invisible on self +
-// ONE merged rounds:600 clock + spend; §70 invisibility adjudication).
-describe('MA-0658 Invisibility self-buff chip', () => {
-  const INVIS_ROW = duergar.actions.find(a => a.name === 'Invisibility');
-
-  it('row authors the monster_self_buff automation (no parallel type)', () => {
-    expect(INVIS_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'invisible', rounds: 600 });
-    expect(INVIS_ROW.uses).toBe(1);
-    expect(INVIS_ROW.maxUses).toBe(1);
-    expect(isMonsterSelfBuffRow(INVIS_ROW)).toBe(true);
-    expect(selfBuffRounds(INVIS_ROW)).toBe(600);
-    expect(INVIS_ROW.usage).toEqual({ type: 'recharge after rest', rest_types: ['short', 'long'] });
-  });
-
-  it('arms a clickable self-buff chip with eye-slash icon + uses counter', () => {
-    const { container, onSelfBuffRow } = renderRow(INVIS_ROW);
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Invisibility');
-    expect(chip.textContent).toContain('(1/Day · 1 left)');
-    expect(chip.querySelector('i').className).toContain('fa-eye-slash');
-    expect(chip.getAttribute('title')).toContain('te invisible on self, 600 rounds');
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
-    expect(onSelfBuffRow.mock.calls[0][0]).toBe(INVIS_ROW);
-  });
-
-  it('spent row shows 0 left + spent class and stays clickable for honest refusal', () => {
-    const { container, onSelfBuffRow } = renderRow(INVIS_ROW, { spellUsesUsed: { Invisibility: 1 } });
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('0 left');
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
-  });
-});
-
-// MA-0780: Ghost "Ethereality" rides the SAME self-buff chip seam —
-// automation:{type:"monster_self_buff", effect:"ethereal", rounds:4800}
-// arms .mc-dice-link-selfbuff with the ghost icon. RAW has NO uses limit →
-// no uses counter renders (honest null gate, At Will ungated §57); the
-// already-active te refusal gates re-casts in the resolver.
-describe('MA-0780 Ghost Ethereality self-buff chip', () => {
-  const ghost = monsters.find(m => m.index === 'ghost');
-  const ETHEREALITY_ROW = ghost.actions.find(a => a.name === 'Ethereality');
-
-  it('row authors the monster_self_buff automation, name/description byte-preserved', () => {
-    expect(ETHEREALITY_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'ethereal', rounds: 4800 });
-    expect(ETHEREALITY_ROW.description).toContain('The ghost casts the <strong>Ethereality</strong> spell');
-    expect(isMonsterSelfBuffRow(ETHEREALITY_ROW)).toBe(true);
-    expect(selfBuffRounds(ETHEREALITY_ROW)).toBe(4800);
-  });
-
-  it('arms a clickable self-buff chip with ghost icon and NO uses counter (At Will)', () => {
-    const { container, onSelfBuffRow } = renderRow(ETHEREALITY_ROW);
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Ethereality');
-    expect(chip.textContent).not.toContain('/Day');
-    expect(chip.querySelector('i').className).toContain('fa-ghost');
-    expect(chip.getAttribute('title')).toContain('te ethereal on self, 4800 rounds');
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
-    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ETHEREALITY_ROW);
-  });
-
-  it('incapacitated attacker: chip inert', () => {
-    const { container, onSelfBuffRow } = renderRow(ETHEREALITY_ROW, { attackerCannotAct: true });
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).not.toHaveBeenCalled();
-  });
-});
-
-// MA-1449: Sea Hag "Illusory Appearance" — formerly a FAIL(a) MISROUTE row
-// whose caster stat was transcribed into row-level save_dc/save_type, arming
-// a "DC 13 Constitution" forced-save chip (junk "+0" rode attack_bonus:0,
-// §490) that paid NOTHING. Now rides the SAME self-buff chip seam —
-// automation:{type:"monster_self_buff", effect:"disguised", rounds:14400}
-// (24 hours §37). DC fields + attack_bonus KEYS DELETED: NO save chip, NO
-// junk "+0"; chip arms off automation.type with ZERO new chip-route code.
-// RAW has no uses limit → no uses counter (At Will ungated §57).
-describe('MA-1449 Sea Hag Illusory Appearance self-buff chip', () => {
-  const seaHag = monsters.find(m => m.index === 'sea-hag');
-  const ILLUSORY_ROW = seaHag.actions[2];
-
-  it('row authors the monster_self_buff automation; save_dc/save_type/attack_bonus keys DELETED', () => {
-    expect(ILLUSORY_ROW.automation).toEqual({ type: 'monster_self_buff', effect: 'disguised', rounds: 14400 });
-    expect('save_dc' in ILLUSORY_ROW).toBe(false);
-    expect('save_type' in ILLUSORY_ROW).toBe(false);
-    expect('attack_bonus' in ILLUSORY_ROW).toBe(false);
-    expect(isMonsterSelfBuffRow(ILLUSORY_ROW)).toBe(true);
-    expect(selfBuffRounds(ILLUSORY_ROW)).toBe(14400);
-  });
-
-  it('arms a clickable self-buff chip with fa-user-secret icon, NO uses counter, NO save/attack chips', () => {
-    const { container, onSelfBuffRow } = renderRow(ILLUSORY_ROW);
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('Illusory Appearance');
-    expect(chip.textContent).not.toContain('/Day');
-    expect(chip.textContent).not.toContain('DC 13');
-    expect(chip.querySelector('i').className).toContain('fa-user-secret');
-    expect(chip.getAttribute('title')).toContain('te disguised on self, 14400 rounds');
-    // FAIL(a) misroute chip + junk "+0" fully gone (MA-1071/§490 family)
-    expect(container.querySelector('.mc-dice-link-save-clickable')).toBeNull();
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).toHaveBeenCalledTimes(1);
-    expect(onSelfBuffRow.mock.calls[0][0]).toBe(ILLUSORY_ROW);
-  });
-
-  it('incapacitated attacker: chip inert', () => {
-    const { container, onSelfBuffRow } = renderRow(ILLUSORY_ROW, { attackerCannotAct: true });
-    const chip = container.querySelector('.mc-dice-link-selfbuff');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    expect(onSelfBuffRow).not.toHaveBeenCalled();
+  it.each([
+    { name: 'non-self-buff STR weapon row', row: WAR_PICK, overrides: {} },
+    // MA-0694: legendary gated child rides the single "Expend Legendary"
+    // chip — the ungated self-buff chip must NOT double-arm.
+    { name: 'legendary gated self-buff row', row: BOLSTER_ROW, overrides: { legendaryGate: () => {} } },
+  ])('arms no self-buff chip: $name', ({ row, overrides }) => {
+    const { container } = renderRow(row, overrides);
+    expect(container.querySelectorAll('.mc-dice-link-selfbuff')).toHaveLength(0);
   });
 });

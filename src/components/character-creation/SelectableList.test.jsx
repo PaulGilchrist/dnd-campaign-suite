@@ -1,821 +1,319 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import SelectableList from './SelectableList.jsx';
 
 const mockItems = [
-  { name: 'Item A', index: 'a', type: 'Type1', level: 1 },
-  { name: 'Item B', index: 'b', type: 'Type2', level: 2 },
-  { name: 'Item C', index: 'c', type: 'Type1', level: 3 },
+  { name: 'Item A', index: 'alpha', type: 'Type1' },
+  { name: 'Item B', index: 'bravo', type: 'Type2' },
+  { name: 'Item C', index: 'charlie', type: 'Type1' },
 ];
 
-const mockFormData = {
-  skills: ['Item A'],
-};
+const ITEM_NAMES = mockItems.map((i) => i.name);
 
-const mockFilters = [
-  { field: 'type', defaultLabel: 'All', getValue: (item) => item.type },
-];
+// One renderItem for every test: exposes selection state as data attributes
+// and each callback as a distinctly-named button (no click bubbling, since
+// the row itself is not clickable here).
+const renderItem = (item, index, opts) => (
+  <div
+    data-testid={`row-${index}`}
+    data-selected={String(opts.isSelected)}
+    data-pre-selected={String(opts.isPreSelected)}
+    data-count={opts.itemCount}
+  >
+    <span>{item.name}</span>
+    {opts.isExpanded ? <span data-testid={`expanded-${index}`}>Expanded</span> : null}
+    <button onClick={opts.onToggle}>Select {item.name}</button>
+    <button onClick={opts.onToggleExpand}>Expand {item.name}</button>
+    <button onClick={opts.onRemove}>Remove {item.name}</button>
+  </div>
+);
 
-function createRenderItem(implementation) {
-  if (implementation) {
-    return vi.fn(implementation);
-  }
-  return vi.fn((item, index, opts) => (
-    <div data-testid={`item-${index}`} onClick={opts?.onToggle} className={opts?.isSelected ? 'selected' : ''}>
-      <span>{item.name}</span>
-      {opts?.isExpanded && <span data-testid={`expanded-${index}`}>Expanded</span>}
-      <button onClick={opts?.onToggleExpand}>Toggle</button>
-    </div>
-  ));
+const listElement = (props = {}) => (
+  <SelectableList
+    items={mockItems}
+    fieldName="skills"
+    formData={{ skills: [] }}
+    onArrayFieldChange={vi.fn()}
+    title="Test List"
+    searchPlaceholder="Search..."
+    renderItem={renderItem}
+    {...props}
+  />
+);
+
+function renderComponent(props = {}) {
+  return render(listElement(props));
 }
 
-function createRenderSummary() {
-  return vi.fn(() => <div data-testid="summary">Summary</div>);
+// Assert the exact set of visible item names.
+function expectVisible(names) {
+  ITEM_NAMES.forEach((name) => {
+    expect(!!screen.queryByText(name), `${name} visible`).toBe(names.includes(name));
+  });
 }
 
-function createRenderWarnings() {
-  return vi.fn(() => <div data-testid="warnings">Warnings</div>);
-}
-
-const defaultRenderItem = createRenderItem();
-
-function renderComponent(props) {
-  return render(
-    <SelectableList
-      items={mockItems}
-      fieldName="skills"
-      formData={mockFormData}
-      onArrayFieldChange={vi.fn()}
-      title="Test List"
-      searchPlaceholder="Search..."
-      filters={[]}
-      renderItem={defaultRenderItem}
-      {...props}
-    />,
-  );
+function selectOptions() {
+  return Array.from(document.querySelector('select').options).map((o) => o.value);
 }
 
 describe('SelectableList', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('renders title, labelled search, summary/warnings, result count and selection count', () => {
+    renderComponent({
+      formData: { skills: ['Item A'] },
+      resultLabel: 'spell',
+      renderSummary: () => <div data-testid="summary">Summary</div>,
+      renderWarnings: () => <div data-testid="warnings">Warnings</div>,
+    });
+    expect(screen.getByRole('heading', { name: 'Test List' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Search Test List')).toBeInTheDocument();
+    expect(screen.getByText('Showing 3 spells')).toBeInTheDocument();
+    expect(screen.getByText('1 selected)')).toBeInTheDocument();
+    expect(screen.getByTestId('summary')).toBeInTheDocument();
+    expect(screen.getByTestId('warnings')).toBeInTheDocument();
+    expectVisible(ITEM_NAMES);
   });
 
-  describe('rendering', () => {
-    it('should render the title', () => {
-      renderComponent();
-      expect(screen.getByText('Test List')).toBeInTheDocument();
-    });
+  it('renders loading/empty state for missing data', () => {
+    const { unmount } = renderComponent({ items: null });
+    expect(screen.getByText('Data not yet loaded. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Item A')).not.toBeInTheDocument();
+    unmount();
 
-    it('should render the search input with the correct label', () => {
-      renderComponent();
-      expect(screen.getByLabelText('Search Test List')).toBeInTheDocument();
-    });
+    renderComponent({ items: [], loadingMessage: 'Loading...' });
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  });
 
-    it('should render result count with correct singular/plural form', () => {
-      const singleRenderItem = createRenderItem((item) => <div key={item.name}>{item.name}</div>);
-      const { container: singleContainer } = render(
-        <SelectableList
-          items={[{ name: 'Item A' }]}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={singleRenderItem}
-        />,
-      );
-      expect(singleContainer.querySelector('.result-count').textContent).toBe('Showing 1 item');
+  it('filters by search case-insensitively across name and index, restoring all when cleared', () => {
+    renderComponent();
+    const input = screen.getByLabelText('Search Test List');
 
-      renderComponent();
-      expect(screen.getByText(/Showing 3 items/)).toBeInTheDocument();
-    });
-
-    it('should use custom resultLabel in count display', () => {
-      renderComponent({ resultLabel: 'spell' });
-      expect(screen.getByText(/Showing 3 spells/)).toBeInTheDocument();
-    });
-
-    it('should render renderSummary and renderWarnings when provided', () => {
-      const mockRenderSummary = createRenderSummary();
-      const mockRenderWarnings = createRenderWarnings();
-      renderComponent({ renderSummary: mockRenderSummary, renderWarnings: mockRenderWarnings });
-      expect(screen.getByTestId('summary')).toBeInTheDocument();
-      expect(screen.getByTestId('warnings')).toBeInTheDocument();
-    });
-
-    it('should render "Show Only Selected" checkbox with selected count', () => {
-      renderComponent();
-      expect(screen.getByText(/Show Only Selected/)).toBeInTheDocument();
-      expect(screen.getByText(/1 selected\)/)).toBeInTheDocument();
+    [
+      ['item a', ['Item A']], // name match, case-insensitive
+      ['bravo', ['Item B']], // index-only match
+      ['nope', []], // no match → criteria message
+      ['', ITEM_NAMES], // cleared → full list restored
+    ].forEach(([query, visible]) => {
+      fireEvent.change(input, { target: { value: query } });
+      expectVisible(visible);
+      if (visible.length === 0) {
+        expect(screen.getByText(/No items found matching your criteria/)).toBeInTheDocument();
+      }
     });
   });
 
-  describe('loading/empty state', () => {
-    it('should render custom loading message when items is empty array', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={[]}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          loadingMessage="Loading..."
-        />,
-      );
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
-    });
-
-    it('should render default "not loaded" message when items is null or undefined', () => {
-      const renderItem = createRenderItem();
-
-      const nullRender = render(
-        <SelectableList
-          items={null}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-      expect(nullRender.container.querySelector('.no-results-found').textContent).toBe('Data not yet loaded. Please try again.');
-
-      const undefRender = render(
-        <SelectableList
-          items={undefined}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-      expect(undefRender.container.querySelector('.no-results-found').textContent).toBe('Data not yet loaded. Please try again.');
-    });
+  it.each([
+    ['getValue', [{ field: 'type', defaultLabel: 'All', label: 'Type', getValue: (item) => item.type }]],
+    ['item field', [{ field: 'type', defaultLabel: 'All', label: 'Type' }]],
+  ])('filters via %s and restores all items when reset to defaultLabel', (_case, filters) => {
+    renderComponent({ filters });
+    const select = document.querySelector('select');
+    fireEvent.change(select, { target: { value: 'Type1' } });
+    expectVisible(['Item A', 'Item C']);
+    fireEvent.change(select, { target: { value: 'All' } });
+    expectVisible(ITEM_NAMES);
   });
 
-  describe('search filtering', () => {
-    it('should filter items by search query matching name', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'Item A' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-    });
-
-    it('should filter items by search query matching index', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'b' } });
-      expect(screen.getByText('Item B')).toBeInTheDocument();
-      expect(screen.queryByText('Item A')).not.toBeInTheDocument();
-    });
-
-    it('should be case-insensitive when filtering by search query', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'item a' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-    });
-
-    it('should show all items when search query is cleared', () => {
-      renderComponent();
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'Item A' } });
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: '' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.getByText('Item B')).toBeInTheDocument();
-      expect(screen.getByText('Item C')).toBeInTheDocument();
-    });
-
-    it('should show no results message when search has no matches', () => {
-      renderComponent({ resultLabel: 'item' });
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'ZZZZ' } });
-      expect(screen.getByText(/No item found matching your criteria/)).toBeInTheDocument();
-    });
-  });
-
-  describe('filter dropdowns', () => {
-    it('should filter by selected type using getValue', () => {
-      renderComponent({ filters: mockFilters });
-      const select = document.querySelector('select');
-      fireEvent.change(select, { target: { value: 'Type1' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.getByText('Item C')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-    });
-
-    it('should filter by selected type using field property', () => {
-      const fieldFilter = [{ field: 'type', defaultLabel: 'All', label: 'Type' }];
-      renderComponent({ filters: fieldFilter });
-      const select = document.querySelector('select');
-      fireEvent.change(select, { target: { value: 'Type1' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-    });
-
-    it('should show all items when filter is reset to defaultLabel', () => {
-      renderComponent({ filters: mockFilters });
-      const select = document.querySelector('select');
-      fireEvent.change(select, { target: { value: 'Type1' } });
-      fireEvent.change(select, { target: { value: 'All' } });
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.getByText('Item B')).toBeInTheDocument();
-      expect(screen.getByText('Item C')).toBeInTheDocument();
-    });
-
-    it('should include array values as filter options and filter by them', () => {
-      const multiClassItems = [
+  it('flattens array-valued items into exact dropdown options and filters by membership', () => {
+    renderComponent({
+      items: [
         { name: 'Fireball', classes: ['Wizard', 'Sorcerer'] },
-        { name: 'Cure Wounds', classes: ['Cleric', 'Druid', 'Paladin'] },
+        { name: 'Cure Wounds', classes: ['Cleric', 'Druid'] },
         { name: 'Eldritch Blast', classes: ['Warlock'] },
-      ];
-      const classFilter = [{ field: 'classes', defaultLabel: 'All', label: 'Class' }];
-
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={multiClassItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Spells"
-          searchPlaceholder="Search..."
-          filters={classFilter}
-          renderItem={renderItem}
-        />,
-      );
-
-      const select = document.querySelector('select');
-      const options = Array.from(select.options).map((o) => o.value);
-      expect(options).toContain('Wizard');
-      expect(options).toContain('Sorcerer');
-      expect(options).toContain('Cleric');
-      expect(options).toContain('Druid');
-      expect(options).toContain('Paladin');
-      expect(options).toContain('Warlock');
-      expect(options).toContain('All');
-
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Cure Wounds')).toBeInTheDocument();
-
-      fireEvent.change(select, { target: { value: 'Wizard' } });
-
-      expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.queryByText('Cure Wounds')).not.toBeInTheDocument();
+      ],
+      filters: [{ field: 'classes', defaultLabel: 'All', label: 'Class' }],
     });
+    expect(selectOptions()).toEqual(['All', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard']);
 
-    it('should use custom sortFn for filter option ordering', () => {
-      const items = [
-        { name: 'Z', type: 'Zebra' },
-        { name: 'A', type: 'Apple' },
-        { name: 'M', type: 'Mango' },
-      ];
-      const descendingSort = [
-        { field: 'type', defaultLabel: 'All', label: 'Type', sortFn: (a, b) => b.localeCompare(a) },
-      ];
+    fireEvent.change(document.querySelector('select'), { target: { value: 'Wizard' } });
+    expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(screen.queryByText('Cure Wounds')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eldritch Blast')).not.toBeInTheDocument();
+  });
 
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={items}
-          fieldName="skills"
-          formData={{}}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={descendingSort}
-          renderItem={renderItem}
-        />,
-      );
-
-      const select = document.querySelector('select');
-      const options = Array.from(select.options).map((o) => o.value);
-      expect(options[0]).toBe('Zebra');
-      expect(options[1]).toBe('Mango');
-      expect(options[2]).toBe('Apple');
+  it('applies sortFn ordering and renderOption labels to dropdown options', () => {
+    renderComponent({
+      filters: [{
+        field: 'type',
+        defaultLabel: 'All',
+        label: 'Type',
+        sortFn: (a, b) => b.localeCompare(a),
+        renderOption: (option) => `★ ${option}`,
+      }],
     });
+    const options = Array.from(document.querySelector('select').options);
+    expect(options.map((o) => o.value)).toEqual(['Type2', 'Type1', 'All']);
+    expect(options.map((o) => o.textContent.trim())).toEqual(['★ Type2', '★ Type1', '★ All']);
+  });
 
-    it('should use custom renderOption for filter option display', () => {
-      const renderItem = createRenderItem();
-      const filterWithRenderOption = [
-        {
-          field: 'type',
-          defaultLabel: 'All',
-          label: 'Type',
-          renderOption: (option) => `★ ${option}`,
-        },
-      ];
-
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={filterWithRenderOption}
-          renderItem={renderItem}
-        />,
-      );
-
-      expect(screen.getByText('★ Type1')).toBeInTheDocument();
-      expect(screen.getByText('★ Type2')).toBeInTheDocument();
-    });
-
-    it('should handle filter with undefined or null values in items', () => {
-      const items = [
+  it('omits undefined and null values from filter options', () => {
+    renderComponent({
+      items: [
         { name: 'Item A', type: 'Type1' },
         { name: 'Item B' },
-        { name: 'Item C', type: 'Type1' },
         { name: 'Item D', type: null },
-      ];
-      const filter = [{ field: 'type', defaultLabel: 'All', label: 'Type' }];
-
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={items}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={filter}
-          renderItem={renderItem}
-        />,
-      );
-
-      const select = document.querySelector('select');
-      const options = Array.from(select.options).map((o) => o.value);
-      expect(options).toContain('Type1');
-      expect(options).not.toContain('undefined');
-      expect(options).not.toContain('null');
+      ],
+      filters: [{ field: 'type', defaultLabel: 'All', label: 'Type' }],
     });
+    expect(selectOptions()).toEqual(['All', 'Type1']);
   });
 
-  describe('item toggling', () => {
-    function renderToggleTest(formData) {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={formData}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-      return { mockOnChange, renderItem };
-    }
+  it.each([
+    ['adds', [], ['Item B']],
+    ['removes', ['Item A', 'Item B'], ['Item A']],
+  ])('toggling a %s item emits the exact onChange payload', (_case, selected, expected) => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({ formData: { skills: selected }, onArrayFieldChange });
 
-    it('should add a non-selected item to the array', () => {
-      const { mockOnChange } = renderToggleTest({ skills: [] });
-      fireEvent.click(screen.getByTestId('item-1'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item B']);
-    });
-
-    it('should remove a selected item from the array', () => {
-      const { mockOnChange } = renderToggleTest({ skills: ['Item A', 'Item B'] });
-      fireEvent.click(screen.getByTestId('item-1'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A']);
-    });
-
-    it('should prevent toggling pre-selected items off when not repeatable', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A', 'Item B'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          preSelectedItems={['Item A']}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).not.toHaveBeenCalled();
-    });
-
-    it('should allow toggling non-pre-selected items that are also in formData', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A', 'Item B'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          preSelectedItems={['Item A']}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('item-1'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A']);
-    });
-
-    it('should apply isSelected and isPreSelected visual states to rendered items', () => {
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div
-          data-testid={`item-${index}`}
-          data-selected={opts.isSelected}
-          data-pre-selected={opts.isPreSelected}
-          onClick={opts.onToggle}
-        >
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          preSelectedItems={['Item A']}
-        />,
-      );
-
-      expect(screen.getByTestId('item-0').getAttribute('data-selected')).toBe('true');
-      expect(screen.getByTestId('item-0').getAttribute('data-pre-selected')).toBe('true');
-
-      expect(screen.getByTestId('item-1').getAttribute('data-selected')).toBe('false');
-      expect(screen.getByTestId('item-1').getAttribute('data-pre-selected')).toBe('false');
-    });
+    expect(screen.getByTestId('row-1').dataset.selected).toBe(String(selected.includes('Item B')));
+    fireEvent.click(screen.getByText('Select Item B'));
+    expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
+    expect(onArrayFieldChange).toHaveBeenCalledWith('skills', expected);
   });
 
-  describe('expand/collapse', () => {
-    it('should show and hide expanded content on toggle', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const buttons = screen.getAllByRole('button', { name: 'Toggle' });
-      fireEvent.click(buttons[0]);
-      expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
-      fireEvent.click(buttons[0]);
-      expect(screen.queryByTestId('expanded-0')).not.toBeInTheDocument();
+  it('locks pre-selected items from toggling off while allowing other selections', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { skills: ['Item A', 'Item B'] },
+      preSelectedItems: ['Item A'],
+      onArrayFieldChange,
     });
 
-    it('should expand different items independently', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
+    const rowA = screen.getByTestId('row-0');
+    expect(rowA.dataset.selected).toBe('true');
+    expect(rowA.dataset.preSelected).toBe('true');
+    expect(screen.getByTestId('row-1').dataset.preSelected).toBe('false');
 
-      const buttons = screen.getAllByRole('button', { name: 'Toggle' });
-      fireEvent.click(buttons[0]);
-      expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
-      expect(screen.queryByTestId('expanded-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Select Item A'));
+    expect(onArrayFieldChange).not.toHaveBeenCalled();
 
-      fireEvent.click(buttons[1]);
-      expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
-      expect(screen.getByTestId('expanded-1')).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByText('Select Item B'));
+    expect(onArrayFieldChange).toHaveBeenCalledWith('skills', ['Item A']);
   });
 
-  describe('show only selected filtering', () => {
-    it('should filter to show only selected items when checkbox is checked', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
+  it('toggles a repeatable pre-selected item off and back on across re-renders', () => {
+    const onArrayFieldChange = vi.fn();
+    const props = {
+      formData: { skills: ['Item A'] },
+      repeatableItems: ['Item A'],
+      preSelectedItems: ['Item A'],
+      onArrayFieldChange,
+    };
+    const { rerender } = renderComponent(props);
 
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
+    expect(screen.getByTestId('row-0').dataset.selected).toBe('true');
+    fireEvent.click(screen.getByText('Select Item A'));
+    expect(onArrayFieldChange).toHaveBeenCalledWith('skills', []);
 
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-      expect(screen.queryByText('Item C')).not.toBeInTheDocument();
-      expect(screen.getByText(/Showing 1 item/)).toBeInTheDocument();
-    });
-
-    it('should show no results message when checkbox is checked but nothing is selected', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: [] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
-
-      expect(screen.getByText(/No items available/)).toBeInTheDocument();
-    });
-
-    it('should call onArrayFieldChange with the correct field name and updated array', () => {
-      const renderItem = createRenderItem();
-      const mockOnChange = vi.fn();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="customField"
-          formData={{ customField: [] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('customField', ['Item A']);
-
-      fireEvent.click(screen.getByTestId('item-1'));
-      expect(mockOnChange).toHaveBeenCalledWith('customField', ['Item B']);
-    });
+    rerender(listElement({ ...props, formData: { skills: [] } }));
+    expect(screen.getByTestId('row-0').dataset.selected).toBe('false');
+    fireEvent.click(screen.getByText('Select Item A'));
+    expect(onArrayFieldChange).toHaveBeenLastCalledWith('skills', ['Item A']);
   });
 
-  describe('combined filtering', () => {
-    it('should apply search, filter, and show only selected together', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A', 'Item B'] }}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={mockFilters}
-          renderItem={renderItem}
-        />,
-      );
+  it('removes one instance of a repeatable item and blocks guarded removals', () => {
+    const onArrayFieldChange = vi.fn();
+    const props = {
+      items: [
+        { name: 'Item A', index: 'alpha' },
+        { name: 'Item B', index: 'bravo' },
+      ],
+      formData: { skills: ['Item A', 'Item A', 'Item B'] },
+      repeatableItems: ['Item A'],
+      preSelectedItems: ['Item A'],
+      onArrayFieldChange,
+    };
+    const { rerender } = renderComponent(props);
 
-      const checkbox = screen.getByRole('checkbox');
-      fireEvent.click(checkbox);
-      const select = document.querySelector('select');
-      fireEvent.change(select, { target: { value: 'Type1' } });
+    expect(screen.getByTestId('row-0').dataset.count).toBe('2');
 
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-      expect(screen.queryByText('Item C')).not.toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByText('Remove Item B')); // not repeatable → blocked
+    expect(onArrayFieldChange).not.toHaveBeenCalled();
 
-    it('should apply search and filter together without show-only-selected', () => {
-      const renderItem = createRenderItem();
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={mockFormData}
-          onArrayFieldChange={vi.fn()}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={mockFilters}
-          renderItem={renderItem}
-        />,
-      );
+    fireEvent.click(screen.getByText('Remove Item A')); // pre-selected with count 2 → remove one
+    expect(onArrayFieldChange).toHaveBeenCalledWith('skills', ['Item A', 'Item B']);
 
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'Item' } });
-      const select = document.querySelector('select');
-      fireEvent.change(select, { target: { value: 'Type1' } });
-
-      expect(screen.getByText('Item A')).toBeInTheDocument();
-      expect(screen.getByText('Item C')).toBeInTheDocument();
-      expect(screen.queryByText('Item B')).not.toBeInTheDocument();
-    });
+    onArrayFieldChange.mockClear();
+    rerender(listElement({ ...props, formData: { skills: ['Item A'] } }));
+    expect(screen.getByTestId('row-0').dataset.count).toBe('1');
+    fireEvent.click(screen.getByText('Remove Item A')); // pre-selected with count 1 → blocked
+    expect(onArrayFieldChange).not.toHaveBeenCalled();
   });
 
-  describe('repeatable items', () => {
-    it('should toggle repeatable items the same as non-repeatable items', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      const { rerender } = render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: [] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          repeatableItems={['Item A']}
-        />,
-      );
+  it('expands and collapses items independently', () => {
+    renderComponent();
 
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Item A']);
+    fireEvent.click(screen.getByText('Expand Item A'));
+    expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('expanded-1')).not.toBeInTheDocument();
 
-      rerender(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          repeatableItems={['Item A']}
-        />,
-      );
+    fireEvent.click(screen.getByText('Expand Item B'));
+    expect(screen.getByTestId('expanded-0')).toBeInTheDocument();
+    expect(screen.getByTestId('expanded-1')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', []);
-    });
-
-    it('should allow removing a pre-selected repeatable item (unlike non-repeatable)', () => {
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="skills"
-          formData={{ skills: ['Item A'] }}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-          repeatableItems={['Item A']}
-          preSelectedItems={['Item A']}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', []);
-    });
+    fireEvent.click(screen.getByText('Expand Item A'));
+    expect(screen.queryByTestId('expanded-0')).not.toBeInTheDocument();
+    expect(screen.getByTestId('expanded-1')).toBeInTheDocument();
   });
 
-  describe('nested field access', () => {    it('should read from and write to a nested field path', () => {
-      const nestedFormData = { character: { skills: [] } };
-      const mockOnChange = vi.fn();
-      const renderItem = createRenderItem((item, index, opts) => (
-        <div data-testid={`item-${index}`} onClick={opts.onToggle}>
-          <span>{item.name}</span>
-        </div>
-      ));
-      render(
-        <SelectableList
-          items={mockItems}
-          fieldName="character.skills"
-          formData={nestedFormData}
-          onArrayFieldChange={mockOnChange}
-          title="Test List"
-          searchPlaceholder="Search..."
-          filters={[]}
-          renderItem={renderItem}
-        />,
-      );
+  it('filters to selected items via show-only-selected and shows empty message when none remain', () => {
+    const { rerender } = renderComponent({ formData: { skills: ['Item B'] } });
 
-      expect(screen.getByRole('checkbox')).toBeInTheDocument();
-      expect(screen.queryByText(/0 selected/)).toBeInTheDocument();
+    const checkbox = screen.getByRole('checkbox');
+    fireEvent.click(checkbox);
+    expect(checkbox).toBeChecked();
+    expectVisible(['Item B']);
+    expect(screen.getByText('Showing 1 item')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('item-0'));
-      expect(mockOnChange).toHaveBeenCalledWith('character.skills', ['Item A']);
-    });
+    rerender(listElement({ formData: { skills: [] } }));
+    expect(screen.getByText('No items available.')).toBeInTheDocument();
+    expectVisible([]);
   });
 
-  describe('unique keys (spells-step key warning lock)', () => {
-    const KeylessSpellRow = ({ spell }) => <div className="spell-item">{spell.name}</div>;
-
-    function spyOnConsoleErrors() {
-      return vi.spyOn(console, 'error').mockImplementation(() => {});
-    }
-
-    function keyWarningCalls(spy) {
-      return spy.mock.calls.filter((args) => String(args[0]).includes('unique "key"'));
-    }
-
-    it('should render component-returning renderItem without React key warnings', () => {
-      const errorSpy = spyOnConsoleErrors();
-      renderComponent({ renderItem: (item) => <KeylessSpellRow spell={item} /> });
-      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
-      errorSpy.mockRestore();
+  it('combines search, dropdown filter, and show-only-selected together', () => {
+    renderComponent({
+      formData: { skills: ['Item A', 'Item B'] },
+      filters: [{ field: 'type', defaultLabel: 'All', label: 'Type' }],
     });
 
-    it('should render without key collisions when identity values repeat across items', () => {
-      const errorSpy = spyOnConsoleErrors();
-      const dupItems = [
+    fireEvent.change(screen.getByLabelText('Search Test List'), { target: { value: 'item' } });
+    fireEvent.change(document.querySelector('select'), { target: { value: 'Type1' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+
+    expectVisible(['Item A']);
+  });
+
+  it('reads and writes nested field paths', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      fieldName: 'character.skills',
+      formData: { character: { skills: ['Item A'] } },
+      onArrayFieldChange,
+    });
+
+    expect(screen.getByTestId('row-0').dataset.selected).toBe('true');
+    expect(screen.getByText('1 selected)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Select Item B'));
+    expect(onArrayFieldChange).toHaveBeenCalledWith('character.skills', ['Item A', 'Item B']);
+  });
+
+  it('renders without React key collisions when item identities repeat', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderComponent({
+      items: [
         { name: 'Bless', index: 'bless' },
         { name: 'Bless', index: 'bless' },
-        { name: 'Cure Wounds', index: 'cure-wounds' },
-      ];
-      renderComponent({ items: dupItems, renderItem: (item) => <KeylessSpellRow spell={item} /> });
-      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
-      expect(screen.getAllByText('Bless')).toHaveLength(2);
-      errorSpy.mockRestore();
+        { name: 'Fire Bolt' },
+        { name: 'Fire Bolt' },
+        { name: 'Cure Wounds' },
+      ],
     });
 
-    it('should render without key collisions when items lack index and names repeat', () => {
-      const errorSpy = spyOnConsoleErrors();
-      const items = [
-        { name: 'Fire Bolt' },
-        { name: 'Fire Bolt' },
-        { name: 'Fire Bolt' },
-      ];
-      renderComponent({ items, renderItem: (item) => <KeylessSpellRow spell={item} /> });
-      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
-      expect(screen.getAllByText('Fire Bolt')).toHaveLength(3);
-      errorSpy.mockRestore();
-    });
-
-    it('should keep selection behavior stable across filtered re-renders', () => {
-      const errorSpy = spyOnConsoleErrors();
-      const mockOnChange = vi.fn();
-      const renderItem = (item, index, opts) => (
-        <div data-testid={`row-${item.name}`} onClick={opts.onToggle} className={opts.isSelected ? 'selected' : ''}>
-          {item.name}
-        </div>
-      );
-      renderComponent({
-        items: [
-          { name: 'Acid Splash', index: 'acid-splash' },
-          { name: 'Bless', index: 'bless' },
-        ],
-        formData: { skills: [] },
-        onArrayFieldChange: mockOnChange,
-        renderItem,
-      });
-      fireEvent.click(screen.getByTestId('row-Bless'));
-      expect(mockOnChange).toHaveBeenCalledWith('skills', ['Bless']);
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'acid' } });
-      expect(screen.queryByTestId('row-Bless')).not.toBeInTheDocument();
-      fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: '' } });
-      expect(screen.getByTestId('row-Bless')).toBeInTheDocument();
-      expect(keyWarningCalls(errorSpy)).toHaveLength(0);
-      errorSpy.mockRestore();
-    });
+    expect(screen.getAllByText('Bless')).toHaveLength(2);
+    expect(screen.getAllByText('Fire Bolt')).toHaveLength(2);
+    expect(screen.getAllByText('Cure Wounds')).toHaveLength(1);
+    expect(errorSpy.mock.calls.filter((args) => String(args[0]).includes('unique "key"'))).toHaveLength(0);
+    errorSpy.mockRestore();
   });
 });

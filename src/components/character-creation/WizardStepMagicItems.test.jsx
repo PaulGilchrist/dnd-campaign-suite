@@ -1,489 +1,372 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import WizardStepMagicItems from './WizardStepMagicItems.jsx';
 
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => html),
-}));
+// Item fixtures: verbatim values from public/data/magic-items.json, trimmed to
+// the fields this step reads. Ring of Protection / Boots of Speed / Ring of
+// Spell Storing / Wand of Magic Missiles descriptions truncated at paragraph
+// boundaries (only Amulet of Health's is rendered in full by an expand test).
+const AMULET_OF_HEALTH = {
+  index: 'amulet_of_health',
+  name: 'Amulet of Health',
+  type: 'Amulet',
+  rarity: 'rare',
+  requiresAttunement: true,
+  description:
+    '<p>Wondrous item, Rare (requires attunement), 1 lb.</p><p>Your Constitution score is 19 while you wear this amulet. It has no effect on you if your Constitution is already 19 or higher without it.</p>',
+};
+const BAG_OF_HOLDING = {
+  index: 'bag_of_holding',
+  name: 'Bag of Holding',
+  type: 'Wondrous Item',
+  rarity: 'uncommon',
+  requiresAttunement: false,
+  description:
+    '<p>Wondrous item, Uncommon</p><p>This bag has an interior space considerably larger than its outside dimensions.</p>',
+};
+const BOOTS_OF_SPEED = {
+  index: 'boots_of_speed',
+  name: 'Boots of Speed',
+  type: 'Wondrous Item',
+  rarity: 'rare',
+  requiresAttunement: true,
+  description:
+    "<p>Wondrous item, rare (requires attunement)</p><p>While you wear these boots, you can take a Bonus Action to click the boots' heels together.</p>",
+};
+const CLOAK_OF_PROTECTION = {
+  index: 'cloak_of_protection',
+  name: 'Cloak of Protection',
+  type: 'Wondrous Item',
+  rarity: 'uncommon',
+  requiresAttunement: true,
+  description:
+    '<p>Wondrous item, uncommon (requires attunement)</p><p>You gain a +1 bonus to Armor Class and saving throws while you wear this cloak.</p>',
+};
+const RING_OF_SPELL_STORING = {
+  index: 'ring_of_spell_storing',
+  name: 'Ring of Spell Storing',
+  type: 'Ring',
+  rarity: 'rare',
+  requiresAttunement: true,
+  description:
+    'This ring stores spells cast into it, holding them until the attuned wearer uses them.',
+};
+const RING_OF_PROTECTION = {
+  index: 'ring_of_protection',
+  name: 'Ring of Protection',
+  type: 'Ring',
+  rarity: 'rare',
+  requiresAttunement: true,
+  description:
+    'You gain a +1 bonus to Armor Class and saving throws while wearing this ring.',
+};
+const WAND_OF_MAGIC_MISSILES = {
+  index: 'wand_of_magic_missiles',
+  name: 'Wand of Magic Missiles',
+  type: 'Wand',
+  rarity: 'uncommon',
+  requiresAttunement: false,
+  description:
+    "This wand has 7 charges. While holding it, you can expend no more than 3 charges to cast Magic Missile from it.",
+};
+
+// Every attuned fixture on disk that the base-limit tests need.
+const FOUR_ATTUNED = [AMULET_OF_HEALTH, BOOTS_OF_SPEED, CLOAK_OF_PROTECTION, RING_OF_SPELL_STORING];
+const FIVE_ATTUNED = [...FOUR_ATTUNED, RING_OF_PROTECTION];
+const ALL_FIXTURE_ITEMS = [...FIVE_ATTUNED, BAG_OF_HOLDING, WAND_OF_MAGIC_MISSILES];
+const names = (items) => items.map((i) => i.name);
+const indexes = (items) => items.map((i) => i.index);
+
+// classSubtypes shape produced by useWizardData.js:
+// 5e   → subtypes: cls.subclasses (Use Magic Device nested under class_levels[])
+// 2024 → subtypes: cls.subclasses || cls.majors (features[] flat) — CLA-374.
+// Feature entries verbatim from public/data/classes.json + public/data/2024/classes.json.
+const thief5e = {
+  name: 'Thief',
+  class_levels: [
+    {
+      level: 13,
+      features: [
+        {
+          name: 'Use Magic Device',
+          level: 13,
+          prerequisites: [],
+          description:
+            'You have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you.',
+          automation: { type: 'use_magic_device', attunementLimit: 4 },
+        },
+      ],
+    },
+  ],
+};
+const thief2024 = {
+  name: 'Thief',
+  subtitle: 'Hunt for Treasure as a Classic Adventurer',
+  features: [
+    {
+      name: 'Use Magic Device',
+      level: 13,
+      description:
+        'Attunement: attune to up to 4 magic items at once.',
+      automation: { type: 'use_magic_device', attunementLimit: 4 },
+    },
+  ],
+};
+const assassin5e = {
+  name: 'Assassin',
+  class_levels: [
+    {
+      level: 3,
+      features: [
+        {
+          name: 'Assassinate',
+          level: 3,
+          prerequisites: [],
+          description:
+            "You are at your deadliest when you get the drop on your enemies.",
+        },
+      ],
+    },
+  ],
+};
+const rogueSubtypes = (subclass) => [{ className: 'Rogue', subtypes: [subclass] }];
+
+// Fresh props per test (#362).
+const magicItemsProps = ({
+  selected = [],
+  allItems = [BAG_OF_HOLDING, AMULET_OF_HEALTH],
+  classData,
+  classSubtypes,
+  level,
+} = {}) => ({
+  stepNumber: 15,
+  formData: {
+    ...(classData ? { class: classData } : {}),
+    ...(level ? { level } : {}),
+    inventory: { magicItems: selected },
+  },
+  allMagicItems: allItems,
+  ruleset: '5e',
+  classSubtypes,
+  onArrayFieldChange: vi.fn(),
+});
 
 describe('WizardStepMagicItems', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const baseMagicItems = [
-    {
-      name: 'Wand of Magic',
-      index: 'wand',
-      type: 'Rod',
-      rarity: 'Uncommon',
-      description: '<p>A magic wand.</p>',
-      requiresAttunement: false,
-    },
-    {
-      name: 'Amulet of Health',
-      index: 'amulet',
-      type: 'Amulet',
-      rarity: 'Uncommon',
-      description: '<p>Health amulet.</p>',
-      requiresAttunement: true,
-    },
-  ];
-
-  const createProps = (overrides = {}) => ({
-    formData: {
-      inventory: {
-        magicItems: ['Wand of Magic'],
-      },
-    },
-    allMagicItems: baseMagicItems,
-    ruleset: '5e',
-    onArrayFieldChange: vi.fn(),
-    ...overrides,
-  });
-
-  describe('attunement warnings', () => {
-    it('displays a warning when selected attuned items exceed the limit', () => {
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-          })}
-        />,
-      );
-      const warningText =
-        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.';
-      expect(screen.getByText(warningText)).toBeInTheDocument();
+  describe('attunement limit and warnings', () => {
+    // Source: WizardStepMagicItems.jsx:65 `attunementItems.length > maxAttunement`.
+    // The 'at the limit' row fails if > becomes >= (mutation-checked 2026-10-18).
+    it.each([
+      [
+        'warns with exact count text when 4 attuned exceed the base limit of 3',
+        names(FOUR_ATTUNED),
+        FOUR_ATTUNED,
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+      ['stays silent at exactly the limit of 3', names(FOUR_ATTUNED.slice(0, 3)), FOUR_ATTUNED, null],
+      [
+        'counts only attuned items (3 attuned + 1 non-attuned is silent)',
+        [...names(FOUR_ATTUNED.slice(0, 3)), 'Bag of Holding'],
+        [...FOUR_ATTUNED, BAG_OF_HOLDING],
+        null,
+      ],
+      ['stays silent when nothing is selected', [], ALL_FIXTURE_ITEMS, null],
+    ])('base limit — %s', (_case, selected, allItems, warningText) => {
+      render(<WizardStepMagicItems {...magicItemsProps({ selected, allItems })} />);
+      if (warningText) {
+        expect(screen.getByText(warningText)).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText(/requiring attunement, but/)).not.toBeInTheDocument();
+      }
     });
 
-    it('does not display a warning when attuned items are within or at the limit', () => {
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-      ];
+    // CLA-374: Use Magic Device (Thief lv13+) raises the cap 3 → 4. Distinct
+    // branches: 5e nested class_levels gate, 2024 flat features gate,
+    // class.subclass vs class.major naming, and each fall-through to base 3.
+    it.each([
+      [
+        '5e nested class_levels raises cap to 4 (Thief lv13, 5 attuned)',
+        { name: 'Rogue', subclass: { name: 'Thief' } },
+        rogueSubtypes(thief5e),
+        13,
+        names(FIVE_ATTUNED),
+        'You have selected 5 items requiring attunement, but a character can only attune to a maximum of 4 items.',
+      ],
+      [
+        '5e nested below lv13 stays at 3',
+        { name: 'Rogue', subclass: { name: 'Thief' } },
+        rogueSubtypes(thief5e),
+        12,
+        names(FOUR_ATTUNED),
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+      [
+        '2024 flat features under class.subclass raises cap (lv20, 4 attuned silent)',
+        { name: 'Rogue', subclass: { name: 'Thief' } },
+        rogueSubtypes(thief2024),
+        20,
+        names(FOUR_ATTUNED),
+        null,
+      ],
+      [
+        '2024 flat features under class.major naming raises cap (lv13, 4 attuned silent)',
+        { name: 'Rogue', major: { name: 'Thief' } },
+        rogueSubtypes(thief2024),
+        13,
+        names(FOUR_ATTUNED),
+        null,
+      ],
+      [
+        '2024 flat below lv13 stays at 3',
+        { name: 'Rogue', subclass: { name: 'Thief' } },
+        rogueSubtypes(thief2024),
+        12,
+        names(FOUR_ATTUNED),
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+      [
+        'subclass without Use Magic Device stays at 3 (flat shape)',
+        { name: 'Rogue', subclass: { name: 'Assassin' } },
+        rogueSubtypes(assassin5e),
+        20,
+        names(FOUR_ATTUNED),
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+      [
+        'class not present in classSubtypes stays at 3',
+        { name: 'Wizard', subclass: { name: 'Thief' } },
+        rogueSubtypes(thief5e),
+        20,
+        names(FOUR_ATTUNED),
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+      [
+        'classSubtypes not yet loaded stays at 3',
+        { name: 'Rogue', subclass: { name: 'Thief' } },
+        undefined,
+        20,
+        names(FOUR_ATTUNED),
+        'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.',
+      ],
+    ])(
+      'Use Magic Device cap — %s',
+      (_case, classData, classSubtypes, level, selected, warningText) => {
+        render(
+          <WizardStepMagicItems
+            {...magicItemsProps({ selected, allItems: FIVE_ATTUNED, classData, level, classSubtypes })}
+          />
+        );
+        if (warningText) {
+          expect(screen.getByText(warningText)).toBeInTheDocument();
+        } else {
+          expect(screen.queryByText(/requiring attunement, but/)).not.toBeInTheDocument();
+        }
+      }
+    );
+
+    // Selections may store item indexes; the warning lookup matches
+    // `i.name === itemName || i.index === itemName` (WizardStepMagicItems.jsx:61).
+    it('counts selected items matched by index, not only by name', () => {
       render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Boots', 'Cloak'],
-              },
-            },
-            allMagicItems: attunedItems,
-          })}
-        />,
+        <WizardStepMagicItems
+          {...magicItemsProps({ selected: indexes(FOUR_ATTUNED), allItems: FOUR_ATTUNED })}
+        />
       );
       expect(
-        screen.queryByText(/items requiring attunement/),
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not display a warning when no items are selected', () => {
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: { inventory: { magicItems: [] } },
-            allMagicItems: baseMagicItems,
-          })}
-        />,
-      );
-      expect(
-        screen.queryByText(/items requiring attunement/),
-      ).not.toBeInTheDocument();
-    });
-
-    it('does not display a warning when selected items do not require attunement', () => {
-      const nonAttunedItems = [
-        { name: 'Wand', requiresAttunement: false },
-        { name: 'Potion', requiresAttunement: false },
-      ];
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['Wand', 'Potion'],
-              },
-            },
-            allMagicItems: nonAttunedItems,
-          })}
-        />,
-      );
-      expect(
-        screen.queryByText(/items requiring attunement/),
-      ).not.toBeInTheDocument();
-    });
-
-    it('increases the attunement limit for Thief Rogue level 13+', () => {
-      const thiefClassSubtypes = [
-        {
-          className: 'Rogue',
-          subtypes: [
-            {
-              name: 'Thief',
-              class_levels: [
-                { level: 13, features: [{ name: 'Use Magic Device' }] },
-              ],
-            },
-          ],
-        },
-      ];
-
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-        { name: 'Amulet', requiresAttunement: true },
-      ];
-
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 13,
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring', 'Amulet'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes: thiefClassSubtypes,
-          })}
-        />,
-      );
-
-      const warningText =
-        'You have selected 5 items requiring attunement, but a character can only attune to a maximum of 4 items.';
-      expect(screen.getByText(warningText)).toBeInTheDocument();
-    });
-
-    it('does not warn when Thief Rogue level 13+ is at the extended limit', () => {
-      const thiefClassSubtypes = [
-        {
-          className: 'Rogue',
-          subtypes: [
-            {
-              name: 'Thief',
-              class_levels: [
-                { level: 13, features: [{ name: 'Use Magic Device' }] },
-              ],
-            },
-          ],
-        },
-      ];
-
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 13,
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes: thiefClassSubtypes,
-          })}
-        />,
-      );
-
-      expect(
-        screen.queryByText(/maximum of 4 items/),
-      ).not.toBeInTheDocument();
-    });
-
-    it('uses the base limit of 3 when classSubtypes is null or class/subclass does not match', () => {
-      const classSubtypes = [
-        { className: 'Rogue', subtypes: [{ name: 'Assassin', class_levels: [] }] },
-      ];
-      const attunedItems = [
-        { name: 'Boots', requiresAttunement: true },
-        { name: 'Cloak', requiresAttunement: true },
-        { name: 'Gloves', requiresAttunement: true },
-        { name: 'Ring', requiresAttunement: true },
-      ];
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Wizard' },
-              inventory: {
-                magicItems: ['Boots', 'Cloak', 'Gloves', 'Ring'],
-              },
-            },
-            allMagicItems: attunedItems,
-            classSubtypes,
-          })}
-        />,
-      );
-      expect(
-        screen.getByText(/maximum of 3 items/),
-      ).toBeInTheDocument();
-    });
-
-    // CLA-374: 2024 wizard maps subtypes = cls.subclasses || cls.majors, and
-    // 2024 Thief majors carry features[] flat (NO class_levels) — the +1 bonus
-    // previously never fired and the cap stayed at 3 for lv13+ Thief.
-    const thief2024Subtypes = [
-      {
-        className: 'Rogue',
-        subtypes: [
-          {
-            name: 'Thief',
-            subtitle: 'Skill and Precision',
-            features: [
-              { level: 3, name: 'Fast Hands' },
-              { level: 13, name: 'Use Magic Device' },
-            ],
-          },
-        ],
-      },
-    ];
-    const fourAttuned = ['Boots', 'Cloak', 'Gloves', 'Ring'];
-
-    it('CLA-374: raises the cap to 4 for 2024 Thief lv13+ (flat features[] shape, class.subclass)', () => {
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 20,
-              inventory: { magicItems: fourAttuned },
-            },
-            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
-            classSubtypes: thief2024Subtypes,
-          })}
-        />,
-      );
-      expect(screen.queryByText(/items requiring attunement/)).not.toBeInTheDocument();
-    });
-
-    it('CLA-374: honors class.major naming (2024 wizard normalization)', () => {
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', major: { name: 'Thief' } },
-              level: 13,
-              inventory: { magicItems: fourAttuned },
-            },
-            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
-            classSubtypes: thief2024Subtypes,
-          })}
-        />,
-      );
-      expect(screen.queryByText(/items requiring attunement/)).not.toBeInTheDocument();
-    });
-
-    it('CLA-374: keeps base limit 3 below lv13 for 2024 Thief shape', () => {
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Thief' } },
-              level: 12,
-              inventory: { magicItems: fourAttuned },
-            },
-            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
-            classSubtypes: thief2024Subtypes,
-          })}
-        />,
-      );
-      expect(screen.getByText(/maximum of 3 items/)).toBeInTheDocument();
-    });
-
-    it('CLA-374: keeps base limit 3 without the feature in the major', () => {
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              class: { name: 'Rogue', subclass: { name: 'Assassin' } },
-              level: 20,
-              inventory: { magicItems: fourAttuned },
-            },
-            allMagicItems: fourAttuned.map((name) => ({ name, requiresAttunement: true })),
-            classSubtypes: [
-              {
-                className: 'Rogue',
-                subtypes: [{ name: 'Assassin', features: [{ level: 3, name: 'Assassinate' }] }],
-              },
-            ],
-          })}
-        />,
-      );
-      expect(screen.getByText(/maximum of 3 items/)).toBeInTheDocument();
-    });
-
-    it('matches selected items by index when name lookup fails', () => {
-      const items = [
-        { name: 'Boots of Speed', index: 'boots-speed', requiresAttunement: true },
-        { name: 'Cloak of Protection', index: 'cloak-protection', requiresAttunement: true },
-        { name: 'Gloves of Thievery', index: 'gloves-thievery', requiresAttunement: true },
-        { name: 'Ring of Spell Storing', index: 'ring-spell-storing', requiresAttunement: true },
-      ];
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['boots-speed', 'cloak-protection', 'gloves-thievery', 'ring-spell-storing'],
-              },
-            },
-            allMagicItems: items,
-          })}
-        />,
-      );
-      expect(
-        screen.getByText(/items requiring attunement/),
+        screen.getByText(
+          'You have selected 4 items requiring attunement, but a character can only attune to a maximum of 3 items.'
+        )
       ).toBeInTheDocument();
     });
   });
 
-  describe('item display', () => {
-    it('shows attunement badge on items that require attunement', () => {
-      render(<WizardStepMagicItems stepNumber={15} {...createProps()} />);
-      expect(screen.getByText('requires attunement')).toBeInTheDocument();
-    });
-
-    it('handles items with missing optional fields gracefully', () => {
-      const minimalItem = {
-        name: 'Odd Item',
-        index: 'odd',
-      };
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            allMagicItems: [minimalItem],
+  describe('step chrome', () => {
+    it('renders the step title, search box, Item Type filter options, counts, and loading message', () => {
+      const { unmount } = render(
+        <WizardStepMagicItems
+          {...magicItemsProps({
+            selected: ['Bag of Holding'],
+            allItems: ALL_FIXTURE_ITEMS,
           })}
-        />,
+        />
       );
-      expect(screen.getByText('Odd Item')).toBeInTheDocument();
-    });
+      expect(screen.getByRole('heading', { name: 'Step 15: Magic Items' })).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search magic items...')).toBeInTheDocument();
+      const typeSelect = screen.getByLabelText('Item Type');
+      expect(Array.from(typeSelect.options).map((o) => o.value)).toEqual([
+        'All',
+        'Amulet',
+        'Ring',
+        'Wand',
+        'Wondrous Item',
+      ]);
+      expect(screen.getByText(`Showing ${ALL_FIXTURE_ITEMS.length} magic items`)).toBeInTheDocument();
+      expect(screen.getByText('1 selected)')).toBeInTheDocument();
 
-    it('renders item type and rarity when present, and omits them when missing', () => {
-      const itemsWithTypeAndRarity = [
-        { name: 'Ring of Protection', index: 'ring', type: 'Ring', rarity: 'Rare', description: 'AC +1' },
-      ];
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            allMagicItems: itemsWithTypeAndRarity,
-          })}
-        />,
-      );
-      expect(screen.getByText('Ring of Protection')).toBeInTheDocument();
-      const magicItem = screen.getByText('Ring of Protection').closest('.magic-item');
-      expect(magicItem.querySelector('.magic-item-type')).toHaveTextContent('Ring');
-      expect(magicItem.querySelector('.magic-item-rarity')).toHaveTextContent('Rare');
-
-      const minimalItem = {
-        name: 'Mysterious Artifact',
-        index: 'artifact',
-      };
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            allMagicItems: [minimalItem],
-          })}
-        />,
-      );
-      expect(screen.getByText('Mysterious Artifact')).toBeInTheDocument();
-      expect(screen.queryByText('requires attunement')).not.toBeInTheDocument();
+      unmount();
+      render(<WizardStepMagicItems {...magicItemsProps({ allItems: [] })} />);
+      expect(screen.getByText('Magic item data not yet loaded. Please try again.')).toBeInTheDocument();
+      expect(screen.queryByText('Amulet of Health')).not.toBeInTheDocument();
     });
   });
 
-  describe('item selection', () => {
-    it('calls onArrayFieldChange to add an unselected item when its checkbox is clicked', () => {
-      const onArrayFieldChange = vi.fn();
+  describe('item row contract', () => {
+    it('renders type/rarity/attunement badges, omits the badge for non-attuned items, and expands the description in place', () => {
       render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            onArrayFieldChange,
-          })}
-        />,
+        <WizardStepMagicItems
+          {...magicItemsProps({ allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] })}
+        />
       );
 
-      const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
-      expect(checkboxes.length).toBe(2);
+      const amuletRow = screen.getByText('Amulet of Health').closest('.magic-item');
+      expect(within(amuletRow).getByText('Amulet')).toBeInTheDocument();
+      expect(within(amuletRow).getByText('rare')).toBeInTheDocument();
+      expect(within(amuletRow).getByText('requires attunement')).toBeInTheDocument();
 
-      // Amulet of Health is unselected; clicking adds it to the array
-      fireEvent.click(checkboxes[0]);
-      expect(onArrayFieldChange).toHaveBeenCalledWith(
-        'inventory.magicItems',
-        ['Wand of Magic', 'Amulet of Health'],
+      const bagRow = screen.getByText('Bag of Holding').closest('.magic-item');
+      expect(within(bagRow).getByText('Wondrous Item')).toBeInTheDocument();
+      expect(within(bagRow).getByText('uncommon')).toBeInTheDocument();
+      expect(within(bagRow).queryByText('requires attunement')).not.toBeInTheDocument();
+
+      expect(document.querySelector('.magic-item-description')).not.toBeInTheDocument();
+      fireEvent.click(within(amuletRow).getByRole('button', { name: 'Show More' }));
+      expect(amuletRow.querySelector('.magic-item-description')).toHaveTextContent(
+        'Your Constitution score is 19 while you wear this amulet.'
       );
-    });
-
-    it('calls onArrayFieldChange to remove a selected item when its checkbox is clicked', () => {
-      const onArrayFieldChange = vi.fn();
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            onArrayFieldChange,
-            formData: {
-              inventory: {
-                magicItems: ['Wand of Magic', 'Amulet of Health'],
-              },
-            },
-          })}
-        />,
-      );
-
-      const checkboxes = document.querySelectorAll('.list-item-checkbox-trigger');
-      expect(checkboxes.length).toBe(2);
-
-      // Items are sorted alphabetically: Amulet of Health first, Wand of Magic second
-      // Both are selected; clicking the first (Amulet) removes it
-      fireEvent.click(checkboxes[0]);
-      expect(onArrayFieldChange).toHaveBeenCalledWith(
-        'inventory.magicItems',
-        ['Wand of Magic'],
-      );
+      fireEvent.click(within(amuletRow).getByRole('button', { name: 'Show Less' }));
+      expect(amuletRow.querySelector('.magic-item-description')).not.toBeInTheDocument();
     });
   });
 
-  describe('item lookup', () => {
-    it('matches selected items by index when the item name differs', () => {
-      const items = [
-        { name: 'Wand of Magic', index: 'wand', requiresAttunement: false },
-        { name: 'Amulet of Health', index: 'amulet', requiresAttunement: true },
-      ];
-      // Select by index instead of name
-      render(
-        <WizardStepMagicItems stepNumber={15}
-          {...createProps({
-            formData: {
-              inventory: {
-                magicItems: ['amulet'],
-              },
-            },
-            allMagicItems: items,
-          })}
-        />,
-      );
-      // The item should be recognized as selected via index lookup
-      expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+  describe('selection', () => {
+    // Exact onChange payload on the step's own fieldName. Checkbox identity via
+    // row query, not bare checkboxes[i] (#289 lane).
+    it.each([
+      [
+        'adds an unselected item to the end of the current selection',
+        ['Bag of Holding'],
+        'Amulet of Health',
+        ['Bag of Holding', 'Amulet of Health'],
+      ],
+      [
+        'removes a selected item, keeping the rest',
+        ['Amulet of Health', 'Bag of Holding'],
+        'Bag of Holding',
+        ['Amulet of Health'],
+      ],
+    ])('checkbox toggle — %s', (_case, selected, clickedName, expectedPayload) => {
+      const props = magicItemsProps({ selected, allItems: [AMULET_OF_HEALTH, BAG_OF_HOLDING] });
+      render(<WizardStepMagicItems {...props} />);
+
+      const checkbox = screen
+        .getByText(clickedName)
+        .closest('.magic-item')
+        .querySelector('.list-item-checkbox-trigger');
+      expect(checkbox.className).toContain(selected.includes(clickedName) ? 'checked' : 'list-item-checkbox');
+
+      fireEvent.click(checkbox);
+      expect(props.onArrayFieldChange).toHaveBeenCalledTimes(1);
+      expect(props.onArrayFieldChange).toHaveBeenCalledWith('inventory.magicItems', expectedPayload);
     });
   });
 });

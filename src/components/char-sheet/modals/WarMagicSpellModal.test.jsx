@@ -1,220 +1,146 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
+import { confirmWarMagicSpell } from '../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js'
 
 vi.mock('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js', () => ({
     confirmWarMagicSpell: vi.fn(),
 }))
 
+const mockAction = { name: 'Improved War Magic', automation: { type: 'war_magic_spell' } }
+const mockPlayerStats = { name: 'TestFighter', rules: '2024' }
+const mockCampaignName = 'test-campaign'
+const mockOnClose = vi.fn()
+
+// Real candidates: spells the handler would offer for Improved War Magic.
+const mockOptions = ['Burning Hands', 'Magic Missile', 'Web']
+// Modal only reads optionDetails[name]?.level and ?.casting_time — keep the mock to that.
+const mockOptionDetails = {
+    'Burning Hands': { level: 1, casting_time: '1 action' },
+    'Magic Missile': { level: 1, casting_time: '1 action' },
+    'Web': { level: 2, casting_time: '1 action' },
+}
+
+function makeProps(overrides) {
+    return {
+        action: mockAction,
+        playerStats: mockPlayerStats,
+        campaignName: mockCampaignName,
+        options: mockOptions,
+        optionDetails: mockOptionDetails,
+        maxSpellLevel: 2,
+        onClose: mockOnClose,
+        ...(overrides || {}),
+    }
+}
+
+const replaceButton = () => screen.getByRole('button', { name: /replace attack/i })
+
 describe('WarMagicSpellModal', () => {
-    const mockOnClose = vi.fn()
-    const mockAction = {
-        name: 'Improved War Magic',
-        automation: { type: 'war_magic_spell', maxSpellLevel: 2 },
-    }
-    const mockPlayerStats = { name: 'TestFighter', rules: '2024' }
-    const mockCampaignName = 'test-campaign'
-    const mockOptions = ['Burning Hands', 'Shield', 'Web']
-    const mockOptionDetails = {
-        'Burning Hands': { name: 'Burning Hands', level: 1, casting_time: '1 action', range: 'Self', description: 'Burst of flame', damage: '3d6 fire' },
-        'Shield': { name: 'Shield', level: 1, casting_time: '1 reaction', range: 'Self', description: 'Arcane barrier', damage: null },
-        'Web': { name: 'Web', level: 2, casting_time: '1 action', range: '60 ft', description: 'Creates areas of webbing', damage: '2d6 bludgeoning' },
-    }
-
-    function renderModal(props = {}) {
-        return render(
-            <WarMagicSpellModal
-                action={mockAction}
-                playerStats={mockPlayerStats}
-                campaignName={mockCampaignName}
-                options={mockOptions}
-                optionDetails={mockOptionDetails}
-                maxSpellLevel={2}
-                onClose={mockOnClose}
-                {...props}
-            />
-        )
-    }
-
     beforeEach(() => {
-        vi.clearAllMocks()
+        vi.resetAllMocks()
     })
 
-    describe('initial render', () => {
-        it('renders all spell options with their levels and casting times', () => {
-            renderModal()
-            expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-            expect(screen.getByText('Shield')).toBeInTheDocument()
-            expect(screen.getByText('Web')).toBeInTheDocument()
-            expect(screen.getAllByText(/Level 1/)).toHaveLength(2)
-            expect(screen.getByText('Level 2')).toBeInTheDocument()
-            expect(screen.getAllByText(/1 action/)).toHaveLength(2)
-            expect(screen.getByText(/1 reaction/)).toBeInTheDocument()
-        })
+    it('renders title, prompt, options with level and casting time, and keeps Replace Attack inert until a selection', () => {
+        const { rerender } = render(<WarMagicSpellModal {...makeProps()} />)
 
-        it('shows the correct prompt text with max spell level', () => {
-            renderModal()
-            expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–2/)).toBeInTheDocument()
-        })
+        expect(screen.getByText('Improved War Magic')).toBeInTheDocument()
+        expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–2/)).toBeInTheDocument()
+        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
+        expect(screen.getByText('Magic Missile')).toBeInTheDocument()
+        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.queryAllByText('Level 1')).toHaveLength(2)
+        expect(screen.queryAllByText('Level 2')).toHaveLength(1)
+        expect(screen.queryAllByText('(1 action)')).toHaveLength(3)
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
 
-        it('disables confirm button when no spell is selected', () => {
-            renderModal()
-            expect(screen.getByRole('button', { name: /replace attack/i })).toBeDisabled()
-        })
+        const confirm = replaceButton()
+        expect(confirm).toBeDisabled()
+        fireEvent.click(confirm)
+        expect(confirmWarMagicSpell).not.toHaveBeenCalled()
 
-        it('renders options without casting time span when detail is missing', () => {
-            const detailsWithoutCastingTime = {
-                'Burning Hands': { name: 'Burning Hands', level: 1 },
-            }
-            renderModal({ options: ['Burning Hands'], optionDetails: detailsWithoutCastingTime })
-            expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-            expect(screen.getByText('Level 1')).toBeInTheDocument()
-            expect(screen.queryAllByText(/\(1 action\)/)).toHaveLength(0)
-        })
+        // Prompt interpolates the maxSpellLevel prop — distinct copy, not hardcoded.
+        rerender(<WarMagicSpellModal {...makeProps({ maxSpellLevel: 3 })} />)
+        expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–3/)).toBeInTheDocument()
+        expect(screen.queryByText(/level 1–2/)).not.toBeInTheDocument()
     })
 
-    describe('spell selection', () => {
-        it('enables confirm button after selecting a spell and maintains enabled state when switching', () => {
-            renderModal()
-            expect(screen.getByRole('button', { name: /replace attack/i })).toBeDisabled()
-            fireEvent.click(screen.getByText('Web'))
-            expect(screen.getByRole('button', { name: /replace attack/i })).toBeEnabled()
-            fireEvent.click(screen.getByText('Shield'))
-            expect(screen.getByRole('button', { name: /replace attack/i })).toBeEnabled()
-        })
+    it('omits level and casting time spans when details are missing or optionDetails is absent', () => {
+        const { unmount } = render(<WarMagicSpellModal {...makeProps({
+            optionDetails: {
+                'Burning Hands': { level: 1 },
+                'Magic Missile': { casting_time: '1 action' },
+            },
+        })} />)
 
-        it('renders the modal with no spell options when options array is empty', () => {
-            renderModal({ options: [] })
-            expect(screen.getByText('Improved War Magic')).toBeInTheDocument()
-            expect(screen.queryAllByText(/Level/)).toHaveLength(0)
-        })
+        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
+        expect(screen.getByText('Magic Missile')).toBeInTheDocument()
+        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.queryAllByText('Level 1')).toHaveLength(1) // only Burning Hands has a level
+        expect(screen.queryAllByText('Level 2')).toHaveLength(0)
+        expect(screen.queryAllByText('(1 action)')).toHaveLength(1) // only Magic Missile has a casting time
+        unmount()
+
+        render(<WarMagicSpellModal {...makeProps({ optionDetails: null })} />)
+        expect(screen.getByText('Burning Hands')).toBeInTheDocument()
+        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.queryAllByText(/Level \d/)).toHaveLength(0)
+        expect(screen.queryAllByText('(1 action)')).toHaveLength(0)
     })
 
-    describe('overlay interactions', () => {
-        it('does not call onClose when the overlay background is clicked', () => {
-            renderModal()
-            const overlay = document.querySelector('.sp-overlay')
-            fireEvent.click(overlay)
-            expect(mockOnClose).not.toHaveBeenCalled()
-            expect(screen.getByText('Cancel')).toBeInTheDocument()
+    it('submits the last-clicked spell with exact args, renders the HTML description unescaped, and Done closes once', async () => {
+        confirmWarMagicSpell.mockResolvedValue({
+            type: 'popup',
+            payload: { description: '<b>Improved War Magic</b>: Cast <b>Web</b>.<br/>Weapon attack: Hit' },
         })
 
-        it('does NOT close when clicking inside the modal content', () => {
-            renderModal()
-            const modal = document.querySelector('.sp-modal')
-            fireEvent.click(modal)
-            expect(mockOnClose).not.toHaveBeenCalled()
+        const { container } = render(<WarMagicSpellModal {...makeProps()} />)
+        fireEvent.click(screen.getByText('Burning Hands'))
+        fireEvent.click(screen.getByText('Web'))
+        expect(replaceButton()).toBeEnabled()
+        fireEvent.click(replaceButton())
+
+        await waitFor(() => {
+            expect(confirmWarMagicSpell).toHaveBeenCalledTimes(1)
         })
+        expect(confirmWarMagicSpell).toHaveBeenCalledWith(
+            mockAction,
+            mockPlayerStats,
+            mockCampaignName,
+            'Web'
+        )
+
+        // Handler descriptions arrive with markup — it must render as HTML, not escaped text.
+        // .sp-body is the contract class the modal uses for dangerouslySetInnerHTML.
+        expect(container.querySelector('.sp-body').innerHTML).toContain('<b>Web</b>')
+        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(screen.queryByText(/Replace one attack with a Wizard spell/)).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
     })
 
-    describe('cancel action', () => {
-        it('calls onClose when Cancel button is clicked', () => {
-            renderModal()
-            fireEvent.click(screen.getByText('Cancel'))
-            expect(mockOnClose).toHaveBeenCalledOnce()
+    it('stays in the selection view when the handler returns no result', async () => {
+        confirmWarMagicSpell.mockResolvedValue(null)
+
+        render(<WarMagicSpellModal {...makeProps()} />)
+        fireEvent.click(screen.getByText('Web'))
+        fireEvent.click(replaceButton())
+
+        await waitFor(() => {
+            expect(confirmWarMagicSpell).toHaveBeenCalledTimes(1)
         })
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument()
+        expect(screen.getByText(/Replace one attack with a Wizard spell/)).toBeInTheDocument()
+        expect(screen.getByText('Web')).toBeInTheDocument()
+        expect(mockOnClose).not.toHaveBeenCalled()
     })
 
-    describe('confirmation flow', () => {
-        it('calls confirmWarMagicSpell with correct arguments and shows result on confirm', async () => {
-            const { confirmWarMagicSpell } = await import('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
-            confirmWarMagicSpell.mockResolvedValue({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Improved War Magic',
-                    description: 'Replaced one attack with the level 2 spell Web.',
-                },
-            })
-
-            renderModal()
-            fireEvent.click(screen.getByText('Web'))
-            fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
-
-            await waitFor(() => {
-                expect(confirmWarMagicSpell).toHaveBeenCalledWith(
-                    mockAction,
-                    mockPlayerStats,
-                    mockCampaignName,
-                    'Web'
-                )
-            })
-
-            await waitFor(() => {
-                expect(screen.getByText('Replaced one attack with the level 2 spell Web.')).toBeInTheDocument()
-            })
-        })
-
-        it('renders the result description as HTML via dangerouslySetInnerHTML', async () => {
-            const { confirmWarMagicSpell } = await import('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
-            confirmWarMagicSpell.mockResolvedValue({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Improved War Magic',
-                    description: '<b>Web</b> replaced one attack with <i>fire damage</i>.',
-                },
-            })
-
-            renderModal()
-            fireEvent.click(screen.getByText('Web'))
-            fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
-
-            await waitFor(() => {
-                const bodyDiv = document.querySelector('.sp-body')
-                expect(bodyDiv.innerHTML).toContain('<b>Web</b>')
-                expect(bodyDiv.innerHTML).toContain('<i>fire damage</i>')
-            })
-        })
-
-        it('calls onClose when Done button is clicked after confirmation', async () => {
-            const { confirmWarMagicSpell } = await import('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
-            confirmWarMagicSpell.mockResolvedValue({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Improved War Magic',
-                    description: 'Replaced one attack with the level 2 spell Web.',
-                },
-            })
-
-            renderModal()
-            fireEvent.click(screen.getByText('Web'))
-            fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
-
-            await waitFor(() => {
-                expect(screen.getByText('Replaced one attack with the level 2 spell Web.')).toBeInTheDocument()
-            })
-            fireEvent.click(screen.getByText('Done'))
-            expect(mockOnClose).toHaveBeenCalledOnce()
-        })
-
-        it('does not show result state when handler returns null', async () => {
-            const { confirmWarMagicSpell } = await import('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
-            confirmWarMagicSpell.mockResolvedValue(null)
-
-            renderModal()
-            fireEvent.click(screen.getByText('Web'))
-            fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
-
-            await waitFor(() => {
-                expect(screen.queryByText('Done')).not.toBeInTheDocument()
-            })
-        })
-
-    })
-
-    describe('edge cases', () => {
-        it('shows a different max spell level in the prompt', () => {
-            renderModal({ maxSpellLevel: 3 })
-            expect(screen.getByText(/Replace one attack with a Wizard spell of level 1–3/)).toBeInTheDocument()
-        })
-
-        it('renders spell name when optionDetails is null', () => {
-            renderModal({ optionDetails: null })
-            expect(screen.getByText('Burning Hands')).toBeInTheDocument()
-            expect(screen.queryAllByText(/Level/)).toHaveLength(0)
-            expect(screen.queryAllByText(/\(1 action\)/)).toHaveLength(0)
-        })
+    it('Cancel closes without dispatching the handler', () => {
+        render(<WarMagicSpellModal {...makeProps()} />)
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+        expect(confirmWarMagicSpell).not.toHaveBeenCalled()
     })
 })

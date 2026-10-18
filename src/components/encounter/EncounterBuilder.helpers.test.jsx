@@ -1,336 +1,229 @@
-import { describe, it, expect } from 'vitest';
+// @maintained-by-ai
+// Helpers lane, salvaged: EncounterBuilder's calc/filter/persistence helpers are
+// module-private, so the previous inline copies tested here could never fail when the
+// REAL source broke — they were pure re-implementations. This file now drives the
+// REAL builder (real filter panel, summary panel, monster table) and owns only the
+// behaviors asserted nowhere else:
+//   • localStorage filter persistence ('encounterFilter-2024'): restore on mount,
+//     corrupt/invalid fallback, and the full saveFilter payload written on change
+//   • filterMonsters narrowing via the UI: name/subtype search (case-insensitive),
+//     fractional CR parsing ('1/8'), 'None' CR exclusion, inclusive CR bounds
+//   • calculateDifficultyIndex band mapping shown as the summary Difficulty label
+// Coverage kept elsewhere (not restated): toggleMonster/updateQty select/decrement and
+// XP/count math — gameplay-flows #400 + panel-interactions; save payload (stripMonsters),
+// sort, Join — additional-interactions #399; selected-monster preservation + Clear All —
+// remaining.test.jsx.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-describe('toggleMonster', () => {
-  function toggleMonster(selected, monster) {
-    const existing = selected.find(m => m.index === monster.index);
-    if (existing) {
-      return selected.map(m =>
-        m.index === monster.index ? { ...m, qty: (m.qty || 1) - 1 } : m
-      ).filter(m => m.qty > 0);
-    }
-    return [...selected, { ...monster, qty: 1 }];
-  }
+vi.mock('../../hooks/ui/useMonstersData.js', () => ({
+  useMonstersData: vi.fn(),
+}));
 
-  it('adds a new monster with qty 1, decrements qty on re-toggle, and removes when qty reaches 0', () => {
-    const monster = { index: 'goblin', name: 'Goblin', xp: 50 };
+vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
+  default: vi.fn(),
+}));
 
-    // add
-    expect(toggleMonster([], monster)).toEqual([{ index: 'goblin', name: 'Goblin', xp: 50, qty: 1 }]);
-    // decrement
-    expect(toggleMonster([{ ...monster, qty: 2 }], monster)).toEqual([{ ...monster, qty: 1 }]);
-    // remove
-    expect(toggleMonster([{ ...monster, qty: 1 }], monster)).toEqual([]);
+// Keep the real filter/summary/table panels; stub the heavy modals (all closed here).
+vi.mock('./EncounterModal.jsx', () => ({ default: () => null }));
+vi.mock('./EncounterGeneratorModal.jsx', () => ({ default: () => null }));
+vi.mock('./MonsterCardModal.jsx', () => ({ default: () => null }));
+vi.mock('../common/PreviewToggle.jsx', () => ({ default: () => null }));
+
+// Sever server persistence — filter persistence and filtering are purely local here.
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
+  const store = new Map();
+  return {
+    getStore: vi.fn(() => store),
+    setRuntimeValue: vi.fn(),
+    listeners: new Map(),
+  };
+});
+vi.mock('../../services/encounters/encounterToInitiative.js', () => ({
+  addMonstersToInitiative: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+import EncounterBuilder from './EncounterBuilder.jsx';
+import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
+import useEncounterManagement from '../../hooks/management/useEncounterManagement.js';
+
+const FILTER_KEY = 'encounterFilter-2024';
+
+const MONSTERS = [
+  { index: 'cloud', name: 'Cloud', xp: 0, type: 'elemental', challenge_rating: 'None', environments: ['sky'] },
+  { index: 'goblin', name: 'Goblin', xp: 50, type: 'humanoid', subtype: 'tribe', challenge_rating: 0.25, environments: ['forest'] },
+  { index: 'kobold', name: 'Kobold', xp: 250, type: 'humanoid', challenge_rating: 0.25, environments: ['underdark'] },
+  { index: 'kobold-captain', name: 'Kobold Captain', xp: 250, type: 'humanoid', challenge_rating: 0.5, environments: ['underdark'] },
+  { index: 'orc', name: 'Orc', xp: 100, type: 'humanoid', challenge_rating: 0.5, environments: ['hill'] },
+  { index: 'rat', name: 'Rat', xp: 25, type: 'beast', challenge_rating: '1/8', environments: ['forest'] },
+  { index: 'shadow', name: 'Shadow', xp: 235, type: 'undead', challenge_rating: 0.5, environments: ['underdark'] },
+  { index: 'young-dragon', name: 'Young Dragon', xp: 450, type: 'dragon', challenge_rating: 2, environments: ['mountain'] },
+];
+
+function mountBuilder({ monsters = [], characters }) {
+  useMonstersData.mockReturnValue({ monsters, loading: false });
+  useEncounterManagement.mockReturnValue({
+    modalOpen: false,
+    modalMode: null,
+    encounters: [],
+    loading: false,
+    openSaveModal: vi.fn(),
+    openLoadModal: vi.fn(),
+    closeModal: vi.fn(),
+    saveEncounter: vi.fn(),
+    updateEncounter: vi.fn(),
+    loadEncounterData: vi.fn(),
+    deleteEncounterAction: vi.fn(),
+    renameEncounterAction: vi.fn(),
   });
+  return render(
+    <EncounterBuilder campaignName="test-campaign" characters={characters} onJoinEncounter={vi.fn()} />
+  );
+}
 
-  it('preserves other monsters when toggling one with qty > 1', () => {
-    const selected = [
-      { index: 'goblin', name: 'Goblin', xp: 50, qty: 2 },
-      { index: 'orc', name: 'Orc', xp: 100, qty: 1 },
-    ];
-    const result = toggleMonster(selected, { index: 'goblin', name: 'Goblin', xp: 50 });
-    expect(result).toHaveLength(2);
-    expect(result.find(m => m.index === 'orc')).toEqual({ index: 'orc', name: 'Orc', xp: 100, qty: 1 });
-    expect(result.find(m => m.index === 'goblin').qty).toBe(1);
-  });
+const thorinLv5 = [{ name: 'Thorin', level: 5 }];
+
+const rowNames = (container) =>
+  Array.from(container.querySelectorAll('tbody tr td.col-name')).map(td => td.textContent);
+
+const thresholdText = (container) =>
+  container.querySelector('.threshold-display strong').textContent;
+
+// 'Difficulty' text exists on both the filter-panel dropdown label and the summary tile;
+// scope to the summary panel tile.
+const summaryDifficulty = () => {
+  const item = screen.getAllByText('Difficulty')
+    .map(el => el.closest('.summary-item'))
+    .find(Boolean);
+  return item.querySelector('.summary-value').textContent;
+};
+
+const savedFilter = () => JSON.parse(localStorage.getItem(FILTER_KEY));
+
+beforeEach(() => {
+  localStorage.clear();
 });
 
-describe('updateQty', () => {
-  function updateQty(selected, index, delta) {
-    return selected.map(m =>
-      m.index === index ? { ...m, qty: (m.qty || 1) + delta } : m
-    ).filter(m => m.qty > 0);
-  }
-
-  it('increases or decreases qty by delta', () => {
-    const base = [{ index: 'goblin', name: 'Goblin', xp: 50, qty: 2 }];
-    expect(updateQty(base, 'goblin', 1)[0].qty).toBe(3);
-    expect(updateQty(base, 'goblin', -1)[0].qty).toBe(1);
-  });
-
-  it('removes monster when qty goes to 0 or negative', () => {
-    const selected = [{ index: 'goblin', name: 'Goblin', xp: 50, qty: 1 }];
-    expect(updateQty(selected, 'goblin', -1)).toEqual([]);
-    expect(updateQty(selected, 'goblin', -2)).toEqual([]);
-  });
-
-  it('does not affect other monsters', () => {
-    const selected = [
-      { index: 'goblin', name: 'Goblin', xp: 50, qty: 1 },
-      { index: 'orc', name: 'Orc', xp: 100, qty: 2 },
-    ];
-    const result = updateQty(selected, 'goblin', 1);
-    expect(result).toHaveLength(2);
-    expect(result.find(m => m.index === 'orc').qty).toBe(2);
-  });
-});
-
-describe('calculateTotalMonsterXP', () => {
-  function calculateTotalMonsterXP(selectedMonsters) {
-    return selectedMonsters.reduce((sum, m) => sum + (m.xp || 0) * (m.qty || 1), 0);
-  }
-
-  it('calculates total XP with single and multiple monsters', () => {
-    expect(calculateTotalMonsterXP([{ index: 'goblin', xp: 50, qty: 1 }])).toBe(50);
-    expect(calculateTotalMonsterXP([
-      { index: 'goblin', xp: 50, qty: 2 },
-      { index: 'orc', xp: 100, qty: 1 },
-    ])).toBe(200);
-  });
-
-  it('handles missing xp as 0, missing qty as 1, and empty array', () => {
-    expect(calculateTotalMonsterXP([{ index: 'goblin', qty: 1 }])).toBe(0);
-    expect(calculateTotalMonsterXP([{ index: 'goblin', xp: 50 }])).toBe(50);
-    expect(calculateTotalMonsterXP([])).toBe(0);
-  });
-});
-
-describe('calculateMonsterCount', () => {
-  function calculateMonsterCount(selectedMonsters) {
-    return selectedMonsters.reduce((sum, m) => sum + (m.qty || 1), 0);
-  }
-
-  it('counts total creatures and handles missing qty as 1', () => {
-    expect(calculateMonsterCount([
-      { index: 'goblin', qty: 2 },
-      { index: 'orc', qty: 1 },
-    ])).toBe(3);
-    expect(calculateMonsterCount([{ index: 'goblin' }])).toBe(1);
-  });
-});
-
-describe('calculateDifficultyIndex', () => {
-  function calculateDifficultyIndex(effectiveXP, totalThreshold) {
-    if (!totalThreshold) return 0;
-    const ratio = effectiveXP / totalThreshold;
-    if (ratio < 0.5) return 0;
-    if (ratio < 1) return 1;
-    if (ratio < 1.5) return 2;
-    return 3;
-  }
-
-  it('returns 0 (Easy) for ratio < 0.5, 1 (Medium) for >= 0.5 and < 1, 2 (Hard) for >= 1 and < 1.5, and 3 (Deadly) for >= 1.5', () => {
-    expect(calculateDifficultyIndex(49, 100)).toBe(0);
-    expect(calculateDifficultyIndex(50, 100)).toBe(1);
-    expect(calculateDifficultyIndex(99, 100)).toBe(1);
-    expect(calculateDifficultyIndex(100, 100)).toBe(2);
-    expect(calculateDifficultyIndex(149, 100)).toBe(2);
-    expect(calculateDifficultyIndex(150, 100)).toBe(3);
-    expect(calculateDifficultyIndex(200, 100)).toBe(3);
-  });
-
-  it('returns 0 when totalThreshold is falsy', () => {
-    expect(calculateDifficultyIndex(100, 0)).toBe(0);
-  });
-});
-
-describe('filterMonsters', () => {
-  function crToNumber(cr) {
-    if (cr === null || cr === undefined || cr === '' || cr === 'None') return NaN;
-    const str = String(cr).trim().toLowerCase();
-    if (str === 'any') return 999;
-    const match = str.match(/^(\d+)\s*\/\s*(\d+)$/);
-    if (match) return parseInt(match[1], 10) / parseInt(match[2], 10);
-    const num = parseFloat(str);
-    return isNaN(num) ? NaN : num;
-  }
-
-  function matchesCrRange(m, crMinNum, crMaxNum) {
-    if (crMinNum === null && crMaxNum === null) return true;
-    const cr = crToNumber(m.challenge_rating);
-    if (isNaN(cr)) return false;
-    if (crMinNum !== null && cr < crMinNum) return false;
-    if (crMaxNum !== null && cr > crMaxNum) return false;
-    return true;
-  }
-
-  function matchesSearchQuery(m, q) {
-    return m.name.toLowerCase().includes(q)
-      || (m.type && m.type.toLowerCase().includes(q))
-      || (m.subtype && m.subtype.toLowerCase().includes(q));
-  }
-
-  function filterMonsters(monsters, filter = {}) {
-    if (!monsters) return [];
-    const { searchQuery = '', environmentFilter = '', typeFilter = '', sizeFilter = '', crMin = '', crMax = '' } = filter;
-    const crMinNum = !crMin ? null : parseFloat(crMin);
-    const crMaxNum = !crMax ? null : parseFloat(crMax);
-    const q = searchQuery ? searchQuery.toLowerCase() : '';
-    return monsters.filter(m => {
-      if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
-      if (typeFilter && m.type && m.type.toLowerCase() !== typeFilter.toLowerCase()) return false;
-      if (sizeFilter && m.size && m.size.toLowerCase() !== sizeFilter.toLowerCase()) return false;
-      if (!matchesCrRange(m, crMinNum, crMaxNum)) return false;
-      if (!q) return true;
-      return matchesSearchQuery(m, q);
-    });
-  }
-
-  const monsters = [
-    { index: 'goblin', name: 'Goblin', xp: 50, type: 'humanoid', subtype: 'tribe', environments: ['forest'], challenge_rating: 0.25 },
-    { index: 'orc', name: 'Orc', xp: 100, type: 'humanoid', subtype: 'warrior', environments: ['hill', 'mountain'], challenge_rating: 0.5 },
-    { index: 'dragon', name: 'Young Dragon', xp: 5900, type: 'dragon', environments: ['underground'], challenge_rating: 2 },
-    { index: 'slime', name: 'Green Slime', xp: 2000, type: 'ooze', environments: ['underdark', 'cave'], challenge_rating: 1 },
-    { index: 'tiger', name: 'Tiger', xp: 200, type: 'beast', environments: ['grassland', 'forest'], challenge_rating: 1 },
-    { index: 'flaming-sphere', name: 'Flaming Sphere', xp: 200, type: 'construct', environments: ['desert'], challenge_rating: 1 },
-    { index: 'shadow', name: 'Shadow', xp: 235, type: 'undead', environments: ['underdark'], challenge_rating: 0.5 },
-  ];
-
-  it('filters by search query matching name, type, or subtype (case-insensitive)', () => {
-    expect(filterMonsters(monsters, { searchQuery: 'goblin' }).map(m => m.index)).toEqual(['goblin']);
-    expect(filterMonsters(monsters, { searchQuery: 'dragon' }).map(m => m.index)).toContain('dragon');
-    expect(filterMonsters(monsters, { searchQuery: 'tribe' }).map(m => m.index)).toEqual(['goblin']);
-    expect(filterMonsters(monsters, { searchQuery: 'GOBLIN' }).map(m => m.index)).toEqual(['goblin']);
-  });
-
-  it('filters by environment only', () => {
-    expect(filterMonsters(monsters, { environmentFilter: 'underdark' }).map(m => m.index)).toEqual(['slime', 'shadow']);
-    expect(filterMonsters(monsters, {}).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
-    expect(filterMonsters(monsters, {}).map(m => m.index)).toEqual(['goblin', 'orc', 'dragon', 'slime', 'tiger', 'flaming-sphere', 'shadow']);
-  });
-
-  it('filters by type', () => {
-    expect(filterMonsters(monsters, { typeFilter: 'humanoid' }).map(m => m.index)).toEqual(['goblin', 'orc']);
-    expect(filterMonsters(monsters, { typeFilter: 'dragon' }).map(m => m.index)).toEqual(['dragon']);
-    expect(filterMonsters(monsters, { typeFilter: 'beast' }).map(m => m.index)).toEqual(['tiger']);
-  });
-
-  it('filters by size', () => {
-    const sizedMonsters = [
-      { index: 'goblin', name: 'Goblin', type: 'humanoid', size: 'small', environments: ['forest'], challenge_rating: 0.25 },
-      { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
-      { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
-    ];
-    expect(filterMonsters(sizedMonsters, { sizeFilter: 'medium' }).map(m => m.index)).toEqual(['orc']);
-    expect(filterMonsters(sizedMonsters, { sizeFilter: 'huge' }).map(m => m.index)).toEqual(['ogre']);
-    expect(filterMonsters(sizedMonsters, { sizeFilter: 'small' }).map(m => m.index)).toEqual(['goblin']);
-  });
-
-  it('filters by CR range', () => {
-    expect(filterMonsters(monsters, { crMin: 0, crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
-    expect(filterMonsters(monsters, { crMin: 1, crMax: 2 }).map(m => m.index)).toContain('dragon');
-    expect(filterMonsters(monsters, { crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc', 'shadow']);
-    expect(filterMonsters(monsters, { crMin: 2 }).map(m => m.index)).toEqual(['dragon']);
-  });
-
-  it('filters by CR range with fraction notation', () => {
-    const fractionMonsters = [
-      { index: 'mold', name: 'Mold', type: 'plant', size: 'medium', environments: ['forest'], challenge_rating: '1/8' },
-      { index: 'rat', name: 'Rat', type: 'beast', size: 'tiny', environments: ['forest'], challenge_rating: '1/4' },
-      { index: 'wolf', name: 'Wolf', type: 'beast', size: 'medium', environments: ['forest'], challenge_rating: '1/4' },
-    ];
-    expect(filterMonsters(fractionMonsters, { crMin: 0.125, crMax: 0.25 }).map(m => m.index)).toEqual(['mold', 'rat', 'wolf']);
-  });
-
-  it('excludes monsters with no CR when CR range is specified', () => {
-    const noCRMonsters = [
-      { index: 'cloud', name: 'Cloud', type: 'elemental', size: 'large', environments: ['sky'], challenge_rating: 'None' },
-      { index: 'goblin', name: 'Goblin', type: 'humanoid', size: 'small', environments: ['forest'], challenge_rating: 0.25 },
-    ];
-    expect(filterMonsters(noCRMonsters, { crMin: 0, crMax: 1 }).map(m => m.index)).toEqual(['goblin']);
-  });
-
-  it('combines type and size filters', () => {
-    const combinedMonsters = [
-      { index: 'goblin', name: 'Goblin', type: 'humanoid', size: 'small', environments: ['forest'], challenge_rating: 0.25 },
-      { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
-      { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
-    ];
-    expect(filterMonsters(combinedMonsters, { typeFilter: 'humanoid', sizeFilter: 'small' }).map(m => m.index)).toEqual(['goblin']);
-  });
-
-  it('combines type, size, and CR filters', () => {
-    const combinedMonsters = [
-      { index: 'goblin', name: 'Goblin', type: 'humanoid', size: 'small', environments: ['forest'], challenge_rating: 0.25 },
-      { index: 'orc', name: 'Orc', type: 'humanoid', size: 'medium', environments: ['hill'], challenge_rating: 0.5 },
-      { index: 'ogre', name: 'Ogre', type: 'giant', size: 'huge', environments: ['hill'], challenge_rating: 3 },
-    ];
-    expect(filterMonsters(combinedMonsters, { typeFilter: 'humanoid', crMin: 0, crMax: 0.5 }).map(m => m.index)).toEqual(['goblin', 'orc']);
-    expect(filterMonsters(combinedMonsters, { sizeFilter: 'medium', crMin: 0, crMax: 1 }).map(m => m.index)).toEqual(['orc']);
-  });
-
-  it('returns empty array when monsters is null or no monsters match', () => {
-    expect(filterMonsters(null, {})).toEqual([]);
-    expect(filterMonsters(monsters, { searchQuery: 'unicorn' })).toEqual([]);
-  });
-});
-
-describe('stripMonsters', () => {
-  function stripMonsters(monsters) {
-    return monsters.map(m => ({
-      index: m.index,
-      name: m.name,
-      qty: m.qty || 1,
+describe('filter persistence (localStorage key encounterFilter-2024)', () => {
+  it('restores saved difficulty and environment filter on mount', () => {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      difficulty: 3, environment: 'forest', type: '', size: '', crMin: '', crMax: '',
     }));
-  }
+    const { container } = mountBuilder({
+      monsters: MONSTERS,
+      characters: thorinLv5,
+    });
 
-  it('strips monster data to minimal fields and defaults qty to 1', () => {
-    expect(stripMonsters([
-      { index: 'goblin', name: 'Goblin', xp: 50, qty: 2, challenge_rating: 0.25 },
-    ])).toEqual([{ index: 'goblin', name: 'Goblin', qty: 2 }]);
+    // Difficulty 3 (Deadly) restored: dropdown shows it and the target threshold
+    // uses it (Lv5 Deadly = 1,100 XP per config.xpThresholds[5][3]).
+    expect(screen.getByLabelText('Difficulty')).toHaveValue('3');
+    expect(thresholdText(container)).toBe('1,100 XP');
+    expect(container.querySelector('.threshold-display').textContent).toContain('(Deadly)');
 
-    expect(stripMonsters([{ index: 'goblin', name: 'Goblin' }])).toEqual([
-      { index: 'goblin', name: 'Goblin', qty: 1 },
+    // Saved environment 'forest' narrows the table to forest dwellers.
+    expect(rowNames(container)).toEqual(['Goblin', 'Rat']);
+  });
+
+  it('writes the full six-field filter payload to localStorage on mount and on difficulty change', () => {
+    const { container } = mountBuilder({ monsters: [], characters: thorinLv5 });
+
+    // Fresh mount persists the default filter (ENCOUNTER_CONFIG.defaultDifficulty = 1).
+    expect(savedFilter()).toEqual({
+      difficulty: 1, environment: '', type: '', size: '', crMin: '', crMax: '',
+    });
+
+    fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '2' } });
+
+    expect(savedFilter()).toEqual({
+      difficulty: 2, environment: '', type: '', size: '', crMin: '', crMax: '',
+    });
+    expect(thresholdText(container)).toBe('750 XP'); // Lv5 Hard threshold (config.xpThresholds[5][2])
+  });
+
+  describe.each([
+    ['a saved filter without a numeric difficulty', JSON.stringify({ difficulty: 'hard', environment: 'forest' })],
+    ['saved data missing difficulty entirely', JSON.stringify({ environment: 'forest' })],
+    ['corrupt JSON', '{not valid json'],
+  ])('with %s', (_desc, raw) => {
+    it('falls back to default Medium with no filters applied', () => {
+      localStorage.setItem(FILTER_KEY, raw);
+      const { container } = mountBuilder({
+        monsters: MONSTERS.filter(m => ['goblin', 'orc'].includes(m.index)),
+        characters: thorinLv5,
+      });
+
+      expect(screen.getByLabelText('Difficulty')).toHaveValue('1');
+      expect(thresholdText(container)).toBe('500 XP'); // Lv5 Medium threshold (config.xpThresholds[5][1])
+      // The saved environment filter is NOT applied because the save was rejected.
+      expect(rowNames(container)).toEqual(['Goblin', 'Orc']);
+    });
+  });
+});
+
+describe('monster table filtering', () => {
+  it('narrows rows by search text on name, subtype, and type, case-insensitively', () => {
+    const { container } = mountBuilder({ monsters: MONSTERS, characters: thorinLv5 });
+    expect(rowNames(container)).toEqual([
+      'Cloud', 'Goblin', 'Kobold', 'Kobold Captain', 'Orc', 'Rat', 'Shadow', 'Young Dragon',
     ]);
+
+    const search = screen.getByLabelText('Search monsters');
+
+    fireEvent.change(search, { target: { value: 'orc' } });
+    expect(rowNames(container)).toEqual(['Orc']);
+
+    // 'tribe' matches only Goblin's subtype, not any name.
+    fireEvent.change(search, { target: { value: 'tribe' } });
+    expect(rowNames(container)).toEqual(['Goblin']);
+
+    // Case-insensitive name match.
+    fireEvent.change(search, { target: { value: 'DRAGON' } });
+    expect(rowNames(container)).toEqual(['Young Dragon']);
+  });
+
+  it('applies CR bounds inclusively, parsing fractional CRs and excluding CR None', () => {
+    const { container } = mountBuilder({ monsters: MONSTERS, characters: thorinLv5 });
+
+    // CR min 0.25: Rat's fractional '1/8' (0.125) drops out; Cloud ('None') is excluded.
+    fireEvent.change(screen.getByLabelText('CR Min'), { target: { value: '0.25' } });
+    expect(rowNames(container)).toEqual([
+      'Goblin', 'Kobold', 'Kobold Captain', 'Orc', 'Shadow', 'Young Dragon',
+    ]);
+
+    // CR max 0.125 keeps Rat at the inclusive upper bound and nothing else.
+    fireEvent.change(screen.getByLabelText('CR Min'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('CR Max'), { target: { value: '0.125' } });
+    expect(rowNames(container)).toEqual(['Rat']);
   });
 });
 
-describe('loadSavedFilter', () => {
-  function loadSavedFilter() {
-    try {
-      const key = 'encounterFilter-2024';
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed.difficulty === 'number') {
-          return parsed;
-        }
-      }
-    } catch { /* ignore corrupt data */ }
-    return null;
-  }
+describe('actual difficulty label bands', () => {
+  it('maps effective XP onto Easy/Medium/Hard/Deadly thresholds, independently of the dropdown', () => {
+    // Party Lv7 solo: Medium threshold 750 XP (config.xpThresholds[7][1]).
+    // Band edges: Easy <375, Medium 375..749, Hard 750..1124, Deadly >=1125.
+    mountBuilder({
+      monsters: MONSTERS.filter(m => ['kobold', 'kobold-captain'].includes(m.index)),
+      characters: [{ name: 'Thorin', level: 7 }],
+    });
 
-  it('returns saved filter with difficulty number', () => {
-    localStorage.setItem('encounterFilter-2024', JSON.stringify({ difficulty: 2, environment: 'forest' }));
-    expect(loadSavedFilter()).toEqual({ difficulty: 2, environment: 'forest' });
-  });
+    expect(summaryDifficulty()).toBe('Easy'); // 0 XP selected
 
-  it('returns null when difficulty is not a number, data is missing, corrupt, or absent', () => {
-    localStorage.setItem('encounterFilter-2024', JSON.stringify({ difficulty: 'hard', environment: 'forest' }));
-    expect(loadSavedFilter()).toBeNull();
+    // 250 XP x1.5 multiplier = 375 — exactly 0.5x threshold, so Medium (inclusive edge).
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Kobold' }));
+    expect(summaryDifficulty()).toBe('Medium');
 
-    localStorage.setItem('encounterFilter-2024', JSON.stringify({ environment: 'forest' }));
-    expect(loadSavedFilter()).toBeNull();
+    // 500 XP x2 = 1,000 — >= 1x and < 1.5x threshold → Hard.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Kobold Captain' }));
+    expect(summaryDifficulty()).toBe('Hard');
 
-    localStorage.setItem('encounterFilter-2024', 'not json');
-    expect(loadSavedFilter()).toBeNull();
+    // 750 XP x2.5 = 1,875 — >= 1.5x threshold → Deadly.
+    fireEvent.click(screen.getByRole('button', { name: 'Increase quantity of Kobold' }));
+    expect(summaryDifficulty()).toBe('Deadly');
 
-    localStorage.removeItem('encounterFilter-2024');
-    expect(loadSavedFilter()).toBeNull();
-  });
-});
-
-describe('saveFilter', () => {
-  function saveFilter(filter) {
-    try {
-      const key = 'encounterFilter-2024';
-      localStorage.setItem(key, JSON.stringify({
-        difficulty: filter.difficulty,
-        environment: filter.environment,
-        type: filter.type,
-        size: filter.size,
-        crMin: filter.crMin,
-        crMax: filter.crMax,
-      }));
-    } catch { /* storage full, ignore */ }
-  }
-
-  it('saves difficulty and environment to localStorage', () => {
-    saveFilter({ difficulty: 2, environment: 'mountain' });
-    const saved = JSON.parse(localStorage.getItem('encounterFilter-2024'));
-    expect(saved).toEqual({ difficulty: 2, environment: 'mountain' });
-
-    saveFilter({ difficulty: 0, environment: '' });
-    const savedEmpty = JSON.parse(localStorage.getItem('encounterFilter-2024'));
-    expect(savedEmpty).toEqual({ difficulty: 0, environment: '' });
+    // The dropdown still reads Medium — actual difficulty is independent of it.
+    expect(screen.getByLabelText('Difficulty')).toHaveValue('1');
   });
 });

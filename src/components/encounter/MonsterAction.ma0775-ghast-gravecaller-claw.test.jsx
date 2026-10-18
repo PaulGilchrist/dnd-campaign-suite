@@ -1,43 +1,50 @@
+// @maintained-by-ai
 // MA-0775: Ghast Gravecaller "Claw" — prose carries "Hit: ... it has the
 // Paralyzed condition" but the row shipped WITHOUT hit_conditions, so the
 // condition rider was structurally inert (buildHitConditionClause reads
 // hit_conditions/hit_target_effect/hit_condition_roll only, NEVER description;
 // consumer live in handlePlainDamage.applyHitClauseConditions). One-field DATA
-// fix: hit_conditions:["paralyzed"] (MA-0621/MA-0763 byte-shape, placed after
-// damage_type_primary). Locks: disk row shape + key placement, clause arm,
-// "+6" attack chip stays live, Horrific Necrosis twin byte-unchanged.
+// fix: hit_conditions:["paralyzed"] (MA-0621/MA-0763 byte-shape, trailing after
+// damage_type_primary). Sole lock: ghast-gravecaller is absent from the
+// handlePlainDamage.hitClause.test.js HIT_CLAUSE_ROWS table, so this file is
+// the only lane pinning the disk row — full byte-shape fingerprint + the
+// "+6" attack-chip render whose click payload carries the rider row intact to
+// the attack seam. Pruned (owners, all green): clause-output re-derivation
+// (generic shapes: handlePlainDamage.hitClause.test.js:289-302 — lich/Paralyzing
+// Touch :265 arms the identical ['paralyzed']/escapeDc-null clause; row inputs
+// byte-pinned here); attackRowMissingToHit false (this row ESCAPES the MA-0286
+// suppression census — attack_bonus != null rows skipped at ma0286:109,
+// armed-bonus-stays-live arm owned :93); 3-arg onAttack dispatch shape
+// (MA-0294; canon MonsterAction.jsx:480 onAttack(name, bonus, row)); save-chip
+// plan units (MA-0927/MA-1433 lanes — this row carries no save fields).
+// MA-0776 Horrific Necrosis twin cross-lock RETIRED — absorbed by MA-0776's
+// own kept byte-shape lock (MonsterAction.ma0776-ghast-gravecaller-necrosis
+// .test.jsx:20-27 pins hit_conditions:["frightened"], key placement, +7 dice).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const CLAW = monsters.find((m) => m.index === 'ghast-gravecaller').actions[1];
-const NECROSIS = monsters.find((m) => m.index === 'ghast-gravecaller').actions[2];
+const CLAW = monsters.find((m) => m.index === 'ghast-gravecaller').actions.find((a) => a.name === 'Claw');
 
-describe('MA-0775 disk fingerprint: ghast-gravecaller Claw hit_conditions fix', () => {
-  it('disk row carries hit_conditions ["paralyzed"] after damage_type_primary (MA-0621 byte-shape)', () => {
-    expect(CLAW.hit_conditions).toEqual(['paralyzed']);
-    const keys = Object.keys(CLAW);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
+describe('MA-0775 ghast-gravecaller Claw hit_conditions fix', () => {
+  it('disk byte-shape carries hit_conditions ["paralyzed"] and the single "+6" chip dispatches the rider row intact', () => {
+    // Fix field + placement byte-exact (trailing key after damage_type_primary);
+    // prose <strong>Paralyzed</strong> anchor byte-kept alongside the armed field.
+    expect(Object.keys(CLAW)).toEqual([
+      'name', 'description', 'attack_bonus', 'reach', 'damage_dice_primary', 'damage_type_primary',
+      'hit_conditions',
+    ]);
+    expect(CLAW.name).toBe('Claw');
     expect(CLAW.attack_bonus).toBe(6);
     expect(CLAW.damage_dice_primary).toBe('3d6 + 3');
     expect(CLAW.damage_type_primary).toBe('Slashing');
-  });
+    expect(CLAW.hit_conditions).toEqual(['paralyzed']);
+    expect(CLAW.description).toContain('<strong>Paralyzed</strong>');
 
-  it('buildHitConditionClause arms the Paralyzed rider (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(CLAW);
-    expect(clause).toEqual({
-      conditions: ['paralyzed'],
-      escapeDc: null,
-      attackName: 'Claw',
-      targetEffect: null,
-    });
-  });
-
-  it('attack half stays live: one "+6" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(CLAW)).toBe(false);
+    // Attack half stays live post-fix: exactly one chip, no save/damage chip
+    // arms; the exact-row payload carries hit_conditions to applyHitClauseConditions.
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -55,17 +62,7 @@ describe('MA-0775 disk fingerprint: ghast-gravecaller Claw hit_conditions fix', 
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+6']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Claw', 6, expect.objectContaining({ name: 'Claw' }));
-  });
-
-  it('Horrific Necrosis twin now authored: hit_conditions ["frightened"] (MA-0776 fix, pin inverted)', () => {
-    expect(NECROSIS.hit_conditions).toEqual(['frightened']);
-    expect(buildHitConditionClause(NECROSIS)).toEqual({
-      conditions: ['frightened'],
-      escapeDc: null,
-      attackName: 'Horrific Necrosis',
-      targetEffect: null,
-    });
-    expect(NECROSIS.attack_bonus).toBe(7);
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Claw', 6, CLAW);
   });
 });

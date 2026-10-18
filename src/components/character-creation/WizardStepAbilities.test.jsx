@@ -1,10 +1,14 @@
-// Removed 3 redundant/low-value tests:
-//   - "should show points remaining in description" → covered by header test (asserts step-description text)
-//   - "should display point cost for each ability score" → low value, only asserts "Cost: 0" ×6 with no variation
-//   - "should not show background ability section for 5e" → negative assertion redundant with 2024 positive test
-// Consolidated 2 input-change callback tests into 1 parameterized test
+// @maintained-by-ai
+// Generic lane for WizardStepAbilities: header/cap descriptions, ability-card
+// rendering, error display, 2024 background panel (render + local validation),
+// feat ASI cards, feat/racial badges, empty-abilities fallback.
+// Point-buy budget refusal/refund and base-score forwarding are pinned in
+// WizardStepAbilities.point-buy.test.jsx — not restated here.
+// Fixtures mirror disk canon: public/data/rules-validation.json point_buy
+// (total_points 27, costs {8:0,9:1,10:2,11:3,12:4,13:5,14:7,15:9}) and the
+// 2024 Acolyte background (Intelligence, Wisdom, Charisma).
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepAbilities from './WizardStepAbilities.jsx';
 
@@ -25,23 +29,14 @@ const mockBackgrounds2024 = [
   },
 ];
 
-const mockRulesValidation2024 = {
-  2024: {
-    point_buy: {
-      total_points: 24,
-      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
-    },
-  },
-};
-
-const mockRulesValidation5e = {
-  '5e': {
-    point_buy: {
-      total_points: 24,
-      costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
-    },
-  },
-};
+// Mirror of public/data/rules-validation.json point_buy for both rulesets (disk canon).
+function rulesValidationFor(rules) {
+  const pointBuy = {
+    total_points: 27,
+    costs: { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 },
+  };
+  return { [rules]: { point_buy: pointBuy } };
+}
 
 global.fetch = vi.fn();
 
@@ -57,18 +52,16 @@ vi.mock('../../services/character/raceBuffService.js', () => ({
   })),
 }));
 
-function createMockProps(overrides = {}) {
+function createProps(overrides = {}) {
   return {
     formData: {
       rules: '5e',
-      abilities: [
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-      ],
+      abilities: Array.from({ length: 6 }, () => ({
+        baseScore: '8',
+        featIncrease: '0',
+        miscIncrease: '0',
+        backgroundIncrease: '0',
+      })),
       ...overrides.formData,
     },
     errors: {},
@@ -84,37 +77,16 @@ function createMockProps(overrides = {}) {
   };
 }
 
-function setupFetchMock(rules, background = null) {
+function setupFetchMock(rules) {
   global.fetch.mockImplementation((url) => {
-    if (url.includes('ability-scores.json')) {
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve(mockAbilityScores),
-      });
-    }
-
-    if (url.includes('rules-validation.json')) {
-      const data = rules === '2024' ? mockRulesValidation2024 : mockRulesValidation5e;
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve(data),
-      });
-    }
-
-    if (url.includes('backgrounds.json') && background) {
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () => Promise.resolve(mockBackgrounds2024),
-      });
-    }
-
+    let data = [];
+    if (url.includes('ability-scores.json')) data = mockAbilityScores;
+    else if (url.includes('rules-validation.json')) data = rulesValidationFor(rules);
+    else if (url.includes('backgrounds.json')) data = mockBackgrounds2024;
     return Promise.resolve({
       ok: true,
       headers: { get: () => 'application/json' },
-      json: () => Promise.resolve([]),
+      json: () => Promise.resolve(data),
     });
   });
 }
@@ -126,19 +98,39 @@ async function renderWizard(props) {
   });
 }
 
+function cardFor(abilityName) {
+  return screen.getByRole('heading', { level: 4, name: abilityName }).closest('.ability-score-card');
+}
+
+// Props for a single-mode '+2 to one / +1 to two' feat choice card.
+const ASI_GROUP = {
+  id: 'ability-score-improvement',
+  featName: 'Ability Score Improvement',
+  type: 'choice',
+  mode: 'single',
+  options: {
+    single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
+    dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
+  },
+  featDescription: 'Increase one ability score of your choice by 2, or increase two ability scores of your choice by 1.',
+};
+const ASI_ASSIGNMENTS = {
+  'ability-score-improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
+};
+
 describe('WizardStepAbilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
-  describe('Header and description', () => {
-    it('should render the step header and descriptions', async () => {
+  describe('Header and descriptions', () => {
+    it('renders the step header, point-buy budget, and total-score cap guidance', async () => {
       setupFetchMock('5e');
-      const props = createMockProps();
-      await renderWizard(props);
+      await renderWizard(createProps());
 
-      expect(screen.getByText('Step 9: Ability Scores')).toBeInTheDocument();
-      expect(screen.getByText(/Total points allowed: 24/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: /Step 9: Ability Scores/ })).toBeInTheDocument();
+      expect(screen.getByText(/\(Total points allowed: 27\)/)).toBeInTheDocument();
       expect(
         screen.getByText(/Total score \(base \+ feat \+ background \+ racial \+ misc\) cannot exceed 20/)
       ).toBeInTheDocument();
@@ -146,394 +138,198 @@ describe('WizardStepAbilities', () => {
   });
 
   describe('Ability score cards', () => {
-    it('should render all six ability score cards with inputs and totals', async () => {
+    it('renders six ability cards with base/misc inputs and totals of 8', async () => {
       setupFetchMock('5e');
-      const props = createMockProps();
-      await renderWizard(props);
+      await renderWizard(createProps());
 
-      expect(screen.getByText('Strength')).toBeInTheDocument();
-      expect(screen.getByText('Dexterity')).toBeInTheDocument();
-      expect(screen.getByText('Constitution')).toBeInTheDocument();
-      expect(screen.getByText('Intelligence')).toBeInTheDocument();
-      expect(screen.getByText('Wisdom')).toBeInTheDocument();
-      expect(screen.getByText('Charisma')).toBeInTheDocument();
+      expect(screen.getAllByLabelText('Base Score (8-15)')).toHaveLength(6);
+      expect(screen.getAllByLabelText('Misc Increase')).toHaveLength(6);
 
-      const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
-      expect(baseInputs.length).toBe(6);
-
-      const miscInputs = screen.getAllByLabelText('Misc Increase');
-      expect(miscInputs.length).toBe(6);
-
-      const totalScores = screen.getAllByText(/Total:/);
-      expect(totalScores.length).toBe(6);
-      totalScores.forEach((el) => {
+      const totals = screen.getAllByText(/Total:/);
+      expect(totals).toHaveLength(6);
+      totals.forEach((el) => {
         expect(el.textContent).toContain('Total: 8');
       });
     });
 
-    it('should call the appropriate callback when base score or misc increase inputs change', async () => {
-      const baseProps = createMockProps();
+    it('forwards misc increase edits as parsed integers', async () => {
+      const props = createProps();
       setupFetchMock('5e');
-      await renderWizard(baseProps);
-
-      const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
-      fireEvent.change(baseInputs[0], { target: { value: '10' } });
-      expect(baseProps.onAbilityBaseScoreChange).toHaveBeenCalledWith(0, '10');
-
-      const miscInputs = screen.getAllByLabelText('Misc Increase');
-      fireEvent.change(miscInputs[0], { target: { value: '3' } });
-      expect(baseProps.onAbilityMiscIncreaseChange).toHaveBeenCalledWith(0, 3);
-    });
-
-    it('should show error styling and message for invalid base score or misc increase', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        errors: { ability_0_baseScore: 'Invalid score', ability_0_miscIncrease: 'Invalid value' },
-      });
       await renderWizard(props);
 
-      const baseInputs = screen.getAllByLabelText('Base Score (8-15)');
-      expect(baseInputs[0]).toHaveClass('error');
-      expect(screen.getByText('Invalid score')).toBeInTheDocument();
-
-      const miscInputs = screen.getAllByLabelText('Misc Increase');
-      expect(miscInputs[0]).toHaveClass('error');
-      expect(screen.getByText('Invalid value')).toBeInTheDocument();
+      fireEvent.change(screen.getAllByLabelText('Misc Increase')[0], { target: { value: '3' } });
+      expect(props.onAbilityMiscIncreaseChange).toHaveBeenCalledWith(0, 3);
     });
 
-    it('should show error styling when total score exceeds 20', async () => {
+    it('marks inputs with error class and shows messages from the errors map', async () => {
       setupFetchMock('5e');
-      const props = createMockProps({
+      await renderWizard(createProps({
+        errors: { ability_0_baseScore: 'Invalid score', ability_0_miscIncrease: 'Invalid value' },
+      }));
+
+      const baseInput = screen.getAllByLabelText('Base Score (8-15)')[0];
+      const miscInput = screen.getAllByLabelText('Misc Increase')[0];
+      expect(baseInput).toHaveClass('error');
+      expect(miscInput).toHaveClass('error');
+      expect(within(cardFor('Strength')).getByText('Invalid score')).toBeInTheDocument();
+      expect(within(cardFor('Strength')).getByText('Invalid value')).toBeInTheDocument();
+    });
+
+    it('shows a single (max 20) error on the card whose total exceeds the cap', async () => {
+      setupFetchMock('5e');
+      await renderWizard(createProps({
         formData: {
           rules: '5e',
           abilities: [
             { baseScore: '15', featIncrease: '0', miscIncrease: '6', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            ...Array.from({ length: 5 }, () => ({ baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' })),
           ],
         },
-      });
-      await renderWizard(props);
+      }));
 
-      const errorTotals = screen.getAllByText(/max 20/);
-      expect(errorTotals.length).toBeGreaterThan(0);
+      expect(screen.getAllByText('(max 20)')).toHaveLength(1);
+      const strCard = cardFor('Strength');
+      expect(strCard.querySelector('.total-score')).toHaveClass('error');
+      expect(strCard).toHaveTextContent('Total: 21');
+      expect(cardFor('Dexterity')).not.toHaveTextContent('max');
     });
 
-    it('should show misc points warning when misc increases total more than 0', async () => {
+    it('warns when misc increases consume points outside point buy', async () => {
       setupFetchMock('5e');
-      const props = createMockProps({
+      await renderWizard(createProps({
         formData: {
           rules: '5e',
           abilities: [
             { baseScore: '8', featIncrease: '0', miscIncrease: '2', backgroundIncrease: '0' },
             { baseScore: '8', featIncrease: '0', miscIncrease: '1', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
-            { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+            ...Array.from({ length: 4 }, () => ({ baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' })),
           ],
         },
-      });
-      await renderWizard(props);
+      }));
 
-      expect(screen.getByText(/Misc increases total 3 points./)).toBeInTheDocument();
+      expect(screen.getByText(/Misc increases total 3 points\./)).toBeInTheDocument();
     });
   });
 
-  describe('2024 ruleset - background ability scores', () => {
-    it('should show background ability section for 2024 with background', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
+  describe('2024 background ability panel', () => {
+    async function renderWithAcolyte() {
+      const props = createProps({ formData: { rules: '2024', background: 'Acolyte' } });
+      setupFetchMock('2024');
       await renderWizard(props);
+      return props;
+    }
 
-      expect(screen.getByText(/Background Ability Scores \(Acolyte\)/)).toBeInTheDocument();
+    it('renders background selects and highlights the three background ability cards with +1 badges', async () => {
+      await renderWithAcolyte();
+
+      expect(screen.getByText('Background Ability Scores (Acolyte):')).toBeInTheDocument();
       expect(screen.getByText('Intelligence:')).toBeInTheDocument();
       expect(screen.getByText('Wisdom:')).toBeInTheDocument();
       expect(screen.getByText('Charisma:')).toBeInTheDocument();
+      // Badge amount reflects formData.backgroundIncrease ('0' until the parent applies changes).
+      expect(screen.getAllByText('Background: +0')).toHaveLength(3);
+      expect(cardFor('Strength').querySelector('.bg-ability-badge')).toBeNull();
     });
 
-    it('should call onBackgroundIncreaseChange when background ability is changed', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
+    it('forwards a background select change as a number and reflects it in the select', async () => {
+      const props = await renderWithAcolyte();
 
-      setupFetchMock('2024', 'Acolyte');
-      await renderWizard(props);
-
-      const selects = screen.getAllByRole('combobox');
-      fireEvent.change(selects[0], { target: { value: '2' } });
+      const select = screen.getByText('Intelligence:').closest('.bg-ability-assignment').querySelector('select');
+      fireEvent.change(select, { target: { value: '2' } });
 
       expect(props.onBackgroundIncreaseChange).toHaveBeenCalledWith('Intelligence', 2);
+      expect(select).toHaveValue('2');
     });
 
-    it('should highlight background abilities in the ability score grid with badge', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
+    it('warns when assigned background points fall below 3, then above 3', async () => {
+      await renderWithAcolyte();
 
-      setupFetchMock('2024', 'Acolyte');
-      await renderWizard(props);
-
-      const bgBadges = screen.getAllByText(/Background:/);
-      expect(bgBadges.length).toBeGreaterThan(0);
-    });
-
-    it('should show validation warnings when points are outside the 3-point limit', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'Acolyte' },
-      });
-
-      setupFetchMock('2024', 'Acolyte');
-      await renderWizard(props);
-
-      const selects = screen.getAllByRole('combobox');
-      fireEvent.change(selects[0], { target: { value: '0' } });
-
+      const intSelect = screen.getByText('Intelligence:').closest('.bg-ability-assignment').querySelector('select');
+      fireEvent.change(intSelect, { target: { value: '0' } });
       await waitFor(() => {
-        expect(screen.getByText(/must assign at least 3 points/)).toBeInTheDocument();
+        expect(screen.getByText(/must assign at least 3 points.*Currently assigned: 2\./)).toBeInTheDocument();
       });
 
-      const allSelects = screen.getAllByRole('combobox');
-      fireEvent.change(allSelects[0], { target: { value: '2' } });
-      fireEvent.change(allSelects[1], { target: { value: '2' } });
-
+      fireEvent.change(intSelect, { target: { value: '2' } });
+      const wisSelect = screen.getByText('Wisdom:').closest('.bg-ability-assignment').querySelector('select');
+      fireEvent.change(wisSelect, { target: { value: '2' } });
       await waitFor(() => {
-        expect(screen.getByText(/maximum is 3/)).toBeInTheDocument();
+        expect(screen.getByText(/You have assigned 5 points to background abilities\. The maximum is 3/)).toBeInTheDocument();
       });
     });
-  });
 
-  describe('2024 ruleset - background not found', () => {
-    it('should handle missing background data gracefully', async () => {
-      const props = createMockProps({
-        formData: { rules: '2024', background: 'NonExistent' },
-      });
-
-      global.fetch.mockImplementation((url) => {
-        if (url.includes('ability-scores.json')) {
-          return Promise.resolve({
-            ok: true,
-            headers: { get: () => 'application/json' },
-            json: () => Promise.resolve(mockAbilityScores),
-          });
-        }
-        if (url.includes('rules-validation.json')) {
-          return Promise.resolve({
-            ok: true,
-            headers: { get: () => 'application/json' },
-            json: () => Promise.resolve(mockRulesValidation2024),
-          });
-        }
-        if (url.includes('backgrounds.json')) {
-          return Promise.resolve({
-            ok: false,
-            status: 404,
-            headers: { get: () => 'application/json' },
-            json: () => Promise.resolve([]),
-          });
-        }
-        return Promise.resolve({
-          ok: true,
-          headers: { get: () => 'application/json' },
-          json: () => Promise.resolve([]),
-        });
-      });
-
-      await renderWizard(props);
+    it('renders no background panel but keeps the ability grid when the background cannot be resolved', async () => {
+      setupFetchMock('2024');
+      await renderWizard(createProps({ formData: { rules: '2024', background: 'NonExistent' } }));
 
       expect(screen.queryByText(/Background Ability Scores/)).not.toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(6);
     });
   });
 
-  describe('Feat ability score increases', () => {
-    it('should not show feat ability section when there are no feat choices', async () => {
+  describe('Feat ability score increase cards', () => {
+    it('renders a feat ASI card with mode labels and the single-mode ability options selected', async () => {
       setupFetchMock('5e');
-      const props = createMockProps();
-      await renderWizard(props);
+      await renderWizard(createProps({
+        featAbilityChoices: [ASI_GROUP],
+        featAbilityAssignments: ASI_ASSIGNMENTS,
+      }));
 
-      expect(screen.queryByText(/Feat Ability Score Increases/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Feat Ability Score Increases:/)).toBeInTheDocument();
+      const card = screen.getByText('Ability Score Improvement').closest('.feat-asi-card');
+      expect(within(card).getByText('+2 to one ability')).toBeInTheDocument();
+      expect(within(card).getByText('+1 to 2 abilities')).toBeInTheDocument();
+
+      const select = within(card).getByRole('combobox');
+      expect([...select.querySelectorAll('option')].map((o) => o.value)).toEqual(['Strength', 'Dexterity', 'Constitution']);
+      expect(select).toHaveValue('Strength');
     });
 
-    it('should show feat ability section when there are feat choices', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Increase one ability score of your choice by 2',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
+    it('forwards ability selection and mode toggle edits from the feat card', async () => {
+      const props = createProps({
+        featAbilityChoices: [ASI_GROUP],
+        featAbilityAssignments: ASI_ASSIGNMENTS,
       });
+      setupFetchMock('5e');
       await renderWizard(props);
 
-      expect(screen.getByText(/Feat Ability Score Increases/)).toBeInTheDocument();
-      expect(screen.getByText('Ability Score Improvement')).toBeInTheDocument();
-    });
+      const card = screen.getByText('Ability Score Improvement').closest('.feat-asi-card');
+      fireEvent.change(within(card).getByRole('combobox'), { target: { value: 'Constitution' } });
+      expect(props.onFeatAbilityChoiceChange).toHaveBeenCalledWith('ability-score-improvement', 0, 'Constitution');
 
-    it('should show mode toggle with single and dual options for choice type', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Test description',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
-      });
-      await renderWizard(props);
-
-      expect(screen.getByText('+2 to one ability')).toBeInTheDocument();
-      expect(screen.getByText('+1 to 2 abilities')).toBeInTheDocument();
-    });
-
-    it('should render all ability options for a feat choice', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Test description',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
-      });
-      await renderWizard(props);
-
-      const featSection = screen.getByText(/Feat Ability Score Increases/).closest('.bg-ability-choice');
-      expect(featSection).toHaveTextContent('Strength');
-      expect(featSection).toHaveTextContent('Dexterity');
-      expect(featSection).toHaveTextContent('Constitution');
-    });
-
-    it('should call onFeatAbilityChoiceChange when feat ability is changed', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            id: 'Ability Score Improvement',
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Test description',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
-      });
-      await renderWizard(props);
-
-      const selects = screen.getAllByRole('combobox');
-      fireEvent.change(selects[0], { target: { value: 'Constitution' } });
-
-      expect(props.onFeatAbilityChoiceChange).toHaveBeenCalledWith('Ability Score Improvement', 0, 'Constitution');
-    });
-
-    it('should call onFeatAbilityModeChange when mode toggle is changed', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        featAbilityChoices: [
-          {
-            id: 'Ability Score Improvement',
-            featName: 'Ability Score Improvement',
-            type: 'choice',
-            mode: 'single',
-            options: {
-              single: { amount: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignment: null },
-              dual: { amount: 1, count: 2, abilityNames: ['Strength', 'Dexterity', 'Constitution'], assignments: [null, null] },
-            },
-            featDescription: 'Test description',
-          },
-        ],
-        featAbilityAssignments: {
-          'Ability Score Improvement': { mode: 'single', assignments: { single: 'Strength', dual: ['Strength', ''] } },
-        },
-      });
-      await renderWizard(props);
-
-      const dualOption = screen.getByText('+1 to 2 abilities');
-      fireEvent.click(dualOption);
-
-      expect(props.onFeatAbilityModeChange).toHaveBeenCalledWith('Ability Score Improvement', 'dual');
+      fireEvent.click(within(card).getByRole('radio', { name: /\+1 to 2 abilities/ }));
+      expect(props.onFeatAbilityModeChange).toHaveBeenCalledWith('ability-score-improvement', 'dual');
     });
   });
 
-  describe('Feat increase badges', () => {
-    it('should show feat increase badge when a feat grants an ability score increase', async () => {
+  describe('Feat and racial increase badges', () => {
+    it('shows Feat and Racial badges on the Strength card and folds both into its total', async () => {
       setupFetchMock('5e');
-      const props = createMockProps({
-        formData: { rules: '5e', feats: ['Observant'] },
+      await renderWizard(createProps({
+        formData: { rules: '5e', feats: ['Observant'], race: { name: 'Hill Dwarf' } },
         allFeats: [{ name: 'Observant' }],
-      });
-      await renderWizard(props);
-
-      const featBadges = screen.getAllByText(/Feat: \+\d/);
-      expect(featBadges.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Racial increase badges', () => {
-    it('should show racial increase badge when race has ability score increases', async () => {
-      setupFetchMock('5e');
-      const props = createMockProps({
-        formData: {
-          rules: '5e',
-          race: { name: 'Hill Dwarf' },
-        },
         racesData: [{ name: 'Hill Dwarf', subraces: [] }],
-      });
-      await renderWizard(props);
+      }));
 
-      const racialBadges = screen.getAllByText(/Racial: \+\d/);
-      expect(racialBadges.length).toBeGreaterThan(0);
+      // Service mocks grant +2 Strength each: total = 8 base + 2 feat + 2 racial.
+      expect(screen.getAllByText('Feat: +2')).toHaveLength(1);
+      expect(screen.getAllByText('Racial: +2')).toHaveLength(1);
+      expect(cardFor('Strength')).toHaveTextContent('Total: 12');
+      expect(cardFor('Dexterity')).toHaveTextContent('Total: 8');
     });
   });
 
   describe('Edge cases', () => {
-    it('should handle empty abilities array gracefully', async () => {
+    it('falls back to default base score 8 on all cards when the abilities array is empty', async () => {
       setupFetchMock('5e');
-      const props = createMockProps({
-        formData: { rules: '5e', abilities: [] },
-      });
-      await renderWizard(props);
+      await renderWizard(createProps({ formData: { rules: '5e', abilities: [] } }));
 
-      expect(screen.getByText('Step 9: Ability Scores')).toBeInTheDocument();
+      const totals = screen.getAllByText(/Total:/);
+      expect(totals).toHaveLength(6);
+      totals.forEach((el) => {
+        expect(el.textContent).toContain('Total: 8');
+      });
+      expect(screen.getAllByLabelText('Base Score (8-15)')[0]).toHaveValue(8);
     });
   });
 });

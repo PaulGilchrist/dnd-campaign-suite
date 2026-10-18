@@ -1,32 +1,35 @@
+// @maintained-by-ai
 // MA-0300: Arcanaloth Counterspell reaction was prose-only inert (no
 // automation metadata → getGatedMonsterReaction null → zero affordance).
-// DATA fix mirrors the live MA-0013 Aberrant Cultist template. RAW note:
-// the arcanaloth statblock prose carries NO per-day limit (unlimited
-// reaction), but the gated seam's reactionMaxUses defaults to 1 when uses
-// are absent — a usage-less row would fabricate a "1/Day uses already spent"
-// refusal after a single counter. Grep found NO usage-less/unlimited gated
-// precedent (all feather_fall/counterspell rows carry uses). So the row
-// honestly documents RAW-unlimited via usage "At Will" (display truth,
-// formatActionUsage string passthrough) + a 999 sentinel maxUses (seam
-// requires a finite number; effectively unlimited in play; reset is
-// GM-enforced advisory per CLA-325, same as all monster uses).
+// DATA fix mirrors the live MA-0013 Aberrant Cultist template. RAW note: the
+// arcanaloth prose carries NO per-day limit; the seam's reactionMaxUses
+// defaults to 1 when uses are absent, so the row honestly documents
+// RAW-unlimited via usage "At Will" + a 999 sentinel maxUses (finite number
+// required by the seam; reset GM-enforced advisory per CLA-325).
+// Ownership map after #422/#508/#505 trim: BY-name disk lock for this row
+// (#387; cited data-shape owner by chip lane ma0300-arcanaloth-chip #421 —
+// chip render + counter echo never restated here). Uses arithmetic + the
+// plain-row null-negative are owned ONCE by gated-reaction.test.js:62-69;
+// the gate limit-999 arm lives there too (:330-340). The usage-less
+// "fabricates a 1/Day cap" seam leg lives once in the MA-0305 twin lane
+// (:79-91). CLA-322 dispel-check arithmetic is owned by
+// resolveCounterspellCheck (:198-208) — the old d20+INT(+5) leg here was
+// self-ref (the test injected its own spellAbilityMod). Counterspell-
+// specific arms that stay: disk lock + the RAW-unlimited press ladder
+// (auto-counter, spends 1 per counter, fresh-round second counter never
+// refused — the MA-0013 cultist caps 2/Day and At-Will parry never spends,
+// so this ladder is owned nowhere else).
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
-  monsterReactionUsesRemaining,
   resolveMonsterGatedReaction,
-  counterspellGate,
   MONSTER_REACTION_USES_KEY,
-  formatActionUsage,
 } from './MonsterCardHelpers.js';
 import monsters from '../../../public/data/monsters.json';
 
 const CAMPAIGN = 'test-campaign';
 const ARCANA = 'Arcanaloth 1';
 const PC = 'DivinationWizard';
-// Arcanaloth INT 20 → +5 spellcasting mod (prose: "same spellcasting
-// ability as Spellcasting" = Intelligence).
-const INT_MOD = 5;
 
 const ARCANA_ACTION = monsters.find(m => m.index === 'arcanaloth').reactions[0];
 
@@ -38,7 +41,7 @@ function csWithPC(round = 1) {
   return { round, creatures: [{ name: PC, type: 'player' }, { name: ARCANA, type: 'npc' }] };
 }
 
-function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, d20 = 20 } = {}) {
+function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {} } = {}) {
   const state = { ...store };
   const logs = [];
   const campaignWrites = [];
@@ -55,101 +58,46 @@ function makeCounterDeps({ lastAttack = pcSpellAttack(), round = 1, store = {}, 
         state[`${key}.${prop}`] = value;
       }),
       addEntry: vi.fn(async (c, e) => { logs.push(e); }),
-      rollD20: vi.fn(() => d20),
-      spellAbilityMod: INT_MOD,
+      rollD20: vi.fn(() => 20),
       resolveSpellLevel: vi.fn(async la => (la?.isCantrip ? 0 : 3)),
     },
   };
 }
 
-describe('MA-0300 arcanaloth Counterspell data-lock', () => {
-  it('monsters.json arcanaloth reactions[0] carries the MA-0013 automation shape', () => {
+describe('MA-0300 arcanaloth Counterspell — disk lock + RAW-unlimited sentinel', () => {
+  it('monsters.json arcanaloth reactions[0] carries the MA-0013 automation shape, honest "At Will" + 999 sentinel, arms the gate', () => {
     expect(ARCANA_ACTION.name).toBe('Counterspell');
     expect(ARCANA_ACTION.automation).toMatchObject({ type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' });
+    expect(ARCANA_ACTION.usage).toBe('At Will');
     expect(ARCANA_ACTION.maxUses).toBe(999);
     expect(ARCANA_ACTION.uses).toBe(999);
     expect(getGatedMonsterReaction(ARCANA_ACTION)?.effect).toBe('counterspell');
   });
 
-  it('usage renders as honest "At Will" (RAW unlimited) — never [object Object]', () => {
-    expect(ARCANA_ACTION.usage).toBe('At Will');
-    expect(formatActionUsage(ARCANA_ACTION.usage)).toBe('At Will');
-  });
-
-  it('usage-less row would fabricate a 1/Day cap (why the 999 sentinel is required)', () => {
-    // reactionMaxUses defaults to 1 with no uses/maxUses authored — this
-    // documents the seam constraint that forces the finite sentinel.
-    const usageless = { name: 'Counterspell', automation: { type: 'reaction', trigger: 'enemy_spell_cast', effect: 'counterspell' } };
-    const g = counterspellGate({ lastAttack: pcSpellAttack(), attackerIsPC: true, monsterName: ARCANA, currentRound: 1, storedUses: { counterspell: 1 }, usedRound: 0, action: usageless });
-    expect(g.ok).toBe(false);
-    expect(g.reason).toBe('uses');
-    expect(g.message).toMatch(/1\/Day uses already spent/);
-    // The authored sentinel row stays open at 1 spent (RAW-unlimited behavior):
-    const sentinel = counterspellGate({ lastAttack: pcSpellAttack(), attackerIsPC: true, monsterName: ARCANA, currentRound: 1, storedUses: { counterspell: 1 }, usedRound: 0, action: ARCANA_ACTION });
-    expect(sentinel.ok).toBe(true);
-    expect(sentinel.limit).toBe(999);
-  });
-
-  it('monsterReactionUsesRemaining counts down from the sentinel', () => {
-    expect(monsterReactionUsesRemaining(ARCANA_ACTION, {})).toBe(999);
-    expect(monsterReactionUsesRemaining(ARCANA_ACTION, { counterspell: 2 })).toBe(997);
-  });
-});
-
-describe('MA-0300 resolveMonsterGatedReaction — arcanaloth Counterspell', () => {
-  it('cantrip (<3) auto-countered via INT check seam, 1 spent, cast stamped resolved', async () => {
-    const { state, logs, campaignWrites, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 0 }) });
-    const result = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.countered).toBe(true);
-    expect(state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
-    const spend = logs.find(l => l.type === 'ability_use');
+  it('cantrip press auto-counters (1 spent, cast stamped, no roll) and the RAW-unlimited sentinel admits a fresh-round second counter — never caps', async () => {
+    const press1 = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 0 }) });
+    const first = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps: press1.deps });
+    expect(first.ok).toBe(true);
+    expect(first.countered).toBe(true);
+    expect(press1.state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const spend = press1.logs.find(l => l.type === 'ability_use');
     expect(spend.abilityName).toBe('Counterspell');
     expect(spend.description).toMatch(/Fire Bolt/);
     expect(spend.description).toMatch(/auto-countered/);
-    expect(campaignWrites[0]).toMatchObject({ counterspellResolved: true, counteredBy: ARCANA, counteredSpell: 'Fire Bolt' });
-    expect(deps.rollD20).not.toHaveBeenCalled();
-  });
+    expect(press1.campaignWrites[0]).toMatchObject({ counterspellResolved: true, counteredBy: ARCANA, counteredSpell: 'Fire Bolt' });
+    expect(press1.deps.rollD20).not.toHaveBeenCalled();
 
-  it('level >=3 uses d20+INT(+5) vs DC 10+level (CLA-322 shape)', async () => {
-    const { logs, deps } = makeCounterDeps({ lastAttack: pcSpellAttack({ spellLevel: 3, isCantrip: false }), d20: 7 });
-    const result = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.countered).toBe(false);
-    expect(logs.find(l => l.abilityName === 'Counterspell').description).toMatch(/d20 \(7\) \+ 5 = 12 vs DC 13 — failed — spell resolves/);
-  });
-
-  it('no PC spell lastAttack: counterspell_refused (trigger), zero spend', async () => {
-    const { state, logs, deps } = makeCounterDeps({ lastAttack: { attackerName: PC, attackName: 'Mace', weaponType: 'melee' } });
-    const result = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('counterspell_refused');
-    expect(logs[0].description).toMatch(/trigger/);
-    expect(state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('RAW-unlimited: a fresh-round second counter is NOT refused (sentinel holds)', async () => {
-    const { state, logs, deps } = makeCounterDeps({
+    // Fresh round, fresh cast, 1 already spent: a usage-less row would refuse
+    // at the default 1/Day cap (MA-0305 lane :79-91); the authored sentinel
+    // holds open and counts the ladder up to 2.
+    const press2 = makeCounterDeps({
       lastAttack: pcSpellAttack({ spellLevel: 0 }),
       round: 4,
       store: { [`${ARCANA}._counterspell_usedRound`]: 2, [`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } },
     });
-    const result = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(logs.some(l => l.automationType === 'counterspell_refused')).toBe(false);
-    expect(state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 2 });
-  });
-
-  it('same-round second click refuses via round latch with zero additional spend', async () => {
-    const { state, logs, deps } = makeCounterDeps({
-      lastAttack: pcSpellAttack({ spellLevel: 0 }),
-      round: 3,
-      store: { [`${ARCANA}._counterspell_usedRound`]: 3, [`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]: { counterspell: 1 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('counterspell_refused');
-    expect(state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 1 });
+    const second = await resolveMonsterGatedReaction({ action: ARCANA_ACTION, monsterName: ARCANA, campaignName: CAMPAIGN, deps: press2.deps });
+    expect(second.ok).toBe(true);
+    expect(press2.logs.some(l => l.automationType === 'counterspell_refused')).toBe(false);
+    expect(press2.state[`${ARCANA}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ counterspell: 2 });
   });
 });

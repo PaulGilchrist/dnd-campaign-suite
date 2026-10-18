@@ -1,8 +1,10 @@
-// BA-002 regression: Grapple contested check math.
-// Previously broken: attacker roll was bare STR (no proficiency) vs a static
-// target STR modifier. Fixed: Strength (Athletics) = d20 + STR + PB (when
-// proficient) vs the target's higher Athletics-or-Acrobatics total, logged
-// with the skill used.
+// @maintained-by-ai
+// BA-002 regression lane: grapple CONTEST MATH at the hook seam — the attacker's
+// check-bonus channels (listed skill bonus vs STR+PB derivation, Jack of All Trades
+// half-bonus rules, exhaustion penalty) and the target's higher-of-Athletics-or-
+// Acrobatics contest resolution across each combat-summary data shape, with byte-exact
+// popup/log pins. Gate, adv/disadv context, condition-stamping and popup-format lanes
+// are owned by useCharActionsGrappleAction.test.js — not duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import {
@@ -14,6 +16,7 @@ import {
     basePlayerStats,
 } from './useCharActionsBaseActions.test-utils.js';
 
+// lv20 Barbarian: STR +5 + PB +6 = +11 (was bare +5 before the BA-002 fix).
 const lv20AthleticsBarbarian = {
     ...basePlayerStats,
     name: 'DraconicDragon',
@@ -28,6 +31,12 @@ const lv20AthleticsBarbarian = {
         { name: 'Intelligence', bonus: 0, skills: [] },
         { name: 'Charisma', bonus: 0, skills: [] },
     ],
+};
+
+const noListedSkills = {
+    ...lv20AthleticsBarbarian,
+    abilities: lv20AthleticsBarbarian.abilities.map(a => ({ ...a, skills: [] })),
+    skills: [],
 };
 
 function grv(total, d20) {
@@ -47,12 +56,31 @@ function banditTarget(overrides = {}) {
     };
 }
 
-function csWith(attacker, target) {
+function csWith(attackerName, target) {
     return {
         creatures: [
-            { name: attacker, targetName: target.name },
+            { name: attackerName, targetName: target.name },
             target,
         ],
+    };
+}
+
+// Builds hook deps for a grapple run, exposing setRuntimeValue so callers can
+// pin (or positively gate) condition-stamp behavior on the outcome leg.
+// Note: targets carrying ability_score_modifiers/skills inline never hit
+// getMonsterData (resolveTargetAbilityMod short-circuits on target-local data),
+// so no dead getMonsterData mocks are supplied below.
+function grappleHarness({ playerStats, target, total = 28, d20 = 17, exhaustionPenalty = 0 }) {
+    const setRuntimeValue = vi.fn().mockResolvedValue(undefined);
+    return {
+        setRuntimeValue,
+        ...createHooks({
+            playerStats,
+            loadCombatSummary: () => Promise.resolve(csWith(playerStats.name, target ?? banditTarget())),
+            getRuntimeValue: grv(total, d20),
+            setRuntimeValue,
+            exhaustionPenalty,
+        }),
     };
 }
 
@@ -61,180 +89,127 @@ describe('BA-002 grapple contest math', () => {
         vi.clearAllMocks();
     });
 
-    it('includes proficiency in the attacker check via the computed Athletics skill bonus', async () => {
-        const cs = csWith('DraconicDragon', banditTarget());
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        // lv20 Barbarian STR +5 + PB +6 = +11 (was bare +5 before BA-002 fix)
-        expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-            'Strength',
-            11,
-            expect.any(Object),
-        );
-    });
-
-    it('derives STR + PB from skillProficiencies when no listed skill bonus exists', async () => {
-        const noSkillStats = {
-            ...lv20AthleticsBarbarian,
-            abilities: lv20AthleticsBarbarian.abilities.map(a => ({ ...a, skills: [] })),
-            skills: [],
-        };
-        const cs = csWith('DraconicDragon', banditTarget());
-        const hooks = createHooks({
-            playerStats: noSkillStats,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        // STR 5 + PB 6 (proficient in Athletics) = +11
-        expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-            'Strength',
-            11,
-            expect.any(Object),
-        );
-    });
-
-    it('does not stack Jack of All Trades half bonus on top of Athletics proficiency', async () => {
-        const cs = csWith('DraconicDragon', banditTarget());
-        const hooks = createHooks({
-            playerStats: {
-                ...lv20AthleticsBarbarian,
-                automation: { passives: [{ type: 'jack_of_all_trades' }] },
+    describe('attacker check-bonus channels', () => {
+        it.each([
+            {
+                name: 'listed Athletics skill bonus channel wins over the ability-mod fallback',
+                stats: { ...lv20AthleticsBarbarian, skillProficiencies: [] },
+                expected: 11,
             },
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        expect(mockRollAbilityCheck).toHaveBeenCalledWith(
-            'Strength',
-            11,
-            expect.any(Object),
-        );
-    });
-
-    it('contests against the target Athletics-or-Acrobatics total, not static target STR', async () => {
-        // Bandit: STR +0, DEX +1, no listed skills -> Acrobatics (+1) is higher.
-        const cs = csWith('DraconicDragon', banditTarget());
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            getMonsterData: vi.fn().mockResolvedValue({ ability_score_modifiers: { str: 0, dex: 1 } }),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            description: expect.stringContaining('vs Bandit 1 Acrobatics (+1)'),
-        }));
-        expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            type: 'ability_use',
-            abilityName: 'Grapple',
-            description: expect.stringContaining('Strength (Athletics) check: 28 (d20: 17 + 11) vs Bandit 1 Acrobatics (+1) contest — Success. Target is now grappled.'),
-        }));
-    });
-
-    it('prefers a listed monster skill total over the raw ability modifier', async () => {
-        // Ogre-style monster: listed Athletics modifier +7 beats DEX +1 contest.
-        const ogre = {
-            name: 'Ogre 1',
-            conditions: [],
-            type: 'monster',
-            skills: { Athletics: { modifier: 7 }, Acrobatics: { modifier: -1 } },
-        };
-        const cs = csWith('DraconicDragon', ogre);
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            description: expect.stringContaining('vs Ogre 1 Athletics (+7)'),
-        }));
-    });
-
-    it('fails when the grapple check does not beat the contest total and does not stamp grappled', async () => {
-        const cs = csWith('DraconicDragon', banditTarget({ ability_score_modifiers: { str: 15, dex: 1 } }));
-        const srw = vi.fn().mockResolvedValue(undefined);
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(12, 1),
-            getMonsterData: vi.fn().mockResolvedValue({ ability_score_modifiers: { str: 15, dex: 1 } }),
-            setRuntimeValue: srw,
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
-
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            description: expect.stringContaining('vs Bandit 1 Athletics (+15)'),
-        }));
-        expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            description: expect.stringContaining('contest — Failure. Target is not grappled.'),
-        }));
-        expect(srw).not.toHaveBeenCalled();
-    });
-
-    it('resolves a player target contest from its computedStats skill bonuses', async () => {
-        const playerTarget = {
-            name: 'ElfTest',
-            conditions: [],
-            type: 'player',
-            computedStats: {
-                skills: [{ name: 'Acrobatics', bonus: 7 }],
-                abilities: [{ name: 'Strength', bonus: 1 }],
+            {
+                name: 'STR + PB derived from skillProficiencies when no listed skill bonus exists',
+                stats: noListedSkills,
+                expected: 11,
             },
-        };
-        const cs = csWith('DraconicDragon', playerTarget);
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
+            {
+                name: 'Jack of All Trades half bonus does not stack on top of Athletics proficiency',
+                stats: { ...lv20AthleticsBarbarian, automation: { passives: [{ type: 'jack_of_all_trades' }] } },
+                expected: 11,
+            },
+            {
+                name: 'Jack of All Trades adds half PB when not proficient (lv5: STR 4 + floor(3/2))',
+                stats: { ...basePlayerStats, automation: { passives: [{ type: 'jack_of_all_trades' }] } },
+                expected: 5,
+            },
+            {
+                name: 'bare STR modifier when neither proficient nor Jack of All Trades (lv5 STR +4)',
+                stats: basePlayerStats,
+                expected: 4,
+            },
+            {
+                name: 'exhaustion penalty subtracts from the contest bonus (11 - 2)',
+                stats: lv20AthleticsBarbarian,
+                exhaustionPenalty: 2,
+                expected: 9,
+            },
+        ])('$name', async ({ stats, exhaustionPenalty = 0, expected }) => {
+            const hooks = grappleHarness({ playerStats: stats, exhaustionPenalty });
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
 
-        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-            description: expect.stringContaining('vs ElfTest Acrobatics (+7)'),
-        }));
+            // No conditionEffects in these fixtures: context must stay empty.
+            expect(mockRollAbilityCheck).toHaveBeenCalledWith('Strength', expected, {});
+        });
     });
 
-    it('stamps grappled on the target when the contest is won', async () => {
-        const cs = csWith('DraconicDragon', banditTarget());
-        const srw = vi.fn().mockResolvedValue(undefined);
-        const hooks = createHooks({
-            playerStats: lv20AthleticsBarbarian,
-            loadCombatSummary: () => Promise.resolve(cs),
-            getRuntimeValue: grv(28, 17),
-            setRuntimeValue: srw,
-        });
-        const actions = useCharActionsBaseActions(hooks);
-        await actions.handleGrappleAction();
+    describe('target contest resolution — higher of Athletics-or-Acrobatics per data shape', () => {
+        it.each([
+            {
+                name: 'raw monster ability_score_modifiers picks the higher Acrobatics (+1) over Athletics (+0), not static STR',
+                target: banditTarget(),
+                popup: 'Grapple successful! (d20: 17 + 11 = 28) vs Bandit 1 Acrobatics (+1). Target is now grappled.',
+                log: 'Strength (Athletics) check: 28 (d20: 17 + 11) vs Bandit 1 Acrobatics (+1) contest — Success. Target is now grappled.',
+            },
+            {
+                name: 'listed monster skills dict beats raw ability modifiers',
+                target: {
+                    name: 'Ogre 1',
+                    conditions: [],
+                    type: 'monster',
+                    skills: { Athletics: { modifier: 7 }, Acrobatics: { modifier: -1 } },
+                },
+                popup: 'Grapple successful! (d20: 17 + 11 = 28) vs Ogre 1 Athletics (+7). Target is now grappled.',
+                log: 'Strength (Athletics) check: 28 (d20: 17 + 11) vs Ogre 1 Athletics (+7) contest — Success. Target is now grappled.',
+            },
+            {
+                name: 'player target resolves contest from computedStats skills array',
+                target: {
+                    name: 'ElfTest',
+                    conditions: [],
+                    type: 'player',
+                    computedStats: {
+                        skills: [{ name: 'Acrobatics', bonus: 7 }],
+                        abilities: [{ name: 'Strength', bonus: 1 }],
+                    },
+                },
+                popup: 'Grapple successful! (d20: 17 + 11 = 28) vs ElfTest Acrobatics (+7). Target is now grappled.',
+                log: 'Strength (Athletics) check: 28 (d20: 17 + 11) vs ElfTest Acrobatics (+7) contest — Success. Target is now grappled.',
+            },
+        ])('$name', async ({ target, popup, log }) => {
+            const hooks = grappleHarness({ playerStats: lv20AthleticsBarbarian, target });
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
 
-        expect(srw).toHaveBeenCalledWith(
-            'Bandit 1',
-            'activeConditions',
-            expect.arrayContaining(['grappled']),
-            campaignName,
-        );
+            expect(mockSetPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Grapple', description: popup });
+            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: 'DraconicDragon',
+                abilityName: 'Grapple',
+                description: log,
+            });
+        });
+    });
+
+    describe('outcome boundary — the grappler must strictly exceed the contest total', () => {
+        it.each([
+            {
+                name: 'tie (roll 12 vs contest 12) resolves as failure and stamps nothing',
+                target: {
+                    name: 'Ogre 1',
+                    conditions: [],
+                    type: 'monster',
+                    skills: { Athletics: { modifier: 12 } },
+                },
+                popup: 'Grapple failed! (d20: 1 + 11 = 12) vs Ogre 1 Athletics (+12). Target is not grappled.',
+                log: 'Strength (Athletics) check: 12 (d20: 1 + 11) vs Ogre 1 Athletics (+12) contest — Failure. Target is not grappled.',
+            },
+            {
+                name: 'loss (roll 12 vs contest +15) resolves as failure and stamps nothing',
+                target: banditTarget({ ability_score_modifiers: { str: 15, dex: 1 } }),
+                popup: 'Grapple failed! (d20: 1 + 11 = 12) vs Bandit 1 Athletics (+15). Target is not grappled.',
+                log: 'Strength (Athletics) check: 12 (d20: 1 + 11) vs Bandit 1 Athletics (+15) contest — Failure. Target is not grappled.',
+            },
+        ])('$name', async ({ target, popup, log }) => {
+            const hooks = grappleHarness({ playerStats: lv20AthleticsBarbarian, target, total: 12, d20: 1 });
+            await useCharActionsBaseActions(hooks).handleGrappleAction();
+            const setRuntimeValue = hooks.setRuntimeValue;
+
+            expect(mockSetPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Grapple', description: popup });
+            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'ability_use',
+                characterName: 'DraconicDragon',
+                abilityName: 'Grapple',
+                description: log,
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
     });
 });

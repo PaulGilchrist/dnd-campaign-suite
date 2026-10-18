@@ -1,11 +1,15 @@
-// MA-0248: Ancient Silver Dragon Paralyzing Breath picker behavior —
-// stagedParalysis arms the staging seams on a failed save (first fail =
-// Incapacitated staged ONLY, NOT Paralyzed flat; zero damage; roll +
-// condition-applied logs). Damageless picker copy never prints
-// "half damage" / "null null damage" / flat "Incapacitated, Paralyzed".
-// MA-1469 extends the same byte-shape pins to the Silver Dragon Wyrmling
-// DC 13 / 15-ft Cone twin: the staged service supersedes the flat
-// extractConditionsFromSaveEffect spray (saveConditions carries BOTH words).
+// @maintained-by-ai
+// MA-0248: Ancient Silver Dragon Paralyzing Breath picker lane — stagedParalysis
+// arms the multi-stage ladder seam: picker copy states the two-stage ladder
+// (never half-damage / null-damage / flat "Incapacitated, Paralyzed" grant
+// text), a failed save stages Incapacitated ONLY via paralyzingBreathService
+// (the flat saveConditions ['incapacitated','paralyzed'] spray is superseded —
+// MA-0904 clause-supersedes), a successful save grants nothing, and the row is
+// damageless either way. The MA-1469 Silver Dragon Wyrmling DC 13 twin rides
+// this byte-identical modal path — its data/props are pinned in
+// MonsterCardModal.paralyzing-breath.test.jsx (modal reads only the
+// stagedParalysis/saveDc PROPS, never action.staged_paralysis), so DC 13
+// appears here only to exercise the pass side of the same seam.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -45,7 +49,7 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => ({
     creatures: [
       { name: 'Ancient Silver Dragon 1', type: 'npc', currentHp: 468, maxHp: 468, saveBonuses: {}, resistances: [], immunities: [] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { con: 2 }, resistances: [], immunities: [] },
+      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, saveBonuses: { constitution: 2 }, resistances: [], immunities: [] },
     ],
   })),
   setCombatSummaryCache: vi.fn(),
@@ -110,21 +114,24 @@ let randomSpy;
 beforeEach(() => {
   vi.clearAllMocks();
   seenPicker.current = null;
-  // Thug 1 con +2, nat 2 → 4 < 24 fails.
+  // Flat spyRandom stream (order-independent): every d20 is nat 2, so
+  // Thug 1 (constitution +2 → 4) fails any DC this lane throws at it.
+  // saveBonuses uses the full-lowercase key the modal reads
+  // (saveType.toLowerCase() — SaveAttackAoeModal.jsx:47).
   randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.05);
 });
 afterEach(() => randomSpy.mockRestore());
 
-function renderParalysisCone() {
+function renderParalysisCone(saveDc = 24) {
   return render(
     <SaveAttackAoeModal
-      action={ACTION}
+      action={{ ...ACTION, save_dc: saveDc }}
       playerStats={{ name: 'Ancient Silver Dragon 1' }}
       campaignName="test-campaign"
       damage={null}
       damageType=""
       saveType="Constitution"
-      saveDc={24}
+      saveDc={saveDc}
       dcSuccess="none"
       titleOverride="90-ft Cone (GM positions tokens; selection advisory)"
       excludeNames={['Ancient Silver Dragon 1']}
@@ -137,19 +144,32 @@ function renderParalysisCone() {
   );
 }
 
+const conditionLogs = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.action === 'applied');
+const stagedSaveLogs = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save');
+
 describe('MA-0248 Paralyzing Breath staged picker', () => {
-  it('picker copy states the staged ladder, never half-damage/null-damage/flat grant text', () => {
+  it('picker copy states the staged ladder and the picker is inert until Confirm', () => {
     renderParalysisCone();
+    // Positive leg first: the picker rendered with the full ladder copy.
+    expect(seenPicker.current).toBeTruthy();
     expect(seenPicker.current.note).toContain('Incapacitated until the end of its next turn');
-    expect(seenPicker.current.note).toContain('Paralyzed');
+    expect(seenPicker.current.note).toContain('Second failure: Paralyzed');
     expect(seenPicker.current.note).toContain('automatically succeeds after 1 minute');
+    // Damageless ladder copy: never half-damage, never "null", never the
+    // flat both-conditions grant, never the sleep ladder's Unconscious.
     expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
     expect(seenPicker.current.note).not.toContain('null');
     expect(seenPicker.current.note).not.toContain('target is Incapacitated, Paralyzed');
+    expect(seenPicker.current.note).not.toContain('Unconscious');
+    // Pre-confirm inertness: nothing staged, no rolls, no logs, no damage.
+    expect(stageParalysisTargets).not.toHaveBeenCalled();
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('failed NPC save stages Incapacitated via paralyzingBreathService (CON, 10 rounds) — no flat Paralyzed grant, no damage', async () => {
-    const { getByText } = renderParalysisCone();
+  it('failed save stages Incapacitated ONLY via paralyzingBreathService — flat spray superseded, sleep lane inert, zero damage', async () => {
+    const { getByText, container } = renderParalysisCone();
     await waitFor(() => expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']));
     fireEvent.click(getByText('Confirm'));
 
@@ -157,101 +177,48 @@ describe('MA-0248 Paralyzing Breath staged picker', () => {
       'test-campaign', 'Ancient Silver Dragon 1', ['Thug 1'], 24,
       { saveType: 'Constitution', label: 'Paralyzing Breath', logLabel: 'Paralyzing Breath', paralyzedRounds: 10 },
     ));
+    expect(stageParalysisTargets).toHaveBeenCalledTimes(1);
     expect(stageSleepTargets).not.toHaveBeenCalled();
-
     expect(applyDamageToTarget).not.toHaveBeenCalled();
 
-    const entries = addEntry.mock.calls.map(c => c[1]);
-    const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
-    expect(rollLog.saveResult).toBe('failure');
-    expect(rollLog.saveDc).toBe(24);
-    const condLog = entries.find(e => e.type === 'condition' && e.action === 'applied');
-    expect(condLog.condition).toBe('Incapacitated');
-    expect(condLog.characterName).toBe('Thug 1');
-    expect(condLog.description).toContain('repeats the save');
-    expect(condLog.description).toContain('second failure Paralyzes');
-    expect(entries.some(e => e.type === 'condition' && e.condition === 'Paralyzed' && e.action === 'applied')).toBe(false);
-  });
+    // Honest roll log: nat 2 + constitution +2 = 4, well under DC 24.
+    const rollLogs = stagedSaveLogs();
+    expect(rollLogs).toHaveLength(1);
+    expect(rollLogs[0]).toMatchObject({ targetName: 'Thug 1', saveResult: 'failure', saveDc: 24, rolls: [2], bonus: 2 });
 
-  it('result rows show staged Incapacitated copy on fail (no null-damage text)', async () => {
-    const { getByText, container } = renderParalysisCone();
-    await waitFor(() => expect(seenPicker.current.targets.length).toBe(1));
-    fireEvent.click(getByText('Confirm'));
-    await waitFor(() => expect(stageParalysisTargets).toHaveBeenCalled());
-    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save'));
+    // One condition grant only (the flat ['incapacitated','paralyzed'] spray
+    // never ran): Incapacitated with the repeat-save ladder prose, and the
+    // 10-rounds → 1-minute auto-success clock spelled out.
+    const conds = conditionLogs();
+    expect(conds).toHaveLength(1);
+    expect(conds[0]).toMatchObject({ condition: 'Incapacitated', characterName: 'Thug 1' });
+    expect(conds[0].description).toContain('repeats the save');
+    expect(conds[0].description).toContain('second failure Paralyzes');
+    expect(conds[0].description).toContain('auto-succeeds after 1 minute');
+
+    // Results row shows the staged copy — no null-damage cosmetics.
+    await waitFor(() => expect(container.textContent).toContain('Incapacitated until the end of its next turn, then repeats the save (rolled 2)'));
     expect(container.textContent).not.toContain('null null');
   });
-});
 
-// MA-1469: Silver Dragon Wyrmling Paralyzing Breath rides the MA-0248 byte
-// shape at DC 13 / 15-ft Cone. saveConditions carries the flat extractor
-// spray ['incapacitated','paralyzed'] (word-list scan over the ladder
-// prose); with stagedParalysis armed the service OWNS the fail leg —
-// first fail stages Incapacitated ONLY via stageParalysisTargets, the flat
-// both-conditions grant and any damage never fire (MA-0904 clause-supersedes).
-const WYRMLING_ACTION = {
-  name: 'Paralyzing Breath',
-  save_dc: 13,
-  save_type: 'Constitution',
-  dc_success: 'none',
-  staged_paralysis: { paralyzed_minutes: 1 },
-  range: '15-foot Cone',
-};
-
-function renderWyrmlingCone() {
-  return render(
-    <SaveAttackAoeModal
-      action={WYRMLING_ACTION}
-      playerStats={{ name: 'Silver Dragon Wyrmling 1' }}
-      campaignName="test-campaign"
-      damage={null}
-      damageType=""
-      saveType="Constitution"
-      saveDc={13}
-      dcSuccess="none"
-      titleOverride="15-ft Cone (GM positions tokens; selection advisory)"
-      excludeNames={['Silver Dragon Wyrmling 1', 'Ancient Silver Dragon 1']}
-      rangeGateFt={15}
-      storeLastAttack={false}
-      saveConditions={['incapacitated', 'paralyzed']}
-      stagedParalysis={{ paralyzedRounds: 10 }}
-      onClose={vi.fn()}
-    />
-  );
-}
-
-describe('MA-1469 Silver Dragon Wyrmling staged picker (MA-0248 DC 13 twin)', () => {
-  it('picker copy states the staged ladder, never flat "target is Incapacitated, Paralyzed" grant text', () => {
-    renderWyrmlingCone();
-    expect(seenPicker.current.note).toContain('Incapacitated until the end of its next turn');
-    expect(seenPicker.current.note).toContain('Second failure: Paralyzed');
-    expect(seenPicker.current.note).toContain('automatically succeeds after 1 minute');
-    expect(seenPicker.current.note).not.toContain('target is Incapacitated, Paralyzed');
-    expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
-  });
-
-  it('failed NPC save routes to paralyzingBreathService at DC 13 (10 rounds) — flat extractor spray superseded, no flat Paralyzed grant, no damage', async () => {
-    const { getByText } = renderWyrmlingCone();
+  // The ladder's other half: applyStagedParalysisSave logs the successful
+  // save roll, then grants NOTHING (no staging te, no conditions, no clock).
+  // DC 13 chosen so the +2 CON Thug's nat 20 (22) passes the same combat mock.
+  it('successful save logs the roll but stages nothing', async () => {
+    randomSpy.mockReturnValue(0.99);
+    const { getByText, container } = renderParalysisCone(13);
     await waitFor(() => expect(seenPicker.current.targets.map(t => t.name)).toEqual(['Thug 1']));
     fireEvent.click(getByText('Confirm'));
 
-    // Thug 1 con +2, nat 2 → 4 < 13 fails.
-    await waitFor(() => expect(stageParalysisTargets).toHaveBeenCalledWith(
-      'test-campaign', 'Silver Dragon Wyrmling 1', ['Thug 1'], 13,
-      { saveType: 'Constitution', label: 'Paralyzing Breath', logLabel: 'Paralyzing Breath', paralyzedRounds: 10 },
-    ));
-    expect(stageSleepTargets).not.toHaveBeenCalled();
-    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    // Positive leg first: the staged seam ran and honestly logged the pass.
+    await waitFor(() => expect(stagedSaveLogs()).toHaveLength(1));
+    expect(stagedSaveLogs()[0]).toMatchObject({ targetName: 'Thug 1', saveResult: 'success', saveDc: 13, rolls: [20], bonus: 2 });
 
-    const entries = addEntry.mock.calls.map(c => c[1]);
-    const rollLog = entries.find(e => e.rollType === 'save' && e.targetName === 'Thug 1');
-    expect(rollLog.saveResult).toBe('failure');
-    expect(rollLog.saveDc).toBe(13);
-    const condLog = entries.find(e => e.type === 'condition' && e.action === 'applied');
-    expect(condLog.condition).toBe('Incapacitated');
-    expect(condLog.description).toContain('repeats the save');
-    expect(condLog.description).toContain('second failure Paralyzes');
-    // Service supersedes the word-list scan: NO flat Paralyzed grant.
-    expect(entries.some(e => e.type === 'condition' && e.condition === 'Paralyzed' && e.action === 'applied')).toBe(false);
+    // Then the absences: no staging, no condition grants, no damage.
+    expect(stageParalysisTargets).not.toHaveBeenCalled();
+    expect(stageSleepTargets).not.toHaveBeenCalled();
+    expect(conditionLogs()).toHaveLength(0);
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+    await waitFor(() => expect(container.textContent).toContain('Saved — takes no damage (rolled 20)'));
   });
 });

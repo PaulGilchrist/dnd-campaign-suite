@@ -1,62 +1,46 @@
+// @maintained-by-ai
 // MA-0984: Hill Giant "Trash Lob" — the row's OWN Hit clause carries the
-// Poisoned rider ("Hit: 16 (2d10 + 5) Bludgeoning damage, and the target
-// has the Poisoned condition until the end of its next turn") but the row
-// authored the rider in the WRONG slot: a structured `save_effect` with NO
-// save_dc (§118 decoy fingerprint — save_effect consumers are gated
-// save_dc!=null in MonsterAction.jsx / MonsterCardModal.jsx, so the field
-// was inert transport; buildHitConditionClause reads hit_conditions /
-// hit_target_effect / hit_condition_roll only, NEVER description/save_effect
-// on the attack-hit path). Wrong-slot FAIL(a)-DATA per §410. Fix:
+// Poisoned rider but the row originally authored it in the WRONG slot: a
+// save_effect decoy with NO save_dc (§118 decoy fingerprint — save consumers
+// are gated save_dc>0 in MonsterAction.jsx, so it was inert transport;
+// buildHitConditionClause reads hit_conditions/hit_target_effect/
+// hit_condition_roll only, NEVER description/save_effect). Fix:
 // hit_conditions:["poisoned"] after damage_type_primary (MA-0621/MA-0763/
-// MA-0877 byte-shape) + decoy save_effect dropped. Duration residual
-// ("until the end of its next turn" not clocked, GM badge removal) accepted
-// per §59/§34 hit_conditions precedent.
+// MA-0877 byte-shape) + decoy dropped. Duration residual accepted per
+// §59/§34 hit_conditions precedent. Fused-1 plain row (disk keys carry NO
+// save fields, so no save-chip half). Runtime lane + numerics +
+// buildHitConditionClause payload owned by handlePlainDamage.hitClause.test.js
+// :264 (HIT_CLAUSE_ROWS :224-282) — direct helper calls pruned. Unique here:
+// exact Object.keys pins byte-shape AND decoy absence (the mega table's
+// `?? null` fallbacks are save-field-blind), verbatim prose, chip identity.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const TRASH_LOB = monsters.find((m) => m.index === 'hill-giant').actions[2];
+const TRASH_LOB = monsters.find((m) => m.index === 'hill-giant').actions.find((a) => a.name === 'Trash Lob');
 
-describe('MA-0984 disk fingerprint: hill-giant Trash Lob hit_conditions fix', () => {
-  it('disk row carries hit_conditions ["poisoned"] after damage_type_primary (MA-0621/MA-0763/MA-0877 byte-shape)', () => {
-    expect(TRASH_LOB.name).toBe('Trash Lob');
-    expect(TRASH_LOB.attack_bonus).toBe(8);
-    expect(TRASH_LOB.range).toBe('60/240 ft.');
-    expect(TRASH_LOB.damage_dice_primary).toBe('2d10 + 5');
-    expect(TRASH_LOB.damage_type_primary).toBe('Bludgeoning');
-    expect(TRASH_LOB.hit_conditions).toEqual(['poisoned']);
-    const keys = Object.keys(TRASH_LOB);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-  });
-
-  it('decoy save_effect dropped: row carries NO save fields (no save_dc ever armed ActionSaveRoll)', () => {
-    expect(TRASH_LOB.save_effect).toBeUndefined();
-    expect(TRASH_LOB.save_dc).toBeUndefined();
-    expect(TRASH_LOB.save_type).toBeUndefined();
-    expect(TRASH_LOB.escape_dc).toBeUndefined();
-    expect(TRASH_LOB.hit_target_effect).toBeUndefined();
-    expect(TRASH_LOB.hit_condition_roll).toBeUndefined();
-  });
-
-  it('Hit clause prose still carries the canonical Poisoned word (rider belongs to HIT)', () => {
-    expect(TRASH_LOB.description).toMatch(/Hit:.*Poisoned/s);
-  });
-
-  it('buildHitConditionClause arms the Poisoned rider (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(TRASH_LOB);
-    expect(clause).toEqual({
-      conditions: ['poisoned'],
-      escapeDc: null,
-      attackName: 'Trash Lob',
-      targetEffect: null,
+describe('MA-0984 hill-giant Trash Lob poisoned rider', () => {
+  it('fused lock: exact disk-row bytes (decoy-free) arm the clause; one "+8" chip live, click payloads the row', () => {
+    expect(Object.keys(TRASH_LOB)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'range',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+    ]);
+    expect(TRASH_LOB).toEqual({
+      name: 'Trash Lob',
+      description: 'Ranged Attack Roll: +8, range 60/240 ft. <strong>Hit:</strong> 16 (2d10 + 5) Bludgeoning damage, and the target has the <strong>Poisoned</strong> condition until the end of its next turn.',
+      attack_bonus: 8,
+      range: '60/240 ft.',
+      damage_dice_primary: '2d10 + 5',
+      damage_type_primary: 'Bludgeoning',
+      hit_conditions: ['poisoned'],
     });
-  });
-
-  it('attack half stays live: one "+8" chip, no save/DC decoy chip', () => {
-    expect(attackRowMissingToHit(TRASH_LOB)).toBe(false);
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -74,6 +58,8 @@ describe('MA-0984 disk fingerprint: hill-giant Trash Lob hit_conditions fix', ()
     const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['+8']);
     fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Trash Lob', 8, expect.objectContaining({ name: 'Trash Lob' }));
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    expect(onAttack).toHaveBeenCalledWith('Trash Lob', 8, TRASH_LOB);
+    expect(onAttack.mock.calls[0][2]).toBe(TRASH_LOB);
   });
 });

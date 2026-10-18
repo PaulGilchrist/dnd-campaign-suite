@@ -1,3 +1,12 @@
+// @maintained-by-ai
+// Selection lane for WeaponKindMasteryModal: click select/deselect at the cap, pre-selection
+// from the `existing` prop, exact applyWeaponKindMastery call (weapons in click order,
+// playerStats, campaignName), and backdrop-click guard.
+// Other lanes: first-paint copy → WeaponKindMasteryModalInitial.test.jsx, maxKinds
+// computation → ...MaxKinds.test.jsx, rows / meleeOnly / toggle / disabled-cap / count →
+// ...WeaponList.test.jsx, result view / exact result copy / Skip / Done → ...Result.test.jsx,
+// payload production → weaponKindMasteryHandler.test.js.
+
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -7,6 +16,7 @@ vi.mock('../../../services/automation/index.js', () => ({
 
 import * as automation from '../../../services/automation/index.js';
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
+import { resetWeaponsCache } from './weapon-kind-mastery-cache.js';
 
 const mockPlayerStats = {
   name: 'Fighter1',
@@ -28,92 +38,101 @@ const mockWeapons = [
   { name: 'Shortsword', equipment_category: 'Weapon', weapon_category: 'Martial', weapon_range: 'Melee', mastery: 'Vex' },
 ];
 
-const baseProps = {
-  action: undefined,
-  playerStats: mockPlayerStats,
-  campaignName: mockCampaignName,
-  onClose: vi.fn(),
-};
-
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
-}
-
-function renderWithWeapons(overrides, weaponsToMock = mockWeapons) {
-  const fetchMock = vi.fn().mockResolvedValue({
+function renderWithWeapons(overrides = {}, weaponsToMock = mockWeapons) {
+  globalThis.fetch = vi.fn().mockResolvedValue({
     json: () => Promise.resolve(weaponsToMock),
   });
-  globalThis.fetch = fetchMock;
-  return { ...render(<WeaponKindMasteryModal {...makeProps(overrides)} />) };
+  return render(
+    <WeaponKindMasteryModal
+      action={undefined}
+      playerStats={mockPlayerStats}
+      campaignName={mockCampaignName}
+      onClose={vi.fn()}
+      {...overrides}
+    />
+  );
 }
 
-describe('WeaponKindMasteryModal', () => {
+function checkboxFor(name) {
+  return screen.getByRole('checkbox', { name: new RegExp(name) });
+}
+
+async function waitForWeapons() {
+  await waitFor(() => screen.getByRole('checkbox', { name: /Battleaxe/ }));
+}
+
+describe('WeaponKindMasteryModal — selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetWeaponsCache();
   });
 
-  describe('weapon selection', () => {
-    it('allows deselecting a weapon to free up a slot', async () => {
-      const props = makeProps({
-        action: { automation: { maxKinds: 1 } },
-      });
-      renderWithWeapons(props);
-      await waitFor(() => screen.getByText('Battleaxe'));
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      fireEvent.click(checkboxes[0]);
-      expect(checkboxes[1].disabled).toBe(true);
-      fireEvent.click(checkboxes[0]);
-      expect(checkboxes[1].disabled).toBe(false);
-    });
+  it('frees the slot for other weapons when the selected weapon is deselected at maxKinds 1', async () => {
+    renderWithWeapons({ action: { automation: { maxKinds: 1 } } });
+    await waitForWeapons();
 
-    it('pre-selects weapons from the existing prop', async () => {
-      renderWithWeapons({ existing: ['Battleaxe', 'Club'] });
-      await waitFor(() => screen.getByText('Battleaxe'));
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      expect(checkboxes[0].checked).toBe(true);
-      expect(checkboxes[2].checked).toBe(true);
-      expect(checkboxes[1].checked).toBe(false);
-    });
+    const battleaxe = checkboxFor('Battleaxe');
+    const blowgun = checkboxFor('Blowgun');
+
+    fireEvent.click(battleaxe);
+    expect(battleaxe.checked).toBe(true);
+    expect(blowgun.disabled).toBe(true);
+
+    fireEvent.click(battleaxe);
+    expect(battleaxe.checked).toBe(false);
+    expect(blowgun.disabled).toBe(false);
   });
 
-  describe('handleSelect / applyWeaponKindMastery', () => {
-    it('calls applyWeaponKindMastery with selected weapons, playerStats, and campaignName', async () => {
-      automation.applyWeaponKindMastery.mockResolvedValue({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Weapon Mastery',
-          description: 'Weapon kinds set to: Battleaxe, Club.',
-        },
-      });
-      renderWithWeapons();
-      await waitFor(() => screen.getByText('Battleaxe'));
-      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-      fireEvent.click(checkboxes[0]);
-      fireEvent.click(checkboxes[2]);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-      });
-      await waitFor(() => {
-        expect(automation.applyWeaponKindMastery).toHaveBeenCalledWith(
-          ['Battleaxe', 'Club'],
-          mockPlayerStats,
-          mockCampaignName
-        );
-      });
-    });
+  it('pre-selects the weapons named in the existing prop', async () => {
+    renderWithWeapons({ existing: ['Battleaxe', 'Club'] });
+    await waitForWeapons();
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(mockWeapons.length);
+    expect(checkboxFor('Battleaxe').checked).toBe(true);
+    expect(checkboxFor('Club').checked).toBe(true);
+    expect(checkboxFor('Blowgun').checked).toBe(false);
+    expect(checkboxFor('Longbow').checked).toBe(false);
   });
 
-  describe('close behavior', () => {
-    it('does not call onClose when the overlay background is clicked', async () => {
-      const onClose = vi.fn();
-      renderWithWeapons({ onClose });
-      await waitFor(() => screen.getByText('Battleaxe'));
-      const overlay = document.querySelector('.sp-overlay');
-      fireEvent.click(overlay);
-      expect(onClose).not.toHaveBeenCalled();
-      expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+  it('calls applyWeaponKindMastery once with the selected weapons in click order, playerStats, and campaignName', async () => {
+    // Honest fixture: matches weaponKindMasteryHandler.applySelections output for ['Club', 'Battleaxe'].
+    automation.applyWeaponKindMastery.mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Weapon Mastery',
+        description: 'Weapon kinds set to: Club, Battleaxe. Mastery properties will be available when attacking with these weapons.',
+      },
     });
+    renderWithWeapons();
+    await waitForWeapons();
+
+    // Deliberately non-alphabetical order to pin pass-through of selection order.
+    fireEvent.click(checkboxFor('Club'));
+    fireEvent.click(checkboxFor('Battleaxe'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+    });
+
+    await waitFor(() => {
+      expect(automation.applyWeaponKindMastery).toHaveBeenCalledTimes(1);
+    });
+    expect(automation.applyWeaponKindMastery).toHaveBeenCalledWith(
+      ['Club', 'Battleaxe'],
+      mockPlayerStats,
+      mockCampaignName
+    );
+  });
+
+  it('does not close when the overlay background is clicked', async () => {
+    const onClose = vi.fn();
+    renderWithWeapons({ onClose });
+    await waitForWeapons();
+
+    fireEvent.click(document.querySelector('.sp-overlay'));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
   });
 });

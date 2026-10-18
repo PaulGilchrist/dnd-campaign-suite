@@ -6,51 +6,51 @@
 // incl. the Large-or-smaller victim gate).
 // One-field DATA fix mirroring the MA-0791/MA-0802 byte-shape twin and the
 // ma0807/ma0819/ma0834 template (MA-0010 seam): hit_conditions:["prone"]
-// placed after damage_type_primary. No escape_dc (no escape clause). The row
-// save_effect is a DECOY (attack row, no save_dc — §115) and must stay
-// byte-preserved untouched. Instant-death/body-absorb clause stays
-// GM-advisory (§70 — zero instant-death consumer on attack rows app-wide).
+// placed after damage_type_primary. gibbering-mouther is deliberately NOT in
+// the mega HIT_CLAUSE_ROWS table (handlePlainDamage.hitClause.test.js:224-282),
+// so this file is the row's only lane — disk fingerprint + chip press, exact
+// bytes, nothing else. No escape_dc, no save fields, no escape clause. The
+// row save_effect is a DECOY (attack row, no save_dc — §115) and stays
+// byte-preserved inside the exact-row toEqual. Instant-death/body-absorb
+// clause stays GM-advisory (§70 — zero instant-death consumer on attack rows
+// app-wide). Clause arming (escapeDc:null), chip suppression
+// (attackRowMissingToHit), and clause class of this exact row are owned
+// generically by the mega lane (handlePlainDamage.hitClause.test.js:183-334)
+// and the ma0286 truth table — not re-derived here.
+// @maintained-by-ai
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const BITE = monsters.find((m) => m.index === 'gibbering-mouther').actions[0];
 
-describe('MA-0838 disk fingerprint: gibbering-mouther Bite prone rider fix', () => {
-  it('disk row carries hit_conditions ["prone"] after damage_type_primary (MA-0791/MA-0802 byte-shape)', () => {
-    expect(BITE.name).toBe('Bite');
-    expect(BITE.hit_conditions).toEqual(['prone']);
-    const keys = Object.keys(BITE);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(BITE.attack_bonus).toBe(2);
-    expect(BITE.reach).toBe('5 ft.');
-    expect(BITE.damage_dice_primary).toBe('2d6');
-    expect(BITE.damage_type_primary).toBe('Piercing');
-  });
-
-  it('decoy save_effect byte-preserved untouched (§115 no-save_dc decoy) and NO save fields added', () => {
-    expect(BITE.save_effect).toBe('If the target is a Medium or smaller creature, it has the Prone condition. The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther, leaving only equipment behind.');
-    expect(BITE.escape_dc).toBeUndefined();
-    expect(BITE.save_dc).toBeUndefined();
-    expect(BITE.save_type).toBeUndefined();
-    expect(BITE.hit_target_effect).toBeUndefined();
-  });
-
-  it('buildHitConditionClause arms the Prone rider with escapeDc null (was null pre-fix)', () => {
-    const clause = buildHitConditionClause(BITE);
-    expect(clause).toEqual({
-      conditions: ['prone'],
-      escapeDc: null,
-      attackName: 'Bite',
-      targetEffect: null,
+describe('MA-0838 gibbering-mouther Bite prone rider', () => {
+  it('disk fingerprint: exact row bytes, exact key order, hit_conditions ["prone"] after damage_type_primary, decoy save_effect untouched, no escape/save fields', () => {
+    expect(BITE).toEqual({
+      name: 'Bite',
+      description: 'Melee Attack Roll: +2, reach 5 ft. Hit: 7 (2d6) Piercing damage. If the target is a Medium or smaller creature, it has the <strong>Prone</strong> condition. The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther, leaving only equipment behind.',
+      attack_bonus: 2,
+      reach: '5 ft.',
+      save_effect: 'If the target is a Medium or smaller creature, it has the Prone condition. The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther, leaving only equipment behind.',
+      damage_dice_primary: '2d6',
+      damage_type_primary: 'Piercing',
+      hit_conditions: ['prone'],
     });
+    expect(Object.keys(BITE)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'save_effect',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'hit_conditions',
+    ]);
   });
 
-  it('attack half stays live: one "+2" chip, no stale suppression', () => {
-    expect(attackRowMissingToHit(BITE)).toBe(false);
+  it('chip press: one "+2" chip routes the exact disk row through onAttack by identity', () => {
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction
@@ -65,9 +65,13 @@ describe('MA-0838 disk fingerprint: gibbering-mouther Bite prone rider fix', () 
         onGatedReaction={vi.fn()}
       />
     );
-    const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
-    expect(chips).toEqual(['+2']);
-    fireEvent.click(container.querySelector('.mc-dice-link'));
-    expect(onAttack).toHaveBeenCalledWith('Bite', 2, expect.objectContaining({ name: 'Bite' }));
+    const chips = [...container.querySelectorAll('.mc-dice-link')];
+    expect(chips.map((c) => c.textContent.trim())).toEqual(['+2']);
+    fireEvent.click(chips[0]);
+    expect(onAttack).toHaveBeenCalledTimes(1);
+    const [name, bonus, row] = onAttack.mock.calls[0];
+    expect(name).toBe('Bite');
+    expect(bonus).toBe(2);
+    expect(row).toBe(BITE);
   });
 });

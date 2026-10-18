@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
@@ -25,23 +26,15 @@ const goblin = { index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 50
 const kobold = { index: 'kobold', name: 'Kobold', challenge_rating: 0.25, xp: 25, qty: 1 };
 const orc = { index: 'orc', name: 'Orc', challenge_rating: 0.75, xp: 100, qty: 2 };
 
-const defaultSuggestions = [
-  {
-    difficultyLabel: 'Medium',
-    totalXP: 250,
-    monsterCount: 2,
-    monsters: [goblin, kobold],
-  },
-];
+const suggestion = (difficultyLabel, xp, count, monsters) => ({
+  difficultyLabel,
+  totalXP: xp,
+  monsterCount: count,
+  monsters,
+});
 
-const secondSuggestions = [
-  {
-    difficultyLabel: 'Hard',
-    totalXP: 300,
-    monsterCount: 3,
-    monsters: [orc, kobold],
-  },
-];
+const defaultSuggestions = [suggestion('Medium', 250, 2, [goblin, kobold])];
+const secondSuggestions = [suggestion('Hard', 300, 3, [orc, kobold])];
 
 function renderModal(overrides = {}) {
   const onApply = vi.fn();
@@ -57,233 +50,160 @@ function renderModal(overrides = {}) {
   return { onApply, onClose, unmount: utils.unmount, ...utils };
 }
 
+const checkedEnvNames = () =>
+  screen.getAllByRole('checkbox')
+    .filter(checkbox => checkbox.checked)
+    .map(checkbox => checkbox.closest('label').textContent.trim());
+
+const clickGenerate = () => fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
 describe('EncounterGeneratorModal', () => {
   beforeEach(() => {
     generateMock.mockReset();
     generateMock.mockReturnValue([]);
   });
 
-  describe('initial render', () => {
-    it('renders the title and an enabled Generate button', () => {
-      renderModal();
-      expect(screen.getByText('Generate Encounter')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /generate/i })).not.toBeDisabled();
+  it('opens with every environment selected, the empty state, a live monster count, and an enabled Generate', () => {
+    renderModal();
+    expect(screen.getByText('Generate Encounter')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate/i })).toBeEnabled();
+    screen.getAllByRole('checkbox').forEach(checkbox => expect(checkbox).toBeChecked());
+    ['All', 'Dungeon', 'Wilderness'].forEach(pick => {
+      expect(screen.getByRole('button', { name: pick })).toBeInTheDocument();
     });
+    expect(screen.getByText('3 monsters available')).toBeInTheDocument();
+    expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+  });
 
-    it('renders every environment group label and quick pick button', () => {
-      renderModal();
-      ['Arctic', 'Temperate', 'Wetlands', 'Desert', 'Underground', 'Aquatic', 'Urban'].forEach(label => {
-        expect(screen.getByText(label)).toBeInTheDocument();
-      });
-      ['All', 'Dungeon', 'Wilderness'].forEach(pick => {
-        expect(screen.getByRole('button', { name: pick })).toBeInTheDocument();
-      });
+  it('unselecting every matching environment drops the count to 0 and blocks generation; the All quick pick restores it', () => {
+    renderModal();
+    ['forest', 'grassland', 'hill', 'underdark'].forEach(env => {
+      fireEvent.click(screen.getByLabelText(env));
     });
+    expect(screen.getByText('0 monsters available')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+    clickGenerate();
+    expect(generateMock).not.toHaveBeenCalled();
 
-    it('shows the empty state and available monster count before generation', () => {
-      renderModal();
-      expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
-      expect(screen.getByText(/3 monsters? available/)).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(screen.getByText('3 monsters available')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate/i })).toBeEnabled();
+    clickGenerate();
+    expect(generateMock).toHaveBeenCalledTimes(1);
+  });
 
-    it('disables Generate and shows 0 monsters when monsters prop is empty array', () => {
-      renderModal({ monsters: [] });
-      expect(screen.getByText(/0 monsters? available/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
-    });
+  it.each([
+    { name: 'empty monsters array', props: { monsters: [] } },
+    { name: 'null monsters', props: { monsters: null } },
+    { name: 'empty player levels', props: { playerLevels: [] } },
+  ])('disables Generate and never calls the generator with $name', ({ props }) => {
+    renderModal(props);
+    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+    clickGenerate();
+    expect(generateMock).not.toHaveBeenCalled();
+  });
 
-    it('disables Generate and shows 0 monsters when monsters prop is null', () => {
-      renderModal({ monsters: null });
-      expect(screen.getByText(/0 monsters? available/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
-    });
+  it('the Dungeon quick pick selects exactly its environments and Generate sends the exact payload', () => {
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Dungeon' }));
+    expect(checkedEnvNames()).toEqual(['underdark', 'urban']);
+    expect(screen.getByText('1 monster available')).toBeInTheDocument();
 
-    it('disables Generate when player levels array is empty', () => {
-      renderModal({ playerLevels: [] });
-      expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
-    });
-
-    it('disables Generate when no monsters match selected environments', () => {
-      renderModal();
-      // Unselect all environments so no monsters match
-      ['forest', 'grassland', 'hill', 'underdark'].forEach(env => {
-        fireEvent.click(screen.getByLabelText(env));
-      });
-      expect(screen.getByText(/0 monsters? available/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
-    });
-
-    it('toggles individual environment checkboxes', () => {
-      renderModal();
-      const forestCheckbox = screen.getByLabelText('forest');
-      expect(forestCheckbox).toBeChecked();
-      fireEvent.click(forestCheckbox);
-      expect(forestCheckbox).not.toBeChecked();
-    });
-
-    it('applies a quick pick to select exactly its environments', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Dungeon' }));
-      expect(screen.getByLabelText('underdark')).toBeChecked();
-      expect(screen.getByLabelText('urban')).toBeChecked();
-      expect(screen.getByLabelText('forest')).not.toBeChecked();
-      expect(screen.getByLabelText('grassland')).not.toBeChecked();
+    clickGenerate();
+    expect(generateMock).toHaveBeenCalledWith({
+      monsters: mockMonsters,
+      playerLevels: [5, 5, 5],
+      difficulty: 1,
+      environments: ['underdark', 'urban'],
+      count: 3,
     });
   });
 
-  describe('generation', () => {
-    it('passes the selected environments and party info to the generator', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: 'Dungeon' }));
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+  it('renders a generated suggestion with difficulty, XP total, monster rows, and Apply', () => {
+    generateMock.mockReturnValue(defaultSuggestions);
+    renderModal();
+    clickGenerate();
 
-      expect(generateMock).toHaveBeenCalledWith(expect.objectContaining({
-        monsters: mockMonsters,
-        playerLevels: defaultProps.playerLevels,
-        difficulty: defaultProps.difficulty,
-        count: 3,
-        environments: ['underdark', 'urban'],
-      }));
-    });
-
-    it('renders suggestions with difficulty, XP totals, and monster list', () => {
-      generateMock.mockReturnValue(defaultSuggestions);
-      renderModal();
-
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-
-      expect(screen.getByText('Suggestions')).toBeInTheDocument();
-      expect(screen.getByText('Medium')).toBeInTheDocument();
-      expect(screen.getByText(/250 XP/)).toBeInTheDocument();
-      expect(screen.getByText(/2 monsters/)).toBeInTheDocument();
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByText('Kobold')).toBeInTheDocument();
-      expect(screen.getAllByText(/CR 0\.25/)).toHaveLength(2);
-      expect(screen.getByText('×2')).toBeInTheDocument();
-      expect(screen.getByText('×1')).toBeInTheDocument();
-      expect(screen.getByText('50 XP')).toBeInTheDocument();
-      expect(screen.getByText('25 XP')).toBeInTheDocument();
-    });
-
-    it('uses singular monster wording for a single-monster suggestion', () => {
-      generateMock.mockReturnValue([{
-        difficultyLabel: 'Easy',
-        totalXP: 50,
-        monsterCount: 1,
-        monsters: [{ index: 'rat', name: 'Rat', challenge_rating: 0, xp: 50, qty: 1 }],
-      }]);
-      renderModal();
-
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-
-      expect(screen.getByText(/1 monster/)).toBeInTheDocument();
-      expect(screen.getByText('Rat')).toBeInTheDocument();
-    });
-
-    it('hides empty state and shows Apply button when suggestions exist', () => {
-      generateMock.mockReturnValue(defaultSuggestions);
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-      expect(screen.queryByText('Pick environments and click Generate')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /apply/i })).toBeInTheDocument();
-    });
-
-    it('keeps empty state visible when generation returns no suggestions', () => {
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-      expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
-    });
-
-    it('replaces previous suggestions when Generate is clicked again', () => {
-      generateMock.mockReturnValue(defaultSuggestions);
-      renderModal();
-
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-      expect(screen.getByText('Medium')).toBeInTheDocument();
-
-      generateMock.mockReturnValue(secondSuggestions);
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-
-      expect(screen.getByText('Hard')).toBeInTheDocument();
-      expect(screen.queryByText('Medium')).not.toBeInTheDocument();
-    });
-
-    it('renders each difficulty label with its corresponding diff class', () => {
-      const labels = ['Easy', 'Medium', 'Hard', 'Deadly'];
-      generateMock.mockReturnValue(labels.map(label => ({
-        difficultyLabel: label,
-        totalXP: 100,
-        monsterCount: 1,
-        monsters: [goblin],
-      })));
-      renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-
-      labels.forEach(label => {
-        const diffEl = screen.getByText(label).closest('.gen-suggestion-diff');
-        expect(diffEl).toBeInTheDocument();
-        expect(diffEl.textContent).toBe(label);
-      });
-    });
-
-    it('does not call the generator when Generate is disabled', () => {
-      renderModal({ monsters: [] });
-
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-
-      expect(generateMock).not.toHaveBeenCalled();
-    });
+    expect(screen.getByText('Suggestions')).toBeInTheDocument();
+    expect(screen.getByText('Max 3 monsters (one per PC)')).toBeInTheDocument();
+    expect(screen.getByText('Medium')).toHaveClass('gen-suggestion-diff', 'gen-suggestion-diff-medium');
+    expect(screen.getByText('250 XP · 2 monsters')).toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem').map(li => li.textContent);
+    expect(rows).toEqual([
+      'GoblinCR 0.25×250 XP',
+      'KoboldCR 0.25×125 XP',
+    ]);
+    expect(screen.getByRole('button', { name: /apply/i })).toBeEnabled();
+    expect(screen.queryByText('Pick environments and click Generate')).not.toBeInTheDocument();
   });
 
-  describe('apply and close', () => {
-    it('calls onApply with the suggestion monsters and onClose on Apply', () => {
-      generateMock.mockReturnValue(defaultSuggestions);
-      const { onApply, onClose } = renderModal();
-
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-      fireEvent.click(screen.getByRole('button', { name: /apply/i }));
-
-      expect(onApply).toHaveBeenCalledWith(defaultSuggestions[0].monsters);
-      expect(onClose).toHaveBeenCalled();
+  it('uses singular wording for a single PC and a single monster', () => {
+    const rat = { index: 'rat', name: 'Rat', challenge_rating: 0, xp: 50 };
+    generateMock.mockReturnValue([suggestion('Easy', 50, 1, [{ ...rat, qty: 1 }])]);
+    renderModal({
+      monsters: [{ ...rat, environments: ['forest'] }],
+      playerLevels: [7],
     });
+    clickGenerate();
 
-    it('applies the monsters of the clicked suggestion when several exist', () => {
-      generateMock.mockReturnValue([...defaultSuggestions, ...secondSuggestions]);
-      const { onApply, onClose } = renderModal();
+    expect(screen.getByText('1 monster available')).toBeInTheDocument();
+    expect(screen.getByText('Easy')).toHaveClass('gen-suggestion-diff', 'gen-suggestion-diff-easy');
+    expect(screen.getByText('Max 1 monster (one per PC)')).toBeInTheDocument();
+    expect(screen.getByText('50 XP · 1 monster')).toBeInTheDocument();
+  });
 
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
-      fireEvent.click(screen.getAllByRole('button', { name: /apply/i })[1]);
+  it('keeps the empty state and offers no Apply when the generator returns no suggestions', () => {
+    renderModal();
+    clickGenerate();
+    expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+  });
 
-      expect(onApply).toHaveBeenCalledWith(secondSuggestions[0].monsters);
-      expect(onClose).toHaveBeenCalled();
-    });
+  it('replaces previous suggestions when Generate is clicked again', () => {
+    generateMock.mockReturnValue(defaultSuggestions);
+    renderModal();
+    clickGenerate();
+    expect(screen.getByText('Medium')).toBeInTheDocument();
 
-    it('calls onClose when the close button is clicked', () => {
-      const { onClose } = renderModal();
+    generateMock.mockReturnValue(secondSuggestions);
+    clickGenerate();
+    expect(screen.getByText('Hard')).toBeInTheDocument();
+    expect(screen.queryByText('Medium')).not.toBeInTheDocument();
+    expect(generateMock).toHaveBeenCalledTimes(2);
+  });
 
-      fireEvent.click(screen.getByRole('button', { name: /×/ }));
+  it('falls back to the deadly modifier class for an unknown difficulty label', () => {
+    generateMock.mockReturnValue([suggestion('Mystery', 100, 1, [goblin])]);
+    renderModal();
+    clickGenerate();
+    expect(screen.getByText('Mystery')).toHaveClass('gen-suggestion-diff', 'gen-suggestion-diff-deadly');
+  });
 
-      expect(onClose).toHaveBeenCalled();
-    });
+  it('applies the exact monster roster of the clicked suggestion, once, then requests close', () => {
+    generateMock.mockReturnValue([defaultSuggestions[0], secondSuggestions[0]]);
+    const { onApply, onClose, container } = renderModal();
+    clickGenerate();
 
-    it('does not call onClose when the backdrop is clicked', () => {
-      const { onClose, container } = renderModal();
+    const applyButtons = screen.getAllByRole('button', { name: /apply/i });
+    expect(applyButtons).toHaveLength(2);
+    expect(screen.getByText('Hard')).toHaveClass('gen-suggestion-diff', 'gen-suggestion-diff-hard');
+    fireEvent.click(applyButtons[1]);
 
-      const overlay = container.querySelector('.gen-modal-overlay');
-      fireEvent.click(overlay);
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith([{ ...orc }, { ...kobold }]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // Backdrop clicks carry no close behaviour: neither the overlay nor the
+    // modal content has a click handler, so the modal must survive them.
+    fireEvent.click(container.querySelector('.gen-modal-overlay'));
+    fireEvent.click(container.querySelector('.gen-modal'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-      expect(onClose).not.toHaveBeenCalled();
-      expect(container.querySelector('.gen-modal')).toBeInTheDocument();
-    });
-
-    it('does not call onClose when the modal content is clicked', () => {
-      const { onClose, container } = renderModal();
-
-      const modal = container.querySelector('.gen-modal');
-      fireEvent.click(modal);
-
-      expect(onClose).not.toHaveBeenCalled();
-    });
+  it('the header close button closes without applying', () => {
+    const { onApply, onClose } = renderModal();
+    fireEvent.click(screen.getByRole('button', { name: '×' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onApply).not.toHaveBeenCalled();
   });
 });

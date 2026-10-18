@@ -1,12 +1,16 @@
-// CLA-208 regression: Land's Aid style save+heal area features must restore
+// @maintained-by-ai
+// CLA-208 regression lane: Land's Aid style save+heal area features must restore
 // real HP to EB-joined monsters. Monster HP lives in combatSummary.currentHp
 // (applyDamage NPC branch), NOT in the per-name runtime currentHitPoints —
 // so the heal must go through applyHealingToTarget/modifyHitPoints, and the
 // result must persist to combatSummary (cache + storage).
 //
 // This suite uses the REAL applyHealing.js + hpModifier.js, mocking only
-// transport (runtime store, storage, SSE/log) and dice.
-import { render, fireEvent, waitFor, act } from '@testing-library/react';
+// transport (runtime store, storage, SSE/log), range checks, the resistance
+// engine (applyDamage) and dice. Sibling lanes: healFlows.test.jsx owns radio
+// gating, one-of-two arbitration, report/Done (applyHealing mocked);
+// saveFlows.test.jsx owns save routing and pending-player UI.
+import { render, fireEvent, waitFor, act, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackHealModal from './SaveAttackHealModal.jsx';
 
@@ -50,6 +54,8 @@ vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
 }));
 
+// Simple NPC damage sink — the resistance engine is not this lane's subject;
+// it just needs to write real HP onto combatSummary.currentHp pre-heal.
 vi.mock('../../../../services/rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn((cs, name, dmg) => {
     const creature = cs.creatures.find(c => c.name === name);
@@ -70,15 +76,20 @@ import * as diceRoller from '../../../../services/dice/diceRoller.js';
 import * as healingRoll from '../../../../services/automation/common/healingRoll.js';
 import storage from '../../../../services/ui/storage.js';
 import { setCombatSummaryCache } from '../../../../services/encounters/combatData.js';
+import { getCheckboxByName } from './SaveAttackHealModal.test-utils.js';
 
 // ── Fixtures ──
+
+const NPC = 'Animated Rug of Smothering 1';
+const MAX_HP = 27;
+const SAVE_DAMAGE = 7; // 4d6 mock total, save fails (d20 4 vs DC 17) → full damage
 
 function makeProps(overrides) {
   return {
     combatSummary: {
       creatures: [
         { name: 'Wild_Sage_Druid', type: 'player', maxHp: 122 },
-        { name: 'Animated Rug of Smothering 1', type: 'npc', maxHp: 27, currentHp: 27, saveBonuses: { con: 0 } },
+        { name: NPC, type: 'npc', maxHp: MAX_HP, currentHp: MAX_HP, saveBonuses: { con: 0 } },
       ],
     },
     attackerName: 'Wild_Sage_Druid',
@@ -97,13 +108,43 @@ function makeProps(overrides) {
   };
 }
 
-function getCheckboxByName(name) {
-  const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-  for (const cb of checkboxes) {
-    const label = cb.closest('label');
-    if (label && label.textContent.includes(name)) return cb;
-  }
-  throw new Error(`Checkbox for "${name}" not found`);
+function getRug(props) {
+  return props.combatSummary.creatures.find(c => c.name === NPC);
+}
+
+// Deterministic dice in exact roll order: CON save fails (4 vs DC 17), then
+// damage 4d6=7, then heal 4d6=healTotal. Any extra or unexpected roll throws
+// so drift in the modal's roll recipe fails loudly instead of silently.
+function scriptDice(healTotal) {
+  const fourD6Queue = [SAVE_DAMAGE, healTotal];
+  diceRoller.rollExpression.mockImplementation(expr => {
+    if (expr === '1d20') return { total: 4, rolls: [4], modifier: 0 };
+    if (expr === '4d6') {
+      const total = fourD6Queue.shift();
+      if (total === undefined) throw new Error('Unexpected extra 4d6 roll');
+      return { total, rolls: [1, 2, 1, 3], modifier: 0 };
+    }
+    throw new Error(`Unexpected roll expression: ${expr}`);
+  });
+}
+
+// Select the rug, resolve the save (fails → 7 necrotic, currentHp 20), then
+// radio-select it and heal.
+async function applyFeatureAndHeal(props, getByRole, healTotal) {
+  scriptDice(healTotal);
+  fireEvent.click(getCheckboxByName(NPC));
+  await act(async () => {
+    fireEvent.click(getByRole('button', { name: /Land's Aid \(1 target\)/ }));
+  });
+  await waitFor(() => {
+    expect(getRug(props).currentHp).toBe(MAX_HP - SAVE_DAMAGE);
+  });
+  await act(async () => {
+    fireEvent.click(document.querySelector('input[type="radio"][name="healTarget"]'));
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
+  });
 }
 
 // ── Tests ──
@@ -115,11 +156,6 @@ describe('SaveAttackHealModal — NPC heal restores combatSummary HP (CLA-208)',
     vi.clearAllMocks();
     localStorage.clear();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
-    // Save fails (d20 4 vs DC 17), damage roll 7 (of 4d6)
-    diceRoller.rollExpression.mockImplementation(expr => {
-      if (expr === '1d20') return { total: 4, rolls: [4], modifier: 0 };
-      return { total: 7, rolls: [1, 2, 1, 3], modifier: 0 };
-    });
     props = makeProps();
   });
 
@@ -127,79 +163,42 @@ describe('SaveAttackHealModal — NPC heal restores combatSummary HP (CLA-208)',
     vi.restoreAllMocks();
   });
 
-  it('heals a damaged NPC monster by the rolled amount, clamped to maxHp, and persists combatSummary', async () => {
+  it.each([
+    // Deficit 7 after the 7-point save damage.
+    { case: 'clamps to maxHp when the roll exceeds the deficit', heal: 10, actualHeal: 7, newHp: 27 },
+    { case: 'applies the full roll when it lands below maxHp', heal: 4, actualHeal: 4, newHp: 24 },
+  ])('$case — heal 4d6=$heal restores $actualHeal HP (20 → $newHp of 27)', async ({ heal, actualHeal, newHp }) => {
     const { getByRole } = render(<SaveAttackHealModal {...props} />);
+    await applyFeatureAndHeal(props, getByRole, heal);
 
-    // Select the rug and resolve the save → fails, takes 7 necrotic → currentHp 20
-    fireEvent.click(getCheckboxByName('Animated Rug of Smothering 1'));
-    await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Land's Aid \(1 target\)/ }));
-    });
-    await waitFor(() => {
-      expect(props.combatSummary.creatures.find(c => c.name === 'Animated Rug of Smothering 1').currentHp).toBe(20);
-    });
+    // DECISIVE (CLA-208): NPC HP actually restored on combatSummary.currentHp.
+    expect(getRug(props).currentHp).toBe(newHp);
 
-    // Radio-select the rug for the heal half; heal roll = 10
-    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [4, 6], modifier: 0 });
-    await act(async () => {
-      fireEvent.click(document.querySelector('input[type="radio"][name="healTarget"]'));
-    });
-    await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Heal Selected/ }));
+    expect(healingRoll.logHealingToSSE).toHaveBeenCalledTimes(1);
+    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', {
+      targetName: NPC,
+      sourceName: "Land's Aid",
+      actualHeal,
+      newHp,
+      maxHp: MAX_HP,
     });
 
-    // DECISIVE: NPC HP actually restored — 20 → 27 (clamped to maxHp), actual heal 7, not 0
-    const rug = props.combatSummary.creatures.find(c => c.name === 'Animated Rug of Smothering 1');
-    expect(rug.currentHp).toBe(27);
-    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      targetName: 'Animated Rug of Smothering 1',
-      actualHeal: 7,
-      newHp: 27,
-      maxHp: 27,
-    }));
-
-    // Persisted to storage + combat summary cache
+    // Persisted to storage + combat summary cache.
     expect(storage.set).toHaveBeenCalledWith('combatSummary', props.combatSummary, 'test-campaign');
     expect(setCombatSummaryCache).toHaveBeenCalledWith(props.combatSummary, 'test-campaign');
 
-    // Popup reports a nonzero actual heal
+    // Popup reports the actual (nonzero) heal — the user-visible CLA-208 proof.
     await waitFor(() => {
-      expect(document.querySelector('.sp-body').textContent).toContain('actual: 7');
+      expect(document.querySelector('.sp-body').textContent).toContain(`actual: ${actualHeal}`);
     });
 
-    // Healing roll logged with the scaled formula
+    // Healing roll logged with the rolled formula and total.
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'roll',
       rollType: 'healing',
-      targetName: 'Animated Rug of Smothering 1',
+      targetName: NPC,
       formula: '4d6',
-      total: 10,
-    }));
-  });
-
-  it('clamps the heal at maxHp so actual heal never exceeds the HP deficit', async () => {
-    props.combatSummary.creatures.find(c => c.name === 'Animated Rug of Smothering 1').currentHp = 25;
-    const { getByRole } = render(<SaveAttackHealModal {...props} />);
-
-    fireEvent.click(getCheckboxByName('Animated Rug of Smothering 1'));
-    await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Land's Aid \(1 target\)/ }));
-    });
-    // Damage mock takes 7 → currentHp 18; heal roll 10 → newHp 28 clamps to 27, actual 9
-    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [4, 6], modifier: 0 });
-    await act(async () => {
-      fireEvent.click(document.querySelector('input[type="radio"][name="healTarget"]'));
-    });
-    await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Heal Selected/ }));
-    });
-
-    const rug = props.combatSummary.creatures.find(c => c.name === 'Animated Rug of Smothering 1');
-    expect(rug.currentHp).toBe(27);
-    expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      actualHeal: 9,
-      newHp: 27,
-      maxHp: 27,
+      total: heal,
     }));
   });
 });

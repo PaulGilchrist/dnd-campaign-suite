@@ -1,13 +1,29 @@
+// @maintained-by-ai: 2026-10-18
 // MA-1224: Nalfeshnee "Pursuit" reaction row — formerly prose-only with
 // ZERO affordance (live fingerprint 2026-09-25: Reactions census 0 chips;
 // getGatedMonsterReaction nulls the row for lack of automation.effect).
 // Fix is DATA-only: advisory fields on reactions[0] arm the existing
 // MA-1223 AdvisoryLink — reaction rows already ride the same MonsterAction
 // row renderer with onAdvisoryRow threaded (MonsterCardBody generic branch).
-// ZERO code. Locks: advisory chip present on the Pursuit reaction row, press
-// routes onAdvisoryRow never onAttack, "(At Will)" usage renders, and the
-// te-channel reaction twins (feather_fall/parry) stay byte-inert on the
-// gated chip with NO advisory chip (§37).
+// ZERO code. Advisory = §70 record-only: no condition stamps, no clocks.
+// OWNERSHIP (per #467 canon): Pursuit disk row shape + isMonsterAction
+// AdvisoryRow predicate + popup/log/resolver record-only contract are owned
+// by services/encounters/monsterActionAdvisory.ma1224-nalfeshnee-pursuit
+// .test.js :28-115; the full-card modal press seam (popup + ONE ability_use,
+// zero rolls, refire) is owned by MonsterCardModal.ma1224-nalfeshnee-pursuit
+// -advisory.test.jsx :92-139; AdvisoryLink press-pattern + both inert lanes
+// (attackerCannotAct / no resolver) are owned by this component's MA-1223
+// twin MonsterAction.ma1223-nalfeshnee-teleport-advisory-chip.test.jsx
+// :54-78 (never restated here — the renderer path is row-independent,
+// MonsterAction.jsx :360-368); te-channel gated press truth-table is owned
+// by MonsterAction.gated-reaction.test.jsx :47-71 and the §37 detector-level
+// twin inertness by the service ma1224 file :67-72; the MA-1232 nightmare
+// Ethereal Stride pattern restatement is dropped (service owner :111-147).
+// This file locks ONLY the DISTINCT MA-1224 lane: the advisory chip arming
+// on the REACTION-category row (first-ever reaction-category advisory —
+// no attack/save/dice siblings, "(At Will)" sentinel renders) and press
+// payload identity with the gated-reaction lane fork (the row dispatches to
+// onAdvisoryRow verbatim, never to onAttack/onGatedReaction).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -15,19 +31,15 @@ import { MonsterAction } from './MonsterAction.jsx';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const NALFESHNEE = monsters.find((m) => m.index === 'nalfeshnee');
-const PURSUIT = NALFESHNEE.reactions[0];
-const FEATHER_FALL = monsters.find((m) => m.index === 'aarakocra-aeromancer').reactions[0];
-const PARRY = monsters.find((m) => m.index === 'bandit-captain').reactions[0];
-const NIGHTMARE = monsters.find((m) => m.index === 'nightmare');
-const ETHEREAL_STRIDE = NIGHTMARE.actions[1];
+const PURSUIT = NALFESHNEE.reactions.find((r) => r.name === 'Pursuit');
 
-const renderRow = (action, extra = {}) => {
+const renderRow = (extra = {}) => {
   const onAttack = vi.fn();
   const onAdvisoryRow = vi.fn();
   const onGatedReaction = vi.fn();
   const { container } = render(
     <MonsterAction
-      action={action}
+      action={PURSUIT}
       index={0}
       attackerCannotAct={false}
       onAttack={onAttack}
@@ -43,90 +55,25 @@ const renderRow = (action, extra = {}) => {
   return { container, onAttack, onAdvisoryRow, onGatedReaction };
 };
 
-describe('MA-1224 disk lock: Pursuit reaction row carries the advisory fields', () => {
-  it('advisory:monster_teleport (MA-1223 key) + At Will sentinel on reactions[0]', () => {
-    expect(PURSUIT.advisory).toBe('monster_teleport');
-    expect(PURSUIT.usage).toBe('At Will');
-    expect(PURSUIT.uses).toBe(999);
-    expect(PURSUIT.maxUses).toBe(999);
-    expect(PURSUIT.automation).toBeUndefined();
-  });
-});
-
-describe('MA-1224 MonsterAction render: advisory chip arms on the REACTION row', () => {
-  it('Pursuit row: advisory chip present, labelled, honest title', () => {
-    const { container } = renderRow(PURSUIT);
+describe('MA-1224 MonsterAction: advisory chip arms on the REACTION row, gated lane forked off', () => {
+  it('Pursuit row: exactly ONE chip — labelled advisory, honest title, no gated/attack/save sibling; "(At Will)" usage renders', () => {
+    const { container } = renderRow();
     const chip = container.querySelector('.mc-dice-link-advisory');
     expect(chip).not.toBe(null);
     expect(chip.textContent).toContain('Pursuit');
-    expect(chip.getAttribute('title')).toMatch(/move-end producer app-wide/);
     expect(chip.getAttribute('title')).toMatch(/GM-enforced gridless \(CLA-320\)/);
-  });
-
-  it('no attack/save/te chips on the inert-by-data row; "(At Will)" usage renders', () => {
-    const { container } = renderRow(PURSUIT);
-    expect(container.querySelector('.mc-dice-link-advisory')).not.toBe(null);
-    expect(Array.from(container.querySelectorAll('.mc-dice-link')).filter((c) => c !== container.querySelector('.mc-dice-link-advisory'))).toHaveLength(0);
+    // automation-less reaction row: the gated te chip never renders — the
+    // advisory chip is the ONLY mc-dice-link on the row (§37 fork).
+    expect(container.querySelectorAll('.mc-dice-link')).toHaveLength(1);
     expect(container.textContent).toContain('(At Will)');
   });
 
-  it('advisory chip press routes onAdvisoryRow with the row, never onAttack/onGatedReaction', () => {
-    const { container, onAttack, onAdvisoryRow, onGatedReaction } = renderRow(PURSUIT);
+  it('press routes onAdvisoryRow with the row verbatim, never onAttack/onGatedReaction', () => {
+    const { container, onAttack, onAdvisoryRow, onGatedReaction } = renderRow();
     fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
     expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
     expect(onAdvisoryRow.mock.calls[0][0]).toBe(PURSUIT);
     expect(onAttack).not.toHaveBeenCalled();
     expect(onGatedReaction).not.toHaveBeenCalled();
-  });
-
-  it('incapacitated adviser chip is inert (no click route)', () => {
-    const { container, onAdvisoryRow } = renderRow(PURSUIT, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).not.toHaveBeenCalled();
-  });
-
-  it('without a resolver wired the chip is inert (no crash, no route)', () => {
-    const { container } = renderRow(PURSUIT, { onAdvisoryRow: undefined });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-  });
-});
-
-describe('MA-1224 byte-inert discipline (§37): te-channel reaction twins unchanged', () => {
-  it('Feather Fall reaction keeps ONLY its gated te chip — no advisory chip', () => {
-    const { container, onGatedReaction } = renderRow(FEATHER_FALL);
-    expect(container.querySelector('.mc-dice-link-advisory')).toBe(null);
-    const gated = Array.from(container.querySelectorAll('.mc-dice-link')).find((l) => l.textContent.includes('Feather Fall'));
-    expect(gated).toBeTruthy();
-    fireEvent.click(gated);
-    expect(onGatedReaction).toHaveBeenCalledTimes(1);
-  });
-
-  it('Parry reaction keeps ONLY its gated te chip — no advisory chip', () => {
-    const { container, onGatedReaction } = renderRow(PARRY);
-    expect(container.querySelector('.mc-dice-link-advisory')).toBe(null);
-    const gated = Array.from(container.querySelectorAll('.mc-dice-link')).find((l) => l.textContent.includes('Parry'));
-    expect(gated).toBeTruthy();
-    fireEvent.click(gated);
-    expect(onGatedReaction).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('MA-1232 MonsterAction render: advisory chip arms on the nightmare Ethereal Stride action row', () => {
-  it('advisory chip present labelled "Ethereal Stride", honest title, NO junk "+0" attack chip', () => {
-    const { container } = renderRow(ETHEREAL_STRIDE);
-    const chip = container.querySelector('.mc-dice-link-advisory');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Ethereal Stride');
-    expect(chip.getAttribute('title')).toMatch(/planar travel is GM-enforced/);
-    expect(chip.getAttribute('title')).toMatch(/No attack roll, no saving throw, no dice\./);
-    expect(Array.from(container.querySelectorAll('.mc-dice-link')).filter((c) => c !== chip)).toHaveLength(0);
-  });
-
-  it('advisory chip press routes onAdvisoryRow with the row, never onAttack', () => {
-    const { container, onAttack, onAdvisoryRow } = renderRow(ETHEREAL_STRIDE);
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
-    expect(onAdvisoryRow.mock.calls[0][0]).toBe(ETHEREAL_STRIDE);
-    expect(onAttack).not.toHaveBeenCalled();
   });
 });

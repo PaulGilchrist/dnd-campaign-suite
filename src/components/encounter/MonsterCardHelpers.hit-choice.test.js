@@ -1,15 +1,19 @@
-// MA-0855: Githzerai Psion "Psychic Warp" — prose carries "the githzerai's
-// choice of (A) the Charmed condition … or (B) the Prone condition, provided
-// the target is a Large or smaller creature" but the row shipped WITHOUT any
-// hit_conditions / choice metadata, so the rider was structurally inert. The
-// fix is BOTH layers: DATA (hit_conditions ledger + hit_choice chooser) plus a
-// HIT-popup condition CHOOSER. Unlike MA-0325/0436 (ALTERNATIVE damage dice)
-// this selects WHICH CONDITION to grant, so buildHitConditionClause SUPPRESSES
-// the hit_conditions array auto-grant whenever hit_choice is armed — otherwise
-// the consumer would grant Charmed+Prone together on every hit (RAW-wrong).
-// Locks: disk row shape + placement, buildHitChoiceOffer arms, clause
-// suppression (null), MA-0841 frightened row byte+behavior identical (inert
-// without hit_choice), and each log builder.
+// @maintained-by-ai
+// MA-0855 helper lane: hit_choice condition-choice rider (Githzerai Psion
+// Psychic Warp — "the githzerai's choice of (A) Charmed … or (B) Prone").
+// hitChoiceArmed/buildHitChoiceOffer arm the HIT-popup chooser; unlike the
+// MA-0325/0436 damage-dice offers this selects WHICH CONDITION to grant, so
+// hitClauseAutoGrantConditions SUPPRESSES the hit_conditions array auto-grant
+// whenever hit_choice carries options (over-granting Charmed+Prone together is
+// RAW-wrong) — the clause collapses to null (no te/riders alongside) and the
+// consumer grants ONLY the GM's popup pick. Byte-inert when the structured key
+// is absent. Consumer lanes (cited, not repeated): MonsterCardModal.hit-choice
+// .test.jsx covers offer forwarding to rollAttack ctx, disk-row suppression
+// (ctx.hitClause null), MA-0841 Draconic Strike byte-inert through the modal,
+// selected/advisory description content, and the condition-applied log;
+// DiceRollResult.hit-choice.test.jsx covers popup rendering of the notice.
+// Here: disk row by name (#387), the helper branch tables, and the applied
+// log's reason/note shape (helper-only contract).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
@@ -22,25 +26,19 @@ import {
 } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const PSION = monsters.find((m) => m.index === 'githzerai-psion');
-const WARP = PSION.actions[1];
+const WARP = monsters.find((m) => m.index === 'githzerai-psion').actions.find((a) => a.name === 'Psychic Warp');
 
-describe('MA-0855 data lock (monsters.json Githzerai Psion Psychic Warp)', () => {
-  it('actions[1] authors hit_conditions ["charmed","prone"] + hit_choice after damage_type_primary', () => {
-    expect(WARP.name).toBe('Psychic Warp');
-    expect(WARP.attack_bonus).toBe(8);
-    expect(WARP.reach).toBe('5 ft.');
-    expect(WARP.range).toBe('120 ft.');
-    expect(WARP.damage_dice_primary).toBe('4d10 + 4');
-    expect(WARP.damage_type_primary).toBe('Psychic');
-    const keys = Object.keys(WARP);
-    expect(keys.indexOf('hit_conditions')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(WARP.hit_conditions).toEqual(['charmed', 'prone']);
-    expect(keys.indexOf('hit_choice')).toBe(keys.indexOf('hit_conditions') + 1);
-    expect(WARP.hit_choice).toEqual({ options: ['charmed', 'prone'], note: 'Prone requires Large or smaller' });
-  });
-
-  it('no save fields / no escape_dc / no hit_target_effect on the row', () => {
+describe('MA-0855 data contract (monsters.json Psychic Warp)', () => {
+  it('authors the hit_conditions ledger + hit_choice chooser; no save leg, no te', () => {
+    expect(WARP).toMatchObject({
+      attack_bonus: 8,
+      reach: '5 ft.',
+      range: '120 ft.',
+      damage_dice_primary: '4d10 + 4',
+      damage_type_primary: 'Psychic',
+      hit_conditions: ['charmed', 'prone'],
+      hit_choice: { options: ['charmed', 'prone'], note: 'Prone requires Large or smaller' },
+    });
     expect(WARP.save_dc).toBeUndefined();
     expect(WARP.save_type).toBeUndefined();
     expect(WARP.escape_dc).toBeUndefined();
@@ -49,80 +47,75 @@ describe('MA-0855 data lock (monsters.json Githzerai Psion Psychic Warp)', () =>
   });
 });
 
-describe('MA-0855 buildHitChoiceOffer', () => {
-  it('arms the HIT-popup chooser from hit_choice.options', () => {
-    const offer = buildHitChoiceOffer(WARP, 'Psychic Warp');
-    expect(offer).toMatchObject({
+describe('MA-0855 chooser offer + hit-clause suppression', () => {
+  it('arms from hit_choice.options — compiles label, lowercases options, defaults note/null attackName fallback', () => {
+    expect(hitChoiceArmed(WARP)).toBe(true);
+    expect(buildHitChoiceOffer(WARP, 'Psychic Warp')).toEqual({
       options: ['charmed', 'prone'],
-      attackName: 'Psychic Warp',
+      label: 'Condition Choice: Charmed or Prone',
       note: 'Prone requires Large or smaller',
+      attackName: 'Psychic Warp',
     });
-    expect(offer.label).toContain('Charmed');
-    expect(offer.label).toContain('Prone');
+    // normalization + note-default + name-arg-absent fallback (row name wins)
+    expect(buildHitChoiceOffer({ name: 'Claw', hit_choice: { options: ['Frightened', 'Stunned'] } })).toMatchObject({
+      options: ['frightened', 'stunned'],
+      label: 'Condition Choice: Frightened or Stunned',
+      note: null,
+      attackName: 'Claw',
+    });
   });
 
-  it('byte-inert null when the hit_choice key is absent or malformed', () => {
+  it('byte-inert null once-only across malformed shapes (no key / no options / empty / undefined row)', () => {
     expect(buildHitChoiceOffer({ name: 'Claw', attack_bonus: 4 }, 'Claw')).toBeNull();
     expect(buildHitChoiceOffer({ name: 'Claw', hit_choice: {} }, 'Claw')).toBeNull();
     expect(buildHitChoiceOffer({ name: 'Claw', hit_choice: { options: [] } }, 'Claw')).toBeNull();
     expect(buildHitChoiceOffer(undefined, 'Claw')).toBeNull();
-    expect(hitChoiceArmed(WARP)).toBe(true);
     expect(hitChoiceArmed({ name: 'Claw' })).toBe(false);
   });
-});
 
-describe('MA-0855 hit-clause array-grant suppression', () => {
-  it('buildHitConditionClause collapses to null when hit_choice is armed (no auto-grant)', () => {
+  it('suppression: armed clause collapses to null (no array auto-grant); a alongside hit_target_effect survives', () => {
     expect(buildHitConditionClause(WARP)).toBeNull();
-  });
-
-  it('suppression is scoped to hit_conditions — a hit_target_effect alongside hit_choice survives', () => {
     const row = { name: 'Rider', attack_bonus: 5, hit_conditions: ['charmed', 'prone'], hit_choice: { options: ['charmed', 'prone'] }, hit_target_effect: 'no_healing' };
-    const clause = buildHitConditionClause(row);
-    expect(clause).toMatchObject({ conditions: [], targetEffect: 'no_healing' });
+    expect(buildHitConditionClause(row)).toMatchObject({ conditions: [], targetEffect: 'no_healing' });
   });
 
-  it('MA-0841 frightened row (NO hit_choice) stays byte+behavior identical', () => {
-    const strike = monsters.find((m) => m.index === 'githyanki-dracomancer').actions[1];
+  it('MA-0841 frightened row (NO hit_choice) still auto-grants normally', () => {
+    // modal-lane twin (byte-inert through ctx incl. this exact clause): MonsterCardModal.hit-choice.test.jsx "stays byte-inert (no offer)… MA-0841"
+    const strike = monsters.find((m) => m.index === 'githyanki-dracomancer').actions.find((a) => a.name === 'Draconic Strike');
     expect(hitChoiceArmed(strike)).toBe(false);
-    expect(buildHitChoiceOffer(strike, 'Draconic Strike')).toBeNull();
-    expect(buildHitConditionClause(strike)).toEqual({
-      conditions: ['frightened'],
-      escapeDc: null,
-      attackName: 'Draconic Strike',
-      targetEffect: null,
-    });
+    expect(buildHitConditionClause(strike)).toEqual({ conditions: ['frightened'], escapeDc: null, attackName: 'Draconic Strike', targetEffect: null });
   });
 });
 
 describe('MA-0855 log builders', () => {
   const offer = buildHitChoiceOffer(WARP, 'Psychic Warp');
 
-  it('selected log names both options + the GM pick, automationType hit_choice_selected', () => {
-    const log = buildHitChoiceSelectedLog({ monsterName: 'Githzerai Psion 1', offer, chosen: 'charmed', targetName: 'Bandit 1' });
-    expect(log.type).toBe('automation');
-    expect(log.automationType).toBe('hit_choice_selected');
-    expect(log.characterName).toBe('Githzerai Psion 1');
-    expect(log.abilityName).toBe('Psychic Warp');
-    expect(log.description).toContain('Charmed');
-    expect(log.description).toContain('Prone');
-    expect(log.description).toContain('only Charmed applied');
-    expect(log.description).toContain('Prone requires Large or smaller');
+  it('selected names pick-of-options + only-applied (note omitted when null); advisory records undecided honestly', () => {
+    const sel = buildHitChoiceSelectedLog({ monsterName: 'Githzerai Psion 1', offer, chosen: 'charmed', targetName: 'Bandit 1' });
+    expect(sel).toMatchObject({ type: 'automation', automationType: 'hit_choice_selected', characterName: 'Githzerai Psion 1', abilityName: 'Psychic Warp', targetName: 'Bandit 1' });
+    expect(sel.description).toContain('GM chose Charmed of (Charmed or Prone); only Charmed applied');
+    expect(sel.description).toContain('Prone requires Large or smaller');
+    expect(buildHitChoiceSelectedLog({ monsterName: 'M', offer: { ...offer, note: null }, chosen: 'prone', targetName: 'T' }).description).not.toContain('Large or smaller');
+
+    const adv = buildHitChoiceAdvisoryLog({ monsterName: 'Githzerai Psion 1', offer, targetName: 'Bandit 1' });
+    expect(adv.automationType).toBe('hit_choice_undecided');
+    expect(adv.description).toContain('choice undecided — no condition granted');
+    expect(adv.description).toContain('options were Charmed or Prone');
   });
 
+  // shape must match handlePlainDamage.applyHitClauseConditions so badges treat
+  // the chooser grant like any hit-clause grant; reason/note are helper-only
+  // (modal lane asserts presence + condition name only).
   it('applied log is a condition-applied entry naming ONLY the chosen condition', () => {
     const log = buildHitChoiceAppliedLog({ offer, chosen: 'prone', targetName: 'Bandit 1' });
-    expect(log.type).toBe('condition');
-    expect(log.action).toBe('applied');
-    expect(log.characterName).toBe('Bandit 1');
-    expect(log.condition).toBe('Prone');
-    expect(log.description ?? '').not.toContain('Charmed');
-  });
-
-  it('advisory log records the undecided leg honestly (nothing granted)', () => {
-    const log = buildHitChoiceAdvisoryLog({ monsterName: 'Githzerai Psion 1', offer, targetName: 'Bandit 1' });
-    expect(log.automationType).toBe('hit_choice_undecided');
-    expect(log.description).toContain('choice undecided');
-    expect(log.description).toContain('no condition granted');
+    expect(log).toMatchObject({
+      type: 'condition',
+      action: 'applied',
+      characterName: 'Bandit 1',
+      condition: 'Prone',
+      reason: 'Psychic Warp (GM choice)',
+      note: 'Prone requires Large or smaller',
+    });
+    expect(log.condition).not.toBe('Charmed');
   });
 });

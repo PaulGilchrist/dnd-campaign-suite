@@ -1,103 +1,72 @@
+// @maintained-by-ai
+// Generic/5e Dodge lane: cannotAct gate, toggleBuff + addExpiration byte
+// payloads, toggle-off copy, name propagation, and 5e Dex-clause PRESENCE
+// byte-pinned in BOTH sinks (log AND popup) in one run. The 2024
+// dexSaveClause === '' dual-sink absence pins are owned by
+// useCharActionsBaseActions.dodge-2024.test.js (#332) — not restated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsBaseActions from './useCharActionsBaseActions.js';
 import { createHooks, mockToggleBuff, mockAddExpiration, mockSetPopupHtml, mockAddEntry, campaignName, basePlayerStats } from './useCharActionsBaseActions.test-utils.js';
 
-describe('useCharActionsBaseActions - handleDodgeAction', () => {
+describe('useCharActionsBaseActions - handleDodgeAction (generic/5e)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockToggleBuff.mockReturnValue({ wasActive: false });
     });
 
-    describe('handleDodgeAction', () => {
-        it('should return early without side effects when cannotAct is true', async () => {
-            const hooks = createHooks({ cannotAct: true });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleDodgeAction();
+    it('returns early without side effects when cannotAct is true', async () => {
+        const hooks = createHooks({ cannotAct: true });
+        const actions = useCharActionsBaseActions(hooks);
+        await actions.handleDodgeAction();
 
-            expect(mockToggleBuff).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).not.toHaveBeenCalled();
-        });
+        expect(mockToggleBuff).not.toHaveBeenCalled();
+        expect(mockAddExpiration).not.toHaveBeenCalled();
+        expect(mockAddEntry).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).not.toHaveBeenCalled();
+    });
 
-        it('should activate dodge when buff is not already active', async () => {
-            mockToggleBuff.mockReturnValue({ wasActive: false });
-            const hooks = createHooks();
+    it.each(['TestFighter', 'RogueOne'])(
+        'activates Dodge as %s — byte-exact buff payload, expiry, and Dex-clause copy in log AND popup',
+        async (name) => {
+            const hooks = createHooks({ playerStats: { ...basePlayerStats, name } });
             const actions = useCharActionsBaseActions(hooks);
             await actions.handleDodgeAction();
 
             expect(mockToggleBuff).toHaveBeenCalledWith(
-                'TestFighter', 'Dodge',
+                name, 'Dodge',
                 { effect: 'dodge', duration: 'until_start_of_next_turn' },
-                campaignName, 'TestFighter'
+                campaignName, name
             );
-            expect(mockAddExpiration).toHaveBeenCalledWith({ attackerName: 'TestFighter', targetName: 'TestFighter', effects: [{ type: 'remove_active_buff', buffName: 'Dodge' }], campaignName, rounds: undefined, expireOnCreatureName: 'TestFighter' });
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            expect(mockAddExpiration).toHaveBeenCalledWith({ attackerName: name, targetName: name, effects: [{ type: 'remove_active_buff', buffName: 'Dodge' }], campaignName, rounds: undefined, expireOnCreatureName: name });
+            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
-                characterName: 'TestFighter',
+                characterName: name,
                 abilityName: 'Dodge',
-                description: expect.stringContaining('Dodge action'),
-            }));
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Dodge',
-                description: expect.stringContaining('Dodge activated'),
+                description: `${name} takes the Dodge action. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.`,
             });
-        });
-
-        it('should deactivate dodge when buff is already active', async () => {
-            mockToggleBuff.mockReturnValue({ wasActive: true });
-            const hooks = createHooks();
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleDodgeAction();
-
-            expect(mockToggleBuff).toHaveBeenCalled();
-            expect(mockAddExpiration).not.toHaveBeenCalled();
-            expect(mockAddEntry).not.toHaveBeenCalled();
-            expect(mockSetPopupHtml).toHaveBeenCalledWith({
-                type: 'automation_info',
-                name: 'Dodge',
-                description: 'Dodge deactivated.',
-            });
-        });
-
-        it('should use the character name from playerStats for all side effects', async () => {
-            mockToggleBuff.mockReturnValue({ wasActive: false });
-            const playerStats = { ...basePlayerStats, name: 'RogueOne' };
-            const hooks = createHooks({ playerStats });
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleDodgeAction();
-
-            expect(mockToggleBuff).toHaveBeenCalledWith(
-                'RogueOne', 'Dodge',
-                { effect: 'dodge', duration: 'until_start_of_next_turn' },
-                campaignName, 'RogueOne'
-            );
-            expect(mockAddExpiration).toHaveBeenCalledWith({ attackerName: 'RogueOne', targetName: 'RogueOne', effects: [{ type: 'remove_active_buff', buffName: 'Dodge' }], campaignName, rounds: undefined, expireOnCreatureName: 'RogueOne' });
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                characterName: 'RogueOne',
-            }));
-        });
-
-        it('should log ability_use with the full dodge description on activation', async () => {
-            mockToggleBuff.mockReturnValue({ wasActive: false });
-            const hooks = createHooks();
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleDodgeAction();
-
-            expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                description: 'TestFighter takes the Dodge action. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.',
-            }));
-        });
-
-        it('should show advantage on Dex saves and disadvantage on attacker popup on activation', async () => {
-            mockToggleBuff.mockReturnValue({ wasActive: false });
-            const hooks = createHooks();
-            const actions = useCharActionsBaseActions(hooks);
-            await actions.handleDodgeAction();
-
+            expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
             expect(mockSetPopupHtml).toHaveBeenCalledWith({
                 type: 'automation_info',
                 name: 'Dodge',
                 description: 'Dodge activated. Attackers have disadvantage on attacks against you until the start of your next turn. You have advantage on Dexterity saving throws.',
             });
+        }
+    );
+
+    it('deactivates dodge when buff is already active — deactivated copy only, no expiry, no log', async () => {
+        mockToggleBuff.mockReturnValue({ wasActive: true });
+        const hooks = createHooks();
+        const actions = useCharActionsBaseActions(hooks);
+        await actions.handleDodgeAction();
+
+        expect(mockToggleBuff).toHaveBeenCalledTimes(1);
+        expect(mockAddExpiration).not.toHaveBeenCalled();
+        expect(mockAddEntry).not.toHaveBeenCalled();
+        expect(mockSetPopupHtml).toHaveBeenCalledTimes(1);
+        expect(mockSetPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Dodge',
+            description: 'Dodge deactivated.',
         });
     });
 });

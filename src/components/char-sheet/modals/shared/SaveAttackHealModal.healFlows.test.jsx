@@ -1,5 +1,11 @@
+// @maintained-by-ai
+// Heal-selection lane for SaveAttackHealModal: phase gating of the heal radios,
+// heal-button enablement, exactly-one-target heal orchestration, and post-resolve
+// Cancel / post-heal Done flows. Real HP math, clamping, and persistence are
+// covered by SaveAttackHealModal.npc-heal.test.jsx (real applyHealing.js);
+// save routing and pending-player UI live in SaveAttackHealModal.saveFlows.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SaveAttackHealModal from './SaveAttackHealModal.jsx';
 
 // ── Mocked modules ──
@@ -18,7 +24,7 @@ vi.mock('../../../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../../../services/dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
+  rollExpression: vi.fn(),
 }));
 
 vi.mock('../../../../services/ui/utils.js', () => ({
@@ -35,7 +41,6 @@ vi.mock('../../../../services/ui/storage.js', () => ({
 }));
 
 vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
-  applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
   logHealingToSSE: vi.fn(),
 }));
 
@@ -56,41 +61,35 @@ import { makeProps, getCheckboxByName } from './SaveAttackHealModal.test-utils.j
 
 // ── Helpers ──
 
+// Deterministic dice: every expression the modal can roll in these flows,
+// so the heal amount (2d8 → 10) is traceable to the exact expression.
+const ROLLS = {
+  '1d20': { total: 10, rolls: [10], modifier: 0 },
+  '4d6': { total: 8, rolls: [2, 1, 3, 2], modifier: 0 },
+  '2d8': { total: 10, rolls: [4, 6], modifier: 0 },
+};
+
+function getHealRadio(name) {
+  const row = Array.from(document.querySelectorAll('.abjure-targets-list label'))
+    .find(l => l.textContent.includes(name));
+  if (!row) throw new Error(`Heal radio row for "${name}" not found`);
+  return row.querySelector('input[type="radio"][name="healTarget"]');
+}
+
 /**
- * Resolve the modal through the full flow to the heal-selection phase.
- * Selects the given target names, applies the feature, and waits for
- * radio buttons to appear.
+ * Select the given targets, apply the feature, and wait until every save is
+ * resolved and the heal-selection phase is showing.
  */
-async function resolveToHealSelection(getByRole, targetNames, featureName) {
+async function resolveToHealSelection(getByRole, targetNames) {
   for (const name of targetNames) {
     fireEvent.click(getCheckboxByName(name));
   }
   await act(async () => {
-    const applyBtn = getByRole('button', { name: new RegExp(featureName || 'Divine Smite') });
-    fireEvent.click(applyBtn);
+    fireEvent.click(getByRole('button', { name: /Divine Smite \(\d targets?\)/ }));
   });
   await waitFor(() => {
+    expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
     expect(screen.getByText(/Select one creature to heal for 2d8 HP/)).toBeInTheDocument();
-  });
-}
-
-/**
- * Select the first available heal radio button.
- */
-async function selectFirstHealRadio() {
-  await act(async () => {
-    fireEvent.click(document.querySelector('input[type="radio"][name="healTarget"]'));
-  });
-}
-
-/**
- * Click the heal button and assert it is enabled.
- */
-async function clickHealButton() {
-  await act(async () => {
-    const healBtn = screen.getByRole('button', { name: /Heal Selected/ });
-    expect(healBtn).toBeEnabled();
-    fireEvent.click(healBtn);
   });
 }
 
@@ -99,67 +98,60 @@ async function clickHealButton() {
 describe('SaveAttackHealModal — heal flows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0, formula: '1d20' });
+    diceRoller.rollExpression.mockImplementation((expr) => {
+      if (!ROLLS[expr]) throw new Error(`Unexpected roll expression: ${expr}`);
+      return ROLLS[expr];
+    });
     localStorage.clear();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  // ── Resolve phase ──
-
-  it('shows heal prompt after all targets resolve', async () => {
+  it('gates the heal phase: no heal UI until all targets resolve, then one radio per resolved target', async () => {
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    fireEvent.click(getCheckboxByName('Goblin A'));
-    await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Divine Smite \(1 target\)/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
-    });
-    await waitFor(() => {
-      expect(screen.getByText(/Select one creature to heal for 2d8 HP/)).toBeInTheDocument();
-    });
+
+    // Pre-apply: the heal phase does not exist yet.
+    expect(document.querySelectorAll('input[type="radio"][name="healTarget"]')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Heal Selected/ })).not.toBeInTheDocument();
+
+    await resolveToHealSelection(getByRole, ['Goblin A', 'Goblin B']);
+
+    // Exactly one radio per resolved target — both goblins, nothing else.
     const radios = document.querySelectorAll('input[type="radio"][name="healTarget"]');
-    expect(radios.length).toBeGreaterThan(0);
+    expect(radios).toHaveLength(2);
+    expect(getHealRadio('Goblin A')).toBeInTheDocument();
+    expect(getHealRadio('Goblin B')).toBeInTheDocument();
   });
 
-  // ── Heal selection ──
-
-  it('disables heal button when no heal target is selected', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    expect(screen.getByRole('button', { name: /Heal Selected/ })).toBeDisabled();
-  });
-
-  it('enables heal button after a heal target radio is selected', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    await selectFirstHealRadio();
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Heal Selected/ })).toBeEnabled();
-    });
-  });
-
-  // ── Full heal execution ──
-
-  it('applies healing, logs to SSE, and adds roll entry on successful heal', async () => {
+  it('heals only the radio-selected creature and logs the healing roll to SSE and the log', async () => {
     const props = makeProps();
     const { getByRole } = render(<SaveAttackHealModal {...props} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    await selectFirstHealRadio();
-    await clickHealButton();
-    // Canonical heal path: combatSummary-aware (monster HP lives in combatSummary.currentHp)
+    await resolveToHealSelection(getByRole, ['Goblin A', 'Goblin B']);
+
+    // No selection yet: heal button is inert.
+    const healBtn = screen.getByRole('button', { name: /Heal Selected/ });
+    expect(healBtn).toBeDisabled();
+
+    // Arbitrate "select one creature to heal": choose Goblin B, not the first row.
+    await act(async () => {
+      fireEvent.click(getHealRadio('Goblin B'));
+    });
+    expect(screen.getByRole('button', { name: /Heal Selected/ })).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
+    });
+
+    // Exactly one heal, aimed at the radio-picked target, amount from the 2d8 roll.
+    expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1);
     expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
       props.combatSummary,
-      'Goblin A',
+      'Goblin B',
       10,
       'test-campaign'
     );
+    expect(healingRoll.logHealingToSSE).toHaveBeenCalledTimes(1);
     expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith('test-campaign', {
-      targetName: 'Goblin A',
+      targetName: 'Goblin B',
       sourceName: 'Divine Smite',
       actualHeal: 10,
       newHp: 30,
@@ -167,66 +159,49 @@ describe('SaveAttackHealModal — heal flows', () => {
     });
     expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'roll',
+      rollType: 'healing',
       name: 'Divine Smite',
       characterName: 'Cleric1',
-      rollType: 'healing',
-      targetName: 'Goblin A',
+      targetName: 'Goblin B',
       formula: '2d8',
+      total: 10,
     }));
   });
 
-  // ── Multiple targets ──
-
-  it('calls onClose when Cancel is clicked after all targets resolve', async () => {
+  it('Cancel after all targets resolve closes the modal without healing', async () => {
     const onClose = vi.fn();
-    diceRoller.rollExpression.mockReturnValue({ total: 15, rolls: [15], modifier: 0, formula: '1d20' });
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({ onClose })} />);
-    fireEvent.click(getCheckboxByName('Goblin A'));
+    await resolveToHealSelection(getByRole, ['Goblin A']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // Negative leg: cancelling in the heal phase must never execute a heal.
+    expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    expect(healingRoll.logHealingToSSE).not.toHaveBeenCalled();
+  });
+
+  it('reports the heal result, then Done closes the modal', async () => {
+    const onClose = vi.fn();
+    const { getByRole } = render(<SaveAttackHealModal {...makeProps({ onClose })} />);
+    await resolveToHealSelection(getByRole, ['Goblin A']);
+
     await act(async () => {
-      fireEvent.click(getByRole('button', { name: /Divine Smite \(1 target\)/ }));
+      fireEvent.click(getHealRadio('Goblin A'));
     });
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Heal Selected/ }));
     });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
 
-  // ── Post-heal UI ──
-
-  it('shows Done button after healing completes', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    await selectFirstHealRadio();
-    await clickHealButton();
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-    });
-  });
-
-  it('calls onClose when Done is clicked after healing', async () => {
-    const onClose = vi.fn();
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps({ onClose })} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    await selectFirstHealRadio();
-    await clickHealButton();
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Edge cases ──
-
-  it('displays healing result after successful heal', async () => {
-    const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
-    await resolveToHealSelection(getByRole, ['Goblin A']);
-    await selectFirstHealRadio();
-    await clickHealButton();
     await waitFor(() => {
       const body = document.querySelector('.sp-body');
-      expect(body.textContent).toContain('Goblin A');
-      expect(body.textContent).toContain('healed for');
-      expect(body.textContent).toContain('HP (actual:');
+      expect(body.textContent).toContain('Goblin A healed for');
+      expect(body.textContent).toContain('10 HP (actual: 10). Current HP: 30 / 40.');
     });
+
+    // Post-heal the modal offers only a terminal Done action.
+    expect(screen.queryByRole('button', { name: /Heal Selected/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// Routing-seam lane: buff-choice modal confirms in useCharActionsModalHandlers.
+// Pins gate refusals (isolated falsy legs per #339), exact buff-service call
+// payloads (arity + byte), setPopupHtml on result.payload only, runtime-store
+// writes / log copy for the inline Inspiring Smite & Trickster Blessing lanes,
+// and modalState clears.
+// Service internals live in tempHpBuffHandler.*.test.js and
+// celestialResilienceHandler.confirmSkip.test.js; the CLA-200 latch semantics are
+// owned by inspiringSmiteLatch.test.js; modal UI wiring lives in the
+// CharActionModals suites.
+// Dead-mock purge: the hook's other imports (combatSuperiority, healing, area
+// handlers, etc.) are never invoked by these six handlers, so they load for real
+// — verified side-effect-free at import by the sibling areaEffects suite.
+// Only modules whose exports these handlers observe are mocked, with every key
+// the live import graph destructures (handle destructured by
+// services/automation/index.js per #318).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsModalHandlers from './useCharActionsModalHandlers.js';
 
@@ -17,107 +33,20 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
-  handle: vi.fn(),
-  handleCombatSuperiorityBonusAction: vi.fn(),
-  handleCombatSuperiorityReaction: vi.fn(),
-  handleCombatSuperiorityGrantAttack: vi.fn(),
-  handleCombatSuperiorityMovement: vi.fn(),
-  handleCombatSuperioritySkillCheck: vi.fn(),
-  handleCombatSuperiorityCommandingPresenceReaction: vi.fn(),
-  handleCombatSuperioritySweepingAttack: vi.fn(),
-  handleAttackRiderPrompt: vi.fn(),
-  handleSkillCheckPrompt: vi.fn(),
-  executeSweepingAttack: vi.fn(),
-  executeBaitAndSwitchChoice: vi.fn(),
-  executeCommanderStrikeChoice: vi.fn(),
-  executeRallyChoice: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-sorcerer/bulwarkOfForceHandler.js', () => ({
-  handle: vi.fn(),
-  activateBulwarkOfForce: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-barbarian/zealousPresenceHandler.js', () => ({
-  handle: vi.fn(),
-  confirmZealousPresence: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massHealHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHeal: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-sorcerer/clockworkCavalcadeHandler.js', () => ({
-  handle: vi.fn(),
-  confirmClockworkCavalcadeHeal: vi.fn(),
-  confirmClockworkCavalcadeDispel: vi.fn(),
-  confirmClockworkCavalcadeRepair: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massCureWoundsHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassCureWounds: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/prayerOfHealingHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPrayerOfHealing: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/buffs/powerWordFortifyHandler.js', () => ({
-  handle: vi.fn(),
-  confirmPowerWordFortify: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/healing/massHealingWordHandler.js', () => ({
-  handle: vi.fn(),
-  confirmMassHealingWord: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-ranger/naturesSanctuaryHandler.js', () => ({
-  handle: vi.fn(),
-  handleMove: vi.fn(),
-  activateNaturesSanctuary: vi.fn(),
-  moveNaturesSanctuary: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/coronaOfLightHandler.js', () => ({
-  handle: vi.fn(),
-  activateCoronaOfLight: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/radianceOfDawnHandler.js', () => ({
-  handle: vi.fn(),
-  confirmRadianceOfDawn: vi.fn(),
-}));
-
 vi.mock('../../services/automation/handlers/buffs/tempHpBuffHandler.js', () => ({
-  handle: vi.fn(),
   confirmMantleOfInspiration: vi.fn(),
   confirmVitalityOfTheTree: vi.fn(),
+  // handle destructured by services/automation/index.js in the live graph (#318;
+  // runtime-verified: removing it fails this suite's import with "No handle export")
+  handle: vi.fn(),
 }));
 
 vi.mock('../../services/automation/handlers/class-warlock/celestialResilienceHandler.js', () => ({
-  handle: vi.fn(),
   confirmCelestialResilience: vi.fn(),
   skipCelestialResilience: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-druid/oceanicGiftHandler.js', () => ({
+  // handle destructured by services/automation/index.js in the live graph (#318;
+  // runtime-verified: removing it fails this suite's import with "No handle export")
   handle: vi.fn(),
-  confirmOceanicGift: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-bard/bardicInspirationHandler.js', () => ({
-  handle: vi.fn(),
-  applyBardicInspiration: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/reactions/reactionBonusHandler.js', () => ({
-  handle: vi.fn(),
-  applyInspiringMovement: vi.fn(),
 }));
 
 const { toggleBuff } = await import('../../services/automation/common/buffToggle.js');
@@ -127,503 +56,419 @@ const { addEntry } = await import('../../services/ui/logService.js');
 const { confirmMantleOfInspiration, confirmVitalityOfTheTree } = await import('../../services/automation/handlers/buffs/tempHpBuffHandler.js');
 const { confirmCelestialResilience, skipCelestialResilience } = await import('../../services/automation/handlers/class-warlock/celestialResilienceHandler.js');
 
-const mockSetPopupHtml = vi.fn();
-const mockSetModalState = vi.fn();
+const CAMPAIGN = 'test-campaign';
 
-function getHandlers(modalState = {}, mergedModalState = {}) {
+function mount(modalState = {}) {
+  const setPopupHtml = vi.fn();
+  const setModalState = vi.fn();
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCharActionsModalHandlers({
-    setPopupHtml: mockSetPopupHtml,
-    setModalState: mockSetModalState,
+  const handlers = useCharActionsModalHandlers({
+    setPopupHtml,
+    setModalState,
     modalState,
-    mergedModalState,
+    mergedModalState: {},
   });
+  return { handlers, setPopupHtml, setModalState };
 }
 
-function makePlayerStats() {
+function stats() {
   return { name: 'TestChar', class: { name: 'Fighter' } };
-}
-
-function makeBaseModalData(overrides = {}) {
-  return {
-    action: { name: 'Test Action' },
-    playerStats: makePlayerStats(),
-    campaignName: 'test-campaign',
-    ...overrides,
-  };
 }
 
 describe('useCharActionsModalHandlers - buffs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSetPopupHtml.mockClear();
-    mockSetModalState.mockClear();
   });
 
   describe('handleMantleOfInspirationConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when selectedTargets is %s', async (selectedTargets) => {
-      const handlers = getHandlers();
-      await handlers.handleMantleOfInspirationConfirm(selectedTargets);
+    it.each([
+      { name: 'selectedTargets is null', targets: null, modalOpen: true },
+      { name: 'selectedTargets is undefined', targets: undefined, modalOpen: true },
+      { name: 'modal is not open', targets: ['Ally1'], modalOpen: false },
+    ])('refuses without touching service, popup, or modalState when $name', async ({ targets, modalOpen }) => {
+      const { handlers, setPopupHtml, setModalState } = mount(
+        modalOpen ? { mantleOfInspirationTarget: { action: { name: 'Mantle of Inspiration' } } } : {}
+      );
+
+      await handlers.handleMantleOfInspirationConfirm(targets);
+
       expect(confirmMantleOfInspiration).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
     });
 
-    it('returns early without side effects when mantleOfInspirationTarget is not in modalState', async () => {
-      const handlers = getHandlers();
-      await handlers.handleMantleOfInspirationConfirm(['target']);
-      expect(confirmMantleOfInspiration).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('delegates to confirmMantleOfInspiration with all parameters and clears the modal', async () => {
-      confirmMantleOfInspiration.mockResolvedValue({ payload: '<p>Inspired!</p>' });
-      const modalState = {
+    it('calls confirmMantleOfInspiration with the full object payload, pops the payload, clears the modal', async () => {
+      const popup = '<p>Inspired!</p>';
+      confirmMantleOfInspiration.mockResolvedValue({ payload: popup });
+      const action = { name: 'Mantle of Inspiration' };
+      const { handlers, setPopupHtml, setModalState } = mount({
         mantleOfInspirationTarget: {
-          action: { name: 'Mantle of Inspiration' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          action,
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
           dieRoll: 7,
           bardicDieSize: 'd8',
           tempHp: 5,
         },
-      };
-      const handlers = getHandlers(modalState);
+      });
+
       await handlers.handleMantleOfInspirationConfirm(['Ally1']);
+
+      // object payload — 7 keys exactly, dieRoll/bardicDieSize/tempHp forwarded
       expect(confirmMantleOfInspiration).toHaveBeenCalledWith({
-        action: modalState.mantleOfInspirationTarget.action,
-        playerStats: modalState.mantleOfInspirationTarget.playerStats,
-        campaignName: modalState.mantleOfInspirationTarget.campaignName,
+        action,
+        playerStats: stats(),
+        campaignName: CAMPAIGN,
         selectedTargets: ['Ally1'],
         dieRoll: 7,
         bardicDieSize: 'd8',
         tempHp: 5,
       });
-      expect(mockSetModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
+      expect(setPopupHtml).toHaveBeenCalledWith(popup);
+      expect(setModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
     });
 
-    it('shows popup when confirmMantleOfInspiration returns a payload', async () => {
-      confirmMantleOfInspiration.mockResolvedValue({ payload: '<p>Healed!</p>' });
-      const handlers = getHandlers({
-        mantleOfInspirationTarget: makeBaseModalData({ dieRoll: 5, bardicDieSize: 'd6', tempHp: 3 }),
-      });
-      await handlers.handleMantleOfInspirationConfirm(['Ally1']);
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Healed!</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
-    });
-
-    it('skips popup when confirmMantleOfInspiration returns no payload', async () => {
+    it('clears the modal without a popup when the service returns no payload', async () => {
       confirmMantleOfInspiration.mockResolvedValue({});
-      const handlers = getHandlers({
-        mantleOfInspirationTarget: makeBaseModalData({ dieRoll: 5, bardicDieSize: 'd6', tempHp: 3 }),
+      const { handlers, setPopupHtml, setModalState } = mount({
+        mantleOfInspirationTarget: {
+          action: { name: 'Mantle of Inspiration' },
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
+          dieRoll: 5,
+          bardicDieSize: 'd6',
+          tempHp: 3,
+        },
       });
+
       await handlers.handleMantleOfInspirationConfirm(['Ally1']);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
+
+      expect(confirmMantleOfInspiration).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ mantleOfInspirationTarget: null });
     });
   });
 
   describe('handleCelestialResilienceConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when selectedTargets is %s', async (selectedTargets) => {
-      const handlers = getHandlers();
-      await handlers.handleCelestialResilienceConfirm(selectedTargets);
+    it.each([
+      { name: 'selectedTargets is null', targets: null, modalOpen: true },
+      { name: 'selectedTargets is undefined', targets: undefined, modalOpen: true },
+      { name: 'modal is not open', targets: ['Ally1'], modalOpen: false },
+    ])('refuses without touching service, popup, or modalState when $name', async ({ targets, modalOpen }) => {
+      const { handlers, setPopupHtml, setModalState } = mount(
+        modalOpen ? { celestialResilienceModal: { action: { name: 'Celestial Resilience' } } } : {}
+      );
+
+      await handlers.handleCelestialResilienceConfirm(targets);
+
       expect(confirmCelestialResilience).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
     });
 
-    it('returns early without side effects when celestialResilienceModal is not in modalState', async () => {
-      const handlers = getHandlers();
-      await handlers.handleCelestialResilienceConfirm(['target']);
-      expect(confirmCelestialResilience).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+    it('calls confirmCelestialResilience with 4 positional args, pops the payload, clears the modal', async () => {
+      const popup = '<p>Resilience applied</p>';
+      confirmCelestialResilience.mockResolvedValue({ payload: popup });
+      const action = { name: 'Celestial Resilience' };
+      const { handlers, setPopupHtml, setModalState } = mount({
+        celestialResilienceModal: { action, playerStats: stats(), campaignName: CAMPAIGN },
+      });
+
+      await handlers.handleCelestialResilienceConfirm(['Ally1']);
+
+      // positional arity — 4 args, not an object payload
+      expect(confirmCelestialResilience).toHaveBeenCalledWith(action, stats(), CAMPAIGN, ['Ally1']);
+      expect(setPopupHtml).toHaveBeenCalledWith(popup);
+      expect(setModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
     });
 
-    it('delegates to confirmCelestialResilience with all parameters and clears the modal', async () => {
-      confirmCelestialResilience.mockResolvedValue({ payload: '<p>Resilient!</p>' });
-      const modalState = {
+    it('clears the modal without a popup when the service returns no payload', async () => {
+      confirmCelestialResilience.mockResolvedValue({});
+      const { handlers, setPopupHtml, setModalState } = mount({
         celestialResilienceModal: {
           action: { name: 'Celestial Resilience' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
         },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleCelestialResilienceConfirm(['Ally1']);
-      expect(confirmCelestialResilience).toHaveBeenCalledWith(
-        modalState.celestialResilienceModal.action,
-        modalState.celestialResilienceModal.playerStats,
-        modalState.celestialResilienceModal.campaignName,
-        ['Ally1']
-      );
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
-    });
-
-    it('shows popup when confirmCelestialResilience returns a payload', async () => {
-      confirmCelestialResilience.mockResolvedValue({ payload: '<p>Resilience applied</p>' });
-      const handlers = getHandlers({
-        celestialResilienceModal: makeBaseModalData(),
       });
-      await handlers.handleCelestialResilienceConfirm(['Ally1']);
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Resilience applied</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
-    });
 
-    it('skips popup when confirmCelestialResilience returns no payload', async () => {
-      confirmCelestialResilience.mockResolvedValue({});
-      const handlers = getHandlers({
-        celestialResilienceModal: makeBaseModalData(),
-      });
       await handlers.handleCelestialResilienceConfirm(['Ally1']);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
+
+      expect(confirmCelestialResilience).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
     });
   });
 
   describe('handleCelestialResilienceSkip', () => {
-    it('returns early without side effects when celestialResilienceModal is not in modalState', async () => {
-      const handlers = getHandlers();
+    it('refuses without touching service, popup, or modalState when the modal is not open', async () => {
+      const { handlers, setPopupHtml, setModalState } = mount({});
+
       await handlers.handleCelestialResilienceSkip();
+
       expect(skipCelestialResilience).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
     });
 
-    it('delegates to skipCelestialResilience with all parameters and clears the modal', async () => {
-      skipCelestialResilience.mockResolvedValue({ payload: '<p>Skipped!</p>' });
-      const modalState = {
+    it('calls skipCelestialResilience with 3 positional args, pops the payload, clears the modal', async () => {
+      const popup = '<p>Resilience skipped</p>';
+      skipCelestialResilience.mockResolvedValue({ payload: popup });
+      const action = { name: 'Celestial Resilience' };
+      const { handlers, setPopupHtml, setModalState } = mount({
+        celestialResilienceModal: { action, playerStats: stats(), campaignName: CAMPAIGN },
+      });
+
+      await handlers.handleCelestialResilienceSkip();
+
+      // skip lane takes 3 args — no targets list on the skip path
+      expect(skipCelestialResilience).toHaveBeenCalledWith(action, stats(), CAMPAIGN);
+      expect(setPopupHtml).toHaveBeenCalledWith(popup);
+      expect(setModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
+    });
+
+    it('clears the modal without a popup when the service returns no payload', async () => {
+      skipCelestialResilience.mockResolvedValue({});
+      const { handlers, setPopupHtml, setModalState } = mount({
         celestialResilienceModal: {
           action: { name: 'Celestial Resilience' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
         },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleCelestialResilienceSkip();
-      expect(skipCelestialResilience).toHaveBeenCalledWith(
-        modalState.celestialResilienceModal.action,
-        modalState.celestialResilienceModal.playerStats,
-        modalState.celestialResilienceModal.campaignName
-      );
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
-    });
-
-    it('shows popup when skipCelestialResilience returns a payload', async () => {
-      skipCelestialResilience.mockResolvedValue({ payload: '<p>Resilience skipped</p>' });
-      const handlers = getHandlers({
-        celestialResilienceModal: makeBaseModalData(),
       });
-      await handlers.handleCelestialResilienceSkip();
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Resilience skipped</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
-    });
 
-    it('skips popup when skipCelestialResilience returns no payload', async () => {
-      skipCelestialResilience.mockResolvedValue({});
-      const handlers = getHandlers({
-        celestialResilienceModal: makeBaseModalData(),
-      });
       await handlers.handleCelestialResilienceSkip();
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
+
+      expect(skipCelestialResilience).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ celestialResilienceModal: null });
     });
   });
 
   describe('handleInspiringSmiteConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when distribution is %s', async (distribution) => {
-      const handlers = getHandlers();
+    // Inline lane (no service delegation): setTempHp + runtime writes + log live in the hook itself.
+    it.each([
+      { name: 'distribution is null', distribution: null, modalOpen: true },
+      { name: 'distribution is undefined', distribution: undefined, modalOpen: true },
+      { name: 'modal is not open', distribution: { Ally1: 5 }, modalOpen: false },
+      { name: 'distribution has no targets', distribution: {}, modalOpen: true },
+    ])('refuses without touching temp HP, runtime store, log, popup, or modalState when $name', async ({ distribution, modalOpen }) => {
+      const { handlers, setPopupHtml, setModalState } = mount(
+        modalOpen ? { inspiringSmiteModal: { action: { name: 'Inspiring Smite' }, playerStats: stats(), campaignName: CAMPAIGN, channelDivinityCharges: 1 } } : {}
+      );
+
       await handlers.handleInspiringSmiteConfirm(distribution);
+
       expect(setTempHp).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
     });
 
-    it('returns early without side effects when inspiringSmiteModal is not in modalState', async () => {
-      const handlers = getHandlers();
-      await handlers.handleInspiringSmiteConfirm({ target: 10 });
-      expect(setTempHp).not.toHaveBeenCalled();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('returns early without side effects when distribution has no targets', async () => {
-      const modalState = {
+    it('CLA-200: distributes temp HP per target, spends the charge, latches castToken, logs, pops, clears', async () => {
+      const { handlers, setPopupHtml, setModalState } = mount({
         inspiringSmiteModal: {
           action: { name: 'Inspiring Smite' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
-          channelDivinityCharges: 1,
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleInspiringSmiteConfirm({});
-      expect(setTempHp).not.toHaveBeenCalled();
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('applies temp HP to each target, decrements charges, logs, shows popup, and clears modal', async () => {
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        inspiringSmiteModal: {
-          action: { name: 'Inspiring Smite' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
           channelDivinityCharges: 2,
+          castToken: 4242,
         },
-      };
-      const handlers = getHandlers(modalState);
-      const distribution = { Ally1: 5, Ally2: 10 };
-      await handlers.handleInspiringSmiteConfirm(distribution);
+      });
 
-      expect(setTempHp).toHaveBeenNthCalledWith(1, 'Ally1', 5, 'test-campaign');
-      expect(setTempHp).toHaveBeenNthCalledWith(2, 'Ally2', 10, 'test-campaign');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'channelDivinityCharges', 1, 'test-campaign');
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+      await handlers.handleInspiringSmiteConfirm({ Ally1: 5, Ally2: 10 });
+
+      // per-target temp HP, insertion order, exact amounts
+      expect(setTempHp).toHaveBeenNthCalledWith(1, 'Ally1', 5, CAMPAIGN);
+      expect(setTempHp).toHaveBeenNthCalledWith(2, 'Ally2', 10, CAMPAIGN);
+      expect(setTempHp).toHaveBeenCalledTimes(2);
+      // two runtime writes in order: charge decrement, then the cast latch (same-store writes race otherwise)
+      expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestChar', 'channelDivinityCharges', 1, CAMPAIGN);
+      expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestChar', 'inspiringSmiteUsedToken', 4242, CAMPAIGN);
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
         type: 'ability_use',
         characterName: 'TestChar',
         abilityName: 'Inspiring Smite',
         description: 'TestChar used Inspiring Smite (15 temp HP). Distribution: Ally1=5, Ally2=10',
       });
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(
+      expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Inspiring Smite</b><br/>Granted 15 temporary hit points: Ally1 (5 HP), Ally2 (10 HP).'
       );
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringSmiteModal: null });
+      expect(setModalState).toHaveBeenCalledWith({ inspiringSmiteModal: null });
     });
 
-    it('CLA-200: latches the confirmed cast (inspiringSmiteUsedToken = castToken)', async () => {
-      addEntry.mockResolvedValue({});
-      setRuntimeValue.mockResolvedValue(undefined);
-      const modalState = {
+    it('latches a wall-clock stamp token when the modal carries no castToken', async () => {
+      const before = Date.now();
+      const { handlers, setModalState } = mount({
         inspiringSmiteModal: {
           action: { name: 'Inspiring Smite' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
           channelDivinityCharges: 3,
-          castToken: 4242,
         },
-      };
-      const handlers = getHandlers(modalState);
+      });
+
       await handlers.handleInspiringSmiteConfirm({ TestChar: 6 });
+      const after = Date.now();
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'channelDivinityCharges', 2, 'test-campaign');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'inspiringSmiteUsedToken', 4242, 'test-campaign');
-    });
-
-    it('handles single target distribution correctly', async () => {
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        inspiringSmiteModal: {
-          action: { name: 'Inspiring Smite' },
-          playerStats: makePlayerStats(),
-          campaignName: 'my-campaign',
-          channelDivinityCharges: 3,
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleInspiringSmiteConfirm({ Self: 8 });
-
-      expect(setTempHp).toHaveBeenCalledWith('Self', 8, 'my-campaign');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'channelDivinityCharges', 2, 'my-campaign');
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(
-        '<b>Inspiring Smite</b><br/>Granted 8 temporary hit points: Self (8 HP).'
-      );
-      expect(mockSetModalState).toHaveBeenCalledWith({ inspiringSmiteModal: null });
+      expect(setTempHp).toHaveBeenCalledWith('TestChar', 6, CAMPAIGN);
+      // castToken ?? Date.now() fallback: token is a fresh stamp between the call bounds
+      expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestChar', 'channelDivinityCharges', 2, CAMPAIGN);
+      const tokenCall = setRuntimeValue.mock.calls[1];
+      expect(tokenCall[0]).toBe('TestChar');
+      expect(tokenCall[1]).toBe('inspiringSmiteUsedToken');
+      expect(tokenCall[2]).toBeGreaterThanOrEqual(before);
+      expect(tokenCall[2]).toBeLessThanOrEqual(after);
+      expect(tokenCall[3]).toBe(CAMPAIGN);
+      expect(setModalState).toHaveBeenCalledWith({ inspiringSmiteModal: null });
     });
   });
 
   describe('handleVitalityOfTheTreeConfirm', () => {
-    it.each([null, undefined])('returns early without side effects when selectedTargets is %s', async (selectedTargets) => {
-      const handlers = getHandlers();
-      await handlers.handleVitalityOfTheTreeConfirm(selectedTargets);
+    it.each([
+      { name: 'selectedTargets is null', targets: null, modalOpen: true },
+      { name: 'selectedTargets is undefined', targets: undefined, modalOpen: true },
+      { name: 'modal is not open', targets: ['Ally1'], modalOpen: false },
+    ])('refuses without touching service, popup, or modalState when $name', async ({ targets, modalOpen }) => {
+      const { handlers, setPopupHtml, setModalState } = mount(
+        modalOpen ? { vitalityOfTheTreeTarget: { action: { name: 'Vitality of the Tree' } } } : {}
+      );
+
+      await handlers.handleVitalityOfTheTreeConfirm(targets);
+
       expect(confirmVitalityOfTheTree).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
     });
 
-    it('returns early without side effects when vitalityOfTheTreeTarget is not in modalState', async () => {
-      const handlers = getHandlers();
-      await handlers.handleVitalityOfTheTreeConfirm(['target']);
-      expect(confirmVitalityOfTheTree).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
-    });
-
-    it('delegates to confirmVitalityOfTheTree with all parameters and clears the modal', async () => {
-      confirmVitalityOfTheTree.mockResolvedValue({ payload: '<p>Tree heal!</p>' });
-      const modalState = {
+    it('calls confirmVitalityOfTheTree with the object payload (maxTargets NOT forwarded), pops, clears', async () => {
+      const popup = '<p>Tree heal!</p>';
+      confirmVitalityOfTheTree.mockResolvedValue({ payload: popup });
+      const action = { name: 'Vitality of the Tree' };
+      const { handlers, setPopupHtml, setModalState } = mount({
         vitalityOfTheTreeTarget: {
-          action: { name: 'Vitality of the Tree' },
-          playerStats: makePlayerStats(),
-          campaignName: 'test-campaign',
+          action,
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
           tempHp: 10,
           maxTargets: 3,
         },
-      };
-      const handlers = getHandlers(modalState);
+      });
+
       await handlers.handleVitalityOfTheTreeConfirm(['Ally1', 'Ally2']);
+
+      // deep-equal payload: maxTargets lives in modalState but must NOT leak to the service
       expect(confirmVitalityOfTheTree).toHaveBeenCalledWith({
-            action: modalState.vitalityOfTheTreeTarget.action,
-            playerStats: modalState.vitalityOfTheTreeTarget.playerStats,
-            campaignName: modalState.vitalityOfTheTreeTarget.campaignName,
-            selectedTargets: ['Ally1', 'Ally2'],
-            tempHp: 10,
-        });
-      expect(mockSetModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
-    });
-
-    it('shows popup when confirmVitalityOfTheTree returns a payload', async () => {
-      confirmVitalityOfTheTree.mockResolvedValue({ payload: '<p>Tree vitality applied</p>' });
-      const handlers = getHandlers({
-        vitalityOfTheTreeTarget: makeBaseModalData({ tempHp: 10, maxTargets: 3 }),
+        action,
+        playerStats: stats(),
+        campaignName: CAMPAIGN,
+        selectedTargets: ['Ally1', 'Ally2'],
+        tempHp: 10,
       });
-      await handlers.handleVitalityOfTheTreeConfirm(['Ally1']);
-      expect(mockSetPopupHtml).toHaveBeenCalledWith('<p>Tree vitality applied</p>');
-      expect(mockSetModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
+      expect(setPopupHtml).toHaveBeenCalledWith(popup);
+      expect(setModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
     });
 
-    it('skips popup when confirmVitalityOfTheTree returns no payload', async () => {
+    it('clears the modal without a popup when the service returns no payload', async () => {
       confirmVitalityOfTheTree.mockResolvedValue({});
-      const handlers = getHandlers({
-        vitalityOfTheTreeTarget: makeBaseModalData({ tempHp: 10, maxTargets: 3 }),
+      const { handlers, setPopupHtml, setModalState } = mount({
+        vitalityOfTheTreeTarget: {
+          action: { name: 'Vitality of the Tree' },
+          playerStats: stats(),
+          campaignName: CAMPAIGN,
+          tempHp: 10,
+          maxTargets: 3,
+        },
       });
+
       await handlers.handleVitalityOfTheTreeConfirm(['Ally1']);
-      expect(mockSetPopupHtml).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
+
+      expect(confirmVitalityOfTheTree).toHaveBeenCalledTimes(1);
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).toHaveBeenCalledWith({ vitalityOfTheTreeTarget: null });
     });
   });
 
   describe('handleTricksterBlessingConfirm', () => {
-    it('returns early without side effects when tricksterBlessingModal is not in modalState', async () => {
-      const handlers = getHandlers();
-      await handlers.handleTricksterBlessingConfirm('target');
-      expect(toggleBuff).not.toHaveBeenCalled();
-      expect(mockSetModalState).not.toHaveBeenCalled();
+    // Inline lane: toggleBuff + log + automation_info popup live in the hook itself.
+    const blessingModal = (action) => ({
+      tricksterBlessingModal: { action, playerStats: stats(), campaignName: CAMPAIGN },
     });
+    const auto = { type: 'buff', duration: '1 hour' };
 
-    it('toggles buff with targetName and logs when activated', async () => {
-      toggleBuff.mockReturnValue({ wasActive: false });
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        tricksterBlessingModal: {
-          action: { name: 'Blessing of the Trickster', automation: { type: 'buff', duration: '1 hour' } },
-          playerStats: makePlayerStats(),
-        },
-      };
-      const handlers = getHandlers(modalState);
+    it('refuses without touching buffToggle, log, popup, or modalState when the modal is not open', async () => {
+      const { handlers, setPopupHtml, setModalState } = mount({});
+
       await handlers.handleTricksterBlessingConfirm('Ally1');
 
-      expect(toggleBuff).toHaveBeenCalledWith(
-        'Ally1',
-        'Blessing of the Trickster',
-        { type: 'buff', duration: '1 hour' },
-        undefined,
-        'Ally1'
-      );
-      expect(addEntry).toHaveBeenCalledWith(undefined, {
+      expect(toggleBuff).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setModalState).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        name: 'explicit ally target',
+        targetName: 'Ally1',
+        expectedTarget: 'Ally1',
+        expectedActivationCopy: 'Blessing of the Trickster activated on Ally1 (1 hour)',
+      },
+      {
+        name: 'null targetName resolves to self',
+        targetName: null,
+        expectedTarget: 'TestChar',
+        expectedActivationCopy: 'Blessing of the Trickster activated on yourself (1 hour)',
+      },
+      {
+        name: 'action name and automation defaults when missing',
+        targetName: 'Ally1',
+        expectedTarget: 'Ally1',
+        expectedActivationCopy: 'Blessing of the Trickster activated on Ally1 (1 hour)',
+        actionOverride: { automation: { type: 'buff' } },
+        expectedAutomation: { type: 'buff' },
+      },
+    ])('toggles buff ON for $name, logs, pops automation_info, clears the modal', async ({ targetName, expectedTarget, expectedActivationCopy, actionOverride, expectedAutomation }) => {
+      const expectedAuto = expectedAutomation || auto;
+      toggleBuff.mockReturnValue({ wasActive: false });
+      const { handlers, setPopupHtml, setModalState } = mount(blessingModal(actionOverride || { name: 'Blessing of the Trickster', automation: auto }));
+
+      await handlers.handleTricksterBlessingConfirm(targetName);
+
+      expect(toggleBuff).toHaveBeenCalledWith(expectedTarget, 'Blessing of the Trickster', expectedAuto, CAMPAIGN, expectedTarget);
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
         type: 'ability_use',
         characterName: 'TestChar',
         abilityName: 'Blessing of the Trickster',
-        description: 'Blessing granted to Ally1 with advantage on Stealth checks.',
+        description: `Blessing granted to ${expectedTarget} with advantage on Stealth checks.`,
       });
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
+      expect(setPopupHtml).toHaveBeenCalledWith({
         type: 'automation_info',
         name: 'Blessing of the Trickster',
         automationType: 'buff',
-        description: 'Blessing of the Trickster activated on Ally1 (1 hour)',
-        automation: { type: 'buff', duration: '1 hour' },
+        description: expectedActivationCopy,
+        automation: expectedAuto,
       });
-      expect(mockSetModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
+      expect(setModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
     });
 
-    it('uses playerStats.name when targetName is null', async () => {
-      toggleBuff.mockReturnValue({ wasActive: false });
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        tricksterBlessingModal: {
-          action: { name: 'Blessing of the Trickster', automation: { type: 'buff', duration: '1 hour' } },
-          playerStats: makePlayerStats(),
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleTricksterBlessingConfirm(null);
-
-      expect(toggleBuff).toHaveBeenCalledWith(
-        'TestChar',
-        'Blessing of the Trickster',
-        { type: 'buff', duration: '1 hour' },
-        undefined,
-        'TestChar'
-      );
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Blessing of the Trickster',
-        automationType: 'buff',
-        description: 'Blessing of the Trickster activated on yourself (1 hour)',
-        automation: { type: 'buff', duration: '1 hour' },
-      });
-      expect(mockSetModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
-    });
-
-    it('shows toggled OFF description when wasActive is true and skips logging', async () => {
+    it('shows toggled-OFF copy and skips the log when the buff was already active, still clearing the modal', async () => {
       toggleBuff.mockReturnValue({ wasActive: true });
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        tricksterBlessingModal: {
-          action: { name: 'Blessing of the Trickster', automation: { type: 'buff', duration: '1 hour' } },
-          playerStats: makePlayerStats(),
-        },
-      };
-      const handlers = getHandlers(modalState);
+      const { handlers, setPopupHtml, setModalState } = mount(blessingModal({ name: 'Blessing of the Trickster', automation: auto }));
+
       await handlers.handleTricksterBlessingConfirm('Ally1');
 
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
+      expect(toggleBuff).toHaveBeenCalledWith('Ally1', 'Blessing of the Trickster', auto, CAMPAIGN, 'Ally1');
+      expect(addEntry).not.toHaveBeenCalled();
+      expect(setPopupHtml).toHaveBeenCalledWith({
         type: 'automation_info',
         name: 'Blessing of the Trickster',
         automationType: 'buff',
         description: 'Blessing of the Trickster toggled OFF',
-        automation: { type: 'buff', duration: '1 hour' },
+        automation: auto,
       });
-      expect(addEntry).not.toHaveBeenCalled();
-      expect(mockSetModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
-    });
-
-    it('defaults feature name to "Blessing of the Trickster" when action.name is missing', async () => {
-      toggleBuff.mockReturnValue({ wasActive: false });
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        tricksterBlessingModal: {
-          action: { automation: { type: 'buff', duration: '1 hour' } },
-          playerStats: makePlayerStats(),
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleTricksterBlessingConfirm('Ally1');
-
-      expect(toggleBuff).toHaveBeenLastCalledWith(
-        'Ally1',
-        'Blessing of the Trickster',
-        { type: 'buff', duration: '1 hour' },
-        undefined,
-        'Ally1'
-      );
-    });
-
-    it('uses fallback duration "1 hour" when automation.duration is missing', async () => {
-      toggleBuff.mockReturnValue({ wasActive: false });
-      addEntry.mockResolvedValue({});
-      const modalState = {
-        tricksterBlessingModal: {
-          action: { name: 'Blessing of the Trickster', automation: { type: 'buff' } },
-          playerStats: makePlayerStats(),
-        },
-      };
-      const handlers = getHandlers(modalState);
-      await handlers.handleTricksterBlessingConfirm('Ally1');
-
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Blessing of the Trickster',
-        automationType: 'buff',
-        description: 'Blessing of the Trickster activated on Ally1 (1 hour)',
-        automation: { type: 'buff' },
-      });
-      expect(mockSetModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
+      expect(setModalState).toHaveBeenCalledWith({ tricksterBlessingModal: null });
     });
   });
 });

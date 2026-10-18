@@ -1,3 +1,4 @@
+// @maintained-by-ai: 2026-10-18 — MA-1063 OWNER: Kuo-Toa Spear two-handed versatile disk lock + row wiring (trimmed 6→2, rec #523)
 // MA-1063: Kuo-Toa Spear versatile "or 5 (1d8 + 1) ... if used with two
 // hands to make a melee attack" was misfiled into damage_dice_secondary —
 // the §118/MA-0426/0531 ADDITIVE combined transport auto-rolled BOTH pools
@@ -8,71 +9,74 @@
 // damage_type_primary; two-handed leg rides damage_type_primary piercing):
 // buildTwoHandedVariantOffer now arms the §166 HIT-popup chooser and
 // buildSecondaryDamageTransport goes byte-inert for the row.
+// Press legs cite-skipped to owners: offer/select-log branch truth-tables live
+// in MonsterCardHelpers.two-handed.test.js:23-34 (literal offer-shape), :36-42
+// (byte-inert null-offer branch — rows without the field, same shape as the
+// Kuo-Toa Bite/Net siblings) and
+// :44-55 (two/one fork); modal offer branches (build from metadata / one-hand
+// null guardrail) in MonsterCardModal.two-handed.test.jsx:214-221; the
+// transport null-triplet in MonsterCardModal.cultist-flat-secondary.test.js:38.
+// Byte-twin verdict (#523): DISTINCT disk row from the MA-0871 Gnoll twin
+// this placement mirrors — Kuo-Toa is 1d6 + 1 → 1d8 + 1, +3, lowercase
+// "piercing"; Gnoll is 1d6 + 2 → 1d8 + 2, +4, "Piercing". No full fingerprint
+// collision, so keeps its own by-name disk lock (#387) — no #422 fold.
+// (1d8 + 1 literal also authors Tribal Warrior/Spear — ma1608 owns that
+// by-name row lock; row identity separates the two.)
 import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
 import { buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog } from './MonsterCardHelpers.js';
 import { buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
 
-describe('MA-1063 data lock (monsters.json Kuo-Toa Spear)', () => {
-  const spearRow = () => {
+describe('MA-1063 Kuo-Toa Spear two-handed versatile (disk lock + row wiring)', () => {
+  const kuoToa = () => {
     const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
-    const spear = monsters.find((m) => m.name === 'Kuo-Toa').actions[1];
-    expect(spear.name).toBe('Spear');
-    return spear;
+    return monsters.find((m) => m.name === 'Kuo-Toa');
+  };
+  const spearRow = () => {
+    const row = kuoToa().actions[1];
+    expect(row.name).toBe('Spear');
+    return row;
   };
 
-  it('actions[1] Spear authors damage_dice_two_handed "1d8 + 1" beside the 1d6 + 1 primary (MA-0871/0636/0652 placement)', () => {
+  it('disk lock (by-name #387): Spear authors damage_dice_two_handed "1d8 + 1" beside the 1d6 + 1 primary (MA-0871/0636/0652 placement), wrong-slot additive fields GONE (§118 combined transport dead for this row), prose byte-intact, Bite/Net siblings ABSENT', () => {
     const spear = spearRow();
     expect(spear.attack_bonus).toBe(3);
     expect(spear.damage_dice_primary).toBe('1d6 + 1');
     expect(spear.damage_dice_two_handed).toBe('1d8 + 1');
+    expect(spear.damage_dice_two_handed).not.toBe(spear.damage_dice_primary);
     expect(spear.damage_type_primary).toBe('piercing');
-    expect(spear.description).toMatch(/1d8 \+ 1\) piercing damage if used with two hands to make a melee attack/);
-  });
-
-  it('wrong-slot additive fields are GONE: no damage_dice_secondary (§118 combined transport dead for this row)', () => {
-    const spear = spearRow();
     expect(spear.damage_dice_secondary).toBeUndefined();
     expect(spear.flat_damage_secondary).toBeUndefined();
+    expect(spear.description).toBe('Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.');
+    expect(kuoToa().actions[0].name).toBe('Bite');
+    expect(kuoToa().actions[0].damage_dice_two_handed).toBeUndefined();
+    expect(kuoToa().actions[2].name).toBe('Net');
+    expect(kuoToa().actions[2].damage_dice_two_handed).toBeUndefined();
   });
 
-  it('buildTwoHandedVariantOffer arms the Spear HIT-popup chooser with both formulas', () => {
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
+  it('row wired: chooser arms with the disk formulas, additive transport byte-inert, select-log fork pays ONE pool (no double-charge)', () => {
+    const spear = spearRow();
+    const offer = buildTwoHandedVariantOffer(spear, 'Spear');
     expect(offer).toMatchObject({
-      formula: '1d8 + 1',
-      baseFormula: '1d6 + 1',
-      damageType: 'piercing',
+      formula: spear.damage_dice_two_handed,
+      baseFormula: spear.damage_dice_primary,
+      damageType: spear.damage_type_primary,
       attackName: 'Spear',
     });
-    expect(offer.label).toContain('1d8 + 1');
-  });
-
-  it('buildSecondaryDamageTransport is byte-inert — no autoDamageSecondaryFormula additive stacking', () => {
-    expect(buildSecondaryDamageTransport(spearRow(), 'Spear')).toEqual({
+    expect(offer.label).toContain(spear.damage_dice_two_handed);
+    expect(buildSecondaryDamageTransport(spear, 'Spear')).toEqual({
       autoDamageSecondaryFormula: null,
       autoDamageSecondaryName: null,
       autoDamageSecondaryDamageType: null,
     });
-  });
-
-  it('select logs: two-handed rides 1d8 + 1, unpicked default is single-hand 1d6 + 1 only', () => {
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
     const two = buildTwoHandedVariantSelectLog({ monsterName: 'Kuo-Toa 1', offer, hands: 'two-handed' });
     expect(two.automationType).toBe('two_handed_variant_selected');
     expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain('1d8 + 1');
+    expect(two.description).toContain(spear.damage_dice_two_handed);
     const one = buildTwoHandedVariantSelectLog({ monsterName: 'Kuo-Toa 1', offer, hands: 'one-handed', defaulted: true });
     expect(one.automationType).toBe('one_handed_variant_selected');
     expect(one.description).toContain('default');
-    expect(one.description).toContain('1d6 + 1');
-  });
-
-  it('Bite/Net siblings stay byte-inert — no chooser, no secondary transport', () => {
-    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
-    const kuoToa = monsters.find((m) => m.name === 'Kuo-Toa');
-    expect(buildTwoHandedVariantOffer(kuoToa.actions[0], 'Bite')).toBeNull();
-    expect(buildSecondaryDamageTransport(kuoToa.actions[0], 'Bite').autoDamageSecondaryFormula).toBeNull();
-    expect(buildTwoHandedVariantOffer(kuoToa.actions[2], 'Net')).toBeNull();
-    expect(buildSecondaryDamageTransport(kuoToa.actions[2], 'Net').autoDamageSecondaryFormula).toBeNull();
+    expect(one.description).toContain(spear.damage_dice_primary);
+    expect(one.description).not.toContain(spear.damage_dice_two_handed);
   });
 });

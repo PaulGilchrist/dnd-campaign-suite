@@ -1,20 +1,22 @@
-// Redundant tests removed: 17 tests covering result view transitions, header
-// rendering, result descriptions, overlay interactions, custom titles,
-// skip button labels, multi-target save listeners, no-uses selection blocking,
-// and Disappearing Step confirmation were all already covered with equal or
-// greater fidelity in the step-specific test files (refreshingStep, tauntingStep,
-// disappearingStep, dreadfulStep), render.test.jsx, and noUses.test.jsx.
-//
-// Kept (5 unique behavioral tests):
-//   - overlay click in result view doesn't call onClose (cross-step modal behavior)
-//   - overlay click in choice step doesn't call onClose (cross-step modal behavior)
-//   - freeCastCountKey: null -> no setRuntimeValue call (unique free-cast flow)
-//   - free cast skip remaining count display (unique free-cast flow)
-//   - skip in taunting step with no targets -> result view (cross-step flow)
+// @maintained-by-ai
+// Integration lane: genuine cross-step seams only — overlay/content-click close behavior
+// spanning choice→result, the null freeCastCountKey guard on the decrement lane, the
+// mistyEscape free-cast skip log/result seam, and the taunting chooser→skip→result flow.
+// Copy is owned by render.test.jsx; exact step payloads by refreshingStep,
+// disappearingStep (#256), dreadfulStep (#257), and bewitching (#254).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpService.js';
+import { addEntry } from '../../../services/ui/logService.js';
+import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
+
+vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+    createSaveListener: vi.fn((campaignName, opts) => ({
+        promptId: `prompt-${opts.targetName}-${Math.random().toString(36).slice(2, 8)}`,
+    })),
+}));
 
 vi.mock('../../../services/ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
@@ -25,15 +27,7 @@ vi.mock('../../../services/rules/effects/expirations.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'activeConditions' && characterKey !== 'campaign') {
-            return [];
-        }
-        if (propertyName === 'targetEffects' && characterKey === 'campaign') {
-            return [];
-        }
-        return [];
-    }),
+    getRuntimeValue: vi.fn(() => []),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
@@ -68,75 +62,84 @@ function makeProps(overrides) {
     return { ...baseProps, ...(overrides || {}) };
 }
 
-function renderToResult() {
-    const refreshingOption = screen.getByText('Refreshing Step');
-    fireEvent.click(refreshingOption);
-    const refreshButton = screen.getByRole('button', { name: /Refresh/ });
-    fireEvent.click(refreshButton);
-}
-
 describe('StepsOfTheFeyTauntModal - Integration', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        localStorage.clear();
     });
 
-    describe('result view', () => {
-        it('does not call onClose when modal content is clicked in result view', async () => {
-            const onClose = vi.fn();
-            render(<StepsOfTheFeyTauntModal {...makeProps({ onClose })} />);
-            renderToResult();
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-            });
-            const modal = document.querySelector('.sp-modal');
-            fireEvent.click(modal);
-            expect(onClose).not.toHaveBeenCalled();
+    it('never closes on overlay or modal-content clicks — holds the choice step, then the result view', async () => {
+        const onClose = vi.fn();
+        const { container } = render(<StepsOfTheFeyTauntModal {...makeProps({ onClose })} />);
+
+        // Choice step: clicking the overlay or inside the modal must not close or advance.
+        fireEvent.click(container.firstChild);
+        fireEvent.click(screen.getByText(/Choose how you use/));
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByText(/Choose how you use/)).toBeInTheDocument();
+
+        // Resolve the refreshing lane to reach the result view.
+        fireEvent.click(screen.getByText('Refreshing Step'));
+        fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
+
+        // Result view: same click-through behavior — only Done closes.
+        fireEvent.click(container.firstChild);
+        fireEvent.click(screen.getByText(/Refreshing Step:/));
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
-    describe('overlay interactions', () => {
-        it('does not call onClose or transition to result view when overlay is clicked in choice step', () => {
-            const onClose = vi.fn();
-            render(<StepsOfTheFeyTauntModal {...makeProps({ onClose })} />);
-            const overlay = document.querySelector('.sp-overlay');
-            fireEvent.click(overlay);
-            expect(onClose).not.toHaveBeenCalled();
-            expect(screen.getByText(/Choose how you use/)).toBeInTheDocument();
+    it('completes the refreshing lane without any runtime write when freeCastCountKey is null', async () => {
+        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3, freeCastCountKey: null })} />);
+        fireEvent.click(screen.getByText('Refreshing Step'));
+        fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
+
+        // Lane ran to completion — the temp-HP benefit landed...
+        expect(setTempHp).toHaveBeenCalledWith('FeyTrickster', expect.any(Number), 'test-campaign');
+        // ...while the missing counter key wrote nothing to the runtime store.
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    describe('free cast flow', () => {
-        it('does not call setRuntimeValue when freeCastCountKey is null', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 3, freeCastCountKey: null })} />);
-            renderToResult();
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-            });
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
+    it('free-cast skip in mistyEscape mode logs the free cast, shows the remaining count, and consumes no uses', async () => {
+        render(<StepsOfTheFeyTauntModal {...makeProps({ mode: 'mistyEscape', newCount: 3 })} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Misty Step only (free cast)' }));
 
-        it('shows correct remaining count after free cast skip in mistyEscape mode', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ mode: 'mistyEscape', newCount: 3 })} />);
-            const skipButton = screen.getByRole('button', { name: 'Misty Step only (free cast)' });
-            fireEvent.click(skipButton);
-            await waitFor(() => {
-                const body = document.querySelector('.sp-body');
-                expect(body.textContent).toContain('3 remaining');
-            });
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
+        expect(screen.getByText(/3 remaining/)).toBeInTheDocument();
+
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            type: 'ability_use',
+            characterName: 'FeyTrickster',
+            abilityName: 'Steps of the Fey',
+            description: expect.stringContaining('cast Misty Step for free'),
+        }));
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    describe('edge cases', () => {
-        it('transitions to result view when skip is pressed in taunting step with no targets', async () => {
-            render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 5 })} />);
-            const tauntingOption = screen.getByText('Taunting Step');
-            fireEvent.click(tauntingOption);
-            const skipButton = screen.getByRole('button', { name: 'Skip' });
-            fireEvent.click(skipButton);
-            await waitFor(() => {
-                expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-            });
+    it('skip from the taunting chooser resolves to a no-targets Taunting result without dispatching saves or writes', async () => {
+        render(<StepsOfTheFeyTauntModal {...makeProps({ newCount: 5 })} />);
+
+        // Cross-step seam: choice → taunting target chooser.
+        fireEvent.click(screen.getByText('Taunting Step'));
+        expect(screen.getByText('Taunting Step: Select creatures to taunt.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
+
+        expect(screen.getByText(/Taunting Step:/)).toBeInTheDocument();
+        expect(screen.getByText(/No targets selected/)).toBeInTheDocument();
+        expect(screen.getByText(/5 remaining/)).toBeInTheDocument();
+        expect(createSaveListener).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 });

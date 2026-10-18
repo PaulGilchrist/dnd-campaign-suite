@@ -1,251 +1,155 @@
+// @maintained-by-ai
+// #386 audit. Disk-faithful fixtures (#387): the mocked fetch serves
+// public/data/resistances-immunities.json verbatim — the prod list is versioned on disk
+// (13 types), so empty-data states can never render and are not tested. The wizard always
+// passes preSelected* as arrays (CharacterCreationWizard.jsx:456), so undefined-prop
+// negatives are dropped as unreachable. Warning rendering, type-classing, and the
+// null/empty guard are owned by WarningList.test.jsx — only the step's pass-through of
+// `warnings` is pinned here. Step-number display is owned by WizardStepNumbering.test.jsx;
+// stepNumber here is a plain props passthrough. Disabled pins, not clicks (#289);
+// fresh props per test (#362). No selection cap exists at this step (useWizardResistances
+// registers one non-limit slot), so there is no count-boundary to pin.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import WizardStepResistances from './WizardStepResistances.jsx';
+import DISK_TYPES from '../../../public/data/resistances-immunities.json';
 
-const mockResistancesData = [
-  'Acid',
-  'Cold',
-  'Fire',
-  'Force',
-  'Lightning',
-  'Necrotic',
-  'Psychic',
-  'Radiant',
-  'Thunder',
-];
-
-function createMockProps(overrides = {}) {
+function createProps(overrides = {}) {
+  const { formData, ...rest } = overrides;
   return {
-    formData: {
-      resistances: [],
-      immunities: [],
-      ...overrides.formData,
-    },
+    stepNumber: 13,
+    formData: { resistances: [], immunities: [], ...formData },
     onResistanceToggle: vi.fn(),
     onImmunityToggle: vi.fn(),
-    warnings: overrides.warnings || [],
-    preSelectedResistances: overrides.preSelectedResistances || [],
-    preSelectedImmunities: overrides.preSelectedImmunities || [],
-    ...overrides,
+    warnings: [],
+    preSelectedResistances: [],
+    preSelectedImmunities: [],
+    ...rest,
   };
 }
 
-function setupFetchMock(data) {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(data),
+function section(labelText) {
+  return screen.getByText(labelText).closest('.form-group');
+}
+
+function checkboxFor(labelText, type) {
+  const item = Array.from(section(labelText).querySelectorAll('.multi-select-item'))
+    .find((el) => el.textContent.includes(type));
+  return item.querySelector('input[type="checkbox"]');
+}
+
+function itemTexts(labelText) {
+  return Array.from(section(labelText).querySelectorAll('.multi-select-item'))
+    .map((el) => el.textContent.replace(/\u00a0/g, ' ').trim());
+}
+
+async function waitForLoaded(container) {
+  await waitFor(() => {
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(DISK_TYPES.length * 2);
   });
-}
-
-function getSectionByLabelText(text) {
-  const formGroups = document.querySelectorAll('.wizard-step .form-group');
-  return Array.from(formGroups).find((g) =>
-    g.querySelector('label')?.textContent?.includes(text)
-  );
-}
-
-function getCheckboxForType(section, typeName) {
-  const labels = section?.querySelectorAll('label') || [];
-  const targetLabel = Array.from(labels).find(
-    (l) => l.querySelector('input[type="checkbox"]') && l.textContent.includes(typeName)
-  );
-  return targetLabel?.querySelector('input[type="checkbox"]') ?? null;
 }
 
 describe('WizardStepResistances', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    setupFetchMock(mockResistancesData);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(DISK_TYPES),
+    }));
   });
 
-  describe('Rendering', () => {
-    it('should render the step header, resistances and immunities labels', () => {
-      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
-      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
-      expect(screen.getByText('Resistances')).toBeInTheDocument();
-      expect(screen.getByText('Immunities')).toBeInTheDocument();
-    });
-
-    it('should render no checkboxes when data array is empty', async () => {
-      setupFetchMock([]);
-      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
-      await waitFor(() => {
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        expect(checkboxes.length).toBe(0);
-      });
-      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
-    });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  describe('Selected values', () => {
-    it('should check the checkbox when a value is in formData resistances', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            formData: { resistances: ['Fire'], immunities: [] },
-          })}
-        />
-      );
-      await waitFor(() => {
-        const resistanceSection = getSectionByLabelText('Resistances');
-        expect(getCheckboxForType(resistanceSection, 'Fire').checked).toBe(true);
-      });
-    });
+  it('fetches disk data and renders its exact ordered damage-type list in both sections', async () => {
+    let resolveFetch;
+    const fetchMock = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = render(<WizardStepResistances {...createProps()} />);
 
-    it('should mark selected items with the "selected" CSS class', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            formData: { resistances: ['Fire'], immunities: ['Cold'] },
-          })}
-        />
-      );
-      await waitFor(() => {
-        const selectedItems = document.querySelectorAll('.multi-select-item.selected');
-        expect(selectedItems.length).toBe(2);
-      });
-    });
+    expect(fetchMock).toHaveBeenCalledWith('/data/resistances-immunities.json');
+    expect(screen.getByRole('heading', { name: 'Step 13: Resistances & Immunities' })).toBeInTheDocument();
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+
+    resolveFetch({ ok: true, status: 200, json: () => Promise.resolve(DISK_TYPES) });
+    await waitForLoaded(container);
+
+    expect(itemTexts('Resistances')).toEqual(DISK_TYPES);
+    expect(itemTexts('Immunities')).toEqual(DISK_TYPES);
   });
 
-  describe('Pre-selected items', () => {
-    it('should show "(Granted)" suffix for pre-selected values', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            preSelectedResistances: ['Acid'],
-            preSelectedImmunities: ['Cold'],
-          })}
-        />
-      );
-      await waitFor(() => {
-        expect(screen.getByText('Acid (Granted)')).toBeInTheDocument();
-        expect(screen.getByText('Cold (Granted)')).toBeInTheDocument();
-      });
-    });
+  it('checks exactly the types listed in formData, independently per section', async () => {
+    const { container } = render(<WizardStepResistances {...createProps({
+      formData: { resistances: ['Fire'], immunities: ['Cold'] },
+    })} />);
+    await waitForLoaded(container);
 
-    it('should disable the checkbox when pre-selected and already selected, and keep it enabled when pre-selected but not yet selected', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            preSelectedResistances: ['Fire'],
-            formData: { resistances: ['Fire'] },
-          })}
-        />
-      );
-      await waitFor(() => {
-        const resistanceSection = getSectionByLabelText('Resistances');
-        const fireCheckbox = getCheckboxForType(resistanceSection, 'Fire');
-        expect(fireCheckbox.disabled).toBe(true);
-        expect(fireCheckbox.checked).toBe(true);
-      });
-    });
-
-    it('should apply pre-selected CSS class to the label', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            preSelectedResistances: ['Acid'],
-          })}
-        />
-      );
-      await waitFor(() => {
-        const preSelectedLabel = document.querySelector('.multi-select-item.pre-selected');
-        expect(preSelectedLabel).toBeInTheDocument();
-        expect(preSelectedLabel.textContent).toContain('Acid');
-      });
-    });
-
-    it('should handle undefined preSelectedResistances gracefully', () => {
-      const props = createMockProps();
-      props.preSelectedResistances = undefined;
-      props.preSelectedImmunities = undefined;
-      render(<WizardStepResistances stepNumber={13} {...props} />);
-      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
-    });
+    expect(checkboxFor('Resistances', 'Fire').checked).toBe(true);
+    expect(checkboxFor('Immunities', 'Cold').checked).toBe(true);
+    expect(checkboxFor('Resistances', 'Cold').checked).toBe(false);
+    expect(checkboxFor('Immunities', 'Fire').checked).toBe(false);
   });
 
-  describe('Toggle interactions', () => {
-    it('should call onResistanceToggle when a resistance checkbox is clicked', async () => {
-      const mockOnResistanceToggle = vi.fn();
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            onResistanceToggle: mockOnResistanceToggle,
-            formData: { resistances: [], immunities: [] },
-          })}
-        />
-      );
-      await waitFor(() => {
-        const resistanceSection = getSectionByLabelText('Resistances');
-        const fireCheckbox = getCheckboxForType(resistanceSection, 'Fire');
-        expect(fireCheckbox).not.toBeNull();
-        fireEvent.click(fireCheckbox);
-      });
+  it.each([
+    ['Resistances', 'onResistanceToggle', 'onImmunityToggle'],
+    ['Immunities', 'onImmunityToggle', 'onResistanceToggle'],
+  ])('clicking a %s checkbox calls only %s with the exact damage type', async (sectionLabel, handlerName, otherName) => {
+    const props = createProps();
+    const { container } = render(<WizardStepResistances {...props} />);
+    await waitForLoaded(container);
 
-      expect(mockOnResistanceToggle).toHaveBeenCalledWith('Fire');
-    });
+    fireEvent.click(checkboxFor(sectionLabel, 'Lightning'));
 
-    it('should keep the checkbox checked when a disabled pre-selected checkbox is clicked', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            preSelectedResistances: ['Fire'],
-            formData: { resistances: ['Fire'] },
-          })}
-        />
-      );
-      await waitFor(() => {
-        const resistanceSection = getSectionByLabelText('Resistances');
-        const fireCheckbox = getCheckboxForType(resistanceSection, 'Fire');
-        expect(fireCheckbox.disabled).toBe(true);
-        expect(fireCheckbox.checked).toBe(true);
-        fireEvent.click(fireCheckbox);
-        expect(fireCheckbox.checked).toBe(true);
-      });
-    });
+    expect(props[handlerName]).toHaveBeenCalledTimes(1);
+    expect(props[handlerName]).toHaveBeenCalledWith('Lightning');
+    expect(props[otherName]).not.toHaveBeenCalled();
   });
 
-  describe('Warnings', () => {
-    it('should render warning messages when provided', async () => {
-      render(
-        <WizardStepResistances stepNumber={13}
-          {...createMockProps({
-            warnings: [
-              { type: 'error', message: 'Too many resistances selected' },
-              { type: 'warning', message: 'Consider your class limitations' },
-            ],
-          })}
-        />
-      );
+  it('suffixes pre-selected types with "(Granted)" and disables only granted-and-selected checkboxes', async () => {
+    const { container } = render(<WizardStepResistances {...createProps({
+      formData: { resistances: ['Fire'], immunities: [] },
+      preSelectedResistances: ['Fire', 'Acid'],
+      preSelectedImmunities: ['Cold'],
+    })} />);
+    await waitForLoaded(container);
 
-      expect(screen.getByText('Too many resistances selected')).toBeInTheDocument();
-      expect(screen.getByText('Consider your class limitations')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Acid (Granted)')).toBeInTheDocument();
+    expect(screen.getByText('Cold (Granted)')).toBeInTheDocument();
 
-    it('should not render warnings container when warnings is null or empty', () => {
-      render(<WizardStepResistances stepNumber={13} {...createMockProps({ warnings: null })} />);
-      expect(document.querySelector('.warning-container')).not.toBeInTheDocument();
-      render(<WizardStepResistances stepNumber={13} {...createMockProps({ warnings: [] })} />);
-      expect(document.querySelector('.warning-container')).not.toBeInTheDocument();
-    });
+    const locked = checkboxFor('Resistances', 'Fire');
+    expect(locked.disabled).toBe(true);
+    expect(locked.checked).toBe(true);
+
+    const stillSelectable = checkboxFor('Resistances', 'Acid');
+    expect(stillSelectable.disabled).toBe(false);
+    expect(stillSelectable.checked).toBe(false);
   });
 
-  describe('Error handling', () => {
-    it('should log an error and keep rendering when fetch fails', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      render(<WizardStepResistances stepNumber={13} {...createMockProps()} />);
+  it('passes warnings through to WarningList', () => {
+    render(<WizardStepResistances {...createProps({
+      warnings: [
+        { type: 'warning', message: 'Consider your class limitations' },
+        { type: 'error', message: 'Too many resistances selected' },
+      ],
+    })} />);
 
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith(
-          'Error loading resistances/immunities:',
-          expect.any(Error),
-        );
-      });
+    expect(document.querySelector('.warning-container')).toBeInTheDocument();
+    expect(screen.getByText('Consider your class limitations')).toBeInTheDocument();
+    expect(screen.getByText('Too many resistances selected')).toBeInTheDocument();
+  });
 
-      expect(screen.getByText('Step 13: Resistances & Immunities')).toBeInTheDocument();
-      consoleSpy.mockRestore();
+  it('logs the load failure and keeps the step rendered with no options', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+    const { container } = render(<WizardStepResistances {...createProps()} />);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading resistances/immunities:', expect.any(Error));
     });
+
+    expect(screen.getByRole('heading', { name: 'Step 13: Resistances & Immunities' })).toBeInTheDocument();
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    consoleSpy.mockRestore();
   });
 });
