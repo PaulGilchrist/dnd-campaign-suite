@@ -1,26 +1,42 @@
+// @maintained-by-ai
 // MA-0322: Awakened Shrub / Rake — flat "Hit: 1 Slashing damage." (no
 // damage_dice_primary) must arm autoDamageFormula "1" on the attack chip and
 // resolve dice-less on hit (total 1, empty rolls), never silently zero.
+//
+// Audit + trim (lane: flat damage, no dice — diceRoller stays REAL here:
+// rollExpression('1') genuinely returns null, constants are not dice, so the
+// parseConstant seam (MonsterCardModal.jsx:1486) is proven at this seam;
+// auto-damage-roll.test.jsx (#580) MOCKS rollExpression and cannot cover it).
+//   - 4 tests → 2: chip-arm identity kept once (flat formula byte →
+//     rollAttack options), callback faces collapsed into ONE it.each
+//     (hit / crit / blocked-refusal) per #580's blocked-guard precedent.
+//   - crit row pins REAL semantics: flat NEVER doubles on crit (dice-only
+//     doubling, :1480) — total stays 1 and context.isAutoCrit rides through.
+//   - vacuous purges: toHaveBeenCalled before mock.calls access,
+//     truthy-on-immediately-invoked callback; unused _roll*/_setPopupHtml
+//     export channels purged (hook-object methods stay for the modal's
+//     destructure). Chip-transport blocked face owned by
+//     unrollable-damage.test.jsx; secondary chip owned by #590; secondary
+//     flat byte owned by cultist-flat-secondary.test.js (#589).
 import { render, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks (mirror MonsterCardModal.auto-damage-roll.test.jsx) ─────────────
-// diceRoller stays REAL: rollExpression('1') genuinely returns null
-// (constants are not dice) — the MA-0322 parseConstant seam resolves it.
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
+  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  // Stable identities for the remaining channels the modal destructures (:2211).
   const _rollAbilityCheck = vi.fn();
   const _rollSavingThrow = vi.fn();
   const _rollSkillCheck = vi.fn();
   const _rollInitiative = vi.fn();
   const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
 
   const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
     get popupHtml() { return _popupHtml; },
@@ -34,17 +50,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     quickRollPlayerSave: _quickRollPlayerSave,
   }));
 
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollAbilityCheck,
-    _rollSavingThrow,
-    _rollSkillCheck,
-    _rollInitiative,
-    _quickRollPlayerSave,
-    _setPopupHtml,
-  };
+  return { default: mockHook, _rollAttack, _rollDamage };
 });
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
@@ -55,7 +61,7 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
+  formatDamageTypes: vi.fn((types) => (types || []).join(', ')),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn(() => ({ name: 'Awakened Shrub 1', conditions: [], targetName: 'Player A' })),
@@ -116,6 +122,7 @@ function renderShrub() {
   fireEvent.click(link);
   // The autoDamageRoll callback rides the useLoggedDiceRoll options (3rd arg).
   const hookOpts = useLoggedDiceRoll.default.mock.calls.at(-1)[2];
+  expect(typeof hookOpts.autoDamageRoll).toBe('function');
   return hookOpts.autoDamageRoll;
 }
 
@@ -124,25 +131,44 @@ describe('MonsterCardModal — MA-0322 flat hit damage (Rake, no dice)', () => {
     vi.clearAllMocks();
   });
 
-  it('arms autoDamageFormula "1" from dice-less prose on the +1 attack chip', () => {
+  it('arms autoDamageFormula "1" + Slashing from dice-less prose on the +1 attack chip', () => {
     renderShrub();
-    expect(rollAttack).toHaveBeenCalled();
     expect(rollAttack.mock.calls[0][2].autoDamageFormula).toBe('1');
     expect(rollAttack.mock.calls[0][2].damageType).toBe('Slashing');
   });
 
-  it('resolves the constant dice-less on hit: rollDamage total 1, empty rolls', async () => {
+  it.each([
+    {
+      label: 'hit — constant resolves dice-less',
+      autoDamage: { formula: '1', damageType: 'Slashing', name: 'Rake', attackerName: 'Awakened Shrub 1' },
+    },
+    {
+      // Flat NEVER doubles on crit (dice-only doubling, playbook §4):
+      // real rollExpressionDoubled('1') → null, parseConstant → 1 verbatim.
+      label: 'crit — flat total stays 1 (not doubled)',
+      autoDamage: { formula: '1', damageType: 'Slashing', name: 'Rake', attackerName: 'Awakened Shrub 1', isAutoCrit: true },
+      crit: true,
+    },
+    {
+      // MA-0014 inert face at the flat callback seam, once: nothing
+      // resolves → logged refusal, never silence.
+      label: 'unrollable formula blocked (MA-0014)',
+      autoDamage: { formula: 'spell level', damageType: 'force', name: 'Broken', attackerName: 'Awakened Shrub 1' },
+      blocked: true,
+    },
+  ])('autoDamageRoll: $label', async ({ autoDamage, blocked, crit }) => {
     const autoDamageRoll = renderShrub();
-    expect(autoDamageRoll).toBeTruthy();
     await act(async () => {
-      await autoDamageRoll({
-        formula: '1',
-        damageType: 'Slashing',
-        name: 'Rake',
-        attackerName: 'Awakened Shrub 1',
-        source: 'Awakened Shrub 1',
-      });
+      await autoDamageRoll(autoDamage);
     });
+    if (blocked) {
+      expect(rollDamage).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'automation blocked',
+        abilityName: 'Broken',
+      }));
+      return;
+    }
     expect(rollDamage).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Rake',
@@ -150,41 +176,10 @@ describe('MonsterCardModal — MA-0322 flat hit damage (Rake, no dice)', () => {
         total: 1,
         rolls: [],
         modifier: 0,
-        context: expect.objectContaining({ damageType: 'Slashing', targetName: 'Player A', attackerName: 'Awakened Shrub 1' }),
+        // wasCrit = isCrit || autoDamage.isAutoCrit (:2223) — absent-flag
+        // hit face is undefined, crit face pins TRUE, and total still 1.
+        context: expect.objectContaining({ damageType: 'Slashing', targetName: 'Player A', attackerName: 'Awakened Shrub 1', ...(crit ? { isAutoCrit: true } : {}) }),
       })
     );
-  });
-
-  it('does NOT double flat damage on crit (dice-only doubling)', async () => {
-    const autoDamageRoll = renderShrub();
-    await act(async () => {
-      await autoDamageRoll({
-        formula: '1',
-        damageType: 'Slashing',
-        name: 'Rake',
-        attackerName: 'Awakened Shrub 1',
-        isAutoCrit: true,
-      });
-    });
-    expect(rollDamage).toHaveBeenCalledWith(
-      expect.objectContaining({ total: 1, rolls: [], modifier: 0 })
-    );
-  });
-
-  it('still logs a blocked-damage refusal for unrollable formulas (MA-0014 intact)', async () => {
-    const autoDamageRoll = renderShrub();
-    await act(async () => {
-      await autoDamageRoll({
-        formula: 'spell level',
-        damageType: 'force',
-        name: 'Broken',
-        attackerName: 'Awakened Shrub 1',
-      });
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'automation blocked',
-      abilityName: 'Broken',
-    }));
   });
 });

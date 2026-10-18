@@ -1,3 +1,24 @@
+// @maintained-by-ai
+// Trim pass (2026-10-18): sole REAL-combineAttackModes owner for the CLA-119
+// Elusive fold — conditionEffects.js/elusiveFeature.js stay UNMOCKED here
+// (mirrors the real adv=0 fold at conditionEffects.js:868-870 that the
+// combineAttackModes→'normal' mocked siblings (attack-advanced #578,
+// attack-logic #579, dodge-ba001 #594) delegate to at :180-212).
+//
+// Removed:
+//   "is idempotent — pre-stamped flag never double-counts" (#580 vacuous)
+//     → applyElusive stamps `noAdvantageAgainst = true` (MonsterCardModal.jsx:996);
+//       a boolean assignment is structurally idempotent and the fn never touches
+//       targetAdvantageCount — the assertion could never fail.
+// Collapsed:
+//   control / feature-less-stub / non-player inert legs → one it.each over the
+//   three applyElusive guard branches (:991-992). Control leg is additionally
+//   covered end-to-end by the owner integration block (:195-203).
+// Dead mocks purged (fold stays REAL):
+//   diceRoller.js — rollExpression only fires in handleDamage/spell lanes
+//   (:2431/:2683), never behind the mocked rollAttack chip click;
+//   shared/abilityLookup.js — not imported anywhere in this modal graph.
+//
 // CLA-119: Elusive (lv18+ Rogue, both rulesets) — EB monster attacks against an
 // Elusive PC must cancel ALL attacker Advantage (noAdvantageAgainst fold consumed
 // by combineAttackModes adv=0). Before the fix applyElusive read `targetComputed`
@@ -12,11 +33,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal, { applyElusive } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 3, rolls: [2], modifier: 1 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 6, rolls: [2, 2], modifier: 2 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({
@@ -25,10 +41,9 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
-  const _setPopupHtml = vi.fn();
   const mockHook = vi.fn(() => ({
     popupHtml: null,
-    setPopupHtml: _setPopupHtml,
+    setPopupHtml: vi.fn(),
     rollAttack: _rollAttack,
     rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
@@ -37,7 +52,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
-  return { default: mockHook, _rollAttack, _setPopupHtml };
+  return { default: mockHook, _rollAttack };
 });
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -58,10 +73,6 @@ vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
 
 vi.mock('../../services/maps/mapsService.js', () => ({
   loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -140,18 +151,6 @@ describe('applyElusive — full playerStats fold (unit)', () => {
     }
   });
 
-  it('is inert for a control defender without Elusive', () => {
-    const data = { targetAdvantageCount: 1 };
-    applyElusive(data, { name: CONTROL, type: 'player' }, [{ name: CONTROL, computedStats: plainStats }], 'test-campaign');
-    expect(data.noAdvantageAgainst ?? false).toBe(false);
-  });
-
-  it('is inert when the characters list lacks computedStats (feature-less stub lane)', () => {
-    const data = {};
-    applyElusive(data, playerTarget, [{ name: ROGUE }], 'test-campaign');
-    expect(data.noAdvantageAgainst ?? false).toBe(false);
-  });
-
   it('honors the Incapacitated exemption (CONDITIONS_THAT_CANNOT_ACT)', () => {
     for (const cond of ['incapacitated', 'paralyzed', 'stunned', 'unconscious', 'petrified']) {
       runtime.store[`${ROGUE}.activeConditions`] = [cond];
@@ -161,18 +160,15 @@ describe('applyElusive — full playerStats fold (unit)', () => {
     }
   });
 
-  it('is idempotent — pre-stamped flag never double-counts (boolean fold)', () => {
-    const data = { noAdvantageAgainst: true, targetAdvantageCount: 1 };
-    applyElusive(data, playerTarget, [{ name: ROGUE, computedStats: elusiveStats }], 'test-campaign');
-    applyElusive(data, playerTarget, [{ name: ROGUE, computedStats: elusiveStats }], 'test-campaign');
-    expect(data.noAdvantageAgainst).toBe(true);
-    expect(data.targetAdvantageCount).toBe(1);
-  });
-
-  it('is inert for non-player targets', () => {
-    const data = {};
-    applyElusive(data, { name: 'Ogre', type: 'npc' }, [{ name: 'Ogre', computedStats: elusiveStats }], 'test-campaign');
+  it.each([
+    ['control defender without Elusive', { name: CONTROL, type: 'player' }, [{ name: CONTROL, computedStats: plainStats }]],
+    ['feature-less stub lane (characters lack computedStats)', playerTarget, [{ name: ROGUE }]],
+    ['non-player target', { name: 'Ogre', type: 'npc' }, [{ name: 'Ogre', computedStats: elusiveStats }]],
+  ])('is inert for %s', (_label, target, characters) => {
+    const data = { targetAdvantageCount: 1 };
+    applyElusive(data, target, characters, 'test-campaign');
     expect(data.noAdvantageAgainst ?? false).toBe(false);
+    expect(data.targetAdvantageCount).toBe(1);
   });
 });
 

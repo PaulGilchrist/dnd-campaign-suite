@@ -1,15 +1,23 @@
-// MA-0590: Demilich "Howl" (actions, DC 19 CON, 20d6 Psychic, Recharge 5-6,
-// range "30-foot Emanation"). breathAoeShape now recognizes the authored
-// "N-foot Emanation" RANGE byte (emanationRadiusFeet) and routes the click
-// through the same SaveAttackAoeModal area picker as the MA-0031 cones /
-// MA-0084 spheres — labelled "30-ft Radius", attacker-origin coverage gate
-// (rangeGateFt = the authored feet, gridless lenient §42) — never the former
-// single-target block-save degrade that left a second adjacent victim with
-// zero save / zero damage / zero log. The DATA edit (save_effect now
-// byte-carries the MA-0303 "Failure or Success:" marker) arms the picker
-// success-leg Frightened grant threaded onto the picker props. Cone/line/
-// cylinder twins stay byte-identical (their branches untouched); a clauseless
-// single-target save row keeps fire() with the picker closed.
+// @maintained-by-ai
+// MA-0590 / MA-0603: authored "N-foot Emanation" RANGE rows (Demilich "Howl"
+// DC 19 CON 20d6 Psychic; Dire Worg "Dreadful Howl" DC 16 WIS 8d8 Psychic —
+// both Recharge 5-6) route the click through the same SaveAttackAoeModal area
+// picker as the MA-0031 cones / MA-0084 spheres — labelled "30-ft Radius",
+// attacker-origin coverage gate (rangeGateFt = the authored feet, gridless
+// lenient §42) — never the former single-target block-save degrade that left a
+// second adjacent victim with zero save / zero damage / zero log. The MA-0590
+// DATA edit (save_effect byte-carries the MA-0303 "Failure or Success:"
+// marker) arms the picker success-leg Frightened grant threaded onto the props;
+// MA-0603's fail-only tail stays un-armed (saveConditions-only).
+//
+// Owned elsewhere, not re-pinned here: breathAoeShape emanation/prose/DC0
+// parsing units (MA-1436 save-variant-shape, MA-1058 kraken-toxic-ink,
+// MA-0610 whirlwind-zone); picker confirm apply/grant legs
+// (SaveAttackAoeModal.demilich-howl + .crackling-wave); clause extraction
+// (MonsterCardHelpers.both-outcomes); cone / line / clauseless-single-target
+// modal twins (MA-0031 recharge-cone — incl. the Chilling Gaze single-target
+// keep, MA-0035 line-breath, dracolich-line-breath); generic recharge
+// popup/log lane (monsterRecharge.js via MA-0031 cold_breath_refused).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -28,12 +36,6 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
       </div>
     );
   },
-}));
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
@@ -119,17 +121,50 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
-const CREATURES = [
-  { name: 'Demilich 1', type: 'npc', monsterType: 'undead', targetName: 'Bandit 1', currentHp: 180, maxHp: 180, ac: 20, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
-  { name: 'Bandit 2', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+// Store keys ride the runtime monsterName (creatureName prop, #591 pattern —
+// never the base monster name).
+const HOWL_ROWS = [
+  {
+    ma: 'MA-0590 Demilich Howl',
+    index: 'demilich',
+    name: 'Demilich',
+    actionName: 'Howl',
+    creatureName: 'Demilich 1',
+    save_dc: 19,
+    save_type: 'Constitution',
+    damage: '20d6',
+    // MA-0303 marker byte arms the picker success-leg grant:
+    saveEffect: "Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.",
+    bothOutcomesClause: { conditions: ['frightened'], effects: [] },
+    durationNote: "until the start of the demilich's next turn (GM-enforced)",
+    descRe: /30-foot\s*<strong>Emanation<\/strong>/i,
+  },
+  {
+    ma: 'MA-0603 Dire Worg Dreadful Howl',
+    index: 'dire-worg',
+    name: 'Dire Worg',
+    actionName: 'Dreadful Howl',
+    creatureName: 'Dire Worg 1',
+    save_dc: 16,
+    save_type: 'Wisdom',
+    damage: '8d8',
+    // fail-only tail — stays un-armed (no MA-0303 marker):
+    saveEffect: "The target has the Frightened condition until the start of the worg's next turn.",
+    bothOutcomesClause: null,
+    durationNote: "until the start of the worg's next turn (GM-enforced)",
+    descRe: /each creature within 30 feet/i,
+  },
 ];
 
-const demilichRow = (name) => monstersData.find(m => m.index === 'demilich').actions.find(a => a.name === name);
+const diskRow = (index, actionName) => monstersData.find(m => m.index === index).actions.find(a => a.name === actionName);
 
 function renderMonster(name, actions, creatureName) {
   const m = makeMonster({ name, actions });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName, creatures: CREATURES })} />);
+  return render(<MonsterCardModal {...makeProps(m, { creatureName, creatures: [
+    { name: creatureName, type: 'npc', monsterType: 'undead', targetName: 'Bandit 1', currentHp: 180, maxHp: 180, ac: 20, conditions: [] },
+    { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+    { name: 'Bandit 2', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+  ] })} />);
 }
 
 function rowLink(label) {
@@ -140,164 +175,68 @@ function rowLink(label) {
   return row ? row.querySelector('.mc-dice-link, .mc-dice-link-save-clickable') : null;
 }
 
-describe('MA-0590 monsters.json data: Demilich Howl row ground truth', () => {
-  it('authors DC 19 CON, 20d6 Psychic, range 30-foot Emanation, Recharge 5-6, both-outcomes Frightened marker', () => {
-    const row = demilichRow('Howl');
-    expect(row.save_dc).toBe(19);
-    expect(row.save_type).toBe('Constitution');
-    expect(row.damage_dice_primary).toBe('20d6');
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  aoeProps.current = null;
+});
+
+describe.each(HOWL_ROWS)('$ma: $actionName Emanation row', ({ index, name, actionName, creatureName, save_dc, save_type, damage, saveEffect, bothOutcomesClause, durationNote, descRe }) => {
+  it('disk ground truth: DC, save type, damage, range "30-foot Emanation", Recharge 5-6, dc_success absent (default half)', () => {
+    const row = diskRow(index, actionName);
+    expect(row.save_dc).toBe(save_dc);
+    expect(row.save_type).toBe(save_type);
+    expect(row.damage_dice_primary).toBe(damage);
     expect(row.damage_type_primary).toBe('Psychic');
     expect(row.range).toBe('30-foot Emanation');
     expect(row.dc_success).toBeUndefined();
     expect(row.recharge).toBe('5-6');
-    expect(row.save_effect).toBe("Failure or Success: The target has the Frightened condition until the start of the demilich's next turn.");
-    expect(row.description).toMatch(/30-foot\s*<strong>Emanation<\/strong>/i);
+    expect(row.save_effect).toBe(saveEffect);
+    expect(row.description).toMatch(descRe);
     expect(row.description).not.toMatch(/\bcone\b|\bline\b|\bcylinder\b/i);
   });
-});
 
-describe('MA-0590 Howl routes the Emanation row to the area picker', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    aoeProps.current = null;
-    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
-  });
-
-  it('fresh click spends the recharge and opens the 30-ft Radius picker, never the single-target save', async () => {
-    renderMonster('Demilich', [demilichRow('Howl')], 'Demilich 1');
-    fireEvent.click(rowLink('Howl'));
+  it('fresh click spends the recharge and opens the 30-ft Radius picker with the attacker-origin gate, never the single-target save', async () => {
+    renderMonster(name, [diskRow(index, actionName)], creatureName);
+    fireEvent.click(rowLink(actionName));
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     const props = aoeProps.current;
     expect(props.titleOverride).toBe('30-ft Radius (GM positions tokens; selection advisory)');
     expect(props.range).toBe(30);
     // attacker-origin emanation coverage gate (MA-0031 cone shape, gridless lenient §42).
     expect(props.rangeGateFt).toBe(30);
-    expect(props.saveDc).toBe(19);
-    expect(props.saveType).toBe('Constitution');
+    expect(props.saveDc).toBe(save_dc);
+    expect(props.saveType).toBe(save_type);
     expect(props.dcSuccess).toBe('half');
-    expect(props.damage).toBe('20d6');
+    expect(props.damage).toBe(damage);
     expect(props.damageType).toBe('Psychic');
     expect(props.saveConditions).toEqual(['frightened']);
-    expect(props.bothOutcomesClause).toEqual({ conditions: ['frightened'], effects: [] });
-    expect(props.conditionDurationNote).toBe("until the start of the demilich's next turn (GM-enforced)");
-    expect(props.excludeNames).toEqual(['Demilich 1']);
+    expect(props.bothOutcomesClause).toEqual(bothOutcomesClause);
+    expect(props.conditionDurationNote).toBe(durationNote);
+    expect(props.excludeNames).toEqual([creatureName]);
     expect(props.storeLastAttack).toBe(false);
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    await waitFor(() => expect(runtime.store['Demilich 1.monsterRecharge']).toBeTruthy());
-    expect(runtime.store['Demilich 1.monsterRecharge']).toEqual({ Howl: { recharged: false, threshold: 5 } });
+    const rechargeKey = `${creatureName}.monsterRecharge`;
+    await waitFor(() => expect(runtime.store[rechargeKey]).toBeTruthy());
+    expect(runtime.store[rechargeKey]).toEqual({ [actionName]: { recharged: false, threshold: 5 } });
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(spend.description).toMatch(/Howl.*Recharge 5-6; unavailable until a d6 5\+/);
-  });
-
-  it('spent row refuses: popup + howl_refused, zero spend, NO picker, no single-target roll', async () => {
-    runtime.store['Demilich 1.monsterRecharge'] = { Howl: { recharged: false, threshold: 5 } };
-    renderMonster('Demilich', [demilichRow('Howl')], 'Demilich 1');
-    fireEvent.click(rowLink('Howl'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect(aoeProps.current).toBeNull();
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Not Recharged');
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'howl_refused');
-    expect(refusal).toBeTruthy();
+    expect(spend.description).toMatch(new RegExp(`${actionName}.*Recharge 5-6; unavailable until a d6 5\\+`));
   });
 });
 
-describe('MA-0590 shape-detection twins stay byte-identical', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    aoeProps.current = null;
-    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
-  });
-
-  it('cone twin (Arch-hag Crackling Wave) keeps the 60-ft Cone picker + max-token gate', async () => {
-    const hag = monstersData.find(m => m.index === 'arch-hag');
-    renderMonster('Arch-hag', [hag.actions.find(a => a.name === 'Crackling Wave')], 'Arch-hag 1');
-    fireEvent.click(rowLink('Crackling Wave'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.titleOverride).toBe('60-ft Cone (GM positions tokens; selection advisory)');
-    expect(aoeProps.current.range).toBe(60);
-    expect(aoeProps.current.rangeGateFt).toBe(60);
-    expect(aoeProps.current.bothOutcomesClause).toEqual({ conditions: ['cursed'], effects: ['no_reactions'] });
-  });
-
-  it('line twin (Adult Blue Dragon Lightning Breath) keeps the max-feet-token 90-ft Line picker', async () => {
-    const dragon = monstersData.find(m => m.index === 'adult-blue-dragon');
-    renderMonster('Adult Blue Dragon', [dragon.actions.find(a => a.name === 'Lightning Breath (Recharge 5-6)')], 'Adult Blue Dragon 1');
-    fireEvent.click(rowLink('Lightning Breath'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.titleOverride).toBe('90-ft Line (GM positions tokens; selection advisory)');
-    expect(aoeProps.current.range).toBe(90);
-    expect(aoeProps.current.rangeGateFt).toBe(90);
-  });
-
-  it('clauseless single-target save row (no emanation range) keeps fire(), picker stays closed', async () => {
-    const creatures = [
-      { name: 'Goblin Boss 1', type: 'npc', targetName: 'Bandit 1', currentHp: 30, maxHp: 30, ac: 17, conditions: [] },
-      { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
-    ];
-    const m = makeMonster({ name: 'Goblin Boss', actions: [{ name: 'Net Attack', description: 'Dexterity Saving Throw: DC 12, one creature. Failure: Restrained.', save_dc: 12, save_type: 'Dexterity', save_effect: 'The target has the Restrained condition.' }] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Goblin Boss 1', creatures })} />);
-    fireEvent.click(rowLink('Net Attack'));
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
-    expect(aoeProps.current).toBeNull();
-  });
-});
-
-describe('MA-0603 Dire Worg Dreadful Howl: 30-ft each-creature AoE routes to the area picker', () => {
-  const direWorgRow = () => monstersData.find(m => m.index === 'dire-worg').actions.find(a => a.name === 'Dreadful Howl');
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    aoeProps.current = null;
-    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
-  });
-
-  it('disk ground truth: range authored "30-foot Emanation", DC 16 WIS, 8d8 Psychic, Recharge 5-6, dc_success absent (default half)', () => {
-    const row = direWorgRow();
-    expect(row.range).toBe('30-foot Emanation');
-    expect(row.save_dc).toBe(16);
-    expect(row.save_type).toBe('Wisdom');
-    expect(row.damage_dice_primary).toBe('8d8');
-    expect(row.damage_type_primary).toBe('Psychic');
-    expect(row.dc_success).toBeUndefined();
-    expect(row.recharge).toBe('5-6');
-    expect(row.save_effect).toBe("The target has the Frightened condition until the start of the worg's next turn.");
-    expect(row.description).toMatch(/each creature within 30 feet/i);
-    expect(row.description).not.toMatch(/\bcone\b|\bline\b|\bcylinder\b/i);
-  });
-
-  it('fresh click opens the 30-ft Radius picker with half-on-save + Frightened fail grant, spends recharge, never the single-target save', async () => {
-    renderMonster('Dire Worg', [direWorgRow()], 'Dire Worg 1');
-    fireEvent.click(rowLink('Dreadful Howl'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    const props = aoeProps.current;
-    expect(props.titleOverride).toBe('30-ft Radius (GM positions tokens; selection advisory)');
-    expect(props.range).toBe(30);
-    expect(props.rangeGateFt).toBe(30);
-    expect(props.saveDc).toBe(16);
-    expect(props.saveType).toBe('Wisdom');
-    expect(props.dcSuccess).toBe('half');
-    expect(props.damage).toBe('8d8');
-    expect(props.damageType).toBe('Psychic');
-    expect(props.saveConditions).toEqual(['frightened']);
-    expect(props.conditionDurationNote).toBe("until the start of the worg's next turn (GM-enforced)");
-    expect(props.excludeNames).toEqual(['Dire Worg 1']);
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-    await waitFor(() => expect(runtime.store['Dire Worg 1.monsterRecharge']).toBeTruthy());
-    expect(runtime.store['Dire Worg 1.monsterRecharge']).toEqual({ 'Dreadful Howl': { recharged: false, threshold: 5 } });
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(spend.description).toMatch(/Dreadful Howl.*Recharge 5-6; unavailable until a d6 5\+/);
-  });
-
-  it('Bite attack twin on the same monster stays picker-inert (emanation parse is save-row-only)', async () => {
-    const bite = monstersData.find(m => m.index === 'dire-worg').actions.find(a => a.name === 'Bite');
-    renderMonster('Dire Worg', [bite], 'Dire Worg 1');
-    fireEvent.click(rowLink('Bite'));
-    await new Promise(r => setTimeout(r, 200));
-    expect(aoeProps.current).toBeNull();
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-  });
+// Refusal once (#571 lane is owned by MA-0031/0035) — this pins only the
+// emanation-row ORDER: the recharge gate refuses BEFORE the picker opens.
+it('MA-0590 spent Howl refuses: popup + howl_refused, zero spend, NO picker, no single-target roll', async () => {
+  runtime.store['Demilich 1.monsterRecharge'] = { Howl: { recharged: false, threshold: 5 } };
+  renderMonster('Demilich', [diskRow('demilich', 'Howl')], 'Demilich 1');
+  fireEvent.click(rowLink('Howl'));
+  await waitFor(() => expect(addEntry).toHaveBeenCalled());
+  expect(aoeProps.current).toBeNull();
+  expect(rollSavingThrow).not.toHaveBeenCalled();
+  expect(String(setPopupHtml.mock.calls[0][0])).toContain('Not Recharged');
+  const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'howl_refused');
+  expect(refusal).toBeTruthy();
+  expect(refusal.characterName).toBe('Demilich 1');
+  expect(refusal.description).toMatch(/refused \(not recharged\)/);
+  expect(runtime.store['Demilich 1.monsterRecharge']).toEqual({ Howl: { recharged: false, threshold: 5 } });
 });

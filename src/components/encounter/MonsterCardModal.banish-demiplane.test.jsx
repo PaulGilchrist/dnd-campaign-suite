@@ -1,7 +1,17 @@
-// MA-0104: clicking the gated Banish legendary row on the Adult Gold Dragon
-// card arms the banished_demiplane te producer + dc_success none in the save
-// context handed to rollSavingThrow (clause + honest success ride to
-// saveProcessing); rows without the clause arm null (byte-inert).
+// @maintained-by-ai
+// MA-0104 modal lane (trimmed): clicking the gated Banish legendary row on the
+// Adult Gold Dragon card arms the banished_demiplane te producer + dc_success
+// 'none' in the save context handed to rollSavingThrow (click->ctx identity
+// bytes; args verified at MonsterCardModal.jsx:446-447 rollSavingThrow(abbr,
+// mod, buildAbilitySaveRollContext(...)) — context rides arg [2]).
+// save_dc/dc_success e2e lock cited by MonsterCardHelpers.banish-transport.test.js:4-5.
+// Owners elsewhere (dropped legs): parse truth-table + both-direction MA-0104
+// discrimination (clauseless save_effect -> null) -> banish-transport.test.js:19 +
+// soul-tome-trap.test.js (#563); attack-seam routing incl. rollSavingThrow-not-
+// called + rollAttack options arg[2] -> scorching-ray.test.jsx:222-233 and the
+// Pounce delegate-chip lane legendary-uses.test.jsx:178-187/:277-286 + #573/#571.
+// (buildSaveOptions carries NO demiplaneTransport byte — MonsterCardModal.jsx:1324-1352 —
+// so a clauseless-row byte-inert leg was un-assertable on the attack path here.)
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -96,19 +106,21 @@ describe('MA-0104 MonsterCardModal Banish arms demiplane te producer in save con
 
   it('Banish click: save context carries demiplaneTransport te arm + dcSuccess none', async () => {
     renderGold({ max: 3, used: 0 });
-    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
+    const chip = goldRow('Banish').querySelector('.mc-dice-link');
+    expect(chip.textContent).toMatch(/3d6/);
+    expect(goldRow('Banish').querySelector('.mc-dice-link-save-clickable').textContent).toMatch(/DC 21 Charisma/);
+    fireEvent.click(chip);
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
+    const [abbr, mod, context] = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(typeof abbr).toBe('string');
+    expect(abbr).toBe('CHA');
+    expect(typeof mod).toBe('number');
+    expect(context.targetName).toBe('ElderPaladin');
+    expect(context.attackerName).toBe('Adult Gold Dragon 1');
+    expect(context.actionName).toBe('Banish');
     expect(context.demiplaneTransport).toEqual({ effect: 'banished_demiplane' });
     expect(context.dcSuccess).toBe('none');
     expect(context.saveDc).toBe(21);
     expect(context.saveConditions).toContain('incapacitated');
-  });
-
-  it('clauseless row (Rend attack via Pounce) arms nothing: demiplaneTransport absent/null on attack path', async () => {
-    renderGold({ max: 3, used: 0 });
-    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

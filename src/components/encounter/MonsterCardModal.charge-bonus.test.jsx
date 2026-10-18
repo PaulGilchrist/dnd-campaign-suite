@@ -1,12 +1,47 @@
-// MA-0007: Aarakocra Skirmisher Talons charge-damage clause (monsters.json
-// conditional_damage) — GM-adjudication offer on the monster attack HIT popup.
-// Locks: offer metadata forwarded to rollAttack, grant rolls 3d4+2 with its own
-// damage + logs, decline logs base-only, resolved decision cannot re-fire.
+// @maintained-by-ai
+// MA-0007 conditional_damage modal lane — canonical owner of resolveChargeBonus
+// (MonsterCardModal.jsx:2676-2704) and the click→ctx offer forward (:1407).
+// Trim pass (2026-10-18): one branch, once.
+//
+// Collapsed (it.each per seam, shared render):
+//   Click→ctx identity: helper-metadata + offer/null forwards → one it.each
+//     asserting full offer object (all 7 buildChargeBonusOffer keys,
+//     MonsterCardHelpers.js:687-703) vs null on arg[2] of rollAttack (:2400,
+//     #580 vacuous-arg class). Direct-helper suite removed — same :689 null
+//     branch, byte-label owners are the disk-row family (ma1566 :227-239,
+//     ma1564 :207-222 BY-name #387).
+//   Grant: hit + crit faces → one it.each pinning the wasCrit roller fold
+//     (:2683), rollDamage bytes, grant-log description (+9 / +15 totals),
+//     resolved:'granted', autoDamage preserved so base Done still applies.
+//   Inert guards: !offer + already-resolved → one it.each on :2678; the
+//     guard is the first statement of the async body so negatives assert
+//     synchronously — no setTimeout flushes (no-timers 🔴).
+//
+// Removed mocks: rollD20 (never called — rollAttack is mocked), hook members
+// rollAbilityCheck/rollSavingThrow/rollSkillCheck/rollInitiative/
+// quickRollPlayerSave (destructured at :2211, never fired on this lane —
+// attack-logic baseline :49-60 proves the minimal shape renders).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
+const TALONS_ACTION = {
+  name: 'Talons',
+  description: 'Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.',
+  attack_bonus: 4,
+  reach: '5 ft.',
+  damage_dice_primary: '1d4 + 2',
+  damage_type_primary: 'Slashing',
+  conditional_damage: {
+    dice: '3d4',
+    modifier: 2,
+    damage_type: 'Slashing',
+    condition: 'moved 30+ feet straight toward target immediately before the hit',
+  },
+};
+
+// Exact buildChargeBonusOffer(TALONS_ACTION, 'Talons') output — full identity.
 const TALONS_OFFER = {
   dice: '3d4',
   modifier: 2,
@@ -17,11 +52,15 @@ const TALONS_OFFER = {
   attackName: 'Talons',
 };
 
+const CREATURES = [
+  { name: 'Aarakocra Skirmisher 1', targetName: 'AasimarTest' },
+  { name: 'AasimarTest', type: 'player' },
+];
+
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
   rollExpression: vi.fn((formula) => ({ total: 9, rolls: [3], modifier: 2, formula })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: 15, rolls: [3, 3], modifier: 2, formula })),
-  rollD20: vi.fn(() => 14),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
@@ -35,19 +74,13 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
     _rollDamage,
     _setPopupHtml,
@@ -56,7 +89,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 });
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ attackAdvantageCount: 0, attackDisadvantageCount: 0 })),
+  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
   combineAttackModes: vi.fn(() => 'normal'),
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
@@ -91,48 +124,24 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-// Stub the popup chain (real offer gating is covered in
-// DiceRollResult.charge-bonus.test.jsx) so handler behavior can be driven.
+// Stub the popup (offer gating on misses is owned by
+// char-sheet/DiceRollResult.charge-bonus.test.jsx) so the modal's
+// resolveChargeBonus handler is driven directly through its real wiring.
 vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
+  default: (props) => (
+    <div data-testid="popup-stub">
+      <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
+      <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
+    </div>
+  ),
 }));
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer } from './MonsterCardHelpers.js';
 
 const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
-
-const TALONS_ACTION = {
-  name: 'Talons',
-  description: 'Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.',
-  attack_bonus: 4,
-  reach: '5 ft.',
-  damage_dice_primary: '1d4 + 2',
-  damage_type_primary: 'Slashing',
-  conditional_damage: {
-    dice: '3d4',
-    modifier: 2,
-    damage_type: 'Slashing',
-    condition: 'moved 30+ feet straight toward target immediately before the hit',
-  },
-};
-
-const CREATURES = [
-  { name: 'Aarakocra Skirmisher 1', targetName: 'AasimarTest' },
-  { name: 'AasimarTest', type: 'player' },
-];
 
 function hitPopupHtml(overrides = {}) {
   return {
@@ -150,18 +159,23 @@ function hitPopupHtml(overrides = {}) {
   };
 }
 
-function renderTalons(popupHtml = null) {
+function renderMonsterModal(action, popupHtml = null) {
   _setPopupHtml(popupHtml);
-  const m = makeMonster({ name: 'Aarakocra Skirmisher', actions: [TALONS_ACTION] });
+  const m = makeMonster({ name: 'Aarakocra Skirmisher', actions: [action] });
   damageUtils.__setFindCreatureReturn({ name: 'Aarakocra Skirmisher 1', targetName: 'AasimarTest', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Aarakocra Skirmisher 1' })} />);
 }
 
-function clickTalonsLink() {
-  const links = document.querySelectorAll('.mc-dice-link');
-  const link = Array.from(links).find((el) => el.textContent.trim() === '+4');
-  expect(link, 'Expected Talons +4 dice link').toBeTruthy();
+function clickChip(bonus = '+4') {
+  const link = Array.from(document.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === bonus);
+  expect(link, `Expected ${bonus} dice link`).toBeTruthy();
   fireEvent.click(link);
+}
+
+function clickPopupButton(label) {
+  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === label);
+  expect(btn, `Expected ${label} button`).toBeTruthy();
+  fireEvent.click(btn);
 }
 
 function findLogEntry(type) {
@@ -173,53 +187,44 @@ beforeEach(() => {
   _setPopupHtml(null);
 });
 
-describe('MA-0007 buildChargeBonusOffer', () => {
-  it('builds the offer from conditional_damage metadata', () => {
-    const offer = buildChargeBonusOffer(TALONS_ACTION, 'Talons');
-    expect(offer).toMatchObject({ dice: '3d4', modifier: 2, damageType: 'Slashing', formula: '3d4 + 2', label: '30+ ft Charge: +3d4+2 Slashing?' });
-  });
-
-  it('returns null for actions without conditional_damage', () => {
-    expect(buildChargeBonusOffer({ name: 'Club', attack_bonus: 4 }, 'Club')).toBeNull();
-    expect(buildChargeBonusOffer(undefined, 'Club')).toBeNull();
-  });
-});
-
-describe('MA-0007 offer forwarding', () => {
-  it('forwards chargeBonusOffer to the attack roll context', () => {
-    renderTalons();
-    clickTalonsLink();
+describe('MA-0007 click→rollAttack ctx forward (MonsterCardModal.jsx:1407)', () => {
+  it.each([
+    {
+      face: 'conditional_damage row forwards the full offer on rollAttack arg[2]',
+      action: TALONS_ACTION,
+      expected: TALONS_OFFER,
+    },
+    {
+      face: 'action without the clause forwards null (Helpers:689)',
+      action: { name: 'Club', attack_bonus: 4, description: 'Melee Attack.', reach: '5 ft.' },
+      expected: null,
+    },
+  ])('$face', ({ action, expected }) => {
+    renderMonsterModal(action);
+    clickChip();
     expect(rollAttack).toHaveBeenCalled();
-    const ctx = rollAttack.mock.calls[0][2];
-    expect(ctx.chargeBonusOffer).toMatchObject({ dice: '3d4', modifier: 2, damageType: 'Slashing' });
-  });
-
-  it('forwards null offer for actions without the clause', () => {
-    const m = makeMonster({ name: 'Goblin', actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.', reach: '5 ft.' }] });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', targetName: null, conditions: [] });
-    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin' }] })} />);
-    clickTalonsLink();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toBeNull();
+    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toEqual(expected);
   });
 });
 
-describe('MA-0007 grant on HIT popup', () => {
-  it('grants: rolls 3d4+2, applies its own damage, logs the clause, marks popup resolved', async () => {
-    renderTalons(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
+describe('MA-0007 grant via HIT popup (MonsterCardModal.jsx:2676-2704)', () => {
+  it.each([
+    { face: 'hit', popup: {}, roller: rollExpression, notRoller: rollExpressionDoubled, total: '+9', isAutoCrit: false },
+    { face: 'crit', popup: { isCrit: true }, roller: rollExpressionDoubled, notRoller: rollExpression, total: '+15', isAutoCrit: true },
+  ])('on a $face: rolls the clause dice once as its own damage roll, logs the clause, marks resolved, keeps base autoDamage', async ({ popup, roller, notRoller, total, isAutoCrit }) => {
+    renderMonsterModal(TALONS_ACTION, hitPopupHtml(popup));
+    clickPopupButton('charge-grant');
     await vi.waitFor(() => {
       expect(rollDamage).toHaveBeenCalled();
     });
+    expect(roller).toHaveBeenCalledWith('3d4 + 2');
+    expect(notRoller).not.toHaveBeenCalled();
     const call = rollDamage.mock.calls[0][0];
+    expect(call.name).toBe('Talons — Charge Bonus');
     expect(call.formula).toBe('3d4 + 2');
-    expect(rollExpression).toHaveBeenCalledWith('3d4 + 2');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    expect(call.name).toMatch(/Talons — Charge Bonus/);
-    expect(call.context).toMatchObject({ damageType: 'Slashing', targetName: 'AasimarTest', attackerName: 'Aarakocra Skirmisher 1' });
+    expect(call.context).toMatchObject({ damageType: 'Slashing', targetName: 'AasimarTest', attackerName: 'Aarakocra Skirmisher 1', isAutoCrit });
     const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('+9 Slashing (3d4 + 2)');
+    expect(grant.description).toContain(`${total} Slashing (3d4 + 2)`);
     expect(grant.description).toContain('moved 30+ feet straight toward target');
     await vi.waitFor(() => {
       expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('granted');
@@ -227,48 +232,31 @@ describe('MA-0007 grant on HIT popup', () => {
     expect(useLoggedDiceRoll.__getPopupHtml().autoDamage).toBeTruthy();
   });
 
-  it('doubles the charge dice on a crit', async () => {
-    renderTalons(hitPopupHtml({ isCrit: true }));
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollExpressionDoubled).toHaveBeenCalledWith('3d4 + 2');
-    });
-  });
-
-  it('declines: no charge roll, logs base-only, marks popup resolved', async () => {
-    renderTalons(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
+  it('on a decline: no charge roll, logs base-only, marks resolved', async () => {
+    renderMonsterModal(TALONS_ACTION, hitPopupHtml());
+    clickPopupButton('charge-decline');
     await vi.waitFor(() => {
       expect(addEntry).toHaveBeenCalled();
     });
     expect(rollDamage).not.toHaveBeenCalled();
     expect(rollExpression).not.toHaveBeenCalled();
     const decline = findLogEntry('conditional_damage_declined');
-    expect(decline).toBeTruthy();
+    expect(decline.description).toContain('Talons charge bonus declined');
     expect(decline.description).toContain('base damage only');
     await vi.waitFor(() => {
       expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('declined');
     });
+    expect(useLoggedDiceRoll.__getPopupHtml().autoDamage).toBeTruthy();
   });
 
-  it('a resolved decision cannot re-fire the bonus', async () => {
-    renderTalons(hitPopupHtml({ chargeBonusResolved: 'granted' }));
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await new Promise((r) => setTimeout(r, 0));
+  it.each([
+    { face: 'a resolved decision', popup: { chargeBonusResolved: 'granted' } },
+    { face: 'a popup with no offer', popup: { chargeBonusOffer: null } },
+  ])('$face cannot fire the grant (:2678 guard)', ({ popup }) => {
+    renderMonsterModal(TALONS_ACTION, hitPopupHtml(popup));
+    clickPopupButton('charge-grant');
     expect(rollDamage).not.toHaveBeenCalled();
     expect(rollExpression).not.toHaveBeenCalled();
-    expect(findLogEntry('conditional_damage_granted')).toBeFalsy();
-  });
-
-  it('does nothing when the popup has no charge offer', async () => {
-    renderTalons(hitPopupHtml({ chargeBonusOffer: null }));
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await new Promise((r) => setTimeout(r, 0));
-    expect(rollDamage).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
   });
 });

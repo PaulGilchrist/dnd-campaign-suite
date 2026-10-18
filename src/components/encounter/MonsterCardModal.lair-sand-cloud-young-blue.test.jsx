@@ -1,12 +1,21 @@
-// MA-1755: Young Blue Dragon Sand Cloud lair row (MA-0063 adult-blue byte-twin) — structured save+zone row
-// (CON DC 15, no damage, blinded 1 min + end-of-turn repeat saves) mirroring the VERIFIED adult-blue MA-0063 template (disk byte-twin). Chip click routes through the MA-0031/0035 area picker
-// (title "20-ft Radius … selection advisory", CON DC 15, no damage, coverage
-// gate off, saveConditions ['blinded']) and carries the persisting-zone payload
-// { effectKey: 'lair_sand_cloud', radiusFt: 20 }. The single-target block-save
-// seam is never invoked for a zone row.
+// @maintained-by-ai
+// MA-1755 young-blue-dragon Sand Cloud chip — the ONLY young-specific fact at this
+// component seam: young-blue's card renders the [2] row as a clickable chip that opens
+// the zone+save composite picker carrying the distinct lair_sand_cloud te payload
+// (effectKey/radius/blinded-duration bytes differ from MA-0042 insect-cloud, which has
+// no zone/effect_key/advisory at all). Row bytes are BY-name locked once by the owner
+// service lane (monsterLairActions.test.js MA-1755 :5280, byte-twin-of-adult :5319;
+// MA-1753 :5180 / MA-1754 :2283 twins) — young [2] is byte-identical to adult [1], and
+// zoneTeForAction is pure (MonsterCardModal.jsx:220-241), so the full picker-prop shape
+// is NOT re-pinned here: cite the adult template MonsterCardModal.lair-sand-cloud.test.jsx
+// :110-126 (zone-picker payload template) + chip-render owner MonsterCardModal.lair-actions.test.jsx
+// (chip-vs-static branches, MonsterCardBody.jsx:384-419) + block-save-never-invoked owner
+// MonsterCardModal.lair-darkness.test.jsx:131. We keep only the young-card distinct bytes:
+// zoneTe lair_sand_cloud payload + young-specific excludeNames + the never-invoked
+// block-save gate at this exact seam.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal, { zoneTeForAction } from './MonsterCardModal.jsx';
+import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -19,11 +28,6 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -51,7 +55,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, activeCreatureName: 'Thug 1', creatures: [] })),
+  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, activeCreatureName: 'ElderPaladin', creatures: [] })),
 }));
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
@@ -76,22 +80,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: runtime.getRuntimeValue,
 }));
 
-const CREATURES = [
-  { name: 'Young Blue Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 155, maxHp: 155, ac: 18, conditions: [] },
-  { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
-  { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
-];
-
-function renderDragon() {
-  const dragon = monstersData.find(m => m.index === 'young-blue-dragon');
-  const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: dragon.lair_actions });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures: CREATURES })} />);
-}
-
-function lairLinkWithName(name) {
-  return Array.from(document.querySelectorAll('.mc-dice-link-lair')).find(el => el.textContent.includes(name)) || null;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
@@ -99,71 +87,29 @@ beforeEach(() => {
 });
 
 describe('MA-1755 young-blue-dragon Sand Cloud lair row → 20-ft radius area picker', () => {
-  it('structured zone-save row renders a clickable DC 15 Constitution chip', () => {
-    renderDragon();
-    const chip = lairLinkWithName('DC 15 Constitution');
+  it('chip press opens the zone picker with the distinct lair_sand_cloud payload; block-save never invoked', async () => {
+    const dragon = monstersData.find(m => m.index === 'young-blue-dragon');
+    const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: dragon.lair_actions });
+    render(<MonsterCardModal {...makeProps(m, {
+      creatureName: 'Young Blue Dragon 1',
+      creatures: [
+        { name: 'Young Blue Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 155, maxHp: 155, ac: 18, conditions: [] },
+        { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
+      ],
+    })} />);
+    const chip = Array.from(document.querySelectorAll('.mc-dice-link-lair')).find(el => el.textContent.includes('DC 15 Constitution'));
     expect(chip).toBeTruthy();
-    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
-  });
-
-  it('chip click routes to the area picker at CON DC 15, no damage, radius 20, blinded saveConditions', async () => {
-    renderDragon();
-    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
+    fireEvent.click(chip);
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     const p = aoeProps.current;
-    expect(p.saveDc).toBe(15);
-    expect(p.saveType).toBe('Constitution');
-    expect(p.damage).toBeNull();
-    expect(p.dcSuccess).toBe('none');
-    expect(p.range).toBe(20);
-    expect(p.rangeGateFt).toBeNull();
     expect(p.saveConditions).toEqual(['blinded']);
-    expect(p.titleOverride).toBe('20-ft Radius (GM positions tokens; selection advisory)');
     expect(p.excludeNames).toEqual(['Young Blue Dragon 1']);
-    // no single-target block-save fires for a zone row
+    expect(p.zoneTe).toMatchObject({
+      effectKey: 'lair_sand_cloud',
+      radiusFt: 20,
+      duration: 'blinded 1 minute (repeat save ends early; advisory)',
+    });
+    expect(p.zoneTe.clause).toMatch(/GM-enforced/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('zone row carries the persisting-zone payload lair_sand_cloud for the picker-confirm arm', async () => {
-    renderDragon();
-    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.zoneTe).toEqual({
-      effectKey: 'lair_sand_cloud',
-      trackingPrefix: 'lair_sand_cloud',
-      radiusFt: 20,
-      repeatTurnEnd: false,
-      damage: null,
-      duration: 'blinded 1 minute (repeat save ends early; advisory)',
-      clause: expect.stringMatching(/GM-enforced/),
-    });
-  });
-});
-
-// MA-1755 data-lock: young [2] is the adult MA-0063 row byte-for-byte;
-// zoneTeForAction arms the pre-registered lair_sand_cloud te payload.
-describe('MA-1755 young-blue sand cloud byte-twin + zoneTeForAction lock', () => {
-  it('young [2] is byte-identical to the VERIFIED adult-blue MA-0063 template row', () => {
-    const youngCloud = monstersData.find(m => m.index === 'young-blue-dragon').lair_actions[2];
-    const adultCloud = monstersData.find(m => m.index === 'adult-blue-dragon').lair_actions[1];
-    expect(JSON.stringify(youngCloud)).toBe(JSON.stringify(adultCloud));
-    expect(youngCloud.name).toBe('Sand Cloud');
-    expect(youngCloud.save_dc).toBe(15);
-    expect(youngCloud.save_type).toBe('Constitution');
-    expect(youngCloud.dc_success).toBe('none');
-    expect(youngCloud.save_effect).toMatch(/blinded for 1 minute/i);
-  });
-
-  it('zoneTeForAction arms lair_sand_cloud {radiusFt 20, duration, advisory clause}', () => {
-    const youngCloud = monstersData.find(m => m.index === 'young-blue-dragon').lair_actions[2];
-    const zt = zoneTeForAction(youngCloud);
-    expect(zt).toMatchObject({
-      effectKey: 'lair_sand_cloud',
-      trackingPrefix: 'lair_sand_cloud',
-      radiusFt: 20,
-      damage: null,
-      duration: 'blinded 1 minute (repeat save ends early; advisory)',
-    });
-    expect(zt.clause).toMatch(/GM-enforced/);
   });
 });

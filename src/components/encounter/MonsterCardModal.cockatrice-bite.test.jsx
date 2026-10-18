@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0501: Cockatrice Petrifying Bite transport + dc_success adjudication —
 // the attack+save combo rides buildSaveOptions to handleNpcSaveDamage (NPC
 // inline) / buildAbilitySaveRollContext to saveProcessing (PC prompt).
@@ -5,9 +6,12 @@
 // petrify rider → authored dc_success:"full" (MA-0367 mode). dc_success:
 // "none" would ZERO the bite on save success (computeDamageAfterSave returns
 // 0) — WRONG for this row; half-default MV-20 leak fixed by the same field.
+// Trimmed MA-0505: computeDamageAfterSave full/half/none math cite-skipped to
+// its owner applyDamage.save-full.test.js (MA-0367); buildSaveOptions 'half'
+// default owned by MonsterCard.ma1971-wing-defense.test.jsx; legacy/DC0 nulls
+// owned by cockatrice-regent-bite.test.jsx (MA-0503) + ma1071 pincer DC0.
 import { describe, it, expect } from 'vitest';
 import { buildSaveOptions, parseStagedPetrifyClause, buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
-import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const cockatrice = (monstersData.monsters || monstersData).find(m => m.name === 'Cockatrice');
@@ -31,22 +35,12 @@ describe('MA-0501 cockatrice Petrifying Bite transport', () => {
     expect(parseStagedPetrifyClause(undefined)).toBeNull();
   });
 
-  it('buildSaveOptions carries stagedPetrify + dcSuccess full; byte-inert null elsewhere', () => {
+  it('transport arms both seams on the DC-11 row: NPC buildSaveOptions + PC ctx', () => {
     const opts = buildSaveOptions(bite);
     expect(opts.stagedPetrify).toEqual({ petrifiedRounds: 14400 });
     expect(opts.dcSuccess).toBe('full');
     expect(opts.saveDc).toBe(11);
 
-    const legacy = buildSaveOptions({ name: 'Claw', attack_bonus: 5, damage_dice_primary: '1d4+1' });
-    expect(legacy.stagedPetrify).toBeNull();
-    expect(legacy.dcSuccess).toBeNull();
-
-    const saveHalfDefault = buildSaveOptions({ name: 'Breath', save_dc: 15, save_type: 'Constitution' });
-    expect(saveHalfDefault.dcSuccess).toBe('half');
-    expect(saveHalfDefault.stagedPetrify).toBeNull();
-  });
-
-  it('buildAbilitySaveRollContext arms stagedPetrify for the PC-prompt seam', () => {
     const ctx = buildAbilitySaveRollContext({
       monsterName: 'Cockatrice 1', target: { name: 'Bandit 1' }, spellName: null, action: bite,
       saveType: 'CON', dcSuccess: 'full', saveDamageFormula: '1d4 + 1', saveConditions: [],
@@ -55,14 +49,5 @@ describe('MA-0501 cockatrice Petrifying Bite transport', () => {
     expect(ctx.stagedPetrify).toEqual({ petrifiedRounds: 14400 });
     expect(ctx.saveDc).toBe(11);
     expect(ctx.dcSuccess).toBe('full');
-  });
-
-  it('dc_success adjudication: save-success pays FULL bite damage; none would zero it', () => {
-    expect(computeDamageAfterSave(3, true, 'full')).toBe(3);
-    expect(computeDamageAfterSave(3, false, 'full')).toBe(3);
-    // contrast (why the bug-file's 'none' suggestion is WRONG here):
-    expect(computeDamageAfterSave(3, true, 'none')).toBe(0);
-    // the old MV-20 half-leak this field fixes:
-    expect(computeDamageAfterSave(3, true, 'half')).toBe(1);
   });
 });

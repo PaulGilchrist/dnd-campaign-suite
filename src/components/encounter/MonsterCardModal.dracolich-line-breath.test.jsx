@@ -1,16 +1,20 @@
-// MA-0049: Adult Blue Dracolich Lightning Breath click-path. Row authors
-// recharge as a structured usage OBJECT {type:"recharge on roll", dice:"1d6",
-// min_value:5} — the row must render "(Recharge 5+)" (never "[object Object]"),
-// spend/refuse/regain at threshold 5 via monsterRecharge (MA-0031 economy),
-// and route the "90-foot line" text through the MA-0035 line picker (multi
-// .secondary-target-row saves DC 20 DEX, half-on-success math untouched).
-// Safety gate (Defect 1 self-resolve): a single-target save row (Frightful
-// Presence) clicked with NO armed target refuses — popup +
-// frightful_presence_refused (no target), zero self-target save.
+// @maintained-by-ai
+// MA-0049: Adult Blue Dracolich Lightning Breath click-path — dracolich-DISTINCT
+// lane only. Row authors recharge as a structured usage OBJECT
+// {type:"recharge on roll", dice:"1d6", min_value:5}, so the modal must render
+// "(Recharge 5+)" / "(Recharge 5+ — unavailable)" from that object (never
+// "[object Object]"), spend/refuse at threshold 5 through it, and route this row's
+// "90-foot line" text to the LINE picker (DC 20 DEX 12d10). Row pinned BY-name
+// (#387). Cite-skips: generic line picker/spent-refuse/re-arm →
+// MonsterCardModal.line-breath.test.jsx (MA-0035 twin, flat "5-6" string);
+// recharge economy (gate/spend/label/regain) → monsterRecharge.test.js (#559);
+// armed FP save + no-target refusal builder bytes → dracolich-fp.test.jsx (MA-0044)
+// + MonsterCardHelpers.usage.test.js. Safety gate (Defect 1 self-resolve) stays:
+// FP clicked with NO armed target refuses — no self-target save.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
@@ -27,20 +31,8 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 67, rolls: [6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 134, rolls: [], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -60,32 +52,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -144,17 +110,13 @@ beforeEach(() => {
   aoeProps.current = null;
 });
 
-describe('MA-0049 Lightning Breath recharge-usage-object + 90-ft line picker', () => {
-  it('row renders "(Recharge 5+)" chip text — never "[object Object]"', () => {
+describe('MA-0049 structured usage-object recharge — modal click-path (dracolich-distinct)', () => {
+  it('fresh click: row renders structured "(Recharge 5+)" chip (never [object Object]), spends at threshold 5, routes the 90-ft LINE picker DC 20 DEX 12d10', async () => {
     renderDracolich();
     const row = breathRow();
     expect(row).toBeTruthy();
     expect(row.textContent).toContain('(Recharge 5+)');
     expect(document.body.textContent).not.toContain('[object Object]');
-  });
-
-  it('fresh click spends the usage-object recharge at threshold 5 and routes the LINE row to the area picker DC 20 DEX, 12d10, half-on-success', async () => {
-    renderDracolich();
     const link = breathLink();
     expect(link).toBeTruthy();
     fireEvent.click(link);
@@ -165,16 +127,11 @@ describe('MA-0049 Lightning Breath recharge-usage-object + 90-ft line picker', (
     expect(aoeProps.current.saveDc).toBe(20);
     expect(aoeProps.current.saveType).toBe('Dexterity');
     expect(aoeProps.current.damage).toBe('12d10');
-    expect(aoeProps.current.dcSuccess).toBe('half');
     expect(aoeProps.current.rangeGateFt).toBe(90);
-    expect(aoeProps.current.excludeNames).toEqual(['Adult Blue Dracolich 1']);
-    expect(aoeProps.current.storeLastAttack).toBe(false);
     expect(aoeProps.current.titleOverride).toBe('90-ft Line (GM positions tokens; selection advisory)');
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(spend.description).toMatch(/Lightning Breath.*Recharge 5\+; unavailable until a d6 5\+/);
   });
 
-  it('spent row refuses: "(Recharge 5+ — unavailable)" + lightning_breath_refused popup/log, zero prompts, picker stays closed', async () => {
+  it('spent structured row refuses: "(Recharge 5+ — unavailable)" chip, lightning_breath_refused log, zero prompts, picker stays closed', async () => {
     runtime.store['Adult Blue Dracolich 1.monsterRecharge'] = { 'Lightning Breath': { recharged: false, threshold: 5 } };
     renderDracolich();
     const link = breathLink();
@@ -187,23 +144,12 @@ describe('MA-0049 Lightning Breath recharge-usage-object + 90-ft line picker', (
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'lightning_breath_refused');
     expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/refused \(not recharged\)/);
-    expect(refusal.description).toMatch(/d6 5\+/);
     expect(refusal.characterName).toBe('Adult Blue Dracolich 1');
-  });
-
-  it('recharged row re-arms: picker opens again and re-spends', async () => {
-    runtime.store['Adult Blue Dracolich 1.monsterRecharge'] = { 'Lightning Breath': { recharged: true, threshold: 5 } };
-    renderDracolich();
-    fireEvent.click(breathLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    aoeProps.onClose();
-    expect(runtime.store['Adult Blue Dracolich 1.monsterRecharge']['Lightning Breath'].recharged).toBe(false);
   });
 });
 
 describe('MA-0049 no-target safety gate — no self-resolve', () => {
-  it('single-target save row (Frightful Presence) clicked with NO armed target refuses: No Target popup + frightful_presence_refused (no target) log, zero self-save', async () => {
+  it('single-target save row (Frightful Presence) clicked with NO armed target refuses: No Target popup + frightful_presence_refused log, zero self-save, zero spend', async () => {
     renderDracolich(UNARMED);
     const chip = fpLink();
     expect(chip).toBeTruthy();
@@ -214,16 +160,7 @@ describe('MA-0049 no-target safety gate — no self-resolve', () => {
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'frightful_presence_refused');
     expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/refused \(no target\)/);
+    expect(refusal.characterName).toBe('Adult Blue Dracolich 1');
     expect(runtime.store['Adult Blue Dracolich 1.monsterRecharge'] == null).toBe(true);
-  });
-
-  it('same row with an armed target still resolves the save untouched (half-on-success seam)', async () => {
-    renderDracolich(ARMED);
-    fireEvent.click(fpLink());
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const call = rollSavingThrow.mock.calls[0];
-    expect(String(call[0]).toLowerCase()).toBe('wis');
-    expect(call[2]).toMatchObject({ saveDc: 18 });
   });
 });

@@ -3,18 +3,18 @@
 // must route a spell-attributed WIS DC 17 save with the AUTHORED upcast level
 // damage (5d8 Psychic, not the base lv2 3d8 — the MA-0112 save-leg residual),
 // half-on-success. Byte-inert for clauseless/base rows.
+// Single click→ctx identity test: the truthy-link guard inside carries the
+// MA-0091 per-spell-render seam (link rendering itself is owned by
+// MonsterCardModal.spellcasting.test.jsx); the diceRoller mock is purged —
+// rollExpression/rollExpressionDoubled fire only on crit attack handlers,
+// never on this save lane (rollSavingThrow is mocked wholesale).
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import spells2024 from '../../../public/data/2024/spells.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 22, rolls: [5, 5, 5, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 44, rolls: [5, 5, 5, 4, 3], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({
@@ -24,10 +24,9 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const mockHook = vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+    setPopupHtml: vi.fn((val) => { _popupHtml = val; }),
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
@@ -36,7 +35,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
-  return { default: mockHook, _rollSavingThrow, _setPopupHtml };
+  return { default: mockHook, _rollSavingThrow };
 });
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
@@ -60,52 +59,30 @@ vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
 vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 vi.mock('../../services/shared/abilityLookup.js', () => ({ getAbilitySaveModifier: vi.fn(() => 0) }));
 
-const runtime = vi.hoisted(() => {
-  const store = {};
-  return {
-    store,
-    getRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
-    setRuntimeValue: vi.fn((k, p, v) => { store[`${k}.${p}`] = v; return Promise.resolve(); }),
-    useRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
-  };
-});
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: runtime.getRuntimeValue,
-  setRuntimeValue: runtime.setRuntimeValue,
-  useRuntimeValue: runtime.useRuntimeValue,
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
-import { loadSpells } from '../../services/ui/dataLoader.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 
+// Disk-row BY-name lock: the authored Adult Copper Spellcasting row carries
+// the "(level 4 version)" clause on Mind Spike — the exact bytes this seam
+// must honor on the save leg (5d8, not the base lv2 3d8).
 const SPELLCASTING = monstersData.find(m => m.index === 'adult-copper-dragon').actions.find(a => a.name === 'Spellcasting');
 
-function linkByText(text) {
-  return Array.from(document.querySelectorAll('.mc-dice-link-spell')).find(el => el.textContent.trim().startsWith(text)) || null;
-}
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? spells2024 : []));
-});
-
 describe('MA-0087 Adult Copper Spellcasting Mind Spike cast level', () => {
-  it('renders the Mind Spike per-spell link (MA-0091 seam, not a block-save-only row)', () => {
-    const m = makeMonster({ name: 'Adult Copper Dragon', actions: [SPELLCASTING] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Copper Dragon 1' })} />);
-    expect(linkByText('Mind Spike')).toBeTruthy();
-  });
-
-  it('clicking Mind Spike routes a WIS DC 17 save-leg with lv4 5d8 Psychic (not base 3d8), half-on-success', async () => {
+  it('clicking the Mind Spike link routes a WIS DC 17 save-leg with lv4 5d8 Psychic (not base 3d8), half-on-success', async () => {
     const m = makeMonster({ name: 'Adult Copper Dragon', actions: [SPELLCASTING] });
     const creatures = [
       { name: 'Adult Copper Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'TestPC', currentHp: 184, maxHp: 184, conditions: [] },
       { name: 'TestPC', type: 'player', currentHp: 30, maxHp: 30, conditions: [], computedStats: {} },
     ];
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Copper Dragon 1', creatures })} />);
-    const spike = linkByText('Mind Spike');
+    const spike = Array.from(document.querySelectorAll('.mc-dice-link-spell')).find(el => el.textContent.trim().startsWith('Mind Spike'));
+    expect(spike).toBeTruthy();
     fireEvent.click(spike);
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
     const context = rollSavingThrow.mock.calls[0][2];
@@ -118,3 +95,5 @@ describe('MA-0087 Adult Copper Spellcasting Mind Spike cast level', () => {
     expect(context.isSpellDamage).toBe(true);
   });
 });
+
+// @maintained-by-ai

@@ -1,12 +1,17 @@
-// MA-0855: Githzerai Psion Psychic Warp — GM-adjudicated CONDITION CHOICE on
-// the monster attack HIT popup (monsters.json hit_choice — Charmed-or-Prone).
-// MA-0325 two-handed modal seam mirror: offer forwarded to rollAttack context,
-// pick grants ONLY the chosen condition via the canonical activeConditions +
-// activeConditionMeta runtime channel (single merged setRuntimeObject per §39),
-// logs `condition applied` + `hit_choice_selected`; the UNCHOSEN option is
-// never granted; a resolved decision cannot re-fire; an unpicked Done grants
-// NOTHING (honest advisory) and the hit_conditions array auto-grant stays
-// suppressed (autoDamage.hitClause null). Non-choice rows stay byte-inert.
+// @maintained-by-ai
+// MA-0855 MODAL lane: GM-adjudicated CONDITION CHOICE on the monster attack HIT
+// popup (monsters.json hit_choice — Githzerai Psion Psychic Warp, Charmed-or-Prone).
+// Once-per-branch modal seams only: chip-click ctx byte pass-through (offer
+// forwarded to rollAttack ctx, array hit-clause suppressed to null; MA-0841
+// non-choice row stays byte-inert), chooser select identity (chosen condition
+// granted ONLY, via the canonical merged activeConditions + activeConditionMeta
+// single setRuntimeObject per §39, autoDamage.hitChoice flipped to 'selected'),
+// resolved decision cannot re-fire, unpicked Done grants NOTHING + honest
+// advisory, pick-then-Done rolls damage with no advisory. Helper-owned log
+// description content and the offer/clause tables live in
+// MonsterCardHelpers.hit-choice.test.js; popup rendering of the chooser in
+// DiceRollResult.hit-choice.test.jsx; engine hit-clause arming in
+// handlePlainDamage.hitClause.test.js — cited, not repeated here.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -20,11 +25,11 @@ const VIAC_OFFER = {
   attackName: 'Psychic Warp',
 };
 
+// rollExpression is reached via autoDamageRoll → resolveAutoDamageResult on the
+// Done seam; rollAttack/rollDamage are hook-mocked so no d20/crit dice roll here.
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
   rollExpression: vi.fn((formula) => ({ total: 26, rolls: [7, 7, 6, 6], modifier: 4, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 48, rolls: [7, 7, 6, 6, 7, 7, 6, 6], modifier: 4, formula })),
-  rollD20: vi.fn(() => 17),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
@@ -99,16 +104,12 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 // Stub the popup chain: real chooser gating is covered in
 // DiceRollResult.hit-choice.test.jsx; here the buttons drive the resolve.
 vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.hitChoiceOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onHitChoice?.('charmed')}>charmed</button>
-        <button onClick={() => props.onHitChoice?.('prone')}>prone</button>
-      </div>
-    );
-  },
+  default: (props) => (
+    <div data-testid="popup-stub">
+      <button onClick={() => props.onHitChoice?.('charmed')}>charmed</button>
+      <button onClick={() => props.onHitChoice?.('prone')}>prone</button>
+    </div>
+  ),
 }));
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
@@ -177,10 +178,6 @@ function findConditionLog(condition) {
   return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.type === 'condition' && e.action === 'applied' && e.condition === condition);
 }
 
-function runtimeWrites() {
-  return setRuntimeObject.mock.calls.map((c) => ({ name: c[0], payload: c[1], campaign: c[2] }));
-}
-
 async function doneWith(autoDamage) {
   const options = useLoggedDiceRoll.__getOptions();
   await options.autoDamageRoll(autoDamage, false);
@@ -216,66 +213,47 @@ describe('MA-0855 offer forwarding', () => {
 });
 
 describe('MA-0855 chooser resolution on HIT popup', () => {
-  it('pick Charmed: grants Charmed ONLY via merged runtime write + logs; Prone never granted', async () => {
-    renderPsion(hitPopupHtml());
-    clickButton('charmed');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().hitChoiceResolved).toBe('charmed');
-    });
-    const writes = runtimeWrites();
-    expect(writes).toHaveLength(1);
-    expect(writes[0].name).toBe('Bandit 1');
-    expect(writes[0].payload).toEqual({
-      activeConditions: ['charmed'],
-      activeConditionMeta: { charmed: { source: 'Githzerai Psion 1', dc: null } },
-    });
-    expect(findConditionLog('Charmed')).toBeTruthy();
-    expect(findConditionLog('Prone')).toBeFalsy();
-    const selected = findLogs('hit_choice_selected');
-    expect(selected).toHaveLength(1);
-    expect(selected[0].description).toContain('Charmed');
-    expect(selected[0].description).toContain('Prone');
-    expect(selected[0].description).toContain('only Charmed applied');
-    expect(useLoggedDiceRoll.__getPopupHtml().autoDamage.hitChoice).toBe('selected');
-  });
-
-  it('pick Prone: grants Prone ONLY; Charmed never granted', async () => {
-    renderPsion(hitPopupHtml());
-    clickButton('prone');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().hitChoiceResolved).toBe('prone');
-    });
-    expect(setRuntimeObject).toHaveBeenCalledTimes(1);
-    expect(setRuntimeObject.mock.calls[0][1]).toEqual({
-      activeConditions: ['prone'],
-      activeConditionMeta: { prone: { source: 'Githzerai Psion 1', dc: null } },
-    });
-    expect(findConditionLog('Prone')).toBeTruthy();
-    expect(findConditionLog('Charmed')).toBeFalsy();
-    expect(findLogs('hit_choice_selected')).toHaveLength(1);
-  });
+  it.each([['charmed', 'Charmed', 'Prone'], ['prone', 'Prone', 'Charmed']])(
+    'pick %s: grants %s ONLY via ONE merged runtime write + logs; %s never granted',
+    async (decision, chosenLabel, unchosenLabel) => {
+      renderPsion(hitPopupHtml());
+      clickButton(decision);
+      await vi.waitFor(() => {
+        expect(useLoggedDiceRoll.__getPopupHtml().hitChoiceResolved).toBe(decision);
+      });
+      expect(setRuntimeObject).toHaveBeenCalledTimes(1);
+      expect(setRuntimeObject.mock.calls[0][0]).toBe('Bandit 1');
+      expect(setRuntimeObject.mock.calls[0][1]).toEqual({
+        activeConditions: [decision],
+        activeConditionMeta: { [decision]: { source: 'Githzerai Psion 1', dc: null } },
+      });
+      expect(findConditionLog(chosenLabel)).toBeTruthy();
+      expect(findConditionLog(unchosenLabel)).toBeFalsy();
+      expect(findLogs('hit_choice_selected')).toHaveLength(1);
+      expect(useLoggedDiceRoll.__getPopupHtml().autoDamage.hitChoice).toBe('selected');
+    }
+  );
 
   it('a resolved decision cannot re-fire the chooser (no second grant/log)', async () => {
     renderPsion(hitPopupHtml({ hitChoiceResolved: 'charmed' }));
     clickButton('charmed');
-    await new Promise((r) => setTimeout(r, 0));
-    expect(setRuntimeObject).not.toHaveBeenCalled();
-    expect(findLogs('hit_choice_selected')).toHaveLength(0);
+    await vi.waitFor(() => {
+      expect(setRuntimeObject).not.toHaveBeenCalled();
+      expect(findLogs('hit_choice_selected')).toHaveLength(0);
+    });
   });
 });
 
 describe('MA-0855 Done auto-damage resolution', () => {
-  it('unpicked Done grants NOTHING extra and logs the honest undecided advisory', async () => {
+  it('unpicked Done rolls the base damage, grants NOTHING extra, logs the honest undecided advisory', async () => {
     renderPsion(hitPopupHtml());
-    await doneWith({ ...hitPopupHtml().autoDamage });
+    await doneWith(useLoggedDiceRoll.__getPopupHtml().autoDamage);
     expect(rollDamage).toHaveBeenCalled();
     expect(rollDamage.mock.calls[0][0].formula).toBe('4d10 + 4');
     expect(setRuntimeObject).not.toHaveBeenCalled();
     expect(findConditionLog('Charmed')).toBeFalsy();
     expect(findConditionLog('Prone')).toBeFalsy();
-    const advisory = findLogs('hit_choice_undecided');
-    expect(advisory).toHaveLength(1);
-    expect(advisory[0].description).toContain('no condition granted');
+    expect(findLogs('hit_choice_undecided')).toHaveLength(1);
   });
 
   it('pick then Done: condition granted once at pick, no undecided advisory', async () => {
@@ -284,7 +262,7 @@ describe('MA-0855 Done auto-damage resolution', () => {
     await vi.waitFor(() => {
       expect(useLoggedDiceRoll.__getPopupHtml().hitChoiceResolved).toBe('charmed');
     });
-    await doneWith({ ...useLoggedDiceRoll.__getPopupHtml().autoDamage });
+    await doneWith(useLoggedDiceRoll.__getPopupHtml().autoDamage);
     expect(rollDamage).toHaveBeenCalled();
     expect(setRuntimeObject).toHaveBeenCalledTimes(1);
     expect(findLogs('hit_choice_selected')).toHaveLength(1);

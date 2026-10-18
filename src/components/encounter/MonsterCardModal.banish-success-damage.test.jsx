@@ -1,16 +1,30 @@
+// @maintained-by-ai
 // MA-0218: Ancient Gold Dragon Banish lists damage under Failure ONLY — a
-// successful save must apply ZERO damage. The row now authors dc_success:"none"
-// (Adult Gold Banish MA-0104 sibling shape) so resolveBlockSaveDcSuccess stops
-// defaulting the save context to 'half'; computeDamageAfterSave(…, 'none')
-// returns 0 on success / full raw on failure. The once-per-turn gate clause
-// rides the MA-0073 cooldown stamp, and a same-boundary re-click refuses
-// (legendary_use_refused, zero spend, no second save rolled).
+// successful save must apply ZERO damage. The row authors dc_success:"none"
+// so blockSaveDcSuccess stops defaulting the save context to 'half'; the
+// click-time context (buildAbilitySaveRollContext, MonsterCardModal.jsx:1794)
+// rides dcSuccess + autoDamageFormula bytes verbatim to saveProcessing.
+// The once-per-turn gate clause rides the MA-0073 cooldown stamp, and a
+// same-boundary re-click refuses (legendary_use_refused, zero spend, no
+// second save rolled). DC 24 Ancient uniquely complements the Adult DC 21
+// demiplane lane in MonsterCardModal.banish-demiplane.test.jsx (#581).
+//
+// Family collapse (MA-0481/0505/0514/0523/0567): every duplicate
+// "dc_success none = zero on success" click-through retired to ONE test per
+// distinct modal branch — block save with transport+cooldown (Ancient,
+// test 2), normal-action save chip with the Multiattack text-collision
+// scoping (Chain Devil), reaction-section save chip (Cockatrice Regent).
+// Constrictor/Couatl/Fell Word chip clicks were byte-identical reruns of
+// the Chain Devil branch (same saveChipPlan → handleSaveRoll →
+// executeBlockSaveRoll seam) and now pin only their unique row-data keys.
+// Compute-face owners for 'none' semantics: applyDamage.save-full.test.js:22-24
+// (computeDamageAfterSave) + saveProcessing.* suite — no inline math reruns here.
+// Transport owners: MonsterCardHelpers.banish-transport.test.js + soul-tome-trap.test.js (#563).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import { hasLegendaryCooldownClause } from '../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
@@ -76,14 +90,16 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 import { addEntry } from '../../services/ui/logService.js';
 
+// One isolation seam for every click test: fresh roll mocks + fresh runtime
+// store so mock.calls[0] always belongs to THIS test's click.
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+});
+
 const CREATURES = [
   { name: 'Ancient Gold Dragon 1', type: 'npc', targetName: 'ElderPaladin', currentHp: 546, maxHp: 546, ac: 22, conditions: [] },
   { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
-];
-
-const CHAIN_CREATURES = [
-  { name: 'Chain Devil 1', type: 'npc', targetName: 'Bandit 1', currentHp: 85, maxHp: 85, ac: 15, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
 ];
 
 const ancient = () => monstersData.find(m => m.name === 'Ancient Gold Dragon');
@@ -102,7 +118,7 @@ function banishRow() {
 }
 
 describe('MA-0218 monsters.json data lock: Ancient Gold Dragon Banish row', () => {
-  it('authors dc_success none (failure-only damage) with DC 24 Charisma 7d6 Force', () => {
+  it('authors dc_success none (failure-only damage) with DC 24 Charisma 7d6 Force, uses 3 armed (MA-0217)', () => {
     const row = ancientRow();
     expect(row.save_dc).toBe(24);
     expect(row.save_type).toBe('Charisma');
@@ -111,30 +127,22 @@ describe('MA-0218 monsters.json data lock: Ancient Gold Dragon Banish row', () =
     expect(row.damage_type_primary).toBe('Force');
     expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
     expect(hasLegendaryCooldownClause(row)).toBe(true);
-  });
-
-  it('legendary header authors numeric uses:3 (MA-0217) arming the economy', () => {
     expect(ancient().legendary_actions[0].uses).toBe(3);
   });
 });
 
 describe('MA-0218 MonsterCardModal Banish save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('save context carries dcSuccess none: success = 0 damage, failure = full raw', async () => {
+  it('block-save click context carries dcSuccess none + 7d6 Force damage byte: success face pays zero', async () => {
     renderAncient({ max: 3, used: 0 });
     fireEvent.click(banishRow().querySelector('.mc-dice-link'));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
     expect(context.saveDc).toBe(24);
     expect(context.dcSuccess).toBe('none');
+    expect(context.autoDamageFormula).toBe('7d6');
+    expect(context.autoDamageDamageType).toContain('Force');
     expect(context.saveConditions).toContain('incapacitated');
     expect(context.demiplaneTransport).toEqual({ effect: 'banished_demiplane' });
-    expect(computeDamageAfterSave(24, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(24, false, context.dcSuccess)).toBe(24);
   });
 
   it('first click spends a use + stamps the banish cooldown; same-boundary re-click refuses zero-spend', async () => {
@@ -157,12 +165,18 @@ describe('MA-0218 MonsterCardModal Banish save: zero damage on success', () => {
 // MA-0481: Chain Devil Conjure Infernal Chain — prose "Success: The chain
 // disappears." = ZERO on a successful save; the absent dc_success field let
 // resolveBlockSaveDcSuccess default the success leg to 'half' (live proof:
-// nat 19 vs DC 15 paid finalDamage 3, hp 951→948). Same MA-0218 byte-shape
-// data fix rides the same block-save seam: dc_success:"none" threaded onto
-// the save context → computeDamageAfterSave(…, 'none') = 0 on success, full
-// raw on failure (fail leg byte-identical: 2d4+4 + Restrained).
+// nat 19 vs DC 15 paid finalDamage 3, hp 951→948). Representative of the
+// NORMAL-ACTION save-chip branch: saveChipPlan chip → handleSaveRoll →
+// executeBlockSaveRoll, same ctx builder as the block-save lane above.
+// MA-0481 gotcha: the Multiattack row text also mentions the action —
+// scope straight to the labelled save chip, not the first row match.
 const chainDevil = () => monstersData.find(m => m.index === 'chain-devil');
 const chainRow = () => chainDevil().actions.find(a => a.name === 'Conjure Infernal Chain');
+
+const CHAIN_CREATURES = [
+  { name: 'Chain Devil 1', type: 'npc', targetName: 'Bandit 1', currentHp: 85, maxHp: 85, ac: 15, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
+];
 
 function renderChainDevil() {
   const m = makeMonster({ name: 'Chain Devil', armor_class: 15, hit_points: 85, actions: chainDevil().actions });
@@ -170,14 +184,12 @@ function renderChainDevil() {
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Chain Devil 1', creatures: CHAIN_CREATURES })} />);
 }
 
-// MA-0481 gotcha: the Multiattack row text also mentions the action —
-// scope straight to the labelled save chip, not the first row match.
 function conjureSaveChip() {
   return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 15 Dexterity')) || null;
 }
 
-describe('MA-0481 monsters.json data lock: Chain Devil Conjure Infernal Chain row', () => {
-  it('authors dc_success none (success = chain disappears) with DC 15 Dexterity 2d4 + 4 Fire', () => {
+describe('MA-0481 Chain Devil Conjure Infernal Chain: dc_success none row + chip save lane', () => {
+  it('authored row locks DC 15 Dex 2d4 + 4 Fire none (success = chain disappears)', () => {
     const row = chainRow();
     expect(row.save_dc).toBe(15);
     expect(row.save_type).toBe('Dexterity');
@@ -188,34 +200,24 @@ describe('MA-0481 monsters.json data lock: Chain Devil Conjure Infernal Chain ro
     expect(row.save_effect).toMatch(/Restrained/);
     expect(row.description).toMatch(/Success:\s*<\/strong>?\s*The chain disappears/i);
   });
-});
 
-describe('MA-0481 MonsterCardModal Conjure Infernal Chain save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('save chip context carries dcSuccess none: success = 0 damage, failure = full raw', async () => {
+  it('save chip context carries dcSuccess none + damage byte: success face pays zero', async () => {
     renderChainDevil();
     fireEvent.click(conjureSaveChip());
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
     expect(context.saveDc).toBe(15);
     expect(context.dcSuccess).toBe('none');
+    expect(context.autoDamageFormula).toBe('2d4 + 4');
     expect(context.saveConditions).toContain('restrained');
-    expect(computeDamageAfterSave(24, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(24, false, context.dcSuccess)).toBe(24);
   });
 });
 
 // MA-0505: Cockatrice Regent Magical Backlash — reactions[0], failure-only
-// damage prose; the absent dc_success field let resolveBlockSaveDcSuccess
-// default the save context to 'half' (live proof: nat 20 vs DC 14 SAVE
-// SUCCESS paid finalDamage 7, hp_change -7, 999→992). Same MA-0218/MA-0481
-// byte-shape data fix: dc_success:"none" threaded onto the generic reaction
-// save-shell chip → computeDamageAfterSave(…, 'none') = 0 on success, full
-// raw on failure (DC 14 Dexterity 3d6 + 3 Force).
+// damage prose; the absent dc_success field let the save context default to
+// 'half' (live proof: nat 20 vs DC 14 SAVE SUCCESS paid finalDamage 7).
+// Representative of the REACTION-section save-chip branch (same
+// executeBlockSaveRoll seam, rendered from reactions[]).
 const cockatrice = () => monstersData.find(m => m.index === 'cockatrice-regent');
 const backlashRow = () => cockatrice().reactions.find(a => a.name === 'Magical Backlash');
 
@@ -234,8 +236,8 @@ function backlashSaveChip() {
   return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 14 Dexterity')) || null;
 }
 
-describe('MA-0505 monsters.json data lock: Cockatrice Regent Magical Backlash row', () => {
-  it('authors dc_success none (failure-only damage) with DC 14 Dexterity 3d6 + 3 Force', () => {
+describe('MA-0505 Cockatrice Regent Magical Backlash: dc_success none reaction lane', () => {
+  it('authored reaction row locks DC 14 Dex 3d6 + 3 Force none, failure-only prose', () => {
     const row = backlashRow();
     expect(row.save_dc).toBe(14);
     expect(row.save_type).toBe('Dexterity');
@@ -246,60 +248,28 @@ describe('MA-0505 monsters.json data lock: Cockatrice Regent Magical Backlash ro
     expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*13 \(3d6 \+ 3\) Force damage\./);
     expect(row.description).not.toMatch(/Success:/i);
   });
-});
 
-describe('MA-0505 MonsterCardModal Magical Backlash save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('reaction save chip context carries dcSuccess none: success = 0 damage, failure = full raw', async () => {
+  it('reaction save chip context carries dcSuccess none + damage byte: success face pays zero', async () => {
     renderCockatrice();
     fireEvent.click(backlashSaveChip());
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
     expect(context.saveDc).toBe(14);
     expect(context.dcSuccess).toBe('none');
-    expect(computeDamageAfterSave(21, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(21, false, context.dcSuccess)).toBe(21);
+    expect(context.autoDamageFormula).toBe('3d6 + 3');
   });
 });
 
-// MA-0514: Constrictor Snake Constrict — failure-only damage+Grappled prose;
-// the absent dc_success field let resolveBlockSaveDcSuccess default the save
-// context to 'half' (live proof: nat 16 +0 vs DC 12 SAVE SUCCESS paid
-// finalDamage 4 of a rolled 8 pool, own hp_change entry; second success nat
-// 15 paid 3 of 6). Same MA-0218/MA-0481/MA-0505 byte-shape data fix:
-// dc_success:"none" threaded onto the save context → computeDamageAfterSave
-// (…, 'none') = 0 on success, full raw on failure. escape_dc:12 authored as
-// the machine representation of prose "(escape DC 12)"; RESIDUAL: the only
-// escape_dc consumer app-wide is the ATTACK-hit hit_conditions stamper
-// (handlePlainDamage.applyHitClauseConditions) — the save-path grapple stamp
-// (saveProcessing.stampConditionMetaAndLogClauses) writes source meta only,
-// so live save-row grapple meta carries no dc field (badge escape remains
-// GM-adjudicated).
-const constrictor = () => monstersData.find(m => m.index === 'constrictor-snake');
-const constrictRow = () => constrictor().actions[1];
-
-const CONSTRICTOR_CREATURES = [
-  { name: 'Constrictor Snake 1', type: 'npc', targetName: 'Bandit 1', currentHp: 13, maxHp: 13, ac: 13, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
-];
-
-function renderConstrictor() {
-  const m = makeMonster({ name: 'Constrictor Snake', armor_class: 13, hit_points: 13, actions: constrictor().actions });
-  ctx.value = { round: 1, activeCreatureName: 'Constrictor Snake 1', creatures: CONSTRICTOR_CREATURES };
-  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Constrictor Snake 1', creatures: CONSTRICTOR_CREATURES })} />);
-}
-
-function constrictSaveChip() {
-  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 12 Strength')) || null;
-}
-
+// MA-0514/MA-0523/MA-0567 row-data locks: the dc_success:"none" +
+// escape_dc / advisory keys on these rows are pinned ONLY here (distinct
+// JSON rows; giant-constrictor-snake's twin lives in
+// services/rules/combat/giant-constrictor-snake-constrict-dc-success.test.js).
+// Their modal click-through is byte-identical to the Chain Devil chip
+// branch above (saveChipPlan → handleSaveRoll → executeBlockSaveRoll with
+// the same buildAbilitySaveRollContext), so no duplicate click tests remain.
 describe('MA-0514 monsters.json data lock: Constrictor Snake Constrict row', () => {
   it('authors dc_success none + escape_dc 12 with DC 12 Strength 3d4 Bludgeoning + Grappled', () => {
-    const row = constrictRow();
+    const row = monstersData.find(m => m.index === 'constrictor-snake').actions[1];
     expect(row.name).toBe('Constrict');
     expect(row.save_dc).toBe(12);
     expect(row.save_type).toBe('Strength');
@@ -311,63 +281,15 @@ describe('MA-0514 monsters.json data lock: Constrictor Snake Constrict row', () 
     expect(row.save_effect).toMatch(/Grappled.*escape DC 12/i);
     expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*7 \(3d4\) Bludgeoning damage/);
     expect(row.description).not.toMatch(/Success:/i);
-  });
-
-  it('RESIDUAL lock: escape_dc rides ONLY the attack-hit hit_conditions seam — save row stays grapple-stamp without dc meta', () => {
-    expect(constrictRow().hit_conditions).toBeUndefined();
-  });
-});
-
-describe('MA-0514 MonsterCardModal Constrict save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('save chip context carries dcSuccess none: success = 0 damage, failure = full 3d4 raw', async () => {
-    renderConstrictor();
-    fireEvent.click(constrictSaveChip());
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
-    expect(context.saveDc).toBe(12);
-    expect(context.dcSuccess).toBe('none');
-    expect(context.saveConditions).toContain('grappled');
-    expect(computeDamageAfterSave(12, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(12, false, context.dcSuccess)).toBe(12);
+    // RESIDUAL lock (MA-0514): escape_dc rides ONLY the attack-hit
+    // hit_conditions stamper — save-row grapple meta carries no dc field.
+    expect(row.hit_conditions).toBeUndefined();
   });
 });
-
-// MA-0523: Couatl Constrict — failure-only damage+Grappled(escape DC 13)+
-// Restrained prose; the absent dc_success field let the save context default
-// to 'half' (live proof: nat 20 vs DC 15 SAVE SUCCESS paid finalDamage 5,
-// own hp_change entry). Same MA-0218/MA-0481/MA-0505/MA-0514 byte-shape data
-// fix: dc_success:"none" threaded onto the save context → computeDamageAfterSave
-// (…, 'none') = 0 on success, full raw on failure. escape_dc:13 authored as the
-// machine representation of prose "(escape DC 13)"; RESIDUAL (MA-0514 precedent):
-// the only escape_dc consumer is the attack-hit hit_conditions stamper — the
-// save-path grapple stamp writes source meta only, so live save-row grapple meta
-// carries no dc field (badge escape stays GM-adjudicated).
-const couatl = () => monstersData.find(m => m.name === 'Couatl');
-const couatlConstrictRow = () => couatl().actions[1];
-
-const COUATL_CREATURES = [
-  { name: 'Couatl 1', type: 'npc', targetName: 'Bandit 1', currentHp: 60, maxHp: 60, ac: 19, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
-];
-
-function renderCouatl() {
-  const m = makeMonster({ name: 'Couatl', armor_class: 19, hit_points: 60, actions: couatl().actions });
-  ctx.value = { round: 1, activeCreatureName: 'Couatl 1', creatures: COUATL_CREATURES };
-  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Couatl 1', creatures: COUATL_CREATURES })} />);
-}
-
-function couatlConstrictSaveChip() {
-  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 15 Strength')) || null;
-}
 
 describe('MA-0523 monsters.json data lock: Couatl Constrict row', () => {
   it('authors dc_success none + escape_dc 13 with DC 15 Strength 1d6 + 5 Bludgeoning + Grappled, Restrained', () => {
-    const row = couatlConstrictRow();
+    const row = monstersData.find(m => m.name === 'Couatl').actions[1];
     expect(row.name).toBe('Constrict');
     expect(row.save_dc).toBe(15);
     expect(row.save_type).toBe('Strength');
@@ -379,66 +301,13 @@ describe('MA-0523 monsters.json data lock: Couatl Constrict row', () => {
     expect(row.save_effect).toMatch(/Grappled.*escape DC 13.*Restrained/i);
     expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*8 \(1d6 \+ 5\) Bludgeoning damage/);
     expect(row.description).not.toMatch(/Success:/i);
-  });
-
-  it('RESIDUAL lock: escape_dc rides ONLY the attack-hit hit_conditions seam — save row stays grapple-stamp without dc meta', () => {
-    expect(couatlConstrictRow().hit_conditions).toBeUndefined();
+    expect(row.hit_conditions).toBeUndefined();
   });
 });
-
-describe('MA-0523 MonsterCardModal Couatl Constrict save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('save chip context carries dcSuccess none: success = 0 damage, failure = full 1d6 + 5 raw', async () => {
-    renderCouatl();
-    fireEvent.click(couatlConstrictSaveChip());
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
-    expect(context.saveDc).toBe(15);
-    expect(context.dcSuccess).toBe('none');
-    expect(context.saveConditions).toContain('grappled');
-    expect(context.saveConditions).toContain('restrained');
-    expect(computeDamageAfterSave(11, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(11, false, context.dcSuccess)).toBe(11);
-  });
-});
-
-// MA-0567: Death Knight Fell Word (legendary row, after MA-0566 header
-// prepend at legendary_actions[0]) — failure-only damage prose; the absent
-// dc_success field let resolveBlockSaveDcSuccess default the save context to
-// 'half' (live proof: nat 18 +0 vs DC 18 SAVE SUCCESS paid finalDamage 7 of
-// a rolled 14 pool, floor(14/2), hp 999→992). Same MA-0218/MA-0481/MA-0505
-// byte-shape data fix: dc_success:"none" threaded onto the save context →
-// computeDamageAfterSave(…, 'none') = 0 on success, full 5d6 raw on failure.
-// RESIDUAL (MA-0483/MA-0559 §116 precedent): the hp-max-reduction clause in
-// save_effect has ZERO producers app-wide — readers-only (greaterRestoration/
-// popups) — advisory-unbuilt, not a new defect.
-const deathKnight = () => monstersData.find(m => m.index === 'death-knight');
-const fellWordRow = () => deathKnight().legendary_actions.find(a => a.name === 'Fell Word');
-
-const DEATH_KNIGHT_CREATURES = [
-  { name: 'Death Knight 1', type: 'npc', targetName: 'Bandit 1', currentHp: 199, maxHp: 199, ac: 19, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
-];
-
-function renderDeathKnight() {
-  runtime.store['Death Knight 1.monsterLegendaryUses'] = { max: 2, used: 0 };
-  const m = makeMonster({ name: 'Death Knight', armor_class: 19, hit_points: 199, actions: deathKnight().actions, legendary_actions: deathKnight().legendary_actions });
-  ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: DEATH_KNIGHT_CREATURES };
-  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Death Knight 1', creatures: DEATH_KNIGHT_CREATURES })} />);
-}
-
-function fellWordSaveChip() {
-  const row = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Fell Word'));
-  return Array.from(row.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.textContent.includes('DC 18 Constitution')) || null;
-}
 
 describe('MA-0567 monsters.json data lock: Death Knight Fell Word row', () => {
-  it('authors dc_success none (failure-only damage) with DC 18 Constitution 5d6 Necrotic', () => {
-    const row = fellWordRow();
+  it('authors dc_success none (failure-only damage) with DC 18 Constitution 5d6 Necrotic + advisory hp-max clause', () => {
+    const row = monstersData.find(m => m.index === 'death-knight').legendary_actions.find(a => a.name === 'Fell Word');
     expect(row.save_dc).toBe(18);
     expect(row.save_type).toBe('Constitution');
     expect(row.dc_success).toBe('none');
@@ -447,29 +316,9 @@ describe('MA-0567 monsters.json data lock: Death Knight Fell Word row', () => {
     expect(row.range).toBe('120 feet');
     expect(row.description).toMatch(/<strong>Failure:<\/strong>\s*17 \(5d6\) Necrotic damage/);
     expect(hasLegendaryCooldownClause(row)).toBe(true);
-  });
-
-  it('RESIDUAL lock: hp-max-reduction clause stays advisory prose (zero hpMaxReduction producers, MA-0483 §116)', () => {
-    const row = fellWordRow();
+    // RESIDUAL lock (MA-0483 §116 precedent): the hp-max-reduction clause in
+    // save_effect has ZERO producers app-wide — readers-only, advisory-unbuilt.
     expect(row.save_effect).toMatch(/Hit Point maximum decreases by an amount equal to the damage taken/i);
     expect(row.hit_conditions).toBeUndefined();
-  });
-});
-
-describe('MA-0567 MonsterCardModal Fell Word save: zero damage on success', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('legendary save chip context carries dcSuccess none: success = 0 damage, failure = full 5d6 raw', async () => {
-    renderDeathKnight();
-    fireEvent.click(fellWordSaveChip());
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
-    expect(context.saveDc).toBe(18);
-    expect(context.dcSuccess).toBe('none');
-    expect(computeDamageAfterSave(14, true, context.dcSuccess)).toBe(0);
-    expect(computeDamageAfterSave(14, false, context.dcSuccess)).toBe(14);
   });
 });

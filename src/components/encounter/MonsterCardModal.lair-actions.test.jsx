@@ -1,16 +1,71 @@
-// MA-0024 regression: structured aboleth lair rows render clickable
-// affordances via the same gated pipeline as legendary rows — a save row
-// opens the save prompt at the authored DC/type (Grasping Tide DC 14 STR,
-// Conduit for Rage DC 14 WIS 2d6 half-on-success untouched math), the
-// phantasmal-force row logs a CLA-325 advisory ability_use, and legacy
-// plain-string lair rows (every other string-row monster) still render
-// statically with zero affordance.
+// @maintained-by-ai
+// MA-0024 modal lane ONLY. Data locks, clickable/affordance classification,
+// per-monster lair parse/te/condition-extraction census, and resolveLairRow
+// handler routing (incl. every young-*/adult-*/mummy-lord chip press cited
+// here) are owned by src/services/encounters/monsterLairActions.test.js —
+// see its MA-0024 :63-124, MA-0041 :126, MA-1207/:4643, MA-1208/:4720,
+// MA-1209/:4812 (+ press :4852), MA-1747/:4976, MA-1753/:5180 (+ press
+// :5218), MA-1760/:5370, MA-1761/:5462. This file pins ONLY the seams the
+// service lane cannot reach: MonsterLairAction's chip-vs-static render
+// branches (MonsterCardBody.jsx:384-419), the chip→handleLairRow click
+// threading with modal-derived ctx identity (attackerName = creatureName,
+// targetName = attacker.targetName, saveDc/saveType from the row), the
+// advisory ability_use record at the modal seam, and the attackerCannotAct
+// inert-gate on lair chips (MonsterCardBody.jsx:403) — previously unpinned
+// in any test.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-import monstersData from '../../../public/data/monsters.json';
 
+vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
+vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
+vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  extractDamageTypes: vi.fn(() => []),
+  formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
+  getTargetFromAttacker: vi.fn(() => ({ name: 'TestPC', type: 'player' })),
+  getResistanceNotice: vi.fn(() => null),
+  findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
+  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, activeCreatureName: 'Thug 1', creatures: [] })),
+}));
+const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
+  let _popupHtml = null;
+  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const rollSavingThrow = vi.fn();
+  ROLLERS.rollSavingThrow = rollSavingThrow;
+  return { default: vi.fn(() => ({
+    get popupHtml() { return _popupHtml; },
+    setPopupHtml: _setPopupHtml,
+    rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
+    rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
+  })), _setPopupHtml };
+});
+const runtime = vi.hoisted(() => {
+  const store = {};
+  return {
+    store,
+    setRuntimeValue: vi.fn((k, p, v) => { store[`${k}.${p}`] = v; return Promise.resolve(); }),
+    getRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
+    useRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
+  };
+});
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  useRuntimeValue: runtime.useRuntimeValue,
+  setRuntimeValue: runtime.setRuntimeValue,
+  getRuntimeValue: runtime.getRuntimeValue,
+}));
+
+import { addEntry } from '../../services/ui/logService.js';
+
+const CREATURES = [
+  { name: 'Aboleth 1', type: 'npc', targetName: 'TestPC', currentHp: 185, maxHp: 185, ac: 17, conditions: [] },
+  { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [] },
+];
+
+// Structured aboleth-shaped rows (field shape canonical in monsters.json,
+// values locked by owner monsterLairActions.test.js MA-0024).
 const LAIR = [
   {
     name: 'Phantasmal Force',
@@ -37,69 +92,10 @@ const LAIR = [
   },
 ];
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-  const rollSavingThrow = vi.fn();
-  ROLLERS.rollSavingThrow = rollSavingThrow;
-  return { default: vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
-    rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })), _setPopupHtml };
-});
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => ({ name: 'TestPC', type: 'player' })),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, activeCreatureName: 'Thug 1', creatures: [] })),
-}));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 30),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
-
-const runtime = vi.hoisted(() => {
-  const store = {};
-  return {
-    store,
-    setRuntimeValue: vi.fn((k, p, v) => { store[`${k}.${p}`] = v; return Promise.resolve(); }),
-    getRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
-    useRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
-  };
-});
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: runtime.useRuntimeValue,
-  setRuntimeValue: runtime.setRuntimeValue,
-  getRuntimeValue: runtime.getRuntimeValue,
-}));
-
-import { addEntry } from '../../services/ui/logService.js';
-
-const CREATURES = [
-  { name: 'Aboleth 1', type: 'npc', targetName: 'TestPC', currentHp: 185, maxHp: 185, ac: 17, conditions: [] },
-  { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [] },
-];
+function renderAboleth(overrides = {}) {
+  const m = makeMonster({ name: 'Aboleth', lair_actions: LAIR });
+  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES, ...overrides })} />);
+}
 
 function lairLinks() {
   return Array.from(document.querySelectorAll('.mc-dice-link-lair'));
@@ -109,476 +105,88 @@ function lairLinkWithName(name) {
   return lairLinks().find(el => el.textContent.includes(name)) || null;
 }
 
-describe('MA-0024 monsters.json data: aboleth lair_actions are structured', () => {
-  it('rows carry name + authored DCs, descriptions verbatim (index-aligned stableKey)', () => {
-    const aboleth = monstersData.find(m => m.name === 'Aboleth');
-    const [pf, tide, rage] = aboleth.lair_actions;
-    expect(pf.name).toBe('Phantasmal Force');
-    expect(pf.advisory).toBe('phantasmal_force');
-    expect(pf.save_dc).toBe(16);
-    expect(pf.save_type).toBe('Intelligence');
-    expect(tide.name).toBe('Grasping Tide');
-    expect(tide.save_dc).toBe(14);
-    expect(tide.save_type).toBe('Strength');
-    expect(tide.save_effect).toMatch(/prone/i);
-    expect(rage.save_dc).toBe(14);
-    expect(rage.save_type).toBe('Wisdom');
-    expect(rage.damage_dice_primary).toBe('2d6');
-    expect(aboleth.legendary_actions[0].uses).toBe(3);
-  });
-});
-
-describe('MA-0024 MonsterCardModal lair rows', () => {
+describe('MA-0024 MonsterCardModal lair rows — modal seams', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('all three structured rows render clickable affordances', () => {
-    const m = makeMonster({ name: 'Aboleth', lair_actions: LAIR });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
+  it('structured rows render THREE chips: save labels + advisory name, role=button, initiative-20 title format', () => {
+    renderAboleth();
     const links = lairLinks();
     expect(links).toHaveLength(3);
-    expect(links.some(el => el.textContent.includes('DC 14 Strength'))).toBe(true);
-    expect(links.some(el => el.textContent.includes('DC 14 Wisdom'))).toBe(true);
-    expect(links.some(el => el.textContent.includes('Phantasmal Force'))).toBe(true);
-    expect(links.every(el => /initiative 20/.test(el.getAttribute('title') || ''))).toBe(true);
+    expect(links.filter(el => el.textContent.includes('DC 14 Strength'))).toHaveLength(1);
+    expect(links.filter(el => el.textContent.includes('DC 14 Wisdom'))).toHaveLength(1);
+    expect(links.filter(el => el.textContent.includes('Phantasmal Force'))).toHaveLength(1);
+    expect(links.every(el => el.getAttribute('role') === 'button')).toBe(true);
+    expect(links.every(el => /^Lair action — .+\. Chosen on initiative 20, GM-enforced\.$/.test(el.getAttribute('title') || ''))).toBe(true);
   });
 
-  it('save row click → save prompt at authored DC/type via the existing seam', async () => {
-    const m = makeMonster({ name: 'Aboleth', lair_actions: LAIR });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
-    fireEvent.click(lairLinkWithName('DC 14 Strength'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+  // One press per save-row shape at the modal seam; DC/type provenance per
+  // monster is owner-locked (monsterLairActions.test.js routing tests cited
+  // in the header) — here only the modal-derived ctx identity + branch math.
+  it.each([
+    ['Grasping Tide (save, no damage, prone condition)', 'DC 14 Strength', 'STR', { saveDc: 14, saveType: 'Strength', autoDamageFormula: null, saveConditions: ['prone'] }],
+    ['Conduit for Rage (save+damage, half-on-success)', 'DC 14 Wisdom', 'WIS', { saveDc: 14, saveType: 'Wisdom', autoDamageFormula: '2d6', dcSuccess: 'half', saveConditions: [] }],
+  ])('%s chip press threads ctx through the block-save seam', async (_label, chipName, abbr, expected) => {
+    renderAboleth();
+    fireEvent.click(lairLinkWithName(chipName));
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
     const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 14, saveType: 'Strength', attackerName: 'Aboleth 1', targetName: 'TestPC' });
-    expect(call[2].saveConditions).toEqual(['prone']);
-    expect(call[2].autoDamageFormula).toBeNull();
+    expect(call[0]).toBe(abbr);
+    expect(call[2]).toMatchObject({ attackerName: 'Aboleth 1', targetName: 'TestPC', ...expected });
   });
 
-  it('damage-bearing save row keeps half-on-success dcSuccess convention', async () => {
-    const m = makeMonster({ name: 'Aboleth', lair_actions: LAIR });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
-    fireEvent.click(lairLinkWithName('DC 14 Wisdom'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[2]).toMatchObject({ saveDc: 14, saveType: 'Wisdom', dcSuccess: 'half', autoDamageFormula: '2d6' });
-  });
-
-  it('phantasmal-force row logs advisory ability_use, opens no save prompt', async () => {
-    const m = makeMonster({ name: 'Aboleth', lair_actions: LAIR });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
+  it('advisory row press logs ONE ability_use record with GM-enforced initiative-20 note, opens no save prompt', async () => {
+    renderAboleth();
     fireEvent.click(lairLinkWithName('Phantasmal Force'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(entry).toBeTruthy();
-    expect(entry.description).toContain('phantasmal force');
-    expect(entry.description).toMatch(/GM-enforced/);
-    expect(entry.description).toMatch(/initiative 20/);
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('legacy plain-string lair rows render statically with zero affordance (other monsters)', () => {
-    const m = makeMonster({ name: 'Lich', lair_actions: ['The lich animates a long-dead sprite.', 'Plants grow rapidly in a 30-foot radius.'] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Lich 1', creatures: CREATURES })} />);
-    expect(lairLinks()).toHaveLength(0);
-    const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action')).filter(el => el.textContent.includes('animates a long-dead sprite'));
-    expect(staticRows).toHaveLength(1);
-    expect(staticRows[0].querySelectorAll('span[role="button"]')).toHaveLength(0);
-  });
-
-  it('MA-0041 adult black dragon water surge: real data row renders + opens STR DC 15 prompt, zero damage', async () => {
-    const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
-    const m = makeMonster({ name: 'Adult Black Dragon', lair_actions: dragon.lair_actions });
-    const creatures = [{ name: 'Adult Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 195, maxHp: 195, ac: 19, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Black Dragon 1', creatures })} />);
-    const chip = lairLinkWithName('DC 15 Strength');
-    expect(chip).toBeTruthy();
-    fireEvent.click(chip);
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', attackerName: 'Adult Black Dragon 1', targetName: 'TestPC' });
-    expect(call[2].saveConditions).toEqual(['prone']);
-    expect(call[2].autoDamageFormula).toBeNull();
-  });
-
-  it('nameless dict rows (MV-24 shape) stay static too', () => {
-    const m = makeMonster({ name: 'Some Serpent', lair_actions: [{ description: 'Pools of water surge outward.', save_dc: 15, save_type: 'Constitution' }] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Dragon 1', creatures: CREATURES })} />);
-    expect(lairLinks()).toHaveLength(0);
-  });
-
-  it('named row without any authored mechanic stays static (clickable === resolvable)', () => {
-    const m = makeMonster({ name: 'Aboleth', lair_actions: [{ name: 'Broken Row', description: 'prose only' }] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
-    expect(lairLinks()).toHaveLength(0);
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('Broken Row'));
-    expect(row).toBeTruthy();
-    expect(row.querySelector('span[role="button"]')).toBeNull();
-  });
-});
-
-// MA-1207: mummy-lord lair_actions[0] named advisory row arms the
-// mc-dice-link-lair chip (press = record-only advisory ability_use, zero
-// save prompt); sibling nameless dicts stay inert static prose — and the
-// static branch no longer emits the orphan leading "." from
-// <strong>{la.name}.</strong> when !la.name. (Chip count widened 1→2 when
-// MA-1208 armed lair_actions[1]; MA-1209 armed [2]'s DC 16 Constitution
-// save chip → 3.)
-describe('MA-1207 mummy-lord lair advisory chip + nameless-dot guard', () => {
-  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
-
-  it('named advisory rows render chips; [2] save row now armed too (MA-1209 widened 2→3)', () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    const links = lairLinks();
-    expect(links).toHaveLength(3);
-    expect(links[0].textContent).toContain('Pinpoint Living Creatures');
-    expect(links[0].getAttribute('role')).toBe('button');
-    expect(links[0].getAttribute('title')).toMatch(/initiative 20/);
-  });
-
-  it('chip press logs advisory record with initiative-20 GM-enforced note, opens no save prompt', async () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    fireEvent.click(lairLinkWithName('Pinpoint Living Creatures'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const entry = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(entry).toBeTruthy();
-    expect(entry.abilityName).toBe('Pinpoint Living Creatures');
-    expect(entry.description).toMatch(/grants each undead creature in the lair/i);
-    expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('nameless dict rows render prose WITHOUT the orphan leading "." (render guard)', () => {
-    const m = makeMonster({ name: 'Nameless Test', lair_actions: [{ description: 'Pools of water surge outward.' }] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Nameless Test 1', creatures: CREATURES })} />);
-    expect(lairLinks()).toHaveLength(0);
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('Pools of water surge outward.'));
-    expect(row).toBeTruthy();
-    expect(row.querySelector('strong')).toBeNull();
-    expect(row.textContent.trim().startsWith('.')).toBe(false);
-  });
-
-  it('named inert row still renders its bold name + period (guard is name-gated)', () => {
-    const m = makeMonster({ name: 'Nameless Test', lair_actions: [{ name: 'Keeping Row', description: 'prose only' }] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Nameless Test 1', creatures: CREATURES })} />);
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('Keeping Row'));
-    expect(row.querySelector('strong')).toBeTruthy();
-    expect(row.querySelector('strong').textContent).toBe('Keeping Row.');
-  });
-});
-
-// MA-1208: mummy-lord lair_actions[1] twin nameless raw dict fixed to a
-// named advisory row → press of the warding chip = record-only advisory
-// ability_use with the honest GM-enforced note, zero save prompt.
-// (Chip census widened by MA-1209: [2] Spellcasting Pain now arms its own
-// DC 16 Constitution save chip — see MA-1209 lock below.)
-describe('MA-1208 mummy-lord turn-undead warding chip render lock', () => {
-  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
-
-  it('advisory chips armed; [2] now arms a save chip too (MA-1209 widened 2→3)', () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    const links = lairLinks();
-    expect(links).toHaveLength(3);
-    const ward = lairLinkWithName('Turn Undead Warding');
-    expect(ward.getAttribute('role')).toBe('button');
-    expect(ward.getAttribute('title')).toMatch(/initiative 20/);
-  });
-
-  it('warding chip press logs ONE advisory ability_use with honest note, opens no save prompt', async () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(lairLinkWithName('Turn Undead Warding'));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
     expect(entries).toHaveLength(1);
-    expect(entries[0].abilityName).toBe('Turn Undead Warding');
-    expect(entries[0].description).toMatch(/grants each undead in the lair advantage on saving throws against effects that turn undead/i);
-    expect(entries[0].description).toMatch(/initiative 20 \(GM-enforced/i);
+    expect(entries[0].abilityName).toBe('Phantasmal Force');
+    expect(entries[0].description).toMatch(/phantasmal force/i);
+    expect(entries[0].description).toMatch(/initiative 20/);
+    expect(entries[0].description).toMatch(/GM-enforced/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
-});
 
-// MA-1209: mummy-lord lair_actions[2] nameless raw dict + unparseable
-// "1d6 per level" fixed to a named SAVE row → THREE mc-dice-link-lair
-// chips on the card; the Spellcasting Pain chip renders "DC 16 Constitution"
-// and its press rides the untouched block-save seam (saveDc 16 / CON,
-// autoDamageFormula honest static "1d6", dc_success "none" — zero-on-success,
-// MV-20 half-default closed), zero advisory entries.
-describe('MA-1209 mummy-lord spellcasting-pain save chip render + press lock', () => {
-  const mummyLord = monstersData.find(m => m.index === 'mummy-lord');
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  it('static branches (bare string, nameless dict, named-inert) render prose with zero affordance and no orphan leading "."', () => {
+    const m = makeMonster({
+      name: 'Static Monster',
+      lair_actions: [
+        'The lich animates a long-dead sprite.',
+        { description: 'Pools of water surge outward.', save_dc: 15, save_type: 'Constitution' },
+        { name: 'Keeping Row', description: 'prose only' },
+      ],
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Static Monster 1', creatures: CREATURES })} />);
+    expect(lairLinks()).toHaveLength(0);
+    const rows = Array.from(document.querySelectorAll('.mc-section .mc-action'));
+    const stringRow = rows.find(el => el.textContent.includes('animates a long-dead sprite'));
+    expect(stringRow).toBeTruthy();
+    expect(stringRow.querySelectorAll('span[role="button"]')).toHaveLength(0);
+    const namelessRow = rows.find(el => el.textContent.includes('Pools of water surge outward.'));
+    expect(namelessRow.querySelector('strong')).toBeNull();
+    expect(namelessRow.textContent.trim().startsWith('.')).toBe(false);
+    const namedRow = rows.find(el => el.textContent.includes('Keeping Row'));
+    expect(namedRow.querySelector('strong').textContent).toBe('Keeping Row.');
+    expect(namedRow.querySelectorAll('span[role="button"]')).toHaveLength(0);
   });
 
-  it('THREE lair chips armed incl. DC 16 Constitution save chip on the wracked-with-pain row', () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
+  it('attackerCannotAct renders lair chips inert: chips still show, clicks dispatch nothing', async () => {
+    const creatures = [
+      { ...CREATURES[0], conditions: [{ key: 'stunned', name: 'Stunned' }] },
+      CREATURES[1],
+    ];
+    render(<MonsterCardModal {...makeProps(makeMonster({ name: 'Aboleth', lair_actions: LAIR }), { creatureName: 'Aboleth 1', creatures })} />);
     const links = lairLinks();
     expect(links).toHaveLength(3);
-    const chip = lairLinkWithName('DC 16 Constitution');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('wracked with pain'));
-    expect(row.querySelector('.mc-dice-link-lair')).toBeTruthy();
-    expect(row.textContent).toContain('Spellcasting Pain');
-    // per-level wording preserved byte in the row prose
-    expect(row.textContent).toMatch(/1d6 necrotic damage per level of the spell, and the spell has no effect and is wasted/i);
-  });
-
-  it('chip press opens DC 16 CON save at the seam: autoDamageFormula 1d6, dcSuccess none, zero advisory log', async () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(lairLinkWithName('DC 16 Constitution'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('CON');
-    expect(call[2]).toMatchObject({ saveDc: 16, saveType: 'Constitution', dcSuccess: 'none', autoDamageFormula: '1d6', attackerName: 'Mummy Lord 1', targetName: 'TestPC' });
-    expect(call[2].saveConditions).toEqual([]);
-    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
-    expect(entries).toHaveLength(0);
-  });
-
-  it('advisory twins still record-only after MA-1209 (no save prompt from [0]/[1])', async () => {
-    const m = makeMonster({ name: 'Mummy Lord', lair_actions: mummyLord.lair_actions });
-    const creatures = [{ name: 'Mummy Lord 1', type: 'npc', targetName: 'TestPC', currentHp: 187, maxHp: 187, ac: 17, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Mummy Lord 1', creatures })} />);
-    fireEvent.click(lairLinkWithName('Pinpoint Living Creatures'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
+    expect(links.every(el => el.className.includes('mc-dice-link-spell-spent'))).toBe(true);
+    expect(links.every(el => el.closest('.mc-action').className.includes('mc-action-disabled'))).toBe(true);
+    fireEvent.click(links[1]);
+    fireEvent.click(links[0]);
+    await Promise.resolve();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-});
-
-// MA-1747 + MA-1748: Young Black Dragon lair_actions[0] bare-string and [1]
-// nameless dict pools rows were text-only with zero affordance (MA-0378
-// bare-string / MV-24 nameless-dict families, live inert 2026-09-30).
-// Option B data fixes arm TWO distinct save chips — "Surging Pools" [0]
-// (MA-1747) + "Grasping Tide" [1] (MA-1748 ONE-FIELD name fix, RAW-anchored
-// on the row's own prose, adult-black-dragon MA-0165 name precedent).
-// MA-1748 WIDENED this lock to 2 chips; MA-1749 WIDENS IT AGAIN to THREE:
-// sibling [2] was the nameless insect dict (inert) and now carries the full
-// adult MA-0042 zone template → named "Insect Cloud" "DC 15 Constitution"
-// chip — three lair chips render distinct names on one card.
-describe('MA-1747/MA-1748/MA-1749 young-black-dragon lair chips render + press lock', () => {
-  const young = monstersData.find(m => m.index === 'young-black-dragon');
-
-  function chipForRowName(name) {
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action'))
-      .find(el => el.querySelector('strong')?.textContent.trim() === `${name}.`);
-    return row ? row.querySelector('.mc-dice-link-lair') : null;
-  }
-
-  it('[0]+[1]+[2] render THREE distinct named chips — 2× "DC 15 Strength" + "DC 15 Constitution" (MA-1749 widened 2→3)', () => {
-    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
-    const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
-    const links = lairLinks();
-    expect(links).toHaveLength(3);
-    expect(links.filter(el => el.textContent.includes('DC 15 Strength'))).toHaveLength(2);
-    expect(links.filter(el => el.textContent.includes('DC 15 Constitution'))).toHaveLength(1);
-    expect(links.every(el => el.getAttribute('role') === 'button')).toBe(true);
-    expect(links.every(el => /initiative 20/.test(el.getAttribute('title') || ''))).toBe(true);
-    expect(chipForRowName('Surging Pools')).toBeTruthy();
-    expect(chipForRowName('Grasping Tide')).toBeTruthy();
-    expect(chipForRowName('Insect Cloud')).toBeTruthy();
-    const names = [chipForRowName('Surging Pools'), chipForRowName('Grasping Tide'), chipForRowName('Insect Cloud')].map(c => c.closest('.mc-action').querySelector('strong').textContent.trim());
-    expect(new Set(names).size).toBe(3);
-    const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action')).filter(el => el.textContent.includes('grasping tide') && !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows).toHaveLength(0);
-    const insectRow = Array.from(document.querySelectorAll('.mc-section .mc-action')).find(el => el.textContent.includes('swarming insects'));
-    expect(insectRow).toBeTruthy();
-    expect(insectRow.querySelector('.mc-dice-link-lair')).toBeTruthy();
-  });
-
-  it('[0] chip press → save seam at authored DC 15 STR, zero damage formula, zero conditions (prone/pull GM-advisory)', async () => {
-    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
-    const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
-    fireEvent.click(chipForRowName('Surging Pools'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', attackerName: 'Young Black Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBeNull();
-    expect(call[2].saveConditions).toEqual([]);
-  });
-
-  it('MA-1748 [1] chip press → save seam at authored DC 15 STR, zero damage formula, zero conditions', async () => {
-    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
-    const creatures = [{ name: 'Young Black Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 127, maxHp: 127, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
-    const chip = chipForRowName('Grasping Tide');
-    expect(chip.getAttribute('title')).toMatch(/DC 15 Strength/);
-    fireEvent.click(chip);
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', attackerName: 'Young Black Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBeNull();
-    expect(call[2].saveConditions).toEqual([]);
-  });
-});
-
-// MA-1753: Young Blue Dragon lair_actions[0] ceiling-collapse bare string
-// rendered as a static text-only row with ZERO affordance (MA-0378
-// bare-string family, live inert 2026-09-30). The named "Ceiling Collapse"
-// SAVE+DAMAGE data fix arms ONE .mc-dice-link-lair chip "DC 15 Dexterity"
-// (nameless siblings [1]/[2] stay inert static rows, MA-1754/MA-1755 lanes);
-// press rides the untouched handleSaveRoll seam at the authored DC 15 DEX
-// with autoDamageFormula 3d6, dcSuccess "none" (RAW success = no damage,
-// MV-20 half-default closed) and saveConditions ['prone','restrained'].
-describe('MA-1753 young-blue-dragon ceiling collapse chip render + press lock', () => {
-  const youngBlue = monstersData.find(m => m.index === 'young-blue-dragon');
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  function chipForRowName(name) {
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action'))
-      .find(el => el.querySelector('strong')?.textContent.trim() === `${name}.`);
-    return row ? row.querySelector('.mc-dice-link-lair') : null;
-  }
-
-  // MA-1754 bumped the young-blue chip census 1→2 ([1] named "Collapsing
-  // Ceiling"); MA-1755 widens it 2→3: [2] sand cloud got its adult-blue
-  // byte-twin "Sand Cloud" save+zone row → clickable "DC 15 Constitution" chip.
-  it('[0]+[1]+[2] arm THREE lair chips — two "DC 15 Dexterity" + one "DC 15 Constitution" (3 chips total)', () => {
-    const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
-    const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
-    const links = lairLinks();
-    expect(links).toHaveLength(3);
-    const dex = links.filter(l => l.textContent.includes('DC 15 Dexterity'));
-    const con = links.filter(l => l.textContent.includes('DC 15 Constitution'));
-    expect(dex).toHaveLength(2);
-    expect(con).toHaveLength(1);
-    for (const link of links) {
-      expect(link.getAttribute('role')).toBe('button');
-      expect(link.getAttribute('title')).toMatch(/initiative 20/);
-    }
-    expect(chipForRowName('Ceiling Collapse')).toBeTruthy();
-    expect(chipForRowName('Collapsing Ceiling')).toBeTruthy();
-    const sandChip = chipForRowName('Sand Cloud');
-    expect(sandChip).toBeTruthy();
-    expect(sandChip.textContent).toContain('DC 15 Constitution');
-  });
-
-  it('chip press → save seam at authored DC 15 DEX, autoDamageFormula 3d6, dcSuccess none, saveConditions prone+restrained', async () => {
-    const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
-    const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(chipForRowName('Ceiling Collapse'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('DEX');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Dexterity', dcSuccess: 'none', attackerName: 'Young Blue Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBe('3d6');
-    expect(call[2].saveConditions).toEqual(['prone', 'restrained']);
-    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
-    expect(entries).toHaveLength(0);
-  });
-
-  it('MA-1754 [1] chip press → save seam at DC 15 DEX, autoDamageFormula 3d6, dcSuccess none, saveConditions prone+restrained', async () => {
-    const m = makeMonster({ name: 'Young Blue Dragon', lair_actions: youngBlue.lair_actions });
-    const creatures = [{ name: 'Young Blue Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 155, maxHp: 155, ac: 19, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Blue Dragon 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(chipForRowName('Collapsing Ceiling'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('DEX');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Dexterity', dcSuccess: 'none', attackerName: 'Young Blue Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBe('3d6');
-    expect(call[2].saveConditions).toEqual(['prone', 'restrained']);
-    const entries = addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use');
-    expect(entries).toHaveLength(0);
-  });
-});
-
-// MA-1760: Young Brass Dragon lair_actions[0] was a BARE STRING (MA-0378
-// family, live inert 2026-09-30: MonsterCardBody.jsx:358 typeof!=='string →
-// static span, zero affordance). The byte-twin adult MA-0074 "Strong Wind"
-// promotion arms ONE .mc-dice-link-lair chip "DC 15 Strength"; sibling [1]
-// (MA-1761 lane) stays a nameless static row (FALSE-locked); press rides the
-// untouched handleSaveRoll seam at DC 15 STR, autoDamageFormula null,
-// dcSuccess "none", saveConditions ['prone'] (MA-0017 damageless seam).
-describe('MA-1760 young-brass-dragon lair strong wind chip render + press lock', () => {
-  const youngBrass = monstersData.find(m => m.index === 'young-brass-dragon');
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  function chipForRowName(name) {
-    const row = Array.from(document.querySelectorAll('.mc-section .mc-action'))
-      .find(el => el.querySelector('strong')?.textContent.trim() === `${name}.`);
-    return row ? row.querySelector('.mc-dice-link-lair') : null;
-  }
-
-  // MA-1761 fixed sibling [1] this pass (former 1-chip census widened 1→2,
-  // nameless static-row FALSE-pin inverted §216): both wind rows are now
-  // named save chips.
-  it('arms TWO "DC 15 Strength" lair chips (Strong Wind + Dispersing Wind), zero static wind rows (2 chip census)', () => {
-    const m = makeMonster({ name: 'Young Brass Dragon', lair_actions: youngBrass.lair_actions });
-    const creatures = [{ name: 'Young Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 110, maxHp: 110, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Brass Dragon 1', creatures })} />);
-    const links = lairLinks();
-    expect(links).toHaveLength(2);
-    expect(links[0].textContent).toContain('DC 15 Strength');
-    expect(links[1].textContent).toContain('DC 15 Strength');
-    expect(links[1].getAttribute('role')).toBe('button');
-    expect(links[1].getAttribute('title')).toMatch(/initiative 20/);
-    expect(chipForRowName('Strong Wind')).toBeTruthy();
-    expect(chipForRowName('Dispersing Wind')).toBeTruthy();
-    const staticRows = Array.from(document.querySelectorAll('.mc-section .mc-action'))
-      .filter(el => el.textContent.includes('strong wind blows around the dragon') && !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows).toHaveLength(0);
-  });
-
-  it('MA-1761 [1] chip press → save seam at authored DC 15 STR, autoDamageFormula null, dcSuccess none, saveConditions prone', async () => {
-    const m = makeMonster({ name: 'Young Brass Dragon', lair_actions: youngBrass.lair_actions });
-    const creatures = [{ name: 'Young Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 110, maxHp: 110, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Brass Dragon 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(chipForRowName('Dispersing Wind'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', dcSuccess: 'none', attackerName: 'Young Brass Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBeNull();
-    expect(call[2].saveConditions).toEqual(['prone']);
-  });
-
-  it('chip press → save seam at authored DC 15 STR, autoDamageFormula null, dcSuccess none, saveConditions prone', async () => {
-    const m = makeMonster({ name: 'Young Brass Dragon', lair_actions: youngBrass.lair_actions });
-    const creatures = [{ name: 'Young Brass Dragon 1', type: 'npc', targetName: 'TestPC', currentHp: 110, maxHp: 110, ac: 18, conditions: [] }, ...CREATURES];
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Brass Dragon 1', creatures })} />);
-    addEntry.mockClear();
-    fireEvent.click(chipForRowName('Strong Wind'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(call[0]).toBe('STR');
-    expect(call[2]).toMatchObject({ saveDc: 15, saveType: 'Strength', dcSuccess: 'none', attackerName: 'Young Brass Dragon 1', targetName: 'TestPC' });
-    expect(call[2].autoDamageFormula).toBeNull();
-    expect(call[2].saveConditions).toEqual(['prone']);
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });

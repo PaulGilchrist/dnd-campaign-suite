@@ -1,11 +1,15 @@
+// @maintained-by-ai
 // BA-001: Dodge (baseAction) — EB monster attack rolls against a dodging PC
 // must fold the Dodge activeBuff into attack mode as Disadvantage (2d20,
 // mode marker), mirroring the verified PC-side seam countDodgeDisadvantage
-// (contextBuilder-sync.js:651) and the active-buff-backed
+// (contextBuilder-sync.js:631) and the active-buff-backed
 // applyProtectionFromEvilPenalty fold in this file. Before the fix
 // buildTargetEffectData read conditions + targetEffects only, so the dodging
 // PC's buff was invisible to the monster card and every roll was single-d20
 // normal mode.
+// Owned here: the activeBuffs-backed fold. The condition/te-backed dodge
+// fold in combineAttackModes is owned by conditionEffects.test.js:352/507;
+// PC-sheet Patient Defense grant lane by useCharActionsAutomation.test.js.
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal, { applyDodgePenalty } from './MonsterCardModal.jsx';
@@ -116,38 +120,28 @@ beforeEach(() => {
 });
 
 describe('applyDodgePenalty — active-buff fold (unit)', () => {
-  it('bumps targetDisadvantageCount when the player target carries a dodge buff', () => {
-    runtime.store['LightfootHalfling.activeBuffs'] = [{ name: 'Dodge', effect: 'dodge' }];
-    const data = { targetDisadvantageCount: 0 };
-    applyDodgePenalty(data, { name: 'LightfootHalfling', type: 'player' }, 'test-campaign');
-    expect(data.targetDisadvantageCount).toBe(1);
-  });
+  const DODGE = [{ name: 'Dodge', effect: 'dodge' }];
+  const PLAYER = { name: 'LightfootHalfling', type: 'player' };
 
-  it('stacks onto an existing disadvantage count', () => {
-    runtime.store['LightfootHalfling.activeBuffs'] = [{ name: 'Dodge', effect: 'dodge' }];
-    const data = { targetDisadvantageCount: 1 };
-    applyDodgePenalty(data, { name: 'LightfootHalfling', type: 'player' }, 'test-campaign');
-    expect(data.targetDisadvantageCount).toBe(2);
-  });
-
-  it('is inert without a dodge buff', () => {
-    runtime.store['LightfootHalfling.activeBuffs'] = [{ name: 'Bless', effect: 'bless_bonus' }];
-    const data = {};
-    applyDodgePenalty(data, { name: 'LightfootHalfling', type: 'player' }, 'test-campaign');
-    expect(data.targetDisadvantageCount ?? 0).toBe(0);
-  });
-
-  it('is inert for non-player targets', () => {
-    runtime.store['Ogre.activeBuffs'] = [{ name: 'Dodge', effect: 'dodge' }];
-    const data = {};
-    applyDodgePenalty(data, { name: 'Ogre', type: 'npc' }, 'test-campaign');
-    expect(data.targetDisadvantageCount ?? 0).toBe(0);
+  it.each([
+    { name: 'folds a dodge buff into a fresh count', buffs: DODGE, target: PLAYER, initial: undefined, expected: 1 },
+    { name: 'stacks onto an existing disadvantage count', buffs: DODGE, target: PLAYER, initial: 1, expected: 2 },
+    { name: 'is inert without a dodge buff', buffs: [{ name: 'Bless', effect: 'bless_bonus' }], target: PLAYER, initial: undefined, expected: 0 },
+    { name: 'is inert for non-player targets', buffs: DODGE, target: { name: 'Ogre', type: 'npc' }, initial: undefined, expected: 0 },
+  ])('$name', ({ buffs, target, initial, expected }) => {
+    runtime.store[`${target.name}.activeBuffs`] = buffs;
+    const data = initial === undefined ? {} : { targetDisadvantageCount: initial };
+    applyDodgePenalty(data, target, 'test-campaign');
+    expect(data.targetDisadvantageCount ?? 0).toBe(expected);
   });
 });
 
-describe('BA-001 MonsterCardModal — Scimitar vs dodging PC', () => {
-  it('rolls with forcedMode disadvantage against a dodging player target', async () => {
-    renderBandit({ dodging: true });
+describe('BA-001 MonsterCardModal — Scimitar vs dodge state', () => {
+  it.each([
+    { dodging: true, expectedMode: 'disadvantage' },
+    { dodging: false, expectedMode: 'normal' },
+  ])('rolls $expectedMode when target dodging=$dodging', async ({ dodging, expectedMode }) => {
+    renderBandit({ dodging });
     const chip = scimitarChip();
     expect(chip).toBeTruthy();
     await act(async () => { fireEvent.click(chip); });
@@ -157,17 +151,6 @@ describe('BA-001 MonsterCardModal — Scimitar vs dodging PC', () => {
     expect(name).toBe('Scimitar');
     expect(bonus).toBe(3);
     expect(options.targetName).toBe('LightfootHalfling');
-    expect(options.forcedMode).toBe('disadvantage');
-  });
-
-  it('rolls normal mode (byte-inert) when the target is not dodging', async () => {
-    renderBandit({ dodging: false });
-    await act(async () => { fireEvent.click(scimitarChip()); });
-
-    await waitFor(() => expect(rollAttack).toHaveBeenCalled());
-    const options = rollAttack.mock.calls[0][2];
-    expect(options.targetName).toBe('LightfootHalfling');
-    expect(options.forcedMode ?? 'normal').toBe('normal');
-    expect(options.forcedMode).not.toBe('disadvantage');
+    expect(options.forcedMode ?? 'normal').toBe(expectedMode);
   });
 });

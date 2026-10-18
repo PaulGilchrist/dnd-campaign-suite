@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// MAINTENANCE PASS 2026-10-18: 6→3 tests. Data describe collapsed 3→1 BY-name
+// disk lock (fields + derivation + spells.json both paths in one pass). Modal
+// chip-detect folded into the gated-click test (args identity = the fix);
+// generic '(N left)' counter + refusal-shape assertions dropped — owners:
+// MonsterCardModal.legendary-uses.test.jsx (counter/refusal) and
+// MonsterCardModal.spell-attack.test.jsx (spell-chip option shape).
+// Dead-mock purge: diceRoller rollExpression/rollExpressionDoubled overrides
+// removed (empirically never invoked — rollAttack/rollDamage mocked upstream
+// of the dice layer); all remaining mock exports verified import-referenced.
 // MA-0219 regression: Ancient Gold Dragon legendary "Guiding Light" was inert
 // prose ("The dragon uses Spellcasting to cast Guiding Bolt (level 4 version).")
 // — the gated "Expend Legendary" chip spent a use then console.errored "no
@@ -5,6 +15,8 @@
 // spell-attack seam mirroring the verified MA-0082/MA-0105/MA-0196 siblings:
 // +16 to hit (PB +7 + CHA +9), level 4 Guiding Bolt = 7d6 Radiant per
 // spells.json (both paths), 120 ft range, spell-origin marker.
+// Generic legendary counter/refusal-shape: owners MonsterCardModal.legendary-uses.test.jsx;
+// spell-attack chip option identity: owner MonsterCardModal.spell-attack.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -13,11 +25,6 @@ import monstersData from '../../../public/data/monsters.json';
 import spells5e from '../../../public/data/spells.json';
 import spells2024 from '../../../public/data/2024/spells.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -90,13 +97,13 @@ const CREATURES = [
 const ancientGold = () => monstersData.find(m => m.name === 'Ancient Gold Dragon');
 const ancientGoldActions = () => [{ name: 'Rend', attack_bonus: 17, damage_dice_primary: '2d8 + 10', damage_type_primary: 'Slashing', damage_dice_secondary: '2d8', damage_type_secondary: 'Fire', reach: '15 ft.' }];
 
-// MA-0219 data lock: Ancient Gold Dragon legendary "Guiding Light" authors the
-// MA-0033 spell-attack seam mirroring the verified MA-0082 (Adult Bronze) /
-// MA-0105 (Adult Gold) / MA-0196 (Ancient Bronze) shape — +16 to hit (from
-// the Spellcasting row: PB +7 + CHA +9), level 4 Guiding Bolt = 7d6 Radiant
-// per spells.json (both paths), 120 ft range, spell-origin marker.
+// MA-0219 data lock (BY-name, once): Ancient Gold Dragon legendary "Guiding
+// Light" authors the MA-0033 spell-attack seam mirroring the verified MA-0082
+// (Adult Bronze) / MA-0105 (Adult Gold) / MA-0196 (Ancient Bronze) shape —
+// +16 to hit derived from the Spellcasting row (PB +7 + CHA +9), level 4
+// Guiding Bolt = 7d6 Radiant per spells.json (both rulesets), 120 ft range.
 describe('MA-0219 monsters.json data: ancient gold dragon Guiding Light authors the spell-attack seam', () => {
-  it('Guiding Light authors +16 spell attack, 7d6 Radiant, 120 ft range', () => {
+  it('BY-name disk lock: +16 spell attack (PB 7 + CHA 9), lv4 Guiding Bolt 7d6 Radiant both rulesets, 120 ft', () => {
     const row = ancientGold().legendary_actions.find(a => a.name === 'Guiding Light');
     expect(row.attack_bonus).toBe(16);
     expect(row.spell_attack_bonus).toBe(16);
@@ -106,29 +113,22 @@ describe('MA-0219 monsters.json data: ancient gold dragon Guiding Light authors 
     expect(row.description).toMatch(/uses Spellcasting to cast <em>Guiding Bolt<\/em> \(level 4 version\)/);
     expect(row.description).toMatch(/Ranged Spell Attack: \+16/);
     expect(row.description).toMatch(/7d6 Radiant damage/);
-  });
-
-  it('+16 derived from the Spellcasting row (PB +7, CHA +9)', () => {
-    expect(ancientGold().actions.find(a => a.name === 'Spellcasting')?.description).toMatch(/\+16 to hit with spell attacks/);
     expect(ancientGold().ability_score_modifiers.cha).toBe(9);
     expect(ancientGold().proficiency_bonus).toBe(7);
-  });
-
-  it('level 4 Guiding Bolt = 7d6 Radiant per spells.json (both rulesets)', () => {
-    const bolt5e = spells5e.find(s => s.index === 'guiding-bolt');
-    const bolt2024 = spells2024.find(s => s.index === 'guiding-bolt');
-    expect(bolt5e.damage.damage_at_slot_level['4']).toBe('7d6');
-    expect(bolt2024.damage.damage_at_slot_level['4']).toBe('7d6');
-    expect(bolt5e.damage.damage_type).toBe('Radiant');
-    expect(bolt2024.damage.damage_type).toBe('Radiant');
-    expect(bolt5e.attack_type).toBe('ranged');
+    expect(ancientGold().actions.find(a => a.name === 'Spellcasting')?.description).toMatch(/\+16 to hit with spell attacks/);
+    for (const bolt of [spells5e, spells2024].map(spells => spells.find(s => s.index === 'guiding-bolt'))) {
+      expect(bolt.damage.damage_at_slot_level['4']).toBe('7d6');
+      expect(bolt.damage.damage_type).toBe('Radiant');
+    }
+    expect(spells5e.find(s => s.index === 'guiding-bolt').attack_type).toBe('ranged');
   });
 });
 
 // MA-0219: with the seam authored, the gated row renders the numeric +16 chip
-// (no expend-legendary chip), and a gated click spends 1 use then rolls the
-// spell attack through the LIVE attack seam (armed target, 7d6 Radiant
-// auto-damage on hit, spell-origin marker). Exhausted click refuses zero-spend.
+// (expend-legendary chip suppressed — LegendarySpendLink numericAffordance),
+// and a gated click spends 1 use then rolls the spell attack through the LIVE
+// attack seam (armed target, 7d6 Radiant auto-damage, spell-origin marker).
+// Counter text and refusal-shape: owners legendary-uses.test.jsx.
 describe('MA-0219 MonsterCardModal ancient gold dragon Guiding Light gated spell-attack row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -152,16 +152,11 @@ describe('MA-0219 MonsterCardModal ancient gold dragon Guiding Light gated spell
     return goldRow('Guiding Light').querySelector('.mc-dice-link');
   }
 
-  it('header shows (3 left); Guiding Light renders the +16 numeric chip, no expend-legendary chip', () => {
+  it('+16 numeric chip, no expend-legendary chip; gated click spends 1 and rolls the spell attack (7d6 Radiant auto-damage, spell-origin, armed target)', async () => {
     renderAGold({ max: 3, used: 0 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
     const row = goldRow('Guiding Light');
     expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
     expect(guidingChip().textContent).toContain('+16');
-  });
-
-  it('gated click spends 1 and rolls the +16 spell attack (7d6 Radiant auto-damage, spell-origin, armed target)', async () => {
-    renderAGold({ max: 3, used: 0 });
     fireEvent.click(guidingChip());
     await waitFor(() => expect(runtime.store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
@@ -181,13 +176,11 @@ describe('MA-0219 MonsterCardModal ancient gold dragon Guiding Light gated spell
 
   it('exhausted (3/3): +16 chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
     renderAGold({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
     fireEvent.click(guidingChip());
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store['Ancient Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
   });
 });

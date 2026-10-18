@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0904: Gorgon Petrifying Breath cone-picker threading — the row now
 // authors the MA-0501 structured staged_petrify key (petrified_hours 24),
 // so every fresh click arms SaveAttackAoeModal with stagedPetrify
@@ -5,30 +6,30 @@
 // word-scan still yields Petrified+Restrained (byte-unchanged) — the picker
 // SUPPRESSES that flat grant while the ladder is armed (the picker route
 // itself is exercised in SaveAttackAoeModal.staged-petrify.test.jsx).
+// Trimmed: excludeNames/storeLastAttack cite-skipped to cone/aoe shape owners
+// (recharge-cone :148-149, line-breath :148-149, paralyzing-breath, sleep-breath);
+// te ladder legs pinned by cockatricePetrifyService.test.js (dc15 'Petrifying
+// Breath' label, petrifiedRounds 14400); pro+lowercase case-insensitivity owner
+// #586 keeps the capitalized-prose legs (report ranges) and the saveConditions
+// arm leg. diceRoller + _rollSavingThrow/_setPopupHtml mock internals purged
+// (empirical: handleSaveRoll arms the stubbed picker, never rolls here).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
+const aoeProps = vi.hoisted(() => ({ current: null }));
 
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     aoeProps.current = props;
-    aoeProps.onClose = props.onClose;
     return (
       <div className="sp-overlay cone-picker-stub">
         <div className="sp-body">{props.titleOverride}</div>
       </div>
     );
   },
-}));
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
@@ -41,23 +42,19 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn(() => Promise.resolve([])),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
-    rollSavingThrow: _rollSavingThrow,
+    rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
-  }));
-  return { default: mockHook, _rollSavingThrow, _setPopupHtml };
-});
+  })),
+}));
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
@@ -165,7 +162,5 @@ describe('MA-0904 Petrifying Breath cone picker staged transport', () => {
     // picker as saveConditions (double-grant suppression happens INSIDE the
     // picker when the ladder is armed — see SaveAttackAoeModal.staged-petrify).
     expect(aoeProps.current.saveConditions).toEqual(expect.arrayContaining(['petrified', 'restrained']));
-    expect(aoeProps.current.excludeNames).toEqual(['Gorgon 1']);
-    expect(aoeProps.current.storeLastAttack).toBe(false);
   });
 });

@@ -1,11 +1,18 @@
-// MA-0042: Adult Black Dragon Insect Cloud lair row — structured save row
-// with an authored 20-ft zone. Chip click routes through the MA-0031/MA-0035
-// area picker (title "20-ft Radius … selection advisory", CON DC 15, 3d6
-// Piercing, half-on-success, coverage gate off since the cloud is centered on
-// a GM-chosen point) and carries the persisting-zone payload { effectKey:
+// @maintained-by-ai
+// MA-0042 + MA-1749: black-dragon Insect Cloud lair row — structured zone row
+// with an authored 20-ft zone (adult lair_actions[1]; young lair_actions[2]
+// byte-mirrors it via the MA-1749 data fix, so both dragons ride the same
+// legs below via it.each). Chip click routes through the MA-0031/MA-0035 area
+// picker (title "20-ft Radius … selection advisory", CON DC 15, 3d6 Piercing,
+// half-on-success, coverage gate off since the cloud is centered on a
+// GM-chosen point) and carries the persisting-zone payload { effectKey:
 // 'lair_insect_cloud', radiusFt: 20, repeatTurnEnd: true }. The single-target
-// block-save seam is never invoked for a zone row; the legacy plain-string
-// darkness row stays inert.
+// block-save seam is never invoked for a zone row.
+// Cited owners (do NOT re-add here): chip render/role/title/advisory and the
+// prose-render static branches → MonsterCardModal.lair-actions.test.jsx (#610);
+// no-zone single-target block-save rows (Water Surge / Surging Pools /
+// Grasping Tide) → MonsterCardModal.lair-darkness.test.jsx (#611);
+// parse/grant/census → services/encounters/monsterLairActions.test.js.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -21,26 +28,20 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const rollSavingThrow = vi.fn();
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+    setPopupHtml: vi.fn((val) => { _popupHtml = val; }),
     rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })), _setPopupHtml };
+  })) };
 });
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
@@ -78,16 +79,20 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: runtime.getRuntimeValue,
 }));
 
-const CREATURES = [
-  { name: 'Adult Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 195, maxHp: 195, ac: 19, conditions: [] },
-  { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
-  { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
+const CLOUD_DRAGONS = [
+  { index: 'adult-black-dragon', label: 'adult (MA-0042)', name: 'Adult Black Dragon', creatureName: 'Adult Black Dragon 1', currentHp: 195, ac: 19 },
+  { index: 'young-black-dragon', label: 'young (MA-1749)', name: 'Young Black Dragon', creatureName: 'Young Black Dragon 1', currentHp: 127, ac: 18 },
 ];
 
-function renderDragon() {
-  const dragon = monstersData.find(m => m.index === 'adult-black-dragon');
-  const m = makeMonster({ name: 'Adult Black Dragon', lair_actions: dragon.lair_actions });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Black Dragon 1', creatures: CREATURES })} />);
+function renderCloud(dragon) {
+  const source = monstersData.find(m => m.index === dragon.index);
+  const m = makeMonster({ name: dragon.name, lair_actions: source.lair_actions });
+  const creatures = [
+    { name: dragon.creatureName, type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: dragon.currentHp, maxHp: dragon.currentHp, ac: dragon.ac, conditions: [] },
+    { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
+    { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, ac: 12, conditions: [] },
+  ];
+  return render(<MonsterCardModal {...makeProps(m, { creatureName: dragon.creatureName, creatures })} />);
 }
 
 function lairLinkWithName(name) {
@@ -100,16 +105,9 @@ beforeEach(() => {
   aoeProps.current = null;
 });
 
-describe('MA-0042 Insect Cloud lair row → 20-ft radius area picker', () => {
-  it('structured zone row renders a clickable DC 15 Constitution chip', () => {
-    renderDragon();
-    const chip = lairLinkWithName('DC 15 Constitution');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
-  });
-
+describe.each(CLOUD_DRAGONS)('insect cloud lair row — $label → 20-ft radius area picker', (dragon) => {
   it('chip click routes to the area picker at CON DC 15, 3d6 Piercing half, radius 20, coverage gate off', async () => {
-    renderDragon();
+    renderCloud(dragon);
     fireEvent.click(lairLinkWithName('DC 15 Constitution'));
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     const p = aoeProps.current;
@@ -121,14 +119,14 @@ describe('MA-0042 Insect Cloud lair row → 20-ft radius area picker', () => {
     expect(p.range).toBe(20);
     expect(p.rangeGateFt).toBeNull();
     expect(p.titleOverride).toBe('20-ft Radius (GM positions tokens; selection advisory)');
-    expect(p.excludeNames).toEqual(['Adult Black Dragon 1']);
+    expect(p.excludeNames).toEqual([dragon.creatureName]);
     expect(p.storeLastAttack).toBe(false);
     // no single-target block-save fires for a zone row
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('zone row carries the persisting-zone payload for the picker-confirm arm', async () => {
-    renderDragon();
+  it('zone row carries the byte-identical persisting-zone payload for the picker-confirm arm', async () => {
+    renderCloud(dragon);
     fireEvent.click(lairLinkWithName('DC 15 Constitution'));
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     expect(aoeProps.current.zoneTe).toEqual({
@@ -139,92 +137,5 @@ describe('MA-0042 Insect Cloud lair row → 20-ft radius area picker', () => {
       damage: '3d6',
       duration: 'until dismissed or used again (advisory)',
     });
-  });
-
-  it('Water Surge (no authored zone) keeps the byte-identical single-target block save', async () => {
-    renderDragon();
-    fireEvent.click(lairLinkWithName('DC 15 Strength'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
-    expect(aoeProps.current).toBeNull();
-    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('STR');
-  });
-});
-
-// MA-1749: Young Black Dragon lair_actions[2] was the nameless insect-cloud
-// save dict (name-gate inert, MA-0118/MV-24 family) — zero chip, zero picker,
-// zero te lane (playbook: lair_insect_cloud pre-registered but zone/name
-// gated it out of zoneTeForAction). MA-1749 data fix byte-mirrors this
-// VERIFIED adult MA-0042 row, so the young card rides the identical picker
-// route: named "DC 15 Constitution" .mc-dice-link-lair chip → 20-ft radius
-// SaveAttackAoeModal picker (coverage gate off, half-on-success,
-// excludeNames = dragon) + persisting-zone payload effectKey lair_insect_cloud.
-describe('MA-1749 young-black-dragon insect cloud → same 20-ft area picker route', () => {
-  const young = monstersData.find(m => m.index === 'young-black-dragon');
-
-  function renderYoung() {
-    const m = makeMonster({ name: 'Young Black Dragon', lair_actions: young.lair_actions });
-    const creatures = [
-      { name: 'Young Black Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 127, maxHp: 127, ac: 18, conditions: [] },
-      { name: 'Thug 1', type: 'npc', currentHp: 45, maxHp: 45, ac: 11, conditions: [] },
-      { name: 'ElderPaladin', type: 'player', currentHp: 60, maxHp: 60, conditions: [] },
-    ];
-    return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Young Black Dragon 1', creatures })} />);
-  }
-
-  it('young [2] is byte-identical to the VERIFIED adult MA-0042 template row', () => {
-    const adultCloud = monstersData.find(m => m.index === 'adult-black-dragon').lair_actions[1];
-    expect(JSON.stringify(young.lair_actions[2])).toBe(JSON.stringify(adultCloud));
-  });
-
-  it('renders three distinct-name lair chips incl. clickable "DC 15 Constitution" Insect Cloud', () => {
-    renderYoung();
-    const links = Array.from(document.querySelectorAll('.mc-dice-link-lair'));
-    expect(links).toHaveLength(3);
-    const chip = lairLinkWithName('DC 15 Constitution');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('role')).toBe('button');
-    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
-    expect(chip.closest('.mc-action').querySelector('strong').textContent.trim()).toBe('Insect Cloud.');
-    expect(chip.closest('.mc-action').textContent).not.toMatch(/cloudwhen/);
-  });
-
-  it('chip click routes to the area picker at CON DC 15, 3d6 Piercing half, radius 20, gate off, no block-save', async () => {
-    renderYoung();
-    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    const p = aoeProps.current;
-    expect(p.saveDc).toBe(15);
-    expect(p.saveType).toBe('Constitution');
-    expect(p.damage).toBe('3d6');
-    expect(p.damageType).toBe('Piercing');
-    expect(p.dcSuccess).toBe('half');
-    expect(p.range).toBe(20);
-    expect(p.rangeGateFt).toBeNull();
-    expect(p.titleOverride).toBe('20-ft Radius (GM positions tokens; selection advisory)');
-    expect(p.excludeNames).toEqual(['Young Black Dragon 1']);
-    expect(p.storeLastAttack).toBe(false);
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('carries the persisting-zone payload lair_insect_cloud for the picker-confirm arm', async () => {
-    renderYoung();
-    fireEvent.click(lairLinkWithName('DC 15 Constitution'));
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.zoneTe).toEqual({
-      effectKey: 'lair_insect_cloud',
-      trackingPrefix: 'lair_insect_cloud',
-      radiusFt: 20,
-      repeatTurnEnd: true,
-      damage: '3d6',
-      duration: 'until dismissed or used again (advisory)',
-    });
-  });
-
-  it('pool siblings [0]/[1] keep their single-target block-save route untouched', async () => {
-    renderYoung();
-    fireEvent.click(lairLinkWithName('DC 15 Strength'));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
-    expect(aoeProps.current).toBeNull();
-    expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('STR');
   });
 });

@@ -1,9 +1,10 @@
-// MA-0554: Darkmantle Darkness Aura actions[] row — formerly inert
-// zero-chip prose (uses "1/Day" invisible). Now the self-origin zone dict
-// arms a ZoneAuraLink chip ("15-ft Aura (1/Day · N left)") that routes the
-// row through resolveSelfAuraRow: self te lair_darkness + 1/Day spend via
-// the monsterSpellUses map; exhausted rows render the spent class and the
-// resolver refuses with zero te/spend. Crush and sibling rows untouched.
+// @maintained-by-ai
+// MA-0554 modal seam only: the Darkmantle Darkness Aura actions[] row arms a
+// ZoneAuraLink chip ("15-ft Aura (1/Day · N left)") and its click routes the
+// row through resolveSelfAuraRow with monsterName + the monsterSpellUses
+// store map. Exhausted chips stay clickable and still route the resolver.
+// Aura math, spend, te arming and the honest exhausted refusal are owned by
+// services/encounters/monsterSelfAura.test.js — not re-proved here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -20,13 +21,8 @@ vi.mock('../../services/encounters/monsterSelfAura.js', async (importActual) => 
   }),
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
+// Mount guards for the heavy modal tree (network/log isolation).
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
@@ -43,21 +39,6 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   combineAttackModes: vi.fn(() => 'normal'),
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn(() => Promise.resolve({ round: 1, activeCreatureName: 'Thug 1', creatures: [] })),
-}));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 30),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -96,43 +77,34 @@ beforeEach(() => {
 });
 
 describe('MA-0554 Darkmantle Darkness Aura chip', () => {
-  it('actions[] row renders a 15-ft Aura chip with the 1/Day counter', () => {
+  it('offers exactly one 15-ft Aura chip with the 1/Day counter; Crush row stays a plain +5 attack', () => {
     renderDarkmantle();
     const chip = auraChip();
     expect(chip).toBeTruthy();
     expect(chip.textContent).toContain('15-ft Aura');
     expect(chip.textContent).toContain('(1/Day · 1 left)');
     expect(chip.getAttribute('title')).toMatch(/lair_darkness on self, radius 15 ft, no save/);
+    const crushRow = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.startsWith('Crush.'));
+    expect(crushRow.querySelector('.mc-dice-link-aura')).toBeNull();
+    expect(crushRow.textContent).toContain('+5');
   });
 
-  it('chip click routes the row through resolveSelfAuraRow with the monster + stored uses', async () => {
+  it.each([
+    { label: 'uses remaining', stored: null, left: '1 left', spent: false },
+    { label: 'exhausted 1/Day', stored: { 'Darkness Aura': 1 }, left: '0 left', spent: true },
+  ])('chip click routes resolveSelfAuraRow with $label via the monsterSpellUses store', async ({ stored, left, spent }) => {
+    if (stored) runtime.store['Darkmantle 1.monsterSpellUses'] = stored;
     renderDarkmantle();
-    fireEvent.click(auraChip());
+    const chip = auraChip();
+    expect(chip.className.includes('mc-dice-link-spell-spent')).toBe(spent);
+    expect(chip.textContent).toContain(`(1/Day · ${left})`);
+    fireEvent.click(chip);
     await waitFor(() => expect(auraCalls.calls.length).toBe(1));
     const args = auraCalls.calls[0];
     expect(args.monsterName).toBe('Darkmantle 1');
     expect(args.action.name).toBe('Darkness Aura');
     expect(args.action.zone.radius_ft).toBe(15);
-    expect(args.storedUses).toEqual({});
+    expect(args.storedUses).toEqual(stored || {});
     expect(typeof args.setPopupHtml).toBe('function');
-  });
-
-  it('spent uses: chip renders the spent class and still routes the honest refusal', async () => {
-    runtime.store['Darkmantle.monsterSpellUses'] = { 'Darkness Aura': 1 };
-    runtime.store['Darkmantle 1.monsterSpellUses'] = { 'Darkness Aura': 1 };
-    renderDarkmantle();
-    const chip = auraChip();
-    expect(chip.className).toContain('mc-dice-link-spell-spent');
-    expect(chip.textContent).toContain('(1/Day · 0 left)');
-    fireEvent.click(chip);
-    await waitFor(() => expect(auraCalls.calls.length).toBe(1));
-  });
-
-  it('Crush attack row unaffected: +5 chip only, no aura link on it', () => {
-    renderDarkmantle();
-    expect(document.querySelectorAll('.mc-dice-link-aura').length).toBe(1);
-    const crushRow = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.startsWith('Crush.'));
-    expect(crushRow.querySelector('.mc-dice-link-aura')).toBeNull();
-    expect(crushRow.textContent).toContain('+5');
   });
 });

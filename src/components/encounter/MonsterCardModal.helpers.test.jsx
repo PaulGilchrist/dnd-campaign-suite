@@ -1,33 +1,36 @@
-// Behavioral tests for the condition-effect badge rendering in the monster card.
+// @maintained-by-ai
+// Behavioral tests for the condition-effect badge row in the monster card modal.
 //
-// Coverage audit against ALL other MonsterCardModal test files (before adding any test):
-//   - Badge label rendering (Save Disadv, +N to hit, No OA, Insp. Move, No OA (Crit),
-//     OA Disadv, No Difficult Terrain on Dash) is asserted ONLY here; no sibling file
-//     checks these labels.
-//   - riderAttackBonus flowing into the actual attack roll (not just the badge) is
-//     asserted in MonsterCardModal.logic.test.jsx.
-//   - speedZero / Shield of Faith / senses / ally badges / save-modifier fallbacks are
-//     covered by MonsterCardModal.test.jsx, senses-and-fallback.test.jsx, ally-modal.test.jsx.
+// Ownership audit (lane #573-#606 catch-all, re-verified Oct 2026):
+//   The bytes under test are MonsterCardBody.jsx :73 (conditions-section gate)
+//   and buildCondEffectBadges :113-119 (seven badge branches). Grep evidence
+//   across all MonsterCardModal*.test.* files: none of the labels
+//   ('Save Disadv', '+N to hit', 'No OA', 'Insp. Move', 'No OA (Crit)',
+//   'OA Disadv', 'No Difficult Terrain on Dash') nor the classes
+//   ('mc-effect-badge', 'effect-cannot-act', 'effect-disadvantage',
+//   'effect-target-adv') are asserted by any sibling — this file is the sole
+//   owner. Same-named badges in ConditionEffectBadges*.test.jsx cover the
+//   initiative component, not MonsterCardBody, so they do not shadow these legs.
+//   riderAttackBonus flowing into the actual roll is covered in
+//   MonsterCardModal.logic.test.jsx (roll path only, not the badge).
+//   speedZero / Shield of Faith / senses / ally badges / save-modifier
+//   fallbacks live in MonsterCardModal.test.jsx, senses-and-fallback.test.jsx,
+//   ally-modal.test.jsx — none touched here.
+//   KNOWN GAP (cross-file recommendation, not added): :111 'No Adv vs' and
+//   :112 'Disadv vs' have zero coverage in this lane.
 //
-// Problems fixed in the previous version:
-//   - The conditionEffects mock duplicated a 30-line default effects object that every
-//     test overrode, so it could silently drift out of sync with test-utils.js.
-//   - Inspiring Move / No OA (Crit) runtime-flag mock state was never reset between
-//     tests, so a test could depend on flags set by an earlier test.
-//   - Assertions used document.querySelector('.effect-...'), probing the whole document
-//     instead of scoping the class check to the badge element itself.
-//   - Repeated creature fixtures were inlined in every test; extracted to helpers.
-//   - Missing negative paths: no badges when effects report nothing, no badges when the
-//     creature has no conditions even if flags/effects are set, and no speedy badges when
-//     the passives are absent.
-//
-// Cleanup applied (redundant / brittle / low-value removal):
-//   - Consolidated 4 individual rider-badge tests into 1 parameterized it.each (same structure, different flag/badge).
-//   - Consolidated 2 individual speedy-badge tests into 1 parameterized it.each (same structure, different passive).
-//   - Removed 3 negative tests already covered by other tests:
-//       * "no badges when no conditions + flags set" — covered by the all-sources integration test.
-//       * "no speedy badges when conditions but no passives" — covered by the first test (no effects = no badges).
-//       * "no speedy badges when passives but no conditions" — covered by the "no conditions" negative test above.
+// Trim applied (12 executions → 3, one per equivalence class):
+//   - Per-badge positive tests (rider it.each x3, Insp. Move, No OA (Crit),
+//     speedy it.each x2, "both speedy together") collapse into the single
+//     all-sources integration test — each branch :113-119 fires exactly once
+//     there, with its unique label + class, so per-flag renders were pure
+//     re-coverage of identical code paths.
+//   - "lacks the passives" negative folds into the all-off test (same
+//     hasMonsterPassive false path; characters:[] from makeProps exercises
+//     it too).
+//   - Kept negatives are non-redundant guards: all-off proves badges are
+//     conditional (not unconditional renders); no-conditions proves the
+//     :73 section gate.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -142,7 +145,12 @@ import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
 
 const BLINDED_CREATURE = { name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] };
 
-/** Build a monsterCharacter whose passives list matches the given effects. */
+const ALL_BADGE_LABELS = [
+  'Save Disadv', '+2 to hit', 'No OA', 'Insp. Move', 'No OA (Crit)',
+  'OA Disadv', 'No Difficult Terrain on Dash',
+];
+
+/** Build a monsterCharacter (named to match makeMonster) with the given passives. */
 function makeMonsterCharacter(effects = []) {
   return {
     name: 'Goblin',
@@ -154,16 +162,31 @@ function makeMonsterCharacter(effects = []) {
   };
 }
 
-/**
- * Assert a badge with the given label renders with the expected effect class.
- * Scoped to the badge element itself rather than probing the whole document.
- */
+/** Arm every badge source: rider flags, runtime flags, speedy passives. */
+function armAllSources(passives = [
+  'opportunity_attacks_disadvantage',
+  'ignore_difficult_terrain_on_dash',
+]) {
+  conditionEffects.__setComputeReturn({
+    ...defaultConditionEffects,
+    riderSaveDisadvantage: true,
+    riderAttackBonus: 2,
+    riderCannotOpportunityAttack: true,
+  });
+  useRuntimeState.__setInspiringMoveNoOA(true);
+  useRuntimeState.__setRemarkableNoOA(true);
+  return makeMonsterCharacter(passives);
+}
+
+/** Scoped badge assertion: the element itself carries the modal classes. */
 function expectBadge(label, effectClass) {
   expect(screen.getByText(label)).toHaveClass('mc-effect-badge', effectClass);
 }
 
-function expectNoBadge(label) {
-  expect(screen.queryByText(label)).not.toBeInTheDocument();
+function expectNoBadges() {
+  ALL_BADGE_LABELS.forEach(label => {
+    expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
 }
 
 function resetState() {
@@ -175,80 +198,30 @@ function resetState() {
   useRuntimeState.__setTargetEffects([]);
 }
 
-// ── Tests: rider effect badges ──────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('MonsterCardModal - condition effect badges', () => {
   beforeEach(resetState);
 
-  it('renders no effect badges when the creature has conditions but no rider effects', () => {
+  it('renders no effect badges when the creature has conditions but no source is active', () => {
     conditionEffects.__setComputeReturn({ ...defaultConditionEffects });
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
 
-    expectNoBadge('Save Disadv');
-    expectNoBadge('+2 to hit');
-    expectNoBadge('No OA');
-    expectNoBadge('Insp. Move');
-    expectNoBadge('No OA (Crit)');
+    // Section is mounted (Blinded label visible) yet zero badges leak through.
+    expect(screen.getByText('Blinded')).toBeInTheDocument();
+    expectNoBadges();
   });
 
-  it.each([
-    { flag: 'riderSaveDisadvantage', value: true, label: 'Save Disadv', cls: 'effect-disadvantage' },
-    { flag: 'riderAttackBonus', value: 2, label: '+2 to hit', cls: 'effect-target-adv' },
-    { flag: 'riderCannotOpportunityAttack', value: true, label: 'No OA', cls: 'effect-cannot-act' },
-  ])('renders the $label badge when $flag is $value', ({ flag, value, label, cls }) => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, [flag]: value });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-
-    expectBadge(label, cls);
-  });
-
-  it('renders the Insp. Move badge when inspiringMovementNoOA is true', () => {
-    useRuntimeState.__setInspiringMoveNoOA(true);
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-
-    expectBadge('Insp. Move', 'effect-cannot-act');
-  });
-
-  it('renders the No OA (Crit) badge when remarkableAthleteNoOA is true', () => {
-    useRuntimeState.__setRemarkableNoOA(true);
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-
-    expectBadge('No OA (Crit)', 'effect-cannot-act');
-  });
-
-  it('renders no effect badges when the creature has no conditions, even if effects and flags are set', () => {
+  it('renders no effect badges when the creature has no conditions, even if every source is armed', () => {
     damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    conditionEffects.__setComputeReturn({
-      ...defaultConditionEffects,
-      riderSaveDisadvantage: true,
-      riderAttackBonus: 2,
-      riderCannotOpportunityAttack: true,
-    });
-    useRuntimeState.__setInspiringMoveNoOA(true);
-    useRuntimeState.__setRemarkableNoOA(true);
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    const monsterCharacter = armAllSources();
+    render(<MonsterCardModal {...makeProps(makeMonster(), { characters: [monsterCharacter] })} />);
 
-    expectNoBadge('Save Disadv');
-    expectNoBadge('+2 to hit');
-    expectNoBadge('No OA');
-    expectNoBadge('Insp. Move');
-    expectNoBadge('No OA (Crit)');
+    expectNoBadges();
   });
 
-  it('renders badges from every source together (rider + runtime + speedy passives)', () => {
-    conditionEffects.__setComputeReturn({
-      ...defaultConditionEffects,
-      riderSaveDisadvantage: true,
-      riderAttackBonus: 2,
-      riderCannotOpportunityAttack: true,
-    });
-    useRuntimeState.__setInspiringMoveNoOA(true);
-    useRuntimeState.__setRemarkableNoOA(true);
-    const monsterCharacter = makeMonsterCharacter([
-      'opportunity_attacks_disadvantage',
-      'ignore_difficult_terrain_on_dash',
-    ]);
-
+  it('renders every badge source together — riders, runtime flags, speedy passives', () => {
+    const monsterCharacter = armAllSources();
     render(<MonsterCardModal {...makeProps(makeMonster(), { characters: [monsterCharacter] })} />);
 
     expectBadge('Save Disadv', 'effect-disadvantage');
@@ -258,39 +231,5 @@ describe('MonsterCardModal - condition effect badges', () => {
     expectBadge('No OA (Crit)', 'effect-cannot-act');
     expectBadge('OA Disadv', 'effect-disadvantage');
     expectBadge('No Difficult Terrain on Dash', 'effect-cannot-act');
-  });
-});
-
-// ── Tests: speedy passive badges ────────────────────────────────────────────
-
-describe('MonsterCardModal - speedy passive badges', () => {
-  beforeEach(resetState);
-
-  it.each([
-    { passive: 'opportunity_attacks_disadvantage', label: 'OA Disadv', cls: 'effect-disadvantage' },
-    { passive: 'ignore_difficult_terrain_on_dash', label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act' },
-  ])('renders the $label badge when the creature has the $passive passive and conditions', ({ passive, label, cls }) => {
-    const monsterCharacter = makeMonsterCharacter([passive]);
-    render(<MonsterCardModal {...makeProps(makeMonster(), { characters: [monsterCharacter] })} />);
-
-    expectBadge(label, cls);
-  });
-
-  it('renders both speedy badges together when both passives are present', () => {
-    const monsterCharacter = makeMonsterCharacter([
-      'opportunity_attacks_disadvantage',
-      'ignore_difficult_terrain_on_dash',
-    ]);
-    render(<MonsterCardModal {...makeProps(makeMonster(), { characters: [monsterCharacter] })} />);
-
-    expectBadge('OA Disadv', 'effect-disadvantage');
-    expectBadge('No Difficult Terrain on Dash', 'effect-cannot-act');
-  });
-
-  it('does not render speedy badges when the creature has conditions but lacks the passives', () => {
-    render(<MonsterCardModal {...makeProps(makeMonster(), { characters: [makeMonsterCharacter([])] })} />);
-
-    expectNoBadge('OA Disadv');
-    expectNoBadge('No Difficult Terrain on Dash');
   });
 });

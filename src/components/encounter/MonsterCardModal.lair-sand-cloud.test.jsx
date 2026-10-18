@@ -1,10 +1,14 @@
-// MA-0063: Adult Blue Dragon Sand Cloud lair row — structured save+zone row
-// (CON DC 15, no damage, blinded 1 min + end-of-turn repeat saves) mirroring
-// MA-0042 Insect Cloud. Chip click routes through the MA-0031/0035 area picker
-// (title "20-ft Radius … selection advisory", CON DC 15, no damage, coverage
-// gate off, saveConditions ['blinded']) and carries the persisting-zone payload
-// { effectKey: 'lair_sand_cloud', radiusFt: 20 }. The single-target block-save
-// seam is never invoked for a zone row.
+// @maintained-by-ai
+// MA-0063: Adult Blue Dragon Sand Cloud lair row — CANONICAL zone+save picker
+// template (CON DC 15, no damage, blinded 1 min) mirroring MA-0042 Insect Cloud.
+// CANONICAL TEMPLATE: young-blue (MonsterCardModal.lair-sand-cloud-young-blue
+// .test.jsx:10-13) cites the picker-prop template and zoneTe byte blocks below —
+// keep them byte-intact (ranges reported if shifted). Cited owners (do NOT
+// re-add here): chip render/title/advisory + static branches →
+// MonsterCardModal.lair-actions.test.jsx (#610); parse/grant/census →
+// services/encounters/monsterLairActions.test.js; block-save-never-invoked →
+// MonsterCardModal.lair-darkness.test.jsx:131 (kept once here inside the cited
+// prop block). Fixtures BY-name off disk (#387). No timers.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -20,26 +24,20 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const rollSavingThrow = vi.fn();
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+    setPopupHtml: vi.fn((val) => { _popupHtml = val; }),
     rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })), _setPopupHtml };
+  })) };
 });
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
@@ -100,13 +98,6 @@ beforeEach(() => {
 });
 
 describe('MA-0063 Sand Cloud lair row → 20-ft radius area picker', () => {
-  it('structured zone-save row renders a clickable DC 15 Constitution chip', () => {
-    renderDragon();
-    const chip = lairLinkWithName('DC 15 Constitution');
-    expect(chip).toBeTruthy();
-    expect(chip.getAttribute('title')).toMatch(/initiative 20/);
-  });
-
   it('chip click routes to the area picker at CON DC 15, no damage, radius 20, blinded saveConditions', async () => {
     renderDragon();
     fireEvent.click(lairLinkWithName('DC 15 Constitution'));

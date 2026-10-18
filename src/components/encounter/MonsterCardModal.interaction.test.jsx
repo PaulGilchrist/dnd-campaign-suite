@@ -1,93 +1,81 @@
-// Removed 11 redundant tests covered by sibling files:
+// Audit + trim + restore (#590 citation refresh + #578 psychic-strike alert restore):
 //
-//   Ability modifier tests (3)
-//     → MonsterCardModal.damage-and-ability-checks.test.jsx:236-293
-//       "passes forcedMode disadvantage when monster has ray_of_enfeeble_debuff..."
-//       "does not pass forcedMode when ability is not STR even with ray debuff"
-//       "does not pass forcedMode when monster lacks ray_of_enfeeble_debuff even for STR"
+//   Citations updated to SEAM NAMES (old line ranges no longer exist):
+//     - Ability modifier ray trio (forcedMode disadvantage / non-str / no-debuff)
+//       → damage-and-ability-checks.test.jsx "ability check chip" it.each.
+//     - Initiative chip (+/- bonus, unparseable text) → damage-and-ability-checks.test.jsx
+//       "initiative chip" it.each — initiative-chips owner per #590.
+//     - Primary damage chip → auto-damage-roll.test.jsx "attack chip → rollAttack
+//       auto-damage transport" seam (#580).
+//     - Action save_dc chip → save-modifier.test.jsx (.mc-dice-link-save-clickable
+//       handleSaveRoll lane); trait/reaction/legendary save_dc chips →
+//       auto-damage-roll.test.jsx "trait save_dc chip" it.each
+//       (replaces dead :208-225 cite).
+//     - Skill chip ray legs: the old damage-and-ability-checks :313-373 cite is
+//       dead and app-wide grep showed ZERO rollSkillCheck click assertions —
+//       restored HERE as one it.each on handleSkillCheck (MonsterCardModal.jsx
+//       :2460-2464): Athletics+debuff → forcedMode, lowercase-key hazard →
+//       undefined, non-Athletics gate → undefined.
 //
-//   Skill dice link tests (2)
-//     → MonsterCardModal.damage-and-ability-checks.test.jsx:313-373
-//       "does not pass forcedMode because skill key is lowercase"
-//       "does not pass forcedMode when skill is not Athletics even with ray debuff"
-//       (base skill click test also covered by same file)
+//   RESTORED per #578: psychicStrikePreconditionFailed alert legs
+//   (MonsterCardModal.jsx:941-953) — once per branch, exact alert message +
+//   zero rollAttack. These branches were untested app-wide (attack-advanced
+//   :551-606 was a dead cite). Hex-gate POSITIVE leg lives in
+//   attack-advanced.test.jsx "Psychic Strike hex-gate positive".
 //
-//   Initiative tests (3)
-//     → MonsterCardModal.damage-and-ability-checks.test.jsx:383-407
-//       "calls rollInitiative with positive bonus"
-//       "calls rollInitiative with negative bonus"
-//       "renders initiative text without a clickable dice link when bonus is not parseable"
+//   Kept (unique): monster-level save chips (.mc-dice-link DefenseModifierRow →
+//   handleSaveThrow :2458, distinct from save-modifier's action-save_dc lane)
+//   — collapsed to it.each; attacker cannot act — authoritative location,
+//   logic.test.jsx:1-4 cites this file for its removal.
 //
-//   Psychic Strike tests (2)
-//     → MonsterCardModal.attack-advanced.test.jsx:551-606
-//       "shows alert when Psychic Strike is used without a target"
-//       "shows alert when Psychic Strike is used but target lacks hex effect"
+//   Dead-mock purge: _rollDamage/_setPopupHtml export channels, popupHtml
+//   getter state, conditionEffects __setComputeReturn (never set non-null),
+//   useRuntimeState __setTempHp, formula-arithmetic diceRoller mock (no test
+//   pins a damage total here). Every ctx assertion is exact
+//   ({forcedMode} | undefined — MA-0694 bolster te channel is byte-inert
+//   without a bolster_advantage te on the holder).
 //
-//   Save DC dice link test (1)
-//     → MonsterCardModal.auto-damage-roll.test.jsx:208-225
-//       "calls rollSavingThrow instead of rollDamage when action has save_dc"
-//
-// Kept (unique behavioral coverage):
-//   Monster-level saving throws (2) — different UI rendering path from
-//   action save_dc tested in save-modifier.test.jsx (uses .mc-dice-link
-//   vs .mc-dice-link-save-clickable, monster.saving_throws vs action.save_dc).
-//   Attacker cannot act (1) — authoritative location; logic.test.jsx
-//   explicitly removed its copy here per comments on lines 3-6.
+// @maintained-by-ai
+
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
 // ── Mocks ----
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
+  rollExpression: vi.fn(() => ({ total: 8, rolls: [3, 5], modifier: 2 })),
+  rollExpressionDoubled: vi.fn(() => ({ total: 16, rolls: [3, 5], modifier: 2 })),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const _rollSkillCheck = vi.fn();
 
   const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
     rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
+    rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: vi.fn(),
+    rollSkillCheck: _rollSkillCheck,
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
 
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
-  };
+  return { default: mockHook, _rollAttack, _rollSavingThrow, _rollSkillCheck };
 });
 
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
-  let _computeReturn = null;
-  const _computeConditionEffects = vi.fn((_conditions) => {
-    return _computeReturn ?? { ...defaultConditionEffects };
-  });
-
-  return {
-    computeConditionEffects: _computeConditionEffects,
-    combineAttackModes: vi.fn(() => 'normal'),
-    CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-    __setComputeReturn(val) { _computeReturn = val; },
-  };
-});
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
+  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
+  combineAttackModes: vi.fn(() => 'normal'),
+  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
+}));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => {
   let _findCreatureReturn = null;
@@ -125,34 +113,23 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
   let _targetEffects = [];
-  let _tempHp = null;
 
   const mockUseRuntimeValue = vi.fn((_characterKey, propertyName, _campaignName) => {
     if (propertyName === 'targetEffects') return _targetEffects;
-    if (propertyName === 'tempHp') return _tempHp;
-    return null;
-  });
-
-  const mockGetRuntimeValue = vi.fn((_characterKey, propertyName) => {
-    if (propertyName === 'tempHp') return _tempHp;
     return null;
   });
 
   return {
     useRuntimeValue: mockUseRuntimeValue,
-    getRuntimeValue: mockGetRuntimeValue,
+    getRuntimeValue: vi.fn(() => 0),
     __setTargetEffects(val) { _targetEffects = val; },
-    __setTempHp(val) { _tempHp = val; },
   };
 });
 
 // ── Re-import mocked modules ----
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
+import { _rollAttack, _rollSavingThrow, _rollSkillCheck } from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
-
-const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
+import { __setTargetEffects } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ----
 
@@ -164,52 +141,109 @@ function findDiceLinkByText(text) {
   return Array.from(links).find((el) => el.textContent.trim() === text) || null;
 }
 
+let alertSpy = null;
+
 // ── Tests ----
 
 describe('MonsterCardModal interaction / game rules', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    conditionEffects.__setComputeReturn(null);
     damageUtils.__setFindCreatureReturn(null);
-    useRuntimeState.__setTargetEffects([]);
+    __setTargetEffects([]);
+  });
+
+  afterEach(() => {
+    alertSpy?.mockRestore();
+    alertSpy = null;
   });
 
   // ════════════════════════════════════════════
-  // Save modifier dice link → rollSavingThrow
+  // Monster-level save chips → rollSavingThrow
+  // (.mc-dice-link DefenseModifierRow lane — NOT the
+  // .mc-dice-link-save-clickable action-save_dc lane owned
+  // by save-modifier.test.jsx)
   // ════════════════════════════════════════════
 
   describe('save modifier dice links', () => {
-    it('clicking save modifier dice link calls rollSavingThrow with ability abbreviation and modifier', () => {
-      const m = makeMonster({
-        saving_throws: { str: { modifier: 2 }, dex: { modifier: 1 } },
-      });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      // Save modifier links use className "mc-dice-link" inside save rows
-      const saveLinks = document.querySelectorAll('.mc-dice-link');
-      // Find the STR save link (contains "STR" or the abbreviation)
-      const strSaveLink = Array.from(saveLinks).find((el) => el.textContent.includes('STR'));
-      expect(strSaveLink).toBeTruthy();
-      fireEvent.click(strSaveLink);
-      // MA-0694 stale-pin inversion: save chips gained a third forcedMode
-      // context channel (Bolster te consumer) — undefined = byte-inert
-      // without a `bolster_advantage` te on the holder.
-      expect(rollSavingThrow).toHaveBeenCalledWith('STR', 2, undefined);
+    it.each([
+      { savingThrows: { str: { modifier: 2 }, dex: { modifier: 1 } }, abbr: 'STR', mod: 2 },
+      { savingThrows: { con: { modifier: -3 } }, abbr: 'CON', mod: -3 },
+    ])('save chip $abbr passes abbreviation + modifier $mod through', ({ savingThrows, abbr, mod }) => {
+      render(<MonsterCardModal {...makeProps(makeMonster({ saving_throws: savingThrows }))} />);
+      const chip = Array.from(document.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.includes(abbr));
+      expect(chip).toBeTruthy();
+      fireEvent.click(chip);
+      // MA-0694: third ctx channel (bolster te) is byte-inert without a
+      // bolster_advantage te on the holder — exact undefined.
+      expect(_rollSavingThrow).toHaveBeenCalledWith(abbr, mod, undefined);
     });
+  });
 
-    it('clicking save modifier with negative value passes the negative modifier', () => {
+  // ════════════════════════════════════════════
+  // Skill chip → rollSkillCheck ray gate
+  // (handleSkillCheck :2460-2464 — restored, was
+  // untested app-wide after the stale :313-373 cite died)
+  // ════════════════════════════════════════════
+
+  describe('skill chip ray gate', () => {
+    it.each([
+      { name: 'Athletics', debuff: true, ctx: { forcedMode: 'disadvantage' } },
+      { name: 'athletics', debuff: true, ctx: undefined },
+      { name: 'Perception', debuff: true, ctx: undefined },
+    ])('skill "$name" with ray debuff $debuff → ctx $ctx', ({ name, debuff, ctx }) => {
+      if (debuff) __setTargetEffects([{ target: 'Goblin', effect: 'ray_of_enfeeble_debuff' }]);
+      render(<MonsterCardModal {...makeProps(makeMonster({ skills: { [name]: { modifier: 5 } } }))} />);
+
+      const sign = '+5';
+      const chip = findDiceLinkByText(`${name} ${sign}`);
+      expect(chip).toBeTruthy();
+      fireEvent.click(chip);
+      expect(_rollSkillCheck).toHaveBeenCalledWith(name, 5, ctx);
+    });
+  });
+
+  // ════════════════════════════════════════════
+  // Psychic Strike precondition alerts (#578 restore)
+  // once per branch of psychicStrikePreconditionFailed
+  // (:941-953): alert message exact, zero rollAttack.
+  // ════════════════════════════════════════════
+
+  describe('Psychic Strike precondition alerts', () => {
+    it.each([
+      {
+        desc: 'no target selected',
+        attacker: { name: 'Goblin', conditions: [] },
+        creatures: [{ name: 'Goblin' }, { name: 'Player A', type: 'player' }],
+        targetEffects: [],
+        alert: "Psychic Strike requires a target to be selected.",
+      },
+      {
+        desc: 'target lacks hex effect',
+        attacker: { name: 'Goblin', conditions: [], targetName: 'Player A' },
+        creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }],
+        targetEffects: [],
+        alert: "Psychic Strike can only be used on a creature under the warlock's Hex spell.",
+      },
+    ])('refuses with alert when $desc', ({ attacker, creatures, targetEffects, alert }) => {
+      damageUtils.__setFindCreatureReturn(attacker);
+      __setTargetEffects(targetEffects);
+      alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
       const m = makeMonster({
-        saving_throws: { con: { modifier: -3 } },
+        actions: [{ name: 'Psychic Strike', attack_bonus: 4, description: 'Psychic attack.' }],
       });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      const conSaveLink = Array.from(document.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.includes('CON'));
-      expect(conSaveLink).toBeTruthy();
-      fireEvent.click(conSaveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith('CON', -3, undefined);
+      render(<MonsterCardModal {...makeProps(m, { creatures })} />);
+
+      fireEvent.click(findDiceLinkByText('+4'));
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expect(alertSpy).toHaveBeenCalledWith(alert);
+      expect(_rollAttack).not.toHaveBeenCalled();
     });
   });
 
   // ════════════════════════════════════════════
   // Attacker cannot act — attack blocking
+  // (authoritative: logic.test.jsx removed its copy)
   // ════════════════════════════════════════════
 
   describe('attacker cannot act', () => {
