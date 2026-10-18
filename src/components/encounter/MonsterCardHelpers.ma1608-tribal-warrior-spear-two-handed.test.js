@@ -1,3 +1,19 @@
+// @maintained-by-ai — trimmed 6→2 tests (#523/#535/#537): this lane's DISTINCT
+// intents are (1) the BY-name disk lock for Tribal Warrior/Spear (#387 — ma1063
+// header explicitly delegates this row here: "1d8 + 1 literal also authors Tribal
+// Warrior/Spear — ma1608 owns that by-name row lock"), folding the Azer/MA-1063
+// key placement (exact key-order lock, #422 fold of the old Kuo-Toa side-by-side
+// twin compare — counterpart keys are BY-name-locked in ma1063's disk lock) and
+// the no-double-charge guard (additive secondary fields ABSENT: "or … two hands"
+// is ALTERNATIVE dice, §415); and (2) the not-swept cross-check that the
+// MA-1264/1267 orc plus-rider rows stay byte-identical (acknowledged byte-twins
+// at :75-77↔ma1264 disk lock; owners: ma1264/ma1267 disk locks). Deleted legs
+// cite owners: offer shape MonsterCardHelpers.two-handed.test.js:23-34, byte-inert
+// null-offer branch :36-42, two/one select-log fork :44-55; modal offer branches
+// MonsterCardModal.two-handed.test.jsx:213-223; transport null (cultist-flat-secondary.
+// test.js:38) — the Tribal row has no secondary fields, same null-triple shape. The
+// offer/select press deleted as byte-twin of ma1063's disk-derived press (row is
+// byte-identical: +3, 1d6 + 1 → 1d8 + 1, lowercase "piercing"; #422).
 // MA-1608: Tribal Warrior Spear advertised versatile two-handed variant
 // ("or 5 (1d8 + 1) piercing damage if used with two hands to make a melee
 // attack") but damage_dice_two_handed was ABSENT — buildTwoHandedVariantOffer
@@ -6,13 +22,9 @@
 // family). One-field DATA fix adds damage_dice_two_handed "1d8 + 1" in the
 // Azer/MA-1063 byte-shape (after damage_dice_primary, before
 // damage_type_primary; two-handed leg rides primary type "piercing"), making
-// the row a byte-twin of the Kuo-Toa Spear (MA-1063). The "or … if used
-// with two hands" conjunction is ALTERNATIVE dice (§415) — damage_dice_secondary
-// must stay absent (additive combined transport would over-deal every hit).
+// the row a byte-twin of the Kuo-Toa Spear (MA-1063).
 import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
-import { buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog } from './MonsterCardHelpers.js';
-import { buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
 
 describe('MA-1608 data lock (monsters.json Tribal Warrior Spear)', () => {
   const spearRow = () => {
@@ -22,55 +34,28 @@ describe('MA-1608 data lock (monsters.json Tribal Warrior Spear)', () => {
     return spear;
   };
 
-  it('actions[0] Spear authors damage_dice_two_handed "1d8 + 1" beside the 1d6 + 1 primary (MA-1063 placement)', () => {
+  it('BY-name disk lock: +3 Spear authors two_handed "1d8 + 1" after primary before type (Azer/MA-1063 placement), prose byte-intact, additive secondary fields ABSENT (§415 alternative dice — no double-charge)', () => {
     const spear = spearRow();
+    expect(Object.keys(spear)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'damage_dice_primary',
+      'damage_dice_two_handed',
+      'damage_type_primary',
+    ]);
     expect(spear.attack_bonus).toBe(3);
     expect(spear.damage_dice_primary).toBe('1d6 + 1');
     expect(spear.damage_dice_two_handed).toBe('1d8 + 1');
     expect(spear.damage_type_primary).toBe('piercing');
-    expect(spear.description).toMatch(/1d8 \+ 1\) piercing damage if used with two hands to make a melee attack/);
-  });
-
-  it('key order mirrors the Kuo-Toa MA-1063 byte-twin (two_handed after primary, before damage_type_primary)', () => {
-    const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
-    const tribalKeys = Object.keys(spearRow());
-    const kuoKeys = Object.keys(monsters.find((m) => m.name === 'Kuo-Toa').actions[1]);
-    expect(tribalKeys).toEqual(kuoKeys);
-    expect(tribalKeys.indexOf('damage_dice_two_handed')).toBe(tribalKeys.indexOf('damage_dice_primary') + 1);
-  });
-
-  it('wrong-slot additive fields stay GONE: "or … two hands" is alternative dice, not a combined rider (§415)', () => {
-    const spear = spearRow();
+    expect(spear.description).toBe('Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.');
     expect(spear.damage_dice_secondary).toBeUndefined();
     expect(spear.flat_damage_secondary).toBeUndefined();
     expect(spear.damage_dice_ranged).toBeUndefined();
-    expect(buildSecondaryDamageTransport(spear, 'Spear').autoDamageSecondaryFormula).toBeNull();
   });
 
-  it('buildTwoHandedVariantOffer arms the Spear HIT-popup chooser with both formulas', () => {
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
-    expect(offer).toMatchObject({
-      formula: '1d8 + 1',
-      baseFormula: '1d6 + 1',
-      damageType: 'piercing',
-      attackName: 'Spear',
-    });
-    expect(offer.label).toContain('1d8 + 1');
-  });
-
-  it('select logs: two-handed rides 1d8 + 1, unpicked default is one-handed 1d6 + 1 only', () => {
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
-    const two = buildTwoHandedVariantSelectLog({ monsterName: 'Tribal Warrior 1', offer, hands: 'two-handed' });
-    expect(two.automationType).toBe('two_handed_variant_selected');
-    expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain('1d8 + 1');
-    const one = buildTwoHandedVariantSelectLog({ monsterName: 'Tribal Warrior 1', offer, hands: 'one-handed', defaulted: true });
-    expect(one.automationType).toBe('one_handed_variant_selected');
-    expect(one.description).toContain('default');
-    expect(one.description).toContain('1d6 + 1');
-  });
-
-  it('orc-family "plus 1d8" rider Spears stay byte-untouched (MA-1264/1267 shapes — not swept by this fix)', () => {
+  it('not-swept cross-check: orc-family "plus 1d8" rider Spears byte-identical (owner locks MA-1264/MA-1267 — untouched by this fix)', () => {
     const monsters = Array.isArray(monstersJson) ? monstersJson : monstersJson.monsters;
     const eye = monsters.find((m) => m.name === 'Orc Eye of Gruumsh').actions[0];
     expect(eye.damage_dice_primary).toBe('1d6 + 3 plus 1d8');

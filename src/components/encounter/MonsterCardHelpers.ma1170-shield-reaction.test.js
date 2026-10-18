@@ -1,3 +1,6 @@
+// @maintained-by-ai — trimmed to row-distinct legs: BY-name disk locks (#387),
+// spell-origin identity table, press e2e + reason-coded refusals. Generic
+// gate/latch/uses/fold/consume legs cite-skip owners (see header cites).
 // MA-1170: Mind Flayer Arcanist Shield — inert prose reaction fixed with the
 // MA-1140 data shape + NEW shield consumer (registry effect + resolver branch).
 // RAW (2024 Monster Core): reaction when targeted by a spell → casts Shield,
@@ -8,6 +11,15 @@
 // generic +5 fold channel (getShieldAcBonus — zero new AC math), spends
 // MONSTER_REACTION_USES[shield] (At Will 999 honest counter), 1/round latch
 // (_shield_usedRound). Refusals log shield_refused, zero spend.
+//
+// Owner cite-skips (reaction-family canon — NOT re-pinned here):
+// - isSpellOriginLastAttack seam + plain rows inert/plain-null once-only +
+//   generic round-latch/uses-ceiling machinery: MonsterCardHelpers.gated-reaction.test.js
+//   (:66 registry inert, :84 gate truth table, :185 spell-origin seam, :330 latch).
+// - getShieldAcBonus +5 fold + own-stamp-only: useLoggedDiceRollUtils.core.test.js:148;
+//   oneShot consume vs persistent PC Shield-spell buff: attackPostProcessing.ma1170-shield-consume.test.js.
+// MA-1242 Noble Prodigy carries the Arcanist block VERBATIM — disk lock only
+// (#387); its gate/press legs are byte-identical behavior, not re-run.
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', async (importActual) => ({
@@ -15,8 +27,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', async (importActual) => ({
   getRuntimeValue: vi.fn(() => null),
 }));
 
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { getShieldAcBonus } from '../../hooks/combat/loggedDiceRollUtils.js';
 import {
   getGatedMonsterReaction,
   shieldIdentityRefusal,
@@ -29,7 +39,6 @@ import monsters from '../../../public/data/monsters.json';
 const SHIELD_ACTION = monsters.find(m => m.index === 'mind-flayer-arcanist').reactions[0];
 // MA-1242: Noble Prodigy Shield — prose-only row fixed with the Arcanist block verbatim.
 const NP_SHIELD_ACTION = monsters.find(m => m.index === 'noble-prodigy').reactions[0];
-const NOBLE_PRODIGY = 'Noble Prodigy 1';
 const ARCANIST = 'Mind Flayer Arcanist 1';
 const CASTER = 'Bandit 1';
 const CAMPAIGN = 'test-campaign';
@@ -59,26 +68,17 @@ function makeShieldDeps({ lastAttack = spellAttackOnArcanist(), round = 1, store
   };
 }
 
-describe('MA-1170 Shield data-lock + registry shape', () => {
-  it('monsters.json mind-flayer-arcanist reactions[0] carries the automation + At Will sentinel (MA-1140 shape, acBonus 5)', () => {
+describe('MA-1170/MA-1242 Shield disk lock (#387 BY-name) + registry arming', () => {
+  it('monsters.json mind-flayer-arcanist reactions[0] carries the automation + At Will sentinel and arms the Shield chip (MA-1140 shape, acBonus 5)', () => {
     expect(SHIELD_ACTION.name).toBe('Shield');
     expect(SHIELD_ACTION.automation).toEqual({ type: 'reaction', trigger: 'targeted_by_spell', effect: 'shield', acBonus: 5 });
     expect(SHIELD_ACTION.usage).toBe('At Will');
     expect(SHIELD_ACTION.uses).toBe(999);
     expect(SHIELD_ACTION.maxUses).toBe(999);
-    expect(getGatedMonsterReaction(SHIELD_ACTION)?.effect).toBe('shield');
+    expect(getGatedMonsterReaction(SHIELD_ACTION)).toMatchObject({ effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' });
   });
 
-  it('GATED_MONSTER_REACTIONS.shield def carries label/icon and arms the chip; prose rows stay inert', () => {
-    const def = getGatedMonsterReaction(SHIELD_ACTION);
-    expect(def).toMatchObject({ effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' });
-    expect(getGatedMonsterReaction({ name: 'Tentacle Attack', description: 'Hit: 2d6+6 bludgeoning.' })).toBeNull();
-    expect(getGatedMonsterReaction({ name: 'Shield', description: 'prose only' })).toBeNull();
-  });
-});
-
-describe('MA-1242 Noble Prodigy Shield — data-lock + arms (Arcanist block verbatim)', () => {
-  it('monsters.json noble-prodigy reactions[0] keeps name/trigger/description + carries the Arcanist automation block verbatim', () => {
+  it('monsters.json noble-prodigy reactions[0] keeps name/trigger/description + carries the Arcanist automation block verbatim (MA-1242)', () => {
     expect(NP_SHIELD_ACTION.name).toBe('Shield');
     expect(NP_SHIELD_ACTION.trigger).toBe('The noble is targeted by a spell');
     expect(NP_SHIELD_ACTION.description).toMatch(/The noble casts <strong>Shield<\/strong> in response/);
@@ -87,103 +87,50 @@ describe('MA-1242 Noble Prodigy Shield — data-lock + arms (Arcanist block verb
     expect(NP_SHIELD_ACTION.usage).toBe('At Will');
     expect(NP_SHIELD_ACTION.uses).toBe(999);
     expect(NP_SHIELD_ACTION.maxUses).toBe(999);
-  });
-
-  it('arms the same Shield chip def + gate accepts a pending spell-origin attack on the noble (NP AC 16 → 21)', () => {
-    const def = getGatedMonsterReaction(NP_SHIELD_ACTION);
-    expect(def).toMatchObject({ effect: 'shield', trigger: 'targeted_by_spell', label: 'Shield', icon: 'fa-shield' });
-    const g = shieldGate({
-      lastAttack: { attackerName: CASTER, targetName: NOBLE_PRODIGY, attackName: 'Fire Bolt', rollType: 'spell-attack', attackType: 'spell', hit: true, d20: 13, bonus: 6, total: 19, targetAc: 16, effectiveAc: 16 },
-      monsterName: NOBLE_PRODIGY, currentRound: 1, storedUses: {}, usedRound: 0, action: NP_SHIELD_ACTION,
-    });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-  });
-
-  it('resolves: one-shot shield buff acBonus 5 on the noble, spends MONSTER_REACTION_USES 999→998', async () => {
-    const lastAttack = { attackerName: CASTER, targetName: NOBLE_PRODIGY, attackName: 'Fire Bolt', rollType: 'spell-attack', attackType: 'spell', hit: true, d20: 13, bonus: 6, total: 19, targetAc: 16, effectiveAc: 16 };
-    const { state, campaignWrites, deps } = makeShieldDeps({ round: 2, lastAttack });
-    const result = await resolveMonsterGatedReaction({ action: NP_SHIELD_ACTION, monsterName: NOBLE_PRODIGY, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    expect(result.acBonus).toBe(5);
-    expect(result.newAc).toBe(21);
-    expect(result.remaining).toBe(998);
-    const buffs = state[`${NOBLE_PRODIGY}.activeBuffs`];
-    expect(buffs.some(b => b.effect === 'shield' && b.acBonus === 5 && b.oneShot === true)).toBe(true);
-    expect(state[`${NOBLE_PRODIGY}._shield_usedRound`]).toBe(2);
-    expect(state[`${NOBLE_PRODIGY}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ shield: 1 });
-    expect(campaignWrites[0]).toMatchObject({ shieldResolved: true, shieldedBy: NOBLE_PRODIGY, shieldAcBonus: 5 });
+    expect(getGatedMonsterReaction(NP_SHIELD_ACTION)?.effect).toBe('shield');
   });
 });
 
-describe('MA-1170 shieldGate spell-origin identity refusals', () => {
-  it('refuses no lastAttack (trigger) and plain weapon attacks (spell)', () => {
-    expect(shieldIdentityRefusal(null, ARCANIST)).toBe('trigger');
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ rollType: 'attack', attackType: undefined, weaponType: 'melee' }), ARCANIST)).toBe('spell');
-    const g = shieldGate({ lastAttack: spellAttackOnArcanist({ rollType: 'attack', attackType: undefined }), monsterName: ARCANIST, currentRound: 1, storedUses: {}, usedRound: 0, action: SHIELD_ACTION });
-    expect(g.ok).toBe(false);
+describe('MA-1170 shieldIdentityRefusal/shieldGate — spell-origin trigger (distinct effect)', () => {
+  it('refusal truth table + accepts spell-attack and spell-save faces against the arcanist', () => {
+    const refusals = [
+      ['no lastAttack → trigger', null, 'trigger'],
+      ['wrong target → trigger', spellAttackOnArcanist({ targetName: 'Bandit Captain 1' }), 'trigger'],
+      ['plain weapon attack → spell', spellAttackOnArcanist({ rollType: 'attack', attackType: undefined, weaponType: 'melee' }), 'spell'],
+      ['damage committed → resolved', spellAttackOnArcanist({ damageApplied: true }), 'resolved'],
+      ['already reacted → reacted', spellAttackOnArcanist({ shieldResolved: true }), 'reacted'],
+      ['self-origin → attacker', spellAttackOnArcanist({ attackerName: ARCANIST }), 'attacker'],
+      ['null attacker → attacker', spellAttackOnArcanist({ attackerName: null }), 'attacker'],
+    ];
+    for (const [label, lastAttack, reason] of refusals) {
+      expect(shieldIdentityRefusal(lastAttack, ARCANIST), label).toBe(reason);
+    }
+    const g = shieldGate({ lastAttack: spellAttackOnArcanist({ rollType: 'attack', attackType: undefined, weaponType: 'melee' }), monsterName: ARCANIST, currentRound: 1, storedUses: {}, usedRound: 0, action: SHIELD_ACTION });
+    expect(g.ok, 'weapon-origin gate refusal').toBe(false);
     expect(g.reason).toBe('spell');
-  });
-
-  it('refuses wrong target, committed damage, already-reacted, and self-origin', () => {
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ targetName: 'Bandit Captain 1' }), ARCANIST)).toBe('trigger');
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ damageApplied: true }), ARCANIST)).toBe('resolved');
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ shieldResolved: true }), ARCANIST)).toBe('reacted');
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ attackerName: ARCANIST }), ARCANIST)).toBe('attacker');
-    expect(shieldIdentityRefusal(spellAttackOnArcanist({ attackerName: null }), ARCANIST)).toBe('attacker');
-  });
-
-  it('accepts a pending spell-origin attack against the arcanist (save-save and spell-attack twins)', () => {
-    const g = shieldGate({ lastAttack: spellAttackOnArcanist(), monsterName: ARCANIST, currentRound: 2, storedUses: {}, usedRound: 0, action: SHIELD_ACTION });
-    expect(g.ok).toBe(true);
-    expect(g.limit).toBe(999);
-    expect(g.attackerName).toBe(CASTER);
+    const ok = shieldGate({ lastAttack: spellAttackOnArcanist(), monsterName: ARCANIST, currentRound: 2, storedUses: {}, usedRound: 0, action: SHIELD_ACTION });
+    expect(ok.ok).toBe(true);
+    expect(ok.limit).toBe(999);
+    expect(ok.attackerName).toBe(CASTER);
     const saveLeg = shieldGate({ lastAttack: spellAttackOnArcanist({ rollType: 'spell-save', attackType: undefined, saveType: 'DEX', saveDc: 15 }), monsterName: ARCANIST, currentRound: 2, storedUses: {}, usedRound: 0, action: SHIELD_ACTION });
-    expect(saveLeg.ok).toBe(true);
-  });
-
-  it('1/round latch + uses ceiling', () => {
-    const same = shieldGate({ lastAttack: spellAttackOnArcanist(), monsterName: ARCANIST, currentRound: 4, storedUses: {}, usedRound: 4, action: SHIELD_ACTION });
-    expect(same.ok).toBe(false);
-    expect(same.reason).toBe('round');
-    const next = shieldGate({ lastAttack: spellAttackOnArcanist(), monsterName: ARCANIST, currentRound: 5, storedUses: {}, usedRound: 4, action: SHIELD_ACTION });
-    expect(next.ok).toBe(true);
-    const spent = shieldGate({ lastAttack: spellAttackOnArcanist(), monsterName: ARCANIST, currentRound: 5, storedUses: { shield: 999 }, usedRound: 4, action: SHIELD_ACTION });
-    expect(spent.ok).toBe(false);
-    expect(spent.reason).toBe('uses');
+    expect(saveLeg.ok, 'spell-save twin accepts').toBe(true);
   });
 });
 
 describe('MA-1170 resolveMonsterGatedReaction — Shield', () => {
-  it('refusal (no pending lastAttack): shield_refused logged, zero writes', async () => {
-    const { state, logs, deps } = makeShieldDeps({ lastAttack: null });
-    const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs).toHaveLength(1);
-    expect(logs[0].automationType).toBe('shield_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${ARCANIST}.activeBuffs`]).toBeUndefined();
-    expect(state[`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-  });
-
-  it('refusal (weapon-origin lastAttack): shield_refused (spell), zero writes', async () => {
-    const { logs, deps } = makeShieldDeps({ lastAttack: spellAttackOnArcanist({ rollType: 'attack', attackType: undefined, weaponType: 'ranged' }) });
-    const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('shield_refused');
-    expect(logs[0].description).toMatch(/spell/);
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('success: stamps activeBuffs {effect:shield,acBonus:5,oneShot:true}, spends MONSTER_REACTION_USES, latches round, stamps lastAttack, AC 16 → 21 logged', async () => {
-    const { state, logs, campaignWrites, deps } = makeShieldDeps({ round: 3 });
+  it('press e2e: merges one-shot shield buff acBonus 5 onto pending activeBuffs, spends MONSTER_REACTION_USES 999→998, latches round, stamps lastAttack, AC 16 → 21 logged', async () => {
+    const { state, logs, campaignWrites, deps } = makeShieldDeps({
+      round: 3,
+      store: { [`${ARCANIST}.activeBuffs`]: [{ effect: 'haste', source: 'Other' }] },
+    });
     const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);
     expect(result.acBonus).toBe(5);
     expect(result.newAc).toBe(21);
     expect(result.remaining).toBe(998);
     const buffs = state[`${ARCANIST}.activeBuffs`];
-    expect(Array.isArray(buffs)).toBe(true);
+    expect(buffs).toHaveLength(2);
+    expect(buffs[0].effect).toBe('haste');
     expect(buffs.some(b => b.effect === 'shield' && b.acBonus === 5 && b.oneShot === true)).toBe(true);
     expect(state[`${ARCANIST}._shield_usedRound`]).toBe(3);
     expect(state[`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]).toEqual({ shield: 1 });
@@ -194,50 +141,21 @@ describe('MA-1170 resolveMonsterGatedReaction — Shield', () => {
     expect(spend.description).toMatch(/At Will/);
   });
 
-  it('preserves pre-existing activeBuffs (merged read-modify-write, one key)', async () => {
-    const { state, deps } = makeShieldDeps({ round: 2, store: { [`${ARCANIST}.activeBuffs`]: [{ effect: 'haste', source: 'Other' }] } });
-    const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(true);
-    const buffs = state[`${ARCANIST}.activeBuffs`];
-    expect(buffs).toHaveLength(2);
-    expect(buffs[0].effect).toBe('haste');
-    expect(buffs[1].effect).toBe('shield');
-  });
-
-  it('same-round second press on the same spell: shield_refused (round), zero additional writes', async () => {
-    const { logs, deps } = makeShieldDeps({
-      round: 3,
-      lastAttack: spellAttackOnArcanist({ shieldResolved: true, shieldedBy: ARCANIST }),
-      store: { [`${ARCANIST}._shield_usedRound`]: 3, [`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]: { shield: 1 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('shield_refused');
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('fresh round, already-reacted spell: shield_refused (reacted) — one shield per triggering spell', async () => {
-    const { logs, deps } = makeShieldDeps({
-      round: 4,
-      lastAttack: spellAttackOnArcanist({ shieldResolved: true, shieldedBy: ARCANIST }),
-      store: { [`${ARCANIST}._shield_usedRound`]: 3, [`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]: { shield: 1 } },
-    });
-    const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('shield_refused');
-    expect(logs[0].description).toMatch(/reacted/);
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-  });
-});
-
-describe('MA-1170 existing +5 AC fold channel (zero new AC math)', () => {
-  it('getShieldAcBonus folds +5 for the armed monster stamp and 0 without it', () => {
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === ARCANIST && prop === 'activeBuffs') return [{ effect: 'shield', acBonus: 5, oneShot: true, source: 'Shield' }];
-      return null;
-    });
-    expect(getShieldAcBonus(ARCANIST, CAMPAIGN)).toBe(5);
-    getRuntimeValue.mockImplementation(() => null);
-    expect(getShieldAcBonus(ARCANIST, CAMPAIGN)).toBe(0);
+  it('refusals log shield_refused with the gate reason, zero writes (trigger / spell / round / reacted)', async () => {
+    const scenarios = [
+      ['trigger', { lastAttack: null }, /trigger/],
+      ['spell', { lastAttack: spellAttackOnArcanist({ rollType: 'attack', attackType: undefined, weaponType: 'ranged' }) }, /spell/],
+      ['round', { lastAttack: spellAttackOnArcanist(), store: { [`${ARCANIST}._shield_usedRound`]: 3, [`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]: { shield: 1 } }, round: 3 }, /round/],
+      ['reacted', { lastAttack: spellAttackOnArcanist({ shieldResolved: true, shieldedBy: ARCANIST }), store: { [`${ARCANIST}._shield_usedRound`]: 3, [`${ARCANIST}.${MONSTER_REACTION_USES_KEY}`]: { shield: 1 } }, round: 4 }, /reacted/],
+    ];
+    for (const [reason, opts, descRe] of scenarios) {
+      const { logs, deps } = makeShieldDeps(opts);
+      const result = await resolveMonsterGatedReaction({ action: SHIELD_ACTION, monsterName: ARCANIST, campaignName: CAMPAIGN, deps });
+      expect(result.ok, reason).toBe(false);
+      expect(logs, reason).toHaveLength(1);
+      expect(logs[0].automationType, reason).toBe('shield_refused');
+      expect(logs[0].description, reason).toMatch(descRe);
+      expect(deps.setRuntimeValue, reason).not.toHaveBeenCalled();
+    }
   });
 });

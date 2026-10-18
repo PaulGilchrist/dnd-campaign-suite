@@ -1,8 +1,14 @@
-// MA-0115: clicking the gated Noxious Miasma legendary row on the Adult
-// Green Dragon card routes the sphere row to the radius picker with the
+// @maintained-by-ai
+// MA-0115 modal seam (fused single lane): the Adult Green Dragon gated Noxious
+// Miasma row renders the "DC 17 Constitution" save chip; the first click spends
+// one legendary use (store used 0→1) and routes to the radius picker with the
 // authored "−2 penalty to AC" clause armed (acPenaltyClause rides the picker
-// seam, MA-0087 shape); a second click in the same turn refuses via the
-// MA-0113 legendary latch with zero picker opens.
+// seam, MA-0087 shape) + full save-ctx identity; a second click in the same
+// turn refuses via the MA-0113 legendary latch — refusal logged, zero extra
+// spend, zero second picker.
+// Parse faces owned by MonsterCardHelpers.ac-penalty.test.js (#497); grant/apply
+// consumer lanes owned by SaveAttackAoeModal.ac-penalty.test.jsx and
+// saveProcessing.ac-penalty.test.js.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -12,7 +18,6 @@ import monstersData from '../../../public/data/monsters.json';
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
   rollExpression: vi.fn(() => ({ total: 7, rolls: [2, 5], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 14, rolls: [2, 5], modifier: 0 })),
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 const logEntries = vi.hoisted(() => ({ current: [] }));
@@ -20,15 +25,14 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn((_c, e) => { logEntries.current.push(e); return Promise.resolve(); }),
 }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  return { default: vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: vi.fn((val) => { _popupHtml = val; }),
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
     rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(), rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })) };
-});
+  })),
+}));
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
   combineAttackModes: vi.fn(() => 'normal'),
@@ -81,14 +85,15 @@ const CREATURES = [
 const green = () => monstersData.find(m => m.name === 'Adult Green Dragon');
 
 function renderGreen(uses) {
-  if (uses !== undefined) runtime.store['Adult Green Dragon 1.monsterLegendaryUses'] = uses;
+  runtime.store['Adult Green Dragon 1.monsterLegendaryUses'] = uses;
   const m = makeMonster({ name: 'Adult Green Dragon', actions: green().actions, legendary_actions: green().legendary_actions });
   ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Green Dragon 1', creatures: CREATURES })} />);
 }
 
-function miasmaRow() {
-  return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Noxious Miasma'));
+function miasmaChip() {
+  const row = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Noxious Miasma'));
+  return row.querySelector('.mc-dice-link-save-clickable');
 }
 
 describe('MA-0115 MonsterCardModal Noxious Miasma picker seam', () => {
@@ -99,9 +104,10 @@ describe('MA-0115 MonsterCardModal Noxious Miasma picker seam', () => {
     logEntries.current = [];
   });
 
-  it('sphere row opens the radius picker with the −2 AC clause armed, DC 17 CON', async () => {
+  it('DC 17 CON chip opens the radius picker with the −2 AC clause armed; same-turn re-click latch-refuses zero-spend', async () => {
     renderGreen({ max: 3, used: 0 });
-    fireEvent.click(miasmaRow().querySelector('.mc-dice-link'));
+    expect(miasmaChip().textContent).toBe('DC 17 Constitution');
+    fireEvent.click(miasmaChip());
     await waitFor(() => expect(pickerProps.current.length).toBe(1));
     const props = pickerProps.current[0];
     expect(props.acPenaltyClause).toEqual({ effect: 'ac_penalty', value: 2 });
@@ -110,15 +116,11 @@ describe('MA-0115 MonsterCardModal Noxious Miasma picker seam', () => {
     expect(props.range).toBe(20);
     expect(props.damage).toBe('2d6');
     expect(props.excludeNames).toEqual(['Adult Green Dragon 1']);
-  });
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
 
-  it('second click same turn refused via the legendary latch: no second picker, refusal logged', async () => {
-    renderGreen({ max: 3, used: 0 });
-    fireEvent.click(miasmaRow().querySelector('.mc-dice-link'));
-    await waitFor(() => expect(pickerProps.current.length).toBe(1));
-    fireEvent.click(miasmaRow().querySelector('.mc-dice-link'));
+    fireEvent.click(miasmaChip());
     await waitFor(() => expect(logEntries.current.some(e => /refused/i.test(e.description || ''))).toBe(true));
-    await new Promise(r => setTimeout(r, 50));
     expect(pickerProps.current).toHaveLength(1);
+    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses'].used).toBe(1);
   });
 });

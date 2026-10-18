@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1652: Vampire Spawn "Bite" (actions[2], DC 14 Constitution, 1d4 + 3
 // Piercing plus 3d6 Necrotic) — FAIL(a)/DATA fixed at the data layer by
 // byte-mirroring the live MA-1639 vampire save-lane twin:
@@ -5,14 +6,19 @@
 //     {equal_to:"damage"} — MA-1547/MA-1639 save-path riders, unauthored on
 //     this row while the save-lane seam was live; the consumer
 //     (saveProcessing.resolveSaveRiderDamage) scopes BOTH riders to the
-//     NECROTIC (damage_dice_secondary) leg on this dual-damage row;
+//     NECROTIC (damage_dice_secondary) leg on this dual-damage row — regain/
+//     drain consumer behavior is covered in the saveProcessing/handlePlainDamage
+//     lanes (cite-skip, never re-fingerprinted here);
 // (2) dc_success:"none" — the disk description is Failure-only (no success
 //     clause), so the engine half-default leaked half damage + drain + regain
 //     on clean saves (§456/MA-1353 failure-only fingerprint);
 // (3) target_prerequisite:{conditions:["grappled","incapacitated","restrained"]}
 //     — MA-0019 gate live at handleSaveRoll but unarmed; the clause survives
 //     as prose-only. "willing" has no te vocabulary = §70 advisory residual.
-// MonsterCardHelpers.ma1639-vampire-bite-recover.test.js twin.
+// BY-name disk lock for the vampire-spawn row only (#387): the vampire-row
+// positive fingerprint lives in MonsterCardHelpers.ma1639-vampire-bite-recover
+// .test.js (#554 — never duplicated here); the Claw sibling row appears only
+// as a byte-inert null-negative against these parsers.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -22,10 +28,10 @@ import { buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
 const monsters = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'));
 const SPAWN = monsters.find((m) => m.index === 'vampire-spawn');
 const BITE = SPAWN.actions[2];
-const VAMPIRE_BITE = monsters.find((m) => m.index === 'vampire').actions[2];
+const CLAW = SPAWN.actions.find((a) => a.name === 'Claw');
 
 describe('MA-1652 disk fingerprint: vampire-spawn Bite save row', () => {
-    it('keeps the adjudication bytes unchanged (DC 14 CON, dual pools, 5 ft)', () => {
+    it('keeps the adjudication bytes unchanged (DC 14 CON, dual pools, 5 ft, Failure-only)', () => {
         expect(BITE.name).toBe('Bite');
         expect(BITE.save_dc).toBe(14);
         expect(BITE.save_type).toBe('Constitution');
@@ -34,48 +40,26 @@ describe('MA-1652 disk fingerprint: vampire-spawn Bite save row', () => {
         expect(BITE.damage_dice_secondary).toBe('3d6');
         expect(BITE.damage_type_secondary).toBe('Necrotic');
         expect(BITE.range).toBe('5 feet');
-    });
-
-    it('authors dc_success:"none" explicitly right after save_type (disk wording is Failure-only)', () => {
         expect(BITE.dc_success).toBe('none');
-        expect(BITE.description).toContain('Failure: 5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage.');
         expect(BITE.description).not.toMatch(/Success:/);
-        const keys = Object.keys(BITE);
-        expect(keys.indexOf('dc_success')).toBe(keys.indexOf('save_type') + 1);
-    });
-
-    it('authors save_hp_max_reduce:{equal_to:"damage"} right after dc_success (MA-1639 vampire twin parity)', () => {
-        expect(BITE.save_hp_max_reduce).toEqual({ equal_to: 'damage' });
-        expect(VAMPIRE_BITE.save_hp_max_reduce).toEqual({ equal_to: 'damage' });
-        const keys = Object.keys(BITE);
-        expect(keys.indexOf('save_hp_max_reduce')).toBe(keys.indexOf('dc_success') + 1);
-    });
-
-    it('authors save_attacker_recover:{equal_to:"damage"} right after save_hp_max_reduce (MA-1639 regain parity)', () => {
-        expect(BITE.save_attacker_recover).toEqual({ equal_to: 'damage' });
-        expect(VAMPIRE_BITE.save_attacker_recover).toEqual({ equal_to: 'damage' });
-        const keys = Object.keys(BITE);
-        expect(keys.indexOf('save_attacker_recover')).toBe(keys.indexOf('save_hp_max_reduce') + 1);
-    });
-
-    it('descriptions byte-carry the necrotic-scoped drain + regain clause unchanged', () => {
-        expect(BITE.description).toContain("The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.");
-        expect(BITE.save_effect).toContain("The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount");
-    });
-
-    it('authors target_prerequisite grappled/incapacitated/restrained (MA-0019 byte-shape, no by_attacker)', () => {
-        expect(BITE.target_prerequisite).toEqual({ conditions: ['grappled', 'incapacitated', 'restrained'] });
-        const tp = parseTargetPrerequisite(BITE);
-        expect(tp).toEqual({ conditions: ['grappled', 'incapacitated', 'restrained'], byAttacker: false, attackName: 'Bite' });
-        expect(targetPrerequisiteSatisfied({ prerequisite: tp, conditions: ['incapacitated'], conditionMeta: {}, monsterName: 'Vampire Spawn 1' }).satisfied).toBe(true);
-        expect(targetPrerequisiteSatisfied({ prerequisite: tp, conditions: [], conditionMeta: {}, monsterName: 'Vampire Spawn 1' }).satisfied).toBe(false);
     });
 });
 
 describe('MA-1652 parsers arm the vampire-spawn row through the live MA-1639 seam', () => {
-    it('parseSaveHpMaxReduce + parseSaveAttackerRecover both arm', () => {
+    it('parseSaveHpMaxReduce + parseSaveAttackerRecover arm; clauseless Claw row stays byte-inert null', () => {
         expect(parseSaveHpMaxReduce(BITE)).toEqual({ equalTo: 'damage' });
         expect(parseSaveAttackerRecover(BITE)).toEqual({ equalTo: 'damage' });
+        expect(parseSaveHpMaxReduce(CLAW)).toBeNull();
+        expect(parseSaveAttackerRecover(CLAW)).toBeNull();
+    });
+
+    it('parseTargetPrerequisite arms the MA-0019 gate (no by_attacker); satisfied truth table; null for Claw', () => {
+        const tp = parseTargetPrerequisite(BITE);
+        expect(tp).toEqual({ conditions: ['grappled', 'incapacitated', 'restrained'], byAttacker: false, attackName: 'Bite' });
+        expect(targetPrerequisiteSatisfied({ prerequisite: tp, conditions: ['incapacitated'], conditionMeta: {}, monsterName: 'Vampire Spawn 1' }).satisfied).toBe(true);
+        expect(targetPrerequisiteSatisfied({ prerequisite: tp, conditions: [], conditionMeta: {}, monsterName: 'Vampire Spawn 1' }).satisfied).toBe(false);
+        expect(parseTargetPrerequisite(CLAW)).toBeNull();
+        expect(targetPrerequisiteSatisfied({ prerequisite: null, conditions: [], conditionMeta: {}, monsterName: 'Vampire Spawn 1' }).satisfied).toBe(true);
     });
 
     it('block-save context: riders + dc_success none + secondary transport thread together', () => {

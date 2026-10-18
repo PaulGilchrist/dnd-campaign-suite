@@ -1,130 +1,57 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// Summoning/creature simpleModal lane for useCharActionsAutomation's modalMap
+// (handleAutomationAction → setModalState). Owns the modalName → stateKey
+// routing for summon/creature choosers (animateDead, createUndead, summonSpirit,
+// dragonCompanion, primalCompanion*, wildCompanion, feyReinforcements).
+// NOT covered here (owned by sibling lanes in this folder):
+//   - class-feature/lineage/target/teleport routes + unregistered-name drop:
+//     useCharActionsAutomation.test.class-feature-modals.js
+//   - resource/healing routes + fontOfMagic literal-true opener:
+//     useCharActionsAutomation.test.resource-modals.js
+//   - enriched-payload handlers (elementalAffinity, fiendishResilience,
+//     breathWeaponShape, celestialResilienceModal):
+//     useCharActionsAutomation.test.condition-modals.js
+//   - popup/roll/attack_roll/notify result dispatch: useCharActionsAutomation.test.result-types.js
+//   - divineIntervention identity + cast half:       useCharActionsAutomation.test.class-feature-modals.js / test.divine-intervention.js
+// All eight summon routes are pure simpleModal passthroughs in the source
+// (useCharActionsAutomation.js modalMap) — no enriched payloads, no confirm
+// callbacks, no derived fields to pin beyond the routing table.
+// Real modules load cleanly in jsdom (proven by test.telepathic-speech.js);
+// vi.mock blocks for divineInterventionHandler/spellCastService deleted here
+// per #546/#547/#549/#550 — no surviving test invokes a modal callback.
+import { describe, it, expect } from 'vitest';
 import useCharActionsAutomation from './useCharActionsAutomation.js';
 import { createHooks, setupBeforeEach } from './useCharActionsAutomation.test.setup.js';
-
-vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
-    handle: vi.fn(),
-    onSpellSelected: vi.fn(),
-}));
-
-vi.mock('../../services/rules/spells/spellCastService.js', () => ({
-    executeSpellCast: vi.fn(),
-}));
 
 describe('useCharActionsAutomation', () => {
     setupBeforeEach();
 
-    describe('handleAutomationAction - summoning/creature modals', () => {
-        it('should handle animateDead modal', async () => {
+    describe('handleAutomationAction - summoning/creature simpleModal routing', () => {
+        // One row per simpleModal route owned by this lane (REC #545):
+        // executeHandler dispatches {type:'modal', modalName} → setModalState
+        // opens the exact stateKey with the payload passed through untouched.
+        // Locks the table so an unregistered summon chooser silently dropping
+        // its modal (CLA-384/MN-016 class of bug) fails loudly here.
+        const ROUTES = [
+            ['animateDead', 'animateDeadModal'],
+            ['createUndead', 'createUndeadModal'],
+            ['summonSpirit', 'summonSpiritModal'],
+            ['dragonCompanion', 'dragonCompanionModal'],
+            ['primalCompanionBonusActionCommand', 'primalCompanionBonusActionModal'], // stateKey drops the 'Command' suffix
+            ['primalCompanionSummon', 'primalCompanionSummonModal'],
+            ['wildCompanion', 'wildCompanionModal'],
+            ['feyReinforcements', 'feyReinforcementsModal'],
+        ];
+
+        it.each(ROUTES)('%s opens %s with payload passthrough', async (modalName, stateKey) => {
             const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'animateDead',
-                payload: { undead: 'zombie' },
-            });
+            const payload = { probe: modalName };
+            hooks.executeHandler.mockResolvedValue({ type: 'modal', modalName, payload });
             const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
+            await handleAutomationAction({ name: 'TestAction', automation: {} });
 
-            expect(hooks.setModalState).toHaveBeenCalledWith({ animateDeadModal: { undead: 'zombie' } });
-        });
-
-        it('should handle createUndead modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'createUndead',
-                payload: { undead: 'skeleton' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ createUndeadModal: { undead: 'skeleton' } });
-        });
-
-        it('should handle summonSpirit modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'summonSpirit',
-                payload: { spirit: 'wolf' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ summonSpiritModal: { spirit: 'wolf' } });
-        });
-
-        it('should handle dragonCompanion modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'dragonCompanion',
-                payload: { dragon: 'red' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ dragonCompanionModal: { dragon: 'red' } });
-        });
-
-        it('should handle primalCompanionBonusActionCommand modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'primalCompanionBonusActionCommand',
-                payload: { command: 'attack' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ primalCompanionBonusActionModal: { command: 'attack' } });
-        });
-
-        it('should handle primalCompanionSummon modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'primalCompanionSummon',
-                payload: { companion: 'bear' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ primalCompanionSummonModal: { companion: 'bear' } });
-        });
-
-        it('should handle wildCompanion modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'wildCompanion',
-                payload: { action: 'bite' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ wildCompanionModal: { action: 'bite' } });
-        });
-
-        it('should handle feyReinforcements modal', async () => {
-            const hooks = createHooks();
-            hooks.executeHandler.mockResolvedValue({
-                type: 'modal',
-                modalName: 'feyReinforcements',
-                payload: { feyType: 'seelie' },
-            });
-            const { handleAutomationAction } = useCharActionsAutomation(hooks);
-            const action = { name: 'TestAction', automation: {} };
-            await handleAutomationAction(action);
-
-            expect(hooks.setModalState).toHaveBeenCalledWith({ feyReinforcementsModal: { feyType: 'seelie' } });
+            expect(hooks.setModalState).toHaveBeenCalledTimes(1);
+            expect(hooks.setModalState).toHaveBeenCalledWith({ [stateKey]: payload });
         });
     });
 });

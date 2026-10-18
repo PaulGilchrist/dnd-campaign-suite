@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1202 data lock: Mummy Lord Spellcasting rode the MA-0421/MA-0532/
 // MA-0576/MA-0611 plain-text zero-affordance template. Pre-fix ONLY the
 // tier headers carried <strong>; Dispel Magic/Thaumaturgy/Animate Dead/
@@ -9,7 +10,7 @@
 // tier headers byte-kept, "(level 7 version)" parenthetical OUTSIDE the
 // tag, strip-tags byte-equality vs the pre-fix plain text (markup-only).
 import { describe, it, expect } from 'vitest';
-import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
+import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, spellCastLevelFromSpellcasting, spellDamageFormulaAtLevel } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 import spellsData from '../../../public/data/spells.json';
 
@@ -21,42 +22,36 @@ const PLAIN_ORIGINAL = 'The mummy casts one of the following spells, requiring n
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 describe('MA-1202 Mummy Lord Spellcasting extraction', () => {
-  it('extracts the five spell names from the marked-up description', () => {
+  it('extracts the five spell names verbatim from the marked-up description', () => {
     expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(NAMES);
   });
 
   it('binds the 1/Day Each tier to {Animate Dead:1, Harm:1, Insect Plague:1} and leaves At Will ungated', () => {
-    const uses = extractSpellcastingSpellUses(row.description);
-    expect(uses).toEqual({ 'Animate Dead': 1, 'Harm': 1, 'Insect Plague': 1 });
-    expect(uses['Dispel Magic']).toBeUndefined();
-    expect(uses['Thaumaturgy']).toBeUndefined();
+    // Full-object toEqual: any leaked At-Will gate fails here too.
+    expect(extractSpellcastingSpellUses(row.description)).toEqual({ 'Animate Dead': 1, 'Harm': 1, 'Insect Plague': 1 });
   });
 });
 
 describe('MA-1202 monsters.json data lock: Mummy Lord Spellcasting row', () => {
-  it('is a markup-only diff — strip-tags byte-equals the pre-fix plain text', () => {
+  it('is a markup-only diff — strip-tags byte-equals the pre-fix plain text, save_dc 17/save_type Wisdom pair kept (§167)', () => {
     expect(stripTags(row.description)).toBe(PLAIN_ORIGINAL);
-  });
-
-  it('keeps the row-level numeric save_dc 17 + save_type Wisdom pair (§167)', () => {
     expect(row.save_dc).toBe(17);
     expect(row.save_type).toBe('Wisdom');
   });
 
-  it('keeps "(level 7 version)" outside the spell-name tag so the name resolves verbatim', () => {
-    expect(row.description).toContain('<strong>Insect Plague</strong> (level 7 version)');
-  });
-
-  it('every extracted name resolves in 5e spells.json with its adjudication fields intact', () => {
+  it('every extracted name resolves in 5e spells.json; "(level 7 version)" OUTSIDE the tag drives the MA-0033 upcast lane', () => {
     for (const name of NAMES) {
       expect(spellsData.some(s => s.name === name)).toBe(true);
     }
     const harm = spellsData.find(s => s.name === 'Harm');
-    expect(harm.level).toBe(6);
     expect(harm.dc.dc_type).toBe('CON');
     expect(harm.dc.dc_success).toBe('half');
     const plague = spellsData.find(s => s.name === 'Insect Plague');
-    expect(plague.damage.damage_at_slot_level['7']).toBe('6d10');
+    // Tag-inside regression: extract would yield "Insect Plague (level 7
+    // version)" and the resolve loop above fails first, with a sharper diff.
+    const castLevel = spellCastLevelFromSpellcasting(row.description, 'Insect Plague', plague);
+    expect(castLevel).toBe(7);
+    expect(spellDamageFormulaAtLevel(plague, castLevel)).toBe('6d10');
     expect(plague.damage.damage_type).toBe('Piercing');
   });
 });

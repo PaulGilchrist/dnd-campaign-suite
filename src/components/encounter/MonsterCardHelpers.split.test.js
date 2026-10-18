@@ -1,13 +1,18 @@
-// MA-0399 regression: Black Pudding Split gated reaction. Row carries
-// automation {type:'reaction', trigger:'bloodied_or_lightning_slashing',
-// effect:'split'}; the gate reads live combatSummary HP (bloodied) and the
-// campaign lastAttack damageTypes (lightning/slashing, "subjected to" —
-// immunity-zeroed damage still counts). Response is a GM-executed duplication
-// advisory (no monster-duplication subsystem, CLA-325/MA-0006 record-only
-// precedent): popup + ability_use log carry one-size-smaller + floor(hp/2)
-// instruction. Refusals log split_refused with zero writes; At Will sentinel
-// never spends MONSTER_REACTION_USES; 1/round latch + lastAttack.splitResolved
-// event stamp gate re-fires.
+// @maintained-by-ai
+// MA-0399 Black Pudding Split + MA-1249 Ochre Jelly arming/species prose.
+// Row carries automation {type:'reaction', trigger:'bloodied_or_lightning_slashing',
+// effect:'split'}; the gate reads live combatSummary HP (bloodied: ≤ floor(maxHp/2)
+// with 10+ HP) and the campaign lastAttack damageTypes (case-insensitive
+// lightning/slashing, "subjected to" — immunity-zeroed damage still counts,
+// actualDamage is never read). Response is a GM-executed duplication advisory
+// (CLA-325/MA-0006 record-only precedent): popup + ability_use log carry
+// one-size-smaller + floor(hp/2). Refusals log split_refused with zero writes;
+// At Will sentinel never spends MONSTER_REACTION_USES; 1/round latch
+// (_split_usedRound) + lastAttack.splitResolved event stamp gate re-fires.
+// Consumers (MonsterCardModal.jsx / MonsterAction.jsx chip threading) and the
+// other gated effects of getGatedMonsterReaction/monsterReactionUsesRemaining
+// are sibling producer lanes (MonsterCardHelpers.gated-reaction.test.js) —
+// not re-tested here.
 import { describe, it, expect, vi } from 'vitest';
 import {
   getGatedMonsterReaction,
@@ -30,6 +35,7 @@ const PUDDING = {
 };
 
 const MONSTER = 'Black Pudding 1';
+const OCHRE = 'Ochre Jelly 1';
 const CAMPAIGN = 'test-campaign';
 
 function combatant(overrides = {}) {
@@ -56,124 +62,79 @@ function makeDeps({ lastAttack = null, round = 1, creatures = [], store = {} } =
   };
 }
 
-describe('MA-0399 Split registry + authored data', () => {
-  it('registry resolves split; unregistered reaction rows stay byte-inert (null)', () => {
-    expect(getGatedMonsterReaction(PUDDING)?.effect).toBe('split');
+function ochreRow() {
+  return monsters.find(m => m.index === 'ochre-jelly').reactions[0];
+}
+function puddingRow() {
+  return monsters.find(m => m.index === 'black-pudding').reactions[0];
+}
+
+describe('MA-0399/MA-1249 split registry + disk fingerprints (BY-name #387)', () => {
+  it('black-pudding + ochre-jelly disk rows arm split identically; unregistered rows stay byte-inert', () => {
+    const pudding = puddingRow();
+    const ochre = ochreRow();
+    expect(getGatedMonsterReaction(pudding)?.effect).toBe('split');
+    expect(getGatedMonsterReaction(ochre)?.effect).toBe('split');
     expect(getGatedMonsterReaction({ name: 'Mace', description: 'Hit: 1d6+2 bludgeoning.' })).toBeNull();
+    // MA-1249: ochre armed with the Black Pudding block VERBATIM (zero-affordance fix)
+    expect(pudding.automation).toEqual({ type: 'reaction', trigger: 'bloodied_or_lightning_slashing', effect: 'split', minHp: 10, damageTypes: ['Lightning', 'Slashing'] });
+    expect(ochre.automation).toEqual(pudding.automation);
+    for (const row of [pudding, ochre]) {
+      expect(row.name).toBe('Split');
+      expect(row.usage).toBe('At Will');
+      expect(row.uses).toBe(999);
+      expect(row.maxUses).toBe(999);
+      expect(monsterReactionUsesRemaining(row, {})).toBe(999); // RAW-unlimited sentinel
+    }
+    expect(pudding.description).toMatch(/^Trigger: While the pudding is Large or Medium/);
+    expect(ochre.description).toMatch(/^The jelly splits into two new <strong>Ochre Jellies<\/strong>/);
   });
 
-  it('monsters.json Black Pudding reactions[0] carries the automation metadata, prose intact', () => {
-    const monster = monsters.find(m => m.index === 'black-pudding');
-    const row = monster.reactions[0];
-    expect(row.name).toBe('Split');
-    expect(row.automation).toMatchObject({ type: 'reaction', trigger: 'bloodied_or_lightning_slashing', effect: 'split', minHp: 10, damageTypes: ['Lightning', 'Slashing'] });
-    expect(row.usage).toBe('At Will');
-    expect(row.maxUses).toBe(999);
-    expect(row.description).toMatch(/^Trigger: While the pudding is Large or Medium/);
-  });
-
-  it('oneSizeSmaller walks the ladder, unknown/Tiny return null', () => {
-    expect(oneSizeSmaller('Large')).toBe('Medium');
-    expect(oneSizeSmaller('Medium')).toBe('Small');
+  it('oneSizeSmaller walks the ladder; Tiny/unknown/null return null', () => {
     expect(oneSizeSmaller('Huge')).toBe('Large');
+    expect(oneSizeSmaller('Large')).toBe('Medium');
     expect(oneSizeSmaller('Tiny')).toBeNull();
+    expect(oneSizeSmaller('weird')).toBeNull();
     expect(oneSizeSmaller(null)).toBeNull();
   });
 });
 
-describe('MA-0399 splitTriggerEvidence', () => {
+describe('MA-0399 splitTriggerEvidence once-per-branch truth table', () => {
   const auto = PUDDING.automation;
+  const ev = (lastAttack, monster) => splitTriggerEvidence({ lastAttack, monster, auto });
 
-  it('bloodied combatant (30/68, Large, 10+ HP) satisfies via bloodied — no attack needed', () => {
-    const t = splitTriggerEvidence({ lastAttack: null, monster: combatant({ currentHp: 30 }), auto });
-    expect(t).toMatchObject({ satisfied: true, via: 'bloodied', hp: 30, maxHp: 68 });
-  });
-
-  it('bloodied boundary: exactly floor(maxHp/2) counts, one above does not', () => {
-    expect(splitTriggerEvidence({ lastAttack: null, monster: combatant({ currentHp: 34 }), auto }).satisfied).toBe(true);
-    expect(splitTriggerEvidence({ lastAttack: null, monster: combatant({ currentHp: 35 }), auto }).satisfied).toBe(false);
-  });
-
-  it('bloodied below the 10+ HP floor does NOT satisfy (RAW)', () => {
-    const t = splitTriggerEvidence({ lastAttack: null, monster: combatant({ maxHp: 16, currentHp: 8 }), auto });
-    expect(t.satisfied).toBe(false);
-    expect(t.reason).toBe('trigger');
-  });
-
-  it('lightning lastAttack against the pudding satisfies even while NOT bloodied', () => {
-    const t = splitTriggerEvidence({ lastAttack: slashingAttack({ damageTypes: ['Lightning'], primaryDamageType: 'Lightning' }), monster: combatant({ currentHp: 60 }), auto });
-    expect(t).toMatchObject({ satisfied: true, via: 'damage_type', damageType: 'Lightning' });
-  });
-
-  it('immune lightning/slashing hit (actualDamage 0) still counts as "subjected to"', () => {
-    const t = splitTriggerEvidence({ lastAttack: slashingAttack({ actualDamage: 0 }), monster: combatant(), auto });
-    expect(t).toMatchObject({ satisfied: true, via: 'damage_type', damageType: 'Slashing' });
-  });
-
-  it('piercing damage against a non-bloodied pudding refuses (trigger)', () => {
-    const t = splitTriggerEvidence({ lastAttack: slashingAttack({ damageTypes: ['Piercing'], primaryDamageType: 'Piercing' }), monster: combatant({ currentHp: 60 }), auto });
-    expect(t.satisfied).toBe(false);
-    expect(t.reason).toBe('trigger');
-  });
-
-  it('elemental damage aimed at ANOTHER creature does not satisfy', () => {
-    const t = splitTriggerEvidence({ lastAttack: slashingAttack({ targetName: 'AasimarTest' }), monster: combatant({ currentHp: 60 }), auto });
-    expect(t.satisfied).toBe(false);
-  });
-
-  it('Small combatant refuses (size)', () => {
-    const t = splitTriggerEvidence({ lastAttack: null, monster: combatant({ size: 'Small', maxHp: 20, currentHp: 10 }), auto });
-    expect(t.satisfied).toBe(false);
-    expect(t.reason).toBe('size');
-  });
-
-  it('missing combatant refuses (combatant)', () => {
-    expect(splitTriggerEvidence({ lastAttack: null, monster: null, auto }).reason).toBe('combatant');
+  it('bloodied + damage_type satisfy; size/combatant/trigger refuse', () => {
+    // bloodied path (≤ floor(maxHp/2), ≥ minHp 10)
+    expect(ev(null, combatant({ currentHp: 30 }))).toMatchObject({ satisfied: true, via: 'bloodied', hp: 30, maxHp: 68 });
+    expect(ev(null, combatant({ currentHp: 34 })).satisfied).toBe(true); // boundary floor(68/2)
+    expect(ev(null, combatant({ currentHp: 35 })).satisfied).toBe(false); // one above the boundary
+    expect(ev(null, combatant({ maxHp: 16, currentHp: 8 }))).toMatchObject({ satisfied: false, reason: 'trigger' }); // below 10+ HP floor (RAW)
+    // damage_type path — not-bloodied + case-insensitive match, immune 0-dealt still "subjected to"
+    expect(ev(slashingAttack({ damageTypes: ['lightning'] }), combatant({ currentHp: 60 }))).toMatchObject({ satisfied: true, via: 'damage_type', damageType: 'lightning' });
+    expect(ev(slashingAttack({ actualDamage: 0 }), combatant())).toMatchObject({ satisfied: true, via: 'damage_type', damageType: 'Slashing' });
+    // refusals
+    expect(ev(slashingAttack({ damageTypes: ['Piercing'], primaryDamageType: 'Piercing' }), combatant({ currentHp: 60 }))).toMatchObject({ satisfied: false, reason: 'trigger' });
+    expect(ev(slashingAttack({ targetName: 'AasimarTest' }), combatant({ currentHp: 60 })).satisfied).toBe(false); // aimed at ANOTHER creature
+    expect(ev(null, combatant({ size: 'Small', maxHp: 20, currentHp: 10 }))).toMatchObject({ satisfied: false, reason: 'size' });
+    expect(ev(null, null).reason).toBe('combatant');
   });
 });
 
-describe('MA-0399 splitGate latch + event stamps', () => {
+describe('MA-0399 splitGate event stamps + floor(hp/2)', () => {
   const auto = PUDDING.automation;
 
-  it('same-round second use refuses (round latch)', () => {
-    const gate = splitGate({ lastAttack: slashingAttack(), monster: combatant({ currentHp: 30 }), monsterName: MONSTER, currentRound: 4, usedRound: 4, auto });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('round');
-  });
-
-  it('same-damage-event second click refuses (splitResolved stamp)', () => {
-    const gate = splitGate({ lastAttack: slashingAttack({ splitResolved: true, splitBy: MONSTER }), monster: combatant({ currentHp: 30 }), monsterName: MONSTER, currentRound: 4, usedRound: 0, auto });
-    expect(gate.ok).toBe(false);
-    expect(gate.reason).toBe('reacted');
-  });
-
-  it('fresh trigger allows with floor(hp/2) eachHp — odd HP floors down', () => {
+  it('reacted stamp / round latch / trigger refuse; fresh allows with odd HP floored down', () => {
+    expect(splitGate({ lastAttack: slashingAttack({ splitResolved: true, splitBy: MONSTER }), monster: combatant({ currentHp: 30 }), monsterName: MONSTER, currentRound: 4, usedRound: 0, auto }).reason).toBe('reacted');
+    expect(splitGate({ lastAttack: slashingAttack(), monster: combatant({ currentHp: 30 }), monsterName: MONSTER, currentRound: 4, usedRound: 4, auto }).reason).toBe('round');
+    expect(splitGate({ lastAttack: slashingAttack({ damageTypes: ['Piercing'] }), monster: combatant({ currentHp: 60 }), monsterName: MONSTER, currentRound: 4, usedRound: 0, auto }).reason).toBe('trigger');
     const gate = splitGate({ lastAttack: null, monster: combatant({ currentHp: 31 }), monsterName: MONSTER, currentRound: 5, usedRound: 4, auto });
     expect(gate.ok).toBe(true);
-    expect(gate.eachHp).toBe(15);
+    expect(gate.eachHp).toBe(15); // floor(31/2)
   });
 });
 
-describe('MA-0399 resolveMonsterSplit via resolveMonsterGatedReaction', () => {
-  it('refusal (no trigger): split_refused logged, zero writes, refusal popup', async () => {
-    const { state, logs, deps } = makeDeps({ lastAttack: slashingAttack({ damageTypes: ['Piercing'], targetName: 'AasimarTest' }), creatures: [combatant({ currentHp: 60 })] });
-    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('split_refused');
-    expect(result.popupHtml).toMatch(/Split Refused/);
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
-  });
-
-  it('not-in-encounter refuses with zero writes', async () => {
-    const { logs, deps } = makeDeps({ lastAttack: null, creatures: [] });
-    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
-    expect(result.ok).toBe(false);
-    expect(logs[0].automationType).toBe('split_refused');
-    expect(logs[0].description).toMatch(/combatant/);
-  });
-
-  it('bloodied accept: round latch stamped, At Will spends NO uses, ability_use carries Medium + 15/15 duplication instruction + popup', async () => {
+describe('MA-0399 resolveMonsterGatedReaction split wiring', () => {
+  it('bloodied accept: latch stamped, At Will spends NO uses, ability_use + popup carry Medium 15/15 duplication instruction', async () => {
     const { state, logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
     const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);
@@ -189,7 +150,7 @@ describe('MA-0399 resolveMonsterSplit via resolveMonsterGatedReaction', () => {
     expect(result.popupHtml).toMatch(/15\/15 HP each/);
   });
 
-  it('slashing-impact accept (immune, 0 dealt): stamps lastAttack splitResolved + splitIntoHp', async () => {
+  it('damage-event accept (immune, 0 dealt): stamps lastAttack splitResolved + splitBy + splitIntoHp', async () => {
     const { state, logs, deps } = makeDeps({ lastAttack: slashingAttack({ actualDamage: 0 }), round: 2, creatures: [combatant({ currentHp: 68 })] });
     const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(true);
@@ -201,8 +162,8 @@ describe('MA-0399 resolveMonsterSplit via resolveMonsterGatedReaction', () => {
     expect(logs.find(l => l.type === 'ability_use').description).toMatch(/subjected to Slashing damage/);
   });
 
-  it('same-round second click refuses with zero additional writes', async () => {
-    const { logs, deps } = makeDeps({
+  it('refusals (round latch re-click, not-in-encounter) log split_refused with zero writes + refusal popup', async () => {
+    const { state, logs, deps } = makeDeps({
       lastAttack: null,
       round: 6,
       creatures: [combatant({ currentHp: 30 })],
@@ -210,50 +171,29 @@ describe('MA-0399 resolveMonsterSplit via resolveMonsterGatedReaction', () => {
     });
     const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
     expect(result.ok).toBe(false);
+    expect(result.popupHtml).toMatch(/Split Refused/);
     expect(logs[0].automationType).toBe('split_refused');
     expect(logs[0].description).toMatch(/round/);
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(state[`${MONSTER}.${MONSTER_REACTION_USES_KEY}`]).toBeUndefined();
+
+    const absent = makeDeps({ lastAttack: null, creatures: [] });
+    const result2 = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps: absent.deps });
+    expect(result2.ok).toBe(false);
+    expect(absent.logs[0].automationType).toBe('split_refused');
+    expect(absent.logs[0].description).toMatch(/combatant/);
+    expect(absent.deps.setRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
-// MA-1249: Ochre Jelly Split — prose-only disk row armed with the Black
-// Pudding automation block verbatim (FAIL(b)/DATA zero-affordance fix), and
-// species-threaded advisory prose (MA-0869 hardcoded-label lineage): puddings
-// stay byte-identical, Ochre Jelly prints "Ochre Jellies"/"jellies".
-describe('MA-1249 Ochre Jelly Split data lock + species-threaded prose', () => {
-  const OCHRE = 'Ochre Jelly 1';
-
-  function ochreRow() {
-    return monsters.find(m => m.index === 'ochre-jelly').reactions[0];
-  }
-  function puddingRow() {
-    return monsters.find(m => m.index === 'black-pudding').reactions[0];
-  }
-
-  it('disk row carries the Black Pudding automation block verbatim + At Will sentinel', () => {
-    const row = ochreRow();
-    expect(row.name).toBe('Split');
-    expect(row.automation).toEqual(puddingRow().automation);
-    expect(row.automation).toEqual({ type: 'reaction', trigger: 'bloodied_or_lightning_slashing', effect: 'split', minHp: 10, damageTypes: ['Lightning', 'Slashing'] });
-    expect(row.uses).toBe(999);
-    expect(row.maxUses).toBe(999);
-    expect(row.usage).toBe('At Will');
-    expect(row.description).toMatch(/^The jelly splits into two new <strong>Ochre Jellies<\/strong>/);
-  });
-
-  it('gated reaction arms: registry def + RAW-unlimited "999 left" counter', () => {
-    const row = ochreRow();
-    expect(getGatedMonsterReaction(row)?.effect).toBe('split');
-    expect(monsterReactionUsesRemaining(row, {})).toBe(999);
-  });
-
-  it('bloodied press prints OCHRE JELLY prose (popup + spend log), never Black Puddings', async () => {
+describe('MA-1249 species-threaded Split prose (MA-0869 lineage)', () => {
+  it('bloodied ochre press prints OCHRE JELLY prose (popup + spend log), never Black Puddings', async () => {
     const { state, logs, deps } = makeDeps({
       lastAttack: null,
       round: 2,
       creatures: [{ name: OCHRE, type: 'npc', size: 'Large', maxHp: 52, currentHp: 26 }],
     });
-    const result = await resolveMonsterGatedReaction({ action: ochreRow(), monsterName: OCHRE, campaignName: CAMPAIGN, species: 'Ochre Jelly 1', deps });
+    const result = await resolveMonsterGatedReaction({ action: ochreRow(), monsterName: OCHRE, campaignName: CAMPAIGN, species: OCHRE, deps });
     expect(result.ok).toBe(true);
     expect(result.eachHp).toBe(13);
     expect(state[`${OCHRE}._split_usedRound`]).toBe(2);
@@ -265,21 +205,13 @@ describe('MA-1249 Ochre Jelly Split data lock + species-threaded prose', () => {
     expect(result.popupHtml).not.toMatch(/pudding/i);
   });
 
-  it('pudding prose stays BYTE-IDENTICAL (default species fallback)', async () => {
+  it('EB-suffixed species "Black Pudding 1" strips the suffix to BYTE-IDENTICAL default pudding prose', async () => {
     const { logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
-    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps });
+    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, species: 'Black Pudding 1', deps });
     expect(result.ok).toBe(true);
     const spend = logs.find(l => l.type === 'ability_use');
     expect(spend.description).toBe(`${MONSTER} uses Split (Bloodied at 30/68 HP) — GM duplication instruction: replace ${MONSTER} with two Medium Black Puddings at 15/15 HP each (floor(30/2)), each on its own Initiative. No monster-duplication subsystem — add via Encounter Builder + stamp HP (GM-enforced, advisory record). At Will — unlimited, 1 Reaction per round.`);
     expect(result.popupHtml).toContain('two Medium Black Puddings');
     expect(result.popupHtml).toContain('add the two puddings via the Encounter Builder');
-  });
-
-  it('EB-suffixed species:"Black Pudding 1" threads to the same byte-identical prose', async () => {
-    const { logs, deps } = makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] });
-    const result = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, species: 'Black Pudding 1', deps });
-    const defaultLogs = await resolveMonsterGatedReaction({ action: PUDDING, monsterName: MONSTER, campaignName: CAMPAIGN, deps: makeDeps({ lastAttack: null, round: 3, creatures: [combatant({ currentHp: 30 })] }).deps });
-    expect(logs.find(l => l.type === 'ability_use').description).toBe(defaultLogs.message);
-    expect(result.popupHtml).toBe(defaultLogs.popupHtml);
   });
 });

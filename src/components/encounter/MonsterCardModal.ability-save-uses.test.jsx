@@ -1,24 +1,25 @@
-// MA-0020 regression: Aboleth "Dominate Mind (2/Day)" click-path enforcement.
-// The ability save row gates on the MA-0005 monsterSpellUses runtime map:
-// fresh row shows a (2/Day · N left) counter and arms the save with a
-// monsterAbilityUse spend marker + until-clause durationNote; exhausted
-// (2/2 used) refuses with a popup + dominate_mind_refused log, zero prompts.
-import { render, fireEvent, waitFor } from '@testing-library/react';
+// MA-0020 modal-lane owner: Aboleth "Dominate Mind (2/Day)" save-row gate as
+// rendered/clicked in MonsterCardModal. Rides the REAL monsters.json row (data
+// pin via literal assertions). Distinct seams, one render per state:
+//   fresh → chip bytes '(2/Day · 2 left)' + click arms save with monsterAbilityUse
+//           spend marker + until-clause durationNote (ungated rows: no counter, no marker)
+//   partial → live '(2/Day · 1 left)', still arms
+//   exhausted → refusal popup + dominate_mind_refused log, zero prompts, spent class.
+// Cite-skip owners: gate arithmetic services/encounters/monsterAbilityUses.test.js:32-36;
+// spend-at-confirm + refusal wording monsterAbilityUses.test.js:44-99 and consumer
+// saveProcessing.failed-save-conditions.test.js; usage-string format
+// MonsterCardHelpers.usage.test.js (#571); generic gated reactions
+// MonsterAction.gated-reaction.test.jsx. No At Will save rows exist in this lane,
+// so the MonsterCardHelpers.js:3022-3027 '999/Day' cosmetic sentinel never surfaces here.
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-const DOMINATE_MIND = {
-  name: 'Dominate Mind (2/Day)',
-  description: 'Wisdom Saving Throw: DC 16, one creature the aboleth can see within 30 feet.',
-  save_dc: 16,
-  save_type: 'Wisdom',
-  save_effect: 'Failure: The target has the Charmed condition until the aboleth dies or is on a different plane of existence from the target',
-  usage: '2/Day',
-  uses: 2,
-  maxUses: 2,
-};
+// Real authored row — renamed/removed aboleth action fails these tests loudly.
+const DOMINATE_MIND = monstersData.find(m => m.index === 'aboleth').actions.find(a => a.name === 'Dominate Mind (2/Day)');
+const MIND_ROT = { name: 'Mind Rot', save_dc: 15, save_type: 'Intelligence', save_effect: 'Failure: Stunned' };
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
@@ -109,25 +110,13 @@ const CREATURES = [
 
 function renderAboleth(uses) {
   if (uses !== undefined) runtime.store['Aboleth 1.monsterSpellUses'] = uses;
-  const m = makeMonster({ name: 'Aboleth', actions: [DOMINATE_MIND] });
+  const m = makeMonster({ name: 'Aboleth', actions: [DOMINATE_MIND, MIND_ROT] });
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
 }
 
-function dominateLink() {
-  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.closest('div')?.textContent.includes('Dominate Mind')) || null;
+function saveLink(name) {
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.closest('div')?.textContent.includes(name)) || null;
 }
-
-describe('MA-0020 monsters.json data: Dominate Mind carries 2/Day uses', () => {
-  it('aboleth row authors usage/uses/maxUses 2 with DC 16 Wisdom', () => {
-    const aboleth = monstersData.find(m => m.index === 'aboleth');
-    const row = aboleth.actions.find(a => a.name === 'Dominate Mind (2/Day)');
-    expect(row.usage).toBe('2/Day');
-    expect(row.uses).toBe(2);
-    expect(row.maxUses).toBe(2);
-    expect(row.save_dc).toBe(16);
-    expect(row.save_type).toBe('Wisdom');
-  });
-});
 
 describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
   beforeEach(() => {
@@ -135,11 +124,12 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('fresh row renders the (2/Day · 2 left) counter and arms the save with spend marker + durationNote', () => {
+  it('fresh row renders (2/Day · 2 left) and click arms DC 16 Wisdom charmed save with spend marker + until-clause note; ungated rows carry no counter/marker', () => {
     renderAboleth();
-    const link = dominateLink();
+    const link = saveLink('Dominate Mind');
     expect(link).toBeTruthy();
     expect(link.textContent).toMatch(/\(2\/Day · 2 left\)/);
+    expect(link.className).not.toContain('mc-dice-link-spell-spent');
 
     fireEvent.click(link);
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);
@@ -149,18 +139,27 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
     expect(ctx.saveConditions).toEqual(['charmed']);
     expect(ctx.monsterAbilityUse).toEqual({ useKey: 'Dominate Mind', maxUses: 2, actionName: 'Dominate Mind (2/Day)' });
     expect(ctx.conditionDurationNote).toMatch(/^until the aboleth dies .* \(GM-enforced\)$/);
+
+    // Ungated save row: no uses authored → no counter bytes, no spend marker, still arms.
+    const rot = saveLink('Mind Rot');
+    expect(rot.textContent).not.toMatch(/\(.*\/Day/);
+    fireEvent.click(rot);
+    expect(rollSavingThrow).toHaveBeenCalledTimes(2);
+    expect(rollSavingThrow.mock.calls[1][2].monsterAbilityUse).toBeUndefined();
   });
 
-  it('one use spent: counter shows 1 left, second click still arms the save', () => {
+  it('one use spent: live counter shows 1 left, click still arms the save', () => {
     renderAboleth({ 'Dominate Mind': 1 });
-    expect(dominateLink().textContent).toMatch(/\(2\/Day · 1 left\)/);
-    fireEvent.click(dominateLink());
+    const link = saveLink('Dominate Mind');
+    expect(link.textContent).toMatch(/\(2\/Day · 1 left\)/);
+    expect(link.className).not.toContain('mc-dice-link-spell-spent');
+    fireEvent.click(link);
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);
   });
 
-  it('exhausted (2/2): popup + dominate_mind_refused log, zero save prompts, counter 0 left + spent class', async () => {
+  it('exhausted (2/2): popup + dominate_mind_refused log, zero save prompts, counter 0 left + spent class', () => {
     renderAboleth({ 'Dominate Mind': 2 });
-    const link = dominateLink();
+    const link = saveLink('Dominate Mind');
     expect(link.textContent).toMatch(/\(2\/Day · 0 left\)/);
     expect(link.className).toContain('mc-dice-link-spell-spent');
 
@@ -168,21 +167,11 @@ describe('MA-0020 MonsterCardModal Dominate Mind uses gate', () => {
     expect(rollSavingThrow).not.toHaveBeenCalled();
     expect(setPopupHtml).toHaveBeenCalled();
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Uses Exhausted');
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'dominate_mind_refused');
     expect(refusal).toBeTruthy();
     expect(refusal.characterName).toBe('Aboleth 1');
     expect(refusal.description).toMatch(/already used Dominate Mind today \(2\/Day\)/);
   });
-
-  it('unlimited save rows untouched: no uses authored → no counter, no marker', () => {
-    const ungated = { name: 'Mind Rot', save_dc: 15, save_type: 'Intelligence', save_effect: 'Failure: Stunned' };
-    const m = makeMonster({ name: 'Aboleth', actions: [ungated] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Aboleth 1', creatures: CREATURES })} />);
-    const link = Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.closest('div')?.textContent.includes('Mind Rot'));
-    expect(link.textContent).not.toMatch(/\/Day/);
-    fireEvent.click(link);
-    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    expect(rollSavingThrow.mock.calls[0][2].monsterAbilityUse).toBeUndefined();
-  });
 });
+
+// @maintained-by-ai

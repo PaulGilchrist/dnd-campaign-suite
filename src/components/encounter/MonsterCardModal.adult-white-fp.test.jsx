@@ -1,14 +1,23 @@
+// @maintained-by-ai
 // MA-0147 regression: Adult White Dragon Frightful Presence (legendary_actions[2])
 // previously authored only name/description/save_dc/save_type — no save_effect —
 // so extractConditionsFromSaveEffect → [] and the MA-0017 damageless-save seam
 // applied NOTHING on a failed save (no activeConditions, no te, no condition log).
 // Data fix mirrors the verified MA-0048 Adult Blue Dracolich FP row:
 // save_effect (frightened) + dc_success:"none" + success_immunity + repeat_save.
+// Lane canon: chip render 'DC 14 Charisma' + gated spend + cooldown + spend log
+// → MonsterCardModal.legendary-uses.test.jsx:1467,1513-1530; service arming +
+// turn-end repeat-save + 24h immunity grant on this row →
+// frightfulPresenceService.test.js:147-172; gate truth table →
+// MonsterCardHelpers.gaze-immunity.test.js:41-50. This file keeps ONLY the
+// two seams pinned nowhere else: the disk row's full-service shape
+// (dc_success none, zero damage, exact repeat_save/success_immunity objects,
+// byte-key mirror) and the modal click → save-context forwarding.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-import { extractConditionsFromSaveEffect, parseSuccessImmunity, gazeImmunityActive } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, parseSuccessImmunity } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
@@ -82,39 +91,17 @@ function fpSaveChip() {
 }
 
 describe('MA-0147 monsters.json data: Adult White Dragon FP row full-service shape', () => {
-  it('FP row: DC 14 Charisma untouched + frightened save_effect + dc_success none', () => {
+  it('FP row: DC 14 Charisma + dc_success none + zero damage + frightened + exact MA-0048 service objects (byte-mirrors Adult Blue Dracolich FP keys)', () => {
     expect(FP.save_dc).toBe(14);
     expect(FP.save_type).toBe('Charisma');
     expect(FP.dc_success).toBe('none');
     expect(FP.damage_dice_primary == null).toBe(true);
     expect(extractConditionsFromSaveEffect(FP.save_effect)).toEqual(['frightened']);
-  });
-
-  it('FP row engages the MA-0048 service: repeat_save + success_immunity object shape (byte-mirrors Adult Blue Dracolich FP)', () => {
-    const dracolich = monstersData.find(m => m.name === 'Adult Blue Dracolich');
-    const DFP = dracolich.actions.find(a => a.name === 'Frightful Presence');
     expect(FP.repeat_save).toEqual({ condition: 'frightened', save_type: 'Charisma', duration_minutes: 1 });
     expect(FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
+    expect(parseSuccessImmunity(FP)).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', durationMinutes: 1440 });
+    const DFP = monstersData.find(m => m.name === 'Adult Blue Dracolich').actions.find(a => a.name === 'Frightful Presence');
     expect(Object.keys(FP)).toEqual(Object.keys(DFP));
-    const immunity = parseSuccessImmunity(FP);
-    expect(immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', durationMinutes: 1440 });
-  });
-
-  it('FP row description carries canonical 120-ft range + turn-end-repeat + 24h-immunity wording', () => {
-    expect(FP.description).toContain('within 120 feet');
-    expect(FP.description).toContain('repeat the saving throw at the end of each of its turns');
-    expect(FP.description).toContain('immune to the dragon\'s Frightful Presence for the next 24 hours');
-  });
-
-  it('immunity te on target refuses the FP row click (MA-0030/MA-0048 gate)', () => {
-    const target = { name: 'TestPC', type: 'player' };
-    const active = gazeImmunityActive({
-      action: FP, target, monsterName: 'Adult White Dragon 1',
-      targetEffects: [{ target: 'TestPC', effect: 'frightful_presence_immunity', source: 'Adult White Dragon 1' }],
-    });
-    expect(active).toMatchObject({ effect: 'frightful_presence_immunity', durationMinutes: 1440 });
-    const none = gazeImmunityActive({ action: FP, target, monsterName: 'Adult White Dragon 1', targetEffects: [] });
-    expect(none).toBeNull();
   });
 });
 

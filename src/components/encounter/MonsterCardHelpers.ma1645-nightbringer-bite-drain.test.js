@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1645: Vampire Nightbringer "Bite" (actions[1], +7 melee, 1d6 + 4
 // Piercing plus 3d6 Necrotic) — disk RAW: "The target's Hit Point maximum
 // decreases by an amount equal to the Necrotic damage taken, and the vampire
@@ -11,6 +12,11 @@
 //     the ATTACK-lane twin of MA-1639's save_attacker_recover (same grammar,
 //     structured-key-only, byte-inert without the key);
 // (3) DATA: both keys authored equal_to:"secondary" on the Nightbringer row.
+// Trimmed to distinct-branch truth tables: drain/regain CONSUMER behavior
+// lives in handlePlainDamage.ma1645-nightbringer-bite-drain.test.js; plain
+// clauseless-row null is owned by handlePlainDamage.hitClause.test.js
+// (:211-215, specter absent from its HIT_CLAUSE_ROWS by name); other-monster
+// fingerprint pins cut per #554.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -34,51 +40,37 @@ describe('MA-1645 disk fingerprint: vampire-nightbringer Bite rider keys', () =>
         expect(BITE.description).toBe('Melee Attack Roll: +7, reach 5 ft. Hit: 7 (1d6 + 4) Piercing damage plus 10 (3d6) Necrotic damage. The target\'s Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount.');
     });
 
-    it('authors hit_hp_max_reduce + hit_attacker_recover {equal_to:"secondary"} after the secondary pool keys', () => {
+    it('authors hit_hp_max_reduce + hit_attacker_recover {equal_to:"secondary"} riders on the Bite row', () => {
         expect(BITE.hit_hp_max_reduce).toEqual({ equal_to: 'secondary' });
         expect(BITE.hit_attacker_recover).toEqual({ equal_to: 'secondary' });
-        const keys = Object.keys(BITE);
-        expect(keys.indexOf('hit_hp_max_reduce')).toBe(keys.indexOf('damage_type_secondary') + 1);
-        expect(keys.indexOf('hit_attacker_recover')).toBe(keys.indexOf('hit_hp_max_reduce') + 1);
     });
 
     it('the Shadow Strike twin row on the SAME monster stays rider-free (per-row wording discipline)', () => {
         expect(SHADOW_STRIKE.hit_hp_max_reduce).toBeUndefined();
         expect(SHADOW_STRIKE.hit_attacker_recover).toBeUndefined();
-        expect(parseHitHpMaxReduce(SHADOW_STRIKE)).toBeNull();
-        expect(parseHitAttackerRecover(SHADOW_STRIKE)).toBeNull();
+        expect(buildHitConditionClause(SHADOW_STRIKE)).toBeNull();
     });
 });
 
-describe('MA-1645 parseHitHpMaxReduce magnitude scope', () => {
-    it('accepts equal_to:"secondary" as {equalTo:"secondary"}', () => {
+describe('MA-1645 parser truth tables (structured-key-only, hit lane)', () => {
+    it('parseHitHpMaxReduce arms damage and secondary scopes; specter twin byte-identical', () => {
         expect(parseHitHpMaxReduce(BITE)).toEqual({ equalTo: 'secondary' });
         expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'Secondary' } })).toEqual({ equalTo: 'secondary' });
-    });
-
-    it('existing equal_to:"damage" rows parse byte-identically (Specter twin)', () => {
         expect(parseHitHpMaxReduce(SPECTER_DRAIN)).toEqual({ equalTo: 'damage' });
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'damage' } })).toEqual({ equalTo: 'damage' });
     });
 
-    it('structured-key-only: garbage scopes and string rows stay inert', () => {
+    it('parseHitHpMaxReduce negatives once per branch: no-key / string-row / wrong-pool scope', () => {
         expect(parseHitHpMaxReduce({})).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: {} })).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'healing' } })).toBeNull();
-        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'primary' } })).toBeNull();
         expect(parseHitHpMaxReduce({ hit_hp_max_reduce: 'secondary' })).toBeNull();
+        expect(parseHitHpMaxReduce({ hit_hp_max_reduce: { equal_to: 'primary' } })).toBeNull();
     });
-});
 
-describe('MA-1645 parseHitAttackerRecover (MA-1639 grammar mirror, hit lane)', () => {
-    it('arms ONLY on the structured hit_attacker_recover dict', () => {
+    it('parseHitAttackerRecover arms ONLY the structured dict (MA-1639 grammar mirror)', () => {
         expect(parseHitAttackerRecover(BITE)).toEqual({ equalTo: 'secondary' });
         expect(parseHitAttackerRecover({ hit_attacker_recover: { equal_to: 'damage' } })).toEqual({ equalTo: 'damage' });
         expect(parseHitAttackerRecover({})).toBeNull();
-        expect(parseHitAttackerRecover({ hit_attacker_recover: {} })).toBeNull();
-        expect(parseHitAttackerRecover({ hit_attacker_recover: { equal_to: 'half' } })).toBeNull();
         expect(parseHitAttackerRecover({ hit_attacker_recover: 'damage' })).toBeNull();
-        expect(parseHitAttackerRecover(SPECTER_DRAIN)).toBeNull();
+        expect(parseHitAttackerRecover({ hit_attacker_recover: { equal_to: 'half' } })).toBeNull();
     });
 });
 
@@ -102,11 +94,5 @@ describe('MA-1645 buildHitConditionClause threading + byte-inertia', () => {
             targetEffect: null,
             hpMaxReduce: { equalTo: 'damage' },
         });
-    });
-
-    it('clauseless rows stay null', () => {
-        const banditRow = monsters.find((m) => m.name === 'Bandit').actions.find((a) => a.attack_bonus != null);
-        expect(buildHitConditionClause(banditRow)).toBeNull();
-        expect(buildHitConditionClause(SHADOW_STRIKE)).toBeNull();
     });
 });

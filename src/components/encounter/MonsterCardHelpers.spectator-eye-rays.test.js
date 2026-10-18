@@ -1,232 +1,124 @@
-// MA-1483: Spectator "Eye Rays" launcher row — rays[] was ABSENT, so
-// parseEyeRays → null, the fire gate (MonsterCardModal) never opened, and
-// the row rendered zero affordance (§157/§88 fingerprint, §949 rays[] twin).
-// DATA fix: author rays[] four ray dicts byte-shape of the gazer MA-0765 /
-// Beholder-Zombie MA-0383 twins (len-inferred die: 4 rays → d4) + row-level
-// save_dc:12 + range:"90 ft." + save_effect; name/description byte-unchanged.
-// Locks: parseEyeRays non-null, picker die = len = 4, reroll-if-used latch
-// (eyeRaysUsed usedKeys), per-ray ability/dice/type match the disk sibling
-// rows actions[3..6], row DC 12 stamped onto every synthesized ray save leg,
-// the Paralyzing ladder rides the MA-0383 flat-ray twins (no
-// staged_paralysis — the eye-ray ladder channel is ray.ladder), and the
-// manual single-fire sibling rows stay byte-unchanged (MA-1481 scope).
+// @maintained-by-ai — trimmed 2026-10-18: spectator BY-name gaze-row fingerprint +
+// gate discrimination only; generic parse/picker/synthesis/compute cite-skipped to
+// owners (eye-rays, gazer-eye-rays, slowed-clauses, saveProcessing.eye-rays,
+// applyDamage.helpers). See lane canon header below for citations.
+// MA-1483: Spectator "Eye Rays" launcher row — rays[] was ABSENT, so parseEyeRays
+// → null, the fire gate (MonsterCardModal.jsx:530) never opened and the row rendered
+// zero affordance (§157/§88 fingerprint, §949 rays[] twin). DATA fix: author rays[]
+// four ray dicts byte-shape of the gazer MA-0765 / Beholder-Zombie MA-0383 twins
+// (len-inferred die: 4 rays → d4) + row-level save_dc:12 + range:"90 ft." +
+// save_effect; name/description byte-unchanged. MA-1484/MA-1486: manual
+// "Confusion Ray"/"Fear Ray" rows RAW-pay ZERO on a successful save (no
+// success-pays clause) — dc_success ABSENT → getSaveDcSuccess default 'half'
+// (MonsterCardModal :268/:1128) leaked half Psychic on success (§63/§129 MV-20
+// family: MA-0481/0622/0768/0781/0868); DATA fix: dc_success:"none" (gazer MA-0768
+// Frost Ray byte-shape), consistent with launcher rays[0]/rays[2].
+// Lane canon: pins ONLY the spectator BY-name disk fingerprint (#387) + gate
+// discriminators (exactly Wounding pays half; d4 die rejects roll 5 — not d10) +
+// disk-driven seam outcomes. Cite-skip owners: parseEyeRays validation truth tables
+// incl. comma/multi-string guards (MonsterCardHelpers.eye-rays.test.js:48-56,
+// source :3110-3111 — non-null above proves clean), picker order/reroll-if-used/
+// exhaustion d4 twin (:100-112), synthesis DC stamp + null desc/save_effect legs +
+// ladder pass-through (:119-138); row DC 12 stamp, save_effect-bearing ray builds
+// null-leg and sibling-scope shape (MonsterCardHelpers.gazer-eye-rays.test.js:62-83);
+// generic computeDamageAfterSave half/none semantics (applyDamage.helpers.test.js:86-102
+// — disk-driven seam stays). REC #562: confusion save_effect FAIL-side no_reactions —
+// parseSlowedClauses never reads dc_success so 'none' cannot suppress the grant;
+// single-clause parse pinned by owner MonsterCardHelpers.slowed-clauses.test.js:30,
+// saveProcessing grant rides saveProcessing.eye-rays.test.js. Frightened grant: prose
+// fingerprint is the launcher fear conditions leg; extraction consumed fail-only at
+// applyFailedSaveConditions (dc_success never gates condition grants).
+// #554/#555/#499/#505 cuts. No timers.
 import { describe, it, expect } from 'vitest';
-import { parseEyeRays, pickEyeRay, buildEyeRayAction, parseSlowedClauses, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
+import { parseEyeRays, pickEyeRay } from './MonsterCardHelpers.js';
 import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import monsters from '../../../public/data/monsters.json';
 
 const list = Array.isArray(monsters) ? monsters : monsters.monsters;
 const spectator = list.find(m => m.name === 'Spectator');
-const row = spectator.actions[2];
-const siblings = spectator.actions.slice(3);
+const row = spectator.actions.find(a => a.name === 'Eye Rays');
+const confusion = spectator.actions.find(a => a.name === 'Confusion Ray');
+const fear = spectator.actions.find(a => a.name === 'Fear Ray');
 
 describe('MA-1483 spectator Eye Rays launcher rays[] data', () => {
-  it('launcher row is the Eye Rays row with rays[] authored', () => {
-    expect(row.name).toBe('Eye Rays');
-    expect(Array.isArray(row.rays)).toBe(true);
-  });
-
-  it('parseEyeRays accepts the four rays (die = len = 4 arms the d4 picker)', () => {
-    const rays = parseEyeRays(row);
-    expect(rays).not.toBeNull();
-    expect(rays).toHaveLength(4);
-    expect(rays.map(r => r.key)).toEqual(['confusion', 'paralyzing', 'fear', 'wounding']);
-    expect(rays.map(r => r.name)).toEqual(['Confusion Ray', 'Paralyzing Ray', 'Fear Ray', 'Wounding Ray']);
-    expect(rays.every(r => r.aoe !== true)).toBe(true);
-  });
-
-  it('row carries save_dc 12 + range token (picker DC stamp + 90 ft range gate)', () => {
+  it('BY-name fingerprint: four rays arm parseEyeRays on the DC 12 / 90 ft. d4 reroll-if-used row', () => {
     expect(row.save_dc).toBe(12);
     expect(row.range).toBe('90 ft.');
     expect(row.description).toBe('The spectator randomly shoots one of the following magical rays at a target it can see within 90 feet of itself (roll 1d4; reroll if the spectator has already used that ray during this turn)');
+    const rays = parseEyeRays(row);
+    expect(rays).not.toBeNull();
+    expect(rays).toHaveLength(4);
+    const byKey = Object.fromEntries(rays.map(r => [r.key, r]));
+    expect(Object.keys(byKey).sort()).toEqual(['confusion', 'fear', 'paralyzing', 'wounding']);
+    // Route selection: all single-target — buildEyeRayAction keeps the null
+    // desc/save_effect leg (owner + gazer :62-76), never the cataclysm AoE route.
+    expect(rays.every(r => r.aoe !== true)).toBe(true);
+    // die = len(rays) = 4: the d10 fallback roll is rejected on this row.
+    expect(pickEyeRay({ rays, rollDie: () => 5 }).ray).toBeNull();
+    // MA-1481/1484/1486 scope: manual single-fire sibling rows stay save rows.
+    expect(spectator.actions.filter(a => a.name.endsWith('Ray')).every(a => a.rays === undefined)).toBe(true);
   });
 
-  it('per-ray save abilities + dice + types match the disk sibling rows byte-exact', () => {
+  it('per-ray save/dice/type + harvested save_effect match the disk sibling rows byte-exact', () => {
+    const siblings = Object.fromEntries(['Confusion Ray', 'Paralyzing Ray', 'Fear Ray', 'Wounding Ray'].map(n => [n, spectator.actions.find(a => a.name === n)]));
     const byKey = Object.fromEntries(parseEyeRays(row).map(r => [r.key, r]));
-    expect(byKey.confusion.save_ability).toBe(siblings[0].save_type);
-    expect(byKey.paralyzing.save_ability).toBe(siblings[1].save_type);
-    expect(byKey.fear.save_ability).toBe(siblings[2].save_type);
-    expect(byKey.wounding.save_ability).toBe(siblings[3].save_type);
-    expect(byKey.confusion.damage_dice).toBe('2d4');
-    expect(byKey.confusion.damage_type).toBe('Psychic');
-    expect(byKey.fear.damage_dice).toBe('2d4');
-    expect(byKey.fear.damage_type).toBe('Psychic');
-    expect(byKey.wounding.damage_dice).toBe('3d10');
-    expect(byKey.wounding.damage_type).toBe('Necrotic');
-    expect(byKey.paralyzing.damage_dice).toBeNull();
-    expect(byKey.paralyzing.damage_type).toBeNull();
-    for (const ray of parseEyeRays(row)) {
-      expect(ray.save_ability).not.toMatch(/,/);
-      expect(String(ray.damage_dice || '')).not.toMatch(/,/);
-    }
+    expect(byKey.confusion.save_ability).toBe(siblings['Confusion Ray'].save_type);
+    expect(byKey.paralyzing.save_ability).toBe(siblings['Paralyzing Ray'].save_type);
+    expect(byKey.fear.save_ability).toBe(siblings['Fear Ray'].save_type);
+    expect(byKey.wounding.save_ability).toBe(siblings['Wounding Ray'].save_type);
+    expect([byKey.confusion.damage_dice, byKey.confusion.damage_type]).toEqual(['2d4', 'Psychic']);
+    expect([byKey.fear.damage_dice, byKey.fear.damage_type]).toEqual(['2d4', 'Psychic']);
+    expect([byKey.wounding.damage_dice, byKey.wounding.damage_type]).toEqual(['3d10', 'Necrotic']);
+    expect([byKey.paralyzing.damage_dice, byKey.paralyzing.damage_type]).toEqual([null, null]);
+    expect(byKey.confusion.save_effect.startsWith(siblings['Confusion Ray'].save_effect)).toBe(true);
+    expect(byKey.fear.save_effect.startsWith(siblings['Fear Ray'].save_effect)).toBe(true);
+    expect(byKey.paralyzing.save_effect).toBe(siblings['Paralyzing Ray'].save_effect);
+    expect(byKey.wounding.save_effect).toBe(siblings['Wounding Ray'].save_effect);
   });
 
-  it('ray save_effect prose harvested byte-from each sibling row', () => {
-    const byKey = Object.fromEntries(parseEyeRays(row).map(r => [r.key, r]));
-    expect(byKey.confusion.save_effect.startsWith(siblings[0].save_effect)).toBe(true);
-    expect(byKey.paralyzing.save_effect).toBe(siblings[1].save_effect);
-    expect(byKey.fear.save_effect.startsWith(siblings[2].save_effect)).toBe(true);
-    expect(byKey.wounding.save_effect).toBe(siblings[3].save_effect);
-  });
-
-  it('conditions + te_grants per each row save_effect prose; registered te keys only', () => {
-    const byKey = Object.fromEntries(parseEyeRays(row).map(r => [r.key, r]));
-    expect(byKey.confusion.conditions).toEqual([]);
+  it('extractor outcomes + dc_success gate discrimination: exactly Wounding pays half', () => {
+    const rays = parseEyeRays(row);
+    const byKey = Object.fromEntries(rays.map(r => [r.key, r]));
+    expect(rays.filter(r => r.dc_success !== 'none').map(r => r.key)).toEqual(['wounding']);
     expect(byKey.confusion.te_grants).toEqual(['no_reactions', 'speed_zero']);
     expect(byKey.confusion.clock_rounds).toBe(2);
+    expect(byKey.fear.conditions).toEqual(['frightened']);
+    expect(byKey.fear.clock_rounds).toBe(2);
     expect(byKey.paralyzing.conditions).toEqual([]);
     expect(byKey.paralyzing.ladder).toBe('paralyzed');
     expect(byKey.paralyzing.staged_paralysis).toBeUndefined();
-    expect(byKey.fear.conditions).toEqual(['frightened']);
-    expect(byKey.fear.clock_rounds).toBe(2);
     expect(byKey.wounding.conditions).toEqual([]);
-  });
-
-  it('dc_success per prose: failure-only rays none, Wounding half (MV-20 half-default guard)', () => {
-    const byKey = Object.fromEntries(parseEyeRays(row).map(r => [r.key, r]));
-    expect(byKey.confusion.dc_success).toBe('none');
-    expect(siblings[0].description).not.toMatch(/half/i);
-    expect(byKey.fear.dc_success).toBe('none');
-    expect(siblings[2].description).not.toMatch(/half/i);
-    expect(byKey.wounding.dc_success).toBe('half');
-    expect(siblings[3].description).toMatch(/Success: Half damage/);
     expect(computeDamageAfterSave(16, false, byKey.wounding.dc_success)).toBe(16);
     expect(computeDamageAfterSave(16, true, byKey.wounding.dc_success)).toBe(8);
-    expect(computeDamageAfterSave(9, true, byKey.fear.dc_success)).toBe(0);
-  });
-
-  it('picker die is d4: rolls 1..4 map to rays in order; used ray rerolls (eyeRaysUsed latch)', () => {
-    const rays = parseEyeRays(row);
-    const seq = rolls => () => rolls.shift();
-    for (let i = 0; i < 4; i += 1) {
-      expect(pickEyeRay({ rays, rollDie: seq([i + 1]) }).ray.key).toBe(rays[i].key);
-    }
-    const picked = pickEyeRay({ rays, usedKeys: ['confusion', 'fear', 'wounding'], rollDie: seq([1, 3, 2]) });
-    expect(picked.ray.key).toBe('paralyzing');
-    expect(picked.rerolls).toEqual([1, 3]);
-    const allUsed = rays.map(r => r.key);
-    expect(pickEyeRay({ rays, usedKeys: allUsed, rollDie: () => Math.floor(Math.random() * 4) + 1 }).ray).toBeNull();
-  });
-
-  it('buildEyeRayAction stamps the row DC 12 onto every synthesized ray save leg', () => {
-    for (const ray of parseEyeRays(row)) {
-      const synthesized = buildEyeRayAction(row, ray);
-      expect(synthesized.save_dc).toBe(12);
-      expect(synthesized.eyeRay.save_dc).toBe(12);
-      expect(synthesized.save_type).toBe(ray.save_ability);
-      expect(synthesized.dc_success).toBe(ray.dc_success);
-      expect(synthesized.name).toBe(`${ray.name} (Eye Rays)`);
-      expect(synthesized.description).toBeNull();
-      expect(synthesized.save_effect).toBeNull();
-    }
-    expect(buildEyeRayAction(row, row.rays[1]).eyeRay.ladder).toBe('paralyzed');
-    expect(buildEyeRayAction(row, row.rays[3]).damage_dice_primary).toBe('3d10');
-    expect(buildEyeRayAction(row, row.rays[3]).damage_type_primary).toBe('Necrotic');
-  });
-
-  it('manual sibling ray rows stay byte-unchanged (MA-1481 verified chips)', () => {
-    expect(spectator.actions.map(a => a.name)).toEqual(['Multiattack', 'Bite', 'Eye Rays', 'Confusion Ray', 'Paralyzing Ray', 'Fear Ray', 'Wounding Ray']);
-    for (const sibling of siblings) {
-      expect(sibling.rays).toBeUndefined();
-      expect(sibling.save_dc).toBe(12);
-    }
-    expect(siblings[0].save_type).toBe('Wisdom');
-    expect(siblings[1].save_type).toBe('Constitution');
-    expect(siblings[2].save_type).toBe('Wisdom');
-    expect(siblings[3].save_type).toBe('Constitution');
   });
 });
 
-// MA-1484: manual "Confusion Ray" row (actions[3]) RAW pays ZERO on a
-// successful save ("Wisdom Saving Throw: DC 12. Failure: 5 (2d4)..." — no
-// success-pays clause). dc_success was ABSENT → getSaveDcSuccess default
-// 'half' (MonsterCardModal :268/:1128) leaked half Psychic on success
-// (§63/§129 MV-20 family: MA-0481/0622/0768/0781/0868) — live ledger:
-// nat17 sum4→fd2, nat19 sum6→fd3. DATA fix: dc_success:"none" after
-// save_effect (gazer MA-0768 Frost Ray byte-shape), consistent with the
-// MA-1483 launcher rays[0] which already carries 'none'. The FAIL-side
-// no_reactions te rides parseSlowedClauses on save_effect grants at
-// saveProcessing :333/:480 regardless of dc_success (§63 trap-check).
 describe('MA-1484 spectator "Confusion Ray" dc_success none — zero damage on save success', () => {
-  const confusion = spectator.actions[3];
-
-  it('row is the Confusion Ray save row', () => {
-    expect(confusion.name).toBe('Confusion Ray');
+  it('dc_success authored "none", prose carries no half-clause, disk-driven seam pays full/zero', () => {
     expect(confusion.save_dc).toBe(12);
     expect(confusion.save_type).toBe('Wisdom');
-  });
-
-  it('canonical prose carries NO half-on-success clause', () => {
+    expect(confusion.dc_success).toBe('none');
     expect(confusion.description).not.toMatch(/half/i);
     expect(confusion.save_effect).not.toMatch(/half/i);
-  });
-
-  it('dc_success authored "none" (half-default leak guard)', () => {
-    expect(confusion.dc_success).toBe('none');
-  });
-
-  it('launcher rays[0] Confusion stays consistent dc_success "none" (MA-1483 twin)', () => {
-    expect(parseEyeRays(row)[0].key).toBe('confusion');
-    expect(parseEyeRays(row)[0].dc_success).toBe('none');
-  });
-
-  it('dc_success "none" does not suppress the FAIL-side slowed-clause transport', () => {
-    expect(parseSlowedClauses(confusion.save_effect)).toEqual({ effects: ['no_reactions'] });
-  });
-
-  it('save seam pays full 2d4 on fail, zero on success', () => {
     expect(computeDamageAfterSave(7, false, confusion.dc_success)).toBe(7);
-    expect(computeDamageAfterSave(2, false, confusion.dc_success)).toBe(2);
-    expect(computeDamageAfterSave(4, true, confusion.dc_success)).toBe(0);
-    expect(computeDamageAfterSave(6, true, confusion.dc_success)).toBe(0);
+    expect(computeDamageAfterSave(7, true, confusion.dc_success)).toBe(0);
   });
+  // FAIL-side no_reactions te (REC #562): parseSlowedClauses never inspects
+  // dc_success — cite owner slowed-clauses.test.js:30 + saveProcessing.eye-rays
+  // grant; launcher rays[0] twin pinned by the dc_success discrimination above.
 });
 
-// MA-1486: manual "Fear Ray" row (actions[5]) RAW pays ZERO on a successful
-// save ("Wisdom Saving Throw: DC 12. Failure: 5 (2d4) Psychic damage, and the
-// target has the Frightened condition until the end of its next turn." — no
-// success-pays clause, success = unaffected). dc_success was ABSENT →
-// getSaveDcSuccess default 'half' (MonsterCardModal :268/:1128) leaked half
-// Psychic on success (§63/§129 MV-20 family: MA-0481/0622/0768/0781/0868) —
-// live ledger: nat18 sum2→fd2, hp −2 (988→986). DATA fix: dc_success:"none"
-// after save_effect (same byte-shape MA-1484 landed on actions[3] today),
-// consistent with the MA-1483 launcher rays[2] fear dict which already
-// carries 'none'. The FAIL-side Frightened grant rides
-// extractConditionsFromSaveEffect on save_effect (canonical word) at
-// applyFailedSaveConditions fail-only regardless of dc_success (§63
-// trap-check: dc_success never gates condition grants).
 describe('MA-1486 spectator "Fear Ray" dc_success none — zero damage on save success', () => {
-  const fear = spectator.actions[5];
-
-  it('row is the Fear Ray save row', () => {
-    expect(fear.name).toBe('Fear Ray');
+  it('dc_success authored "none", prose carries no half-clause, disk-driven seam pays full/zero', () => {
     expect(fear.save_dc).toBe(12);
     expect(fear.save_type).toBe('Wisdom');
-  });
-
-  it('canonical prose carries NO half-on-success clause', () => {
+    expect(fear.dc_success).toBe('none');
     expect(fear.description).not.toMatch(/half/i);
     expect(fear.save_effect).not.toMatch(/half/i);
-  });
-
-  it('dc_success authored "none" (half-default leak guard)', () => {
-    expect(fear.dc_success).toBe('none');
-  });
-
-  it('launcher rays[2] fear stays consistent dc_success "none" (MA-1483 twin)', () => {
-    expect(parseEyeRays(row)[2].key).toBe('fear');
-    expect(parseEyeRays(row)[2].dc_success).toBe('none');
-  });
-
-  it('dc_success "none" does not suppress the FAIL-side Frightened grant', () => {
-    expect(extractConditionsFromSaveEffect(fear.save_effect)).toContain('frightened');
-    expect(parseEyeRays(row)[2].conditions).toEqual(['frightened']);
-  });
-
-  it('save seam pays full 2d4 on fail, zero on success', () => {
-    expect(computeDamageAfterSave(4, false, fear.dc_success)).toBe(4);
     expect(computeDamageAfterSave(7, false, fear.dc_success)).toBe(7);
-    expect(computeDamageAfterSave(2, true, fear.dc_success)).toBe(0);
-    expect(computeDamageAfterSave(9, true, fear.dc_success)).toBe(0);
+    expect(computeDamageAfterSave(7, true, fear.dc_success)).toBe(0);
   });
+  // FAIL-side Frightened grant: prose fingerprint pinned by the launcher fear
+  // conditions leg; extraction is fail-only at applyFailedSaveConditions —
+  // dc_success never gates condition grants.
 });

@@ -3,8 +3,7 @@
 // (1) half-on-success: prose "Success: Half damage" now matched by AUTHORED
 //     dc_success:"half" (§1095: prose half without an authored field is a
 //     FAIL(a) fingerprint even when the block-save default happens to halve —
-//     the harness must pin it explicitly; MA-0481 family placement, after
-//     save_type);
+//     the harness must pin it explicitly);
 // (2) save-path HP-max-reduce: the RAW "Failure or Success: the target's
 //     Hit Point maximum decreases by an amount equal to the damage taken" was
 //     structurally unexpressible on save rows (§1096 — MA-1489's
@@ -17,10 +16,15 @@
 // same save_hp_max_reduce:{equal_to:"damage"} rider — pins inverted below;
 // its dc_success stays UNAUTHORED (half-default verified live, MA-0963
 // convention — §523; §165: never copy the succubus' explicit half here).
+// CONSUMER behavior (both RAW faces, ledger, clamp, legacy inert) is owned by
+// saveProcessing.ma1547-draining-kiss.test.js; succubus save_dc/save_type/
+// rider disk bytes are re-pinned by monsterSelfBuff.succubus-incubus-
+// etherealness.test.js:82-85 (twin) and ma1639 (rider parity); the
+// parseHitHpMaxReduce specter forward owns to ma1645-nightbringer:60.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseSaveHpMaxReduce, parseHitHpMaxReduce } from './MonsterCardHelpers.js';
+import { parseSaveHpMaxReduce } from './MonsterCardHelpers.js';
 import { buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
 
 const monsters = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'));
@@ -29,66 +33,33 @@ const KISS = SUCCUBUS.actions.find((a) => a.name === 'Draining Kiss');
 const INCUBUS_TWIN = monsters.find((m) => m.index === 'succubus-incubus').actions.find((a) => a.name === 'Draining Kiss');
 const SPECTER_HIT = monsters.find((m) => m.index === 'specter').actions[0];
 
-describe('MA-1547 disk fingerprint: succubus Draining Kiss save row', () => {
-  it('keeps the adjudication bytes unchanged (DC 15 CON, 3d8 Psychic, 5 ft)', () => {
-    expect(KISS.name).toBe('Draining Kiss');
+describe('MA-1547/1550 disk fingerprint: Draining Kiss save rows', () => {
+  it('succubus row: DC 15 CON 3d8 Psychic with EXPLICIT dc_success:"half" + save_hp_max_reduce rider (§1095 explicit-half axis)', () => {
     expect(KISS.save_dc).toBe(15);
     expect(KISS.save_type).toBe('Constitution');
     expect(KISS.damage_dice_primary).toBe('3d8');
     expect(KISS.damage_type_primary).toBe('Psychic');
-    expect(KISS.range).toBe('5 feet');
-  });
-
-  it('authors dc_success:"half" explicitly after save_type (§1095/MA-0481 placement)', () => {
     expect(KISS.dc_success).toBe('half');
-    const keys = Object.keys(KISS);
-    expect(keys.indexOf('dc_success')).toBe(keys.indexOf('save_type') + 1);
-  });
-
-  it('description/save_effect byte-unchanged (RAW both-faces copy)', () => {
-    expect(KISS.description).toBe("Constitution Saving Throw: DC 15, one creature Charmed by the succubus within 5 feet. Failure: 13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken.");
-    expect(KISS.save_effect).toBe("13 (3d8) Psychic damage. Success: Half damage. Failure or Success: The target's Hit Point maximum decreases by an amount equal to the damage taken");
-  });
-
-  it('authors save_hp_max_reduce:{equal_to:"damage"} right after dc_success', () => {
     expect(KISS.save_hp_max_reduce).toEqual({ equal_to: 'damage' });
-    const keys = Object.keys(KISS);
-    expect(keys.indexOf('save_hp_max_reduce')).toBe(keys.indexOf('dc_success') + 1);
   });
 
-  it('MA-1550 twin row now carries the rider after save_type; dc_success stays UNAUTHORED', () => {
+  it('MA-1550 incubus twin row: rider ARMED but dc_success stays UNAUTHORED (§523/§165 — never copy the explicit half)', () => {
     expect(INCUBUS_TWIN.save_hp_max_reduce).toEqual({ equal_to: 'damage' });
-    const keys = Object.keys(INCUBUS_TWIN);
-    expect(keys.indexOf('save_hp_max_reduce')).toBe(keys.indexOf('save_type') + 1);
-    // Half-default is the verified MA-0963 behaviour on this row (§523/§165) —
-    // do NOT copy the succubus' explicit dc_success:"half" here.
     expect(INCUBUS_TWIN.dc_success).toBeUndefined();
   });
 });
 
-describe('MA-1547 parseSaveHpMaxReduce — structured-key-only parser', () => {
-  it('arms the succubus row clause', () => {
-    expect(parseSaveHpMaxReduce(KISS)).toEqual({ equalTo: 'damage' });
-  });
-
-  it('arms the MA-1550 incubus twin row clause', () => {
-    expect(parseSaveHpMaxReduce(INCUBUS_TWIN)).toEqual({ equalTo: 'damage' });
-  });
-
-  it('byte-inert null for rows without the key (clauseless rows)', () => {
+describe('MA-1547 parseSaveHpMaxReduce — structured-key-only truth table', () => {
+  it('arms equal_to:"damage" (case-folded); inert for missing key, scalar riders, wrong magnitudes, and the attack-lane hit_hp_max_reduce key', () => {
+    expect(parseSaveHpMaxReduce({ save_hp_max_reduce: { equal_to: 'damage' } })).toEqual({ equalTo: 'damage' });
+    expect(parseSaveHpMaxReduce({ save_hp_max_reduce: { equal_to: 'Damage' } })).toEqual({ equalTo: 'damage' });
+    // byte-inert null for every row without the structured key:
     expect(parseSaveHpMaxReduce({ name: 'Constrict', save_dc: 15, save_type: 'Strength' })).toBeNull();
     expect(parseSaveHpMaxReduce(undefined)).toBeNull();
-  });
-
-  it('does NOT read the attack-lane hit_hp_max_reduce key (lane separation)', () => {
-    expect(parseSaveHpMaxReduce(SPECTER_HIT)).toBeNull();
-    expect(parseHitHpMaxReduce(SPECTER_HIT)).toEqual({ equalTo: 'damage' });
-    expect(parseHitHpMaxReduce(KISS)).toBeNull();
-  });
-
-  it('equal_to must name "damage" — any other magnitude is inert', () => {
     expect(parseSaveHpMaxReduce({ save_hp_max_reduce: { equal_to: 'half' } })).toBeNull();
     expect(parseSaveHpMaxReduce({ save_hp_max_reduce: 'damage' })).toBeNull();
+    // lane separation — never reads MA-1489's attack-lane key (specter row):
+    expect(parseSaveHpMaxReduce(SPECTER_HIT)).toBeNull();
   });
 });
 
@@ -111,25 +82,24 @@ describe('MA-1547 block-save context threading (buildAbilitySaveRollContext)', (
     });
   }
 
-  it('save_hp_max_reduce rides the save context alongside dc_success half', () => {
+  it('both rows ride saveHpMaxReduce:{equalTo:"damage"} — succubus explicit half 3d8, MA-1550 twin half-default 5d10+5', () => {
     const ctx = kissContext(KISS);
     expect(ctx.saveDc).toBe(15);
     expect(ctx.dcSuccess).toBe('half');
     expect(ctx.autoDamageFormula).toBe('3d8');
     expect(ctx.autoDamageDamageType).toBe('Psychic');
     expect(ctx.saveHpMaxReduce).toEqual({ equalTo: 'damage' });
-  });
 
-  it('MA-1550 incubus twin rides the rider with half-default dcSuccess (dc_success unauthored)', () => {
-    const ctx = kissContext(INCUBUS_TWIN);
-    expect(ctx.saveDc).toBe(15);
-    expect(ctx.saveType).toBe('CON');
-    // Harness feeds `action.dc_success ?? 'half'` exactly as MonsterCardModal's
+    // Twin: harness feeds `action.dc_success ?? 'half'` exactly as MonsterCardModal's
     // getSaveDcSuccess default does — unauthored row lands on half (MA-0963).
+    const twin = kissContext(INCUBUS_TWIN);
     expect(INCUBUS_TWIN.dc_success).toBeUndefined();
-    expect(ctx.dcSuccess).toBe('half');
-    expect(ctx.autoDamageFormula).toBe('5d10 + 5');
-    expect(ctx.autoDamageDamageType).toBe('Psychic');
-    expect(ctx.saveHpMaxReduce).toEqual({ equalTo: 'damage' });
+    expect(twin.saveDc).toBe(15);
+    expect(twin.dcSuccess).toBe('half');
+    expect(twin.autoDamageFormula).toBe('5d10 + 5');
+    expect(twin.autoDamageDamageType).toBe('Psychic');
+    expect(twin.saveHpMaxReduce).toEqual({ equalTo: 'damage' });
   });
 });
+
+// @maintained-by-ai

@@ -1,47 +1,31 @@
-// Consolidated (redundant positive/negative test pairs merged into parameterized tests):
+// @maintained-by-ai
+// Trim pass (2026-10-18): keeps only modal-state seams unique to this lane.
 //
-//   getDamageTypesForAction: 2 tests → 1 test
-//     "returns primary damage type when damage_type_primary is set"
-//     "returns primary damage type (ignoring secondary) when both are set"
-//       → merged into single test; secondary damage type is irrelevant to the assertion.
-//
-//   Nature's Sanctuary cover: 2 tests → 1 test (it.each)
-//     "applies +2 AC cover bonus when target is in sanctuary list"
-//     "does not apply Nature's Sanctuary cover when target is not in list"
-//       → merged into parameterized test covering both cases.
-//
-//   Smite of Protection cover: 2 tests → 1 test
-//     "does not apply Smite of Protection when paladin lacks Aura of Protection"
-//       → removed; covered by MonsterCardModal.logic.test.jsx:337-340
-//         ("skips the combat-context fetch when the creatures prop is provided")
-//         which asserts the same negative path via getCombatContext not being called.
-//
-//   Elusive: 2 tests → 1 test
-//     "does not set noAdvantageAgainst when target player lacks Elusive feature"
-//       → removed; covered by MonsterCardModal.attack-logic.test.jsx:286-298
-//         ("does not grant advantage when $desc" it.each negative cases)
-//         which asserts the same forcedMode: undefined behavior.
-//
-//   Protection from Evil and Good: 1 test → removed
-//     "adds targetDisadvantageCount when Protection from Evil and Good is active..."
-//       → brittle test using vi.resetModules() + dynamic import; behavior
-//         is covered by the buff handler module tests.
-//
-//   Range effects with map data: 3 tests → 2 tests (it.each)
-//     "sets isAutoMiss when computeRangeEffect returns mode 'miss'"
-//     "sets rangeForcedMode to 'disadvantage' when computeRangeEffect returns disadvantage mode"
-//       → merged into parameterized test.
-//     "does not set range effects when mapData is not loaded"
-//       → removed; covered by MonsterCardModal.senses-and-fallback.test.jsx:145-149
-//         ("renders monster name when mapName is provided but map loading fails").
-//
-//   Psychic Strike validation: 3 tests → 1 test
-//     "shows alert when Psychic Strike is used without a target"
-//     "shows alert when Psychic Strike is used but target lacks hex effect"
-//       → removed; explicitly documented as removed from interaction.test.jsx
-//         (lines 23-26) which refers to these exact tests.
-//     "proceeds with attack when target has hex effect applied"
-//       → kept; unique positive path asserting attack proceeds with hex effect.
+// Removed:
+//   "passes damage_type_primary as damageType to rollAttack"
+//     → damage_type_primary → options.damageType transport through handleAttack /
+//       buildAttackRollOptions (MonsterCardModal.jsx:2350 + :1386) is covered
+//       end-to-end on this same modal lane by MonsterCardModal.scorching-ray.test.jsx:222-233.
+//   "prevents advantage when target player has Elusive feature"
+//     → vacuous here: this file mocks combineAttackModes to always return 'normal'
+//       (the sole consumer of applyElusive's noAdvantageAgainst fold), so the
+//       not.toBe('advantage') assertion could never fail. Covered with the REAL
+//       combineAttackModes, advantage control, and Incapacitated exemption by
+//       MonsterCardModal.elusive-cla119.test.jsx:180-212.
+// Collapsed:
+//   "sets isAutoMiss when computeRangeEffect returns mode 'miss'" +
+//   "sets rangeForcedMode to 'disadvantage' when computeRangeEffect returns disadvantage mode"
+//     → one it.each over identical setup, one case per RANGE_MODE_HANDLERS branch
+//       (MonsterCardModal.jsx:1031-1056); strengthened with forcedMode/rangeReason
+//       payload identity and the isAutoMiss → NO_COVER short-circuit (:1105).
+// Kept (unique in the modal family):
+//   Nature's Sanctuary cover it.each (list-member vs non-member),
+//   Smite of Protection modal cover positive (other smite lanes are service/handler),
+//   Psychic Strike hex-gate positive — asserts chip → rollAttack name/bonus identity.
+// Cross-file note: MonsterCardModal.interaction.test.jsx:21-24 cites Psychic Strike
+//   alert negatives at "attack-advanced.test.jsx:551-606" — those lines no longer
+//   exist here (removed in an earlier pass); the owner should fix the citation or
+//   restore the alert tests (psychicStrikePreconditionFailed, :941-953).
 
 import { render, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -62,11 +46,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
 
   const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
@@ -74,57 +53,35 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     setPopupHtml: _setPopupHtml,
     rollAttack: _rollAttack,
     rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
   }));
 
   return {
     default: mockHook,
     _rollAttack,
     _rollDamage,
-    _rollAbilityCheck,
-    _rollSavingThrow,
-    _rollSkillCheck,
-    _rollInitiative,
-    _quickRollPlayerSave,
     _setPopupHtml,
   };
 });
 
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
-  let _computeReturn = null;
-  const _computeConditionEffects = vi.fn((_conditions) => {
-    return _computeReturn ?? { ...defaultConditionEffects };
-  });
-
-  return {
-    computeConditionEffects: _computeConditionEffects,
-    combineAttackModes: vi.fn(() => 'normal'),
-    CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-    __setComputeReturn(val) { _computeReturn = val; },
-  };
-});
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
+  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
+  combineAttackModes: vi.fn(() => 'normal'),
+  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
+}));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => {
   let _findCreatureReturn = null;
-  let _targetFromAttackerReturn = null;
-  let _resistanceNoticeReturn = null;
 
   return {
     extractDamageTypes: vi.fn(() => []),
     formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-    getTargetFromAttacker: vi.fn(() => _targetFromAttackerReturn),
-    getResistanceNotice: vi.fn(() => _resistanceNoticeReturn),
+    getTargetFromAttacker: vi.fn(() => null),
+    getResistanceNotice: vi.fn(() => null),
     findCreatureByName: vi.fn((_ctx, _name) => {
       return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
     }),
     getCombatContext: vi.fn().mockResolvedValue(null),
     __setFindCreatureReturn(val) { _findCreatureReturn = val; },
-    __setTargetFromAttackerReturn(val) { _targetFromAttackerReturn = val; },
-    __setResistanceNoticeReturn(val) { _resistanceNoticeReturn = val; },
   };
 });
 
@@ -161,28 +118,16 @@ vi.mock('../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandl
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-  let _inspiringMoveNoOA = false;
-  let _remarkableNoOA = false;
   let _targetEffects = [];
-  let _activeBuffs = null;
-  let _bulwarkActive = null;
-  let _bulwarkTargets = [];
-  let _invokeDuplicityAdvantageTargets = [];
   let _naturesSanctuaryCreatures = [];
   let _smiteOfProtectionActive = false;
 
   const mockUseRuntimeValue = vi.fn((_characterKey, propertyName, _campaignName) => {
     if (propertyName === 'targetEffects') return _targetEffects;
-    if (propertyName === 'inspiringMovementNoOA') return _inspiringMoveNoOA;
-    if (propertyName === 'remarkableAthleteNoOA') return _remarkableNoOA;
     return null;
   });
 
   const mockGetRuntimeValue = vi.fn((_characterKey, propertyName) => {
-    if (propertyName === 'activeBuffs') return _activeBuffs;
-    if (propertyName === 'bulwarkOfForceActive') return _bulwarkActive;
-    if (propertyName === 'bulwarkOfForceTargets') return _bulwarkTargets;
-    if (propertyName === 'invokeDuplicityAdvantageTargets') return _invokeDuplicityAdvantageTargets;
     if (propertyName === 'naturesSanctuaryCreatures') return _naturesSanctuaryCreatures;
     if (propertyName === 'smiteOfProtectionActive') return _smiteOfProtectionActive;
     return null;
@@ -191,13 +136,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
   return {
     useRuntimeValue: mockUseRuntimeValue,
     getRuntimeValue: mockGetRuntimeValue,
-    __setInspiringMoveNoOA(val) { _inspiringMoveNoOA = val; },
-    __setRemarkableNoOA(val) { _remarkableNoOA = val; },
     __setTargetEffects(val) { _targetEffects = val; },
-    __setActiveBuffs(val) { _activeBuffs = val; },
-    __setBulwarkActive(val) { _bulwarkActive = val; },
-    __setBulwarkTargets(val) { _bulwarkTargets = val; },
-    __setInvokeDuplicityAdvantageTargets(val) { _invokeDuplicityAdvantageTargets = val; },
     __setNaturesSanctuaryCreatures(val) { _naturesSanctuaryCreatures = val; },
     __setSmiteOfProtectionActive(val) { _smiteOfProtectionActive = val; },
   };
@@ -206,7 +145,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
 // ── Re-import mocked modules for test setup helpers ─────────────────────────
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
@@ -226,40 +164,14 @@ function clickAttackLink(attackBonus) {
 /** Reset all shared mock state used by attack handler tests. */
 function resetAttackMocks() {
   vi.clearAllMocks();
-  conditionEffects.__setComputeReturn(null);
   damageUtils.__setFindCreatureReturn(null);
-  useRuntimeState.__setBulwarkActive(null);
-  useRuntimeState.__setBulwarkTargets([]);
-  useRuntimeState.__setInvokeDuplicityAdvantageTargets([]);
-  useRuntimeState.__setActiveBuffs(null);
+  useRuntimeState.__setTargetEffects([]);
   useRuntimeState.__setNaturesSanctuaryCreatures([]);
   useRuntimeState.__setSmiteOfProtectionActive(false);
   mapsService.__setLoadMapDataReturn(null);
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
-
-describe('MonsterCardModal - handleAttack: getDamageTypesForAction', () => {
-  beforeEach(resetAttackMocks);
-
-  it('passes damage_type_primary as damageType to rollAttack', () => {
-    damageUtils.__setFindCreatureReturn({
-      name: 'Goblin',
-      conditions: [],
-      targetName: 'Player A',
-    });
-
-    const m = makeMonster({
-      actions: [{ name: 'Fire Bolt', attack_bonus: 4, damage_type_primary: 'fire', description: 'A fire bolt.' }],
-    });
-    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
-
-    clickAttackLink('+4');
-    expect(rollAttack).toHaveBeenCalled();
-    const callArgs = rollAttack.mock.calls[0][2];
-    expect(callArgs.damageType).toBe('fire');
-  });
-});
 
 describe('MonsterCardModal - handleAttack: Nature\'s Sanctuary cover', () => {
   beforeEach(resetAttackMocks);
@@ -329,50 +241,23 @@ describe('MonsterCardModal - handleAttack: Smite of Protection cover', () => {
   });
 });
 
-describe('MonsterCardModal - handleAttack: Elusive', () => {
-  beforeEach(resetAttackMocks);
-
-  it('prevents advantage when target player has Elusive feature', () => {
-    damageUtils.__setFindCreatureReturn({
-      name: 'Goblin',
-      conditions: [],
-      targetName: 'Player A',
-    });
-
-    const m = makeMonster({
-      actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
-    });
-    const targetPlayer = {
-      name: 'Player A',
-      type: 'player',
-      computedStats: {
-        actions: [{ name: 'Elusive' }],
-      },
-    };
-    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, targetPlayer] })} />);
-
-    clickAttackLink('+4');
-    expect(rollAttack).toHaveBeenCalled();
-    const callArgs = rollAttack.mock.calls[0][2];
-    expect(callArgs.forcedMode).not.toBe('advantage');
-  });
-});
-
 describe('MonsterCardModal - handleAttack: range effects with map data', () => {
   beforeEach(() => {
     resetAttackMocks();
     mapsService.__setLoadMapDataReturn(null);
   });
 
-  it('sets isAutoMiss when computeRangeEffect returns mode "miss"', async () => {
+  it.each([
+    { mode: 'miss', reason: 'Out of range', distanceFt: 100, expectedAutoMiss: true, expectedForcedMode: undefined, desc: 'mode "miss" auto-misses with no cover' },
+    { mode: 'disadvantage', reason: 'Long range', distanceFt: 60, expectedAutoMiss: false, expectedForcedMode: 'disadvantage', desc: 'mode "disadvantage" forces disadvantage' },
+  ])('$desc', async ({ mode, reason, distanceFt, expectedAutoMiss, expectedForcedMode }) => {
     damageUtils.__setFindCreatureReturn({
       name: 'Goblin',
       conditions: [],
       targetName: 'Player A',
     });
-    vi.mocked(rangeValidation.computeRangeEffect).mockReturnValue({ mode: 'miss', reason: 'Out of range' });
-    vi.mocked(rangeValidation.getDistanceFeet).mockReturnValue(100);
-    vi.mocked(rangeValidation.getNearestPlacedItem).mockReturnValue({ name: 'Player A', gridX: 10, gridY: 10 });
+    vi.mocked(rangeValidation.computeRangeEffect).mockReturnValue({ mode, reason });
+    vi.mocked(rangeValidation.getDistanceFeet).mockReturnValue(distanceFt);
     mapsService.__setLoadMapDataReturn({
       players: [{ name: 'Player A', gridX: 10, gridY: 10 }],
       placedItems: [{ name: 'Goblin', gridX: 0, gridY: 0 }],
@@ -392,39 +277,13 @@ describe('MonsterCardModal - handleAttack: range effects with map data', () => {
     clickAttackLink('+4');
     expect(rollAttack).toHaveBeenCalled();
     const callArgs = rollAttack.mock.calls[0][2];
-    expect(callArgs.isAutoMiss).toBe(true);
-  });
-
-  it('sets rangeForcedMode to "disadvantage" when computeRangeEffect returns disadvantage mode', async () => {
-    damageUtils.__setFindCreatureReturn({
-      name: 'Goblin',
-      conditions: [],
-      targetName: 'Player A',
-    });
-    vi.mocked(rangeValidation.computeRangeEffect).mockReturnValue({ mode: 'disadvantage', reason: 'Long range' });
-    vi.mocked(rangeValidation.getDistanceFeet).mockReturnValue(60);
-    vi.mocked(rangeValidation.getNearestPlacedItem).mockReturnValue({ name: 'Player A', gridX: 10, gridY: 10 });
-    mapsService.__setLoadMapDataReturn({
-      players: [{ name: 'Player A', gridX: 10, gridY: 10 }],
-      placedItems: [{ name: 'Goblin', gridX: 0, gridY: 0 }],
-    });
-
-    const m = makeMonster({
-      actions: [{ name: 'Fire Bolt', attack_bonus: 4, description: 'Ranged Attack.', range: '50 ft.' }],
-    });
-    render(<MonsterCardModal {...makeProps(m, {
-      creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }],
-      mapName: 'test-map',
-    })} />);
-
-    // Flush the async map data load
-    await act(async () => { await Promise.resolve(); });
-
-    clickAttackLink('+4');
-    expect(rollAttack).toHaveBeenCalled();
-    const callArgs = rollAttack.mock.calls[0][2];
-    expect(callArgs.forcedMode).toBe('disadvantage');
-    expect(callArgs.rangeReason).toBe('Long range');
+    expect(callArgs.isAutoMiss).toBe(expectedAutoMiss);
+    expect(callArgs.rangeReason).toBe(reason);
+    expect(callArgs.forcedMode).toBe(expectedForcedMode);
+    // Auto-miss short-circuits cover (NO_COVER); non-miss vs empty characters list is also NO_COVER.
+    expect(callArgs.coverAcBonus).toBe(0);
+    expect(callArgs.coverLevel).toBeNull();
+    expect(callArgs.coverReason).toBeNull();
   });
 });
 
@@ -447,6 +306,9 @@ describe('MonsterCardModal - handleAttack: Psychic Strike validation', () => {
     render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
     clickAttackLink('+4');
-    expect(rollAttack).toHaveBeenCalled();
+    expect(rollAttack).toHaveBeenCalledTimes(1);
+    const [rollName, rollBonus] = rollAttack.mock.calls[0];
+    expect(rollName).toBe('Psychic Strike');
+    expect(rollBonus).toBe(4);
   });
 });

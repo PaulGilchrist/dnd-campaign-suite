@@ -1,3 +1,9 @@
+// @maintained-by-ai — trimmed 7→5 tests (disk lock incl. key placement; both
+// formulas parse incl. '+'-joined grammar guard; offer; no-additive guard;
+// select logs). All assertions kept except provably-redundant two_handed
+// not.toBe(primary) (both literals already toBe-locked). Twin note: the
+// byte-identical eye literals in MA-1608 test :76-77 are that fix's
+// not-swept cross-check; THIS file is the MA-1264 owner lock (canon #523).
 // MA-1264: Orc Eye of Gruumsh Spear had TWO data defects (FAIL(a)/DATA):
 // (1) damage_dice_primary "1d6 + 3" dropped the trait rider — description
 // carries "Hit: 11 (1d6 + 3 plus 1d8)" and Gruumsh's Fury confirms the +1d8
@@ -26,24 +32,20 @@ describe('MA-1264 data lock (monsters.json Orc Eye of Gruumsh Spear)', () => {
     return spear;
   };
 
-  it('actions[0] Spear authors plus-rider primary + two-handed variant (Azer/MA-0636 placement)', () => {
+  it('disk lock: actions[0] Spear authors plus-rider primary + two-handed variant in Azer/MA-0636 key placement', () => {
     const spear = spearRow();
     expect(spear.attack_bonus).toBe(5);
     expect(spear.damage_dice_primary).toBe('1d6 + 3 plus 1d8');
     expect(spear.damage_dice_two_handed).toBe('2d8 + 3');
-    expect(spear.damage_dice_two_handed).not.toBe(spear.damage_dice_primary);
     expect(spear.damage_type_primary).toBe('Piercing');
     expect(spear.description).toMatch(/1d6 \+ 3 plus 1d8\) piercing damage, or 12 \(2d8 \+ 3\) piercing damage if used with two hands/);
-  });
-
-  it('key placement: damage_dice_two_handed AFTER damage_dice_primary, BEFORE damage_type_primary (Azer byte-shape)', () => {
-    const keys = Object.keys(spearRow());
+    const keys = Object.keys(spear);
     expect(keys.indexOf('damage_dice_two_handed')).toBeGreaterThan(keys.indexOf('damage_dice_primary'));
     expect(keys.indexOf('damage_dice_two_handed')).toBeLessThan(keys.indexOf('damage_type_primary'));
   });
 
-  it('plus-rider primary PARSES — "1d6 + 3 + 1d8" two-dice-plus shape does NOT (parser grammar guard)', () => {
-    const primary = spearRow().damage_dice_primary;
+  it('both row formulas PARSE via the plus-word split — "+"-joined "1d6 + 3 + 1d8" does NOT (grammar guard)', () => {
+    const { damage_dice_primary: primary, damage_dice_two_handed: twoHanded } = spearRow();
     expect(canRollExpression(primary)).toBe(true);
     const single = rollExpression(primary);
     expect(single.rolls.length).toBe(2);
@@ -53,15 +55,12 @@ describe('MA-1264 data lock (monsters.json Orc Eye of Gruumsh Spear)', () => {
     const crit = rollExpressionDoubled(primary);
     expect(crit.doubledRolls.length).toBe(4);
     expect(crit.modifier).toBe(3);
-    expect(parseExpression('1d6 + 3 + 1d8')).toBeNull();
-    expect(canRollExpression('1d6 + 3 + 1d8')).toBe(false);
-  });
-
-  it('two-handed variant parses for the chooser swap', () => {
-    expect(canRollExpression(spearRow().damage_dice_two_handed)).toBe(true);
-    const two = rollExpression('2d8 + 3');
+    expect(canRollExpression(twoHanded)).toBe(true);
+    const two = rollExpression(twoHanded);
     expect(two.total).toBeGreaterThanOrEqual(5);
     expect(two.total).toBeLessThanOrEqual(19);
+    expect(parseExpression('1d6 + 3 + 1d8')).toBeNull();
+    expect(canRollExpression('1d6 + 3 + 1d8')).toBe(false);
   });
 
   it('buildTwoHandedVariantOffer arms the Spear HIT-popup chooser with both formulas', () => {

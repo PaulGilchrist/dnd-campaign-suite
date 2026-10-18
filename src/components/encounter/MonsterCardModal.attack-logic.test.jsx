@@ -1,18 +1,35 @@
-// Consolidated (redundant negative tests merged into parameterized tests):
+// @maintained-by-ai
+// Trim pass (2026-10-18): handleAttack payload-transport seams unique to this lane.
 //
-//   Bulwark of Force: 3 tests → 2 tests
-//     "does not apply cover when Bulwark of Force is inactive"
-//     "does not apply cover when the target is not in bulwarkTargets"
-//       → merged into single parameterized test covering both negative cases
-//         with identical assertions (coverAcBonus: 0, coverLevel: null, coverReason: null)
+// Collapsed (one it.each per branch owner, shared render):
+//   Bulwark of Force cover: positive + 2 negatives → one it.each over
+//     computeBulwarkCover (MonsterCardModal.jsx:1060-1068) hit / inactive-continue /
+//     target-miss→NO_COVER (:1104-1118), asserted on the rollAttack ctx.
+//   Graze mastery: 2 tests → one it.each over computeGrazeSettings branches
+//     (:955-961); grazeAbilityName:'STR' literal pinned on both rows (:1402).
+//   Auto-crit: 3 tests → one it.each pinning the isMelee && autoCritWithin5ft
+//     fold (:2372) — melee true/false + ranged short-circuit. The melee-negative
+//     render (characters: []) also covers the !monsterCharacter early return (:956).
 //
-//   Improved Duplicity: CLA-189 fixed — the picker list stores granted ALLY names;
-//     monsters never gain Advantage from Improved Duplicity. These tests now assert
-//     monster attacks stay un-boosted (including the old inverted-semantics case).
-//
-// Kept (unique behavioral coverage for handleAttack in this component):
-//   Bulwark of Force cover, Improved Duplicity negatives, Graze weapon
-//   mastery, and auto-crit within 5 feet.
+// Removed:
+//   "Improved Duplicity never buffs monster attacks (CLA-189)" suite (3 cases)
+//     → vacuous on this lane: MonsterCardModal.jsx never reads
+//       invokeDuplicityAdvantageTargets (grep-clean; owner is
+//       services/combat/auras/duplicityAuraUtils.js:31, consumed by the
+//       CharActionModals/Initiative sheet lanes), and forcedMode was pinned
+//       undefined by this file's own combineAttackModes→'normal' mock +
+//       resolveForcedMode (:1121-1124) — the assertion could never fail even if
+//       CLA-189 inverted semantics again. Same vacuity class as the #504 Elusive
+//       cut in attack-advanced (#578); real combineAttackModes fold owner is
+//       MonsterCardModal.elusive-cla119.test.jsx.
+//   Dead mock channels/setters no surviving test reads (REC #578 pattern):
+//     __setInvokeDuplicityAdvantageTargets, __setActiveBuffs (only the removed
+//     duplicity suite consumed them), __setInspiringMoveNoOA, __setRemarkableNoOA
+//     (never set by any test; modal passes falsy to card-body props, :2145-2146),
+//     __setTargetEffects (never set; modal coalesces storedTargetEffects ?? [],
+//     :2142-2143), and the unused _rollDamage/_rollAbilityCheck/_rollSavingThrow/
+//     _rollSkillCheck/_rollInitiative/_quickRollPlayerSave/_setPopupHtml mock
+//     exports (only _rollAttack is read).
 
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -30,38 +47,15 @@ vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-
-  const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
 
   return {
-    default: mockHook,
+    default: vi.fn((_monsterName, _campaignName, _opts) => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAttack: _rollAttack,
+    })),
     _rollAttack,
-    _rollDamage,
-    _rollAbilityCheck,
-    _rollSavingThrow,
-    _rollSkillCheck,
-    _rollInitiative,
-    _quickRollPlayerSave,
-    _setPopupHtml,
   };
 });
 
@@ -81,16 +75,15 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => {
   let _findCreatureReturn = null;
-  const _findCreatureByName = vi.fn((_ctx, _name) => {
-    return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
-  });
 
   return {
     extractDamageTypes: vi.fn(() => []),
     formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
     getTargetFromAttacker: vi.fn(() => null),
     getResistanceNotice: vi.fn(() => null),
-    findCreatureByName: _findCreatureByName,
+    findCreatureByName: vi.fn((_ctx, _name) => {
+      return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
+    }),
     getCombatContext: vi.fn().mockResolvedValue(null),
     __setFindCreatureReturn(val) { _findCreatureReturn = val; },
   };
@@ -118,39 +111,18 @@ vi.mock('../../services/shared/abilityLookup.js', () => ({
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-  let _inspiringMoveNoOA = false;
-  let _remarkableNoOA = false;
-  let _targetEffects = [];
-  let _activeBuffs = null;
   let _bulwarkActive = null;
   let _bulwarkTargets = [];
-  let _invokeDuplicityAdvantageTargets = [];
-
-  const mockUseRuntimeValue = vi.fn((_characterKey, propertyName, _campaignName) => {
-    if (propertyName === 'targetEffects') return _targetEffects;
-    if (propertyName === 'inspiringMovementNoOA') return _inspiringMoveNoOA;
-    if (propertyName === 'remarkableAthleteNoOA') return _remarkableNoOA;
-    return null;
-  });
-
-  const mockGetRuntimeValue = vi.fn((_characterKey, propertyName) => {
-    if (propertyName === 'activeBuffs') return _activeBuffs;
-    if (propertyName === 'bulwarkOfForceActive') return _bulwarkActive;
-    if (propertyName === 'bulwarkOfForceTargets') return _bulwarkTargets;
-    if (propertyName === 'invokeDuplicityAdvantageTargets') return _invokeDuplicityAdvantageTargets;
-    return null;
-  });
 
   return {
-    useRuntimeValue: mockUseRuntimeValue,
-    getRuntimeValue: mockGetRuntimeValue,
-    __setInspiringMoveNoOA(val) { _inspiringMoveNoOA = val; },
-    __setRemarkableNoOA(val) { _remarkableNoOA = val; },
-    __setTargetEffects(val) { _targetEffects = val; },
-    __setActiveBuffs(val) { _activeBuffs = val; },
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn((_characterKey, propertyName) => {
+      if (propertyName === 'bulwarkOfForceActive') return _bulwarkActive;
+      if (propertyName === 'bulwarkOfForceTargets') return _bulwarkTargets;
+      return null;
+    }),
     __setBulwarkActive(val) { _bulwarkActive = val; },
     __setBulwarkTargets(val) { _bulwarkTargets = val; },
-    __setInvokeDuplicityAdvantageTargets(val) { _invokeDuplicityAdvantageTargets = val; },
   };
 });
 
@@ -176,13 +148,8 @@ function resetAttackMocks() {
   vi.clearAllMocks();
   conditionEffects.__setComputeReturn(null);
   damageUtils.__setFindCreatureReturn(null);
-  useRuntimeState.__setInspiringMoveNoOA(false);
-  useRuntimeState.__setRemarkableNoOA(false);
-  useRuntimeState.__setTargetEffects([]);
-  useRuntimeState.__setActiveBuffs(null);
   useRuntimeState.__setBulwarkActive(null);
   useRuntimeState.__setBulwarkTargets([]);
-  useRuntimeState.__setInvokeDuplicityAdvantageTargets([]);
 }
 
 /** Point findCreatureByName at the Goblin attacker targeting the given creature. */
@@ -223,24 +190,11 @@ function getAttackContext() {
 describe('MonsterCardModal - handleAttack: Bulwark of Force cover', () => {
   beforeEach(resetAttackMocks);
 
-  it('applies +2 AC cover when Bulwark of Force is active and the target is in bulwarkTargets', () => {
-    setAttackTarget();
-    useRuntimeState.__setBulwarkActive(true);
-    useRuntimeState.__setBulwarkTargets(['Player A']);
-
-    renderAttackAction(null, { characters: [{ name: 'Player A' }] });
-    clickAttackLink();
-
-    const ctx = getAttackContext();
-    expect(ctx.coverAcBonus).toBe(2);
-    expect(ctx.coverLevel).toBe('half');
-    expect(ctx.coverReason).toBe('Bulwark of Force');
-  });
-
   it.each([
-    { bulwarkActive: false, bulwarkTargets: ['Player A'], desc: 'inactive' },
-    { bulwarkActive: true, bulwarkTargets: ['Player B'], desc: 'target not in bulwarkTargets' },
-  ])('does not apply cover when Bulwark of Force is $desc', ({ bulwarkActive, bulwarkTargets }) => {
+    { bulwarkActive: true, bulwarkTargets: ['Player A'], coverAcBonus: 2, coverLevel: 'half', coverReason: 'Bulwark of Force', desc: 'active and the target is in bulwarkTargets' },
+    { bulwarkActive: false, bulwarkTargets: ['Player A'], coverAcBonus: 0, coverLevel: null, coverReason: null, desc: 'inactive' },
+    { bulwarkActive: true, bulwarkTargets: ['Player B'], coverAcBonus: 0, coverLevel: null, coverReason: null, desc: 'target not in bulwarkTargets' },
+  ])('coverAcBonus=$coverAcBonus when Bulwark of Force is $desc', ({ bulwarkActive, bulwarkTargets, coverAcBonus, coverLevel, coverReason }) => {
     setAttackTarget();
     useRuntimeState.__setBulwarkActive(bulwarkActive);
     useRuntimeState.__setBulwarkTargets(bulwarkTargets);
@@ -249,39 +203,11 @@ describe('MonsterCardModal - handleAttack: Bulwark of Force cover', () => {
     clickAttackLink();
 
     const ctx = getAttackContext();
-    expect(ctx.coverAcBonus).toBe(0);
-    expect(ctx.coverLevel).toBeNull();
-    expect(ctx.coverReason).toBeNull();
-  });
-});
-
-describe('MonsterCardModal - handleAttack: Improved Duplicity never buffs monster attacks (CLA-189)', () => {
-  beforeEach(resetAttackMocks);
-
-  function makeCleric() {
-    return {
-      name: 'Cleric',
-      computedStats: {
-        automation: {
-          passives: [{ effect: 'enhanced_distraction_and_healing' }],
-        },
-      },
-    };
-  }
-
-  it.each([
-    { advantageTargets: ['Goblin'], buffs: [{ effect: 'create_illusion', isImprovedDuplicity: true }], desc: 'the monster name matches the granted list (inverted-semantics regression)' },
-    { advantageTargets: ['Player A'], buffs: [{ effect: 'create_illusion', isImprovedDuplicity: true }], desc: 'a granted ally is the monster target' },
-    { advantageTargets: ['Goblin'], buffs: [], desc: 'the cleric lacks an improved duplicity buff' },
-  ])('does not grant the attacking monster advantage when $desc', ({ advantageTargets, buffs }) => {
-    setAttackTarget();
-    useRuntimeState.__setInvokeDuplicityAdvantageTargets(advantageTargets);
-    useRuntimeState.__setActiveBuffs(buffs);
-
-    renderAttackAction(null, { characters: [makeCleric()] });
-    clickAttackLink();
-
-    expect(getAttackContext().forcedMode).toBeUndefined();
+    expect(ctx.targetName).toBe('Player A');
+    expect(ctx.attackerName).toBe('Goblin');
+    expect(ctx.coverAcBonus).toBe(coverAcBonus);
+    expect(ctx.coverLevel).toBe(coverLevel);
+    expect(ctx.coverReason).toBe(coverReason);
   });
 });
 
@@ -300,57 +226,35 @@ describe('MonsterCardModal - handleAttack: Graze weapon mastery', () => {
     };
   }
 
-  it('enables graze damage with the Strength modifier on a melee attack when the mastery is Graze', () => {
+  it.each([
+    { mastery: 'Graze', grazeDamage: true, grazeAbilityMod: 2, desc: 'the mastery is Graze' },
+    { mastery: 'Polished', grazeDamage: false, grazeAbilityMod: 0, desc: 'the mastery is a different choice' },
+  ])('grazeDamage=$grazeDamage with mod $grazeAbilityMod on a melee attack when $mastery', ({ mastery, grazeDamage, grazeAbilityMod }) => {
     setAttackTarget();
-    renderAttackAction(null, { characters: [makeMonsterCharacter('Graze')] });
+    renderAttackAction(null, { characters: [makeMonsterCharacter(mastery)] });
     clickAttackLink();
 
     const ctx = getAttackContext();
-    expect(ctx.grazeDamage).toBe(true);
-    expect(ctx.grazeAbilityMod).toBe(2);
+    expect(ctx.grazeDamage).toBe(grazeDamage);
+    expect(ctx.grazeAbilityMod).toBe(grazeAbilityMod);
     expect(ctx.grazeAbilityName).toBe('STR');
-  });
-
-  it('does not enable graze damage for a different weapon mastery', () => {
-    setAttackTarget();
-    renderAttackAction(null, { characters: [makeMonsterCharacter('Polished')] });
-    clickAttackLink();
-
-    const ctx = getAttackContext();
-    expect(ctx.grazeDamage).toBe(false);
-    expect(ctx.grazeAbilityMod).toBe(0);
   });
 });
 
 describe('MonsterCardModal - handleAttack: auto-crit within 5 feet', () => {
   beforeEach(resetAttackMocks);
 
-  it('sets isAutoCrit on a melee attack when the target auto-crits within 5 feet', () => {
+  it.each([
+    { autoCritWithin5ft: true, melee: true, isAutoCrit: true, desc: 'the target auto-crits within 5 feet' },
+    { autoCritWithin5ft: false, melee: true, isAutoCrit: false, desc: 'the target lacks auto-crit-within-5ft' },
+    { autoCritWithin5ft: true, melee: false, isAutoCrit: false, desc: 'the attack is ranged (isMelee short-circuits)' },
+  ])('isAutoCrit=$isAutoCrit on a $melee attack when $desc', ({ autoCritWithin5ft, melee, isAutoCrit }) => {
     setAttackTarget();
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, autoCritWithin5ft: true });
+    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, autoCritWithin5ft });
 
-    renderAttackAction();
+    renderAttackAction(melee ? null : { name: 'Fire Bolt', description: 'Ranged Attack.', reach: undefined, range: '120 ft.' });
     clickAttackLink();
 
-    expect(getAttackContext().isAutoCrit).toBe(true);
-  });
-
-  it('does not set isAutoCrit on a melee attack when the target lacks auto-crit-within-5ft', () => {
-    setAttackTarget();
-
-    renderAttackAction();
-    clickAttackLink();
-
-    expect(getAttackContext().isAutoCrit).toBe(false);
-  });
-
-  it('does not set isAutoCrit on a ranged attack even when auto-crit-within-5ft applies', () => {
-    setAttackTarget();
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, autoCritWithin5ft: true });
-
-    renderAttackAction({ name: 'Fire Bolt', description: 'Ranged Attack.', reach: undefined, range: '120 ft.' });
-    clickAttackLink();
-
-    expect(getAttackContext().isAutoCrit).toBe(false);
+    expect(getAttackContext().isAutoCrit).toBe(isAutoCrit);
   });
 });

@@ -1,3 +1,13 @@
+// @maintained-by-ai — trimmed 7→3 tests (#523): disk lock folds key-placement +
+// no-double-charge guard (damage_dice_secondary ABSENT); ONE parser press derives
+// both formulas FROM disk (+ row-distinct "'1d6 + 4 + 1d8'" grammar guard — grep:
+// these bytes live only here, vs ma1264 "+3" / ma1266 "1d12 + 4"); offer+select
+// fork kept as this row's press because its unpicked default carries the distinct
+// plus-rider baseFormula (#535 precedent — absent from generic owners:
+// two-handed.test.js:23-34,44-55,133-143; Modal.two-handed.test.jsx:213-223;
+// null-triple transport cite-skipped to cultist-flat-secondary.test.js:36-39,
+// plus-split parser behavior to diceRoller.test.js:228-357). Row literals
+// "1d6 + 4 plus 1d8" / "2d8 + 4" BY-name disk-lock stays (#387).
 // MA-1267: Orc War Chief Spear had TWO data defects (FAIL(a)/DATA) — twin of
 // MA-1264 (Orc Eye of Gruumsh Spear) + MA-1266 (same-monster Greataxe):
 // (1) damage_dice_primary "1d6 + 4" dropped the trait rider — description carries
@@ -17,7 +27,6 @@ import { describe, it, expect } from 'vitest';
 import monstersJson from '../../../public/data/monsters.json';
 import { canRollExpression, rollExpression, rollExpressionDoubled, parseExpression } from '../../../src/services/dice/diceRoller.js';
 import { buildTwoHandedVariantOffer, buildTwoHandedVariantSelectLog } from './MonsterCardHelpers.js';
-import { buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
 
 describe('MA-1267 data lock (monsters.json Orc War Chief Spear)', () => {
   const spearRow = () => {
@@ -27,24 +36,21 @@ describe('MA-1267 data lock (monsters.json Orc War Chief Spear)', () => {
     return spear;
   };
 
-  it('actions[2] Spear authors plus-rider primary + two-handed variant (Azer/MA-1264 placement)', () => {
+  it('disk lock: actions[2] Spear plus-rider primary + two-handed variant, Azer key placement, no additive misfire fields (secondary ABSENT — Fury rides PRIMARY, chooser swaps it)', () => {
     const spear = spearRow();
     expect(spear.attack_bonus).toBe(6);
     expect(spear.damage_dice_primary).toBe('1d6 + 4 plus 1d8');
     expect(spear.damage_dice_two_handed).toBe('2d8 + 4');
-    expect(spear.damage_dice_two_handed).not.toBe(spear.damage_dice_primary);
     expect(spear.damage_type_primary).toBe('Piercing');
+    expect(spear.damage_dice_secondary).toBeUndefined();
     expect(spear.description).toBe('Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 12 (1d6 + 4 plus 1d8) piercing damage, or 13 (2d8 + 4) piercing damage if used with two hands to make a melee attack.');
-  });
-
-  it('key placement: damage_dice_two_handed AFTER damage_dice_primary, BEFORE damage_type_primary (Azer byte-shape)', () => {
-    const keys = Object.keys(spearRow());
+    const keys = Object.keys(spear);
     expect(keys.indexOf('damage_dice_two_handed')).toBeGreaterThan(keys.indexOf('damage_dice_primary'));
     expect(keys.indexOf('damage_dice_two_handed')).toBeLessThan(keys.indexOf('damage_type_primary'));
   });
 
-  it('plus-rider primary PARSES — "1d6 + 4 + 1d8" two-dice-plus shape does NOT (parser grammar guard)', () => {
-    const primary = spearRow().damage_dice_primary;
+  it('both row formulas PARSE via the plus-word split — "+"-joined "1d6 + 4 + 1d8" does NOT (grammar guard: MA-0014 zero-damage if prose-plus is ever rewritten to plus-sign-joined)', () => {
+    const { damage_dice_primary: primary, damage_dice_two_handed: twoHanded } = spearRow();
     expect(canRollExpression(primary)).toBe(true);
     const single = rollExpression(primary);
     expect(single.rolls.length).toBe(2);
@@ -54,47 +60,26 @@ describe('MA-1267 data lock (monsters.json Orc War Chief Spear)', () => {
     const crit = rollExpressionDoubled(primary);
     expect(crit.doubledRolls.length).toBe(4);
     expect(crit.modifier).toBe(4);
+    expect(canRollExpression(twoHanded)).toBe(true);
+    const two = rollExpression(twoHanded);
+    expect(two.total).toBeGreaterThanOrEqual(6);
+    expect(two.total).toBeLessThanOrEqual(20);
     expect(parseExpression('1d6 + 4 + 1d8')).toBeNull();
     expect(canRollExpression('1d6 + 4 + 1d8')).toBe(false);
   });
 
-  it('two-handed variant parses for the chooser swap', () => {
-    expect(canRollExpression(spearRow().damage_dice_two_handed)).toBe(true);
-    const two = rollExpression('2d8 + 4');
-    expect(two.total).toBeGreaterThanOrEqual(6);
-    expect(two.total).toBeLessThanOrEqual(20);
-  });
-
-  it('buildTwoHandedVariantOffer arms the Spear HIT-popup chooser with both formulas', () => {
+  it('chooser fork wired from disk: offer arms both formulas; select logs ride two-handed, unpicked default keeps the plus-rider base', () => {
+    const { damage_dice_primary: baseFormula, damage_dice_two_handed: formula, damage_type_primary: damageType } = spearRow();
     const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
-    expect(offer).toMatchObject({
-      formula: '2d8 + 4',
-      baseFormula: '1d6 + 4 plus 1d8',
-      damageType: 'Piercing',
-      attackName: 'Spear',
-    });
-    expect(offer.label).toContain('2d8 + 4');
-  });
-
-  it('no additive misfire fields on the row: damage_dice_secondary ABSENT (chooser swaps PRIMARY)', () => {
-    const spear = spearRow();
-    expect(spear.damage_dice_secondary).toBeUndefined();
-    expect(buildSecondaryDamageTransport(spear, 'Spear')).toEqual({
-      autoDamageSecondaryFormula: null,
-      autoDamageSecondaryName: null,
-      autoDamageSecondaryDamageType: null,
-    });
-  });
-
-  it('select logs: two-handed rides 2d8 + 4, unpicked default is one-handed plus-rider', () => {
-    const offer = buildTwoHandedVariantOffer(spearRow(), 'Spear');
+    expect(offer).toMatchObject({ formula, baseFormula, damageType, attackName: 'Spear' });
+    expect(offer.label).toContain(formula);
     const two = buildTwoHandedVariantSelectLog({ monsterName: 'Orc War Chief 1', offer, hands: 'two-handed' });
     expect(two.automationType).toBe('two_handed_variant_selected');
     expect(two.description).toContain('TWO-HANDED');
-    expect(two.description).toContain('2d8 + 4');
+    expect(two.description).toContain(formula);
     const one = buildTwoHandedVariantSelectLog({ monsterName: 'Orc War Chief 1', offer, hands: 'one-handed', defaulted: true });
     expect(one.automationType).toBe('one_handed_variant_selected');
     expect(one.description).toContain('default');
-    expect(one.description).toContain('1d6 + 4 plus 1d8');
+    expect(one.description).toContain(baseFormula);
   });
 });

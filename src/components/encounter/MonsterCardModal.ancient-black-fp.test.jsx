@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0163 regression: Ancient Black Dragon Frightful Presence (legendary_actions[2])
 // previously authored only name/description — the header uses:3 gate (MA-0161) made
 // the "Expend Legendary" chip live, but the row still spent a use into the
@@ -7,11 +8,21 @@
 // success_immunity + repeat_save. save_type follows the SPELL's dc_type (spells.json
 // Fear dc_type WIS → Wisdom), matching Adult Black/Dracolich precedents; save_dc =
 // authored Spellcasting save_dc 21.
+// Lane canon: service arming + turn-end repeat-save + 24h immunity grant on this
+// exact WIS DC 21 row → frightfulPresenceService.test.js:174-221 (row shape +
+// description wording included); immunity-gate truth table →
+// MonsterCardHelpers.gaze-immunity.test.js:41-50; chip render + gated spend +
+// cooldown + spend log → MonsterCardModal.legendary-uses.test.jsx:1467,1513-1530;
+// usage formatting → MonsterCardHelpers.usage.test.js. This file keeps ONLY the
+// two seams pinned nowhere else: the disk row's full-service shape (dc_success
+// none, zero damage, exact repeat_save/success_immunity objects, byte-key mirror
+// to Adult White FP) and the modal click → save-context forwarding of
+// repeatSave/successImmunity.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-import { extractConditionsFromSaveEffect, parseSuccessImmunity, gazeImmunityActive } from './MonsterCardHelpers.js';
+import { extractConditionsFromSaveEffect, parseSuccessImmunity } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
@@ -86,37 +97,16 @@ function fpSaveChip() {
 }
 
 describe('MA-0163 monsters.json data: Ancient Black Dragon FP row full-service shape', () => {
-  it('FP row: DC 21 + Wisdom save (spell dc_type follows Fear) + frightened save_effect + dc_success none', () => {
+  it('FP row: DC 21 Wisdom + dc_success none + zero damage + frightened + exact MA-0147 service objects (byte-key mirror Adult White FP)', () => {
     expect(FP.save_dc).toBe(21);
     expect(FP.save_type).toBe('Wisdom');
     expect(FP.dc_success).toBe('none');
     expect(FP.damage_dice_primary == null).toBe(true);
     expect(extractConditionsFromSaveEffect(FP.save_effect)).toEqual(['frightened']);
-  });
-
-  it('FP row engages the MA-0048 service: repeat_save + success_immunity object shape (MA-0147 exact shape, objects not booleans)', () => {
     expect(FP.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
     expect(FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
+    expect(parseSuccessImmunity(FP)).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', durationMinutes: 1440 });
     expect(Object.keys(FP)).toEqual(Object.keys(WHITE_FP));
-    const immunity = parseSuccessImmunity(FP);
-    expect(immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', durationMinutes: 1440 });
-  });
-
-  it('FP row description carries canonical 120-ft range + turn-end-repeat + 24h-immunity wording', () => {
-    expect(FP.description).toContain('within 120 feet');
-    expect(FP.description).toContain('repeat the saving throw at the end of each of its turns');
-    expect(FP.description).toContain('immune to the dragon\'s Frightful Presence for the next 24 hours');
-  });
-
-  it('immunity te on target refuses the FP row click (MA-0030/MA-0048 gate)', () => {
-    const target = { name: 'TestPC', type: 'player' };
-    const active = gazeImmunityActive({
-      action: FP, target, monsterName: 'Ancient Black Dragon 1',
-      targetEffects: [{ target: 'TestPC', effect: 'frightful_presence_immunity', source: 'Ancient Black Dragon 1' }],
-    });
-    expect(active).toMatchObject({ effect: 'frightful_presence_immunity', durationMinutes: 1440 });
-    const none = gazeImmunityActive({ action: FP, target, monsterName: 'Ancient Black Dragon 1', targetEffects: [] });
-    expect(none).toBeNull();
   });
 });
 

@@ -1300,3 +1300,69 @@ run2#527: encounter/MonsterCardHelpers.ma0989-hobgoblin-longsword -> maintained 
 run2#528: encounter/MonsterCardHelpers.ma1063-kuo-toa-spear -> maintained (6->2): distinct-bytes verified; S118 misfile lock; owners 40/40
 run2#529: encounter/MonsterCardHelpers.ma1100-lizard-king-queen -> maintained (6->2): single-row truth; unique trident literal; owners 34/34
 ## Batch #159 flush after run2#529 (15 files #515-#529)
+## Batch #159 GREEN-canon — 2752 files: 2 failed (canon FIXME: steps-config, Players dragging) + 3 expected fail; 35122 passed. Lint clean. #158 ElementalAttunement flake did NOT recur. Evidence /tmp/batch159.log
+## Batch #159 — PROGRESS: completed 1674 / remaining 1010 (total 2684)
+## Protocol add (owner query 2026-10-18): dispatch prompt now includes PREFLIGHT — subagent greps its file for existing @maintained-by-ai and ABORTS reporting-already-maintained if found. Verified flagged useModalHandlers-damage.test.js: marked :1, not queued, committed clean by owner (08:08).
+run2#530: encounter/MonsterCardHelpers.ma1120-mage-counterspell -> maintained (7->1): rec #517 applied; sole mage-row disk lock+registry arm kept; self-ref FIX; owners 40/40 [note: first dispatch aborted by owner due to tree-wide diffstat confusion; tree-wide git now BANNED in spec]
+run2#531: encounter/MonsterCardHelpers.ma1146-merfolk-spear-2h -> maintained (6->2): unique bare-1d8 row; canon shape; preflight+scoped-git OBSERVED compliant; owners green
+run2#532: encounter/MonsterCardHelpers.ma1170-shield-reaction -> maintained (16->5): distinct shield-key lanes kept (2 disk locks+e2e+refusal loop); generics->#508/#148 owners; owners 47
+run2#533: encounter/MonsterCardHelpers.ma1202-mummy-lord-spellcasting -> maintained (6->4): markup-pin->behavior-upgrade (castLevel->6d10); sole-lane verified; owners 73/73
+run2#534: encounter/MonsterCardHelpers.ma1203-whirlwind -> maintained (15->7): rec #508 applied; ranged->melee semantic kept once; owner 39/39
+run2#535: encounter/MonsterCardHelpers.ma1264-orc-eye-spear-2h -> maintained (7->5): intent-distinct twin adjudication honest; grammar-guard unique kept; owners green
+run2#536: encounter/MonsterCardHelpers.ma1266-war-chief-greataxe -> maintained (3->2): distinct literals disk-verified; plus-split totals + grammar guard; owners 12/12
+run2#537: encounter/MonsterCardHelpers.ma1267-war-chief-spear-2h -> maintained (7->3): rec #523 applied; plus-rider default fork kept per #535 precedent; owners 39/39
+run2#538: encounter/MonsterCardHelpers.ma1352-psychic-gray-ooze -> maintained (7->3): sole fingerprint + parser arms fused; mega-dup slaad leg cut; owners green
+run2#539: encounter/MonsterCardHelpers.ma1354-mind-corrosion -> maintained (18->8): refusal table 7->1; latch chain; resolve-only HP branch kept; owners 40/40
+run2#540: encounter/MonsterCardHelpers.ma1367-thonot-defense -> maintained (5->1): byte-twin of shield owner -> pure BY-name lock; owners 37/37
+run2#541: encounter/MonsterCardHelpers.ma1407-reflexive-antennae -> maintained (16->7): distinct lane; refusals collapsed; latch chain state-forward; owners 93/93
+run2#542: encounter/MonsterCardHelpers.ma1547-draining-kiss -> maintained (12->4): prose/key-order data-locks cut (#505); new case-fold parser pin; twin inversion kept; rec NEW: ma1639:53/ma1718:48 cross-fingerprint trim candidates
+run2#543: encounter/MonsterCardHelpers.ma1563-swarm-save-damage -> maintained (5->3): data-lock+half-vacuous cut; tarrasque supersedes; rec: Modal.ma1563:38-42 triple-dup trim candidate
+
+## Batch #160 — PROGRESS: completed 1689 / remaining 1005 (total 2694)
+- run2#530-#544 all marker-gated GREEN (15 files dropped: ma1120/1146/1170/1202/1203/1264/1266/1267/1352/1354/1367/1407/1547/1563/1608)
+- Suite: 2752 files, 35,032 passed, 2 canon FIXME fails + 3 expected = GREEN canon (evidence /tmp/batch160.log)
+- Total drifted 2684->2694: owner added ~10 test files with "Test Quality" commit f59d311cd — queue regenerated from marker truth
+- New recs logged: ma1639:53/ma1718:48 cross-fingerprint trims; Modal.ma1563:38-42 triple-dup trim
+- Preflight + scoped-git rules ACTIVE in all dispatches (spec :107/:126)
+run2#545: char-sheet/useCharActionsAutomation.class-feature-modals -> maintained (739->177 lines, 46 tests table-driven): 4 new gap rows (warpingImplosion/warBondSummon/telekineticMovement/psychicWhispersTarget); identity routing toBe; vacuous fallback FIX; rec: sibling resource/summon/condition-modals collapse to it.each
+run2#546: char-sheet/useCharActionsAutomation.condition-modals -> maintained (417->140 lines, 24 table rows): rec #545 collapse; enriched table owns 4 cited handlers; mocks cut; owners 77/77
+run2#547: char-sheet/useCharActionsAutomation.divine-intervention -> maintained (10->6): folds+derivation pins; createDivineHooks dedupe->setup.js createHooks; mocks cut; family 196/196
+run2#548: char-sheet/useCharActionsAutomation.early-returns -> maintained (491->~60 lines, 23->2): FP/gate dups owned by test.js cut; vacuous FP fixture deleted (#499); rec: test.js:18-19 header stale xref; setup.js marker normalize
+run2#549: char-sheet/useCharActionsAutomation.resource-modals -> maintained (130->71 lines, 8->7-row table+1): rec #545 collapse; fontOfMagic payload-drop kept; rec: result-types/summon-modals mock audit
+run2#550: char-sheet/useCharActionsAutomation.result-types -> maintained (17->6 tables/16 cases): seam-per-table collapse; exact-args upgrade; rec: .test.js:487 weaker falsy dup -> cite this lane
+run2#551: char-sheet/useCharActionsAutomation.setup (shared fixture) -> maintained (80->61): 11 dead override knobs cut w/ consumer-grep evidence; all exports kept; legacy marker normalized; lanes 175/175
+run2#552: char-sheet/useCharActionsAutomation.summon-modals -> maintained (130->58, 8-row table): rec #545/#549 applied; primalCompanion owner rows kept w/ rename flag; sweep 5072 green
+run2#553: char-sheet/useCharActionsAutomation.telepathic-speech -> maintained (2 owner legs kept, vacuous fixture cut, setupBeforeEach adopted): owner chains intact; citing siblings 113/113
+run2#554: encounter/MonsterCardHelpers.ma1639-vampire-bite-recover -> maintained (11->3): rec #542 applied (succubus parity cut); dual-pool fingerprint fused; rec: ma1652:49,56 cross-row pins cut + ma1547 header xref update
+run2#555: encounter/MonsterCardHelpers.ma1645-nightbringer-bite-drain -> maintained (11->8): specter forward owned+kept; bandit fingerprint cut (#554 pattern); owners 172/172; rec: ma1652/ma1718 key-order pins non-behavioral
+run2#556: encounter/MonsterCardHelpers.ma1652-vampire-spawn-bite-drain -> maintained (6->4): recs #554/#555 applied (cross-row pins + key-order cut); prereq table kept; owners 159/159
+run2#557: encounter/MonsterCardHelpers.ma1661-veteran-longsword-2h -> maintained (8->2): distinct-row canon; false twin claim disproven; owners 34/34
+run2#558: encounter/MonsterCardHelpers.ma1718-wight-life-drain -> maintained (7->3): recs #542/#555 applied; consumer ledger cite-skip; self-ref dcSuccess FIX; owners 22/22
+
+## Batch #161 — PROGRESS: completed 1704 / remaining 990 (total 2694)
+- run2#545-#559 all marker-gated GREEN (useCharActionsAutomation family 9 lanes collapsed/trimmed + 6 MA drain/recover/2h/react lanes + portent)
+- Suite: 2752 files, 34,979 passed, 2 canon FIXME + 3 expected + ElementalAttunementModal.player-save FLAKE (WATCHLIST 2x: #158,#161; isolated 21/21, load-timeout suspect 1425ms — evidence /tmp/batch161.log)
+run2#560: encounter/MonsterCardHelpers.push-clause -> maintained (4->2): BY-name bronze fingerprint + once-per-branch table; wyrmling positive cut (#554); NOTE anomaly: dispatch saw marker at preflight (transparent-retry suspect) — state verified green 2/2
+run2#561: encounter/MonsterCardHelpers.save-variant-chooser -> maintained (9->4): gaze positives->saveProcessing owner; empty-te boundary kept; animal-spirit owner-cite honored; owners green
+run2#562: encounter/MonsterCardHelpers.slowed-clauses -> maintained (7->3, 75->36 lines): full-tuple fingerprint unique; curly-apostrophe pin unique; Mind Spike/Jolt data-locks cut (#505); rec: ma1863/ma1872/spectator parse-reassert cites
+run2#563: encounter/MonsterCardHelpers.soul-tome-trap -> maintained (8->4): positional->BY-name FIX; MA-0104 discrimination both-dir kept; #505/#499 cuts; rec: banish-transport:6-7 stale line cite :32-33/:60->:27-30
+run2#564: encounter/MonsterCardHelpers.spectator-eye-rays -> maintained (22->5): rec #562 applied; BY-name FIX; gate-discrimination map kept; owners 53/53
+run2#565: encounter/MonsterCardHelpers.speed-half -> maintained (4->2): distinct helper adjudicated vs #562; decoy-neighbor guard kept; owners 8/8
+run2#566: encounter/MonsterCardHelpers.speed-reduce -> maintained (7->2, 73->51 lines): numeric-capture table + verb decoy; registry re-pin->definitions:280-308; neighbors 352 green
+run2#567: encounter/MonsterCardHelpers.speed-zero -> maintained (5->2): 'speed is 0\b' contract pinned verbatim; neighbor decoys once; rec: targetEffectDefinitions add speed_zero te pin (carry to that lane's turn)
+run2#568: encounter/MonsterCardHelpers.split -> maintained (25->9): pudding/jelly fingerprints sole-owner; floor-boundary tables; byte-twin compare removed; owners 41/41
+run2#569: encounter/MonsterCardHelpers.subtract-die -> maintained (4->3): clause-parser contract (not arithmetic); sentence-boundary guard newly pinned; consumer->d20RollComputation owner
+run2#570: encounter/MonsterCardHelpers.two-handed (GENERIC OWNER) -> maintained (13->8): owner blocks strengthened IN PLACE, cite span MOVED :23-55 -> OFFER :25-36 / INERT :38-45 / FORK :47-61 (combined :25-61) — STANDING REC: all future dispatch prompts cite two-handed.test.js:25-61; existing sibling files keep stale cites (harmless prose), update only if reworked
+run2#571: encounter/MonsterCardHelpers.usage (OWNER) -> maintained (67 lines): full-branch usage table incl. missing At-Will face; refusal builders exact-pinned; slug-norm sole pins; 999/Day cosmetic NOT codified; siblings 47/47. Owner ranges :16-38/:40-66
+run2#572: encounter/MonsterCardHelpers.weakening-breath -> maintained (5->3): 4-row gold-dragon fingerprint (corpus-exhaustive); markup+minute-branch synthetic seam pins; intra-file dup deduped; owners 30/30
+
+## Batch #162 — PROGRESS: completed 1718 / remaining 976 (total 2694)
+- run2#560-#573 all marker-gated GREEN (14 files: clause family + speed family + split/usage/weakening + 2 OWNER lanes maintained-in-place)
+- Suite: 2752 files, 34,934 passed, 2 canon FIXME + 3 expected = GREEN canon; player-save flake did NOT recur (evidence /tmp/batch162.log)
+- STANDING REC ACTIVE: two-handed owner cites now :25-61 (offer :25-36/inert :38-45/fork :47-61)
+run2#574: encounter/MonsterCardHelpers.save-margin -> maintained (7->2): un-clamped band math pinned; twin disk locks -> ma1584/ma1351 owners; owners 43+1xf
+run2#575: encounter/MonsterCardModal.ac-penalty -> maintained (2->1 fused): setTimeout->waitFor; spend-state pin added; owners 12/12
+run2#576: encounter/MonsterCardModal.adult-white-fp -> maintained (5->2): Frightful Presence decoded; repeat_save/immunity locks unique; rec: ancient-black-fp:105/:111 carbon-copy cuts available
+run2#577: encounter/MonsterCardModal.ancient-black-fp -> maintained (4->2): rec #576 applied; white-FP byte-mirror lock unique; owners 138/138
+run2#578: encounter/MonsterCardModal.attack-advanced -> maintained (452->314 lines, 8->6): Elusive test vacuous-confirmed+cut (#504); range-branch it.each w/ forcedMode identity; rec: interaction.test.jsx:21-24 cites dead lines—Psychic Strike alert gaps untested app-wide
+run2#579: encounter/MonsterCardModal.attack-logic -> maintained (356->260, 11->8 it.each): Duplicity suite vacuous-confirmed CUT (#504 class); REC #578 dead setters confirmed+cleared; owners 36/36

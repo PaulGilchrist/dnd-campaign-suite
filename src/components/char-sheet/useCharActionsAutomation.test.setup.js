@@ -1,4 +1,9 @@
-// @improved-by-ai
+// @maintained-by-ai
+// Shared hooks fixture for the useCharActionsAutomation lanes (#545-#550 family).
+// Output must cover all 15 props the hook destructures (useCharActionsAutomation.js:259-275).
+// Only the 5 override knobs grep-confirmed passed by sibling call sites are parameterized
+// (playerStats, getRuntimeValue, setRuntimeValue, modalState, executeHandler);
+// every other field is a fixed default. No actual tests live here.
 import { vi, beforeEach } from 'vitest';
 
 export const campaignName = 'test-campaign';
@@ -20,56 +25,34 @@ export const basePlayerStats = {
     automation: { passives: [] },
 };
 
-function makeBaseGRV(activeBuffs, focusPoints) {
-    return vi.fn((charKey, key, _cn) => {
-        if (key === 'activeBuffs') return activeBuffs;
-        if (key === 'focusPoints') return focusPoints;
+// Default runtime-store seam: pins the keys the hook family reads via getRuntimeValue
+// (focusPoints stays 3 — the runtime read, not the basePlayerStats sheet value).
+function makeBaseGRV() {
+    return vi.fn((charKey, key) => {
+        if (key === 'activeBuffs') return [];
+        if (key === 'focusPoints') return 3;
         if (key === 'lastActionSpellCast') return null;
         return undefined;
     });
 }
 
-function pick(value, fallback) {
-    return value || fallback;
-}
-
 export function createHooks(overrides = {}) {
-    const {
-        cannotAct = false,
-        getRuntimeValue: customGRV,
-        setRuntimeValue: customSRV,
-        playerStats = basePlayerStats,
-        campaignName: cn = campaignName,
-        activeBuffs = [],
-        focusPoints = 3,
-        rollDamage: customRollDamage,
-        rollAttack: customRollAttack,
-        executeHandler: customExecuteHandler,
-        addEntry: customAddEntry,
-        setPopupHtml: customSetPopupHtml,
-        setModalState: customSetModalState,
-        onBuffsChange: customOnBuffsChange,
-        modalState: customModalState,
-        mapName: customMapName,
-        characters: customCharacters,
-    } = overrides;
-
     return {
-        cannotAct,
-        getRuntimeValue: pick(customGRV, makeBaseGRV(activeBuffs, focusPoints)),
-        setRuntimeValue: pick(customSRV, vi.fn()),
-        rollDamage: pick(customRollDamage, vi.fn()),
-        rollAttack: pick(customRollAttack, vi.fn()),
-        executeHandler: pick(customExecuteHandler, vi.fn()),
-        addEntry: pick(customAddEntry, vi.fn().mockResolvedValue(undefined)),
-        setPopupHtml: pick(customSetPopupHtml, vi.fn()),
-        setModalState: pick(customSetModalState, vi.fn()),
-        modalState: pick(customModalState, {}),
-        playerStats,
-        campaignName: cn,
-        mapName: pick(customMapName, 'test-map'),
-        characters: pick(customCharacters, []),
-        onBuffsChange: pick(customOnBuffsChange, vi.fn()),
+        cannotAct: false,
+        playerStats: overrides.playerStats || basePlayerStats,
+        campaignName,
+        mapName: 'test-map',
+        characters: [],
+        getRuntimeValue: overrides.getRuntimeValue || makeBaseGRV(),
+        setRuntimeValue: overrides.setRuntimeValue || vi.fn(),
+        setPopupHtml: vi.fn(),
+        setModalState: vi.fn(),
+        modalState: overrides.modalState || {},
+        rollDamage: vi.fn(),
+        rollAttack: vi.fn(),
+        executeHandler: overrides.executeHandler || vi.fn(),
+        addEntry: vi.fn().mockResolvedValue(undefined),
+        onBuffsChange: vi.fn(),
     };
 }
 

@@ -1,3 +1,10 @@
+// @maintained-by-ai — trimmed 3→2 tests: no-additive guard (secondary/two_handed
+// ABSENT + null transport) folded into the disk lock; parser plus-split behavior +
+// '+'-joined grammar guard kept intact. Distinct from MA-1267 spear twin (actions[2],
+// "1d6 + 4 plus 1d8", two-handed variant): grep shows this row's "1d12 + 4 plus 1d8"
+// appears disk-wide only in monsters.json:49153-49156 + this file. Greataxe has NO
+// two-hands clause, so two_handed ABSENCE is the #523 guard against a future
+// chooser misfire on this row. Canon #523.
 // MA-1266: Orc War Chief Greataxe dropped the Gruumsh's Fury rider (FAIL(a)/DATA):
 // description carries "Hit: 15 (1d12 + 4 plus 1d8) slashing damage" and the trait
 // confirms the +1d8 is "included in the attacks" (unconditional weapon-hit ride), but
@@ -21,15 +28,22 @@ describe('MA-1266 data lock (monsters.json Orc War Chief Greataxe)', () => {
     return axe;
   };
 
-  it('actions[1] Greataxe authors plus-rider primary matching the row prose byte-shape (MA-1264 twin)', () => {
+  it('disk lock: actions[1] Greataxe plus-rider primary matches row prose byte-shape; secondary/two_handed ABSENT, transport null (rider rides PRIMARY)', () => {
     const axe = axeRow();
     expect(axe.attack_bonus).toBe(6);
     expect(axe.damage_dice_primary).toBe('1d12 + 4 plus 1d8');
     expect(axe.damage_type_primary).toBe('Slashing');
     expect(axe.description).toBe('Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 15 (1d12 + 4 plus 1d8) slashing damage.');
+    expect(axe.damage_dice_secondary).toBeUndefined();
+    expect(axe.damage_dice_two_handed).toBeUndefined();
+    expect(buildSecondaryDamageTransport(axe, 'Greataxe')).toEqual({
+      autoDamageSecondaryFormula: null,
+      autoDamageSecondaryName: null,
+      autoDamageSecondaryDamageType: null,
+    });
   });
 
-  it('plus-rider primary PARSES and rolls a d8 leg — "1d12 + 4 + 1d8" two-dice-plus shape does NOT (parser grammar guard)', () => {
+  it('plus-rider primary PARSES and rolls both legs d12+d8+4 (crit doubles 4 rolls) — "1d12 + 4 + 1d8" two-dice-plus shape does NOT (parser grammar guard)', () => {
     const primary = axeRow().damage_dice_primary;
     expect(canRollExpression(primary)).toBe(true);
     const single = rollExpression(primary);
@@ -42,16 +56,5 @@ describe('MA-1266 data lock (monsters.json Orc War Chief Greataxe)', () => {
     expect(crit.modifier).toBe(4);
     expect(parseExpression('1d12 + 4 + 1d8')).toBeNull();
     expect(canRollExpression('1d12 + 4 + 1d8')).toBe(false);
-  });
-
-  it('no additive misfire fields on the row: damage_dice_secondary / two_handed ABSENT (rider rides PRIMARY)', () => {
-    const axe = axeRow();
-    expect(axe.damage_dice_secondary).toBeUndefined();
-    expect(axe.damage_dice_two_handed).toBeUndefined();
-    expect(buildSecondaryDamageTransport(axe, 'Greataxe')).toEqual({
-      autoDamageSecondaryFormula: null,
-      autoDamageSecondaryName: null,
-      autoDamageSecondaryDamageType: null,
-    });
   });
 });
