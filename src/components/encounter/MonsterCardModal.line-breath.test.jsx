@@ -1,13 +1,22 @@
+// @maintained-by-ai
 // MA-0035: Adult Black Dragon Acid Breath (Recharge 5-6) click-path.
 // Fresh click spends the recharge (threshold 5), routes the LINE row through
 // the SAME SaveAttackAoeModal flow as MA-0031 cones with a labelled
 // "60-ft Line" title; row exposes the labelled "DC 18 Dexterity" save
 // affordance; spent click refuses with acid_breath_refused (not recharged)
 // zero prompts. Save math untouched (picker per-target half-on-success).
+// Canonical owner (cited by dracolich-line-breath, recharge-cone, arcs,
+// gorgon): line-shape picker payload :105-124 (dcSuccess :117 /
+// rangeGateFt :118 / excludeNames :119 / storeLastAttack :120 / title :121),
+// spent-refuse wording :138-152, re-arm :155-162. Mock surface trimmed to
+// the minimal template (picker stub + log + dice-hook + runtime): diceRoller,
+// sanitize, dataLoader, conditionEffects, damageUtils, rangeValidation,
+// mapsService mocks purged via empirical bisect (each deleted individually
+// and together, 4/4 green, zero unhandled-fetch noise).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
@@ -24,20 +33,8 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 51, rolls: [4, 4, 7, 6, 6, 3, 6, 5, 3, 2, 2, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 102, rolls: [], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -57,32 +54,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};

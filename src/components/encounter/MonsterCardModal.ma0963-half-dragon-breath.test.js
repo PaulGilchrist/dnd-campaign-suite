@@ -1,26 +1,26 @@
-// MA-0963: Half-Dragon "Dragon's Breath" (actions[2]) — save row was
-// damage-less on BOTH legs: the row authored NO damage_dice_primary/
+// @maintained-by-ai
+// MA-0963: Half-Dragon "Dragon's Breath" (BY-name disk lock #387 family) — the
+// save row was damage-less on BOTH legs: it authored NO damage_dice_primary/
 // damage_type_primary, so the save/picker route (saveChipPlan.formula ->
 // saveDamageFormula -> SaveAttackAoeModal, MA-0901/§408 cone picker reads
-// damage_dice_primary ONLY) got a null pool and paid zero on fail AND
-// success. Description "(8d6)" sits behind </strong> so the prose extractor
-// (extractDamageDiceFromDescription) never sees it either. DATA fix mirrors
-// the MA-0618/0629 Dragon Turtle Steam Breath twin: author the two dice
-// fields; the TYPE is dynamic (Draconic Origin DM's choice) so the honest
-// composite label "Acid/Cold/Fire/Lightning/Poison (GM-chosen)" rides, same
-// precedent as the MA-0962 Claw rider on this very monster (§422: unknown
-// labels are safe in resistance lookups — exact-lowercase compare, miss =
-// full damage cosmetic pass-through). dc_success stays UNAUTHORED = half
-// (byte-correct vs prose "Success: Half damage", §63/MA-0618).
+// damage_dice_primary ONLY) got a null pool and paid zero on fail AND success.
+// Description "(8d6)" sits behind </strong> so the prose extractor
+// (extractDamageDiceFromDescription) never sees it either. DATA fix mirrors the
+// MA-0618/0629 Dragon Turtle Steam Breath twin: author the two dice fields; the
+// TYPE is dynamic (Draconic Origin DM's choice) so the honest composite label
+// "Acid/Cold/Fire/Lightning/Poison (GM-chosen)" rides (§422: unknown labels miss
+// the exact-lowercase resistance compare = full-damage cosmetic pass-through).
+// dc_success stays UNAUTHORED = half (§63/MA-0618 prose). OWNED ELSEWHERE, not
+// re-pinned: secondary-null triple #589 (cultist :36-39)+#673, Cone shape parse
+// save-variant-shape:20/#640, save math applyDamage.save-full:19 (#597 rec), Claw BY-name #674, usage #571.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { extractDamageDiceFromDescription, saveChipPlan, buildSaveOptions, buildSecondaryDamageTransport, breathAoeShape } from './MonsterCardModal.jsx';
-import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
+import { extractDamageDiceFromDescription, saveChipPlan, buildSaveOptions } from './MonsterCardModal.jsx';
 
 const monsters = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'));
 const halfDragon = monsters.find(m => m.index === 'half-dragon');
-const breath = halfDragon.actions[2];
+const breath = halfDragon.actions.find(a => a.name === "Dragon's Breath");
 
 describe('MA-0963 Half-Dragon Dragon\'s Breath disk row (data lock)', () => {
     it('is the DC 14 Dexterity 30-foot Cone recharge 5-6 save row', () => {
@@ -58,41 +58,19 @@ describe('MA-0963 picker pool transport feeds the 8d6 dice to both legs', () => 
         expect(plan.rollable).toBe(true);
         expect(plan.clickable).toBe(true);
     });
-    it('breathAoeShape parses the 30-foot Cone picker (shape seam byte-intact)', () => {
-        expect(breathAoeShape(breath, null)).toMatchObject({ shape: 'Cone', feet: 30 });
-    });
-    it('save options arm DC 14 + half default + PRIMARY-only pool (secondary null triple)', () => {
+    it('save options arm DC 14 dex + half default (PRIMARY-only pool)', () => {
         const opts = buildSaveOptions(breath);
         expect(opts.saveDc).toBe(14);
         expect(opts.saveType).toBe('dex');
         expect(opts.dcSuccess).toBe('half');
-        expect(buildSecondaryDamageTransport(breath)).toEqual({ autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null });
     });
 });
 
-describe('MA-0963 half-on-save semantics', () => {
-    it('failed save pays the FULL raw roll', () => {
-        expect(computeDamageAfterSave(28, false, 'half')).toBe(28);
-        expect(computeDamageAfterSave(48, false, 'half')).toBe(48);
-    });
-    it('successful save pays floor(raw/2)', () => {
-        expect(computeDamageAfterSave(28, true, 'half')).toBe(14);
-        expect(computeDamageAfterSave(41, true, 'half')).toBe(20);
-        expect(computeDamageAfterSave(8, true, 'half')).toBe(4);
-    });
-});
-
-describe('MA-0963 sibling rows byte-inert (actions[0]/actions[1] untouched)', () => {
+describe('MA-0963 sibling Multiattack row byte-inert (actions[0], cited #674)', () => {
     it('Multiattack stays header text with its own primary, no secondary', () => {
         const multi = halfDragon.actions[0];
         expect(multi.name).toBe('Multiattack');
         expect(multi.damage_dice_primary).toBe('1d4 + 4');
         expect(multi.damage_dice_secondary).toBeUndefined();
-    });
-    it('Claw keeps the MA-0962 secondary rider exactly as authored', () => {
-        const claw = halfDragon.actions[1];
-        expect(claw.name).toBe('Claw');
-        expect(claw.damage_dice_secondary).toBe('2d6');
-        expect(claw.damage_type_secondary).toBe('Acid/Cold/Fire/Lightning/Poison (GM-chosen)');
     });
 });

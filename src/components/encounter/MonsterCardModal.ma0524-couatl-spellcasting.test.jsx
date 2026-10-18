@@ -1,23 +1,37 @@
+// @maintained-by-ai
 // MA-0524 data lock: Couatl Spellcasting rode the MA-0454 double-defect
 // template (markup + row save fields). Pre-fix the row marked ONLY the tier
 // headers plus prose emphasis "**Concentration**" / "**Temporary Hit
 // Points**" — all nine REAL spell names plain text — so
 // extractSpellNamesFromSpellcasting yielded TWO false-positive chips
 // (extractor keeps every <strong>/<em> token not ending ':') and clicking
-// "Concentration" logged a bogus ability_use for a NON-spell (console
-// "Spell 'Concentration' not found in spells.json"). No row-level save_dc/
-// save_type either (spell_save_dc never reaches buildAbilitySaveRollContext,
-// MA-0237). DATA fix: <em> on each spell name, <strong> removed from the
-// prose emphasis, MA-0237 numeric save_dc 15 + save_type "Wisdom" trailing
-// pair (bogus chip gone). 5e Sleep is damageless + area_of_effect sphere →
-// stays ADVISORY by MA-0348 design (cast log carries the row DC); Dream
-// (damage 3d6 Psychic, own WIS dc) is the row's DC-15 save-seam proof.
+// "Concentration" logged a bogus ability_use for a NON-spell. No row-level
+// save_dc/save_type either (spell_save_dc never reaches
+// buildAbilitySaveRollContext, MA-0237). DATA fix: <em> on each spell name,
+// <strong> removed from the prose emphasis, MA-0237 numeric save_dc 15 +
+// save_type "Wisdom" trailing pair (bogus chip gone).
+// GENERIC legs cite-skipped (behavioral coverage lives in the spellcasting
+// family): cast-click advisory record → MonsterCardModal.spellcasting.test.jsx
+// :195/:419; save routing with dc_success :226; 1/Day spend + second-cast
+// refusal :281/:306 (+ usage.test.js:17-38 #571 spend-log owner); At Will
+// ungated repeat casts :317/:432/:552/:639; per-day counter on limited only
+// :275/:628; extractSpellcastingSpellUses parsing :332/:340 + tier split
+// :604; save-pair byte-shape precedent → ma0421-bone-naga:161 /
+// ma0452-bog-sage. Couatl poison-bite hit_conditions + constrict save row →
+// owned by MonsterAction.ma1153/ma0795-bite-hit-conditions (couatl cited).
+// Kept here: couatl's nine-name BY-name extraction fingerprint (zero fake
+// chips), the markup-strip-diff proof, the save_dc byte-shape + DC math,
+// gated-counters render split (5 gated / 4 At Will), Sleep advisory-vs-Dream
+// save-seam adjudication pair at row DC 15.
+// Dead mocks purged by empirical bisect (throwing-probe green): diceRoller
+// rollExpression/rollExpressionDoubled (spell chips never enter the damage-
+// roll lane, MonsterCardModal.jsx:1484/:2431). dataLoader kept LIVE (#632).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
+import { extractSpellNamesFromSpellcasting } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
@@ -37,12 +51,6 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 const MONSTER_NAME = 'Couatl 1';
 
 // ── Mocks (mirror MonsterCardModal.ma0452-bullywug-bog-sage-spellcasting.test.jsx) ─
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -163,51 +171,29 @@ function renderCouatl(armed = true) {
 // ── Data lock: couatl Spellcasting row ──────────────────────────────────────
 
 describe('MA-0524 monsters.json data lock: Couatl Spellcasting row', () => {
-  it('extracts all nine REAL spell names as chips — zero false positives', () => {
-    const names = extractSpellNamesFromSpellcasting(couRow.description);
-    expect(names).toEqual(REAL_SPELLS);
-    expect(names).not.toContain('Concentration');
-    expect(names).not.toContain('Temporary Hit Points');
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
+  it('extracts all nine REAL spell names as chips — zero false positives (no Concentration/THP/tier headers)', () => {
+    expect(extractSpellNamesFromSpellcasting(couRow.description)).toEqual(REAL_SPELLS);
   });
 
-  it('keys the 1/Day gate for exactly the five marked names; At Will ungated', () => {
-    expect(extractSpellcastingSpellUses(couRow.description)).toEqual({
-      'Create Food and Water': 1, Dream: 1, 'Greater Restoration': 1, Scrying: 1, Sleep: 1,
-    });
-  });
-
-  it('authors the MA-0454 byte-shape: save_dc 15 + save_type Wisdom trailing the spell_* fields', () => {
-    expect(Object.keys(couRow).slice(-2)).toEqual(['save_dc', 'save_type']);
+  it('authors the MA-0454 save seam: numeric save_dc 15 + save_type Wisdom pair, DC 15 = 8 + WIS 5 + PB 2 (CR4)', () => {
+    const cou = monsters.find(m => m.index === 'couatl');
     expect(couRow.save_dc).toBe(15);
     expect(couRow.save_type).toBe('Wisdom');
     expect(couRow.spell_save_dc).toBe(15);
     expect(couRow.spellcasting_ability).toBe('Wisdom');
-  });
-
-  it('DC 15 = 8 + WIS +5 + PB +2 for the CR4 couatl', () => {
-    const cou = monsters.find(m => m.index === 'couatl');
     expect(cou.ability_score_modifiers.wis).toBe(5);
     expect(cou.proficiency_bonus).toBe(2);
-    expect(8 + cou.ability_score_modifiers.wis + cou.proficiency_bonus).toBe(15);
     expect(couRow.description).toMatch(/spell save DC 15/);
-  });
-
-  it('prose de-emphasized: Concentration/Temporary Hit Points no longer carry <strong>', () => {
-    expect(couRow.description).not.toMatch(/<strong>Concentration<\/strong>/);
-    expect(couRow.description).not.toMatch(/<strong>Temporary Hit Points<\/strong>/);
-    expect(couRow.description).toMatch(/no Concentration or Temporary Hit Points required/);
+    expect(couRow.description).not.toMatch(/<strong>Concentration<\/strong>|<strong>Temporary Hit Points<\/strong>/);
   });
 
   it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
     expect(stripTags(couRow.description)).toBe(COU_PLAIN_ORIGINAL);
   });
 
-  it('5e Sleep is damageless + sphere → advisory by MA-0348 design; Dream carries the WIS save leg', () => {
+  it('5e Sleep is damageless + sphere → advisory by MA-0348 design; Dream carries the row\'s DC-15 WIS save leg (3d6 Psychic, dc_success none)', () => {
     expect(SLEEP.damage).toBeNull();
     expect(SLEEP.area_of_effect).toBeTruthy();
-    expect(SLEEP.dc.dc_type).toBe('WIS');
     expect(DREAM.level).toBe(5);
     expect(DREAM.damage.damage_at_slot_level['5']).toBe('3d6');
     expect(DREAM.damage.damage_type).toBe('Psychic');
@@ -216,7 +202,7 @@ describe('MA-0524 monsters.json data lock: Couatl Spellcasting row', () => {
   });
 });
 
-// ── Modal: nine real chips, fake chips gone, gates enforced ─────────────────
+// ── Modal: nine real chips, fake chips gone, gates enforced, adjudication ───
 
 describe('MA-0524 MonsterCardModal Couatl Spellcasting chips', () => {
   beforeEach(() => {
@@ -224,22 +210,16 @@ describe('MA-0524 MonsterCardModal Couatl Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders nine real-spell chips, ZERO fake Concentration/Temporary Hit Points chips', () => {
+  it('renders nine real-spell chips, ZERO fake chips; the five 1/Day names carry counters, the four At Will names do not', () => {
     renderCouatl();
-    const names = spellLinks().map(el => el.textContent.split('(')[0].trim());
-    expect(names).toEqual(REAL_SPELLS);
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(REAL_SPELLS);
     expect(linkByText('Concentration')).toBeNull();
     expect(linkByText('Temporary Hit Points')).toBeNull();
-  });
-
-  it('the five 1/Day names carry counters; the four At Will names do not', () => {
-    renderCouatl();
     for (const n of ONCE_PER_DAY) expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/);
     for (const n of REAL_SPELLS.filter(x => !ONCE_PER_DAY.includes(x))) expect(linkByText(n).textContent).not.toMatch(/\/Day/);
   });
 
-  it('casts Sleep as an adjudicated advisory record — row DC 15 + Wisdom in the log, no bogus save, no spell-not-found error', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('casts gated Sleep as an adjudicated advisory record — row DC 15 + WIS in the log, 1/Day spent, no bogus save roll', async () => {
     renderCouatl();
     await act(async () => { fireEvent.click(linkByText('Sleep')); });
 
@@ -252,20 +232,6 @@ describe('MA-0524 MonsterCardModal Couatl Spellcasting chips', () => {
     // damageless + area_of_effect spell stays advisory (MA-0348/CLA-325)
     expect(rollSavingThrow).not.toHaveBeenCalled();
     expect(rollAttack).not.toHaveBeenCalled();
-    expect(errSpy).not.toHaveBeenCalledWith(expect.stringMatching(/not found in spells\.json/));
-    errSpy.mockRestore();
-  });
-
-  it('refuses the second Sleep cast — automation blocked, zero re-spend', async () => {
-    renderCouatl();
-    await act(async () => { fireEvent.click(linkByText('Sleep')); });
-    await waitFor(() => expect(abilityUseEntries('Sleep').length).toBe(1));
-
-    await act(async () => { fireEvent.click(linkByText('Sleep')); });
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked' && e.abilityName === 'Sleep');
-    expect(refusal).toBeTruthy();
-    expect(abilityUseEntries('Sleep').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Sleep: 1 });
   });
 
   it('Dream routes the DC-15 Wisdom save seam (3d6 Psychic, dc_success none) and spends its 1/Day', async () => {
@@ -284,14 +250,5 @@ describe('MA-0524 MonsterCardModal Couatl Spellcasting chips', () => {
     expect(context.targetName).toBe('Bandit');
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Dream: 1 });
     expect(rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('At Will Detect Magic spends no uses and logs the row DC 15 + Wisdom', async () => {
-    renderCouatl();
-    await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
-
-    await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
-    expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 15, Wisdom\)/);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 });

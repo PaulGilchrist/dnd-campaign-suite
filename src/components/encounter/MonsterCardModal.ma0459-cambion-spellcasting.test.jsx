@@ -1,9 +1,22 @@
+// @maintained-by-ai — MA-0459 lane (cambion spellcasting bytes + save_dc seam).
+// Trimmed 9→5 tests: generic chip-click/advisory/spend/refuse lanes cited-skipped
+// to owners (MonsterCardModal.spellcasting.test.jsx #588 — advisory :195, 1/Day
+// spend+refuse+store :281-315, 2/Day spend-to-zero+3rd-refuse :518-533; usage
+// #571 MonsterCardHelpers.usage.test.js; dual-tier counter render already pinned
+// by ma0543-cyclops-oracle:213; WIS-charmed arm+spend marker by
+// ability-save-uses.test.jsx:127). Key-order indexOf dropped (non-behavioral —
+// buildAbilitySaveRollContext reads by name). Kept by-name: markup-only diff proof
+// with qualifier bytes, gate extraction, save_dc/save_type seam end-to-end,
+// 5-chip render (was zero affordances). Dead diceRoller + popup mocks purged
+// (empirical bisect: never reached in this lane, mirrors MA-0421 purge).
+// Disk note: cambion carries NO Fiendish Luck (no traits/reactions/legendary on
+// disk) and fly is speed.fly 60 ft. (movement lane) — no coverage owed here.
 // MA-0459 data lock: Cambion Spellcasting row (actions[3]) carried plain-text
 // spell names (zero affordances, MA-0421 family) and spell_save_dc only — the
 // save seam never reached buildAbilitySaveRollContext (MA-0532: row-level
 // numeric save_dc/save_type required; MA-0237 prose-DC twin). DATA fix mirrors
 // the MA-0421 bone-naga / MA-0454 bullywug-bog-sage byte-shape exactly: five
-// spell names in <em> with qualifiers OUTSIDE the tags, trailing
+// spell names in <em> with qualifiers OUTSIDE the tags (MA-0276), trailing
 // save_dc: 14 + save_type: "Charisma" pair, tier headers byte-unchanged.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
@@ -29,12 +42,6 @@ const cambionRow = cambion.actions.find(a => a.name === 'Spellcasting');
 
 // ── Mocks (mirror MonsterCardModal.ma0421-bone-naga-spellcasting.test.jsx) ─
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 21, rolls: [4, 5, 6, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 42, rolls: [4, 5, 6, 6, 4, 5, 6, 6], modifier: 0 })),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -46,35 +53,21 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
   const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-
+  const noop = () => vi.fn();
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
+    popupHtml: null,
+    setPopupHtml: noop(),
+    rollAttack: noop(),
+    rollDamage: noop(),
+    rollAbilityCheck: noop(),
     rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
+    rollSkillCheck: noop(),
+    rollInitiative: noop(),
+    quickRollPlayerSave: noop(),
   }));
 
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
-  };
+  return { default: mockHook, _rollSavingThrow };
 });
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
@@ -111,7 +104,6 @@ const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -141,10 +133,6 @@ function abilityUseEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
 }
 
-function refusals() {
-  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked');
-}
-
 function renderCambion() {
   const m = makeMonster({ name: cambion.name, actions: [cambionRow] });
   const creatures = [
@@ -152,20 +140,17 @@ function renderCambion() {
     { name: 'TestPC', type: 'player', currentHp: 60, maxHp: 60, conditions: [], computedStats: {} },
   ];
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Cambion 1', creatures })} />);
-  expect(stripTags(cambionRow.description)).toBe(CAMBION_PLAIN_ORIGINAL);
 }
 
-// ── Data lock: cambion row shape ───────────────────────────────────────────
+// ── Data lock: cambion row bytes + save_dc seam ─────────────────────────────
 
 describe('MA-0459 monsters.json data lock: Cambion Spellcasting row', () => {
-  it('authors the MA-0421/MA-0454 byte-shape markup: five spell names in <em>, tier headers unchanged', () => {
+  it('by-name bytes: five spell names extract as chips, qualifiers stay OUTSIDE the <em> tags (MA-0276), and stripped text equals the pre-fix description byte-for-byte (markup-only diff)', () => {
     expect(extractSpellNamesFromSpellcasting(cambionRow.description)).toEqual(CAMBION_SPELLS);
-  });
-
-  it('qualifiers stay OUTSIDE the tags (MA-0276): level/self-only parentheticals never ride a chip name', () => {
     expect(cambionRow.description).toContain('<em>Command</em> (level 3 version)');
     expect(cambionRow.description).toContain('<em>Dominate Person</em> (level 8 version)');
     expect(cambionRow.description).toContain('<em>Plane Shift</em> (self only)');
+    expect(stripTags(cambionRow.description)).toBe(CAMBION_PLAIN_ORIGINAL);
   });
 
   it('extractSpellcastingSpellUses binds the 2/Day x3 + 1/Day x2 gates to MARKED names only', () => {
@@ -175,21 +160,14 @@ describe('MA-0459 monsters.json data lock: Cambion Spellcasting row', () => {
     });
   });
 
-  it('carries the trailing save_dc 14 + save_type Charisma pair (8 + CHA + PB) — the seam buildAbilitySaveRollContext reads', () => {
+  it('carries the trailing save_dc 14 + save_type Charisma pair (8 + CHA + PB) — the seam buildAbilitySaveRollContext reads (spell_save_dc alone never reached it, MA-0532)', () => {
     expect(cambionRow.save_dc).toBe(14);
     expect(cambionRow.save_type).toBe('Charisma');
     expect(8 + cambion.ability_score_modifiers.cha + cambion.proficiency_bonus).toBe(14);
-    const keys = Object.keys(cambionRow);
-    expect(keys.indexOf('save_dc')).toBeGreaterThan(keys.indexOf('spellcasting_ability'));
-    expect(keys.indexOf('save_type')).toBeGreaterThan(keys.indexOf('save_dc'));
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
-    expect(stripTags(cambionRow.description)).toBe(CAMBION_PLAIN_ORIGINAL);
   });
 });
 
-// ── Modal: chips + cast routing ────────────────────────────────────────────
+// ── Modal: chips + save_dc seam, by name ────────────────────────────────────
 
 describe('MA-0459 MonsterCardModal Cambion Spellcasting chips', () => {
   beforeEach(() => {
@@ -197,19 +175,16 @@ describe('MA-0459 MonsterCardModal Cambion Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders five clickable spell chips (was zero affordances) with tier counters', () => {
+  it('renders five clickable spell chips (was zero affordances) with tier counters on both gates', () => {
     renderCambion();
     const names = spellLinks().map(el => el.textContent.split('(')[0].trim());
     expect(names.sort()).toEqual([...CAMBION_SPELLS].sort());
     expect(linkByText('Command').textContent).toMatch(/\(2\/Day · 2 left\)/);
-    expect(linkByText('Alter Self').textContent).toMatch(/\(2\/Day · 2 left\)/);
-    expect(linkByText('Detect Magic').textContent).toMatch(/\(2\/Day · 2 left\)/);
     expect(linkByText('Dominate Person').textContent).toMatch(/\(1\/Day · 1 left\)/);
-    expect(linkByText('Plane Shift').textContent).toMatch(/\(1\/Day · 1 left\)/);
     expect(document.querySelector('.mc-dice-link-save-clickable')).toBeNull();
   });
 
-  it('Dominate Person routes a DC 14 WIS charmed save leg, spends 1/Day, refuses the re-cast', async () => {
+  it('Dominate Person routes the save leg through the newly-authored save_dc seam: DC 14 WIS, one ability_use cast record', async () => {
     renderCambion();
     await act(async () => { fireEvent.click(linkByText('Dominate Person')); });
 
@@ -218,46 +193,6 @@ describe('MA-0459 MonsterCardModal Cambion Spellcasting chips', () => {
     expect(context.spellName).toBe('Dominate Person');
     expect(context.saveDc).toBe(14);
     expect(context.saveType).toBe('WIS');
-    expect(context.saveConditions).toEqual(['charmed']);
-    expect(context.autoDamageFormula || '').toBe('');
-
     await waitFor(() => expect(abilityUseEntries('Dominate Person').length).toBe(1));
-    expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Dominate Person': 1 });
-    expect(abilityUseEntries('Dominate Person')[0].description).toMatch(/1\/Day use spent — 0 remaining today/);
-
-    await act(async () => { fireEvent.click(linkByText('Dominate Person')); });
-    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    const refusal = refusals().find(e => e.abilityName === 'Dominate Person');
-    expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/already cast Dominate Person today \(1\/Day\)/);
-    expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Dominate Person': 1 });
-  });
-
-  it('Command cast logs the DC 14 WIS note on the advisory MA-0348-family record and spends 2/Day', async () => {
-    renderCambion();
-    await act(async () => { fireEvent.click(linkByText('Command')); });
-
-    await waitFor(() => expect(abilityUseEntries('Command').length).toBe(1));
-    expect(abilityUseEntries('Command')[0].description).toMatch(/Cambion 1 casts Command via Spellcasting/);
-    expect(abilityUseEntries('Command')[0].description).toMatch(/spell save DC 14, WIS/);
-    expect(abilityUseEntries('Command')[0].description).toMatch(/GM-enforced for monsters/);
-    expect(abilityUseEntries('Command')[0].description).toMatch(/2\/Day use spent — 1 remaining today/);
-    expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Command': 1 });
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('2/Day exhaustion: second cast spends to zero, third is refused with zero spend', async () => {
-    renderCambion();
-    await act(async () => { fireEvent.click(linkByText('Alter Self')); });
-    await waitFor(() => expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Alter Self': 1 }));
-    await act(async () => { fireEvent.click(linkByText('Alter Self')); });
-    await waitFor(() => expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Alter Self': 2 }));
-
-    await act(async () => { fireEvent.click(linkByText('Alter Self')); });
-    const refusal = refusals().find(e => e.abilityName === 'Alter Self');
-    expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/already cast Alter Self today \(2\/Day\)/);
-    expect(refusal.description).toMatch(/Alter Self refused/);
-    expect(runtime.store['Cambion 1.monsterSpellUses']).toEqual({ 'Alter Self': 2 });
   });
 });

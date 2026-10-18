@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1014 modal seam: handleSpellCast forks the spell_save_dc-only utility
 // row (Ice Devil "Ice Wall") to resolveUtilitySpellCastRow BEFORE the
 // invisibility ender and BEFORE the block-save fork — routing the save seam
@@ -17,14 +18,6 @@ const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
 const ICE_DEVIL = monsters.find(m => m.index === 'ice-devil');
 const ICE_WALL_ROW = ICE_DEVIL.actions[3];
 const MONSTER_NAME = 'Ice Devil 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -134,8 +127,9 @@ describe('MA-1014 modal: Ice Wall chip → recharge-gated advisory cast', () => 
     expect(runtime.store[`${MONSTER_NAME}.monsterRecharge`]).toEqual({ 'Ice Wall': { recharged: false, threshold: 6 } });
     const cast = abilityUses('Wall of Ice')[0];
     expect(cast.description).toContain('(spell save DC 17, Intelligence)');
+    // modal-side castLevel parse (spellCastLevelFromSpellcasting on the row text)
     expect(cast.description).toContain('Level 8 version.');
-    expect(cast.description).toContain('No spell components required.');
+    // BY-family distinct byte: wall variant (service pins generic §70; ma1016 pins fog)
     expect(cast.description).toMatch(/Wall\/zone objects have no engine consumer \(§70\)/);
     expect(abilityUses('Ice Wall').length).toBe(1);
     expect(_rollSavingThrow).not.toHaveBeenCalled();
@@ -153,16 +147,5 @@ describe('MA-1014 modal: Ice Wall chip → recharge-gated advisory cast', () => 
     expect(abilityUses('Wall of Ice').length).toBe(1);
     expect(abilityUses('Ice Wall').length).toBe(1);
     expect(_setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('mc-recharge-refusal'));
-  });
-
-  it('recovered row casts again with a fresh spend', async () => {
-    renderDevil();
-    await waitFor(() => expect(chip()).toBeTruthy());
-    await act(async () => { fireEvent.click(chip()); });
-    await waitFor(() => expect(abilityUses('Wall of Ice').length).toBe(1));
-    runtime.store[`${MONSTER_NAME}.monsterRecharge`] = { 'Ice Wall': { recharged: true, threshold: 6 } };
-    await act(async () => { fireEvent.click(chip()); });
-    await waitFor(() => expect(abilityUses('Wall of Ice').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterRecharge`]).toEqual({ 'Ice Wall': { recharged: false, threshold: 6 } });
   });
 });

@@ -1,3 +1,21 @@
+// @maintained-by-ai — trimmed 2026-10-18 (11→6 tests): kept BY-name extraction
+// + exact gate map (not.toContain/toBeUndefined subsumed by full toEqual, #576
+// precedent), spell_save_dc/spellcasting_ability data pins (DC arithmetic
+// restatement dropped, #652 precedent; no save_dc seam e2e — all four spells are
+// DC-less utility, zero save-prompt folded into the advisory e2e; advisory class
+// owned by ma0524-couatl:222, spell-shape dc-null class owned by
+// ma1959-orcus-wand:243), strip-tags markup-only diff + decoy-strong guard
+// merged, cast e2es merged to advisory + gate lanes one-render-multi-spell
+// (#576/#652 template; counter-render text folded into the cast e2es, class
+// owned by spellcasting.test.jsx :275, 1/Day spend/refuse :281). Shapechange
+// second-advisory click dropped — same lane as Detect Evil and Good, its
+// parenthetical bytes proven NOT captured by exact-name extraction. No upcast
+// pins (#656) — deva carries none. Dead mocks purged by empirical bisect
+// (ma0576 #652 twin, same advisory/gate lanes): diceRoller (cast lanes roll
+// through mocked useLoggedDiceRoll), damageUtils, rangeValidation, mapsService,
+// abilityLookup (stub outputs never reach the asserted lanes). LIVE:
+// conditionEffects (MonsterCardBody :36 useMemo), useLoggedDiceRoll, dataLoader
+// (render suspends until resolved), sanitize, logService, runtime.
 // MA-0599 data lock: Deva Spellcasting rode the MA-0421/MA-0524/MA-0532/
 // MA-0576 twin markup-gap template plus the §158 fake-chip variant: pre-fix
 // Detect Evil and Good/Shapechange/Commune/Raise Dead were plain text (zero
@@ -22,7 +40,6 @@ const deva = monsters.find(m => m.index === 'deva');
 const devaRow = deva.actions.find(a => a.name === 'Spellcasting');
 const NAMES = ['Detect Evil and Good', 'Shapechange', 'Commune', 'Raise Dead'];
 const ONE_DAY = ['Commune', 'Raise Dead'];
-const AT_WILL = ['Detect Evil and Good', 'Shapechange'];
 const SPELLS = Object.fromEntries(NAMES.map(n => [n, spells5e.find(s => s.name === n)]));
 
 const PRE_FIX_DESCRIPTION = 'The deva casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 17):\n<strong>At Will:</strong> Detect Evil and Good, Shapechange (Beast or Humanoid form only, no Temporary Hit Points gained from the spell, and no <strong>Concentration</strong> or <strong>Temporary Hit Points</strong> required to maintain the spell)\n<strong>1/Day Each:</strong> Commune, Raise Dead';
@@ -30,18 +47,13 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Deva 1';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// dataLoader LIVE (#652): render suspends until loadSpells resolves
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn(() => Promise.resolve(NAMES.map(n => SPELLS[n]))),
 }));
@@ -71,10 +83,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
   return {
     default: mockHook,
-    _rollAttack,
-    _rollDamage,
     _rollSavingThrow,
-    _setPopupHtml,
   };
 });
 
@@ -84,35 +93,10 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -157,46 +141,25 @@ function renderDeva() {
 // ── Data lock: deva Spellcasting row ─────────────────────────────────────────
 
 describe('MA-0599 monsters.json data lock: Deva Spellcasting row', () => {
-  it('extracts the four real spell names — zero fake names', () => {
-    const names = extractSpellNamesFromSpellcasting(devaRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('Concentration');
-    expect(names).not.toContain('Temporary Hit Points');
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
+  it('BY-name extraction: four real spell names, zero fakes (headers + decoy words skipped, Shapechange parenthetical NOT captured); 1/Day Each binds exactly Commune + Raise Dead, At Will ungated; all four resolve in spells.json', () => {
+    expect(extractSpellNamesFromSpellcasting(devaRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(devaRow.description)).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
+    NAMES.forEach(n => expect(SPELLS[n]).toBeTruthy());
   });
 
-  it('binds 1/Day Each to Commune + Raise Dead; the two At Will names ungated', () => {
-    const uses = extractSpellcastingSpellUses(devaRow.description);
-    expect(uses).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
-    AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  it('spell_save_dc 17 + spellcasting_ability Charisma authored; DC 17 prose present', () => {
+    expect(devaRow.spell_save_dc).toBe(17);
+    expect(devaRow.spellcasting_ability).toBe('Charisma');
+    expect(devaRow.description).toMatch(/spell save DC 17/);
   });
 
-  it('decoy mid-prose emphasis is GONE — no <strong>Concentration</strong>/<strong>Temporary Hit Points</strong>', () => {
+  it('markup-only diff: decoy mid-prose <strong> emphases GONE, tier headers byte-kept, stripped text equals the pre-fix description byte-for-byte', () => {
     expect(devaRow.description).not.toMatch(/<strong>Concentration<\/strong>/);
     expect(devaRow.description).not.toMatch(/<strong>Temporary Hit Points<\/strong>/);
     expect(devaRow.description).toMatch(/no Concentration or Temporary Hit Points required to maintain the spell/);
-  });
-
-  it('spell_save_dc 17 + spellcasting_ability Charisma authored; DC 17 = 8 + CHA +5 + PB +4', () => {
-    expect(devaRow.spell_save_dc).toBe(17);
-    expect(devaRow.spellcasting_ability).toBe('Charisma');
-    expect(deva.ability_score_modifiers.cha).toBe(5);
-    expect(deva.proficiency_bonus).toBe(4);
-    expect(8 + deva.ability_score_modifiers.cha + deva.proficiency_bonus).toBe(17);
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
+    expect(devaRow.description).toMatch(/<strong>At Will:<\/strong>/);
+    expect(devaRow.description).toMatch(/<strong>1\/Day Each:<\/strong>/);
     expect(stripTags(devaRow.description)).toBe(stripTags(PRE_FIX_DESCRIPTION));
-  });
-
-  it('all four spells exist in 5e spells.json; all DC-less utility spells', () => {
-    NAMES.forEach(n => expect(spells5e.some(s => s.name === n)).toBe(true));
-    expect(SPELLS['Detect Evil and Good'].level).toBe(1);
-    expect(SPELLS.Shapechange.level).toBe(9);
-    expect(SPELLS.Commune.level).toBe(5);
-    expect(SPELLS['Raise Dead'].level).toBe(5);
-    NAMES.forEach(n => expect(SPELLS[n].dc ?? null).toBeNull());
   });
 });
 
@@ -208,22 +171,14 @@ describe('MA-0599 MonsterCardModal Deva Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders four spell chips — the two fake chips are gone', () => {
+  it('renders exactly four spell chips — the two fake chips are gone', () => {
     renderDeva();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
-    const heads = spellLinks().map(el => el.textContent.split('(')[0].trim());
-    expect(heads).not.toContain('Concentration');
-    expect(heads).not.toContain('Temporary Hit Points');
   });
 
-  it('the two 1/Day names carry counters; the two At Will names do not', () => {
+  it('At Will advisory lane: Detect Evil and Good shows no counter, casts ungated twice — advisory cast log, zero uses stored, zero save prompts (all four spells DC-less utility)', async () => {
     renderDeva();
-    ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
-    AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
-  });
-
-  it('At Will Detect Evil and Good casts ungated twice — zero uses, advisory cast log', async () => {
-    renderDeva();
+    expect(linkByText('Detect Evil and Good').textContent).not.toMatch(/\/Day/);
     await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
     await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(1));
     expect(abilityUseEntries('Detect Evil and Good')[0].description).toMatch(/casts Detect Evil and Good via Spellcasting/);
@@ -231,10 +186,12 @@ describe('MA-0599 MonsterCardModal Deva Spellcasting chips', () => {
     await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
     await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(2));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('Commune 1/Day: cast spends the single use, second refused — zero extra spend', async () => {
+  it('Gate lane: Commune shows (1/Day · 1 left); first cast spends the single use, second refused — zero extra spend', async () => {
     renderDeva();
+    expect(linkByText('Commune').textContent).toMatch(/\(1\/Day · 1 left\)/);
     await act(async () => { fireEvent.click(linkByText('Commune')); });
     await waitFor(() => expect(abilityUseEntries('Commune').length).toBe(1));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
@@ -244,12 +201,5 @@ describe('MA-0599 MonsterCardModal Deva Spellcasting chips', () => {
     await waitFor(() => expect(refusals('Commune').length).toBe(1));
     expect(abilityUseEntries('Commune').length).toBe(1);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Commune': 1 });
-  });
-
-  it('zero save prompts fired — all four spells are DC-less utility casts', async () => {
-    renderDeva();
-    await act(async () => { fireEvent.click(linkByText('Detect Evil and Good')); });
-    await waitFor(() => expect(abilityUseEntries('Detect Evil and Good').length).toBe(1));
-    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 });

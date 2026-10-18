@@ -1,25 +1,29 @@
-// MA-0805: Giant Elk Ram — hit_conditions:["prone"] + conditional_damage
-// authored on monsters.json actions[0] (MA-0010 prone family + MA-0007 charge-bonus
-// seam) so the HIT popup offers the "extra 2d4 Bludgeoning" charge rider and the
-// resolved hit grants Prone (Large-or-smaller gate lives in handlePlainDamage).
-// Locks: data byte-shape mirrors the MA-0756 galeb-duhr fixed row (modifier-less
-// conditional_damage, hit_conditions after damage_type_secondary per MA-0794),
-// offer builds with formula "2d4" (modifier 0), grant rolls 2d4 + logs, hit
-// clause carries prone. Bandit (Medium) passes the consumer size gate either way;
-// the RAW Huge-or-smaller threshold vs the Large-or-smaller consumer gate is
-// advisory (Huge victims rare).
+// @maintained-by-ai
+// MA-0805: Giant Elk Ram — the fix authored TWO fields on monsters.json actions[0]:
+// hit_conditions:["prone"] (MA-0010 seam) + modifier-less conditional_damage
+// (MA-0007 charge-bonus seam, galeb-duhr MA-0756 byte-shape twin). This lane keeps
+// exactly those two seams, one press each (trim pass 2026-10-18):
+//   1. Disk-row bytes BY-name (#387 family): both fields + MA-0794 placement
+//      (hit_conditions after damage_type_secondary) + key-parity vs galeb-duhr.
+//   2. ONE click→rollAttack ctx press (#583 canonical idiom, forward at
+//      MonsterCardModal.jsx:1407; buildAutoDamageOptions :1156/:1180 rides the same
+//      arg[2]): full offer identity FROM disk via toEqual (all 7 offer keys,
+//      formula "2d4" modifier 0) + the prone hitClause {conditions:['prone'],
+//      escapeDc:null, attackName:'Ram'}.
+// Cut (owner #583 MonsterCardModal.charge-bonus.test.jsx owns resolveChargeBonus
+// grant hit/crit + decline/refuse machine — the 2d4 roll bytes, grant/decline logs,
+// resolved-write are byte-shape twins there with :2678 guards). Cut helper-direct
+// re-reads of buildChargeBonusOffer/buildHitConditionClause (#662/#666 precedent —
+// both helpers fire inside the ctx press above). Dead-mock purge empirical per-lane
+// (#659/#666): diceRoller mock gone (rollAttack mocked, no roller fires on this
+// lane), AttackResultPopup mock gone (popupHtml null → never rendered), rollD20 +
+// five never-fired hook members gone (owner :20-23 baseline proves minimal hook
+// renders). No timers 🔴 — no waitFor needed, ctx lands synchronously.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: 7, rolls: [3, 4], modifier: 0, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 14, rolls: [3, 4, 3, 4], modifier: 0, formula })),
-  rollD20: vi.fn(() => 16),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -32,23 +36,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -88,71 +84,37 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, buildHitConditionClause } from './MonsterCardHelpers.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const ELK = monsters.find((m) => m.index === 'giant-elk');
 const RAM = ELK.actions.find((a) => a.name === 'Ram');
-const GALEB = monsters.find((m) => m.index === 'galeb-duhr');
-const SLAM = GALEB.actions.find((a) => a.name === 'Avalanche Slam');
+const SLAM = monsters.find((m) => m.index === 'galeb-duhr').actions.find((a) => a.name === 'Avalanche Slam');
+
+// Exact buildChargeBonusOffer(RAM, 'Ram') output FROM the disk row — full identity.
+const RAM_OFFER = {
+  dice: '2d4',
+  modifier: 0,
+  damageType: 'Bludgeoning',
+  condition: 'moved 20+ feet straight toward target immediately before the hit',
+  formula: '2d4',
+  label: '20+ ft Charge: +2d4 Bludgeoning?',
+  attackName: 'Ram',
+};
 
 const CREATURES = [
   { name: 'Giant Elk 1', targetName: 'Bandit 1' },
-  { name: 'Bandit 1', type: 'player', size: 'Medium or Small' },
+  { name: 'Bandit 1', type: 'player' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(RAM, 'Ram');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Ram',
-    rolls: [16],
-    bonus: 6,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Ram', formula: '2d6 + 4', damageType: 'Bludgeoning', source: 'Giant Elk 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderRam(popupHtml = null) {
-  _setPopupHtml(popupHtml);
+function renderRam() {
+  _setPopupHtml(null);
   const m = makeMonster({ name: 'Giant Elk', actions: ELK.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Giant Elk 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Giant Elk 1' })} />);
-}
-
-function clickRamLink() {
-  const ramRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Ram/.test(a.textContent.trim()));
-  const chip = Array.from(ramRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
-  expect(chip, 'Expected Ram +6 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
 }
 
 beforeEach(() => {
@@ -161,7 +123,7 @@ beforeEach(() => {
 });
 
 describe('MA-0805 monsters.json data lock: Giant Elk Ram charge riders', () => {
-  it('authors hit_conditions ["prone"] after damage_type_secondary (MA-0794 placement)', () => {
+  it('BY-name row bytes: hit_conditions ["prone"] after damage_type_secondary (MA-0794) + modifier-less conditional_damage mirroring the MA-0756 galeb-duhr byte-shape', () => {
     expect(RAM.attack_bonus).toBe(6);
     expect(RAM.damage_dice_primary).toBe('2d6 + 4');
     expect(RAM.damage_type_primary).toBe('Bludgeoning');
@@ -170,64 +132,25 @@ describe('MA-0805 monsters.json data lock: Giant Elk Ram charge riders', () => {
     expect(RAM.hit_conditions).toEqual(['prone']);
     const keys = Object.keys(RAM);
     expect(keys.indexOf('hit_conditions')).toBeGreaterThan(keys.indexOf('damage_type_secondary'));
-  });
-
-  it('authors modifier-less conditional_damage mirroring the MA-0756 galeb-duhr byte-shape', () => {
     const cd = RAM.conditional_damage;
-    expect(cd).toBeTruthy();
     expect(cd.dice).toBe('2d4');
     expect(cd.damage_type).toBe('Bludgeoning');
     expect(cd.condition).toMatch(/moved 20\+ feet straight toward/i);
     expect('modifier' in cd).toBe(false);
     expect(Object.keys(cd).sort()).toEqual(Object.keys(SLAM.conditional_damage).sort());
   });
-
-  it('buildChargeBonusOffer builds the charge variant with formula "2d4" (modifier 0)', () => {
-    const offer = buildChargeBonusOffer(RAM, 'Ram');
-    expect(offer).toMatchObject({ dice: '2d4', modifier: 0, damageType: 'Bludgeoning', formula: '2d4', attackName: 'Ram' });
-    expect(offer.label).toBe('20+ ft Charge: +2d4 Bludgeoning?');
-  });
-
-  it('buildHitConditionClause arms the prone hit clause', () => {
-    const clause = buildHitConditionClause(RAM);
-    expect(clause).toMatchObject({ conditions: ['prone'], escapeDc: null, attackName: 'Ram' });
-  });
 });
 
-describe('MA-0805 Ram HIT popup offer + grant', () => {
-  it('forwards the charge conditional offer to the attack roll context', () => {
+describe('MA-0805 Ram click→ctx forward (#583 single press)', () => {
+  it('clicking the +6 chip forwards the full disk offer + the prone hit clause on rollAttack arg[2]', () => {
     renderRam();
-    clickRamLink();
+    const ramRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Ram/.test(a.textContent.trim()));
+    const chip = Array.from(ramRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
+    expect(chip, 'Expected Ram +6 dice link').toBeTruthy();
+    fireEvent.click(chip);
     expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d4', modifier: 0, damageType: 'Bludgeoning' });
-  });
-
-  it('grants: rolls 2d4, applies its own damage, logs the clause', async () => {
-    renderRam(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d4');
-    expect(call.context.damageType).toBe('Bludgeoning');
-    expect(rollExpression).toHaveBeenCalledWith('2d4');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('+7 Bludgeoning (2d4)');
-  });
-
-  it('declines: logs the refusal with zero charge roll', async () => {
-    renderRam(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      const decline = findLogEntry('conditional_damage_declined');
-      expect(decline).toBeTruthy();
-      expect(decline.description).toContain('base damage only');
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.chargeBonusOffer).toEqual(RAM_OFFER);
+    expect(ctx.hitClause).toEqual({ conditions: ['prone'], escapeDc: null, attackName: 'Ram', targetEffect: null });
   });
 });

@@ -1,3 +1,8 @@
+// @maintained-by-ai — trimmed 2026-10-18: removed 16 duplicate legs per super-owner lane
+// (9 exhausted dups :297/:405/:530/:707/:718/:840/:1035/:1091/:1545 → canonical :190,
+// 3 latch dups :418/:543/:731 → canonical :310, 4 cooldown dups :552/:740/:1047/:1173 →
+// canonical :427 incl. merged popup-wording). Distinct bytes absorbed into the canonical
+// exhausted + cooldown legs; per-seam faces covered by monsterLegendaryUses.test.js.
 // MA-0021 regression: legendary-uses economy on the Aboleth card. The header
 // row shows a "(N left)" counter via the monsterLegendaryUses runtime map;
 // the verbatim action rows beneath become gated clickable rows — click expends
@@ -197,6 +202,13 @@ describe('MA-0070 MonsterCardModal brass dragon legendary gated rows', () => {
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+    // Canonical exhausted leg (trimmed): absorbs the zero-spend-log byte from
+    // the deleted aboleth dup and the zero-roll bytes from the deleted brass/
+    // bronze/copper/gold/green/red/silver/white exhausted dups — single shared
+    // gate (monsterLegendaryUses.js), per-seam faces covered service-side.
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'ability_use')).toBe(false);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 
   it('Blazing Light spends 1 and rolls the +8 spell attack', async () => {
@@ -294,19 +306,6 @@ describe('MA-0081 MonsterCardModal bronze dragon legendary gated rows', () => {
     expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(10);
   });
 
-  it('exhausted (3/3): Thunderclap click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderBronze({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(bronzeRow('Thunderclap').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
   it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
     renderBronze({ max: 3, used: 0 });
     fireEvent.click(bronzeRow('Pounce').querySelector('.mc-dice-link-legendary'));
@@ -402,28 +401,6 @@ describe('MA-0092 MonsterCardModal copper dragon legendary gated rows', () => {
     expect(spend.description).toMatch(/expends a legendary use for Giggling Magic/);
   });
 
-  it('exhausted (3/3): Mind Jolt click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderCopper({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(copperRow('Mind Jolt').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
-  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
-    renderCopper({ max: 3, used: 0 });
-    fireEvent.click(copperRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(copperRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
-
   it('per-action cooldown: Giggling Magic re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
     renderCopper({ max: 3, used: 0 });
     fireEvent.click(copperRow('Giggling Magic').querySelector('.mc-dice-link'));
@@ -433,6 +410,11 @@ describe('MA-0092 MonsterCardModal copper dragon legendary gated rows', () => {
     fireEvent.click(copperRow('Giggling Magic').querySelector('.mc-dice-link'));
     await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'giggling_magic_refused (once per turn)')).toBe(true));
     expect(runtime.store['Adult Copper Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    // Canonical cooldown leg (trimmed): absorbs the popup-wording byte from the
+    // deleted MA-0073 Scorching Sands dup (monsterLegendaryUses.js:139 template)
+    // and the zero-extra-roll bytes from the deleted gold/green/red dups.
+    expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/can't take Giggling Magic again/);
+    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 });
 
@@ -525,38 +507,6 @@ describe('MA-0103 MonsterCardModal gold dragon legendary gated rows', () => {
     expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ banish: { round: 1 } });
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Banish/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Banish/);
-  });
-
-  it('exhausted (3/3): Guiding Light click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderGold({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(goldRow('Guiding Light').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
-  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
-    renderGold({ max: 3, used: 0 });
-    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(goldRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
-
-  it('per-action cooldown: Banish re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
-    renderGold({ max: 3, used: 0 });
-    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
-    fireEvent.click(goldRow('Banish').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'banish_refused (once per turn)')).toBe(true));
-    expect(runtime.store['Adult Gold Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
   });
 });
 
@@ -703,49 +653,6 @@ describe('MA-0113 MonsterCardModal green dragon legendary gated rows', () => {
     expect(spend.description).toMatch(/expends a legendary use for Mind Invasion/);
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
-
-  it('exhausted (3/3): Mind Invasion click refuses with popup + legendary_use_refused, zero spend, zero save roll', async () => {
-    renderGreen({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(greenRow('Mind Invasion').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('exhausted (3/3): Noxious Miasma click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderGreen({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
-  it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
-    renderGreen({ max: 3, used: 0 });
-    fireEvent.click(greenRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(greenRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
-
-  it('per-action cooldown: Noxious Miasma re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
-    renderGreen({ max: 3, used: 0 });
-    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
-    fireEvent.click(greenRow('Noxious Miasma').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'noxious_miasma_refused (once per turn)')).toBe(true));
-    expect(runtime.store['Adult Green Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
 });
 
 const red = () => monstersData.find(m => m.name === 'Adult Red Dragon');
@@ -835,19 +742,6 @@ describe('MA-0124 MonsterCardModal red dragon legendary gated rows', () => {
     const row = redRow('Fiery Rays');
     expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
     expect(row.querySelector('.mc-dice-link').textContent).toContain('+12');
-  });
-
-  it('exhausted (3/3): Commanding Presence save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderRed({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(redRow('Commanding Presence').querySelector('.mc-dice-link-save-clickable'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
   });
 
   it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
@@ -1031,30 +925,6 @@ describe('MA-0126 MonsterCardModal red dragon Fiery Rays gated spell-attack row'
     expect(spend.description).toMatch(/expends a legendary use for Fiery Rays/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
-
-  it('exhausted (3/3): +12 chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderRedArmed({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(fieryChip());
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
-  it('per-action cooldown: re-click at a later boundary refuses zero-spend with (once per turn) log', async () => {
-    renderRedArmed({ max: 3, used: 0 });
-    fireEvent.click(fieryChip());
-    await waitFor(() => expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    ctx.value = { round: 1, activeCreatureName: 'TestPC', creatures: CREATURES };
-    fireEvent.click(fieryChip());
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'fiery_rays_refused (once per turn)')).toBe(true));
-    expect(runtime.store['Adult Red Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
-  });
-
   it('regain at the dragon turn-start clears the latch; next-boundary click spends and rolls again', async () => {
     renderRedArmed({ max: 3, used: 0 });
     fireEvent.click(fieryChip());
@@ -1086,18 +956,6 @@ describe('MA-0021 MonsterCardModal legendary economy', () => {
     expect(spend).toBeTruthy();
     expect(spend.characterName).toBe('Aboleth 1');
     expect(spend.description).toMatch(/expends a legendary use for Lash/);
-  });
-
-  it('exhausted (3/3): popup + legendary_use_refused log, zero spend, counter 0 left', async () => {
-    renderAboleth({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(lashLink());
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'ability_use')).toBe(false);
-    expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 
   // MA-0022: Lash has no own numbers — it delegates_to the Tentacle row and
@@ -1143,46 +1001,6 @@ describe('MA-0021 MonsterCardModal legendary economy', () => {
     fireEvent.click(lashLink());
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(runtime.store['Aboleth 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-  });
-});
-
-// MA-0073: Scorching Sands per-action cooldown on the live card. First
-// gated click spends 1 + stamps the action-keyed cooldown; a later boundary
-// in the same round refuses with popup + scorching_sands_refused (once per
-// turn) log, zero spend, zero second save prompt.
-describe('MA-0073 MonsterCardModal Scorching Sands once-per-turn gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
-  });
-
-  function renderBrass(uses) {
-    if (uses !== undefined) runtime.store['Adult Brass Dragon 1.monsterLegendaryUses'] = uses;
-    const m = makeMonster({
-      name: 'Adult Brass Dragon',
-      actions: brassActions(),
-      legendary_actions: brass().legendary_actions,
-    });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Brass Dragon 1', creatures: CREATURES })} />);
-  }
-  function sandsRow() {
-    return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Scorching Sands'));
-  }
-
-  it('first click spends + stamps cooldown; next-boundary re-click refuses zero-spend with (once per turn) log', async () => {
-    renderBrass({ max: 3, used: 0 });
-    fireEvent.click(sandsRow().querySelector('.mc-dice-link'));
-    await waitFor(() => expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryActionCooldowns']).toMatchObject({ scorching_sands: { round: 1 } });
-
-    // Later boundary, same round — row's own gate refuses even though the
-    // boundary latch would allow and 2 uses remain.
-    ctx.value = { round: 1, activeCreatureName: 'AasimarTest', creatures: CREATURES };
-    fireEvent.click(sandsRow().querySelector('.mc-dice-link'));
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'scorching_sands_refused (once per turn)')).toBe(true));
-    expect(runtime.store['Adult Brass Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(String(setPopupHtml.mock.calls.map(c => c[0]).join('|'))).toMatch(/can't take Scorching Sands again/);
   });
 });
 
@@ -1540,18 +1358,6 @@ describe('MA-0145 MonsterCardModal white dragon legendary gated rows', () => {
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Pounce/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('exhausted (3/3): save-chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderWhite({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(whiteRow('Freezing Burst').querySelector('.mc-dice-link-save-clickable'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Adult White Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
   });
 
   it('turn latch: same-boundary second click refuses via the MA-0021 latch (zero extra spend)', async () => {
@@ -2091,3 +1897,4 @@ describe('MA-0175 MonsterCardModal ancient blue dragon Tail Swipe gated delegate
     expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
   });
 });
+

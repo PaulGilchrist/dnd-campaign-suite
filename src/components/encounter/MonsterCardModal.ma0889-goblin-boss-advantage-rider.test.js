@@ -1,9 +1,17 @@
+// @maintained-by-ai
 // MA-0889: Goblin Boss Scimitar/Shortbow advantage-rider METADATA SPLIT —
 // "Hit: 5 (1d6 + 2) … damage, plus 2 (1d4) … damage if the attack roll had
 // Advantage." The rider is discriminated by authored `secondary_condition:
 // "advantage"` riding the MA-0427 secondary transport; legacy additive
-// riders (MA-0426/0531 "plus 3d6 poison" family, flat_sickle twin) carry no
-// field and forward null = always-roll, byte-identical.
+// riders (MA-0426/0531 "plus 3d6 poison" family, flat_sickle twin MA-0530)
+// carry no field and forward null = always-roll, byte-identical.
+// Seam: the REAL exported buildSecondaryDamageTransport (MonsterCardModal
+// .jsx:1199-1214) — transport-level discrimination only. The advantage FOLD
+// itself (rider fires only when resolved lastAttack.forcedMode ===
+// 'advantage') is proven at the real consumer in
+// handlePlainDamage.secondary-advantage-gate.test.js (advantage/normal/
+// disadvantage legs :186-223, MA-1444/1445 Scout Captain fold + that file's
+// own monsters.json lock :259-266 — cited-skipped here).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -25,54 +33,28 @@ describe('MA-0889 Goblin Boss advantage-gated secondary rider', () => {
         expect(scimitarRow.damage_type_secondary).toBe('Slashing');
         expect(scimitarRow.secondary_condition).toBe('advantage');
         expect(scimitarRow.description).toContain('if the attack roll had Advantage');
-    });
-
-    it('MA-0890 twin data-lock: Shortbow actions[2] carries secondary_condition "advantage"', () => {
-        expect(shortbowRow.name).toBe('Shortbow');
-        expect(shortbowRow.damage_dice_primary).toBe('1d6 + 2');
-        expect(shortbowRow.damage_dice_secondary).toBe('1d4');
-        expect(shortbowRow.damage_type_secondary).toBe('Piercing');
-        expect(shortbowRow.secondary_condition).toBe('advantage');
-        expect(shortbowRow.description).toContain('if the attack roll had Advantage');
-    });
-
-    it('transport forwards secondaryCondition "advantage" with the secondary triple intact', () => {
         const t = buildSecondaryDamageTransport(scimitarRow, 'Scimitar');
         expect(t.autoDamageSecondaryFormula).toBe('1d4');
         expect(t.autoDamageSecondaryName).toBe('Scimitar');
         expect(t.autoDamageSecondaryDamageType).toBe('Slashing');
         expect(t.secondaryCondition).toBe('advantage');
-        const s = buildSecondaryDamageTransport(shortbowRow, 'Shortbow');
-        expect(s.secondaryCondition).toBe('advantage');
     });
 
-    it('MA-0897 twin data-lock: Goblin Warrior Scimitar actions[0] carries secondary_condition "advantage"', () => {
-        const row = goblinWarrior.actions[0];
-        expect(row.name).toBe('Scimitar');
-        expect(row.attack_bonus).toBe(4);
-        expect(row.damage_dice_primary).toBe('1d6 + 2');
-        expect(row.damage_type_primary).toBe('Slashing');
-        expect(row.damage_dice_secondary).toBe('1d4');
-        expect(row.damage_type_secondary).toBe('Slashing');
-        expect(row.secondary_condition).toBe('advantage');
-        expect(row.description).toContain('if the attack roll had Advantage');
-        const t = buildSecondaryDamageTransport(row, 'Scimitar');
-        expect(t.secondaryCondition).toBe('advantage');
-        expect(t.autoDamageSecondaryFormula).toBe('1d4');
-        expect(t.autoDamageSecondaryDamageType).toBe('Slashing');
-    });
-
-    it('MA-0898 twin data-lock: Goblin Warrior Shortbow actions[1] carries secondary_condition "advantage"', () => {
-        const row = goblinWarrior.actions[1];
-        expect(row.name).toBe('Shortbow');
-        expect(row.damage_dice_primary).toBe('1d6 + 2');
-        expect(row.damage_dice_secondary).toBe('1d4');
-        expect(row.damage_type_secondary).toBe('Piercing');
-        expect(row.secondary_condition).toBe('advantage');
-        expect(row.description).toContain('if the attack roll had Advantage');
-        const t = buildSecondaryDamageTransport(row, 'Shortbow');
-        expect(t.secondaryCondition).toBe('advantage');
-        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
+    it('MA-0890/0897/0898 advantage twins forward "advantage" through the transport', () => {
+        const twins = [
+            [shortbowRow, 'Shortbow', '1d4', 'Piercing'],
+            [goblinWarrior.actions[0], 'Scimitar', '1d4', 'Slashing'],
+            [goblinWarrior.actions[1], 'Shortbow', '1d4', 'Piercing'],
+        ];
+        for (const [row, name, formula, type] of twins) {
+            expect(row.name).toBe(name);
+            expect(row.damage_dice_secondary).toBe(formula);
+            expect(row.secondary_condition).toBe('advantage');
+            const t = buildSecondaryDamageTransport(row, name);
+            expect(t.autoDamageSecondaryFormula).toBe(formula);
+            expect(t.autoDamageSecondaryDamageType).toBe(type);
+            expect(t.secondaryCondition).toBe('advantage');
+        }
     });
 
     it('legacy always-roll riders forward secondaryCondition null byte-identical (MA-0426/0531 family)', () => {
@@ -90,40 +72,5 @@ describe('MA-0889 Goblin Boss advantage-gated secondary rider', () => {
     it('secondary-less rows keep the null triple shape byte-identical (no new key)', () => {
         const nullRow = { name: 'Bite', damage_dice_primary: '1d6' };
         expect(buildSecondaryDamageTransport(nullRow)).toEqual({ autoDamageSecondaryFormula: null, autoDamageSecondaryName: null, autoDamageSecondaryDamageType: null });
-    });
-
-    it('MA-1444 data-lock: Scout Captain Shortsword actions[1] carries secondary_condition "advantage"', () => {
-        const scoutCaptain = monsters.find(m => m.index === 'scout-captain');
-        const row = scoutCaptain.actions[1];
-        expect(row.name).toBe('Shortsword');
-        expect(row.attack_bonus).toBe(5);
-        expect(row.damage_dice_primary).toBe('1d6 + 3');
-        expect(row.damage_type_primary).toBe('Piercing');
-        expect(row.damage_dice_secondary).toBe('3d6');
-        expect(row.damage_type_secondary).toBe('Piercing');
-        expect(row.secondary_condition).toBe('advantage');
-        expect(row.description).toContain('if the attack was made with Advantage');
-        const t = buildSecondaryDamageTransport(row, 'Shortsword');
-        expect(t.secondaryCondition).toBe('advantage');
-        expect(t.autoDamageSecondaryFormula).toBe('3d6');
-        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
-    });
-
-    it('MA-1445 data-lock: Scout Captain Longbow actions[2] carries secondary_condition "advantage"', () => {
-        const scoutCaptain = monsters.find(m => m.index === 'scout-captain');
-        const row = scoutCaptain.actions[2];
-        expect(row.name).toBe('Longbow');
-        expect(row.attack_bonus).toBe(5);
-        expect(row.damage_dice_primary).toBe('1d8 + 3');
-        expect(row.damage_type_primary).toBe('Piercing');
-        expect(row.damage_dice_secondary).toBe('3d6');
-        expect(row.damage_type_secondary).toBe('Piercing');
-        expect(row.secondary_condition).toBe('advantage');
-        expect(row.range).toBe('150/600 ft.');
-        expect(row.description).toContain('if the attack was made with Advantage');
-        const t = buildSecondaryDamageTransport(row, 'Longbow');
-        expect(t.secondaryCondition).toBe('advantage');
-        expect(t.autoDamageSecondaryFormula).toBe('3d6');
-        expect(t.autoDamageSecondaryDamageType).toBe('Piercing');
     });
 });

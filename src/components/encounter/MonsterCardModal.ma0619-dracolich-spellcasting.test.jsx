@@ -1,3 +1,20 @@
+// @maintained-by-ai — trimmed 2026-10-18 (13→6): kept BY-name extraction + exact
+// gate map, row-level save_dc 19/Charisma pair pin, strip-tags markup diff, At Will
+// advisory cast ×2 at row DC 19 (zero-chip inert-row render folded in; counter-render
+// class owned by spellcasting.test.jsx :275, counters asserted inline on the gated
+// leg), Ray of Sickness 2024-fallback lv2/+11/3d8 leg, merged 1/Day Each gated leg
+// (Create Undead + Finger of Death spend, Finger of Death refuse; refusal shape owned
+// by spellcasting.test.jsx :281). Create Undead lv8 upcast pin sits at data level
+// (spellCastLevelFromSpellcasting — the advisory log does not echo the parenthetical,
+// verified live 2026-10-18). Vacuous drops: not.toContain/toBeUndefined subsumed
+// by full toEqual; <strong> placement regexes subsumed by exact-name extraction
+// (MonsterCardHelpers.js:401 reads [^<]+ INSIDE the tag); DC arithmetic restatement
+// (#652/ma0576 precedent); Ray 5e-absent pin folded into the gate-map test. Dead
+// mocks purged by empirical bisect (ma0576 twin, same lanes): diceRoller (cast lanes
+// roll through mocked useLoggedDiceRoll), damageUtils, rangeValidation, mapsService,
+// abilityLookup (stub outputs never reach the asserted advisory/gate lanes).
+// LIVE: conditionEffects (MonsterCardBody :36 useMemo), useLoggedDiceRoll, dataLoader
+// (render suspends until resolved, §177 ruleset branch), sanitize, logService, runtime.
 // MA-0619 data lock: Dracolich Spellcasting rode the MA-0421/MA-0524/MA-0532/
 // MA-0576/MA-0611 twin markup-gap template. Pre-fix ONLY the two tier headers
 // carried <strong>; Detect Magic/Ray of Sickness/Create Undead/Finger of Death
@@ -8,12 +25,14 @@
 // fingerprint). DATA fix: <strong> on each spell name (headers byte-kept,
 // level parentheticals OUTSIDE the tag, strip-tags byte-equality) + trailing
 // row-level numeric save_dc 19 + save_type "Charisma" pair (MA-0454/§164).
+// Distinct bytes: the twin row whose only attack spell (Ray of Sickness) is
+// 2024-only — findMonsterSpell 2024 fallback is the sole resolution lane here.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
+import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses, spellCastLevelFromSpellcasting } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
@@ -23,7 +42,6 @@ const dracolich = monsters.find(m => m.index === 'dracolich');
 const dracolichRow = dracolich.actions.find(a => a.name === 'Spellcasting');
 const NAMES = ['Detect Magic', 'Ray of Sickness', 'Create Undead', 'Finger of Death'];
 const ONE_DAY = ['Create Undead', 'Finger of Death'];
-const AT_WILL = ['Detect Magic', 'Ray of Sickness'];
 const SPELLS_5E = NAMES.map(n => spells5e.find(s => s.name === n)).filter(Boolean);
 const SPELLS_2024 = NAMES.map(n => spells2024.find(s => s.name === n)).filter(Boolean);
 
@@ -32,51 +50,34 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Dracolich 1';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// dataLoader LIVE: render suspends until loadSpells resolves; §177 — the mock
+// MUST branch on the ruleset arg so Ray of Sickness resolves ONLY on 2024.
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? SPELLS_2024 : SPELLS_5E)),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
 
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
-
   return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+      rollInitiative: vi.fn(),
+      quickRollPlayerSave: vi.fn(),
+    })),
   };
 });
 
@@ -86,35 +87,10 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -157,54 +133,30 @@ function renderDracolich() {
 // ── Data lock: dracolich Spellcasting row ────────────────────────────────────
 
 describe('MA-0619 monsters.json data lock: Dracolich Spellcasting row', () => {
-  it('extracts all four spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(dracolichRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
+  it('BY-name extraction + exact gate map: four chips (tier headers skipped); 1/Day Each binds exactly {Create Undead:1, Finger of Death:1}, At Will ungated; Ray of Sickness resolves on the 2024 spell list only', () => {
+    expect(extractSpellNamesFromSpellcasting(dracolichRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(dracolichRow.description)).toEqual({ 'Create Undead': 1, 'Finger of Death': 1 });
+    expect(spells5e.some(s => s.name === 'Ray of Sickness')).toBe(false);
+    expect(spells2024.some(s => s.name === 'Ray of Sickness')).toBe(true);
   });
 
-  it('binds 1/Day Each to the two marked names; At Will ungated', () => {
-    const uses = extractSpellcastingSpellUses(dracolichRow.description);
-    expect(uses).toEqual({ 'Create Undead': 1, 'Finger of Death': 1 });
-    AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
-  });
-
-  it('row-level numeric save_dc 19 + save_type Charisma pair authored (trailing)', () => {
+  it('row-level numeric save_dc 19 + save_type Charisma pair authored (trailing); Create Undead lv8 upcast pin resolves', () => {
     expect(dracolichRow.save_dc).toBe(19);
     expect(dracolichRow.save_type).toBe('Charisma');
     expect(dracolichRow.spell_save_dc).toBe(19);
     expect(dracolichRow.spell_attack_bonus).toBe(11);
     expect(dracolichRow.spellcasting_ability).toBe('Charisma');
     expect(dracolichRow.description).toMatch(/spell save DC 19/);
-    expect(dracolichRow.description).toMatch(/<strong>Ray of Sickness<\/strong> \(level 2 version\)/);
-    expect(dracolichRow.description).toMatch(/<strong>Create Undead<\/strong> \(level 8 version\)/);
-  });
-
-  it('no fake chips: level parentheticals and prose stay plain text', () => {
-    expect(dracolichRow.description).not.toMatch(/<(?:strong|em)>[^<]*level[^<]*<\/(?:strong|em)>/);
-    expect(dracolichRow.description).not.toMatch(/<(?:strong|em)>[^<]*Charisma[^<]*<\/(?:strong|em)>/);
-  });
-
-  it('DC 19 = 8 + CHA +5 + PB +6 and +11 = CHA +5 + PB +6 for the dracolich', () => {
-    expect(dracolich.ability_score_modifiers.cha).toBe(5);
-    expect(dracolich.proficiency_bonus).toBe(6);
-    expect(8 + dracolich.ability_score_modifiers.cha + dracolich.proficiency_bonus).toBe(19);
-    expect(dracolich.ability_score_modifiers.cha + dracolich.proficiency_bonus).toBe(11);
+    const createUndead = spells5e.find(s => s.name === 'Create Undead');
+    expect(spellCastLevelFromSpellcasting(dracolichRow.description, 'Create Undead', createUndead)).toBe(8);
   });
 
   it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
     expect(stripTags(dracolichRow.description)).toBe(DRACOLICH_PLAIN_ORIGINAL);
   });
-
-  it('three spells exist in 5e; Ray of Sickness is 2024-only (findMonsterSpell 2024 fallback)', () => {
-    ['Detect Magic', 'Create Undead', 'Finger of Death'].forEach(n => expect(spells5e.some(s => s.name === n)).toBe(true));
-    expect(spells5e.some(s => s.name === 'Ray of Sickness')).toBe(false);
-    expect(spells2024.some(s => s.name === 'Ray of Sickness')).toBe(true);
-  });
 });
 
-// ── Modal: four chips, counters, gates ───────────────────────────────────────
+// ── Modal: four chips, cast lanes, gates ─────────────────────────────────────
 
 describe('MA-0619 MonsterCardModal Dracolich Spellcasting chips', () => {
   beforeEach(() => {
@@ -212,19 +164,10 @@ describe('MA-0619 MonsterCardModal Dracolich Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders four spell chips — the zero-chip inert row is gone', () => {
+  it('At Will Detect Magic casts ungated twice — four chips rendered (zero-chip inert row gone), no counter, advisory log prints row DC 19, uses store stays empty', async () => {
     renderDracolich();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
-  });
-
-  it('the two 1/Day names carry counters; the two At Will names do not', () => {
-    renderDracolich();
-    ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
-    AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
-  });
-
-  it('At Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 19', async () => {
-    renderDracolich();
+    expect(linkByText('Detect Magic').textContent).not.toMatch(/\/Day/);
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
     expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 19/);
@@ -242,29 +185,23 @@ describe('MA-0619 MonsterCardModal Dracolich Spellcasting chips', () => {
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 
-  it('Finger of Death 1/Day: cast spends the single use, second refused — zero extra spend', async () => {
+  it('1/Day Each gated leg: both names carry counters; Create Undead lv8 spends its single use; Finger of Death spends then refuses — zero extra spend', async () => {
     renderDracolich();
+    ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
+
+    await act(async () => { fireEvent.click(linkByText('Create Undead')); });
+    await waitFor(() => expect(abilityUseEntries('Create Undead').length).toBe(1));
+    expect(abilityUseEntries('Create Undead')[0].description).toMatch(/\(spell save DC 19/);
+    expect(abilityUseEntries('Create Undead')[0].description).toMatch(/1\/Day use spent/);
+
     await act(async () => { fireEvent.click(linkByText('Finger of Death')); });
     await waitFor(() => expect(abilityUseEntries('Finger of Death').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Finger of Death': 1 });
+    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Create Undead': 1, 'Finger of Death': 1 });
     expect(abilityUseEntries('Finger of Death')[0].description).toMatch(/1\/Day use spent/);
 
     await act(async () => { fireEvent.click(linkByText('Finger of Death')); });
     await waitFor(() => expect(refusals('Finger of Death').length).toBe(1));
     expect(abilityUseEntries('Finger of Death').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Finger of Death': 1 });
-  });
-
-  it('Create Undead 1/Day: cast spends the single use, second refused — zero extra spend', async () => {
-    renderDracolich();
-    await act(async () => { fireEvent.click(linkByText('Create Undead')); });
-    await waitFor(() => expect(abilityUseEntries('Create Undead').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Create Undead': 1 });
-    expect(abilityUseEntries('Create Undead')[0].description).toMatch(/1\/Day use spent/);
-
-    await act(async () => { fireEvent.click(linkByText('Create Undead')); });
-    await waitFor(() => expect(refusals('Create Undead').length).toBe(1));
-    expect(abilityUseEntries('Create Undead').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Create Undead': 1 });
+    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Create Undead': 1, 'Finger of Death': 1 });
   });
 });

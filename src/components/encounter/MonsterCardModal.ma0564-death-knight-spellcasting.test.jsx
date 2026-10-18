@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0564 data lock: Death Knight Spellcasting rode the MA-0421/MA-0532/
 // MA-0552 twin markup-gap template. Pre-fix ONLY the tier headers carried
 // <strong>; Command/Phantom Steed/Destructive Wave (Necrotic)/Dispel Magic
@@ -11,6 +12,12 @@
 // DUAL-RULES RESOLUTION: Destructive Wave is 2024-only — findMonsterSpell
 // is 5e-first with a 2024 fallback, so this 5e-path monster still resolves
 // it without cross-file spell copies (MA-0536 homebrew precedent unused).
+// Trimmed per REC #654: exact toEqual maps subsume tier-header/at-Will
+// negatives (#653); refusals + repeated at-Will castable owned by
+// spellcasting.test.jsx :281/:317; spell-shape null legs owned by
+// ma1959-orcus-wand; advisory-log class owned by ma0524:222. Distinct
+// bytes kept here: DC 18/15 saveDc seam e2e (:1803), 2/Day-vs-1/Day
+// gates, (Necrotic)-outside-tag byte, strip-diffs, merged one-render casts.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,8 +32,6 @@ const spells2024 = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8
 const dk = monsters.find(m => m.index === 'death-knight');
 const dkRow = dk.actions.find(a => a.name === 'Spellcasting');
 const NAMES = ['Command', 'Phantom Steed', 'Destructive Wave', 'Dispel Magic'];
-const TWO_DAY = ['Destructive Wave', 'Dispel Magic'];
-const AT_WILL = ['Command', 'Phantom Steed'];
 const COMMAND = spells5e.find(s => s.name === 'Command');
 const PHANTOM_STEED = spells5e.find(s => s.name === 'Phantom Steed');
 const DISPEL_MAGIC = spells5e.find(s => s.name === 'Dispel Magic');
@@ -36,12 +41,6 @@ const DK_PLAIN_ORIGINAL = 'The death knight casts one of the following spells, r
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Death Knight 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -149,8 +148,8 @@ function abilityUseEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
 }
 
-function refusals(name) {
-  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked' && e.abilityName === name);
+function saveOptsFor(spellName) {
+  return rollSavingThrow.mock.calls.map(c => c[2]).find(o => o.spellName === spellName);
 }
 
 function renderDeathKnight() {
@@ -165,51 +164,30 @@ function renderDeathKnight() {
 // ── Data lock: death-knight Spellcasting row ─────────────────────────────────
 
 describe('MA-0564 monsters.json data lock: Death Knight Spellcasting row', () => {
-  it('extracts all four spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(dkRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('2/Day Each');
+  it('extracts the four spell names BY-name and the exact 2/Day gate map (tier headers and at-Will names absent)', () => {
+    expect(extractSpellNamesFromSpellcasting(dkRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(dkRow.description)).toEqual({ 'Destructive Wave': 2, 'Dispel Magic': 2 });
   });
 
-  it('binds 2/Day Each to exactly the two marked names; the two At Will names ungated', () => {
-    const uses = extractSpellcastingSpellUses(dkRow.description);
-    expect(uses).toEqual(Object.fromEntries(TWO_DAY.map(n => [n, 2])));
-    AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
-  });
-
-  it('row-level numeric save_dc 18 + save_type Charisma pair authored (trailing)', () => {
+  it('row-level numeric save_dc 18 + save_type Charisma pair authored; (Necrotic) parenthetical OUTSIDE the em tag', () => {
     expect(dkRow.save_dc).toBe(18);
     expect(dkRow.save_type).toBe('Charisma');
     expect(dkRow.spell_save_dc).toBe(18);
     expect(dkRow.spellcasting_ability).toBe('Charisma');
-    expect(dkRow.description).toMatch(/spell save DC 18/);
-  });
-
-  it('DC 18 = 8 + CHA +4 + PB +6 for the death knight', () => {
-    expect(dk.ability_score_modifiers.cha).toBe(4);
-    expect(dk.proficiency_bonus).toBe(6);
-    expect(8 + dk.ability_score_modifiers.cha + dk.proficiency_bonus).toBe(18);
+    expect(dkRow.description).toMatch(/<em>Destructive Wave<\/em> \(Necrotic\)/);
   });
 
   it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
     expect(stripTags(dkRow.description)).toBe(DK_PLAIN_ORIGINAL);
   });
 
-  it('resolution pins: three RAW 5e spells resolve first; Destructive Wave is 2024-only (5e-first fallback, no cross-file copy)', () => {
-    expect(COMMAND.dc).toEqual(expect.objectContaining({ dc_type: 'WIS', dc_success: 'none' }));
-    expect(PHANTOM_STEED.damage ?? null).toBeNull();
-    expect(DISPEL_MAGIC.damage ?? null).toBeNull();
+  it('Destructive Wave is 2024-only — 5e-first fallback resolves without cross-file spell copies', () => {
     expect(spells5e.some(s => s.name === 'Destructive Wave')).toBe(false);
     expect(spells2024.some(s => s.name === 'Destructive Wave')).toBe(true);
-    expect(DESTRUCTIVE_WAVE.level).toBe(5);
-    expect(DESTRUCTIVE_WAVE.damage.damage_dice_primary).toBe('5d6');
-    expect(DESTRUCTIVE_WAVE.dc).toEqual(expect.objectContaining({ dc_type: 'CON', dc_success: 'half' }));
-    expect(dkRow.description).toMatch(/<em>Destructive Wave<\/em> \(Necrotic\)/);
   });
 });
 
-// ── Modal: four chips, counters, gates ───────────────────────────────────────
+// ── Modal: chips, counters, merged one-render cast e2e ─────────────────────
 
 describe('MA-0564 MonsterCardModal Death Knight Spellcasting chips', () => {
   beforeEach(() => {
@@ -217,57 +195,36 @@ describe('MA-0564 MonsterCardModal Death Knight Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders four spell chips — the zero-chip inert row is gone', () => {
+  it('renders four chips; only the two 2/Day names carry counters', () => {
     renderDeathKnight();
-    const names = spellLinks().map(el => el.textContent.split('(')[0].trim());
-    expect(names).toEqual(NAMES);
-  });
-
-  it('two 2/Day names carry counters; the two At Will names do not', () => {
-    renderDeathKnight();
-    expect(linkByText('Dispel Magic').textContent).toMatch(/\(2\/Day · 2 left\)/);
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
     expect(linkByText('Destructive Wave').textContent).toMatch(/\(2\/Day · 2 left\)/);
+    expect(linkByText('Dispel Magic').textContent).toMatch(/\(2\/Day · 2 left\)/);
     expect(linkByText('Command').textContent).not.toMatch(/\/Day/);
     expect(linkByText('Phantom Steed').textContent).not.toMatch(/\/Day/);
   });
 
-  it('At Will Command casts ungated twice — zero uses, advisory log prints row DC 18', async () => {
+  it('one-render multi-spell cast: Command logs row DC 18 ungated, Dispel Magic spends 2/Day, Destructive Wave reaches save context at saveDc 18', async () => {
     renderDeathKnight();
+
     await act(async () => { fireEvent.click(linkByText('Command')); });
     await waitFor(() => expect(abilityUseEntries('Command').length).toBe(1));
     expect(abilityUseEntries('Command')[0].description).toMatch(/\(spell save DC 18/);
-    await act(async () => { fireEvent.click(linkByText('Command')); });
-    await waitFor(() => expect(abilityUseEntries('Command').length).toBe(2));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
-  });
 
-  it('Dispel Magic 2/Day: two casts spend down to zero, third refused — zero extra spend', async () => {
-    renderDeathKnight();
     await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 });
+    await waitFor(() => expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 }));
     expect(abilityUseEntries('Dispel Magic')[0].description).toMatch(/casts Dispel Magic via Spellcasting \(spell save DC 18/);
-
     await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 2 });
+    await waitFor(() => expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 2 }));
 
-    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(refusals('Dispel Magic').length).toBe(1));
-    expect(abilityUseEntries('Dispel Magic').length).toBe(2);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 2 });
-  });
-
-  it('Destructive Wave resolves via the 2024 fallback and routes to the save leg at row DC — spends 2/Day', async () => {
-    renderDeathKnight();
     await act(async () => { fireEvent.click(linkByText('Destructive Wave')); });
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const opts = rollSavingThrow.mock.calls[0][2];
-    expect(opts.spellName).toBe('Destructive Wave');
+    await waitFor(() => expect(saveOptsFor('Destructive Wave')).toBeTruthy());
+    const opts = saveOptsFor('Destructive Wave');
     expect(opts.saveType).toBe('CON');
     expect(opts.dcSuccess).toBe('half');
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Destructive Wave': 1 });
-    expect(abilityUseEntries('Destructive Wave').length).toBe(1);
+    expect(opts.saveDc).toBe(18);
+    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 2, 'Destructive Wave': 1 });
     expect(abilityUseEntries('Destructive Wave')[0].description).toMatch(/2\/Day use spent/);
   });
 });
@@ -277,7 +234,6 @@ describe('MA-0564 MonsterCardModal Death Knight Spellcasting chips', () => {
 const asp = monsters.find(m => m.index === 'death-knight-aspirant');
 const aspRow = asp.actions.find(a => a.name === 'Spellcasting');
 const ASP_NAMES = ['Phantom Steed', 'Destructive Wave', 'Dispel Magic'];
-const ASP_1DAY = ['Destructive Wave', 'Dispel Magic'];
 const ASP_PLAIN_ORIGINAL = 'The aspirant casts one of the following spells, using Charisma as the spellcasting ability (spell save DC 15):\nAt Will: Phantom Steed\n1/Day Each: Destructive Wave (Necrotic), Dispel Magic';
 const ASP_MONSTER = 'Death Knight Aspirant 1';
 
@@ -291,36 +247,17 @@ function renderAspirant() {
 }
 
 describe('MA-0572 twin data lock: Death Knight Aspirant Spellcasting row', () => {
-  it('extracts all three spell names — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(aspRow.description);
-    expect(names).toEqual(ASP_NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
+  it('extracts the three spell names BY-name and the exact 1/Day gate map (tier headers and Phantom Steed absent)', () => {
+    expect(extractSpellNamesFromSpellcasting(aspRow.description)).toEqual(ASP_NAMES);
+    expect(extractSpellcastingSpellUses(aspRow.description)).toEqual({ 'Destructive Wave': 1, 'Dispel Magic': 1 });
   });
 
-  it('binds 1/Day Each to exactly the two marked names; Phantom Steed ungated', () => {
-    const uses = extractSpellcastingSpellUses(aspRow.description);
-    expect(uses).toEqual(Object.fromEntries(ASP_1DAY.map(n => [n, 1])));
-    expect(uses['Phantom Steed']).toBeUndefined();
-  });
-
-  it('trailing row-level save_dc 15 + save_type Charisma pair authored', () => {
+  it('save_dc 15 + Charisma pair authored; stripped text byte-equals the pre-fix description', () => {
     expect(aspRow.save_dc).toBe(15);
     expect(aspRow.save_type).toBe('Charisma');
     expect(aspRow.spell_save_dc).toBe(15);
     expect(aspRow.spellcasting_ability).toBe('Charisma');
-    expect(aspRow.description).toMatch(/spell save DC 15/);
-    expect(aspRow.description).toMatch(/<em>Destructive Wave<\/em> \(Necrotic\)/);
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
     expect(stripTags(aspRow.description)).toBe(ASP_PLAIN_ORIGINAL);
-  });
-
-  it('DC 15 = 8 + CHA +3 + PB +4 for the aspirant', () => {
-    expect(asp.ability_score_modifiers.cha).toBe(3);
-    expect(asp.proficiency_bonus).toBe(4);
-    expect(8 + asp.ability_score_modifiers.cha + asp.proficiency_bonus).toBe(15);
   });
 });
 
@@ -330,53 +267,32 @@ describe('MA-0572 twin MonsterCardModal Death Knight Aspirant Spellcasting chips
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders three spell chips — the zero-chip inert row is gone', () => {
+  it('renders three chips; only the two 1/Day names carry counters', () => {
     renderAspirant();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(ASP_NAMES);
-  });
-
-  it('two 1/Day names carry counters; Phantom Steed does not', () => {
-    renderAspirant();
-    expect(linkByText('Dispel Magic').textContent).toMatch(/\(1\/Day · 1 left\)/);
     expect(linkByText('Destructive Wave').textContent).toMatch(/\(1\/Day · 1 left\)/);
+    expect(linkByText('Dispel Magic').textContent).toMatch(/\(1\/Day · 1 left\)/);
     expect(linkByText('Phantom Steed').textContent).not.toMatch(/\/Day/);
   });
 
-  it('At Will Phantom Steed casts twice ungated — zero uses, advisory log prints row DC 15', async () => {
+  it('one-render multi-spell cast: Phantom Steed logs row DC 15 ungated, Dispel Magic spends the single use, Destructive Wave reaches save context at saveDc 15', async () => {
     renderAspirant();
+
     await act(async () => { fireEvent.click(linkByText('Phantom Steed')); });
     await waitFor(() => expect(abilityUseEntries('Phantom Steed').length).toBe(1));
     expect(abilityUseEntries('Phantom Steed')[0].description).toMatch(/\(spell save DC 15/);
-    await act(async () => { fireEvent.click(linkByText('Phantom Steed')); });
-    await waitFor(() => expect(abilityUseEntries('Phantom Steed').length).toBe(2));
     expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`] ?? null).toBeNull();
-  });
 
-  it('Dispel Magic 1/Day: cast spends the single use, second refused — zero extra spend', async () => {
-    renderAspirant();
     await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(1));
-    expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 });
+    await waitFor(() => expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 }));
     expect(abilityUseEntries('Dispel Magic')[0].description).toMatch(/casts Dispel Magic via Spellcasting \(spell save DC 15/);
 
-    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(refusals('Dispel Magic').length).toBe(1));
-    expect(abilityUseEntries('Dispel Magic').length).toBe(1);
-    expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 });
-  });
-
-  it('Destructive Wave 1/Day rides the 2024 fallback save leg at DC 15 — spends use, second refused', async () => {
-    renderAspirant();
     await act(async () => { fireEvent.click(linkByText('Destructive Wave')); });
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const opts = rollSavingThrow.mock.calls[0][2];
-    expect(opts.spellName).toBe('Destructive Wave');
+    await waitFor(() => expect(saveOptsFor('Destructive Wave')).toBeTruthy());
+    const opts = saveOptsFor('Destructive Wave');
     expect(opts.saveType).toBe('CON');
-    expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`]).toEqual({ 'Destructive Wave': 1 });
+    expect(opts.saveDc).toBe(15);
+    expect(runtime.store[`${ASP_MONSTER}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1, 'Destructive Wave': 1 });
     expect(abilityUseEntries('Destructive Wave')[0].description).toMatch(/1\/Day use spent/);
-
-    await act(async () => { fireEvent.click(linkByText('Destructive Wave')); });
-    await waitFor(() => expect(refusals('Destructive Wave').length).toBe(1));
-    expect(abilityUseEntries('Destructive Wave').length).toBe(1);
   });
 });

@@ -1,14 +1,31 @@
+// @maintained-by-ai — trimmed 2026-10-18 (11→7 tests): kept BY-name extraction
+// + exact gate map, save_dc seam pins, strip-tags markup diff, upcast pins,
+// save_dc seam e2e via Blight save leg, per spellcasting template (#645-#655).
+// Vacuous drops: not.toContain/toBeUndefined subsumed by full toEqual; em-tag
+// parenthetical regexes subsumed by exact-name extraction (helper reads
+// [^<]+ INSIDE the tag — a parenthetical inside <em> would corrupt the name —
+// MonsterCardHelpers.js:401); DC arithmetic restatement (#652 precedent);
+// counter-render text folded into the two cast e2es (class owned by
+// spellcasting.test.jsx :275); Fly e2e dropped — 1/Day spend/refuse class owned
+// by spellcasting.test.jsx :281 + proven here on Blight, advisory lane proven on
+// Detect Magic; Fly carries no distinct bytes. Dead mocks purged by empirical
+// bisect (dao #652 twin, same lanes): diceRoller (cast lanes roll through mocked
+// useLoggedDiceRoll), damageUtils, rangeValidation, mapsService, abilityLookup
+// (stub outputs never reach the asserted advisory/gate/save-opts lanes).
+// LIVE: conditionEffects (MonsterCardBody :36 useMemo), useLoggedDiceRoll,
+// dataLoader (render suspends until resolved), sanitize, logService, runtime.
 // MA-0576 data lock: Death Slaad Spellcasting rode the MA-0421/MA-0524/
-// MA-0532/MA-0552/MA-0558/MA-0564/MA-0572 twin markup-gap template. Pre-fix
-// ONLY the tier headers carried <strong>; Detect Magic/Detect Thoughts/
-// Invisibility/Mage Hand/Major Image/Blight/Cloudkill/Fly/Plane Shift/Tongues
-// were plain text — extractSpellNamesFromSpellcasting returned [] and
-// extractSpellcastingSpellUses returned {} → SpellCastLinks null → zero
-// chips, and the orphaned spell_save_dc 16 never reached
-// buildAbilitySaveRollContext (MA-0532 fork). DATA fix: <em> on each spell
-// name (headers byte-kept, "(self only)"/"(level N version)" parentheticals
-// OUTSIDE the tag, strip-tags byte-equality) + trailing row-level numeric
-// save_dc 16 + save_type "Charisma" pair (MA-0454/MA-0421).
+// MA-0532/MA-0552/MA-0564 twin markup-gap template. Pre-fix ONLY the tier
+// headers carried <strong>; Detect Magic/Detect Thoughts/Invisibility/Mage
+// Hand/Major Image/Blight/Cloudkill/Fly/Plane Shift/Tongues were plain text —
+// extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses
+// returned {} → SpellCastLinks null → zero chips, and the orphaned spell_save_dc
+// 16 never reached buildAbilitySaveRollContext (MA-0532 fork). DATA fix: <em>
+// on each spell name (headers byte-kept, "(self only)"/"(level N version)"
+// parentheticals OUTSIDE the tag, strip-tags byte-equality) + trailing row-level
+// numeric save_dc 16 + save_type "Charisma" pair (MA-0454/MA-0421). Distinct
+// bytes: the ONLY twin row with TWO (level N version) upcast pins — Blight lv8
+// 12d8, Cloudkill lv6 6d8 — plus "no Material components" prose, CHA DC 16.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -23,7 +40,6 @@ const slaad = monsters.find(m => m.index === 'death-slaad');
 const slaadRow = slaad.actions.find(a => a.name === 'Spellcasting');
 const NAMES = ['Detect Magic', 'Detect Thoughts', 'Invisibility', 'Mage Hand', 'Major Image', 'Blight', 'Cloudkill', 'Fly', 'Plane Shift', 'Tongues'];
 const ONE_DAY = ['Blight', 'Cloudkill', 'Fly', 'Plane Shift', 'Tongues'];
-const AT_WILL = ['Detect Magic', 'Detect Thoughts', 'Invisibility', 'Mage Hand', 'Major Image'];
 const SPELLS = Object.fromEntries(NAMES.map(n => [n, spells5e.find(s => s.name === n)]));
 
 const SLAAD_PLAIN_ORIGINAL = 'The slaad casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 16):\nAt Will: Detect Magic, Detect Thoughts, Invisibility (self only), Mage Hand, Major Image\n1/Day Each: Blight (level 8 version), Cloudkill (level 6 version), Fly, Plane Shift, Tongues';
@@ -31,18 +47,13 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Death Slaad 1';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// dataLoader LIVE (#652): render suspends until loadSpells resolves
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn(() => Promise.resolve(NAMES.map(n => SPELLS[n]))),
 }));
@@ -72,10 +83,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
   return {
     default: mockHook,
-    _rollAttack,
-    _rollDamage,
     _rollSavingThrow,
-    _setPopupHtml,
   };
 });
 
@@ -85,35 +93,10 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -159,17 +142,9 @@ function renderDeathSlaad() {
 // ── Data lock: death-slaad Spellcasting row ──────────────────────────────────
 
 describe('MA-0576 monsters.json data lock: Death Slaad Spellcasting row', () => {
-  it('extracts all ten spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(slaadRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
-  });
-
-  it('binds 1/Day Each to exactly the five marked names; the five At Will names ungated', () => {
-    const uses = extractSpellcastingSpellUses(slaadRow.description);
-    expect(uses).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
-    AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
+  it('BY-name extraction: ten chips (tier headers skipped, parentheticals sit OUTSIDE the em tags); 1/Day Each binds exactly the five marked names, At Will ungated', () => {
+    expect(extractSpellNamesFromSpellcasting(slaadRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(slaadRow.description)).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
   });
 
   it('row-level numeric save_dc 16 + save_type Charisma pair authored (trailing)', () => {
@@ -178,30 +153,18 @@ describe('MA-0576 monsters.json data lock: Death Slaad Spellcasting row', () => 
     expect(slaadRow.spell_save_dc).toBe(16);
     expect(slaadRow.spellcasting_ability).toBe('Charisma');
     expect(slaadRow.description).toMatch(/spell save DC 16/);
-    expect(slaadRow.description).toMatch(/<em>Invisibility<\/em> \(self only\)/);
-    expect(slaadRow.description).toMatch(/<em>Blight<\/em> \(level 8 version\)/);
-    expect(slaadRow.description).toMatch(/<em>Cloudkill<\/em> \(level 6 version\)/);
-  });
-
-  it('DC 16 = 8 + CHA +4 + PB +4 for the death slaad', () => {
-    expect(slaad.ability_score_modifiers.cha).toBe(4);
-    expect(slaad.proficiency_bonus).toBe(4);
-    expect(8 + slaad.ability_score_modifiers.cha + slaad.proficiency_bonus).toBe(16);
   });
 
   it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
     expect(stripTags(slaadRow.description)).toBe(SLAAD_PLAIN_ORIGINAL);
   });
 
-  it('all ten spells exist in 5e spells.json; upcast pins Blight lv8 12d8, Cloudkill lv6 6d8', () => {
-    NAMES.forEach(n => expect(spells5e.some(s => s.name === n)).toBe(true));
+  it('the two (level N version) upcast pins resolve — Blight lv8 12d8 CON half, Cloudkill lv6 6d8 CON half (distinct twin bytes)', () => {
     const blight = SPELLS.Blight;
     const cloudkill = SPELLS.Cloudkill;
     expect(blight.level).toBe(4);
-    expect(blight.damage.damage_at_slot_level['8']).toBe('12d8');
-    expect(blight.dc).toEqual(expect.objectContaining({ dc_type: 'CON', dc_success: 'half' }));
     expect(cloudkill.level).toBe(5);
-    expect(cloudkill.damage.damage_at_slot_level['6']).toBe('6d8');
+    expect(blight.dc).toEqual(expect.objectContaining({ dc_type: 'CON', dc_success: 'half' }));
     expect(cloudkill.dc).toEqual(expect.objectContaining({ dc_type: 'CON', dc_success: 'half' }));
     expect(spellCastLevelFromSpellcasting(slaadRow.description, 'Blight', blight)).toBe(8);
     expect(spellDamageFormulaAtLevel(blight, 8)).toBe('12d8');
@@ -223,14 +186,9 @@ describe('MA-0576 MonsterCardModal Death Slaad Spellcasting chips', () => {
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
   });
 
-  it('five 1/Day names carry counters; the five At Will names do not', () => {
+  it('At Will Detect Magic casts ungated twice — no counter, zero uses, advisory log prints row DC 16', async () => {
     renderDeathSlaad();
-    ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
-    AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
-  });
-
-  it('At Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 16', async () => {
-    renderDeathSlaad();
+    expect(linkByText('Detect Magic').textContent).not.toMatch(/\/Day/);
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
     expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 16/);
@@ -239,21 +197,9 @@ describe('MA-0576 MonsterCardModal Death Slaad Spellcasting chips', () => {
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 
-  it('Fly 1/Day: cast spends the single use, second refused — zero extra spend', async () => {
+  it('Blight 1/Day save leg: counter shown; first cast adjudicates CON half at row DC 16 upcast 12d8 and spends the use; second refused — zero extra spend, zero extra save roll', async () => {
     renderDeathSlaad();
-    await act(async () => { fireEvent.click(linkByText('Fly')); });
-    await waitFor(() => expect(abilityUseEntries('Fly').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
-    expect(abilityUseEntries('Fly')[0].description).toMatch(/1\/Day use spent/);
-
-    await act(async () => { fireEvent.click(linkByText('Fly')); });
-    await waitFor(() => expect(refusals('Fly').length).toBe(1));
-    expect(abilityUseEntries('Fly').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fly': 1 });
-  });
-
-  it('Blight level-8 save leg: 12d8 CON half at row DC 16 — spends 1/Day, second refused', async () => {
-    renderDeathSlaad();
+    expect(linkByText('Blight').textContent).toMatch(/\(1\/Day · 1 left\)/);
     await act(async () => { fireEvent.click(linkByText('Blight')); });
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
     const opts = rollSavingThrow.mock.calls[0][2];

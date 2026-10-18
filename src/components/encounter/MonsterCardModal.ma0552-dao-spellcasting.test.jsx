@@ -1,3 +1,16 @@
+// @maintained-by-ai — trimmed 2026-10-18 (10→7 tests): kept BY-name extraction
+// + gate map, strip-tags markup diff, save_dc seam e2e, distinct bytes per
+// spellcasting template (#645-#652). Counter-render text folded into the two
+// cast e2es (template counter class already owned by MA-0500 :628 / #275).
+// Vacuous drops: not.toContain/toBeUndefined subsumed by full toEqual, DC
+// arithmetic restatement (#652 precedent). Dead mocks purged by empirical bisect
+// (9 green, no import-time throw): diceRoller (dead probe #649/#651/#652 —
+// cast lanes roll through mocked useLoggedDiceRoll), damageUtils,
+// rangeValidation, mapsService, abilityLookup (stub outputs never reach the
+// asserted advisory/gate lanes). LIVE: conditionEffects (MonsterCardBody :36
+// useMemo), useLoggedDiceRoll, dataLoader (render suspends until resolved).
+// render suspends until loadSpells resolves). Vacuous-arith restatement dropped
+// (#652 precedent): DC 16 = 8 + CHA + PB — row DC pins kept.
 // MA-0552 data lock: Dao Spellcasting rode the MA-0421/MA-0532/MA-0543
 // twin markup-gap template. Pre-fix ONLY the tier headers carried <strong>;
 // all ten spell names were plain text — extractSpellNamesFromSpellcasting
@@ -33,18 +46,13 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Dao 1';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+// dataLoader LIVE (#652): render suspends until loadSpells resolves
 vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((version) => Promise.resolve(version === '2024' ? [] : spellObjs)),
 }));
@@ -87,35 +95,10 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -158,19 +141,9 @@ function renderDao() {
 // ── Data lock: dao Spellcasting row ──────────────────────────────────────────
 
 describe('MA-0552 monsters.json data lock: Dao Spellcasting row', () => {
-  it('extracts all ten spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(daoRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
-  });
-
-  it('binds 1/Day Each to exactly the seven marked names; the three At Will names ungated', () => {
-    const uses = extractSpellcastingSpellUses(daoRow.description);
-    expect(uses).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
-    expect(uses['Detect Magic']).toBeUndefined();
-    expect(uses['Detect Evil and Good']).toBeUndefined();
-    expect(uses['Stone Shape']).toBeUndefined();
+  it('BY-name extraction: ten chips (tier headers skipped); 1/Day Each binds exactly the seven marked names, At Will ungated', () => {
+    expect(extractSpellNamesFromSpellcasting(daoRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(daoRow.description)).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
   });
 
   it('row-level numeric save_dc 16 + save_type Charisma pair authored (trailing)', () => {
@@ -179,12 +152,6 @@ describe('MA-0552 monsters.json data lock: Dao Spellcasting row', () => {
     expect(daoRow.spell_save_dc).toBe(16);
     expect(daoRow.spellcasting_ability).toBe('Charisma');
     expect(daoRow.description).toMatch(/spell save DC 16/);
-  });
-
-  it('DC 16 = 8 + CHA +4 + PB +4 for the dao', () => {
-    expect(dao.ability_score_modifiers.cha).toBe(4);
-    expect(dao.proficiency_bonus).toBe(4);
-    expect(8 + dao.ability_score_modifiers.cha + dao.proficiency_bonus).toBe(16);
   });
 
   it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
@@ -213,16 +180,9 @@ describe('MA-0552 MonsterCardModal Dao Spellcasting chips', () => {
     expect(names).toEqual(NAMES);
   });
 
-  it('seven 1/Day names carry counters; the three At Will names do not', () => {
+  it('At Will Detect Magic casts ungated twice — no counter, zero uses, advisory log prints row DC 16 Charisma', async () => {
     renderDao();
-    expect(linkByText('Tongues').textContent).toMatch(/\(1\/Day · 1 left\)/);
-    expect(linkByText('Wall of Stone').textContent).toMatch(/\(1\/Day · 1 left\)/);
     expect(linkByText('Detect Magic').textContent).not.toMatch(/\/Day/);
-    expect(linkByText('Stone Shape').textContent).not.toMatch(/\/Day/);
-  });
-
-  it('At Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 16 Charisma', async () => {
-    renderDao();
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
     expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/\(spell save DC 16, Charisma\)/);
@@ -231,8 +191,9 @@ describe('MA-0552 MonsterCardModal Dao Spellcasting chips', () => {
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 
-  it('Tongues 1/Day: first cast spends, second refused — RAW 1/Day Each gate', async () => {
+  it('Tongues 1/Day: counter shown; first cast spends, second refused — RAW 1/Day Each gate', async () => {
     renderDao();
+    expect(linkByText('Tongues').textContent).toMatch(/\(1\/Day · 1 left\)/);
     await act(async () => { fireEvent.click(linkByText('Tongues')); });
     await waitFor(() => expect(abilityUseEntries('Tongues').length).toBe(1));
     expect(abilityUseEntries('Tongues')[0].description).toMatch(/casts Tongues via Spellcasting \(spell save DC 16, Charisma\)/);

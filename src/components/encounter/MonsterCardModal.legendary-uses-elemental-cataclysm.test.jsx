@@ -1,3 +1,10 @@
+// @maintained-by-ai — trimmed 6→3 to cataclysm-distinct lanes: BY-name #387
+// data locks through the resolvers (header resolves at index 0 — the
+// swallowed-child fingerprint — Eruption→Elemental Burst delegate bytes,
+// Rumbling Movement byte-invariance) + ONE effect-distinct click (Eruption
+// Expend chip → spend 1 + delegated +15 / 5d6 + 8 Acid ctx, zero burn).
+// Generic turn-latch and exhausted-refusal clicks cite-skipped to their
+// owners (map in header comment).
 // MA-0675 regression: Elemental Cataclysm legendary_actions[0] was the
 // Eruption CHILD with uses:1 — legendaryHeaderAction() swallowed it as the
 // header, so the card printed "Eruption (1 left)" as inert header text with
@@ -6,23 +13,42 @@
 // never ran on the swallowed row), economy unreachable (§99 harder-zero than
 // MA-0510). Fix mirrors the §165 Colossus/Death Knight/MA-0620 byte-shape
 // DATA-only one-pass template: header "Legendary Action Uses: 3" + numeric
-// uses:3 (CR 22 twins ancient-bronze/ancient-green in this file both stamp
-// numeric 3; canonical total is a named honest gap — a correction is a
-// one-line edit of la[0].uses + its name), and Eruption authored the SAME
-// pass as a delegating child onto the byte-existing +15 Elemental Burst
-// attack row (MA-0672 live-proven) with its own uses dropped.
+// uses:3 (CR 22 twins ancient-bronze/ancient-green both stamp numeric 3;
+// canonical total is a named honest gap — a correction is a one-line edit of
+// la[0].uses + its name), and Eruption authored the SAME pass as a
+// delegating child onto the byte-existing +15 Elemental Burst attack row
+// (MA-0672 live-proven) with its own uses dropped.
+//
+// Distinct lanes kept here (BY-name #387 rows + one effect-distinct click):
+// - header resolves through legendaryHeaderAction at index 0 (the
+//   swallowed-child fingerprint) with numeric uses:3
+// - Eruption→Elemental Burst delegate resolves the byte-existing +15 row;
+//   Rumbling Movement stays byte-unchanged (save_dc 23 rides its own chip)
+// - ONE effect-distinct click: Eruption Expend chip spends 1 and rolls the
+//   delegated +15 / 5d6 + 8 Acid attack ctx — zero console burn (the
+//   MA-0675 affordance proof: the chip exists and LegendarySpendLink runs)
+//
+// Cite-skipped generics (covered by owners — verified):
+// - gate / spend / turn-latch / own-turn / exhausted / refusal / regain units:
+//   src/services/encounters/monsterLegendaryUses.test.js :79-110, :112-143, :145-162
+// - modal turn-latch lane: MonsterCardModal.legendary-uses.test.jsx :310, :418, :543, :731
+// - modal exhausted refusal (the ONE exhausted sibling kept at beholder #626):
+//   MonsterCardModal.legendary-uses-beholder.test.jsx :213-223,
+//   MonsterCardModal.legendary-uses.test.jsx :190
+// - legendary save-chip click riding the shared gate (Rumbling Movement twin):
+//   MonsterCardModal.legendary-uses-mummy-lord.test.jsx :227-245 (MA-0676)
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-
-const ELEMENTAL_BURST = { name: 'Elemental Burst', attack_bonus: 15, reach: '30 ft.', range: '150 ft.', damage_dice_primary: '5d6 + 8', damage_type_primary: 'Acid' };
+import {
+  legendaryHeaderAction, legendaryDelegateAction, legendaryDelegateAttackName,
+} from '../../services/encounters/monsterLegendaryUses.js';
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
   rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
@@ -84,8 +110,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import { addEntry } from '../../services/ui/logService.js';
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
 const CREATURES = [
   { name: 'Elemental Cataclysm 1', type: 'npc', targetName: 'Bandit 1', currentHp: 555, maxHp: 555, ac: 22, conditions: [] },
@@ -94,29 +118,32 @@ const CREATURES = [
 
 const cataclysm = () => monstersData.find(m => m.name === 'Elemental Cataclysm');
 
-describe('MA-0675 monsters.json data: elemental cataclysm legendary header+delegates shape', () => {
-  it('legendary_actions[0] is the header with numeric uses 3 (no longer the Eruption child)', () => {
-    const la = cataclysm().legendary_actions;
-    expect(la[0].name).toBe('Legendary Action Uses: 3');
-    expect(la[0].uses).toBe(3);
-    expect(la[0].name).not.toMatch(/Eruption|Rumbling/);
-    expect(la[0].description).toMatch(/Immediately after another creature's turn, the cataclysm can expend a use/);
-    expect(la[0].description).toMatch(/regains all expended uses at the start of each of its turns/);
+describe('MA-0675 monsters.json data: elemental cataclysm legendary rows by-name locks', () => {
+  it('header resolves through legendaryHeaderAction with numeric uses 3 (no longer the swallowed Eruption child)', () => {
+    const m = cataclysm();
+    const header = m.legendary_actions[0];
+    expect(header.name).toBe('Legendary Action Uses: 3');
+    expect(header.uses).toBe(3);
+    expect(header.name).not.toMatch(/Eruption|Rumbling/);
+    expect(header.description).toMatch(/Immediately after another creature's turn, the cataclysm can expend a use/);
+    expect(header.description).toMatch(/regains all expended uses at the start of each of its turns/);
+    expect(legendaryHeaderAction(m)).toBe(header);
   });
 
-  it('Eruption child delegates_to the byte-existing +15 Elemental Burst row, own uses dropped', () => {
-    const eruption = cataclysm().legendary_actions.find(a => a.name === 'Eruption');
+  it('Eruption→Elemental Burst resolves the byte-existing +15 row; Rumbling Movement stays byte-unchanged (save_dc 23 rides its own chip)', () => {
+    const m = cataclysm();
+    const eruption = m.legendary_actions.find(a => a.name === 'Eruption');
     expect(eruption.delegates_to).toBe('Elemental Burst');
     expect(eruption.uses).toBeUndefined();
     expect(eruption.description).toBe('The cataclysm makes one Elemental Burst attack.');
-    const burst = cataclysm().actions.find(a => a.name === 'Elemental Burst');
+    const burst = m.actions.find(a => a.name === 'Elemental Burst');
+    expect(legendaryDelegateAction(m, eruption)).toBe(burst);
+    expect(legendaryDelegateAttackName(eruption, burst)).toBe('Eruption (Elemental Burst attack)');
     expect(burst.attack_bonus).toBe(15);
     expect(burst.damage_dice_primary).toBe('5d6 + 8');
     expect(burst.damage_type_primary).toBe('Acid');
-  });
 
-  it('Rumbling Movement child stays byte-unchanged (save_dc 23 rides its own chip)', () => {
-    const rumbling = cataclysm().legendary_actions.find(a => a.name === 'Rumbling Movement');
+    const rumbling = m.legendary_actions.find(a => a.name === 'Rumbling Movement');
     expect(rumbling.save_dc).toBe(23);
     expect(rumbling.save_type).toBe('Constitution');
     expect(rumbling.delegates_to).toBeUndefined();
@@ -124,67 +151,47 @@ describe('MA-0675 monsters.json data: elemental cataclysm legendary header+deleg
   });
 });
 
+// Live seam: counter mounts, the ONE effect-distinct Eruption gated click
+// spends 1 BEFORE rolling and lands its delegated attack ctx with zero
+// console burn (the MA-0675 fingerprint: zero affordance, zero spend).
 describe('MA-0675 MonsterCardModal elemental cataclysm legendary gated rows', () => {
-  let consoleSpy;
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
     ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
-    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
-  afterEach(() => { consoleSpy.mockRestore(); });
 
   function renderCataclysm(uses) {
     if (uses !== undefined) runtime.store['Elemental Cataclysm 1.monsterLegendaryUses'] = uses;
     const m = makeMonster({
       name: 'Elemental Cataclysm',
-      actions: [ELEMENTAL_BURST],
+      actions: cataclysm().actions,
       legendary_actions: cataclysm().legendary_actions,
     });
     render(<MonsterCardModal {...makeProps(m, { creatureName: 'Elemental Cataclysm 1', creatures: CREATURES })} />);
   }
-  function legendaryRowLink(name) {
+  function laChip(name) {
     return Array.from(document.querySelectorAll('.mc-action'))
-      .find(r => r.textContent.trim().startsWith(name))?.querySelector('.mc-dice-link') || null;
+      .find(r => r.textContent.trim().startsWith(name))?.querySelector('.mc-dice-link-legendary') || null;
   }
 
-  it('header shows (3 left); Eruption renders Expend-Legendary chip, spends 1, delegates +15 attack', async () => {
+  it('header shows (3 left); Eruption Expend chip click spends 1, rolls delegated +15 / 5d6 + 8 Acid — zero burn', async () => {
     renderCataclysm({ max: 3, used: 0 });
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
-    const link = legendaryRowLink('Eruption');
-    expect(link).not.toBeNull();
-    expect(link.className).toContain('mc-dice-link-legendary');
-    fireEvent.click(link);
+    const chip = laChip('Eruption');
+    expect(chip).not.toBeNull();
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fireEvent.click(chip);
     await waitFor(() => expect(runtime.store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
     expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Eruption (Elemental Burst attack)');
     expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(15);
+    const options = ROLLERS.rollAttack.mock.calls[0][2];
+    expect(options.autoDamageFormula).toBe('5d6 + 8');
+    expect(options.damageType).toBe('Acid');
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Eruption/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Eruption/);
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('same active creature second Eruption click refuses on the turn latch, counter held', async () => {
-    renderCataclysm({ max: 3, used: 0 });
-    fireEvent.click(legendaryRowLink('Eruption'));
-    await waitFor(() => expect(runtime.store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    ROLLERS.rollAttack.mockClear();
-    setPopupHtml.mockClear();
-    fireEvent.click(legendaryRowLink('Eruption'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
-    expect(runtime.store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('exhausted (3/3): Eruption click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderCataclysm({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(legendaryRowLink('Eruption'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Elemental Cataclysm 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 });

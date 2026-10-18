@@ -7,25 +7,27 @@
 // needs "Hit|Failure|Success: N (XdY)" — no match) to console.error
 // "no resolvable mechanic" = MA-0510/0696/0957/1636 silent-burn fingerprint
 // (spend logged, ZERO popup/roll/damage). Fix is the one-field delegate
-// lanes of monsterLegendaryUses.js:3-9 (legendaryDelegateAction spans
+// lane of monsterLegendaryUses.js:3-9 (legendaryDelegateAction spans
 // actions[]): delegates_to:"Grave Strike" (live twins MA-0675 Eruption→
 // Elemental Burst, MA-0956 Claw→Claw, MA-1635 Charging Horn→Radiant Horn
 // byte-shape {name, description, delegates_to}). The move clause stays
 // gridless advisory in the description prose — an advisory key WOULD
-// preempt the numeric delegate leg (MA-1457/MA-1494 ordering). Header
-// uses:2 + clean child keys verified in the MA-1640 sibling file.
+// preempt the numeric delegate leg (MA-1457/MA-1494 ordering).
+// Trim (#635/#636): header uses:2, clean child keys, gate math and the
+// latch/exhausted/own-turn refusal legs are MA-1640-owned — cited, not
+// re-tested here (sibling legendary-uses-vampire.test.jsx:111-215 + the
+// service suite monsterLegendaryUses.test.js). This file keeps the two
+// MA-1641-distinct legs: the BY-name byte-shape lock and ONE effect-distinct
+// delegated-attack click. Dead mocks purged by empirical bisect: rollExpression,
+// rollExpressionDoubled, extractDamageTypes, getTargetFromAttacker and the
+// range geometry trio never fire on this lane (rollAttack is fully mocked;
+// popup-damage and placed-item paths unreachable).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import { legendaryDelegateAction, legendaryDelegateAttackName } from '../../services/encounters/monsterLegendaryUses.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -41,7 +43,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     setPopupHtml: _setPopupHtml,
     rollAttack: ROLLERS.rollAttack, rollDamage: ROLLERS.rollDamage, rollAbilityCheck: vi.fn(),
     rollSavingThrow: ROLLERS.rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })), _setPopupHtml };
+  })) };
 });
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
@@ -81,8 +83,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import { addEntry } from '../../services/ui/logService.js';
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
 const CREATURES = [
   { name: 'Vampire 1', type: 'npc', monsterType: 'undead', targetName: 'Bandit 1', currentHp: 195, maxHp: 195, ac: 16, conditions: [] },
@@ -92,35 +92,8 @@ const CREATURES = [
 const KEY = 'Vampire 1.monsterLegendaryUses';
 const vampire = () => monstersData.find(m => m.name === 'Vampire');
 const legendary = () => vampire().legendary_actions;
-const dsRow = () => legendary().find(a => a.name === 'Deathless Strike');
 
-describe('MA-1641 monsters.json data lock: Deathless Strike delegates_to Grave Strike', () => {
-  it('row byte-shape mirrors the MA-1635 unicorn twin {name, description, delegates_to}', () => {
-    const ds = dsRow();
-    expect(ds.delegates_to).toBe('Grave Strike');
-    expect(ds.description).toBe('The vampire moves up to half its Speed, and it makes one Grave Strike attack.');
-    expect(Object.keys(ds)).toEqual(['name', 'description', 'delegates_to']);
-    expect(ds.uses).toBeUndefined();
-    expect(ds.recharge).toBeUndefined();
-    expect(ds.advisory).toBeUndefined();
-    expect(ds.advisory_message).toBeUndefined();
-    expect(ds.attack_bonus).toBeUndefined();
-    expect(ds.save_dc).toBeUndefined();
-  });
-
-  it('delegate spans actions[] and resolves the byte-existing +9 Grave Strike row', () => {
-    const delegate = legendaryDelegateAction(vampire(), dsRow());
-    expect(delegate).not.toBe(null);
-    expect(delegate.name).toBe('Grave Strike');
-    expect(delegate.attack_bonus).toBe(9);
-    expect(delegate.damage_dice_primary).toBe('1d8 + 4');
-    expect(delegate.damage_dice_secondary).toBe('2d6');
-    expect(delegate.damage_type_secondary).toBe('Necrotic');
-    expect(legendaryDelegateAttackName(dsRow(), delegate)).toBe('Deathless Strike (Grave Strike attack)');
-  });
-});
-
-describe('MA-1641 MonsterCardModal delegated legendary attack adjudication', () => {
+describe('MA-1641 Vampire Deathless Strike silent-burn fix', () => {
   let consoleSpy;
   beforeEach(() => {
     vi.clearAllMocks();
@@ -144,12 +117,19 @@ describe('MA-1641 MonsterCardModal delegated legendary attack adjudication', () 
       .find(r => r.textContent.trim().startsWith('Deathless Strike'))?.querySelector('.mc-dice-link-legendary') || null;
   }
 
-  it('Expend-Legendary chip spends 2→1 and adjudicates the delegated +9 Grave Strike attack, console clean', async () => {
+  it('row byte-shape is the MA-1635 twin {name, description, delegates_to} — the missing delegate WAS the silent-burn', () => {
     renderVampire({ max: 2, used: 0 });
-    const chip = expendChip();
-    expect(chip).not.toBeNull();
-    expect(chip.textContent.trim()).toBe('Expend Legendary');
-    fireEvent.click(chip);
+    const ds = legendary().find(a => a.name === 'Deathless Strike');
+    expect(ds.delegates_to).toBe('Grave Strike');
+    expect(ds.description).toBe('The vampire moves up to half its Speed, and it makes one Grave Strike attack.');
+    expect(Object.keys(ds)).toEqual(['name', 'description', 'delegates_to']);
+    expect(expendChip()).not.toBeNull();
+    expect(expendChip().textContent.trim()).toBe('Expend Legendary');
+  });
+
+  it('one chip click spends 2→1 and adjudicates the delegated +9 Grave Strike (1d8+4 + 2d6 Necrotic) vs Bandit 1, console clean', async () => {
+    renderVampire({ max: 2, used: 0 });
+    fireEvent.click(expendChip());
     await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
     expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Deathless Strike (Grave Strike attack)');
@@ -162,42 +142,8 @@ describe('MA-1641 MonsterCardModal delegated legendary attack adjudication', () 
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Deathless Strike/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Deathless Strike/);
     expect(spend.description).toMatch(/1 of 2 left/);
-    expect(consoleSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('same active creature refire refuses on the turn latch, counter held, zero extra attack', async () => {
-    renderVampire({ max: 2, used: 0 });
-    fireEvent.click(expendChip());
-    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 }));
-    ROLLERS.rollAttack.mockClear();
-    setPopupHtml.mockClear();
-    fireEvent.click(expendChip());
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
-    expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('exhausted (2/2): press refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderVampire({ max: 2, used: 2 });
-    fireEvent.click(expendChip());
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('own-turn refusal leg: refuses before spend, zero attack rolled (§204 exhaustion/turn gates first)', async () => {
-    renderVampire({ max: 2, used: 0 });
-    ctx.value = { round: 1, activeCreatureName: 'Vampire 1', creatures: CREATURES };
-    fireEvent.click(expendChip());
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store[KEY]).toEqual({ max: 2, used: 0 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 });
+
+// @maintained-by-ai

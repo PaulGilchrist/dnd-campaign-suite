@@ -1,67 +1,44 @@
-// MA-0747: composite "Hit: 1 Piercing damage plus 5 (2d4) Poison damage."
-// rows (flying-snake/Bite, scorpion/Sting — no authored damage_dice_primary)
+// @maintained-by-ai
+// MA-0747: composite "Hit: 1 Piercing damage plus 5 (2d4) Poison damage." rows
+// (flying-snake/Bite + scorpion/Sting byte-twins, no authored damage_dice_primary)
 // previously resolved autoDamageFormula to null, so buildAutoDamage
-// (useLoggedDiceRollAttack.js) early-returned undefined and BOTH legs dealt
-// ZERO on every hit. Fix: extractFlatHitDamage's dice guard is scoped to
-// PRIMARY-clause dice, so the flat constant "1" now threads through
-// buildAutoDamageOptions beside the MA-0426 secondary transport. These tests
-// lock: flat primary "1" + secondary dice ride the SAME options object
-// (combined_damage_roll inputs), and the flat constant stays dice-less and
-// NEVER doubles on crit (§49/§210) while the secondary dice doubles per §32.
-import { describe, it, expect, vi } from 'vitest';
-import { buildAutoDamageOptions, buildSecondaryDamageTransport } from './MonsterCardModal.jsx';
+// (useLoggedDiceRollAttack.js) early-returned undefined and BOTH legs dealt ZERO
+// on every hit. Fix: extractFlatHitDamage's dice guard is scoped to PRIMARY-clause
+// dice (MonsterCardHelpers.js:3082), so the flat constant "1" now threads through
+// buildAutoDamageOptions beside the MA-0426 secondary transport.
+// Trimmed 6→3 cases, distinct branches only. Cited legs kept (update sibling
+// citations to these ranges): flying-snake/Bite consumer flat '1' + same-object
+// secondary transport → test 1; flat crit-invariance dice-less roller trio
+// (CLA-281, cultist-flat-secondary owner cites) → test 2; dice-primary byte-inert
+// face → test 3. Cut legs (owners): disk twins byte-mirror (implied by behavior
+// below; scorpion/Sting extractor '1' → flat-hit-damage.test.js:26),
+// buildSecondaryDamageTransport passthrough + null triple (cultist-flat-secondary),
+// 2d4 roll/double ranges (diceRoller.test.js), scorpion options leg (byte-twin).
+import { describe, it, expect } from 'vitest';
+import { buildAutoDamageOptions } from './MonsterCardModal.jsx';
 import { extractFlatHitDamage } from './MonsterCardHelpers.js';
 import { parseConstant, rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import monstersData from '../../../public/data/monsters.json';
 
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-const flyingSnake = monstersData.find(m => m.index === 'flying-snake');
-const scorpion = monstersData.find(m => m.index === 'scorpion');
-const BITE = flyingSnake.actions.find(a => a.name === 'Bite');
-const STING = scorpion.actions.find(a => a.name === 'Sting');
+const BITE = monstersData.find(m => m.index === 'flying-snake').actions.find(a => a.name === 'Bite');
 
 describe('MA-0747 composite flat-primary + dice-secondary auto-damage', () => {
-  it('disk twins carry no damage_dice_primary and dice only in the secondary rider', () => {
-    expect(BITE.damage_dice_primary).toBeUndefined();
-    expect(BITE.damage_dice_secondary).toBe('2d4');
-    expect(BITE.damage_type_secondary).toBe('Poison');
-    expect(STING.damage_dice_primary).toBeUndefined();
-    expect(STING.damage_dice_secondary).toBe('1d6');
-    expect(STING.damage_type_secondary).toBe('Poison');
-  });
-
-  it.each([
-    ['flying-snake/Bite', BITE, '2d4'],
-    ['scorpion/Sting', STING, '1d6'],
-  ])('buildAutoDamageOptions resolves flat primary "1" + threaded secondary %s (was null = zero-damage)', (_label, row, secondary) => {
-    const opts = buildAutoDamageOptions(row, row.name);
+  it('flying-snake/Bite: flat primary "1" + threaded secondary ride the SAME options object (was null = zero-damage)', () => {
+    // MA-0747 guard scope: dice ONLY in the "plus 5 (2d4) Poison" rider must
+    // not block flat-primary extraction — this disk row IS the fix.
+    expect(extractFlatHitDamage(BITE)).toBe('1');
+    const opts = buildAutoDamageOptions(BITE, BITE.name);
     expect(opts.autoDamageFormula).toBe('1');
-    expect(opts.autoDamageSecondaryFormula).toBe(secondary);
+    expect(opts.autoDamageSecondaryFormula).toBe('2d4');
     expect(opts.autoDamageSecondaryDamageType).toBe('Poison');
   });
 
-  it('buildSecondaryDamageTransport emits the secondary triple for the composite row', () => {
-    const t = buildSecondaryDamageTransport(BITE, 'Bite');
-    expect(t.autoDamageSecondaryFormula).toBe('2d4');
-    expect(t.autoDamageSecondaryDamageType).toBe('Poison');
-  });
-
-  it('flat constant "1" resolves dice-less and NEVER doubles on crit; secondary dice doubles', () => {
-    expect(extractFlatHitDamage(BITE)).toBe('1');
-    // Primary flat leg — parseConstant owns it, no dice, crit-invariant (§49/§210).
+  it('flat constant "1" resolves dice-less and NEVER doubles on crit (§49/§210 — CLA-281 lock)', () => {
+    // Primary flat leg — parseConstant owns it, no dice, crit-invariant;
+    // the secondary dice-doubling path (§32) is diceRoller-owned.
     expect(rollExpression('1')).toBeNull();
     expect(rollExpressionDoubled('1')).toBeNull();
     expect(parseConstant('1')).toBe(1);
-    // Secondary dice leg — rolls, doubles its dice count on crit (§32).
-    const roll = rollExpression('2d4');
-    expect(roll.total).toBeGreaterThanOrEqual(2);
-    expect(roll.total).toBeLessThanOrEqual(8);
-    const crit = rollExpressionDoubled('2d4');
-    expect(crit.total).toBeGreaterThanOrEqual(4);
-    expect(crit.total).toBeLessThanOrEqual(16);
   });
 
   it('byte-inert: pure dice-primary rows never touch the flat extractor', () => {

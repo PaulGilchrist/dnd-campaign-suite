@@ -1,9 +1,12 @@
+// @maintained-by-ai 2026-10-18 (MA-0485 audit/trim: 5→2 tests; advantage-face press + data lock;
+// generic MA-0007 seam faces — ctx forward :190-206, grant/crit, decline :235, guards — stay owned by MonsterCardModal.charge-bonus.test.jsx)
 // MA-0485: Chimera Bite advantage-damage variant — conditional_damage authored on
 // monsters.json actions[1] (MA-0007 seam) so the HIT popup offers the
-// "or 18 (4d6 + 4) Piercing if Advantage" variant. Locks: data shape mirrors the
-// Aarakocra Talons sibling byte-for-byte (dice/modifier/damage_type/condition),
-// offer builds with formula 4d6 + 4, grant rolls 4d6+4 + logs, decline keeps
-// base 2d6 + 4 only.
+// "or 18 (4d6 + 4) Piercing if Advantage" variant. Locks the authored row bytes
+// (dice/modifier/damage_type/advantage condition, single Bite row) and presses the
+// advantage face once end-to-end through the REAL builder + resolveChargeBonus:
+// offer shape + popup label transport, grant rolls 4d6 + 4 as its own damage roll,
+// logs the clause, marks resolved, keeps base autoDamage.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -84,6 +87,9 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
+// Stub the popup (offer gating on misses is owned by
+// char-sheet/DiceRollResult.charge-bonus.test.jsx) so the modal's
+// resolveChargeBonus handler is driven directly through its real wiring.
 vi.mock('../common/AttackResultPopup.jsx', () => ({
   default: (props) => {
     const offer = props.popupHtml?.chargeBonusOffer;
@@ -103,47 +109,10 @@ import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceR
 import { addEntry } from '../../services/ui/logService.js';
 import { buildChargeBonusOffer } from './MonsterCardHelpers.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollDamage, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const CHIMERA = monsters.find((m) => m.index === 'chimera');
-const BITE = CHIMERA.actions.find((a) => a.name === 'Bite');
-
-const CREATURES = [
-  { name: 'Chimera 1', targetName: 'Bandit 1' },
-  { name: 'Bandit 1', type: 'player' },
-];
-
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(BITE, 'Bite');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Bite',
-    rolls: [14],
-    bonus: 7,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Bite', formula: '2d6 + 4', damageType: 'Piercing', source: 'Chimera 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderBite(popupHtml = null) {
-  _setPopupHtml(popupHtml);
-  const m = makeMonster({ name: 'Chimera', actions: CHIMERA.actions });
-  damageUtils.__setFindCreatureReturn({ name: 'Chimera 1', targetName: 'Bandit 1', conditions: [] });
-  return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Chimera 1' })} />);
-}
-
-function clickBiteLink() {
-  const biteRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Bite/.test(a.textContent.trim()));
-  const chip = Array.from(biteRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+7');
-  expect(chip, 'Expected Bite +7 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
 
 function findLogEntry(type) {
   return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
@@ -154,69 +123,73 @@ beforeEach(() => {
   _setPopupHtml(null);
 });
 
-describe('MA-0485 monsters.json data lock: Chimera Bite conditional_damage', () => {
-  it('authors conditional_damage mirroring the MA-0007 sibling byte-shape', () => {
+describe('MA-0485 Chimera Bite conditional_damage (advantage 4d6 + 4 variant)', () => {
+  it('authors conditional_damage on the single Chimera Bite row — advantage clause, 4d6 + 4 Piercing over base 2d6 + 4', () => {
+    const bites = CHIMERA.actions.filter((a) => a.name === 'Bite');
+    expect(bites).toHaveLength(1);
+    const BITE = bites[0];
     expect(BITE.attack_bonus).toBe(7);
     expect(BITE.damage_dice_primary).toBe('2d6 + 4');
     expect(BITE.damage_type_primary).toBe('Piercing');
-    const cd = BITE.conditional_damage;
-    expect(cd).toBeTruthy();
-    expect(cd.dice).toBe('4d6');
-    expect(cd.modifier).toBe(4);
-    expect(cd.damage_type).toBe('Piercing');
-    expect(cd.condition).toMatch(/advantage/i);
-    const sibling = monsters.find((m) => m.name === 'Aarakocra Skirmisher').actions[0].conditional_damage;
-    expect(Object.keys(cd).sort()).toEqual(Object.keys(sibling).sort());
-  });
-
-  it('buildChargeBonusOffer builds the advantage variant with formula 4d6 + 4', () => {
-    const offer = buildChargeBonusOffer(BITE, 'Bite');
-    expect(offer).toMatchObject({ dice: '4d6', modifier: 4, damageType: 'Piercing', formula: '4d6 + 4', attackName: 'Bite' });
-  });
-});
-
-describe('MA-0485 Bite HIT popup offer', () => {
-  it('forwards the advantage conditional offer to the attack roll context', () => {
-    renderBite();
-    clickBiteLink();
-    expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '4d6', modifier: 4, damageType: 'Piercing' });
-  });
-
-  it('grants: rolls 4d6 + 4, applies its own damage, logs the clause', async () => {
-    renderBite(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
+    expect(BITE.conditional_damage).toEqual({
+      dice: '4d6',
+      modifier: 4,
+      damage_type: 'Piercing',
+      condition: 'advantage on the attack roll',
     });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('4d6 + 4');
+  });
+
+  it('presses the advantage face via the real MA-0007 seam: offer + popup label, grant rolls 4d6 + 4 as its own damage roll and logs the clause', async () => {
+    // Real builder over the REAL authored row (Helpers:687) — locks the
+    // static-condition label chrome face (MA-1363: no feet token here).
+    const BITE = CHIMERA.actions.find((a) => a.name === 'Bite');
+    const offer = buildChargeBonusOffer(BITE, 'Bite');
+    expect(offer).toMatchObject({
+      dice: '4d6',
+      modifier: 4,
+      damageType: 'Piercing',
+      formula: '4d6 + 4',
+      attackName: 'Bite',
+      label: 'Advantage on the attack roll: +4d6+4 Piercing?',
+    });
+
+    _setPopupHtml({
+      type: 'd20',
+      rollType: 'attack',
+      name: 'Bite',
+      rolls: [14],
+      bonus: 7,
+      targetName: 'Bandit 1',
+      targetAc: 12,
+      hit: true,
+      autoDamage: { name: 'Bite', formula: '2d6 + 4', damageType: 'Piercing', source: 'Chimera 1' },
+      chargeBonusOffer: offer,
+    });
+    const m = makeMonster({ name: 'Chimera', actions: CHIMERA.actions });
+    damageUtils.__setFindCreatureReturn({ name: 'Chimera 1', targetName: 'Bandit 1', conditions: [] });
+    render(<MonsterCardModal {...makeProps(m, { creatures: [
+      { name: 'Chimera 1', targetName: 'Bandit 1' },
+      { name: 'Bandit 1', type: 'player' },
+    ], creatureName: 'Chimera 1' })} />);
+    expect(document.querySelector('[data-testid="popup-stub"]').textContent).toContain('Advantage on the attack roll: +4d6+4 Piercing?');
+
+    fireEvent.click(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant'));
+    await vi.waitFor(() => {
+      expect(_rollDamage).toHaveBeenCalled();
+    });
     expect(rollExpression).toHaveBeenCalledWith('4d6 + 4');
     expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    const call = _rollDamage.mock.calls[0][0];
+    expect(call.name).toBe('Bite — Charge Bonus');
+    expect(call.formula).toBe('4d6 + 4');
+    expect(call.context).toMatchObject({ damageType: 'Piercing', targetName: 'Bandit 1', attackerName: 'Chimera 1' });
     const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
     expect(grant.description).toContain('+17 Piercing (4d6 + 4)');
-    expect(grant.description).toMatch(/advantage/i);
+    expect(grant.description).toMatch(/advantage on the attack roll/i);
     await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('granted');
-    });
-  });
-
-  it('declines: no variant roll, logs base-only (2d6 + 4 stays the only damage)', async () => {
-    renderBite(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      expect(addEntry).toHaveBeenCalled();
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-    const decline = findLogEntry('conditional_damage_declined');
-    expect(decline).toBeTruthy();
-    expect(decline.description).toContain('base damage only');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('declined');
+      const resolved = useLoggedDiceRoll.__getPopupHtml();
+      expect(resolved.chargeBonusResolved).toBe('granted');
+      expect(resolved.autoDamage).toBeTruthy();
     });
   });
 });

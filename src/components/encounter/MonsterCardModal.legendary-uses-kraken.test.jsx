@@ -1,37 +1,48 @@
-// MA-1057 regression: Kraken "Storm Bolt" (legendary_actions[0], uses:1) was
-// swallowed as the economy header (MA-0675 §99 harder-zero): legendaryHeaderAction
-// (monsterLegendaryUses.js:156, rows[0].uses != null) returned Storm Bolt itself,
-// the card rendered its name+(1 left) in a plain no-onClick header div
-// (MonsterCardBody.jsx MonsterLegendaryHeaderRow), children slice(1) dropped it
-// from the clickable rows, and LegendarySpendLink never ran — ZERO affordance,
-// economy capped at 1, frozen "(1 left)", click zero-delta, console 0. Fix is
-// DATA-only per §99/§165/§168 (MA-0675 elemental-cataclysm + MA-0956 gynosphinx
-// fixed twins on disk): prepend header {name:"Legendary Action Uses: 3", uses:3}
-// (RAW Kraken = 3; disk description names NO legendary count — honest gap, floor
-// = CR-23 SRD 3, matching the CR-22/23 numeric-3 twins §231), give Storm Bolt
-// delegates_to:"Lightning Strike" (actions[] row exists: DC 23 Dex 6d10 Lightning —
-// resolveDelegates spans actions[], monsterLegendaryUses.js:8) and drop per-child
-// uses/recharge noise. Toxic Ink keeps its save transport fields (rides the shared
-// legendary gate as rows[1]; MA-1058 owns its own audit).
+// @maintained-by-ai
+// MA-1057/MA-1058 Kraken legendary lane — canon kraken BY-name data locks +
+// the two effect-distinct gated clicks, once each.
+// MA-1057 (harder-zero §99): pre-fix Storm Bolt was legendary_actions[0] and
+// was swallowed as the economy header (rows[0].uses != null) — plain no-onClick
+// header div, slice(1) dropped it from clickable rows, ZERO affordance, economy
+// capped at its own uses:1. Fix is DATA-only: prepend header {name:"Legendary
+// Action Uses: 3", uses:3} (RAW = 3; disk description names no legendary count —
+// honest gap, CR-23 SRD floor matching the CR-22/23 numeric-3 twins §231) and
+// Storm Bolt delegates_to "Lightning Strike" (own actions[] row, DC 23 Dex
+// 6d10 — resolveDelegates spans actions[], monsterLegendaryUses.js:8), no
+// per-child uses/recharge noise (§165). Header boilerplate byte-mirrors the
+// VERIFIED death-knight sibling (§168) with death-knight→kraken, takes 2→3.
+// MA-1058 (stale-pin inversion §216): Toxic Ink pre-fix had NO save_dc — the
+// generic Expend chip spent then hit the resolveLegendaryRowMechanic else-branch
+// console.error (§423 burn). Now numeric save_dc:23 + range arms the row's OWN
+// "DC 23 Constitution" save chip which rides the shared legendary gate
+// (MonsterCardBody legendaryGate=handleLegendaryRow :216) — spend + picker on
+// ONE chip. §157: the "Failure or Success:" tail attaches to the REUSE LIMIT,
+// names no canonical condition → parseBothOutcomesClause null → SUCCESS grants
+// NOTHING; fail leg grants Blinded+Poisoned.
+// Generics cite-skipped (never re-run here): header/max/remaining, expend gate
+// (turn / own-turn / exhausted), spend flow, turn-start regain, delegate
+// resolution — monsterLegendaryUses.test.js :64-77/:79-109/:112-143/:145-162/
+// :171-211; modal latch + exhausted sibling seams — legendary-uses.test.jsx
+// (e.g. :310, :418) and legendary-uses-beholder.test.jsx:213-223; Toxic Ink
+// LIVE picker adjudication (fail-grant meta, damageless pays zero) —
+// SaveAttackAoeModal.kraken-toxic-ink.test.jsx (whose header names THIS file
+// canon for the row-data byte pins, incl. breathAoeShape range→Radius parse).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal, { breathAoeShape } from './MonsterCardModal.jsx';
 import { extractConditionsFromSaveEffect, parseBothOutcomesClause } from './MonsterCardHelpers.js';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import {
-  legendaryHeaderAction, legendaryMaxUses, legendaryUsesRemaining,
-  legendaryDelegateAction, legendaryDelegateAttackName, regainLegendaryUses,
-} from '../../services/encounters/monsterLegendaryUses.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
+const aoeProps = vi.hoisted(() => ({ current: null }));
+vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
+  default: (props) => {
+    aoeProps.current = props;
+    return <div className="sp-overlay emanation-picker-stub"><div className="sp-body">{props.titleOverride}</div></div>;
+  },
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 const ROLLERS = vi.hoisted(() => {
   const rollAttack = vi.fn();
   const rollDamage = vi.fn();
@@ -62,13 +73,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 5),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -93,37 +97,20 @@ const CREATURES = [
 ];
 
 const KEY = 'Kraken 1.monsterLegendaryUses';
-const LATCH_KEY = 'Kraken 1._legendaryUses_usedRound';
 
 const kraken = () => monstersData.find(m => m.index === 'kraken');
 const legendary = () => kraken().legendary_actions;
 const row = (name) => legendary().find(a => a.name === name);
 const lightningRow = () => kraken().actions.find(a => a.name === 'Lightning Strike');
 
-// MA-1057 data lock: economy header PREPENDED with numeric uses:3 (was: no
-// header — rows[0] was the Storm Bolt prose child, swallowed as the header,
-// capping the economy at its own uses:1). Description byte-mirrors the VERIFIED
-// death-knight header (playbook §168) with death knight→kraken; the kraken's
-// own description names NO legendary count (honest gap — CR-23 SRD floor = 3,
-// matching CR-22/23 numeric-3 twins §231).
-describe('MA-1057 monsters.json data: kraken legendary header authors uses:3', () => {
-  it('rows[0] is the economy header with uses:3 (was: Storm Bolt)', () => {
+// MA-1057 disk lane: header PREPENDED with numeric uses:3 (was: Storm Bolt
+// swallowed as rows[0]); Storm Bolt delegates with NO own numbers (§165); the
+// delegate target row exists on disk with its RAW save numbers.
+describe('MA-1057 kraken disk: economy header + Storm Bolt delegate byte pins', () => {
+  it('rows[0] economy header uses:3 (boilerplate §168 death-knight mirror); Storm Bolt delegates_to Lightning Strike, no own numeric mechanic, no per-child uses/recharge; Lightning Strike authors DC 23 Dex 6d10 Lightning', () => {
     expect(legendary()[0].name).toBe('Legendary Action Uses: 3');
     expect(legendary()[0].uses).toBe(3);
-    expect(legendary()[1].name).toBe('Storm Bolt');
-    expect(legendaryHeaderAction(kraken())).toBe(legendary()[0]);
-    expect(legendaryMaxUses(legendary()[0], null)).toBe(3);
-    expect(legendaryUsesRemaining(legendary()[0], { max: 3, used: 1 })).toBe(2);
     expect(legendary()[0].description).toBe("The kraken takes 3 legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only immediately after another creature's turn. The kraken regains expended legendary uses at the start of its turn.");
-  });
-
-  it('header boilerplate mirrors the VERIFIED death-knight sibling byte-for-byte', () => {
-    const dk = monstersData.find(m => m.index === 'death-knight').legendary_actions[0];
-    const mirror = dk.description.replace(/\bdeath knight\b/g, 'kraken').replace('takes 2 legendary', 'takes 3 legendary');
-    expect(legendary()[0].description).toBe(mirror);
-  });
-
-  it('Storm Bolt delegates_to Lightning Strike, no own numeric mechanic, no per-child uses/recharge (§165)', () => {
     const sb = row('Storm Bolt');
     expect(sb.delegates_to).toBe('Lightning Strike');
     expect(sb.description).toBe('The kraken uses Lightning Strike.');
@@ -131,76 +118,44 @@ describe('MA-1057 monsters.json data: kraken legendary header authors uses:3', (
     expect(sb.save_dc).toBeUndefined();
     expect(sb.uses).toBeUndefined();
     expect(sb.recharge).toBeUndefined();
-  });
-
-  it('delegate resolves the kraken own Lightning Strike row: DC 23 Dex 6d10 Lightning save', () => {
     const ls = lightningRow();
     expect(ls.save_dc).toBe(23);
     expect(ls.save_type).toBe('Dexterity');
     expect(ls.damage_dice_primary).toBe('6d10');
     expect(ls.damage_type_primary).toBe('Lightning');
-    const delegate = legendaryDelegateAction(kraken(), row('Storm Bolt'));
-    expect(delegate).toBe(ls);
-    expect(legendaryDelegateAttackName(row('Storm Bolt'), ls)).toBe('Storm Bolt (Lightning Strike save)');
   });
+});
 
-  it('Toxic Ink keeps save transport, drops per-child uses/recharge noise (§165)', () => {
+// MA-1058 disk lane canon (per SaveAttackAoeModal.kraken-toxic-ink.test.jsx
+// header): numeric save_dc arms the save chip, range arms the picker
+// (MA-0590 range-field-only parse → Radius), §157 tail byte-inert so SUCCESS
+// grants NOTHING (fail-only Blinded+Poisoned). Key order mirrors harpy/vrock
+// emanation save twins: save_dc→save_type→range→save_effect.
+describe('MA-1058 kraken disk: Toxic Ink byte pins + parser derivatives', () => {
+  it('save_dc:23 + range "15-foot Emanation" (uses/recharge dropped §165, save_type/save_effect byte-unchanged), key order pinned; breathAoeShape parses 15-ft Radius picker; §157 clause null; fail leg extracts blinded+poisoned', () => {
     const ti = row('Toxic Ink');
     expect(ti.uses).toBeUndefined();
     expect(ti.recharge).toBeUndefined();
+    expect(ti.save_dc).toBe(23);
     expect(ti.save_type).toBe('Constitution');
+    expect(ti.range).toBe('15-foot Emanation');
     expect(ti.save_effect).toBe("Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.");
     expect(ti.description).toContain('Constitution Saving Throw: DC 23');
-  });
-
-  // MA-1058 DATA fix: prose "DC 23" (MA-0237 prose-DC family) + prose
-  // "15-foot Emanation" (MA-0590 reads RANGE field only, §181) now NUMERIC.
-  // save_type/save_effect byte-unchanged (ticket). save_dc arms the legendary
-  // save chip (ActionSaveRoll gate save_dc!=null, MonsterAction.jsx:106) and
-  // routes the gated click to handleSaveRoll (resolveLegendaryRowMechanic
-  // :570); range arms the picker (breathAoeShape). Twin placement mirrors the
-  // VERIFIED harpy Luring Song / vrock Spores rows: save_dc→save_type→range→save_effect.
-  it('MA-1058 Toxic Ink authors numeric save_dc:23 + range "15-foot Emanation", save_type/save_effect byte-unchanged', () => {
-    const ti = row('Toxic Ink');
-    expect(ti.save_dc).toBe(23);
-    expect(ti.range).toBe('15-foot Emanation');
-    // byte-unchanged (from MA-1057 above):
-    expect(ti.save_type).toBe('Constitution');
-    expect(ti.save_effect).toBe("Failure: The target has the Blinded and Poisoned conditions until the end of the kraken's next turn. The kraken then moves up to its Speed. Failure or Success: The kraken can't take this action again until the start of its next turn.");
-    // key order mirrors harpy/vrock emanation save twins:
     expect(Object.keys(ti)).toEqual(['name', 'description', 'save_dc', 'save_type', 'range', 'save_effect']);
-  });
-
-  // MA-0590 seam: range-field-only parse opens the SaveAttackAoeModal picker
-  // (Emanation→Radius, rangeGateFt = attacker-origin feet). damageless save —
-  // NO damage dice anywhere (§Actual fd==0), save_dc present pre/post-fix.
-  it('MA-1058 breathAoeShape parses Toxic Ink as a 15-ft Radius emanation picker (range field byte)', () => {
-    const ti = row('Toxic Ink');
     expect(breathAoeShape(ti, null)).toEqual({ shape: 'Radius', feet: 15, rangeGateFt: 15 });
-  });
-
-  // §157/§160 both-outcomes marker: the "Failure or Success:" tail on this row
-  // attaches to the REUSE LIMIT ("can't take this action again"), NOT to the
-  // conditions. parseBothOutcomesClause reads the tail after the marker — the
-  // kraken tail names no canonical condition and no "can't take Reactions" →
-  // null, so SUCCESS grants NOTHING (conditions stay fail-only per RAW). The
-  // fail leg grants Blinded+Poisoned from the "Failure:" section.
-  it('MA-1058 §157 marker is byte-inert (reuse-limit tail names no condition) — success grants nothing, fail grants Blinded+Poisoned', () => {
-    const ti = row('Toxic Ink');
     expect(parseBothOutcomesClause(ti.save_effect)).toBeNull();
     expect(extractConditionsFromSaveEffect(ti.save_effect)).toEqual(['blinded', 'poisoned']);
   });
 });
 
-// MA-1057 live seam: header counter mounts at 3, Storm Bolt gains the gated
-// Expend chip (was: zero affordance, swallowed header, frozen (1 left), click
-// zero-delta), the gated click spends the shared pool and adjudicates the
-// delegated Lightning Strike DC 23 Dex save against the armed target.
-describe('MA-1057 MonsterCardModal kraken gated legendary economy', () => {
+// Live seam: one render, one click per effect-distinct row — the two kraken
+// legendary affordances adjudicate through their distinct mechanics.
+describe('MA-1057/MA-1058 MonsterCardModal kraken gated clicks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
     ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
+    aoeProps.current = null;
   });
 
   function renderAKraken(uses) {
@@ -216,49 +171,24 @@ describe('MA-1057 MonsterCardModal kraken gated legendary economy', () => {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.startsWith(name));
   }
 
-  it('header shows "Legendary Action Uses: 3 (3 left)"; Storm Bolt renders a gated Expend chip', () => {
-    renderAKraken({ max: 3, used: 0 });
-    expect(document.querySelector('.mc-legendary-header-row').textContent).toContain('Legendary Action Uses: 3');
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
-    const chip = krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Expend Legendary');
-  });
-
-  // MA-1058 STALE-PIN INVERSION (§216): pre-fix Toxic Ink had NO save_dc, so
-  // LegendarySpendLink rendered the generic "Expend Legendary" chip that spent
-  // the use then hit the resolveLegendaryRowMechanic else-branch console.error
-  // (§423 burn). Post-fix save_dc:23 arms ActionSaveRoll: LegendarySpendLink
-  // self-suppresses on numeric rows (MonsterAction.jsx:182) and the row now
-  // renders its OWN "DC 23 Constitution" save chip (mc-dice-link-save-clickable)
-  // which rides the shared legendary gate — MonsterCardBody rewires the
-  // legendary section's onSaveRoll to legendaryGate=handleLegendaryRow (:216),
-  // so the gated spend (economy) + adjudication (picker) BOTH ride one chip.
-  it('MA-1058 Toxic Ink now renders its own "DC 23 Constitution" save chip (no Expend chip), riding the shared gate', () => {
-    renderAKraken({ max: 3, used: 0 });
-    const r = krakenRow('Toxic Ink');
-    expect(r.querySelector('.mc-dice-link-legendary')).toBe(null);
-    const chip = r.querySelector('.mc-dice-link-save-clickable');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('DC 23');
-    expect(chip.textContent).toContain('Constitution');
-  });
-
-  // MA-0675 live shape: Lightning Strike carries disk-truth attack_bonus:0,
-  // so the delegate resolves through the ATTACK seam (Eruption→Elemental
-  // Burst +15/5d6 twin): rollAttack rides the delegated row's own numbers —
-  // +0 vs the armed Bandit AC 12 with autoDamageFormula 6d10 Lightning.
-  it('Storm Bolt gated click spends 1 and adjudicates the delegated Lightning Strike leg against the armed target, zero console dead-end', async () => {
+  // MA-1057: card mounts the counter + the gated Expend chip (was: swallowed
+  // header, frozen "(1 left)", zero affordance). Lightning Strike carries
+  // disk-truth attack_bonus:0, so the delegated leg rides the ATTACK seam
+  // (+0 vs armed Bandit AC 12, autoDamageFormula 6d10) — never the
+  // "no resolvable mechanic" console dead-end (§423).
+  it('Storm Bolt mounts Expend-chip on "(3 left)" header; gated click spends 1 and adjudicates the delegated Lightning Strike leg once against the armed target, zero console dead-end', async () => {
     renderAKraken({ max: 3, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fireEvent.click(krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary'));
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
+    const chip = krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary');
+    expect(chip.textContent).toContain('Expend Legendary');
+    fireEvent.click(chip);
     await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
     expect(ROLLERS.rollAttack.mock.calls[0][0]).toBe('Storm Bolt (Lightning Strike save)');
     expect(ROLLERS.rollAttack.mock.calls[0][1]).toBe(0);
-    const options = ROLLERS.rollAttack.mock.calls[0][2];
-    expect(options.autoDamageFormula).toBe('6d10');
-    expect(options.targetName).toBe('Bandit 1');
+    expect(ROLLERS.rollAttack.mock.calls[0][2].autoDamageFormula).toBe('6d10');
+    expect(ROLLERS.rollAttack.mock.calls[0][2].targetName).toBe('Bandit 1');
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Storm Bolt/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Storm Bolt \(Lightning Strike save\)/);
     expect(spend.description).toMatch(/2 of 3 left/);
@@ -266,54 +196,27 @@ describe('MA-1057 MonsterCardModal kraken gated legendary economy', () => {
     errSpy.mockRestore();
   });
 
-  it('repeat same-window refuses (turn latch): zero extra spend, zero extra save, one spend log', async () => {
+  // MA-1058 stale-pin inversion: post-fix the row self-suppresses the generic
+  // Expend chip (MonsterAction.jsx:182) and renders its OWN "DC 23
+  // Constitution" save chip; one gated click spends the economy AND opens the
+  // 15-ft emanation picker — the picker owns adjudication (no auto roll here;
+  // fail/success grants are canon in SaveAttackAoeModal.kraken-toxic-ink).
+  it('Toxic Ink renders its own "DC 23 Constitution" save chip (no Expend chip); one gated click spends 1 and opens the 15-ft emanation picker, zero auto-roll', async () => {
     renderAKraken({ max: 3, used: 0 });
-    const chip = krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary');
+    const r = krakenRow('Toxic Ink');
+    expect(r.querySelector('.mc-dice-link-legendary')).toBe(null);
+    const chip = r.querySelector('.mc-dice-link-save-clickable');
+    expect(chip.textContent).toContain('DC 23');
+    expect(chip.textContent).toContain('Constitution');
     fireEvent.click(chip);
     await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 }));
-    fireEvent.click(chip);
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store[KEY]).toEqual({ max: 3, used: 1 });
-    const spends = addEntry.mock.calls.map(c => c[1]).filter(e => /expends a legendary use for Storm Bolt/.test(String(e.description)));
-    expect(spends.length).toBe(1);
-    expect(ROLLERS.rollAttack.mock.calls.length).toBe(1);
-  });
-
-  it('exhausted (3/3): chip click refuses with popup + legendary_use_refused, zero spend, zero save', async () => {
-    renderAKraken({ max: 3, used: 3 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(String(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'legendary_use_refused').description)).toContain('exhausted');
-    expect(runtime.store[KEY]).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('own-turn click refuses (turn latch): zero spend, zero save', async () => {
-    renderAKraken({ max: 3, used: 0 });
-    ctx.value = { round: 1, activeCreatureName: 'Kraken 1', creatures: CREATURES };
-    fireEvent.click(krakenRow('Storm Bolt').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store[KEY]).toEqual({ max: 3, used: 0 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('turn-start regain clears uses and latch with an ability_use log', async () => {
-    runtime.store[KEY] = { max: 3, used: 3 };
-    runtime.store[LATCH_KEY] = { round: 1, activeCreature: 'Bandit 1' };
-    const res = await regainLegendaryUses({
-      monsterName: 'Kraken 1',
-      campaignName: 'test-campaign',
-      deps: {
-        getRuntimeValue: runtime.getRuntimeValue,
-        setRuntimeValue: runtime.setRuntimeValue,
-        addEntry,
-      },
-    });
-    expect(res).toEqual({ regained: true, max: 3 });
-    expect(runtime.store[KEY]).toEqual({ max: 3, used: 0 });
-    expect(runtime.store[LATCH_KEY]).toBe(null);
-    const regain = addEntry.mock.calls.map(c => c[1]).find(e => /regains all expended legendary action uses/.test(String(e.description)));
-    expect(regain.description).toMatch(/Kraken 1 regains all expended legendary action uses at the start of its turn — 3 available\./);
+    await waitFor(() => expect(document.querySelector('.emanation-picker-stub')).not.toBe(null));
+    expect(aoeProps.current.saveDc).toBe(23);
+    expect(aoeProps.current.range).toBe(15);
+    expect(aoeProps.current.titleOverride).toMatch(/15-ft Radius/);
+    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Toxic Ink/.test(e.description));
+    expect(spend.description).toMatch(/expends a legendary use for Toxic Ink/);
+    expect(spend.description).toMatch(/2 of 3 left/);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

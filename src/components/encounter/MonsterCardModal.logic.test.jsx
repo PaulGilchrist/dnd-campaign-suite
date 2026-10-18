@@ -1,35 +1,42 @@
-// Removed redundant test: "renders the (Incapacitated) label and no attack dice link
-// when the attacker cannot act" — covered by interaction.test.jsx
-// ("does not render attack links when the attacker has an incapacitating condition"),
-// which asserts the same (Incapacitated) label + missing attack link behavior.
-// Behavioral tests for MonsterCardModal logic that is NOT covered by the
-// sibling MonsterCardModal test files. Every behavior below was checked
-// against ALL other MonsterCardModal test files before being added:
-//
-//   attacker cannot act (incapacitated)      — now covered by interaction.test.jsx
-//     ("does not render attack links when the attacker has an incapacitating condition").
-//     The redundant test was removed; only the non-blocking condition path remains here.
-//   riderAttackBonus added to attack bonus   — not covered. helpers.test.jsx only
-//     asserts the badge renders, never that rollAttack receives bonus + riderAttackBonus.
-//   resistanceNotice passthrough             — not covered. attack-advanced.test.jsx
-//     defines __setResistanceNoticeReturn but never uses it.
-//   saveConditions from save_effect         — not covered. conditions-extraction.test.jsx
-//     only asserts rendering, never the rollAttack argument.
-//   handleSaveRoll autoDamage context        — not covered. save-modifier.test.jsx only
-//     asserts saveDc/saveType/dcSuccess, never the autoDamage fields.
-//   handleDamage critical-hit path           — not covered. auto-damage-roll.test.jsx
-//     exercises the autoDamageRoll callback crit, not popupHtml.isCrit in handleDamage.
-//   combat-context fallback                  — not covered. senses-and-fallback.test.jsx
-//     only checks the name still renders; nothing asserts getCombatContext is used.
-//
-// Duplicate coverage deliberately avoided (already asserted elsewhere):
-//   - rollAttack damageType / autoDamageFormula / saveDc / saveType / forcedMode
-//     (attack-logic, attack-advanced, auto-damage-roll)
-//   - damage/skill/ability/initiative dice clicks (interaction, damage-and-ability-checks)
-//   - extractDamageDiceFromDescription unit cases (extract-damage-dice)
-//   - effect badge rendering (helpers)
-//   - senses, shield of faith, ally modal, save-modifier fallbacks
-//     (senses-and-fallback, ally-modal, save-modifier)
+// @maintained-by-ai
+// Audit + trim (8 → 7): combat-context load/skip faces collapsed into one
+// unmount-based test (same :2124 guard); dead _rollAbilityCheck/_rollSkillCheck/
+// _rollInitiative/_quickRollPlayerSave export channels purged (hook-object
+// methods kept for :2211 destructure); rollExpression override purged
+// empirically — no surviving leg reaches it (crit uses rollExpressionDoubled;
+// non-crit chips owned by damage-and-ability-checks/auto-damage-roll #580).
+// Vacuity guards added (#580 class). Strengthened: blinded leg now clicks and
+// pins rollAttack('Club', 4) — non-blocking cannotAct lane (blocking face +
+// (Incapacitated) label stay owned by interaction.test.jsx). Preserved cited
+// owners: petrified saveConditions :274 (conditions-extraction #586 cited
+// :265), riderAttackBonus roll :228 (helpers.test.jsx cites this file),
+// executeBlockSaveRoll non-empty saveConditions + autoDamage ctx matcher
+// :294-306 (conditions-extraction #586 cited :285-297), dice crit popup
+// :313-330 (#602 lane).
+// Behavioral tests whose SOLE owner is this file (re-verified Oct 2026 against
+// all sibling MonsterCardModal*.test.* files):
+//   attacker can act with a NON-blocking condition — chip renders and +4
+//     clicks roll unmodified. Blocking face + (Incapacitated) label owned by
+//     interaction.test.jsx "attacker cannot act".
+//   riderAttackBonus → rollAttack bonus fold — roll-path owner; helpers.test.jsx
+//     cites this file for the roll and owns only the badge.
+//   resistanceNotice — getResistanceNotice args + rollAttack passthrough; sole
+//     owner (attack-advanced.test.jsx lost __setResistanceNoticeReturn in its
+//     #578 trim).
+//   saveConditions ['petrified'] from save_effect on the attack chip — cited
+//     owner by conditions-extraction.test.jsx (#586); chip case-insensitivity
+//     owned by gorgon-breath.test.jsx:145-167.
+//   save chip → rollSavingThrow autoDamage context + non-empty saveConditions —
+//     cited owner by conditions-extraction.test.jsx (#586); empty-[] face owned
+//     by ma1863-behemoth-trumpet.test.jsx:206-213; abbreviation/modifier
+//     resolution owned by save-modifier.test.jsx (full matcher kept here per
+//     the #586 cite range).
+//   handleDamage popup isCrit → doubled total + popup clear — dice crit popup
+//     owner (#602); flat non-doubling owned by flat-hit-damage.test.jsx;
+//     autoDamageRoll callback crit by auto-damage-roll.test.jsx (#580);
+//     non-crit primary/secondary chips by damage-and-ability-checks.test.jsx.
+//   getCombatContext fallback, both faces — sole owner (no sibling asserts the
+//     call; senses-and-fallback only renders the name).
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -40,7 +47,6 @@ import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardMo
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
 }));
 
@@ -50,6 +56,8 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
+  // Stable identities for the channels the modal destructures (:2211) that no
+  // test here reads; export bindings purged (#578 dead-mock pattern).
   const _rollAbilityCheck = vi.fn();
   const _rollSavingThrow = vi.fn();
   const _rollSkillCheck = vi.fn();
@@ -73,11 +81,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     default: mockHook,
     _rollAttack,
     _rollDamage,
-    _rollAbilityCheck,
     _rollSavingThrow,
-    _rollSkillCheck,
-    _rollInitiative,
-    _quickRollPlayerSave,
     _setPopupHtml,
     __setPopupHtml(val) { _popupHtml = val; },
   };
@@ -182,22 +186,25 @@ function resetMocks() {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('MonsterCardModal - handleAttack: attacker cannot act', () => {
+describe('MonsterCardModal - handleAttack: attacker CAN act with non-blocking condition', () => {
   beforeEach(resetMocks);
 
-  it('still renders the attack dice link when the attacker has a non-blocking condition', () => {
+  it('still renders and rolls the attack dice link when the attacker has a non-blocking condition', () => {
     damageUtils.__setFindCreatureReturn({
       name: 'Goblin',
       conditions: [{ key: 'blinded', label: 'Blinded' }],
+      targetName: 'Player A',
     });
 
     const m = makeMonster({
       actions: [{ name: 'Club', attack_bonus: 4, description: 'Melee Attack.' }],
     });
-    render(<MonsterCardModal {...makeProps(m)} />);
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
     expect(screen.queryByText('(Incapacitated)')).not.toBeInTheDocument();
-    expect(screen.getByText('+4')).toBeInTheDocument();
+    clickDiceLink('+4');
+    // Blinded gates nothing in the cannotAct lane — bonus rolls unmodified.
+    expect(rollAttack).toHaveBeenCalledWith('Club', 4, expect.anything());
   });
 });
 
@@ -239,6 +246,7 @@ describe('MonsterCardModal - handleAttack: resistance notice', () => {
     render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Ogre' }, { name: 'Ogre', resistances: ['slashing'] }] })} />);
 
     clickDiceLink('+4');
+    expect(rollAttack).toHaveBeenCalled();
     expect(damageUtils.getResistanceNotice).toHaveBeenCalledWith(['slashing'], ['slashing'], [], 'Ogre');
     const callArgs = rollAttack.mock.calls[0][2];
     expect(callArgs.resistanceNotice).toBe('Resists slashing');
@@ -261,6 +269,7 @@ describe('MonsterCardModal - handleAttack: save conditions', () => {
     render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
 
     clickDiceLink('+4');
+    expect(rollAttack).toHaveBeenCalled();
     const callArgs = rollAttack.mock.calls[0][2];
     expect(callArgs.saveConditions).toEqual(['petrified']);
   });
@@ -324,13 +333,13 @@ describe('MonsterCardModal - handleDamage: critical-hit popup', () => {
 describe('MonsterCardModal - combat-context fallback', () => {
   beforeEach(resetMocks);
 
-  it('loads the combat context when the creatures prop is absent', () => {
-    render(<MonsterCardModal {...makeProps(makeMonster(), { creatures: undefined })} />);
+  it('fetches getCombatContext only when the creatures prop is absent', () => {
+    const { unmount } = render(<MonsterCardModal {...makeProps(makeMonster(), { creatures: undefined })} />);
     expect(damageUtils.getCombatContext).toHaveBeenCalledWith('test-campaign');
-  });
 
-  it('skips the combat-context fetch when the creatures prop is provided', () => {
+    unmount();
     render(<MonsterCardModal {...makeProps(makeMonster(), { creatures: [] })} />);
-    expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    // creatures provided → the `if (creatures) return;` guard (MonsterCardModal.jsx:2124) skips the fetch.
+    expect(damageUtils.getCombatContext).toHaveBeenCalledTimes(1);
   });
 });
