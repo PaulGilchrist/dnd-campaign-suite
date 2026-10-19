@@ -1,3 +1,24 @@
+// @maintained-by-ai
+// Lane: feature-driven damage in the attack pipeline — the two post-damage-calc steps owned by
+// attackRollPostDamage.js. Services (features/*.js, automation handlers) own grant/consume store
+// and per-spell internals (#945-#951); THIS lane pins only the pipeline-step bytes of the
+// generic featureRiders dispatcher (idx 15) and the unarmed damageTypeModifiers step (idx 16).
+//
+// Composition map (verified against attackRollDamageSteps.js buildAttackRollDamageSteps()):
+//   steps[15] = buildFeatureRidersStep()   name 'featureRiders'      subscribe 'celestial:applied' emit 'riders:applied'
+//   steps[16] = buildDamageTypeModifiersStep() name 'damageTypeModifiers' subscribe 'riders:applied' emit 'dmg_type:modified'
+// Structure (names/order/subscribe-emit chain) is owned by attackRollDamageSteps.test.js exact
+// ordered-names toEqual — cited here, not re-pinned. This file covers handler behavior only.
+//
+// Stub dice (deterministic #1026): 1d4 -> 4, 1d6 -> [4]/total 4. Math hand-derived once (#815).
+//
+// Old -> new map:
+//   featureRiders: condition-tautology removed; skip+call -> one gating test; update+sequence ->
+//     one chaining test (adds null-result arm); modal + stops-processing -> one halt test
+//     (adds popup arm, the previously uncovered branch); passthrough + missing-rolls merged.
+//   damageTypeModifiers: 3 condition its -> 1; auto-select resist/immune/case-insensitive ->
+//     1 test, 3 runs; prompt-with-target/prompt-target-not-found -> 1 test, 2 runs
+//     (same fall-through branch, both exact-pinned).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
@@ -147,524 +168,264 @@ function makeCtx(overrides = {}) {
   };
 }
 
+function makeUnarmedCtx(passives, attackOverrides = {}) {
+  return makeCtx({
+    attack: { weaponType: 'unarmed', damageType: 'bludgeoning', ...attackOverrides },
+    playerStats: { name: 'TestChar', automation: { passives } },
+    formula: '1d4',
+    total: 4,
+    rolls: [4],
+  });
+}
+
+const EMPOWERED_STRIKES = {
+  name: 'Empowered Strikes',
+  type: 'damage_type_modifier',
+  trigger: 'unarmed_strike_hit',
+  options: [
+    { name: 'Force', damageType: 'Force' },
+    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+  ],
+};
+
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('buildAttackRollDamageSteps - featureRiders, damageTypeModifiers', () => {
-  let steps;
+describe('featureRiders step (steps[15]) — dispatcher bytes', () => {
+  let step;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    steps = buildAttackRollDamageSteps();
+    step = buildAttackRollDamageSteps()[15];
     featureModules.length = 0;
   });
 
-  // ──────────────────────────────────────────────────────────────
-  // featureRiders (index 14)
-  // ──────────────────────────────────────────────────────────────
+  it('passes damage through untouched when no feature module fires (missing rolls normalize to [])', async () => {
+    featureModules.push({ condition: () => false, handler: vi.fn() });
 
-  describe('featureRiders step', () => {
-    describe('condition', () => {
-      it('always returns true', () => {
-        expect(steps[15].condition({})).toBe(true);
-      });
+    const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    expect(await step.handler(ctx)).toEqual({
+      data: { formula: '1d8+3', total: 11, rolls: [8, 3] },
     });
 
-    describe('handler', () => {
-      beforeEach(() => {
-        featureModules.length = 0;
-      });
-
-      it('returns data when no feature modules', async () => {
-        featureModules.length = 0;
-        const ctx = makeCtx({
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[15].handler(ctx);
-
-        expect(result.data).toEqual({
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-      });
-
-      it('skips features whose condition returns false', async () => {
-        const handlerMock = vi.fn();
-        featureModules.push({
-          condition: () => false,
-          handler: handlerMock,
-        });
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[15].handler(ctx);
-
-        expect(handlerMock).not.toHaveBeenCalled();
-      });
-
-      it('calls feature handler when condition returns true', async () => {
-        const handlerMock = vi.fn(async () => null);
-        featureModules.push({
-          condition: () => true,
-          handler: handlerMock,
-        });
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[15].handler(ctx);
-
-        expect(handlerMock).toHaveBeenCalledWith(ctx, expect.objectContaining({
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        }));
-      });
-
-      it('updates data when feature returns data', async () => {
-        featureModules.push({
-          condition: () => true,
-          handler: async () => ({
-            data: { total: 20, formula: '1d8+3 + 6 [Feature]' },
-          }),
-        });
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[15].handler(ctx);
-
-        expect(result.data.total).toBe(20);
-        expect(result.data.formula).toBe('1d8+3 + 6 [Feature]');
-      });
-
-      it('returns modal when feature returns modal', async () => {
-        featureModules.push({
-          condition: () => true,
-          handler: async () => ({
-            modal: { type: 'test-modal', props: {} },
-          }),
-        });
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[15].handler(ctx);
-
-        expect(result).toEqual({ modal: { type: 'test-modal', props: {} } });
-      });
-
-      it('calls sideEffects when feature returns them', async () => {
-        const sideEffectsMock = vi.fn();
-        featureModules.push({
-          condition: () => true,
-          handler: async () => ({
-            data: { total: 20 },
-            sideEffects: sideEffectsMock,
-          }),
-        });
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[15].handler(ctx);
-
-        expect(sideEffectsMock).toHaveBeenCalled();
-        featureModules.length = 0;
-      });
-
-      it('processes multiple features in sequence', async () => {
-        featureModules.push(
-          {
-            condition: () => true,
-            handler: async () => ({ data: { total: 15 } }),
-          },
-          {
-            condition: () => true,
-            handler: async () => ({ data: { total: 20 } }),
-          },
-        );
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        const result = await steps[15].handler(ctx);
-
-        expect(result.data.total).toBe(20);
-        featureModules.length = 0;
-      });
-
-      it('stops processing when a feature returns modal', async () => {
-        const handler2 = vi.fn(async () => ({ data: { total: 20 } }));
-        featureModules.push(
-          {
-            condition: () => true,
-            handler: async () => ({ data: { total: 15 } }),
-          },
-          {
-            condition: () => true,
-            handler: async () => ({ modal: { type: 'stop' } }),
-          },
-          {
-            condition: () => true,
-            handler: handler2,
-          },
-        );
-
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
-        await steps[15].handler(ctx);
-
-        expect(handler2).not.toHaveBeenCalled();
-        featureModules.length = 0;
-      });
-
-      it('handles missing rolls gracefully', async () => {
-        featureModules.length = 0;
-        const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: undefined });
-        const result = await steps[15].handler(ctx);
-
-        expect(result.data.rolls).toEqual([]);
-      });
+    const noRolls = makeCtx({ formula: '1d8+3', total: 11, rolls: undefined });
+    expect(await step.handler(noRolls)).toEqual({
+      data: { formula: '1d8+3', total: 11, rolls: [] },
     });
   });
 
-  // ──────────────────────────────────────────────────────────────
-  // damageTypeModifiers (index 15)
-  // ──────────────────────────────────────────────────────────────
+  it('invokes only condition-true features, handing each (ctx, currentData)', async () => {
+    const skipped = vi.fn();
+    const fired = vi.fn(async () => null);
+    featureModules.push(
+      { condition: () => false, handler: skipped },
+      { condition: () => true, handler: fired },
+    );
 
-  describe('damageTypeModifiers step', () => {
-    describe('condition', () => {
-      it('returns true when weaponType is unarmed and passives exist', () => {
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
-          playerStats: { automation: { passives: [] } },
-        });
-        expect(steps[16].condition(ctx)).toBe(true);
-      });
+    const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    const result = await step.handler(ctx);
 
-      it('returns false when weaponType is not unarmed', () => {
-        const ctx = makeCtx({
-          attack: { weaponType: 'melee' },
-          playerStats: { automation: { passives: [] } },
-        });
-        expect(steps[16].condition(ctx)).toBe(false);
-      });
+    expect(skipped).not.toHaveBeenCalled();
+    expect(fired).toHaveBeenCalledWith(ctx, { formula: '1d8+3', total: 11, rolls: [8, 3] });
+    expect(result).toEqual({ data: { formula: '1d8+3', total: 11, rolls: [8, 3] } });
+  });
 
-      it('returns false when passives are missing', () => {
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
-          playerStats: { automation: {} },
-        });
-        expect(steps[16].condition(ctx)).toBe(false);
-      });
+  it('chains feature data in order: null results are skipped, later data replaces earlier', async () => {
+    featureModules.push(
+      { condition: () => true, handler: async () => null },
+      {
+        condition: () => true,
+        handler: async () => ({ data: { formula: '1d8+3 + 4 [Smite]', total: 15, rolls: [8, 3, 4] } }),
+      },
+    );
+    const last = vi.fn(async () => ({ data: { formula: '1d8+3 + 4 [Smite] + 5 [Bonus]', total: 20, rolls: [8, 3, 4, 5] } }));
+    featureModules.push({ condition: () => true, handler: last });
+
+    const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    const result = await step.handler(ctx);
+
+    // Third feature must receive the second feature's output, not the original data.
+    expect(last).toHaveBeenCalledWith(ctx, { formula: '1d8+3 + 4 [Smite]', total: 15, rolls: [8, 3, 4] });
+    expect(result).toEqual({
+      data: { formula: '1d8+3 + 4 [Smite] + 5 [Bonus]', total: 20, rolls: [8, 3, 4, 5] },
+    });
+  });
+
+  it('halts the chain immediately when a feature returns modal or popup', async () => {
+    const afterModal = vi.fn(async () => ({ data: { total: 99 } }));
+    featureModules.push(
+      { condition: () => true, handler: async () => ({ modal: { type: 'test-modal', props: { a: 1 } } }) },
+      { condition: () => true, handler: afterModal },
+    );
+
+    const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    expect(await step.handler(ctx)).toEqual({ modal: { type: 'test-modal', props: { a: 1 } } });
+    expect(afterModal).not.toHaveBeenCalled();
+
+    featureModules.length = 0;
+    const afterPopup = vi.fn(async () => ({ data: { total: 99 } }));
+    featureModules.push(
+      { condition: () => true, handler: async () => ({ popup: '<b>Smite</b> applied' }) },
+      { condition: () => true, handler: afterPopup },
+    );
+
+    expect(await step.handler(ctx)).toEqual({ popup: '<b>Smite</b> applied' });
+    expect(afterPopup).not.toHaveBeenCalled();
+  });
+
+  it('applies feature data then awaits sideEffects', async () => {
+    const calls = [];
+    featureModules.push({
+      condition: () => true,
+      handler: async () => ({
+        data: { formula: '1d8+3 + 6 [Feature]', total: 17, rolls: [8, 3, 6] },
+        sideEffects: async () => {
+          await Promise.resolve();
+          calls.push('sideEffects');
+        },
+      }),
     });
 
-    describe('handler', () => {
-      it('returns early when no damage_type_modifier passives', async () => {
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
-          playerStats: {
-            automation: {
-              passives: [
-                { type: 'attack_rider', trigger: 'hit' },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
+    const ctx = makeCtx({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    const result = await step.handler(ctx);
 
-        expect(result.data.formula).toBe('1d4');
+    expect(result).toEqual({ data: { formula: '1d8+3 + 6 [Feature]', total: 17, rolls: [8, 3, 6] } });
+    expect(calls).toEqual(['sideEffects']);
+  });
+});
+
+describe('damageTypeModifiers step (steps[16]) — unarmed damage-type bytes', () => {
+  let step;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
+    step = buildAttackRollDamageSteps()[16];
+    featureModules.length = 0;
+  });
+
+  it('condition gates on unarmed weaponType with a passives array', () => {
+    expect(step.condition(makeCtx({ attack: { weaponType: 'unarmed' } }))).toBe(true);
+    expect(step.condition(makeCtx({ attack: { weaponType: 'melee' } }))).toBe(false);
+    expect(step.condition(makeCtx({ attack: { weaponType: 'unarmed' }, playerStats: { automation: {} } }))).toBe(false);
+  });
+
+  it('returns damage untouched when no passive triggers on unarmed_strike_hit', async () => {
+    const ctx = makeUnarmedCtx([{ type: 'attack_rider', trigger: 'hit' }], { damageType: 'bludgeoning' });
+
+    expect(await step.handler(ctx)).toEqual({ data: { formula: '1d4', total: 4, rolls: [4] } });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(ctx.attack.damageType).toBe('bludgeoning');
+  });
+
+  it('consumes stored empoweredStrikesDamageType once and clears the token', async () => {
+    getRuntimeValue.mockReturnValue('psychic');
+    const ctx = makeUnarmedCtx([EMPOWERED_STRIKES]);
+
+    const result = await step.handler(ctx);
+
+    expect(ctx.attack.damageType).toBe('psychic');
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', 'empoweredStrikesDamageType', null, 'test-campaign');
+    expect(result).toEqual({ data: { formula: '1d4', total: 4, rolls: [4] } });
+  });
+
+  it('auto-selects Force when the normal damage type is resisted, immune, or resisted case-insensitively — logging each choice', async () => {
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue({ creatures: [] });
+
+    const cases = [
+      { defenses: { name: 'Goblin', resistances: ['Bludgeoning'], immunities: [] }, reason: 'resists' },
+      { defenses: { name: 'Goblin', resistances: [], immunities: ['Bludgeoning'] }, reason: 'immune to' },
+      { defenses: { name: 'Goblin', resistances: ['BLUDGEONING'], immunities: [] }, reason: 'resists' },
+    ];
+
+    for (const { defenses, reason } of cases) {
+      addEntry.mockClear();
+      getTargetFromAttacker.mockReturnValue(defenses);
+      const ctx = makeUnarmedCtx([EMPOWERED_STRIKES]);
+      const result = await step.handler(ctx);
+
+      expect(ctx.attack.damageType).toBe('Force');
+      expect(result.popup).toBe(`<b>Empowered Strikes</b><br/>Goblin ${reason} Bludgeoning — using <b>Force</b>`);
+      expect(result.data).toEqual({ formula: '1d4', total: 4, rolls: [4] });
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+        type: 'ability_use',
+        characterName: 'TestChar',
+        abilityName: 'Empowered Strikes',
+        description: `Empowered Strikes — auto-selected Force damage (Goblin ${reason} Bludgeoning)`,
+        targetName: 'Goblin',
       });
+    }
+  });
 
-      it('uses stored empoweredStrikesDamageType', async () => {
-        getRuntimeValue.mockReturnValue('psychic');
+  it('prompts via damageTypeChoice modal when nothing forces a choice — target unaffected or absent', async () => {
+    getRuntimeValue.mockReturnValue(null);
+    getCombatContext.mockResolvedValue({ creatures: [] });
+    const expectedModal = {
+      type: 'damageTypeChoice',
+      props: { title: 'Empowered Strikes — Damage Type', types: ['Force', 'Bludgeoning'] },
+    };
 
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                },
-              ],
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin', resistances: ['Piercing'], immunities: [] });
+    const resistedOther = makeUnarmedCtx([EMPOWERED_STRIKES]);
+    const r1 = await step.handler(resistedOther);
+    expect(r1.modal).toEqual(expectedModal);
+    expect(r1.data).toEqual({ formula: '1d4', total: 4, rolls: [4], _damageTypeModifier: EMPOWERED_STRIKES });
+    expect(resistedOther.attack.damageType).toBe('bludgeoning');
+
+    getTargetFromAttacker.mockReturnValue(null);
+    const r2 = await step.handler(makeUnarmedCtx([EMPOWERED_STRIKES]));
+    expect(r2.modal).toEqual(expectedModal);
+  });
+
+  it('applies stored Chosen Rider damage_bonus exactly and clears the selection token', async () => {
+    // stub: rollExpression('1d6') -> { total: 4, rolls: [4] }; total 4 + 4 = 8, rolls [4, 4].
+    getRuntimeValue.mockImplementation((_key, prop) => (prop === '_Chosen_Rider_selectedOption' ? 'Option A' : null));
+    const rider = {
+      name: 'Chosen Rider',
+      type: 'attack_rider',
+      trigger: 'unarmed_strike_hit',
+      chooseOne: true,
+      options: [
+        { name: 'Option A', effect: 'damage_bonus', damageExpression: '1d6', damageType: 'force' },
+        { name: 'Option B', effect: 'other' },
+      ],
+    };
+    const ctx = makeUnarmedCtx([rider]);
+
+    const result = await step.handler(ctx);
+
+    expect(result).toEqual({
+      data: { formula: '1d4 + 1d6 [force]', total: 8, rolls: [4, 4] },
+    });
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_Chosen_Rider_selectedOption', null, 'test-campaign');
+  });
+
+  it('opens the Enhanced Unarmed Strike choice modal when no rider option is stored', async () => {
+    getRuntimeValue.mockReturnValue(null);
+    const ctx = makeCtx({
+      attack: { weaponType: 'unarmed' },
+      playerStats: {
+        name: 'TestChar',
+        automation: {
+          passives: [
+            {
+              name: 'Chosen Rider',
+              type: 'attack_rider',
+              trigger: 'unarmed_strike_hit',
+              chooseOne: true,
+              options: [{ name: 'Option A' }, { name: 'Option B' }],
             },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        await steps[16].handler(ctx);
+          ],
+        },
+      },
+    });
 
-        expect(ctx.attack.damageType).toBe('psychic');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestChar',
-          'empoweredStrikesDamageType',
-          null,
-          'test-campaign',
-        );
-      });
-
-      it('auto-selects Force when target resists Bludgeoning', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        getTargetFromAttacker.mockReturnValue({ resistances: ['Bludgeoning'], immunities: [] });
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                  options: [
-                    { name: 'Force', damageType: 'Force' },
-                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(ctx.attack.damageType).toBe('Force');
-        expect(result.popup).toContain('resists Bludgeoning');
-        expect(result.popup).toContain('using <b>Force</b>');
-        expect(addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'ability_use',
-            abilityName: 'Empowered Strikes',
-            description: expect.stringContaining('auto-selected Force'),
-            targetName: undefined,
-          }),
-        );
-      });
-
-      it('auto-selects Force when target is immune to Bludgeoning', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        getTargetFromAttacker.mockReturnValue({ resistances: [], immunities: ['Bludgeoning'] });
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                  options: [
-                    { name: 'Force', damageType: 'Force' },
-                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(ctx.attack.damageType).toBe('Force');
-        expect(result.popup).toContain('immune to Bludgeoning');
-        expect(result.popup).toContain('using <b>Force</b>');
-        expect(addEntry).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({
-            type: 'ability_use',
-            abilityName: 'Empowered Strikes',
-            description: expect.stringMatching(/auto-selected Force.*immune to Bludgeoning/),
-            targetName: undefined,
-          }),
-        );
-      });
-
-      it('returns damageTypeChoice modal when target has no relevant resistances', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        getTargetFromAttacker.mockReturnValue({ resistances: ['Piercing'], immunities: [] });
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                  options: [
-                    { name: 'Force', damageType: 'Force' },
-                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(result.modal).toEqual({
-          type: 'damageTypeChoice',
-          props: { title: 'Empowered Strikes — Damage Type', types: ['Force', 'Bludgeoning'] },
-        });
-        expect(result.data._damageTypeModifier).toEqual(expect.objectContaining({ name: 'Empowered Strikes' }));
-      });
-
-      it('returns damageTypeChoice modal when target not found', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        getTargetFromAttacker.mockReturnValue(null);
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                  options: [
-                    { name: 'Force', damageType: 'Force' },
-                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(result.modal).toEqual({
-          type: 'damageTypeChoice',
-          props: { title: 'Empowered Strikes — Damage Type', types: ['Force', 'Bludgeoning'] },
-        });
-      });
-
-      it('uses case-insensitive comparison for resistances', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        getCombatContext.mockResolvedValue({ creatures: [] });
-        getTargetFromAttacker.mockReturnValue({ resistances: ['BLUDGEONING'], immunities: [] });
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed', damageType: 'bludgeoning' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Empowered Strikes',
-                  type: 'damage_type_modifier',
-                  trigger: 'unarmed_strike_hit',
-                  options: [
-                    { name: 'Force', damageType: 'Force' },
-                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(ctx.attack.damageType).toBe('Force');
-        expect(result).toHaveProperty('popup');
-      });
-
-      it('prompts for chosen option when stored and effect is damage_bonus', async () => {
-        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
-          if (prop === '_Chosen_Rider_selectedOption') return 'Option A';
-          return null;
-        });
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Chosen Rider',
-                  type: 'attack_rider',
-                  trigger: 'unarmed_strike_hit',
-                  chooseOne: true,
-                  options: [
-                    { name: 'Option A', effect: 'damage_bonus', damageExpression: '1d6', damageType: 'force' },
-                    { name: 'Option B', effect: 'other' },
-                  ],
-                },
-              ],
-            },
-          },
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(result.data.formula).toBe('1d4 + 1d6 [force]');
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestChar',
-          '_Chosen_Rider_selectedOption',
-          null,
-          'test-campaign',
-        );
-      });
-
-      it('prompts for rider option selection when no stored value', async () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        const ctx = makeCtx({
-          attack: { weaponType: 'unarmed' },
-          playerStats: {
-            name: 'TestChar',
-            automation: {
-              passives: [
-                {
-                  name: 'Chosen Rider',
-                  type: 'attack_rider',
-                  trigger: 'unarmed_strike_hit',
-                  chooseOne: true,
-                  options: [
-                    { name: 'Option A' },
-                    { name: 'Option B' },
-                  ],
-                },
-              ],
-            },
-          },
-        });
-        const result = await steps[16].handler(ctx);
-
-        expect(result.modal).toEqual({
-          type: 'damageTypeChoice',
-          props: {
-            title: expect.stringContaining('Enhanced Unarmed Strike'),
-            types: ['Option A', 'Option B'],
-          },
-        });
-      });
+    expect(await step.handler(ctx)).toEqual({
+      modal: {
+        type: 'damageTypeChoice',
+        props: { title: 'Chosen Rider — Enhanced Unarmed Strike', types: ['Option A', 'Option B'] },
+      },
     });
   });
 });

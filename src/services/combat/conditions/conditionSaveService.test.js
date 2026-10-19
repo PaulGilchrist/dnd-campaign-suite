@@ -1,6 +1,42 @@
+// @maintained-by-ai
+// SAVE-ENGINE lane of conditionSaveService (base canonical owner): getCreatureSaveBonus
+// resolution (:13-30, incl. Wild Shape CON shortcut :15-16) and rollConditionSave
+// orchestration (:70-99) — bonus/aura composition, advantage-channel routing
+// (purity :75-77, passive saveModifiers :34-52, Protection from Poison :54-58,
+// Circle of Power via real isCircleOfPowerActive :88), Starry Form floor ordering
+// (:66-68, :90-98), DC>= boundary, collaborator call-bytes (:71-72 exact once).
+//
+// Family map (behaviors owned elsewhere, not duplicated here):
+// - conditionSaveService.aura-immunity.test.js (#1002) — CLA-019/020 aura suppression gate,
+//   armed/unarmed channel, gate-order proofs, immunity log envelopes.
+// - conditionSaveService.conditionManagement.test.js (#1003) — removeCondition full lane,
+//   addCondition auto-immunity gate, append/dedup/meta-merge/guards, { suppressed } contract,
+//   activeConditionMeta strip.
+// - conditionSaveService.popup.test.js (#1004) — buildConditionPopup envelope bytes,
+//   CLA-209 multi-roll, conditional-spread key-absence falsifiers.
+// - Engine lanes CLOSED #995-#1001 (compute #1000 folded() registry census) — fold math
+//   cite-only, never re-driven here.
+// addCondition/removeCondition/buildConditionPopup are exported here but owned by the
+// sibling lanes above — this file pins the export contract only (R9 census), no payloads.
+// Pure in-memory orchestration: zero-network (useRuntimeState/combatData mocked stores,
+// setRuntimeValue never POSTs), no timers, no wall-clock — adjudication waits
+// indefinitely (turn-based CANON).
+//
+// old -> new: p(computedStats)+p(char-obj)+p(not-found→undefined)→G1 | p(getName)+
+// p(no-bestiary)+p(no-bestiary+npcs)→G3 | sT(throws)+sT(fallback)+sT(prefer)+
+// sT(null)+sT(empty)+sT(reject)→G4 | sT(name/npcs bytes)→G5 | NEW G2 wild-shape CON
+// shortcut (:15-16, builder file pins production only) | t(plain)+t(computeAuraBonus
+// bytes)→R1 (strengthened: allCreatures + getCombatSummary pins) | t(aura-detail×3)+
+// t(zero-detail-omit)→R2 | t(dc-boundary)→R3 | t(purity-adv)+t(purity-nomatch×2)→R4
+// (+label-fallback :74) | t(CLA-102)+t(CLA-102-nomatch)→R5 (+abilities-guard) |
+// t(starry-floor)+t(starry-no-floor×2)+t(starry-con-only)→R6 | t(adv-then-floor)→R7 |
+// NEW R8 Circle of Power/Protection from Poison/Powerful Build advantage channels |
+// NEW R9 export census (#969 lesson).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
+
+const runtimeStore = vi.hoisted(() => new Map());
 
 vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
@@ -19,7 +55,8 @@ vi.mock('../auras/auraOfProtection.js', () => ({
 }));
 
 vi.mock('../automation/automationService.js', () => ({
-  playerIsImmuneToCondition: vi.fn(),
+  // auto-immunity lane kept inert (owned by #1003 conditionManagement lane)
+  playerIsImmuneToCondition: vi.fn(() => false),
 }));
 
 vi.mock('../../../services/automation/handlers/buffs/auraOfPurityHandler.js', () => ({
@@ -32,8 +69,20 @@ vi.mock('../starryFormConstellation.js', () => ({
   hasStarryDragonConstellation: vi.fn(),
 }));
 
+// In-memory runtime store faithful to the real getRuntimeValue (null when unset);
+// setRuntimeValue kept inert — real one POSTs (zero-network).
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn((characterKey, propertyName) => runtimeStore.get(`${characterKey}:${propertyName}`) ?? null),
+  setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => null),
+}));
+
 // ── Imports ──────────────────────────────────────────────────────
 
+import * as conditionSaveService from './conditionSaveService.js';
 import {
   getCreatureSaveBonus,
   rollConditionSave,
@@ -45,651 +94,312 @@ import { getAbilitySaveBonus } from './conditionUtils.js';
 import { computeAuraBonus } from '../auras/auraOfProtection.js';
 import { isAuraOfPurityActive, getAuraOfPuritySaveAdvantageConditions } from '../../../services/automation/handlers/buffs/auraOfPurityHandler.js';
 import { hasStarryDragonConstellation } from '../starryFormConstellation.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
 const defaultGetName = (name) => name;
 
-// ── Tests ────────────────────────────────────────────────────────
+function saveArgs(overrides = {}) {
+  return {
+    creature: { type: 'player', name: 'Hero' },
+    condition: { ability: 'wis', dc: 15 },
+    characters: [{ name: 'Hero' }],
+    campaignNpcs: [],
+    campaignName: 'Campaign',
+    mapName: '',
+    getName: defaultGetName,
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks(); // clears calls only — impls set below are (re)applied each test
+  // consumers-exact explicit defaults (#872); rollD20 mockReset clears once-queues
+  rollD20.mockReset().mockReturnValue(10);
+  getAbilitySaveBonus.mockReturnValue(0);
+  getMonsterData.mockResolvedValue(null);
+  computeAuraBonus.mockResolvedValue({ bonus: 0 });
+  isAuraOfPurityActive.mockReturnValue(false);
+  getAuraOfPuritySaveAdvantageConditions.mockReturnValue([]);
+  hasStarryDragonConstellation.mockReturnValue(false);
+  getCombatSummary.mockReturnValue(null);
+  runtimeStore.clear();
+});
+
+// ── getCreatureSaveBonus ─────────────────────────────────────────
 
 describe('getCreatureSaveBonus', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('G1: player bonus resolves via computedStats, then character object, then undefined for not-found', async () => {
+    getAbilitySaveBonus.mockReturnValue(5);
+    expect(await getCreatureSaveBonus({ type: 'player', name: 'Hero' }, 'wis', [{ name: 'Hero', computedStats: { x: 1 } }], [], defaultGetName)).toBe(5);
+    expect(getAbilitySaveBonus).toHaveBeenLastCalledWith({ x: 1 }, 'wis');
+
+    getAbilitySaveBonus.mockReturnValue(3);
+    expect(await getCreatureSaveBonus({ type: 'player', name: 'Hero' }, 'con', [{ name: 'Hero' }], [], defaultGetName)).toBe(3);
+    expect(getAbilitySaveBonus).toHaveBeenLastCalledWith({ name: 'Hero' }, 'con');
+
+    expect(await getCreatureSaveBonus({ type: 'player', name: 'NoOne' }, 'str', [], [], defaultGetName)).toBe(3);
+    expect(getAbilitySaveBonus).toHaveBeenLastCalledWith(undefined, 'str');
   });
 
-  describe('player creatures', () => {
-    it('returns ability save bonus from computedStats when available', async () => {
-      getAbilitySaveBonus.mockReturnValue(5);
-      const characters = [{ name: 'Hero', computedStats: {} }];
+  it('G2: Wild Shape creature takes its CON save from wildShapeConSaveBonus, ?? 0, other abilities fall through', async () => {
+    const creature = { type: 'player', name: 'Hero', wildShapeSource: 'Hero' };
+    expect(await getCreatureSaveBonus({ ...creature, wildShapeConSaveBonus: 7 }, 'con', [{ name: 'Hero' }], [], defaultGetName)).toBe(7);
+    expect(getAbilitySaveBonus).not.toHaveBeenCalled();
 
-      const bonus = await getCreatureSaveBonus(
-        { type: 'player', name: 'Hero' },
-        'wis',
-        characters,
-        [],
-        defaultGetName,
-      );
+    expect(await getCreatureSaveBonus(creature, 'con', [{ name: 'Hero' }], [], defaultGetName)).toBe(0);
 
-      expect(bonus).toBe(5);
-      expect(getAbilitySaveBonus).toHaveBeenCalledWith({}, 'wis');
-    });
-
-    it('returns ability save bonus from character object when computedStats is absent', async () => {
-      getAbilitySaveBonus.mockReturnValue(3);
-      const characters = [{ name: 'Hero' }];
-
-      const bonus = await getCreatureSaveBonus(
-        { type: 'player', name: 'Hero' },
-        'con',
-        characters,
-        [],
-        defaultGetName,
-      );
-
-      expect(bonus).toBe(3);
-      expect(getAbilitySaveBonus).toHaveBeenCalledWith({ name: 'Hero' }, 'con');
-    });
-
-    it('passes undefined to getAbilitySaveBonus when character is not found', async () => {
-      getAbilitySaveBonus.mockReturnValue(0);
-
-      await getCreatureSaveBonus(
-        { type: 'player', name: 'NoOne' },
-        'str',
-        [],
-        [],
-        defaultGetName,
-      );
-
-      expect(getAbilitySaveBonus).toHaveBeenCalledWith(undefined, 'str');
-    });
-
-    it('uses getName to transform character property before matching', async () => {
-      getAbilitySaveBonus.mockReturnValue(4);
-      const characters = [{ name: 'hero_lower' }];
-
-      await getCreatureSaveBonus(
-        { type: 'player', name: 'HERO_LOWER' },
-        'dex',
-        characters,
-        [],
-        (cName) => cName.toUpperCase(),
-      );
-
-      expect(getAbilitySaveBonus).toHaveBeenCalledWith({ name: 'hero_lower' }, 'dex');
-    });
-
-    it('does not call getMonsterData for player creatures', async () => {
-      getAbilitySaveBonus.mockReturnValue(2);
-      const characters = [{ name: 'Hero' }];
-
-      await getCreatureSaveBonus(
-        { type: 'player', name: 'Hero' },
-        'con',
-        characters,
-        [],
-        defaultGetName,
-      );
-
-      expect(getMonsterData).not.toHaveBeenCalled();
-    });
+    getAbilitySaveBonus.mockReturnValue(2);
+    expect(await getCreatureSaveBonus({ ...creature, wildShapeConSaveBonus: 7 }, 'wis', [{ name: 'Hero' }], [], defaultGetName)).toBe(2);
+    expect(getAbilitySaveBonus).toHaveBeenCalledWith({ name: 'Hero' }, 'wis');
   });
 
-  describe('monster creatures', () => {
-    it('returns saving_throw modifier when available', async () => {
-      getMonsterData.mockResolvedValue({
-        saving_throws: { wis: { modifier: 6 } },
-      });
+  it('G3: getName transforms the lookup key before matching; player lane never consults the bestiary even with campaignNpcs', async () => {
+    getAbilitySaveBonus.mockReturnValue(4);
+    expect(await getCreatureSaveBonus({ type: 'player', name: 'HERO_LOWER' }, 'dex', [{ name: 'hero_lower' }], [], (cName) => cName.toUpperCase())).toBe(4);
+    expect(getAbilitySaveBonus).toHaveBeenCalledWith({ name: 'hero_lower' }, 'dex');
 
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'Goblin' },
-        'wis',
-        [],
-        [],
-        defaultGetName,
-      );
+    expect(await getCreatureSaveBonus({ type: 'player', name: 'Hero' }, 'wis', [{ name: 'Hero' }], [{ armorClass: 15, name: 'Goblin' }], defaultGetName)).toBe(4);
+    expect(getMonsterData).not.toHaveBeenCalled();
+  });
 
-      expect(bonus).toBe(6);
-    });
+  it('G4: monster ladder — saving_throws beats ability_score_modifiers, falls back, 0 for absent/null/rejected lookups', async () => {
+    getMonsterData.mockResolvedValue({ saving_throws: { dex: { modifier: 5 } }, ability_score_modifiers: { dex: 3 } });
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'Goblin' }, 'dex', [], [], defaultGetName)).toBe(5);
 
-    it('falls back to ability_score_modifiers when saving_throws entry is missing', async () => {
-      getMonsterData.mockResolvedValue({
-        ability_score_modifiers: { con: 2 },
-      });
+    getMonsterData.mockResolvedValue({ ability_score_modifiers: { con: 2 } });
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'Goblin' }, 'con', [], [], defaultGetName)).toBe(2);
 
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'Goblin' },
-        'con',
-        [],
-        [],
-        defaultGetName,
-      );
+    getMonsterData.mockResolvedValue({ saving_throws: {}, ability_score_modifiers: {} });
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'Goblin' }, 'int', [], [], defaultGetName)).toBe(0);
 
-      expect(bonus).toBe(2);
-    });
+    getMonsterData.mockResolvedValue(null);
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'NonExistent' }, 'str', [], [], defaultGetName)).toBe(0);
 
-    it('prefers saving_throws over ability_score_modifiers when both exist', async () => {
-      getMonsterData.mockResolvedValue({
-        saving_throws: { dex: { modifier: 5 } },
-        ability_score_modifiers: { dex: 3 },
-      });
+    getMonsterData.mockRejectedValue(new Error('not found'));
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'Goblin' }, 'wis', [], [], defaultGetName)).toBe(0);
+  });
 
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'Goblin' },
-        'dex',
-        [],
-        [],
-        defaultGetName,
-      );
-
-      expect(bonus).toBe(5);
-    });
-
-    it('returns 0 when monster lookup returns null', async () => {
-      getMonsterData.mockResolvedValue(null);
-
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'NonExistent' },
-        'str',
-        [],
-        [],
-        defaultGetName,
-      );
-
-      expect(bonus).toBe(0);
-    });
-
-    it('returns 0 when monster lacks the ability in both saving_throws and ability_score_modifiers', async () => {
-      getMonsterData.mockResolvedValue({
-        saving_throws: {},
-        ability_score_modifiers: {},
-      });
-
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'Goblin' },
-        'int',
-        [],
-        [],
-        defaultGetName,
-      );
-
-      expect(bonus).toBe(0);
-    });
-
-    it('returns 0 and suppresses errors from getMonsterData', async () => {
-      getMonsterData.mockRejectedValue(new Error('not found'));
-
-      const bonus = await getCreatureSaveBonus(
-        { type: 'monster', name: 'Goblin' },
-        'wis',
-        [],
-        [],
-        defaultGetName,
-      );
-
-      expect(bonus).toBe(0);
-    });
-
-    it('passes monster name and campaignNpcs to getMonsterData', async () => {
-      getMonsterData.mockResolvedValue(null);
-
-      await getCreatureSaveBonus(
-        { type: 'monster', name: 'Ogre' },
-        'str',
-        [],
-        [{ name: 'Custom Ogre' }],
-        defaultGetName,
-      );
-
-      expect(getMonsterData).toHaveBeenCalledWith('Ogre', [{ name: 'Custom Ogre' }]);
-    });
-
-    it('does not call getMonsterData for player creatures even when campaignNpcs are provided', async () => {
-      getAbilitySaveBonus.mockReturnValue(0);
-      const characters = [{ name: 'Hero' }];
-
-      await getCreatureSaveBonus(
-        { type: 'player', name: 'Hero' },
-        'wis',
-        characters,
-        [{ armorClass: 15, name: 'Goblin' }],
-        defaultGetName,
-      );
-
-      expect(getMonsterData).not.toHaveBeenCalled();
-    });
+  it('G5: monster lookup forwards exact name and campaignNpcs bytes, once', async () => {
+    getMonsterData.mockResolvedValue({ saving_throws: { str: { modifier: 4 } } });
+    expect(await getCreatureSaveBonus({ type: 'monster', name: 'Ogre' }, 'str', [], [{ name: 'Custom Ogre' }], defaultGetName)).toBe(4);
+    expect(getMonsterData).toHaveBeenCalledTimes(1);
+    expect(getMonsterData).toHaveBeenCalledWith('Ogre', [{ name: 'Custom Ogre' }]);
   });
 });
 
-describe('rollConditionSave', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+// ── rollConditionSave ────────────────────────────────────────────
 
-  it('returns success result with correct fields on a successful save', async () => {
-    const condition = { ability: 'wis', dc: 15 };
+describe('rollConditionSave', () => {
+  it('R1: plain save returns exact result envelope and computes bonus/aura with exact collaborator bytes', async () => {
+    const combatCreatures = [{ name: 'Hero' }, { name: 'Goblin' }];
+    getCombatSummary.mockReturnValue({ creatures: combatCreatures });
     getAbilitySaveBonus.mockReturnValue(3);
     computeAuraBonus.mockResolvedValue({ bonus: 0 });
     rollD20.mockReturnValue(12);
-    isAuraOfPurityActive.mockReturnValue(false);
 
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition,
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(12);
-    expect(result.bonus).toBe(3);
-    expect(result.total).toBe(15);
-    expect(result.success).toBe(true);
-    expect(result.bonusDetail).toBeUndefined();
-    expect(result.advantage).toBeUndefined();
-  });
-
-  it('includes aura bonus in total and success calculation with bonusDetail', async () => {
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 2 });
-    rollD20.mockReturnValue(14);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    let result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', dc: 18 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.total).toBe(19);
-    expect(result.success).toBe(true);
-    expect(result.bonus).toBe(5);
-
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 1 });
-    rollD20.mockReturnValue(10);
-
-    result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'wis', dc: 11 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.bonusDetail).toBe('(+1 aura)');
-
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
-    rollD20.mockReturnValue(8);
-
-    result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'wis', dc: 13 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.bonusDetail).toBe('(+3 aura from Paladin)');
-  });
-
-  it('omits bonusDetail when auraBonus is zero even with sourceName', async () => {
-    getMonsterData.mockResolvedValue({ saving_throws: { con: { modifier: 5 } } });
-    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: 'None' });
-    rollD20.mockReturnValue(1);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    const result = await rollConditionSave({
-      creature: { type: 'monster', name: 'Goblin' },
-      condition: { ability: 'con', dc: 6 },
-      characters: [],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.bonusDetail).toBeUndefined();
-  });
-
-  it('calls computeAuraBonus with correct parameters', async () => {
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    await rollConditionSave({
-      creature: { type: 'player', name: 'Ally' },
-      condition: { ability: 'con', dc: 10 },
-      characters: [{ name: 'Group' }],
-      campaignNpcs: [],
+    const result = await rollConditionSave(saveArgs({
+      condition: { ability: 'wis', dc: 15 },
       campaignName: 'TheCampaign',
       mapName: 'DungeonMap',
-      getName: defaultGetName,
-    });
+    }));
 
+    expect(result).toEqual({
+      roll: 12,
+      total: 15,
+      success: true,
+      bonus: 3,
+      bonusDetail: undefined,
+      rolls: [12],
+      starryDragonFloor: false,
+    });
+    expect(result).not.toHaveProperty('advantage');
+    expect(getCombatSummary).toHaveBeenCalledWith('TheCampaign');
+    expect(computeAuraBonus).toHaveBeenCalledTimes(1);
     expect(computeAuraBonus).toHaveBeenCalledWith({
-      targetName: 'Ally',
-      characters: [{ name: 'Group' }],
+      targetName: 'Hero',
+      characters: [{ name: 'Hero' }],
       campaignName: 'TheCampaign',
       activeMapName: 'DungeonMap',
+      allCreatures: combatCreatures,
     });
   });
 
-  it('succeeds when total equals dc, fails when one below, and handles negative bonus', async () => {
-    getAbilitySaveBonus.mockReturnValue(5);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
+  it('R2: aura bonus joins total/bonus and formats bonusDetail; zero aura omits detail even with sourceName', async () => {
+    computeAuraBonus.mockResolvedValue({ bonus: 2 });
+    rollD20.mockReturnValue(14);
+    let result = await rollConditionSave(saveArgs({ condition: { ability: 'con', dc: 18 } }));
+    expect(result.bonus).toBe(2);
+    expect(result.total).toBe(16);
+    expect(result.success).toBe(false);
 
-    let result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'str', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: '',
-      mapName: '',
-      getName: defaultGetName,
-    });
+    computeAuraBonus.mockResolvedValue({ bonus: 1 });
+    rollD20.mockReturnValue(11);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', dc: 12 } }));
+    expect(result.total).toBe(12);
     expect(result.success).toBe(true);
+    expect(result.bonusDetail).toBe('(+1 aura)');
+
+    computeAuraBonus.mockResolvedValue({ bonus: 3, sourceName: 'Paladin' });
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', dc: 13 } }));
+    expect(result.bonusDetail).toBe('(+3 aura from Paladin)');
+
+    computeAuraBonus.mockResolvedValue({ bonus: 0, sourceName: 'None' });
+    rollD20.mockReturnValue(10);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'con', dc: 10 } }));
+    expect(result.bonusDetail).toBeUndefined();
+    expect(result.total).toBe(10);
+  });
+
+  it('R3: DC boundary — total equal succeeds, one below fails, negative save bonus folds with aura', async () => {
+    getAbilitySaveBonus.mockReturnValue(5);
+    rollD20.mockReturnValue(10);
+    expect((await rollConditionSave(saveArgs({ condition: { ability: 'str', dc: 15 } }))).success).toBe(true);
 
     getAbilitySaveBonus.mockReturnValue(4);
-    result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'str', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: '',
-      mapName: '',
-      getName: defaultGetName,
-    });
-    expect(result.success).toBe(false);
+    expect((await rollConditionSave(saveArgs({ condition: { ability: 'str', dc: 15 } }))).success).toBe(false);
 
     getAbilitySaveBonus.mockReturnValue(-1);
     computeAuraBonus.mockResolvedValue({ bonus: 1 });
-    rollD20.mockReturnValue(10);
-
-    result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', dc: 10 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: '',
-      mapName: '',
-      getName: defaultGetName,
-    });
-    expect(result.total).toBe(10);
-    expect(result.success).toBe(true);
-    expect(result.bonus).toBe(0);
+    const result = await rollConditionSave(saveArgs({ condition: { ability: 'con', dc: 10 } }));
+    expect(result).toMatchObject({ total: 10, success: true, bonus: 0 });
   });
 
-  it('rolls two d20s and uses the higher when aura of purity advantage applies', async () => {
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
+  it('R4: Aura of Purity advantage — two d20s keep the max with raw rolls array; single roll when inactive, off-list, or key absent; label supplies the condition key', async () => {
+    // armed + covered condition: rolls 3,17 -> 17
+    isAuraOfPurityActive.mockReturnValue(true);
+    getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['charmed']);
     rollD20.mockReturnValueOnce(3).mockReturnValueOnce(17);
+    let result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', key: 'charmed', dc: 15 } }));
+    expect(result).toMatchObject({ roll: 17, rolls: [3, 17], total: 17, success: true, advantage: true });
+
+    // inactive: one roll, no advantage key
+    rollD20.mockReset().mockReturnValue(10);
+    isAuraOfPurityActive.mockReturnValue(false);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'charmed', dc: 12 } }));
+    expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result).not.toHaveProperty('advantage');
+
+    // armed but condition not on the list: one roll
     isAuraOfPurityActive.mockReturnValue(true);
     getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['charmed']);
+    rollD20.mockReset().mockReturnValue(10);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'poisoned', dc: 12 } }));
+    expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result.advantage).toBeUndefined();
 
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'wis', key: 'charmed', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(17);
-    expect(result.total).toBe(19);
-    expect(result.success).toBe(true);
+    // key absent: label lowercased drives the match (:74)
+    rollD20.mockReset().mockReturnValueOnce(4).mockReturnValueOnce(9);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', label: 'Charmed', dc: 12 } }));
+    expect(rollD20).toHaveBeenCalledTimes(2);
     expect(result.advantage).toBe(true);
+    expect(result.roll).toBe(9);
   });
 
-  it('uses lower roll when disadvantageous roll is higher, and does not apply advantage when inactive or condition not in list', async () => {
-    rollD20.mockReset();
-    getAbilitySaveBonus.mockReturnValue(0);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValueOnce(18).mockReturnValueOnce(5);
-    isAuraOfPurityActive.mockReturnValue(true);
-    getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['blinded']);
+  it('R5: passive saveModifiers advantage (CLA-102 Dwarven Resilience poison→poisoned); off-condition or ability-scoped mods stay single-roll', async () => {
+    const chars = (mod) => [{ name: 'Ironhold', computedStats: { saveModifiers: [mod] } }];
+    const dwarven = { source: 'Dwarven Resilience', target: 'saving_throw', condition: 'poison', effect: 'advantage', abilities: [], skills: [] };
 
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'blinded', dc: 10 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-    expect(result.roll).toBe(18);
-    expect(result.total).toBe(18);
+    getAbilitySaveBonus.mockReturnValue(2);
+    rollD20.mockReturnValueOnce(8).mockReturnValueOnce(15);
+    let result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Ironhold' }, condition: { ability: 'con', key: 'poisoned', dc: 12 }, characters: chars(dwarven) }));
+    expect(result).toMatchObject({ advantage: true, roll: 15, total: 17, success: true });
 
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReset();
-    rollD20.mockReturnValue(10);
-    isAuraOfPurityActive.mockReturnValue(false);
-
-    await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'charmed', dc: 12 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
+    // condition mismatch: single roll
+    rollD20.mockReset().mockReturnValue(10);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Ironhold' }, condition: { ability: 'wis', key: 'frightened', dc: 12 }, characters: chars(dwarven) }));
     expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result).not.toHaveProperty('advantage');
 
-    isAuraOfPurityActive.mockReturnValue(true);
-    getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['charmed']);
-    rollD20.mockReset();
-    rollD20.mockReturnValue(10);
-
-    await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'poisoned', dc: 12 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
+    // ability-scoped saving_throw mod does not grant unconditional save advantage (:35 guard)
+    rollD20.mockReset().mockReturnValue(10);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Ironhold' }, condition: { ability: 'con', key: 'poisoned', dc: 12 }, characters: chars({ ...dwarven, abilities: ['con'] }) }));
     expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result.advantage).toBeUndefined();
   });
 
-  it('floors a low CON condition save roll to 10 when Starry Form Dragon is active', async () => {
+  it('R6: Starry Form Dragon floor — CON saves ≤9 floor to 10 with raw roll preserved; above-9, inactive, and non-CON saves never floor', async () => {
     getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    rollD20.mockReturnValue(5);
-    isAuraOfPurityActive.mockReturnValue(false);
     hasStarryDragonConstellation.mockReturnValue(true);
-
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'deafened', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(10);
-    expect(result.total).toBe(13);
-    expect(result.success).toBe(false);
+    rollD20.mockReturnValue(5);
+    let result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'deafened', dc: 15 } }));
+    expect(result).toMatchObject({ roll: 10, total: 13, success: false, starryDragonFloor: true });
     expect(result.rolls).toEqual([5]);
-    expect(result.starryDragonFloor).toBe(true);
-  });
 
-  it('does not floor when Starry Form Dragon is inactive or roll is above 9', async () => {
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    isAuraOfPurityActive.mockReturnValue(false);
-    hasStarryDragonConstellation.mockReturnValue(true);
     rollD20.mockReturnValue(12);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'deafened', dc: 15 } }));
+    expect(result).toMatchObject({ roll: 12, total: 15, starryDragonFloor: true });
 
-    let result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'deafened', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(12);
-    expect(result.total).toBe(15);
-    expect(result.starryDragonFloor).toBe(true);
-
+    rollD20.mockReturnValue(5);
     hasStarryDragonConstellation.mockReturnValue(false);
-    rollD20.mockReturnValue(5);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'deafened', dc: 10 } }));
+    expect(result).toMatchObject({ roll: 5, total: 8, starryDragonFloor: false });
 
-    result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'deafened', dc: 10 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(5);
-    expect(result.total).toBe(8);
-    expect(result.starryDragonFloor).toBe(false);
-  });
-
-  it('only applies the Starry Form Dragon floor to Constitution saves', async () => {
-    getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    isAuraOfPurityActive.mockReturnValue(false);
     hasStarryDragonConstellation.mockReturnValue(true);
-    rollD20.mockReturnValue(5);
-
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'wis', key: 'charmed', dc: 10 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(5);
-    expect(result.total).toBe(8);
-    expect(result.starryDragonFloor).toBe(false);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', key: 'charmed', dc: 10 } }));
+    expect(result).toMatchObject({ roll: 5, total: 8, starryDragonFloor: false });
   });
 
-  it('floors the effective roll on an advantage CON save when Starry Form Dragon is active', async () => {
+  it('R7: advantage then floor order — max of the pair is floored, raw pair preserved in rolls', async () => {
     getAbilitySaveBonus.mockReturnValue(3);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
     isAuraOfPurityActive.mockReturnValue(true);
     getAuraOfPuritySaveAdvantageConditions.mockReturnValue(['deafened']);
     hasStarryDragonConstellation.mockReturnValue(true);
     rollD20.mockReturnValueOnce(8).mockReturnValueOnce(2);
 
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Hero' },
-      condition: { ability: 'con', key: 'deafened', dc: 15 },
-      characters: [{ name: 'Hero' }],
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
-    expect(result.roll).toBe(10);
-    expect(result.total).toBe(13);
-    expect(result.success).toBe(false);
-    expect(result.advantage).toBe(true);
-    expect(result.starryDragonFloor).toBe(true);
+    const result = await rollConditionSave(saveArgs({ condition: { ability: 'con', key: 'deafened', dc: 15 } }));
+    expect(result).toMatchObject({ roll: 10, total: 13, success: false, advantage: true, starryDragonFloor: true });
+    expect(result.rolls).toEqual([8, 2]);
   });
 
-  it('grants advantage from Dwarven Resilience conditional_advantage on poisoned saves (CLA-102)', async () => {
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    isAuraOfPurityActive.mockReturnValue(false);
-    rollD20.mockReturnValueOnce(8).mockReturnValueOnce(15);
+  it('R8: other advantage channels — Circle of Power campaign targetEffect, Protection from Poison buff, Powerful Build grapple escape; each falsifies single-roll', async () => {
+    // Circle of Power: campaign-level targetEffect routed through real isCircleOfPowerActive
+    runtimeStore.set('campaign:targetEffects', [{ effect: 'circle_of_power', target: 'Hero' }]);
+    rollD20.mockReturnValueOnce(4).mockReturnValueOnce(16);
+    let result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', dc: 15 } }));
+    expect(result).toMatchObject({ advantage: true, roll: 16, total: 16 });
 
-    const characters = [{
-      name: 'Ironhold',
-      computedStats: {
-        saveModifiers: [{
-          source: 'Dwarven Resilience',
-          target: 'saving_throw',
-          condition: 'poison',
-          effect: 'advantage',
-          abilities: [],
-          skills: [],
-        }],
-      },
-    }];
+    runtimeStore.clear();
+    rollD20.mockReset().mockReturnValue(6);
+    result = await rollConditionSave(saveArgs({ condition: { ability: 'wis', dc: 15 } }));
+    expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result).not.toHaveProperty('advantage');
 
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Ironhold' },
-      condition: { ability: 'con', key: 'poisoned', dc: 12 },
-      characters,
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
+    // Protection from Poison buff with saveAdvantageTypes:poisoned
+    runtimeStore.set('Ironhold:activeBuffs', [{ name: 'Protection from Poison', saveAdvantageTypes: ['poisoned'] }]);
+    rollD20.mockReset().mockReturnValueOnce(1).mockReturnValueOnce(13);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Ironhold' }, condition: { ability: 'con', key: 'poisoned', dc: 12 } }));
     expect(rollD20).toHaveBeenCalledTimes(2);
-    expect(result.advantage).toBe(true);
-    expect(result.roll).toBe(15);
-    expect(result.total).toBe(17);
-    expect(result.success).toBe(true);
-  });
+    expect(result).toMatchObject({ advantage: true, roll: 13 });
 
-  it('does not grant advantage from conditional_advantage when condition does not match', async () => {
-    getAbilitySaveBonus.mockReturnValue(2);
-    computeAuraBonus.mockResolvedValue({ bonus: 0 });
-    isAuraOfPurityActive.mockReturnValue(false);
-    rollD20.mockReturnValue(10);
-
-    const characters = [{
-      name: 'Ironhold',
-      computedStats: {
-        saveModifiers: [{
-          source: 'Dwarven Resilience',
-          target: 'saving_throw',
-          condition: 'poison',
-          effect: 'advantage',
-          abilities: [],
-          skills: [],
-        }],
-      },
-    }];
-
-    const result = await rollConditionSave({
-      creature: { type: 'player', name: 'Ironhold' },
-      condition: { ability: 'wis', key: 'frightened', dc: 12 },
-      characters,
-      campaignNpcs: [],
-      campaignName: 'Campaign',
-      mapName: '',
-      getName: defaultGetName,
-    });
-
+    // buff present but no poisoned saveAdvantageTypes: single roll
+    runtimeStore.set('Ironhold:activeBuffs', [{ name: 'Protection from Poison' }]);
+    rollD20.mockReset().mockReturnValue(6);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Ironhold' }, condition: { ability: 'con', key: 'poisoned', dc: 12 } }));
     expect(rollD20).toHaveBeenCalledTimes(1);
     expect(result.advantage).toBeUndefined();
-    expect(result.roll).toBe(10);
+
+    // Powerful Build: ability_check adv mod grants advantage only on grappled saves (:38-40, :50-51)
+    const pbChars = [{ name: 'Bruenor', computedStats: { saveModifiers: [{ target: 'ability_check', effect: 'advantage', abilities: ['STR'], condition: 'powerful_build_grapple_escape' }] } }];
+    rollD20.mockReset().mockReturnValueOnce(2).mockReturnValueOnce(14);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Bruenor' }, condition: { ability: 'str', key: 'grappled', dc: 12 }, characters: pbChars }));
+    expect(rollD20).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ advantage: true, roll: 14 });
+
+    rollD20.mockReset().mockReturnValue(4);
+    result = await rollConditionSave(saveArgs({ creature: { type: 'player', name: 'Bruenor' }, condition: { ability: 'str', key: 'restrained', dc: 12 }, characters: pbChars }));
+    expect(rollD20).toHaveBeenCalledTimes(1);
+    expect(result.advantage).toBeUndefined();
+  });
+
+  it('R9: export census (#969) — module surface matches the family ownership split exactly', () => {
+    expect(Object.keys(conditionSaveService).sort()).toEqual([
+      'addCondition', // owned by #1003 conditionManagement + #1002 aura-immunity lanes
+      'buildConditionPopup', // owned by #1004 popup lane
+      'getCreatureSaveBonus', // owned here
+      'removeCondition', // owned by #1003
+      'rollConditionSave', // owned here
+    ]);
   });
 });

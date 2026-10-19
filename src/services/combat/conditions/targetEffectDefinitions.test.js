@@ -1,3 +1,20 @@
+// @maintained-by-ai
+// Registry canon owner (#820 golden-once): TARGET_EFFECT_DEFINITIONS is imported by the
+// entire conditions family (#995-#1011, all maintained: base #998 dispatch, compute #1000
+// fold bytes, combine #999, internal #1001, tickets, saveService quad, utils #1006,
+// rules #1007-#1008, restoreBalance #1009, savePrompt #1010, slow #1011), the engine
+// 134-key dispatch census (#998), and the GM manual-add UI (EffectAdder reads SOLELY
+// from this registry — #app mandate: label/description/icon/group on every entry).
+// A data typo here propagates app-wide, so the full golden census IS the test:
+// every key's label/icon/cls/group/fields/defaults bytes pinned once (#815/#985 pattern,
+// transcribed verbatim from the running module). Descriptions are long advisory prose —
+// pinned non-empty here, with ticket-copy guard phrases for the ones consumers quote.
+// Fold bytes → #1000 · dispatch → #998 · UI render → EffectAdder lanes · Defensive
+// label sort → healingBlock.test.js:28. Consumers (registerTargetEffect writers,
+// badge renderers) pin their own usage in their own lanes.
+// Old→new map: 40 loose blocks → goldenCensus(134) + roster + goldenSelfConsistency +
+// getEffectDefinition-honesty + register-table + getActive-pin + matcher-truth-table +
+// description-copy-guards.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition, registerTargetEffect, getActiveTargetEffect, abilitySaveDisadvantageActive } from './targetEffectDefinitions.js';
 
@@ -8,682 +25,317 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
-describe('targetEffectDefinitions', () => {
-  describe('TARGET_EFFECT_DEFINITIONS', () => {
-    it('is an array', () => {
-      expect(Array.isArray(TARGET_EFFECT_DEFINITIONS)).toBe(true);
-    });
+// Golden census: [effect, label, icon, cls, group, fields, defaults] — verbatim bytes.
+// Adding/removing an effect MUST update this table (roster test fails otherwise), which
+// is the intended friction of the #820 golden-once mandate.
+const CENSUS = [
+  ['slasher_enhanced_critical', 'Attack Disadv', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['disadvantage_next_attack', 'Disadv Next Attack', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['concentration_disadvantage', 'Concentration Disadv', 'fa-arrow-down', 'effect-disadvantage', 'Saves & Checks', ['source']],
+  ['goad', 'Goad', 'fa-bullseye', 'effect-disadvantage', 'Attack', ['source']],
+  ['next_attack_bonus', 'Next Attack +N Bonus', 'fa-bullseye', 'effect-target-adv', 'Attack', ['source', 'value'], { value: 5 }],
+  ['next_attack_advantage', 'Next Attack Advantage', 'fa-arrow-up', 'effect-target-adv', 'Attack', ['source']],
+  ['distracting_strike_advantage', 'Next Attack Adv vs Target', 'fa-arrow-up', 'effect-target-adv', 'Attack', ['source']],
+  ['marked_as_prey', 'Marked as Prey', 'fa-crosshairs', 'effect-buff', 'Attack', ['source']],
+  ['pesky_swarm', 'Pesky Swarm', 'fa-bug', 'effect-disadvantage', 'Attack', ['source']],
+  ['disadvantage_attack_rolls', 'Attack Disadvantage', 'fa-arrow-down', 'effect-disadvantage', 'Attack', ['source']],
+  ['reckless_attack', 'Reckless Attack', 'fa-shield-halved', 'effect-buff', 'Attack', ['source']],
+  ['taunting_step', 'Taunted', 'fa-wand-sparkles', 'effect-disadvantage', 'Attack', ['source']],
+  ['thri_kreen_bite_poison', 'Poisoned', 'fa-disease', 'effect-debuff', 'Attack', ['source', 'dc', 'saveType']],
+  ['burning', 'Burning', 'fa-fire', 'effect-debuff', 'Defensive', ['source']],
+  ['no_healing', "Can't Regain Hit Points", 'fa-heart-circle-xmark', 'effect-debuff', 'Defensive', ['source']],
+  ['constrict_grapple', 'Constrict', 'fa-hand-fist', 'effect-debuff', 'Defensive', ['source', 'dc']],
+  ['dodge', 'Disadvantage on attacks', 'fa-shield-halved', 'effect-target-disadv', 'Defensive'],
+  ['escape_the_horde', 'Escape the Horde', 'fa-shield-halved', 'effect-target-disadv', 'Defensive', ['source']],
+  ['frightful_presence_immunity', 'FP Immunity', 'fa-shield-halved', 'effect-buff', 'Defensive', ['source']],
+  ['frightful_presence', 'Frightful Presence', 'fa-skull', 'effect-debuff', 'Defensive', ['source']],
+  ['gaze_immunity', 'Gaze Immunity', 'fa-eye-slash', 'effect-buff', 'Defensive', ['source']],
+  ['infernal_wound', 'Infernal Wound', 'fa-droplet', 'effect-debuff', 'Defensive', ['source', 'dc', 'bleedDie'], { bleedDie: '1d10' }],
+  ['ink_cloud', 'Ink Cloud', 'fa-smog', 'effect-debuff', 'Defensive', ['source']],
+  ['multiattack_defense', 'Multiattack Defense', 'fa-shield-halved', 'effect-target-disadv', 'Defensive', ['source']],
+  ['no_action_and_bonus_action', 'No Actions or Bonus Actions', 'fa-ban', 'effect-cannot-act', 'Defensive', ['source']],
+  ['no_opportunity_attacks', 'No Opportunity Attacks', 'fa-ban', 'effect-cannot-act', 'Defensive'],
+  ['no_reactions', 'No Reactions', 'fa-ban', 'effect-cannot-act', 'Defensive'],
+  ['protection', 'Protection', 'fa-shield-halved', 'effect-target-disadv', 'Defensive', ['source']],
+  ['rapport_spores', 'Telepathic Rapport (Rapport Spores)', 'fa-comment-dots', 'effect-buff', 'Defensive', ['source']],
+  ['ability_score_drain', 'Ability Score Drain', 'fa-arrow-down', 'effect-debuff', 'Saves & Checks', ['ability', 'source']],
+  ['hp_max_reduce', 'HP Max Reduced', 'fa-heart-crack', 'effect-debuff', 'Saves & Checks', ['source']],
+  ['advantage_abilities', 'Adv Check', 'fa-hand', 'effect-buff', 'Saves & Checks', ['source']],
+  ['advantage_attacks', 'Adv', 'fa-arrow-up', 'effect-buff', 'Saves & Checks', ['source']],
+  ['advantage_saves', 'Adv Save', 'fa-shield-halved', 'effect-buff', 'Saves & Checks', ['source']],
+  ['bane_penalty', 'Bane (-1d4)', 'fa-shield-halved', 'effect-disadvantage', 'Saves & Checks', ['source', 'dc', 'displayLabel'], { dc: 15, displayLabel: 'Bane' }],
+  ['giggling_magic_debuff', 'Giggling Magic (-1d6)', 'fa-face-laugh-squint', 'effect-disadvantage', 'Saves & Checks', ['source', 'displayLabel'], { displayLabel: 'Giggling Magic' }],
+  ['weakening_breath', 'Weakening Breath', 'fa-hand-fist', 'effect-disadvantage', 'Saves & Checks', ['source', 'dc', 'saveType', 'damageSubtractDie'], { damageSubtractDie: '1d6' }],
+  ['hex_ability_check_disadvantage', 'Check Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source'], { ability: 'wis' }],
+  ['dex_save_disadvantage', 'DEX Save Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks'],
+  ['disadvantage_perception_checks', 'Perception Disadv', 'fa-eye-slash', 'effect-disadvantage', 'Saves & Checks'],
+  ['hex_save_disadvantage', 'Save Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source'], { ability: 'wis' }],
+  ['ability_save_disadvantage', 'Save Disadv (Ability)', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source']],
+  ['disadvantage_on_next_save', 'Save Disadv (Next)', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['source']],
+  ['sleep_staged', 'Sleep', 'fa-moon', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['paralyzing_staged', 'Paralyzing Breath', 'fa-bolt', 'effect-debuff', 'Spells', ['source', 'dc', 'saveType']],
+  ['petrifying_bite_staged', 'Petrifying Bite', 'fa-diamond', 'effect-debuff', 'Spells', ['source', 'dc', 'saveType']],
+  ['tashas_hideous_laughter', "Tasha's Hideous Laughter", 'fa-music', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['forcecage', 'Forcecage', 'fa-dungeon', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['protection_from_evil_and_good', 'Protection from Evil and Good', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['protection_from_poison', 'Protection from Poison', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['maze', 'Maze', 'fa-dungeon', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['confusion', 'Confused', 'fa-circle-notch', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['banishment', 'Banishment', 'fa-door-open', 'effect-debuff', 'Spells', ['source']],
+  ['banished_demiplane', 'Banished (Demiplane)', 'fa-door-open', 'effect-debuff', 'Spells', ['source']],
+  ['holy_aura', 'Holy Aura', 'fa-sun', 'effect-buff', 'Spells', ['source']],
+  ['antimagic_field', 'Antimagic Field', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['aura_of_life', 'Aura of Life', 'fa-heart-pulse', 'effect-buff', 'Spells', ['source']],
+  ['aura_of_purity', 'Aura of Purity', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['aura_of_vitality', 'Aura of Vitality', 'fa-heart-pulse', 'effect-buff', 'Spells', ['source']],
+  ['barkskin', 'Barkskin', 'fa-tree', 'effect-buff', 'Spells', ['source']],
+  ['blur', 'Blur', 'fa-eye-slash', 'effect-target-disadv', 'Spells', ['source']],
+  ['beacon_of_hope', 'Beacon of Hope', 'fa-heart-pulse', 'effect-buff', 'Spells', ['source']],
+  ['bless_bonus', 'Bless (+1d4)', 'fa-hands', 'effect-bless', 'Spells', ['source']],
+  ['calm_emotions', 'Calm Emotions', 'fa-hand-holding-heart', 'effect-buff', 'Spells', ['source']],
+  ['indifferent', 'Indifferent (Calm Emotions)', 'fa-handshake', 'effect-neutral', 'Spells', ['source']],
+  ['circle_of_power', 'Circle of Power', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['clairvoyant_combatant', 'Clairvoyant Combatant', 'fa-eye', 'effect-target-adv', 'Spells', ['source']],
+  ['compelled_duel', 'Compelled Duel', 'fa-hand-fist', 'effect-disadvantage', 'Spells', ['source']],
+  ['crown_of_madness', 'Crown of Madness', 'fa-crown', 'effect-charm', 'Spells', ['source']],
+  ['death_strike', 'Death Strike', 'fa-skull', 'effect-auto-crit', 'Spells', ['source', 'dc'], { dc: 15 }],
+  ['heroism', 'Heroism', 'fa-dragon', 'effect-buff', 'Spells', ['source']],
+  ['death_ward', 'Death Ward', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['enhance_ability', 'Enhance Ability', 'fa-hand', 'effect-buff', 'Spells', ['ability', 'source'], { ability: 'STR' }],
+  ['bolstered', 'Bolstered', 'fa-shield-heart', 'effect-buff', 'Spells', ['source']],
+  ['bolster_advantage', 'Bolstered (Advantage on D20 Tests)', 'fa-arrow-up', 'effect-buff', 'Spells', ['source']],
+  ['enlarged', 'Enlarged', 'fa-up-right-and-down-left-from-center', 'effect-buff', 'Spells', ['source']],
+  ['ethereal', 'Ethereal', 'fa-ghost', 'effect-buff', 'Spells', ['source']],
+  ['disguised', 'Disguised', 'fa-user-secret', 'effect-buff', 'Spells', ['source']],
+  ['invisible', 'Invisible', 'fa-eye-slash', 'effect-buff', 'Spells', ['source']],
+  ['eye_ray_paralyzed', 'Eye Ray: Paralyzed', 'fa-bolt', 'effect-debuff', 'Spells', ['source', 'dc', 'saveType']],
+  ['eye_ray_petrifying', 'Eye Ray: Petrifying', 'fa-hand', 'effect-debuff', 'Spells', ['source', 'dc', 'saveType']],
+  ['faerie_fire', 'Faerie Fire', 'fa-fire', 'effect-debuff', 'Spells', ['source']],
+  ['flesh_to_stone', 'Flesh to Stone', 'fa-dungeon', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['foresight', 'Foresight', 'fa-eye', 'effect-target-adv', 'Spells', ['source']],
+  ['globe_barrier', 'Globe of Invulnerability', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['ottos_irresistible_dance', "Otto's Irresistible Dance", 'fa-music', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['regenerate', 'Regenerate', 'fa-heart-pulse', 'effect-buff', 'Spells', ['source']],
+  ['resistance_damage_reduction', 'Resistance', 'fa-shield-halved', 'effect-buff', 'Spells', ['source']],
+  ['ray_of_enfeeble_debuff', 'Ray of Enfeeblement', 'fa-hand-fist', 'effect-disadvantage', 'Spells', ['source']],
+  ['resilient_sphere', 'Resilient Sphere', 'fa-circle', 'effect-debuff', 'Spells', ['source']],
+  ['silenced', 'Silenced', 'fa-volume-xmark', 'effect-disadvantage', 'Spells', ['source']],
+  ['starry_form', 'Starry Form', 'fa-star', 'effect-buff', 'Spells', ['source', 'constellation']],
+  ['incite_rampage', 'Incited Rampage', 'fa-fire', 'effect-buff', 'Spells', ['source']],
+  ['redirect_attack', 'Redirected Attack', 'fa-right-left', 'effect-buff', 'Spells', ['source']],
+  ['summoned', 'Summoned', 'fa-hand-sparkles', 'effect-summoned', 'Spells', ['source']],
+  ['wild_shape', 'Wild Shape', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
+  ['polymorph', 'Polymorph', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
+  ['true_polymorph', 'True Polymorph', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName', 'mode']],
+  ['animal_shapes', 'Animal Shapes', 'fa-paw', 'effect-buff', 'Spells', ['source', 'beastName']],
+  ['shapechange', 'Shapechange', 'fa-paw', 'effect-buff', 'Spells', ['source', 'formName']],
+  ['object_transform', 'True Polymorph (Object)', 'fa-gem', 'effect-debuff', 'Spells', ['source', 'objectType']],
+  ['pass_without_trace_bonus', 'Pass Without Trace', 'fa-wind', 'effect-target-adv', 'Spells', ['source', 'value'], { value: 10 }],
+  ['imprisonment', 'Imprisonment', 'fa-dungeon', 'effect-debuff', 'Spells', ['source', 'value']],
+  ['prismatic_spray_indigo', 'Prismatic Spray (Indigo)', 'fa-eye', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['prismatic_spray_violet', 'Prismatic Spray (Violet)', 'fa-door-open', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['sanctuary', 'Sanctuary', 'fa-shield-halved', 'effect-buff', 'Spells', ['source', 'dc']],
+  ['sleet_storm', 'Sleet Storm', 'fa-snowflake', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['stinking_cloud', 'Stinking Cloud', 'fa-smog', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['warding_bond', 'Warding Bond', 'fa-ring', 'effect-buff', 'Spells', ['source']],
+  ['web', 'Web', 'fa-spider', 'effect-debuff', 'Spells', ['source', 'dc']],
+  ['whirlwind', 'Whirlwind (Zone)', 'fa-hurricane', 'effect-debuff', 'Spells', ['source', 'dc', 'saveType']],
+  ['lair_dream_plane', 'Dream Plane (Lair)', 'fa-cloud-moon', 'effect-debuff', 'Lair', ['source']],
+  ['lair_darkness', 'Magical Darkness (Lair)', 'fa-moon', 'effect-debuff', 'Lair', ['source']],
+  ['lair_insect_cloud', 'Insect Cloud (Lair)', 'fa-bug', 'effect-debuff', 'Lair', ['source', 'dc']],
+  ['lair_sand_cloud', 'Sand Cloud (Lair)', 'fa-smog', 'effect-debuff', 'Lair', ['source', 'dc']],
+  ['lair_fog_cloud', 'Fog Cloud (Lair)', 'fa-cloud-fog', 'effect-debuff', 'Lair', ['source']],
+  ['lair_spike_growth', 'Stone Spikes (Lair)', 'fa-mountain', 'effect-debuff', 'Lair', ['source']],
+  ['lair_slimy_ground', 'Slimy Ground (Lair)', 'fa-hand-dots', 'effect-debuff', 'Lair', ['source']],
+  ['lair_spectral_eyes', 'Spectral Eyes and Tentacles (Lair)', 'fa-eye', 'effect-debuff', 'Lair', ['source']],
+  ['lair_mud', 'Liquid Mud (Lair)', 'fa-water', 'effect-debuff', 'Lair', ['source', 'dc']],
+  ['lair_volcanic_gas', 'Volcanic Gas (Lair)', 'fa-smog', 'effect-debuff', 'Lair', ['source', 'dc']],
+  ['ac_penalty', 'AC Penalty', 'fa-shield-halved', 'effect-disadvantage', 'Movement', ['source', 'value'], { value: 2 }],
+  ['attached', 'Attached', 'fa-circle-dot', 'effect-debuff', 'Movement', ['source']],
+  ['branches_of_the_tree_teleport', 'Tree-Branch Teleport', 'fa-tree', 'effect-neutral', 'Movement', ['source', 'value'], { value: 5 }],
+  ['frozen_grip', 'Frozen Grip', 'fa-snowflake', 'effect-debuff', 'Movement', ['source', 'value'], { value: 10 }],
+  ['falling', 'Falling', 'fa-person-falling', 'effect-debuff', 'Movement', ['value'], { value: 10 }],
+  ['push', 'Pushed', 'fa-hand', 'effect-debuff', 'Movement', ['source', 'value'], { value: 10 }],
+  ['speed_half', 'Speed Halved', 'fa-gauge-high', 'effect-debuff', 'Movement', ['source']],
+  ['speed_zero', 'Speed 0', 'fa-gauge-simple', 'effect-speed-zero', 'Movement', ['source']],
+  ['speed_reduction', 'Speed Reduced', 'fa-minus', 'effect-speed-zero', 'Movement', ['source', 'value'], { value: 10 }],
+  ['telekinetic_movement', 'Telekinetic Moved', 'fa-hand', 'effect-neutral', 'Movement', ['source', 'value'], { value: 30 }],
+  ['teleport_swap_with_illusion', 'Illusion Swap', 'fa-arrows-rotate', 'effect-neutral', 'Movement', ['source', 'value'], { value: 30 }],
+  ['warping_implosion_teleport', 'Warping Implosion', 'fa-arrow-right-arrow-left', 'effect-neutral', 'Movement', ['source', 'value'], { value: 120 }],
+  ['pulled_toward', 'Pulled Toward', 'fa-arrows-to-circle', 'effect-debuff', 'Movement', ['source', 'value'], { value: 5 }],
+];
 
-    it('has a non-zero length', () => {
-      expect(TARGET_EFFECT_DEFINITIONS.length).toBeGreaterThan(0);
-    });
-
-    it('contains definitions for all expected groups', () => {
-      const groups = [...new Set(TARGET_EFFECT_DEFINITIONS.map((d) => d.group))];
-      expect(groups).toContain('Attack');
-      expect(groups).toContain('Defensive');
-      expect(groups).toContain('Saves & Checks');
-      expect(groups).toContain('Spells');
-      expect(groups).toContain('Movement');
-    });
-
-    it('defines at least one effect per group', () => {
-      const groupCounts = {};
-      for (const def of TARGET_EFFECT_DEFINITIONS) {
-        groupCounts[def.group] = (groupCounts[def.group] || 0) + 1;
-      }
-      for (const group of Object.keys(groupCounts)) {
-        expect(groupCounts[group]).toBeGreaterThan(0);
-      }
-    });
+describe('TARGET_EFFECT_DEFINITIONS golden census (#820)', () => {
+  it.each(CENSUS)('te "%s" is golden', (effect, label, icon, cls, group, fields, defaults) => {
+    const def = getEffectDefinition(effect);
+    expect(def).toBeDefined();
+    const { description, ...shape } = def;
+    expect(typeof description).toBe('string');
+    expect(description.length).toBeGreaterThan(0);
+    // Exact shape: no missing, extra, or drifted property beyond description (#app mandate).
+    expect(shape).toEqual({ effect, label, icon, cls, group, fields, defaults });
   });
 
-  describe('definition shape', () => {
-    const requiredProps = ['effect', 'label', 'description', 'icon', 'cls', 'group'];
-    for (const def of TARGET_EFFECT_DEFINITIONS) {
-      it(`"${def.effect}" has all required properties`, () => {
-        for (const prop of requiredProps) {
-          expect(def).toHaveProperty(prop);
-          expect(typeof def[prop]).toBe('string');
-          expect(def[prop]).toBeTruthy();
-        }
-      });
+  it('roster is exactly the golden census — no additions, removals, or duplicates', () => {
+    const keys = TARGET_EFFECT_DEFINITIONS.map((d) => d.effect);
+    expect(keys).toHaveLength(CENSUS.length);
+    expect([...keys].sort()).toEqual(CENSUS.map((row) => row[0]).sort());
+    expect([...new Set(keys)]).toHaveLength(CENSUS.length);
+    // Groups stay within the authored picker set.
+    expect([...new Set(TARGET_EFFECT_DEFINITIONS.map((d) => d.group))].sort())
+      .toEqual(['Attack', 'Defensive', 'Lair', 'Movement', 'Saves & Checks', 'Spells']);
+  });
 
-      it(`"${def.effect}" has valid optional properties when present`, () => {
-        if (def.fields) {
-          expect(Array.isArray(def.fields)).toBe(true);
-          for (const field of def.fields) {
-            expect(['value', 'ability', 'source', 'dc', 'constellation', 'beastName', 'mode', 'objectType', 'displayLabel', 'formName', 'saveType', 'damageSubtractDie', 'bleedDie']).toContain(field);
-          }
-        }
-        if (def.defaults) {
-          expect(typeof def.defaults).toBe('object');
-          expect(def.defaults).not.toBeNull();
-        }
-        if (def.sourceLabel) {
-          expect(typeof def.sourceLabel).toBe('string');
-          expect(def.sourceLabel).toBeTruthy();
-        }
-      });
+  it('golden rows are self-consistent: fa- icons, effect- cls, defaults keys declared in fields', () => {
+    for (const [effect, , icon, cls, , fields, defaults] of CENSUS) {
+      expect(icon, effect).toMatch(/^fa-/);
+      expect(cls, effect).toMatch(/^effect-/);
+      for (const key of Object.keys(defaults || {})) {
+        expect(fields, `${effect}.${key}`).toContain(key);
+      }
     }
   });
+});
 
-  describe('unique effect keys', () => {
-    it('has no duplicate effect keys', () => {
-      const keys = TARGET_EFFECT_DEFINITIONS.map((d) => d.effect);
-      const uniqueKeys = [...new Set(keys)];
-      expect(keys.length).toBe(uniqueKeys.length);
-    });
+// Advisory prose guards for copy consumers quote verbatim (badges, modals, tickets).
+// Full-byte description ownership stays in the consumer lanes that render them.
+describe('description copy guards', () => {
+  it.each([
+    ['concentration_disadvantage', ['Disadvantage on saving throws to maintain Concentration']],
+    ['no_healing', ["can't regain Hit Points"]],
+    ['indifferent', ['GM-enforced advisory', 'takes damage']],
+    ['rapport_spores', ['telepathy', 'GM-enforced']],
+    ['attached', ["2d4) Necrotic damage at the start of each of the stirge's turns", '5 feet of movement', 'can detach it as an action', 'Darkmantle: Speed 0, moves with the target', 'DC 13 Strength (Athletics) action']],
+    ['frozen_grip', ['Speed is reduced by N feet', "can't take Reactions", 'move or take one action on its turn, not both', 'GM-enforced']],
+    ['pulled_toward', ['pulled N feet straight toward the source', 'GM-enforced']],
+  ])('te "%s" copy stays in force', (effect, phrases) => {
+    const def = getEffectDefinition(effect);
+    for (const phrase of phrases) {
+      expect(def.description, `${effect}: ${phrase}`).toContain(phrase);
+    }
+  });
+});
+
+describe('getEffectDefinition', () => {
+  it('returns undefined for unknown/empty keys — honest lookup, no throw', () => {
+    expect(getEffectDefinition('nonexistent_effect')).toBeUndefined();
+    expect(getEffectDefinition('')).toBeUndefined();
+    expect(getEffectDefinition(null)).toBeUndefined();
+    expect(getEffectDefinition(undefined)).toBeUndefined();
+  });
+});
+
+describe('registerTargetEffect', () => {
+  const campaignName = 'test-campaign';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe('definitions by group', () => {
-    describe('Attack group', () => {
-      const attackEffects = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Attack');
-
-      it('contains expected attack effects', () => {
-        const effectKeys = attackEffects.map((d) => d.effect);
-        expect(effectKeys).toContain('slasher_enhanced_critical');
-        expect(effectKeys).toContain('disadvantage_next_attack');
-        expect(effectKeys).toContain('goad');
-        expect(effectKeys).toContain('next_attack_bonus');
-        expect(effectKeys).toContain('next_attack_advantage');
-        expect(effectKeys).toContain('distracting_strike_advantage');
-        expect(effectKeys).toContain('reckless_attack');
-        expect(effectKeys).toContain('taunting_step');
-        expect(effectKeys).toContain('disadvantage_attack_rolls');
-      });
-
-      it('Attack effects have appropriate icon classes', () => {
-        for (const def of attackEffects) {
-          expect(def.icon).toMatch(/^fa-/);
-        }
-      });
-    });
-
-    describe('Defensive group', () => {
-      const defensiveEffects = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Defensive');
-
-      it('contains expected defensive effects', () => {
-        const effectKeys = defensiveEffects.map((d) => d.effect);
-        expect(effectKeys).toContain('escape_the_horde');
-        expect(effectKeys).toContain('multiattack_defense');
-        expect(effectKeys).toContain('no_opportunity_attacks');
-        expect(effectKeys).toContain('no_reactions');
-        expect(effectKeys).toContain('protection');
-      });
-
-      it('Defensive effects that block actions have no optional fields', () => {
-        const noFieldEffects = defensiveEffects.filter((d) => d.effect === 'no_opportunity_attacks' || d.effect === 'no_reactions');
-        for (const def of noFieldEffects) {
-          expect(def.fields).toBeUndefined();
-        }
-      });
-
-      // MA-1212: Myconid Adult Rapport Spores save-less zone te (armed by the
-      // ACTION-category zone picker, MA-0043/MA-0595 byte-twin consumers).
-      it('MA-1212 rapport_spores registered Defensive buff, source field only', () => {
-        expect(defensiveEffects.map((d) => d.effect)).toContain('rapport_spores');
-        const def = getEffectDefinition('rapport_spores');
-        expect(def.label).toBe('Telepathic Rapport (Rapport Spores)');
-        expect(def.cls).toBe('effect-buff');
-        expect(def.group).toBe('Defensive');
-        expect(def.fields).toEqual(['source']);
-        expect(def.description).toMatch(/telepathy/i);
-        expect(def.description).toMatch(/GM-enforced/);
-      });
-
-      it('MA-1212 Defensive labels stay localeCompare-sorted (healingBlock.test.js pin)', () => {
-        const labels = defensiveEffects.map((d) => d.label);
-        const sorted = [...labels].sort((a, b) => a.localeCompare(b));
-        expect(labels).toEqual(sorted);
-      });
-    });
-
-    describe('Saves & Checks group', () => {
-      const savesChecksEffects = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Saves & Checks');
-
-      it('contains expected saves & checks effects', () => {
-        const effectKeys = savesChecksEffects.map((d) => d.effect);
-        expect(effectKeys).toContain('advantage_abilities');
-        expect(effectKeys).toContain('advantage_attacks');
-        expect(effectKeys).toContain('advantage_saves');
-        expect(effectKeys).toContain('bane_penalty');
-        expect(effectKeys).toContain('hex_ability_check_disadvantage');
-        expect(effectKeys).toContain('dex_save_disadvantage');
-        expect(effectKeys).toContain('disadvantage_perception_checks');
-        expect(effectKeys).toContain('hex_save_disadvantage');
-        expect(effectKeys).toContain('disadvantage_on_next_save');
-      });
-
-      it('effects with ability fields have correct defaults', () => {
-        const hexCheck = savesChecksEffects.find((d) => d.effect === 'hex_ability_check_disadvantage');
-        expect(hexCheck.defaults.ability).toBe('wis');
-
-        const hexSave = savesChecksEffects.find((d) => d.effect === 'hex_save_disadvantage');
-        expect(hexSave.defaults.ability).toBe('wis');
-      });
-    });
-
-    describe('Spells group', () => {
-      const spellEffects = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Spells');
-
-      it('contains expected spell effects', () => {
-        const effectKeys = spellEffects.map((d) => d.effect);
-        expect(effectKeys).toContain('tashas_hideous_laughter');
-        expect(effectKeys).toContain('forcecage');
-        expect(effectKeys).toContain('protection_from_evil_and_good');
-        expect(effectKeys).toContain('protection_from_poison');
-        expect(effectKeys).toContain('maze');
-        expect(effectKeys).toContain('confusion');
-        expect(effectKeys).toContain('banishment');
-        expect(effectKeys).toContain('banished_demiplane');
-        expect(effectKeys).toContain('holy_aura');
-        expect(effectKeys).toContain('antimagic_field');
-        expect(effectKeys).toContain('aura_of_life');
-        expect(effectKeys).toContain('aura_of_purity');
-        expect(effectKeys).toContain('aura_of_vitality');
-        expect(effectKeys).toContain('barkskin');
-        expect(effectKeys).toContain('blur');
-        expect(effectKeys).toContain('beacon_of_hope');
-        expect(effectKeys).toContain('bless_bonus');
-        expect(effectKeys).toContain('calm_emotions');
-        // SP-020 B3: advisory attitude te replacing the old Charmed substitute
-        const indifferent = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'indifferent');
-        expect(indifferent).toBeDefined();
-        expect(indifferent.group).toBe('Spells');
-        expect(indifferent.cls).toBe('effect-neutral');
-        expect(indifferent.icon).toBe('fa-handshake');
-        expect(indifferent.description).toContain('GM-enforced advisory');
-        expect(indifferent.description).toContain('takes damage');
-        expect(effectKeys).toContain('circle_of_power');
-        expect(effectKeys).toContain('clairvoyant_combatant');
-        expect(effectKeys).toContain('compelled_duel');
-        expect(effectKeys).toContain('crown_of_madness');
-        expect(effectKeys).toContain('death_strike');
-        expect(effectKeys).toContain('heroism');
-        expect(effectKeys).toContain('death_ward');
-        expect(effectKeys).toContain('enhance_ability');
-        expect(effectKeys).toContain('faerie_fire');
-        expect(effectKeys).toContain('flesh_to_stone');
-        expect(effectKeys).toContain('foresight');
-        expect(effectKeys).toContain('globe_barrier');
-        expect(effectKeys).toContain('ottos_irresistible_dance');
-        expect(effectKeys).toContain('regenerate');
-        expect(effectKeys).toContain('resistance_damage_reduction');
-        expect(effectKeys).toContain('ray_of_enfeeble_debuff');
-        expect(effectKeys).toContain('resilient_sphere');
-        expect(effectKeys).toContain('silenced');
-        expect(effectKeys).toContain('starry_form');
-        expect(effectKeys).toContain('summoned');
-        expect(effectKeys).toContain('wild_shape');
-        expect(effectKeys).toContain('polymorph');
-        expect(effectKeys).toContain('true_polymorph');
-        expect(effectKeys).toContain('animal_shapes');
-        expect(effectKeys).toContain('shapechange');
-        expect(effectKeys).toContain('object_transform');
-        expect(effectKeys).toContain('pass_without_trace_bonus');
-        expect(effectKeys).toContain('imprisonment');
-        expect(effectKeys).toContain('prismatic_spray_indigo');
-        expect(effectKeys).toContain('prismatic_spray_violet');
-        expect(effectKeys).toContain('sanctuary');
-        expect(effectKeys).toContain('sleet_storm');
-        expect(effectKeys).toContain('stinking_cloud');
-        expect(effectKeys).toContain('warding_bond');
-      });
-
-      it('SP-111: registers stinking_cloud zone and no_action_and_bonus_action block', () => {
-        const cloud = getEffectDefinition('stinking_cloud');
-        expect(cloud).toBeDefined();
-        expect(cloud.group).toBe('Spells');
-        expect(cloud.fields).toContain('dc');
-
-        const block = getEffectDefinition('no_action_and_bonus_action');
-        expect(block).toBeDefined();
-        expect(block.cls).toBe('effect-cannot-act');
-      });
-
-      it('polymorph effects have beastName field', () => {
-        const polymorphEffects = ['wild_shape', 'polymorph', 'true_polymorph', 'animal_shapes'];
-        for (const key of polymorphEffects) {
-          const def = spellEffects.find((d) => d.effect === key);
-          expect(def.fields).toContain('beastName');
-        }
-      });
-
-      it('shapechange has formName field', () => {
-        const def = spellEffects.find((d) => d.effect === 'shapechange');
-        expect(def.fields).toContain('formName');
-      });
-
-      it('object_transform has objectType field', () => {
-        const def = spellEffects.find((d) => d.effect === 'object_transform');
-        expect(def.fields).toContain('objectType');
-      });
-
-      it('true_polymorph has mode field', () => {
-        const def = spellEffects.find((d) => d.effect === 'true_polymorph');
-        expect(def.fields).toContain('mode');
-      });
-
-      it('starry_form has constellation field', () => {
-        const def = spellEffects.find((d) => d.effect === 'starry_form');
-        expect(def.fields).toContain('constellation');
-      });
-    });
-
-    describe('Movement group', () => {
-      const movementEffects = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Movement');
-
-      it('contains expected movement effects', () => {
-        const effectKeys = movementEffects.map((d) => d.effect);
-        expect(effectKeys).toContain('ac_penalty');
-        expect(effectKeys).toContain('speed_reduction');
-      });
-
-      it('movement effects have defaults', () => {
-        const acPenalty = movementEffects.find((d) => d.effect === 'ac_penalty');
-        expect(acPenalty.defaults.value).toBe(2);
-
-        const speedReduction = movementEffects.find((d) => d.effect === 'speed_reduction');
-        expect(speedReduction.defaults.value).toBe(10);
-      });
-
-      // MA-0995 reuse contract: hobgoblin-warlord Javelin rides this te via
-      // the hit_target_effect passthrough (§215 MA-0542/MA-0733 twin). The
-      // producer (applyHitClauseTargetEffect) writes NO value — the registry
-      // default 10 is the RAW −10 ft and MUST stay pinned here and at the
-      // consumer default (conditionEffects.js te.value || 10).
-      it('MA-0995: speed_reduction whitelist pins value field + default 10 for the Javelin passthrough', () => {
-        const speedReduction = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'speed_reduction');
-        expect(speedReduction.label).toBe('Speed Reduced');
-        expect(speedReduction.group).toBe('Movement');
-        expect(speedReduction.fields).toEqual(['source', 'value']);
-        expect(speedReduction.defaults.value).toBe(10);
-      });
-
-      // MA-1012: Ice Devil Ice Spear composite rider — the single-string
-      // hit_target_effect passthrough (§215) carries ONE te, so the
-      // no-Bonus-Action/no-Reaction/Speed−10/move-or-action rider registers
-      // as frozen_grip with value default 10 = RAW −10 ft (MA-0995 whitelist
-      // shape). Consumer legs: conditionEffects.js speed_reduction +
-      // no_reactions fold (MA-0087 trio) + ConditionEffectBadges.jsx
-      // 'Frozen Grip' badge; economy clauses are §70 advisory copy.
-      // MA-1459: Shambling Mound Charged Tendril reuses pulled_toward (no
-      // duplicate te — AGENTS registry rule). The attack-hit producer
-      // (handlePlainDamage.applyHitPullClause) writes value = feet (5 RAW);
-      // PC Warping Implosion writes no value (default covers the GM add UI,
-      // registerTargetEffect itself merges extraProps verbatim).
-      it('MA-1459: pulled_toward whitelist extended with value field + default 5 for the monster attack-hit pull producer', () => {
-        const pulledToward = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'pulled_toward');
-        expect(pulledToward.label).toBe('Pulled Toward');
-        expect(pulledToward.group).toBe('Movement');
-        expect(pulledToward.fields).toEqual(['source', 'value']);
-        expect(pulledToward.defaults.value).toBe(5);
-        expect(pulledToward.description).toMatch(/pulled N feet straight toward the source/i);
-        expect(pulledToward.description).toMatch(/GM-enforced/);
-      });
-
-      it('MA-1012: frozen_grip whitelist pins label/group/value field + default 10 for the Ice Spear passthrough', () => {
-        const frozenGrip = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'frozen_grip');
-        expect(frozenGrip.label).toBe('Frozen Grip');
-        expect(frozenGrip.group).toBe('Movement');
-        expect(frozenGrip.fields).toEqual(['source', 'value']);
-        expect(frozenGrip.defaults.value).toBe(10);
-        expect(frozenGrip.description).toMatch(/Speed is reduced by N feet/);
-        expect(frozenGrip.description).toMatch(/can't take Reactions/);
-        expect(frozenGrip.description).toMatch(/move or take one action.*not both/);
-        expect(frozenGrip.description).toMatch(/GM-enforced/);
-      });
-    });
-  });
-
-  describe('defaults values', () => {
-    it('next_attack_bonus has default value of 5', () => {
-      const def = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'next_attack_bonus');
-      expect(def.defaults.value).toBe(5);
-    });
-
-    it('bane_penalty has default dc of 15 and displayLabel of "Bane"', () => {
-      const def = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'bane_penalty');
-      expect(def.defaults.dc).toBe(15);
-      expect(def.defaults.displayLabel).toBe('Bane');
-    });
-
-    it('death_strike has default dc of 15', () => {
-      const def = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'death_strike');
-      expect(def.defaults.dc).toBe(15);
-    });
-
-    it('pass_without_trace_bonus has default value of 10', () => {
-      const def = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'pass_without_trace_bonus');
-      expect(def.defaults.value).toBe(10);
-    });
-
-    it('effects without defaults do not have the property', () => {
-      const noDefaults = TARGET_EFFECT_DEFINITIONS.filter((d) => !d.fields);
-      for (const def of noDefaults) {
-        expect(def.defaults).toBeUndefined();
-      }
-    });
-  });
-
-  describe('icon classes', () => {
-    it('all effects have Font Awesome icon classes', () => {
-      for (const def of TARGET_EFFECT_DEFINITIONS) {
-        expect(def.icon).toMatch(/^fa-/);
-      }
-    });
-
-    it('effects in the same group share consistent icon patterns', () => {
-      const attackDef = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'slasher_enhanced_critical');
-      expect(attackDef.icon).toBe('fa-arrow-down');
-
-      const buffDef = TARGET_EFFECT_DEFINITIONS.find((d) => d.effect === 'next_attack_advantage');
-      expect(buffDef.icon).toBe('fa-arrow-up');
-    });
-  });
-
-  describe('CSS class values', () => {
-    it('all effects have cls values', () => {
-      for (const def of TARGET_EFFECT_DEFINITIONS) {
-        expect(def.cls).toMatch(/^effect-/);
-      }
-    });
-
-    it('has effects with various CSS class types', () => {
-      const clsValues = [...new Set(TARGET_EFFECT_DEFINITIONS.map((d) => d.cls))];
-      expect(clsValues).toContain('effect-buff');
-      expect(clsValues).toContain('effect-disadvantage');
-      expect(clsValues).toContain('effect-debuff');
-      expect(clsValues).toContain('effect-target-adv');
-      expect(clsValues).toContain('effect-target-disadv');
-    });
-  });
-
-  describe('getEffectDefinition', () => {
-    it('returns the definition for a known effect key', () => {
-      const result = getEffectDefinition('goad');
-      expect(result).toBeDefined();
-      expect(result.effect).toBe('goad');
-      expect(result.label).toBe('Goad');
-    });
-
-    it('returns undefined for an unknown effect key', () => {
-      const result = getEffectDefinition('nonexistent_effect');
-      expect(result).toBeUndefined();
-    });
-
-    it('returns the correct definition for every effect in the array', () => {
-      for (const def of TARGET_EFFECT_DEFINITIONS) {
-        const result = getEffectDefinition(def.effect);
-        expect(result).toEqual(def);
-      }
-    });
-
-    it('returns the correct definition for effects with special characters in labels', () => {
-      const tasha = getEffectDefinition('tashas_hideous_laughter');
-      expect(tasha.label).toBe("Tasha's Hideous Laughter");
-
-      const otto = getEffectDefinition('ottos_irresistible_dance');
-      expect(otto.label).toBe("Otto's Irresistible Dance");
-    });
-
-    it('handles empty string as effect key', () => {
-      const result = getEffectDefinition('');
-      expect(result).toBeUndefined();
-    });
-
-    it('handles null and undefined as effect keys', () => {
-      expect(() => getEffectDefinition(null)).not.toThrow();
-      expect(() => getEffectDefinition(undefined)).not.toThrow();
-    });
-  });
-
-  describe('cross-group consistency', () => {
-    it('all groups are unique and non-overlapping', () => {
-      const groups = TARGET_EFFECT_DEFINITIONS.map((d) => d.group);
-      const uniqueGroups = [...new Set(groups)];
-      expect(groups.length).toBe(uniqueGroups.length + (TARGET_EFFECT_DEFINITIONS.length - uniqueGroups.length));
-    });
-
-    it('effects with similar purposes have consistent cls values', () => {
-      const attackDisadvEffects = TARGET_EFFECT_DEFINITIONS.filter(
-        (d) => d.group === 'Attack' && d.cls === 'effect-disadvantage',
-      );
-      for (const def of attackDisadvEffects) {
-        expect(def.cls).toBe('effect-disadvantage');
-      }
-
-      const attackAdvEffects = TARGET_EFFECT_DEFINITIONS.filter(
-        (d) => d.group === 'Attack' && d.cls === 'effect-target-adv',
-      );
-      for (const def of attackAdvEffects) {
-        expect(def.cls).toBe('effect-target-adv');
-      }
-    });
-
-    it('effects with fields have matching defaults keys', () => {
-      for (const def of TARGET_EFFECT_DEFINITIONS) {
-        if (def.fields && def.defaults) {
-          for (const fieldKey of Object.keys(def.defaults)) {
-            expect(def.fields).toContain(fieldKey);
-          }
-        }
-      }
-    });
-  });
-
-  describe('registerTargetEffect', () => {
-    const campaignName = 'test-campaign';
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it('creates a new targetEffect entry when none exists', () => {
-      getRuntimeValue.mockReturnValue([]);
-      registerTargetEffect(campaignName, 'Ally1', 'holy_aura', 'Paladin');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        [{ target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' }],
-        campaignName,
-        true,
-      );
-    });
-
-    it('creates a new entry when store is empty', () => {
-      getRuntimeValue.mockReturnValue(null);
-      registerTargetEffect(campaignName, 'Ally1', 'aura_of_life', 'Cleric');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        [{ target: 'Ally1', effect: 'aura_of_life', source: 'Cleric', duration: 'concentration' }],
-        campaignName,
-        true,
-      );
-    });
-
-    it('updates an existing entry for same target+effect+source instead of duplicating', () => {
-      const existing = [
+  // Full written-array + full setRuntimeValue arg-tuple pins (skipSync=true baked in).
+  it.each([
+    {
+      name: 'creates a concentration entry on an empty store',
+      stored: [],
+      call: ['Ally1', 'holy_aura', 'Paladin', undefined],
+      expected: [{ target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' }],
+    },
+    {
+      name: 'creates a concentration entry on a null store',
+      stored: null,
+      call: ['Ally1', 'aura_of_life', 'Cleric', undefined],
+      expected: [{ target: 'Ally1', effect: 'aura_of_life', source: 'Cleric', duration: 'concentration' }],
+    },
+    {
+      name: 'same target+effect+source overwrites in place, extraProps replacing values',
+      stored: [{ target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Paladin', chosenType: 'Fire', duration: 'concentration' }],
+      call: ['Ally1', 'resistance_damage_reduction', 'Paladin', { chosenType: 'Cold' }],
+      expected: [{ target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Paladin', chosenType: 'Cold', duration: 'concentration' }],
+    },
+    {
+      name: 'different target appends, preserving the existing entry',
+      stored: [{ target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' }],
+      call: ['Ally2', 'holy_aura', 'Paladin', undefined],
+      expected: [
         { target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' },
-      ];
-      getRuntimeValue.mockReturnValue(existing);
-      registerTargetEffect(campaignName, 'Ally1', 'holy_aura', 'Paladin');
-
-      const updated = setRuntimeValue.mock.calls[0][2];
-      expect(updated).toHaveLength(1);
-      expect(updated[0]).toEqual({ target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' });
-    });
-
-    it('appends new entry when existing entries are for different targets', () => {
-      const existing = [
-        { target: 'Ally1', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' },
-      ];
-      getRuntimeValue.mockReturnValue(existing);
-      registerTargetEffect(campaignName, 'Ally2', 'holy_aura', 'Paladin');
-
-      const updated = setRuntimeValue.mock.calls[0][2];
-      expect(updated).toHaveLength(2);
-      expect(updated[1].target).toBe('Ally2');
-    });
-
-    it('appends new entry when existing entries are for different sources', () => {
-      const existing = [
+        { target: 'Ally2', effect: 'holy_aura', source: 'Paladin', duration: 'concentration' },
+      ],
+    },
+    {
+      name: 'different source appends its own entry with extraProps passed through',
+      stored: [{ target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Cleric', chosenType: 'Fire', duration: 'concentration' }],
+      call: ['Ally1', 'resistance_damage_reduction', 'Paladin', { chosenType: 'Cold' }],
+      expected: [
         { target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Cleric', chosenType: 'Fire', duration: 'concentration' },
-      ];
-      getRuntimeValue.mockReturnValue(existing);
-      registerTargetEffect(campaignName, 'Ally1', 'resistance_damage_reduction', 'Paladin', { chosenType: 'Cold' });
+        { target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Paladin', chosenType: 'Cold', duration: 'concentration' },
+      ],
+    },
+  ])('$name', ({ stored, call, expected }) => {
+    getRuntimeValue.mockReturnValue(stored);
+    const [target, effect, source, extraProps] = call;
+    registerTargetEffect(campaignName, target, effect, source, extraProps);
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expected, campaignName, true);
+  });
+});
 
-      const updated = setRuntimeValue.mock.calls[0][2];
-      expect(updated).toHaveLength(2);
-      expect(updated[1].source).toBe('Paladin');
-      expect(updated[1].chosenType).toBe('Cold');
-    });
+describe('getActiveTargetEffect', () => {
+  const campaignName = 'test-campaign';
 
-    it('passes extra properties through via extraProps', () => {
-      getRuntimeValue.mockReturnValue([]);
-      registerTargetEffect(campaignName, 'Goblin', 'resistance_damage_reduction', 'Cleric', { chosenType: 'Fire' });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        [{ target: 'Goblin', effect: 'resistance_damage_reduction', source: 'Cleric', duration: 'concentration', chosenType: 'Fire' }],
-        campaignName,
-        true,
-      );
-    });
-
-    it('overwrites extra properties on existing entry', () => {
-      const existing = [
-        { target: 'Ally1', effect: 'resistance_damage_reduction', source: 'Paladin', chosenType: 'Fire', duration: 'concentration' },
-      ];
-      getRuntimeValue.mockReturnValue(existing);
-      registerTargetEffect(campaignName, 'Ally1', 'resistance_damage_reduction', 'Paladin', { chosenType: 'Cold' });
-
-      const updated = setRuntimeValue.mock.calls[0][2];
-      expect(updated).toHaveLength(1);
-      expect(updated[0].chosenType).toBe('Cold');
-    });
-
-    it('always sets skipSync as 5th argument', () => {
-      getRuntimeValue.mockReturnValue([]);
-      registerTargetEffect(campaignName, 'Ally1', 'holy_aura', 'Paladin');
-
-      const callArgs = setRuntimeValue.mock.calls[0];
-      expect(callArgs[4]).toBe(true);
-    });
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe('MA-0038 concentration_disadvantage registry entry', () => {
-    const campaignName = 'test-campaign';
+  it('returns the live te by target+key, null for misses and non-array stores', () => {
+    const te = { target: 'Ally1', effect: 'concentration_disadvantage', source: 'Adult Black Dragon 1', duration: 'until_end_of_next_turn' };
+    getRuntimeValue.mockReturnValue([te]);
+    expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBe(te);
+    expect(getActiveTargetEffect(campaignName, 'Ally2', 'concentration_disadvantage')).toBeNull();
+    expect(getActiveTargetEffect(campaignName, 'Ally1', 'holy_aura')).toBeNull();
+    getRuntimeValue.mockReturnValue(undefined);
+    expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBeNull();
+  });
+});
 
-    it('registers concentration_disadvantage in Saves & Checks', () => {
-      const def = getEffectDefinition('concentration_disadvantage');
-      expect(def).toBeTruthy();
-      expect(def.group).toBe('Saves & Checks');
-      expect(def.description).toMatch(/Disadvantage on saving throws to maintain Concentration/);
-    });
-
-    it('getActiveTargetEffect returns the live te for target+key, null otherwise', () => {
-      const te = { target: 'Ally1', effect: 'concentration_disadvantage', source: 'Adult Black Dragon 1', duration: 'until_end_of_next_turn' };
-      getRuntimeValue.mockReturnValue([te]);
-      expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBe(te);
-      expect(getActiveTargetEffect(campaignName, 'Ally2', 'concentration_disadvantage')).toBeNull();
-      getRuntimeValue.mockReturnValue(undefined);
-      expect(getActiveTargetEffect(campaignName, 'Ally1', 'concentration_disadvantage')).toBeNull();
-    });
+// MA-1352 + CLA-107: ability-scoped save-disadvantage matcher truth table.
+describe('abilitySaveDisadvantageActive', () => {
+  const abilityTe = (over = {}) => ({
+    target: 'Bandit 1',
+    effect: 'ability_save_disadvantage',
+    ability: 'int',
+    source: 'Psychic Gray Ooze 1',
+    duration: 'until_start_of_next_turn',
+    ...over,
+  });
+  const hexTe = (over = {}) => ({
+    target: 'Bandit 1',
+    effect: 'hex_save_disadvantage',
+    ability: 'DEX',
+    source: 'HexWarlock',
+    ...over,
   });
 
-  describe('MA-1352 ability_save_disadvantage (Psychic Gray Ooze Pseudopod)', () => {
-    const te = (over = {}) => ({
-      target: 'Bandit 1',
-      effect: 'ability_save_disadvantage',
-      ability: 'int',
-      source: 'Psychic Gray Ooze 1',
-      duration: 'until_start_of_next_turn',
-      ...over,
-    });
-
-    it('registers ability_save_disadvantage in Saves & Checks with the hex byte-shape whitelist', () => {
-      const savesChecks = TARGET_EFFECT_DEFINITIONS.filter((d) => d.group === 'Saves & Checks').map((d) => d.effect);
-      expect(savesChecks).toContain('ability_save_disadvantage');
-      const def = getEffectDefinition('ability_save_disadvantage');
-      expect(def.label).toBe('Save Disadv (Ability)');
-      expect(def.cls).toBe('effect-disadvantage');
-      expect(def.icon).toBe('fa-shield');
-      expect(def.fields).toEqual(['ability', 'source']);
-      expect(def.defaults).toBeUndefined();
-      expect(def.description).toMatch(/chosen ability/i);
-    });
-
-    it('matcher: full-word and abbreviation save types match the int te', () => {
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'Intelligence')).toBe(true);
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'INT')).toBe(true);
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'int')).toBe(true);
-    });
-
-    it('matcher: other save types and other targets stay unaffected', () => {
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'DEX')).toBe(false);
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', 'Wisdom')).toBe(false);
-      expect(abilitySaveDisadvantageActive([te()], 'Other 1', 'Intelligence')).toBe(false);
-    });
-
-    it('matcher: no te / no te-list / no saveType are all false (inert)', () => {
-      expect(abilitySaveDisadvantageActive([], 'Bandit 1', 'Intelligence')).toBe(false);
-      expect(abilitySaveDisadvantageActive(undefined, 'Bandit 1', 'Intelligence')).toBe(false);
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', '')).toBe(false);
-      expect(abilitySaveDisadvantageActive([te()], 'Bandit 1', undefined)).toBe(false);
-    });
-
-    it('matcher: te without an ability payload or with the wrong ability never matches', () => {
-      const noAbility = te();
-      delete noAbility.ability;
-      expect(abilitySaveDisadvantageActive([noAbility], 'Bandit 1', 'Intelligence')).toBe(false);
-      expect(abilitySaveDisadvantageActive([te({ ability: 'dex' })], 'Bandit 1', 'Intelligence')).toBe(false);
-    });
-
-    // CLA-107: Eldritch Hex producer te folds at every shared save-roll seam.
-    it('CLA-107 matcher: hex_save_disadvantage folds the chosen ability only', () => {
-      const hex = te({ effect: 'hex_save_disadvantage', ability: 'DEX', source: 'HexWarlock' });
-      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'DEX')).toBe(true);
-      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'Dexterity')).toBe(true);
-      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'dex')).toBe(true);
-      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'STR')).toBe(false);
-      expect(abilitySaveDisadvantageActive([hex], 'Bandit 1', 'Wisdom')).toBe(false);
-      expect(abilitySaveDisadvantageActive([hex], 'Other 1', 'Dexterity')).toBe(false);
-    });
-
-    it('matcher: a separate next_save te does not leak into the ability-scoped match', () => {
-      expect(abilitySaveDisadvantageActive(
-        [{ target: 'Bandit 1', effect: 'disadvantage_on_next_save', source: 'X' }],
-        'Bandit 1',
-        'Intelligence',
-      )).toBe(false);
-    });
-  });
-
-  describe('MA-0553 attached (Darkmantle) registry entry', () => {
-    it('registers attached in Movement with the DC 13 detach advisory', () => {
-      const def = getEffectDefinition('attached');
-      expect(def).toBeTruthy();
-      expect(def.effect).toBe('attached');
-      expect(def.label).toBe('Attached');
-      expect(def.group).toBe('Movement');
-      expect(def.description).toMatch(/DC 13 Strength \(Athletics\)/);
-      expect(def.description).toMatch(/GM-enforced/);
-      expect(def.fields).toContain('source');
-    });
-
-    it('MA-1531: generalized copy carries stirge tick + detach advisory, darkmantle copy intact', () => {
-      const def = getEffectDefinition('attached');
-      expect(def.description).toMatch(/2d4\) Necrotic damage at the start of each of the stirge's turns/);
-      expect(def.description).toMatch(/5 feet of movement/);
-      expect(def.description).toMatch(/creature within 5 feet can detach it as an action/);
-      expect(def.description).toMatch(/Darkmantle: Speed 0, moves with the target/);
-      expect(def.description).toMatch(/DC 13 Strength \(Athletics\) action/);
-    });
+  it.each([
+    ['full-word save type matches the int te', [abilityTe()], 'Bandit 1', 'Intelligence', true],
+    ['uppercase abbreviation matches', [abilityTe()], 'Bandit 1', 'INT', true],
+    ['lowercase abbreviation matches', [abilityTe()], 'Bandit 1', 'int', true],
+    ['other save type stays unaffected', [abilityTe()], 'Bandit 1', 'DEX', false],
+    ['other worded save type stays unaffected', [abilityTe()], 'Bandit 1', 'Wisdom', false],
+    ['other target stays unaffected', [abilityTe()], 'Other 1', 'Intelligence', false],
+    ['te without an ability never matches', [{ target: 'Bandit 1', effect: 'ability_save_disadvantage', source: 'X' }], 'Bandit 1', 'Intelligence', false],
+    ['te with the wrong ability never matches', [abilityTe({ ability: 'dex' })], 'Bandit 1', 'Intelligence', false],
+    ['CLA-107 hex folds its chosen ability (uppercase stored)', [hexTe()], 'Bandit 1', 'DEX', true],
+    ['CLA-107 hex folds the worded form', [hexTe()], 'Bandit 1', 'Dexterity', true],
+    ['CLA-107 hex folds the lowercase form', [hexTe()], 'Bandit 1', 'dex', true],
+    ['CLA-107 hex does not fold other abilities', [hexTe()], 'Bandit 1', 'STR', false],
+    ['CLA-107 hex worded mismatch stays false', [hexTe()], 'Bandit 1', 'Wisdom', false],
+    ['CLA-107 hex does not leak to other targets', [hexTe()], 'Other 1', 'Dexterity', false],
+    ['next_save te does not leak into the ability-scoped lane', [{ target: 'Bandit 1', effect: 'disadvantage_on_next_save', source: 'X' }], 'Bandit 1', 'Intelligence', false],
+    ['empty te-list is inert', [], 'Bandit 1', 'Intelligence', false],
+    ['undefined te-list is inert', undefined, 'Bandit 1', 'Intelligence', false],
+    ['empty saveType is inert', [abilityTe()], 'Bandit 1', '', false],
+    ['undefined saveType is inert', [abilityTe()], 'Bandit 1', undefined, false],
+  ])('%s', (_name, targetEffects, target, saveType, expected) => {
+    expect(abilitySaveDisadvantageActive(targetEffects, target, saveType)).toBe(expected);
   });
 });

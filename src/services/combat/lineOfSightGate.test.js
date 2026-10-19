@@ -1,7 +1,35 @@
+// @maintained-by-ai
+// L5-003 §8.2 lane — combat/lineOfSightGate.js: the enforcement-mode GATE WRAPPER for
+// ranged attacks/casts (master switch campaign.enforcement.lineOfSight, consulted at the
+// attack/spell seams). Distinct from the §8.3 cover CHANNEL, owned by coverService.test.js
+// (#_cover_shot stamp, bresenham scan, −2 half cover — #1013): every fixture here omits
+// `zones`, so the cover branch never fires and this lane never writes the store.
+//
+// Contract here (gate truth table + denial plumbing, not ray math):
+//   sightBlockedBetween     — pure INTERIOR-only ray, FIRST blocker wins (the cell
+//                             sequence itself is owned by maps/lineOfSight.test.js).
+//   isLineOfSightEnforced   — sync pre-check callers use to keep the OFF path fully sync.
+//   checkLineOfSight        — async seam: exact verdict bytes, popup + enforcement_denied
+//                             audit on deny, fail-open ALLOW on every unresolvable grid.
+//
+// Family map — owned ELSEWHERE, cited not re-driven:
+//   maps/lineOfSight.test.js                            — bresenham + computeVisibility cells.
+//   combat/coverService.test.js                       — cover geometry/channel (#1013).
+//   hooks/combat/useSpellCastExecutor.castAction.test.js   — spell seam wiring (gate mocked).
+//   components/char-sheet/useCharActionsAttackHandlers.test.js — attack seam wiring (gate mocked).
+//
+// Store keys consulted (census): 'campaign'.'enforcement' + '__map__'.'activeMapName'.
+// This gate never writes — stampCoverShot writes belong to coverService's suite.
+//
+// Old→new: 4 ray tests → 1 truth table · separate off-tests → master-off span over both
+// entry points (#989) · gridless + unplaced-token folded into one unresolvable-ALLOW test ·
+// toContain/toMatchObject → exact bytes (#995) · new rows: los-flag-off, touch boundary,
+// campaignName guard, read census (#967), console.error on fetch-fail, default source byte.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(),
 }));
 vi.mock('../maps/mapsService.js', () => ({
     loadMapData: vi.fn(async () => null),
@@ -9,17 +37,18 @@ vi.mock('../maps/mapsService.js', () => ({
 vi.mock('../ui/logService.js', () => ({
     addEntry: vi.fn(async () => ({})),
 }));
-// Obstacle computation belongs to effectiveWalls' own suite — feed a fixed set.
+// Walls→blockers-set computation belongs to reachability's own suite — identity feed here.
 vi.mock('../maps/reachability.js', () => ({
-    computeMovementObstacles: vi.fn(() => new Set()),
+    computeMovementObstacles: vi.fn((walls) => walls),
 }));
 
 import { sightBlockedBetween, isLineOfSightEnforced, checkLineOfSight } from './lineOfSightGate.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { loadMapData } from '../maps/mapsService.js';
 import { addEntry } from '../ui/logService.js';
 import { computeMovementObstacles } from '../maps/reachability.js';
 
+// No `zones` key ⇒ isCoverEnforced stays false and the cover branch never fires (#1013).
 const ON = { mode: 'on', lineOfSight: true };
 
 function mapWith(over = {}) {
@@ -35,108 +64,137 @@ function mapWith(over = {}) {
     };
 }
 
+// Key-routed store: only the exact store.key bytes the gate actually consults.
+function gateStore(enforcement, activeMapName = 'battle-arena') {
+    getRuntimeValue.mockImplementation((store, key) => {
+        if (store === 'campaign' && key === 'enforcement') return enforcement;
+        if (store === '__map__' && key === 'activeMapName') return activeMapName;
+        return null;
+    });
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
-    computeMovementObstacles.mockReturnValue(new Set());
+    computeMovementObstacles.mockImplementation((walls) => walls);
 });
 
-describe('sightBlockedBetween (pure)', () => {
-    it('clear ray ⇒ null', () => {
+describe('sightBlockedBetween (pure interior ray)', () => {
+    it('clear ⇒ null · interior hit ⇒ FIRST blocker along the ray · endpoint walls never block', () => {
         expect(sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 5, gridY: 0 }, new Set())).toBeNull();
-    });
-
-    it('mid-ray wall ⇒ blocking cell reported', () => {
-        const blocked = sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 5, gridY: 0 }, new Set(['3,0']));
-        expect(blocked).toEqual({ x: 3, y: 0 });
-    });
-
-    it('walls on the ENDPOINTS do not block (adjacency + stand-in-the-same-cell)', () => {
+        // interior scan order: 4,0 painted first in the Set, but the first hit along the ray wins
+        expect(sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 5, gridY: 0 }, new Set(['4,0', '3,0']))).toEqual({ x: 3, y: 0 });
         expect(sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 1, gridY: 0 }, new Set(['0,0', '1,0']))).toBeNull();
-    });
-
-    it('diagonal grazing an interior corner is blocked', () => {
-        const blocked = sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 4, gridY: 4 }, new Set(['2,2']));
-        expect(blocked).toEqual({ x: 2, y: 2 });
+        expect(sightBlockedBetween({ gridX: 0, gridY: 0 }, { gridX: 4, gridY: 4 }, new Set(['2,2']))).toEqual({ x: 2, y: 2 });
     });
 });
 
 describe('isLineOfSightEnforced (sync pre-check)', () => {
-    it('off ⇒ false with a single flag read (no map traffic)', () => {
+    it('OFF rows ⇒ false: store missing · master off · los flag absent · no campaign (zero reads)', () => {
         getRuntimeValue.mockReturnValue(null);
         expect(isLineOfSightEnforced('test-campaign', '30 ft')).toBe(false);
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'enforcement');
+
         getRuntimeValue.mockReturnValue({ mode: 'off', lineOfSight: true });
         expect(isLineOfSightEnforced('test-campaign', '30 ft')).toBe(false);
+
+        getRuntimeValue.mockReturnValue({ mode: 'on' }); // master on, los channel flag absent
+        expect(isLineOfSightEnforced('test-campaign', '30 ft')).toBe(false);
+
+        getRuntimeValue.mockClear();
+        expect(isLineOfSightEnforced(null, '30 ft')).toBe(false);
+        expect(getRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('on + melee/touch/unknown ranges ⇒ false; ranged/sight ⇒ true', () => {
-        getRuntimeValue.mockReturnValue(ON);
-        expect(isLineOfSightEnforced('test-campaign', '5 ft.')).toBe(false);
-        expect(isLineOfSightEnforced('test-campaign', 'touch')).toBe(false);
-        expect(isLineOfSightEnforced('test-campaign', 'self')).toBe(false);
-        expect(isLineOfSightEnforced('test-campaign', null)).toBe(false);
-        expect(isLineOfSightEnforced('test-campaign', '30 ft')).toBe(true);
-        expect(isLineOfSightEnforced('test-campaign', 'sight')).toBe(true);
+    it('ON ⇒ melee/touch/8-ft-boundary/unknown range false, ranged/sight/numeric true — reads ONLY campaign.enforcement', () => {
+        gateStore(ON);
+        for (const range of ['5 ft.', '8 ft', 'touch', 'self', 'special', null]) {
+            expect(isLineOfSightEnforced('test-campaign', range)).toBe(false);
+        }
+        for (const range of ['30 ft', 'sight', 60]) {
+            expect(isLineOfSightEnforced('test-campaign', range)).toBe(true);
+        }
+        const consulted = [...new Set(getRuntimeValue.mock.calls.map(([store, key]) => `${store}.${key}`))];
+        expect(consulted).toEqual(['campaign.enforcement']);
     });
 });
 
 describe('checkLineOfSight', () => {
-    it('enforcement off ⇒ allowed, gated:false, ZERO map I/O', async () => {
-        getRuntimeValue.mockReturnValue(null);
-        const popup = vi.fn();
-        const r = await checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '30 ft', setPopupHtml: popup });
-        expect(r).toEqual({ allowed: true, gated: false });
+    it('OFF spans master-off AND melee: exact {allowed:true,gated:false} with ZERO popup/log/write/map I/O', async () => {
+        const legs = [
+            [null, '30 ft'],
+            [{ mode: 'off', lineOfSight: true }, '30 ft'],
+            [{ mode: 'on' }, '30 ft'],
+            [ON, '5 ft'],
+        ];
+        for (const [enforcement, range] of legs) {
+            gateStore(enforcement);
+            const popup = vi.fn();
+            expect(isLineOfSightEnforced('test-campaign', range)).toBe(false);
+            await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range, setPopupHtml: popup }))
+                .resolves.toEqual({ allowed: true, gated: false });
+            expect(popup).not.toHaveBeenCalled();
+        }
         expect(loadMapData).not.toHaveBeenCalled();
-        expect(popup).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('gridless (no active map) ⇒ allowed passthrough', async () => {
-        getRuntimeValue.mockImplementation((store, key) => (store === 'campaign' ? ON : key === 'activeMapName' ? null : null));
-        const r = await checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '30 ft' });
-        expect(r.allowed).toBe(true);
+    it('grid UNRESOLVABLE degrades to exact ALLOW: no active map (never fetches) · unplaced tokens (never scans blockers)', async () => {
+        gateStore(ON, null);
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '30 ft' }))
+            .resolves.toEqual({ allowed: true, gated: false });
         expect(loadMapData).not.toHaveBeenCalled();
+
+        gateStore(ON);
+        loadMapData.mockResolvedValue(mapWith({ players: [] }));
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '30 ft' }))
+            .resolves.toEqual({ allowed: true, gated: false });
+        expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'battle-arena');
+        expect(computeMovementObstacles).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('clear line ⇒ allowed with gated:true', async () => {
-        getRuntimeValue.mockImplementation((store) => (store === 'campaign' ? ON : 'battle-arena'));
-        loadMapData.mockResolvedValue(mapWith());
-        const r = await checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft' });
-        expect(r).toEqual({ allowed: true, gated: true });
-    });
-
-    it('wall between ⇒ denied: popup + enforcement_denied log bucket lineOfSight', async () => {
-        getRuntimeValue.mockImplementation((store) => (store === 'campaign' ? ON : 'battle-arena'));
-        loadMapData.mockResolvedValue(mapWith());
-        computeMovementObstacles.mockReturnValue(new Set(['5,1']));
-        const popup = vi.fn();
-        const r = await checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft', setPopupHtml: popup, source: 'attack-row' });
-        expect(r.allowed).toBe(false);
-        expect(r.reason).toContain('no line of sight');
-        expect(popup).toHaveBeenCalledWith(expect.stringContaining('behind a wall at (5,1)'));
-        const denied = addEntry.mock.calls[0][1];
-        expect(denied).toMatchObject({ type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', source: 'attack-row' });
-    });
-
-    it('map fetch failure degrades to ALLOW (GM keeps the fiction), never a false deny', async () => {
-        getRuntimeValue.mockImplementation((store) => (store === 'campaign' ? ON : 'battle-arena'));
+    it('map fetch FAILURE degrades to exact ALLOW + ONE console.error, never a false deny, never a log', async () => {
+        gateStore(ON);
         loadMapData.mockRejectedValue(new Error('offline'));
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const r = await checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft' });
-        expect(r.allowed).toBe(true);
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '30 ft' }))
+            .resolves.toEqual({ allowed: true, gated: false });
+        expect(spy).toHaveBeenCalledTimes(1);
         spy.mockRestore();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('pre-resolved positions (cast chokepoint) skip token lookup but still adjudicate', async () => {
-        getRuntimeValue.mockImplementation((store) => (store === 'campaign' ? ON : 'battle-arena'));
-        loadMapData.mockResolvedValue(mapWith({ players: [] }));
-        computeMovementObstacles.mockReturnValue(new Set(['4,4']));
-        const r = await checkLineOfSight({
-            campaignName: 'test-campaign',
-            attackerName: 'Archer',
-            targetName: 'Goblin',
-            range: '90 ft',
-            fromPos: { gridX: 2, gridY: 4 },
-            toPos: { gridX: 6, gridY: 4 },
+    it('clear line ⇒ exact {allowed:true,gated:true} — no popup, no denial log', async () => {
+        gateStore(ON);
+        loadMapData.mockResolvedValue(mapWith());
+        const popup = vi.fn();
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft', setPopupHtml: popup }))
+            .resolves.toEqual({ allowed: true, gated: true });
+        expect(popup).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
+
+    it('wall between ⇒ DENY: exact reason + popup + full enforcement_denied payload · token leg (source label) and pre-resolved-position leg (default source)', async () => {
+        gateStore(ON);
+        loadMapData.mockResolvedValue(mapWith({ walls: new Set(['5,1']) }));
+        const popup = vi.fn();
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft', setPopupHtml: popup, source: 'attack-row' }))
+            .resolves.toEqual({ allowed: false, reason: 'Goblin is behind a wall at (5,1) — no line of sight.' });
+        expect(popup).toHaveBeenCalledWith('Goblin is behind a wall at (5,1) — no line of sight.');
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', source: 'attack-row',
+            reason: 'Goblin is behind a wall at (5,1) — no line of sight.',
         });
-        expect(r.allowed).toBe(false);
+
+        // cast chokepoint: fromPos/toPos skip token lookup (empty players) but adjudicate identically; source defaults to 'action'
+        addEntry.mockClear();
+        loadMapData.mockResolvedValue(mapWith({ players: [], walls: new Set(['4,4']) }));
+        await expect(checkLineOfSight({ campaignName: 'test-campaign', attackerName: 'Archer', targetName: 'Goblin', range: '90 ft', fromPos: { gridX: 2, gridY: 4 }, toPos: { gridX: 6, gridY: 4 } }))
+            .resolves.toEqual({ allowed: false, reason: 'Goblin is behind a wall at (4,4) — no line of sight.' });
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'enforcement_denied', creature: 'Archer', target: 'Goblin', bucket: 'lineOfSight', source: 'action',
+            reason: 'Goblin is behind a wall at (4,4) — no line of sight.',
+        });
     });
 });

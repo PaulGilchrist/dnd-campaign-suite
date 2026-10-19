@@ -1,41 +1,58 @@
-// CLA-019: Aura of Courage — addCondition GM-add seam suppresses aura-covered
-// conditions with a condition_immunity_aura automation log.
+// @maintained-by-ai
+// CLA-019/CLA-020 ticket lane: aura-immunity gate on the addCondition GM-add seam
+// (conditionSaveService.js auraSuppressesCondition + optional auraImmunities channel).
+//
+// Family map (behaviors owned elsewhere, not duplicated here):
+// - auras/auraConditionImmunity.test.js — channel delegation, auraCoversCondition
+//   membership engine, log envelope + Aura of Courage/Devotion label mapping.
+// - conditionSaveService.conditionManagement.test.js — generic management: playerIsImmuneToCondition
+//   gate (:110), append/dedup/spread-new (:188), npc/not-found (:239).
+// - saveProcessing.aura-of-{courage,devotion}.test.js + charmSpellUtils.aura-immunity.test.js —
+//   failed-save resolution legs consuming the same channel (distinct seams).
+// Range/self-filter gating is delegated wholesale upstream to computeAuraComboEffects,
+// so there is no range-boundary pair at this seam. Aura has no wall-clock ticks (turn-based).
+//
+// old -> new: t1→test1 | t2+t5→test2 | t4+t6→test3 | t3+t7→test4 | t8 removed
+// (dedup/spread-new owned by conditionManagement.test.js:188 + charmSpellUtils.aura-immunity.test.js:193).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../automation/automationService.js', () => ({
+  // auto-immunity lane kept inert (owned by conditionManagement lane)
   playerIsImmuneToCondition: vi.fn(() => false),
 }));
 
-const logEntries = [];
+const logCalls = [];
 vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn((campaignName, entry) => {
-    logEntries.push(entry);
+    logCalls.push({ campaignName, entry });
     return Promise.resolve();
   }),
 }));
 
 import { addCondition } from './conditionSaveService.js';
+import { playerIsImmuneToCondition } from '../automation/automationService.js';
 
 const cs = { creatures: [{ name: 'ElderPaladin', type: 'player' }, { name: 'EvasiveFighter', type: 'player' }, { name: 'Thug 1', type: 'npc' }] };
 const campaignName = 'test-campaign';
 
 function makeRuntime(initial = {}) {
+  // faithful store: captures campaign pin on every write
   const store = new Map(Object.entries(initial));
   const setCalls = [];
   return {
     getRuntimeValue: vi.fn((name, key) => store.get(`${name}:${key}`)),
-    setRuntimeValue: vi.fn((name, key, value) => { setCalls.push({ name, key, value }); }),
+    setRuntimeValue: vi.fn((name, key, value, campaign) => { setCalls.push({ name, key, value, campaignName: campaign }); }),
     setCalls,
   };
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  logEntries.length = 0;
+  vi.clearAllMocks(); // clears calls only — vi.fn(impl) implementations are kept
+  logCalls.length = 0;
 });
 
-describe('addCondition — CLA-019 aura immunity gate', () => {
-  it('suppresses frightened for aura-covered host: no write, immunity log, suppressed flag', () => {
+describe('addCondition — CLA-019/020 aura-immunity gate (GM-add seam)', () => {
+  it('CLA-019 armed: aura-covered frightened suppressed — zero writes, byte-exact Aura of Courage log', () => {
     const rt = makeRuntime();
     const result = addCondition({
       combatSummary: cs,
@@ -52,76 +69,24 @@ describe('addCondition — CLA-019 aura immunity gate', () => {
     });
 
     expect(result).toEqual({ suppressed: true });
-    expect(rt.setCalls).toHaveLength(0);
-    expect(logEntries).toHaveLength(1);
-    expect(logEntries[0].type).toBe('automation');
-    expect(logEntries[0].automationType).toBe('condition_immunity_aura');
-    expect(logEntries[0].characterName).toBe('ElderPaladin');
-    expect(logEntries[0].description).toContain('ElderPaladin is immune to Frightened (Aura of Courage from ElderPaladin)');
-  });
-
-  it('suppresses covered ally PC in aura (no stats required)', () => {
-    const rt = makeRuntime();
-    const result = addCondition({
-      combatSummary: cs,
-      creatureName: 'EvasiveFighter',
-      conditionDef: { key: 'frightened', label: 'Frightened' },
-      getRuntimeValue: rt.getRuntimeValue,
-      setRuntimeValue: rt.setRuntimeValue,
-      campaignName,
-      playerStats: null,
-      auraImmunities: ['frightened'],
-      auraImmunitySources: { frightened: 'ElderPaladin' },
+    expect(rt.setCalls).toEqual([]);
+    // gate order: the aura channel short-circuits before the stats-dependent auto-immunity lane
+    expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
+    expect(logCalls).toHaveLength(1);
+    expect(logCalls[0].campaignName).toBe(campaignName);
+    const { timestamp, ...entry } = logCalls[0].entry;
+    expect(typeof timestamp).toBe('number');
+    expect(entry).toEqual({
+      type: 'automation',
+      automationType: 'condition_immunity_aura',
+      characterName: 'ElderPaladin',
+      sourceName: 'ElderPaladin',
+      abilityName: 'Aura of Courage',
+      description: 'ElderPaladin is immune to Frightened (Aura of Courage from ElderPaladin) — condition not applied.',
     });
-
-    expect(result).toEqual({ suppressed: true });
-    expect(rt.setCalls).toHaveLength(0);
-    expect(logEntries).toHaveLength(1);
   });
 
-  it('non-covered condition applies normally for aura member (only covered suppressed)', () => {
-    const rt = makeRuntime({ 'EvasiveFighter:activeConditions': [] });
-    const result = addCondition({
-      combatSummary: cs,
-      creatureName: 'EvasiveFighter',
-      conditionDef: { key: 'prone', label: 'Prone' },
-      dc: 10,
-      ability: 'STR',
-      getRuntimeValue: rt.getRuntimeValue,
-      setRuntimeValue: rt.setRuntimeValue,
-      campaignName,
-      playerStats: { name: 'EvasiveFighter' },
-      auraImmunities: ['frightened'],
-      auraImmunitySources: { frightened: 'ElderPaladin' },
-    });
-
-    expect(result).toEqual({ suppressed: false });
-    expect(rt.setCalls[0]).toEqual({ name: 'EvasiveFighter', key: 'activeConditions', value: ['prone'] });
-    expect(logEntries).toHaveLength(0);
-  });
-
-  it('control target without aura channel: byte-identical legacy write + no immunity log', () => {
-    const rt = makeRuntime({ 'Thug 1:activeConditions': [] });
-    const result = addCondition({
-      combatSummary: cs,
-      creatureName: 'Thug 1',
-      conditionDef: { key: 'frightened', label: 'Frightened' },
-      dc: 16,
-      ability: 'WIS',
-      getRuntimeValue: rt.getRuntimeValue,
-      setRuntimeValue: rt.setRuntimeValue,
-      campaignName,
-      playerStats: null,
-    });
-
-    expect(result).toEqual({ suppressed: false });
-    expect(rt.setCalls[0]).toEqual({ name: 'Thug 1', key: 'activeConditions', value: ['frightened'] });
-    expect(rt.setCalls[1].key).toBe('activeConditionMeta');
-    expect(logEntries).toHaveLength(0);
-  });
-
-  // CLA-020: Aura of Devotion charmed rides the identical gate + label mapping.
-  it('CLA-020: suppresses charmed for aura-covered ally; log labels Aura of Devotion', () => {
+  it('CLA-020 armed twin: charmed suppressed for ally in aura without playerStats — Aura of Devotion log', () => {
     const rt = makeRuntime();
     const result = addCondition({
       combatSummary: cs,
@@ -132,45 +97,80 @@ describe('addCondition — CLA-019 aura immunity gate', () => {
       getRuntimeValue: rt.getRuntimeValue,
       setRuntimeValue: rt.setRuntimeValue,
       campaignName,
-      playerStats: { name: 'EvasiveFighter' },
+      playerStats: null, // aura gate needs no playerStats
       auraImmunities: ['charmed'],
       auraImmunitySources: { charmed: 'ElderPaladin' },
     });
 
     expect(result).toEqual({ suppressed: true });
-    expect(rt.setCalls).toHaveLength(0);
-    expect(logEntries).toHaveLength(1);
-    expect(logEntries[0].automationType).toBe('condition_immunity_aura');
-    expect(logEntries[0].description).toContain('EvasiveFighter is immune to Charmed (Aura of Devotion from ElderPaladin)');
+    expect(rt.setCalls).toEqual([]);
+    expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
+    expect(logCalls).toHaveLength(1);
+    expect(logCalls[0].campaignName).toBe(campaignName);
+    const { timestamp, ...entry } = logCalls[0].entry;
+    expect(typeof timestamp).toBe('number');
+    expect(entry).toEqual({
+      type: 'automation',
+      automationType: 'condition_immunity_aura',
+      characterName: 'EvasiveFighter',
+      sourceName: 'ElderPaladin',
+      abilityName: 'Aura of Devotion',
+      description: 'EvasiveFighter is immune to Charmed (Aura of Devotion from ElderPaladin) — condition not applied.',
+    });
   });
 
-  it('CLA-020: control target with empty channel (outside aura) gets charmed (differential)', () => {
+  it('unarmed control pair: same adds with channel omitted or empty — byte-identical legacy write lane, no immunity log', () => {
     const rt = makeRuntime({ 'Thug 1:activeConditions': [] });
     const result = addCondition({
+      combatSummary: cs,
+      creatureName: 'Thug 1',
+      conditionDef: { key: 'frightened', label: 'Frightened' },
+      dc: 16,
+      ability: 'WIS',
+      getRuntimeValue: rt.getRuntimeValue,
+      setRuntimeValue: rt.setRuntimeValue,
+      campaignName,
+      playerStats: null,
+    }); // legacy caller: aura channel args omitted entirely
+
+    expect(result).toEqual({ suppressed: false });
+    expect(rt.setCalls).toEqual([
+      { name: 'Thug 1', key: 'activeConditions', value: ['frightened'], campaignName },
+      { name: 'Thug 1', key: 'activeConditionMeta', value: { frightened: { dc: 16, ability: 'WIS' } }, campaignName },
+    ]);
+
+    const rt2 = makeRuntime({ 'Thug 1:activeConditions': [] });
+    const result2 = addCondition({
       combatSummary: cs,
       creatureName: 'Thug 1',
       conditionDef: { key: 'charmed', label: 'Charmed' },
       dc: 16,
       ability: 'WIS',
-      getRuntimeValue: rt.getRuntimeValue,
-      setRuntimeValue: rt.setRuntimeValue,
+      getRuntimeValue: rt2.getRuntimeValue,
+      setRuntimeValue: rt2.setRuntimeValue,
       campaignName,
       playerStats: null,
       auraImmunities: [],
       auraImmunitySources: {},
     });
 
-    expect(result).toEqual({ suppressed: false });
-    expect(rt.setCalls[0]).toEqual({ name: 'Thug 1', key: 'activeConditions', value: ['charmed'] });
-    expect(logEntries).toHaveLength(0);
+    expect(result2).toEqual({ suppressed: false });
+    expect(rt2.setCalls).toEqual([
+      { name: 'Thug 1', key: 'activeConditions', value: ['charmed'], campaignName },
+      { name: 'Thug 1', key: 'activeConditionMeta', value: { charmed: { dc: 16, ability: 'WIS' } }, campaignName },
+    ]);
+    expect(logCalls).toEqual([]);
   });
 
-  it('CLA-019/020 parity: charmed coverage does not suppress frightened', () => {
+  it('falsifier: near-miss keys on a covered target still apply — membership is exact, meta stamped only with dc/ability', () => {
     const rt = makeRuntime({ 'EvasiveFighter:activeConditions': [] });
+    // target inside charmed-only Aura of Devotion: frightened is a near-miss and must apply
     const result = addCondition({
       combatSummary: cs,
       creatureName: 'EvasiveFighter',
       conditionDef: { key: 'frightened', label: 'Frightened' },
+      dc: 16,
+      ability: 'WIS',
       getRuntimeValue: rt.getRuntimeValue,
       setRuntimeValue: rt.setRuntimeValue,
       campaignName,
@@ -180,21 +180,29 @@ describe('addCondition — CLA-019 aura immunity gate', () => {
     });
 
     expect(result).toEqual({ suppressed: false });
-    expect(rt.setCalls[0].value).toEqual(['frightened']);
-  });
+    expect(rt.setCalls).toEqual([
+      { name: 'EvasiveFighter', key: 'activeConditions', value: ['frightened'], campaignName },
+      { name: 'EvasiveFighter', key: 'activeConditionMeta', value: { frightened: { dc: 16, ability: 'WIS' } }, campaignName },
+    ]);
 
-  it('replaces existing frightened when not covered (spread-new array preserved)', () => {
-    const rt = makeRuntime({ 'Thug 1:activeConditions': ['Poisoned', 'frightened'] });
-    addCondition({
+    // prone is in no aura channel; omitting dc/ability writes exactly one entry (no meta stamp)
+    const rt2 = makeRuntime({ 'EvasiveFighter:activeConditions': [] });
+    const result2 = addCondition({
       combatSummary: cs,
-      creatureName: 'Thug 1',
-      conditionDef: { key: 'frightened', label: 'Frightened' },
-      getRuntimeValue: rt.getRuntimeValue,
-      setRuntimeValue: rt.setRuntimeValue,
+      creatureName: 'EvasiveFighter',
+      conditionDef: { key: 'prone', label: 'Prone' },
+      getRuntimeValue: rt2.getRuntimeValue,
+      setRuntimeValue: rt2.setRuntimeValue,
       campaignName,
       playerStats: null,
+      auraImmunities: ['charmed'],
+      auraImmunitySources: { charmed: 'ElderPaladin' },
     });
 
-    expect(rt.setCalls[0].value).toEqual(['Poisoned', 'frightened']);
+    expect(result2).toEqual({ suppressed: false });
+    expect(rt2.setCalls).toEqual([
+      { name: 'EvasiveFighter', key: 'activeConditions', value: ['prone'], campaignName },
+    ]);
+    expect(logCalls).toEqual([]); // no suppression log for uncovered legs
   });
 });

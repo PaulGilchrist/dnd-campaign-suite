@@ -1,11 +1,29 @@
+// @maintained-by-ai
+// Generic condition-management lane of conditionSaveService (owned here):
+// removeCondition full lane (:101-115, incl. activeConditionMeta strip :109-114) and
+// addCondition auto-immunity gate (:141-150), append/dedup replace-not-stack (:152-154),
+// meta merge (:160-173), combatSummary guard (:130-133), and the { suppressed } return contract.
+//
+// Family map (behaviors owned elsewhere, not duplicated here):
+// - conditionSaveService.aura-immunity.test.js (#1002) — CLA-019/020 aura suppression gate,
+//   armed/unarmed channel, byte-exact immunity logs, fresh meta stamp only with dc/ability.
+// - conditionSaveService.test.js — getCreatureSaveBonus / rollConditionSave engine lanes.
+// - conditionSaveService.popup.test.js — buildConditionPopup envelope.
+// Aura membership/fold math is delegated upstream (computeAuraComboEffects); not re-driven here.
+// No timers, no network, no wall-clock at this seam (turn-based, pure store mediation).
+//
+// old -> new: rmT1→R1 | rmT2+rmT3→R2 | rmT4+rmT5→R3 | addT1→A1 | addT2+addT3→A2 |
+// addT4→A3 | addT5(npc/not-found) split→A2(npc leg)+A5(not-found+guard) | new A4 meta merge.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
 
-vi.mock('../../../services/automation/handlers/buffs/auraOfPurityHandler.js', () => ({
+// Kept inert: purity/roll lanes owned by conditionSaveService.test.js; mock keeps this
+// lane's module graph isolated (zero-network).
+vi.mock('../../automation/handlers/buffs/auraOfPurityHandler.js', () => ({
   handle: vi.fn(),
-  isAuraOfPurityActive: vi.fn(),
-  getAuraOfPuritySaveAdvantageConditions: vi.fn(),
+  isAuraOfPurityActive: vi.fn(() => false),
+  getAuraOfPuritySaveAdvantageConditions: vi.fn(() => []),
 }));
 
 vi.mock('../automation/automationService.js', () => ({
@@ -14,259 +32,176 @@ vi.mock('../automation/automationService.js', () => ({
 
 // ── Imports ──────────────────────────────────────────────────────
 
-import {
-  removeCondition,
-  addCondition,
-} from './conditionSaveService.js';
-
+import { removeCondition, addCondition } from './conditionSaveService.js';
 import { playerIsImmuneToCondition } from '../automation/automationService.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function makeGetRuntimeValue(initial = {}) {
-  const store = new Map();
-  for (const [key, value] of Object.entries(initial)) {
-    store.set(key, value);
-  }
-  return vi.fn((name, runtimeKey) => store.get(`${name}:${runtimeKey}`));
+const cs = { creatures: [{ type: 'player', name: 'Hero' }, { type: 'monster', name: 'Orc' }, { type: 'npc', name: 'Goblin' }] };
+
+function makeRuntime(initial = {}) {
+  // faithful store: captures campaign pin on every write
+  const store = new Map(Object.entries(initial));
+  const setCalls = [];
+  return {
+    getRuntimeValue: vi.fn((name, key) => store.get(`${name}:${key}`)),
+    setRuntimeValue: vi.fn((name, key, value, campaignName) => { setCalls.push({ name, key, value, campaignName }); }),
+    setCalls,
+  };
 }
 
-function makeSetRuntimeValue() {
-  const calls = [];
-  const fn = vi.fn((name, runtimeKey, value) => {
-    calls.push({ name, runtimeKey, value });
-  });
-  fn.calls = calls;
-  return fn;
-}
+beforeEach(() => {
+  vi.clearAllMocks(); // clears calls only — vi.fn(impl) implementations are kept
+});
 
-// ── Tests ────────────────────────────────────────────────────────
+// ── removeCondition ──────────────────────────────────────────────
 
 describe('removeCondition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('removes case-insensitively via key object or plain string; strips matching meta and leaves other meta intact', () => {
+    const rt = makeRuntime({
+      'Hero:activeConditions': ['blinded', 'Charmed'],
+      'Hero:activeConditionMeta': { charmed: { dc: 15 }, poisoned: { dc: 12 } },
+    });
+    removeCondition({ combatSummary: cs, creatureName: 'Hero', condition: { key: 'CHARMED' }, getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign' });
+
+    expect(rt.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['blinded'], campaignName: 'Campaign' },
+      { name: 'Hero', key: 'activeConditionMeta', value: { poisoned: { dc: 12 } }, campaignName: 'Campaign' },
+    ]);
+
+    // string condition shape, no stored meta for it → exactly one write, meta untouched
+    const rt2 = makeRuntime({ 'Hero:activeConditions': ['frightened', 'grappled'] });
+    removeCondition({ combatSummary: cs, creatureName: 'Hero', condition: 'Frightened', getRuntimeValue: rt2.getRuntimeValue, setRuntimeValue: rt2.setRuntimeValue, campaignName: 'Campaign' });
+
+    expect(rt2.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['grappled'], campaignName: 'Campaign' },
+    ]);
   });
 
-  it('removes condition by key or string, case-insensitive, from activeConditions', () => {
-    const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded', 'Charmed'] });
-    const setRV = makeSetRuntimeValue();
+  it('treats null or missing stored lists as empty and writes the filtered array even when nothing matched', () => {
+    const rtNull = makeRuntime({ 'Orc:activeConditions': null });
+    removeCondition({ combatSummary: cs, creatureName: 'Orc', condition: { key: 'blinded' }, getRuntimeValue: rtNull.getRuntimeValue, setRuntimeValue: rtNull.setRuntimeValue, campaignName: '' });
+    expect(rtNull.setCalls).toEqual([{ name: 'Orc', key: 'activeConditions', value: [], campaignName: '' }]);
 
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'CHARMED' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: 'Campaign' });
+    const rtMissing = makeRuntime(); // key never stored → undefined read
+    removeCondition({ combatSummary: cs, creatureName: 'Orc', condition: { key: 'blinded' }, getRuntimeValue: rtMissing.getRuntimeValue, setRuntimeValue: rtMissing.setRuntimeValue, campaignName: '' });
+    expect(rtMissing.setCalls).toEqual([{ name: 'Orc', key: 'activeConditions', value: [], campaignName: '' }]);
 
-    expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], 'Campaign');
-
-    vi.clearAllMocks();
-    const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['frightened', 'grappled'] });
-    const setRV2 = makeSetRuntimeValue();
-
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: 'Frightened', getRuntimeValue: getRV2, setRuntimeValue: setRV2, campaignName: 'Campaign' });
-
-    expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['grappled'], 'Campaign');
+    // absent condition is a no-op on content but still a write (authored always-write)
+    const rtAbsent = makeRuntime({ 'Hero:activeConditions': ['blinded'] });
+    removeCondition({ combatSummary: cs, creatureName: 'Hero', condition: { key: 'charmed' }, getRuntimeValue: rtAbsent.getRuntimeValue, setRuntimeValue: rtAbsent.setRuntimeValue, campaignName: '' });
+    expect(rtAbsent.setCalls).toEqual([{ name: 'Hero', key: 'activeConditions', value: ['blinded'], campaignName: '' }]);
   });
 
-  it('treats null/undefined activeConditions as empty array', () => {
-    const setRV = makeSetRuntimeValue();
-
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'poisoned' }, getRuntimeValue: vi.fn(() => null), setRuntimeValue: setRV, campaignName: 'Campaign' });
-    expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
-
-    vi.clearAllMocks();
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'poisoned' }, getRuntimeValue: vi.fn(() => undefined), setRuntimeValue: setRV, campaignName: 'Campaign' });
-    expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', [], 'Campaign');
-  });
-
-  it('leaves array unchanged when condition is not present', () => {
-    const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
-    const setRV = makeSetRuntimeValue();
-
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] }, creatureName: 'Hero', condition: { key: 'charmed' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: '' });
-
-    expect(setRV).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded'], '');
-  });
-
-  it('works for monster creatures', () => {
-    const getRV = makeGetRuntimeValue({ 'Orc:activeConditions': ['blinded', 'charmed'] });
-    const setRV = makeSetRuntimeValue();
-
-    removeCondition({ combatSummary: { creatures: [{ type: 'monster', name: 'Orc' }] }, creatureName: 'Orc', condition: { key: 'blinded' }, getRuntimeValue: getRV, setRuntimeValue: setRV, campaignName: '' });
-
-    expect(setRV).toHaveBeenCalledWith('Orc', 'activeConditions', ['charmed'], '');
-  });
-
-  it('does not call setRuntimeValue when creature is not found', () => {
-    const setRV = makeSetRuntimeValue();
-
-    removeCondition({ combatSummary: { creatures: [{ type: 'player', name: 'Other' }] }, creatureName: 'NonExistent', condition: { key: 'blinded' }, getRuntimeValue: vi.fn(), setRuntimeValue: setRV, campaignName: '' });
-
-    expect(setRV).not.toHaveBeenCalled();
+  it('writing stops entirely when the named creature is not in the combat summary', () => {
+    const rt = makeRuntime({ 'Other:activeConditions': ['blinded'] });
+    removeCondition({ combatSummary: cs, creatureName: 'NonExistent', condition: { key: 'blinded' }, getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign' });
+    expect(rt.setCalls).toEqual([]);
+    expect(rt.getRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
+// ── addCondition ─────────────────────────────────────────────────
+
 describe('addCondition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('skips adding when playerStats is immune', () => {
+  it('auto-immunity hit suppresses the add: {suppressed:true}, zero writes, conditions never read', () => {
     playerIsImmuneToCondition.mockReturnValue(true);
-    const setRV = makeSetRuntimeValue();
+    const rt = makeRuntime({ 'Hero:activeConditions': ['blinded'], 'Hero:activeConditionMeta': { blinded: { dc: 8 } } });
 
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: vi.fn(),
-      setRuntimeValue: setRV,
-      campaignName: 'Campaign',
-      playerStats: { name: 'Hero', allFeatures: [] },
-    });
+    const result = addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, dc: 15, ability: 'wis', getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign', playerStats: { name: 'Hero', allFeatures: [] } });
 
-    expect(playerIsImmuneToCondition).toHaveBeenCalled();
-    expect(setRV).not.toHaveBeenCalled();
+    expect(result).toEqual({ suppressed: true });
+    expect(playerIsImmuneToCondition).toHaveBeenCalledTimes(1);
+    expect(rt.setCalls).toEqual([]);
+    expect(rt.getRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions')).toEqual([]);
   });
 
-  it('skips immunity check when playerStats is null or campaignName is falsy', () => {
-    const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': [] });
-    const setRV = makeSetRuntimeValue();
-
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: getRV,
-      setRuntimeValue: setRV,
-      campaignName: '',
-      playerStats: null,
-    });
+  it('immunity gate runs only with playerStats AND campaignName, in the exact argument envelope', () => {
+    // leg a: playerStats null (npc lane) despite truthy campaign → gate skipped, exact legacy write bytes
+    playerIsImmuneToCondition.mockReturnValue(true); // falsifier: if gating were type-based, this would suppress
+    const rtA = makeRuntime({ 'Goblin:activeConditions': ['blinded'] });
+    const resA = addCondition({ combatSummary: cs, creatureName: 'Goblin', conditionDef: { key: 'frightened', label: 'Frightened' }, dc: 13, ability: 'wis', getRuntimeValue: rtA.getRuntimeValue, setRuntimeValue: rtA.setRuntimeValue, campaignName: 'Campaign', playerStats: null });
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
+    expect(resA).toEqual({ suppressed: false });
+    expect(rtA.setCalls).toEqual([
+      { name: 'Goblin', key: 'activeConditions', value: ['blinded', 'frightened'], campaignName: 'Campaign' },
+      { name: 'Goblin', key: 'activeConditionMeta', value: { frightened: { dc: 13, ability: 'wis' } }, campaignName: 'Campaign' },
+    ]);
 
-    vi.clearAllMocks();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: getRV,
-      setRuntimeValue: setRV,
-      campaignName: '',
-      playerStats: { name: 'Hero' },
-    });
+    // leg b: campaignName falsy with truthy playerStats → gate skipped, writes pin the empty campaign
+    const rtB = makeRuntime({ 'Hero:activeConditions': [] });
+    addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, dc: 15, ability: 'wis', getRuntimeValue: rtB.getRuntimeValue, setRuntimeValue: rtB.setRuntimeValue, campaignName: '', playerStats: { name: 'Hero' } });
     expect(playerIsImmuneToCondition).not.toHaveBeenCalled();
-  });
+    expect(rtB.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['charmed'], campaignName: '' },
+      { name: 'Hero', key: 'activeConditionMeta', value: { charmed: { dc: 15, ability: 'wis' } }, campaignName: '' },
+    ]);
 
-  it('calls playerIsImmuneToCondition with correct arguments when not immune', () => {
+    // leg c: both truthy → gate invoked with the exact envelope
     playerIsImmuneToCondition.mockReturnValue(false);
-    const getRV = makeGetRuntimeValue({ 'Hero:activeConditions': [] });
-    const setRV = makeSetRuntimeValue();
+    const rtC = makeRuntime({ 'Hero:activeConditions': [] });
     const playerStats = { name: 'Hero' };
-
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: getRV,
-      setRuntimeValue: setRV,
-      campaignName: 'Campaign',
-      playerStats,
-    });
-
+    addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, dc: 15, ability: 'wis', getRuntimeValue: rtC.getRuntimeValue, setRuntimeValue: rtC.setRuntimeValue, campaignName: 'Campaign', playerStats });
     expect(playerIsImmuneToCondition).toHaveBeenCalledWith({
       conditionKey: 'charmed',
       playerStats,
-      getRuntimeValue: getRV,
+      getRuntimeValue: rtC.getRuntimeValue,
       campaignName: 'Campaign',
     });
   });
 
-  it('appends new condition, deduplicates by key, and handles null activeConditions', () => {
+  it('appends new conditions and re-stamps a case-insensitive duplicate at the tail — replaced, never stacked', () => {
     playerIsImmuneToCondition.mockReturnValue(false);
 
-    const getRV1 = makeGetRuntimeValue({ 'Hero:activeConditions': ['blinded'] });
-    const setRV1 = makeSetRuntimeValue();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: getRV1,
-      setRuntimeValue: setRV1,
-      campaignName: 'Campaign',
-      playerStats: {},
-    });
-    expect(setRV1).toHaveBeenCalledWith('Hero', 'activeConditions', ['blinded', 'charmed'], 'Campaign');
+    const rt1 = makeRuntime({ 'Hero:activeConditions': ['blinded'] });
+    const res1 = addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, dc: 15, ability: 'wis', getRuntimeValue: rt1.getRuntimeValue, setRuntimeValue: rt1.setRuntimeValue, campaignName: 'Campaign', playerStats: {} });
+    expect(res1).toEqual({ suppressed: false });
+    expect(rt1.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['blinded', 'charmed'], campaignName: 'Campaign' },
+      { name: 'Hero', key: 'activeConditionMeta', value: { charmed: { dc: 15, ability: 'wis' } }, campaignName: 'Campaign' },
+    ]);
 
-    vi.clearAllMocks();
-    const getRV2 = makeGetRuntimeValue({ 'Hero:activeConditions': ['Charmed'] });
-    const setRV2 = makeSetRuntimeValue();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'charmed', label: 'Charmed' },
-      dc: 15,
-      ability: 'wis',
-      getRuntimeValue: getRV2,
-      setRuntimeValue: setRV2,
-      campaignName: 'Campaign',
-      playerStats: {},
-    });
-    expect(setRV2).toHaveBeenCalledWith('Hero', 'activeConditions', ['charmed'], 'Campaign');
-
-    vi.clearAllMocks();
-    const getRV3 = vi.fn(() => null);
-    const setRV3 = makeSetRuntimeValue();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Hero' }] },
-      creatureName: 'Hero',
-      conditionDef: { key: 'poisoned', label: 'Poisoned' },
-      dc: 12,
-      ability: 'con',
-      getRuntimeValue: getRV3,
-      setRuntimeValue: setRV3,
-      campaignName: '',
-      playerStats: {},
-    });
-    expect(setRV3).toHaveBeenCalledWith('Hero', 'activeConditions', ['poisoned'], '');
+    // duplicate 'Charmed' is filtered out and re-appended lowercase; no dc/ability → no meta write
+    const rt2 = makeRuntime({ 'Hero:activeConditions': ['Charmed', 'blinded'] });
+    const res2 = addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, getRuntimeValue: rt2.getRuntimeValue, setRuntimeValue: rt2.setRuntimeValue, campaignName: '', playerStats: {} });
+    expect(res2).toEqual({ suppressed: false });
+    expect(rt2.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['blinded', 'charmed'], campaignName: '' },
+    ]);
   });
 
-  it('works for monster/npc creatures and does nothing when creature is not found', () => {
+  it('meta merge preserves other conditions and stale keys while refreshing dc/ability for the target', () => {
     playerIsImmuneToCondition.mockReturnValue(false);
-
-    const getRV = makeGetRuntimeValue({ 'Goblin:activeConditions': ['blinded'] });
-    const setRV = makeSetRuntimeValue();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'npc', name: 'Goblin' }] },
-      creatureName: 'Goblin',
-      conditionDef: { key: 'frightened', label: 'Frightened' },
-      dc: 13,
-      ability: 'wis',
-      getRuntimeValue: getRV,
-      setRuntimeValue: setRV,
-      campaignName: '',
-      playerStats: null,
+    const rt = makeRuntime({
+      'Hero:activeConditions': ['blinded'],
+      'Hero:activeConditionMeta': { blinded: { dc: 8, source: 'hex' }, poisoned: { dc: 12, ability: 'con' } },
     });
-    expect(setRV).toHaveBeenCalledWith('Goblin', 'activeConditions', ['blinded', 'frightened'], '');
 
-    vi.clearAllMocks();
-    const setRV2 = makeSetRuntimeValue();
-    addCondition({
-      combatSummary: { creatures: [{ type: 'player', name: 'Other' }] },
-      creatureName: 'NonExistent',
-      conditionDef: { key: 'blinded', label: 'Blinded' },
-      dc: 10,
-      ability: 'null',
-      getRuntimeValue: vi.fn(),
-      setRuntimeValue: setRV2,
-      campaignName: '',
-      playerStats: null,
-    });
-    expect(setRV2).not.toHaveBeenCalled();
+    const result = addCondition({ combatSummary: cs, creatureName: 'Hero', conditionDef: { key: 'blinded', label: 'Blinded' }, dc: 15, ability: 'wis', getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign', playerStats: {} });
+
+    expect(result).toEqual({ suppressed: false });
+    expect(rt.setCalls).toEqual([
+      { name: 'Hero', key: 'activeConditions', value: ['blinded'], campaignName: 'Campaign' },
+      { name: 'Hero', key: 'activeConditionMeta', value: { blinded: { dc: 15, ability: 'wis', source: 'hex' }, poisoned: { dc: 12, ability: 'con' } }, campaignName: 'Campaign' },
+    ]);
+  });
+
+  it('missing combatSummary logs an exact console.error; unknown creature no-writes — both {suppressed:false}, no writes', () => {
+    playerIsImmuneToCondition.mockReturnValue(false);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rt = makeRuntime();
+    try {
+      const resMissing = addCondition({ combatSummary: undefined, creatureName: 'Hero', conditionDef: { key: 'charmed', label: 'Charmed' }, getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign', playerStats: null });
+      expect(resMissing).toEqual({ suppressed: false });
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledWith('[addCondition] combatSummary is null/undefined or missing creatures when adding charmed to Hero');
+
+      const resUnknown = addCondition({ combatSummary: cs, creatureName: 'NonExistent', conditionDef: { key: 'blinded', label: 'Blinded' }, dc: 10, ability: 'con', getRuntimeValue: rt.getRuntimeValue, setRuntimeValue: rt.setRuntimeValue, campaignName: 'Campaign', playerStats: null });
+      expect(resUnknown).toEqual({ suppressed: false });
+      expect(rt.setCalls).toEqual([]);
+      expect(errSpy).toHaveBeenCalledTimes(1); // unknown-creature lane is silent
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 });

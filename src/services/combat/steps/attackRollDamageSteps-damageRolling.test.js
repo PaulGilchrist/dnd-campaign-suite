@@ -1,133 +1,94 @@
+// @maintained-by-ai
+// damageRolling lane — the dice-rolling pipeline legs of the attackRollDamageSteps
+// pipeline: buildRollBaseDamageStep / buildBuildContextStep / buildSneakAttackStep
+// (attackRollDamageCalc.js, composed at attackRollDamageSteps.js:14-16). Steps are
+// built directly here; composite order/names/subscribe-emit chain are owned by
+// attackRollDamageSteps.test.js (structure lane).
+//
+// CITED-OWNER (#1027, #1030): generic [Empowered Evocation] append/skip CANON arms —
+// append once when mod > 0, skip when mod 0 or negative — are PRESERVED here (old
+// :237-255). The CLA-120 fold-exactly-once / pre-baked dedupe gate is owned by
+// attackRollDamageCalc-cla120-empowered-evocation.test.js. Cite-refresh after fold:
+// append arm → it('appends the [Empowered Evocation] term once when mod > 0') :152-165;
+// skip arms co-located → it('skips the [Empowered Evocation] append when modifier is 0 or negative') :168-185.
+//
+// Family split:
+//   attackRollDamageSteps.test.js              composite structure — order, names, event chain
+//   attackRollDamageCalc-cla120-*.test.js     EE fold-exactly-once / never re-append gate
+//   attackRollDamageCalc-radiantSoul.test.js  Radiant Soul append + execution-owned dedupe
+//   attackRollDamageSteps-endgame.test.js     overchannel step (idx 17) post-damage rolls
+//   attackRollRiders.test.js                  cunningStrike rider modal (not the cost fold here)
+//
+// Determinism (#1026/#1027): ROLL_TABLE hand-derived ONCE (1d6→4, 1d8→5 stub
+// convention), exact bytes→total lookup — never a re-parse oracle; unknown formula
+// rolls null like the real roller (honest skip legs, #945), no silent { total: 6 }
+// fallback (#1030 class). Unmocked-called audit (#1029): only the five modules
+// attackRollDamageCalc.js imports are mocked.
+//
+// old -> new map:
+//   3-4 condition arms per step                     → one folded all-arms condition test each
+//   'clears popupHtml on crit' / 'does not clear'   → legs of crit / default-path tests
+//   'uses autoFormulaOverride when no attack.damage' / 'prefers...' → 'autoFormulaOverride wins...'
+//   'returns data with formula, total, rolls, modifier' (expect.any oracle) → exact toEqual in default-path test
+//   'combines autoFormulaOverride with empowered evocation' → REMOVED (input-agnostic concat;
+//     override selection and EE append are separate folded legs above)
+//   'uses rollExpressionDoubled on crit' / '...Maximized when overchannelActive' /
+//   'prefers overchannel over crit' → two roller-selection tests (crit, overchannel-beats-crit)
+//   buildContext handler arms → WM-008 rebuild / map routing / sneakDice+targetName derive / no-fn guard
+//   sneak handler arms → apply+stamp+preserve / missing-rolls leg / crit double / cunning fold+clamp+reset / null leg
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks ────────────────────────────────────────────────────────
+// Hand-derived once (#815/#710): rolls pinned by stub convention, totals sum the bytes.
+const ROLL_TABLE = {
+  '1d8+3': { total: 8, rolls: [5], modifier: 3 },
+  '3d6+2': { total: 14, rolls: [4, 4, 4], modifier: 2 },
+  '3d6': { total: 12, rolls: [4, 4, 4], modifier: 0 },
+  '8d6': { total: 32, rolls: [4, 4, 4, 4, 4, 4, 4, 4], modifier: 0 },
+  '8d6+3': { total: 35, rolls: [4, 4, 4, 4, 4, 4, 4, 4], modifier: 3 },
+  '2d6': { total: 8, rolls: [4, 4], modifier: 0 },
+  '1d6': { total: 4, rolls: [4], modifier: 0 },
+};
+const DOUBLED_TABLE = {
+  '8d6': { total: 64, rolls: [4, 4, 4, 4, 4, 4, 4, 4], doubledRolls: [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], modifier: 0 },
+  '2d6': { total: 16, rolls: [4, 4], doubledRolls: [4, 4, 4, 4], modifier: 0 },
+};
+const MAXIMIZED_TABLE = {
+  '8d6': { total: 48, rolls: [6, 6, 6, 6, 6, 6, 6, 6], modifier: 0, maximized: true },
+};
+// Same normalization the real roller applies (tag-strip, whitespace fold).
+const normKey = (formula) => (formula || '').replace(/\s*\[[^\]]*\]/g, '').replace(/\s+/g, '');
 
 vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = rolls.reduce((s, r) => s + r, 0) + modStr;
-      return { total, rolls, modifier: modStr };
-    }
-    return { total: 6, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionDoubled: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = (rolls.reduce((s, r) => s + r, 0) * 2) + modStr;
-      const doubledRolls = rolls.concat(rolls);
-      return { total, rolls, doubledRolls, modifier: modStr };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionMaximized: vi.fn((formula) => {
-    if (!formula) return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      return { total: count * sides + modStr, rolls: Array(count).fill(sides), modifier: modStr, maximized: true };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-}));
-
-vi.mock('../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
+  rollExpression: vi.fn((formula) => ROLL_TABLE[normKey(formula)] ?? null),
+  rollExpressionDoubled: vi.fn((formula) => DOUBLED_TABLE[normKey(formula)] ?? null),
+  rollExpressionMaximized: vi.fn((formula) => MAXIMIZED_TABLE[normKey(formula)] ?? null),
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 1),
-  loadCombatSummary: vi.fn(() => Promise.resolve({ lastAttack: {} })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_characterKey, _propertyName, _campaignName) => null),
-  setRuntimeValue: vi.fn(),
-  setRuntimeObject: vi.fn(),
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../automation/common/choiceStorage.js', () => ({
+  getChosenRuntimeValue: vi.fn(() => undefined),
 }));
 
 vi.mock('../../combat/automation/automationService.js', () => ({
   hasTwoWeaponFighting: vi.fn(() => false),
-  collectWeaponMastery: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
-}));
-
-vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve({})),
-}));
-
-vi.mock('../../automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
-  getAttackRiderOptions: vi.fn(() => Promise.resolve([])),
-  getAttackRiderOptionsByContext: vi.fn(() => Promise.resolve([])),
-}));
-
-vi.mock('../../combat/prompts/bardicInspirationPromptUtils.js', () => ({
-  sendBardicInspirationOffensePrompt: vi.fn(),
-}));
-
-vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-  hasBardicInspirationOffense: vi.fn(() => false),
-  getBardicInspirationDieSize: vi.fn(() => null),
-}));
-
-vi.mock('../../automation/common/resourceCheck.js', () => ({
-  spendResource: vi.fn(),
-}));
-
-vi.mock('../../automation/common/buffToggle.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
-vi.mock('../../ui/utils.js', () => ({
-  default: { guid: () => 'test-guid-123' },
-}));
-
-vi.mock('./features/index.js', () => ({
-  featureModules: [],
-}));
-
-vi.mock('../../automation/handlers/combat/weaponMasteryHandler.js', () => ({
-  applyMasteryEffect: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(() => 3),
-}));
-
-vi.mock('../../automation/common/savePrompt.js', () => ({
-  createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id', promise: Promise.resolve({ success: true }) })),
-}));
-
-// ── Imports ──────────────────────────────────────────────────────
-
-const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
+const { buildRollBaseDamageStep, buildBuildContextStep, buildSneakAttackStep } = await import('./attackRollDamageCalc.js');
 const { rollExpression, rollExpressionDoubled, rollExpressionMaximized } = await import('../../dice/diceRoller.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-const { loadCombatSummary } = await import('../../encounters/combatData.js');
 
-// ── Helpers ───────────────────────────────────────────────────────
+const rollBaseDamage = buildRollBaseDamageStep();
+const buildContext = buildBuildContextStep();
+const sneakAttack = buildSneakAttackStep();
 
 function makeCtx(overrides = {}) {
   return {
@@ -139,477 +100,279 @@ function makeCtx(overrides = {}) {
       level: 5,
       proficiency: 3,
     },
-    proceedWithDamage: vi.fn(),
     campaignName: 'test-campaign',
     ...overrides,
   };
 }
 
-// ── Tests ────────────────────────────────────────────────────────
+beforeEach(() => {
+  vi.clearAllMocks(); // keeps factory impls (ROLL_TABLE lookups), clears call logs
+  getRuntimeValue.mockReturnValue(null);
+});
 
-describe('buildAttackRollDamageSteps - rollBaseDamage, buildContext, sneakAttack', () => {
-  let steps;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    steps = buildAttackRollDamageSteps();
+describe('rollBaseDamage — formula → roller → total pipeline', () => {
+  it('runs when attack.damage or autoFormulaOverride exists, skips otherwise', () => {
+    expect(rollBaseDamage.condition(makeCtx({ attack: { damage: '1d8+3' } }))).toBe(true);
+    expect(rollBaseDamage.condition(makeCtx({ autoFormulaOverride: '2d6' }))).toBe(true);
+    expect(rollBaseDamage.condition(makeCtx({ attack: {} }))).toBe(false);
+    expect(rollBaseDamage.condition({})).toBe(false);
   });
 
-  // ──────────────────────────────────────────────────────────────
-  // rollBaseDamage (index 4)
-  // ──────────────────────────────────────────────────────────────
+  it('rolls damage with its damage-type tag and returns exact bytes and total', async () => {
+    const setPopupHtml = vi.fn();
+    const result = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '1d8+3' },
+      setPopupHtml,
+    }));
 
-  describe('rollBaseDamage step', () => {
-    describe('condition', () => {
-      it('returns true when ctx.attack has damage', () => {
-        const ctx = makeCtx({ attack: { damage: '1d8+3' } });
-        expect(steps[5].condition(ctx)).toBe(true);
-      });
+    expect(rollExpression).toHaveBeenCalledWith('1d8+3');
+    expect(result.data).toEqual({ formula: '1d8+3', total: 8, rolls: [5], modifier: 3 });
+    expect(setPopupHtml).not.toHaveBeenCalled(); // popup clear is a crit-only arm
 
-      it('returns true when ctx has autoFormulaOverride', () => {
-        const ctx = makeCtx({ autoFormulaOverride: '2d6' });
-        expect(steps[5].condition(ctx)).toBe(true);
-      });
+    const tagged = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '1d8+3', damageType: 'Necrotic' },
+    }));
+    expect(rollExpression).toHaveBeenCalledWith('1d8+3 [necrotic]');
+    expect(tagged.data).toEqual({ formula: '1d8+3 [necrotic]', total: 8, rolls: [5], modifier: 3 });
+  });
 
-      it('returns false when neither attack.damage nor autoFormulaOverride exists', () => {
-        const ctx = makeCtx({ attack: {} });
-        expect(steps[5].condition(ctx)).toBe(false);
-      });
-    });
+  it('autoFormulaOverride wins over attack.damage', async () => {
+    // '2d8+4' is unmapped: if priority inverted, the roller rolls null and the
+    // exact-data assertions below fail loudly (no silent fallback).
+    const result = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '2d8+4' },
+      autoFormulaOverride: '3d6+2',
+    }));
 
-    describe('handler', () => {
-      it('clears popupHtml on crit', async () => {
-        const setPopupHtml = vi.fn();
-        const ctx = makeCtx({
-          attack: { damage: '1d8+3' },
-          isCrit: true,
-          setPopupHtml,
-        });
+    expect(rollExpression).toHaveBeenCalledWith('3d6+2');
+    expect(rollExpression).not.toHaveBeenCalledWith('2d8+4');
+    expect(result.data).toEqual({ formula: '3d6+2', total: 14, rolls: [4, 4, 4], modifier: 2 });
+  });
 
-        await steps[5].handler(ctx);
+  // CITED-OWNER #1027 append arm (old :227-235 → here): PRESERVE.
+  it('appends the [Empowered Evocation] term once when mod > 0', async () => {
+    const result = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '8d6' },
+      empoweredEvocationModifier: 3,
+    }));
 
-        expect(setPopupHtml).toHaveBeenCalledWith(null);
-      });
-
-      it('does not clear popupHtml on non-crit', async () => {
-        const setPopupHtml = vi.fn();
-        const ctx = makeCtx({
-          attack: { damage: '1d8+3' },
-          isCrit: false,
-          setPopupHtml,
-        });
-
-        await steps[5].handler(ctx);
-
-        expect(setPopupHtml).not.toHaveBeenCalled();
-      });
-
-      it('uses autoFormulaOverride when no attack.damage', async () => {
-        const ctx = makeCtx({ autoFormulaOverride: '3d6+2' });
-        const result = await steps[5].handler(ctx);
-
-        expect(rollExpression).toHaveBeenCalledWith('3d6+2');
-        expect(result.data.formula).toBe('3d6+2');
-      });
-
-      it('prefers autoFormulaOverride over attack.damage', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '2d8+4' },
-          autoFormulaOverride: '3d6',
-        });
-        const result = await steps[5].handler(ctx);
-
-        expect(rollExpression).toHaveBeenCalledWith('3d6');
-        expect(result.data.formula).toBe('3d6');
-      });
-
-      it('appends empowered evocation modifier to formula', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          empoweredEvocationModifier: 3,
-        });
-        const result = await steps[5].handler(ctx);
-
-        expect(result.data.formula).toBe('8d6 + 3 [Empowered Evocation]');
-      });
-
-      it('does not append empowered evocation when modifier is 0', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          empoweredEvocationModifier: 0,
-        });
-        const result = await steps[5].handler(ctx);
-
-        expect(result.data.formula).toBe('8d6');
-      });
-
-      it('does not append empowered evocation when modifier is negative', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          empoweredEvocationModifier: -1,
-        });
-        const result = await steps[5].handler(ctx);
-
-        expect(result.data.formula).toBe('8d6');
-      });
-
-      it('uses rollExpressionDoubled on crit', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          isCrit: true,
-        });
-        await steps[5].handler(ctx);
-
-        expect(rollExpressionDoubled).toHaveBeenCalledWith('8d6');
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('uses rollExpressionMaximized when overchannelActive', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          overchannelActive: true,
-        });
-        await steps[5].handler(ctx);
-
-        expect(rollExpressionMaximized).toHaveBeenCalledWith('8d6');
-        expect(rollExpressionDoubled).not.toHaveBeenCalled();
-      });
-
-      it('prefers overchannel over crit when both are set', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '8d6' },
-          isCrit: true,
-          overchannelActive: true,
-        });
-        await steps[5].handler(ctx);
-
-        expect(rollExpressionMaximized).toHaveBeenCalledWith('8d6');
-        expect(rollExpressionDoubled).not.toHaveBeenCalled();
-      });
-
-      it('returns null when rollExpression returns null', async () => {
-        const ctx = makeCtx({ attack: { damage: '0' } });
-        const result = await steps[5].handler(ctx);
-
-        expect(result).toBeNull();
-      });
-
-      it('returns data with formula, total, rolls, and modifier', async () => {
-        const ctx = makeCtx({ attack: { damage: '1d8+3' } });
-        const result = await steps[5].handler(ctx);
-
-        expect(result.data).toEqual(
-          expect.objectContaining({
-            formula: '1d8+3',
-            total: expect.any(Number),
-            rolls: expect.any(Array),
-            modifier: expect.any(Number),
-          }),
-        );
-      });
-
-      it('combines autoFormulaOverride with empowered evocation', async () => {
-        const ctx = makeCtx({
-          autoFormulaOverride: '8d6',
-          empoweredEvocationModifier: 2,
-        });
-        const result = await steps[5].handler(ctx);
-
-        expect(result.data.formula).toBe('8d6 + 2 [Empowered Evocation]');
-      });
+    expect(rollExpression).toHaveBeenCalledWith('8d6 + 3 [Empowered Evocation]');
+    expect(result.data).toEqual({
+      formula: '8d6 + 3 [Empowered Evocation]',
+      total: 35,
+      rolls: [4, 4, 4, 4, 4, 4, 4, 4],
+      modifier: 3,
     });
   });
 
-  // ──────────────────────────────────────────────────────────────
-  // buildContext (index 5)
-  // ──────────────────────────────────────────────────────────────
+  // CITED-OWNER #1027 skip arms (old :237-255 → here): PRESERVE, co-located falsifiers.
+  it('skips the [Empowered Evocation] append when modifier is 0 or negative', async () => {
+    const zero = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '8d6' },
+      empoweredEvocationModifier: 0,
+    }));
+    expect(rollExpression).toHaveBeenCalledWith('8d6');
+    expect(zero.data.formula).toBe('8d6');
+    expect(zero.data.total).toBe(32);
 
-  describe('buildContext step', () => {
-    describe('condition', () => {
-      it('returns true when no buildCtxResult and no autoDamageSource', () => {
-        const ctx = makeCtx();
-        expect(steps[6].condition(ctx)).toBe(true);
-      });
+    rollExpression.mockClear();
+    const negative = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '8d6' },
+      empoweredEvocationModifier: -1,
+    }));
+    expect(rollExpression).toHaveBeenCalledWith('8d6');
+    expect(rollExpression).not.toHaveBeenCalledWith(expect.stringContaining('Empowered'));
+    expect(negative.data).toEqual({ formula: '8d6', total: 32, rolls: [4, 4, 4, 4, 4, 4, 4, 4], modifier: 0 });
+  });
 
-      it('returns false when ctx.buildCtxResult exists', () => {
-        const ctx = makeCtx({ buildCtxResult: { sneakAttackDice: 2 } });
-        expect(steps[6].condition(ctx)).toBe(false);
-      });
+  it('routes crit through the doubled roller — exact dice count, doubled total — and clears the crit popup', async () => {
+    const setPopupHtml = vi.fn();
+    const result = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '8d6' },
+      isCrit: true,
+      setPopupHtml,
+    }));
 
-      it('returns false when ctx.autoDamageSource exists', () => {
-        const ctx = makeCtx({ autoDamageSource: 'some-source' });
-        expect(steps[6].condition(ctx)).toBe(false);
-      });
-    });
-
-    describe('handler', () => {
-      it('calls buildCtxSync when available (default path)', async () => {
-        const buildCtxSyncMock = vi.fn(async () => ({ sneakAttackDice: 2, targetName: 'Orc' }));
-        const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[6].handler(ctx);
-
-        // WM-008: damage-phase ctx rebuild must not consume one-shot attack te.
-        expect(buildCtxSyncMock).toHaveBeenCalledWith({}, { consumeAttackTe: false });
-        expect(result.data.buildCtxResult).toEqual({ sneakAttackDice: 2, targetName: 'Orc' });
-        expect(result.data.sneakDice).toBe(2);
-      });
-
-      it('calls buildCtx when mapName is present', async () => {
-        const buildCtxMock = vi.fn(async () => ({ sneakAttackDice: 3 }));
-        const ctx = makeCtx({
-          mapName: 'test-map',
-          buildCtx: buildCtxMock,
-        });
-        const result = await steps[6].handler(ctx);
-
-        expect(buildCtxMock).toHaveBeenCalled();
-        expect(result.data.sneakDice).toBe(3);
-      });
-
-      it('returns empty data when no build function available', async () => {
-        const ctx = makeCtx();
-        const result = await steps[6].handler(ctx);
-
-        expect(result.data).toEqual({});
-      });
-
-      it('sets targetName from buildResult when ctx.targetName is missing', async () => {
-        const buildCtxSyncMock = vi.fn(async () => ({ sneakAttackDice: 1, targetName: 'Goblin' }));
-        const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[6].handler(ctx);
-
-        expect(result.data.targetName).toBe('Goblin');
-      });
-
-      it('does not override targetName when ctx.targetName exists', async () => {
-        const buildCtxSyncMock = vi.fn(async () => ({ sneakAttackDice: 1, targetName: 'Goblin' }));
-        const ctx = makeCtx({
-          buildCtxSync: buildCtxSyncMock,
-          targetName: 'Orc',
-        });
-        const result = await steps[6].handler(ctx);
-
-        expect(result.data.targetName).toBeUndefined();
-      });
-
-      it('handles buildCtxResult with no sneakAttackDice', async () => {
-        const buildCtxSyncMock = vi.fn(async () => ({}));
-        const ctx = makeCtx({ buildCtxSync: buildCtxSyncMock });
-        const result = await steps[6].handler(ctx);
-
-        expect(result.data.sneakDice).toBe(0);
-      });
+    expect(setPopupHtml).toHaveBeenCalledWith(null);
+    expect(rollExpressionDoubled).toHaveBeenCalledWith('8d6');
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(rollExpressionMaximized).not.toHaveBeenCalled();
+    expect(result.data).toEqual({
+      formula: '8d6',
+      total: 64, // (8d6 raw 32) * 2 + 0
+      rolls: [4, 4, 4, 4, 4, 4, 4, 4],
+      modifier: 0,
     });
   });
 
-  // ──────────────────────────────────────────────────────────────
-  // sneakAttack (index 6)
-  // ──────────────────────────────────────────────────────────────
+  it('overchannel maximizes to flat top bytes and beats crit doubling', async () => {
+    const result = await rollBaseDamage.handler(makeCtx({
+      attack: { damage: '8d6' },
+      isCrit: true,
+      overchannelActive: true,
+    }));
 
-  describe('sneakAttack step', () => {
-    describe('condition', () => {
-      it('returns true when ctx.sneakDice > 0', () => {
-        const ctx = makeCtx({ sneakDice: 2 });
-        expect(steps[7].condition(ctx)).toBe(true);
-      });
+    expect(rollExpressionMaximized).toHaveBeenCalledWith('8d6');
+    expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(result.data).toEqual({
+      formula: '8d6',
+      total: 48, // 8 dice at face value, no doubling applied
+      rolls: [6, 6, 6, 6, 6, 6, 6, 6],
+      modifier: 0,
+    });
+  });
 
-      it('returns false when ctx.sneakDice is 0', () => {
-        const ctx = makeCtx({ sneakDice: 0 });
-        expect(steps[7].condition(ctx)).toBe(false);
-      });
+  it('returns null when the roller cannot parse the formula (honest skip, #945)', async () => {
+    const result = await rollBaseDamage.handler(makeCtx({ attack: { damage: '0' } }));
 
-      it('returns false when ctx.sneakDice is undefined', () => {
-        const ctx = makeCtx();
-        expect(steps[7].condition(ctx)).toBe(false);
-      });
+    expect(rollExpression).toHaveBeenCalledWith('0');
+    expect(result).toBeNull();
+  });
+});
 
-      it('returns false when ctx.sneakDice is negative', () => {
-        const ctx = makeCtx({ sneakDice: -1 });
-        expect(steps[7].condition(ctx)).toBe(false);
-      });
+describe('buildContext — damage-phase ctx rebuild', () => {
+  it('runs unless a prebuilt ctx or autoDamageSource short-circuits it', () => {
+    expect(buildContext.condition(makeCtx())).toBe(true);
+    expect(buildContext.condition(makeCtx({ buildCtxResult: { sneakAttackDice: 2 } }))).toBe(false);
+    expect(buildContext.condition(makeCtx({ autoDamageSource: 'some-source' }))).toBe(false);
+  });
+
+  it('rebuilds via buildCtxSync WITHOUT consuming one-shot attack te (WM-008)', async () => {
+    const buildCtxSync = vi.fn(async () => ({ sneakAttackDice: 2, targetName: 'Orc' }));
+    const buildCtx = vi.fn();
+    const ctx = makeCtx({ attack: { damage: '1d8+3' }, buildCtxSync, buildCtx });
+    const result = await buildContext.handler(ctx);
+
+    expect(buildCtxSync).toHaveBeenCalledWith({ damage: '1d8+3' }, { consumeAttackTe: false });
+    expect(buildCtx).not.toHaveBeenCalled();
+    expect(result.data).toEqual({
+      buildCtxResult: { sneakAttackDice: 2, targetName: 'Orc' },
+      sneakDice: 2,
+      targetName: 'Orc',
+    });
+  });
+
+  it('routes to the map-aware buildCtx when mapName is present', async () => {
+    const buildCtx = vi.fn(async () => ({ sneakAttackDice: 3 }));
+    const buildCtxSync = vi.fn();
+    const ctx = makeCtx({ mapName: 'test-map', buildCtx, buildCtxSync });
+    const result = await buildContext.handler(ctx);
+
+    expect(buildCtx).toHaveBeenCalledWith({}, { consumeAttackTe: false });
+    expect(buildCtxSync).not.toHaveBeenCalled();
+    expect(result.data).toEqual({ buildCtxResult: { sneakAttackDice: 3 }, sneakDice: 3 });
+  });
+
+  it('defaults sneakDice to 0 and adopts targetName only when ctx has none', async () => {
+    const empty = await buildContext.handler(makeCtx({
+      buildCtxSync: async () => ({}),
+    }));
+    expect(empty.data).toEqual({ buildCtxResult: {}, sneakDice: 0 });
+
+    const occupied = await buildContext.handler(makeCtx({
+      targetName: 'Orc',
+      buildCtxSync: async () => ({ sneakAttackDice: 1, targetName: 'Goblin' }),
+    }));
+    expect(occupied.data.targetName).toBeUndefined();
+    expect(occupied.data.sneakDice).toBe(1);
+  });
+
+  it('returns empty data when no build function is available', async () => {
+    expect((await buildContext.handler(makeCtx())).data).toEqual({});
+  });
+});
+
+describe('sneakAttack — sneak dice fold into the running damage payload', () => {
+  const baseSneakCtx = (overrides = {}) => makeCtx({
+    sneakDice: 2,
+    formula: '1d8+3',
+    total: 11,
+    rolls: [8, 3],
+    ...overrides,
+  });
+
+  it('runs only when sneakDice is positive', () => {
+    expect(sneakAttack.condition(makeCtx({ sneakDice: 2 }))).toBe(true);
+    expect(sneakAttack.condition(makeCtx({ sneakDice: 0 }))).toBe(false);
+    expect(sneakAttack.condition(makeCtx())).toBe(false);
+    expect(sneakAttack.condition(makeCtx({ sneakDice: -1 }))).toBe(false);
+  });
+
+  it('adds the sneak roll with exact bytes, preserves existing rolls, and stamps the used round', async () => {
+    const result = await sneakAttack.handler(baseSneakCtx());
+
+    expect(rollExpression).toHaveBeenCalledWith('2d6');
+    expect(result.data).toEqual({
+      formula: '1d8+3 + 2d6 [Sneak Attack]',
+      total: 19, // 11 + sneak 8
+      rolls: [8, 3, 4, 4],
+      effectiveSneakDice: 2,
+    });
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_SneakAttack_usedRound', 1, 'test-campaign');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestChar', '_cunningStrikeCostUsed', 0, 'test-campaign');
+
+    // Missing rolls array → output carries only the sneak rolls.
+    rollExpression.mockReturnValueOnce(ROLL_TABLE['1d6']);
+    const noRolls = await sneakAttack.handler(baseSneakCtx({ sneakDice: 1, rolls: undefined }));
+    expect(noRolls.data).toEqual({
+      formula: '1d8+3 + 1d6 [Sneak Attack]',
+      total: 15,
+      rolls: [4],
+      effectiveSneakDice: 1,
+    });
+  });
+
+  it('doubles sneak dice on crit and not on a normal hit', async () => {
+    const crit = await sneakAttack.handler(baseSneakCtx({ isCrit: true }));
+    expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6');
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(crit.data).toEqual({
+      formula: '1d8+3 + 2d6 [Sneak Attack]',
+      total: 27, // 11 + (2d6 raw 8) * 2
+      rolls: [8, 3, 4, 4],
+      effectiveSneakDice: 2,
     });
 
-    describe('handler', () => {
-      it('adds sneak dice to formula and total', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[7].handler(ctx);
+    rollExpression.mockClear();
+    rollExpressionDoubled.mockClear();
+    const hit = await sneakAttack.handler(baseSneakCtx({ isCrit: false }));
+    expect(rollExpression).toHaveBeenCalledWith('2d6');
+    expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    expect(hit.data.total).toBe(19);
+  });
 
-        expect(result.data.formula).toBe('1d8+3 + 2d6 [Sneak Attack]');
-        expect(result.data.effectiveSneakDice).toBe(2);
-        expect(result.data.rolls).toContainEqual(expect.any(Number));
-      });
-
-      it('doubles sneak dice on crit', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-          isCrit: true,
-        });
-        await steps[7].handler(ctx);
-
-        expect(rollExpressionDoubled).toHaveBeenCalledWith('2d6');
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('does not double sneak dice on non-crit', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-          isCrit: false,
-        });
-        await steps[7].handler(ctx);
-
-        expect(rollExpression).toHaveBeenCalledWith('2d6');
-        expect(rollExpressionDoubled).not.toHaveBeenCalled();
-      });
-
-      it('reduces sneak dice by cunning strike cost', async () => {
-        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
-          if (prop === '_cunningStrikeCostUsed') return 1;
-          return null;
-        });
-        const ctx = makeCtx({
-          sneakDice: 3,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[7].handler(ctx);
-
-        expect(result.data.effectiveSneakDice).toBe(2);
-        expect(result.data.formula).toBe('1d8+3 + 2d6 [Sneak Attack]');
-      });
-
-      it('clamps effective sneak dice to 0 minimum', async () => {
-        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
-          if (prop === '_cunningStrikeCostUsed') return 5;
-          return null;
-        });
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[7].handler(ctx);
-
-        expect(result.data.effectiveSneakDice).toBe(0);
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('resets cunning strike cost to 0 when cost > 0', async () => {
-        getRuntimeValue.mockImplementation((_key, prop, _campaign) => {
-          if (prop === '_cunningStrikeCostUsed') return 1;
-          return null;
-        });
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        await steps[7].handler(ctx);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestChar',
-          '_cunningStrikeCostUsed',
-          0,
-          'test-campaign',
-        );
-      });
-
-      it('does not reset cunning strike cost when cost is 0', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        await steps[7].handler(ctx);
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-          'TestChar',
-          '_cunningStrikeCostUsed',
-          0,
-          'test-campaign',
-        );
-      });
-
-      it('marks sneak attack as used this round', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        await steps[7].handler(ctx);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'TestChar',
-          '_SneakAttack_usedRound',
-          1,
-          'test-campaign',
-        );
-      });
-
-      it('returns data without sneak dice when rollExpression returns null', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        rollExpression.mockReturnValue(null);
-        const ctx = makeCtx({
-          sneakDice: 1,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[7].handler(ctx);
-
-        expect(result.data.effectiveSneakDice).toBe(1);
-        expect(result.data.formula).toBe('1d8+3');
-        expect(result.data.total).toBe(11);
-      });
-
-      it('preserves existing rolls and adds sneak rolls', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        rollExpression.mockReturnValue({ total: 7, rolls: [4, 3], modifier: 0 });
-        const ctx = makeCtx({
-          sneakDice: 2,
-          formula: '1d8+3',
-          total: 11,
-          rolls: [8, 3],
-        });
-        const result = await steps[7].handler(ctx);
-
-        expect(result.data.rolls).toEqual([8, 3, 4, 3]);
-      });
-
-      it('uses existing rolls when rolls array is missing', async () => {
-        getRuntimeValue.mockReturnValue(0);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-        const ctx = makeCtx({
-          sneakDice: 1,
-          formula: '1d8+3',
-          total: 11,
-          rolls: undefined,
-        });
-        const result = await steps[7].handler(ctx);
-
-        expect(result.data.rolls).toEqual([5]);
-      });
+  it('folds cunning strike cost into sneak dice, clamps at 0, and resets the cost only once spent', async () => {
+    // Leg 1: cost 1 of sneak 3 → 2d6 applied, cost reset.
+    getRuntimeValue.mockImplementation((_name, prop) => (prop === '_cunningStrikeCostUsed' ? 1 : null));
+    const reduced = await sneakAttack.handler(baseSneakCtx({ sneakDice: 3 }));
+    expect(rollExpression).toHaveBeenCalledWith('2d6');
+    expect(reduced.data).toEqual({
+      formula: '1d8+3 + 2d6 [Sneak Attack]',
+      total: 19,
+      rolls: [8, 3, 4, 4],
+      effectiveSneakDice: 2,
     });
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_cunningStrikeCostUsed', 0, 'test-campaign');
+
+    // Leg 2: cost exceeds dice → nothing rolls, nothing stamped, spent cost still reset.
+    rollExpression.mockClear();
+    setRuntimeValue.mockClear();
+    getRuntimeValue.mockImplementation((_name, prop) => (prop === '_cunningStrikeCostUsed' ? 5 : null));
+    const clamped = await sneakAttack.handler(baseSneakCtx({ sneakDice: 2 }));
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(rollExpressionDoubled).not.toHaveBeenCalled();
+    expect(clamped.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3], effectiveSneakDice: 0 });
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_cunningStrikeCostUsed', 0, 'test-campaign');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('TestChar', '_SneakAttack_usedRound', 1, 'test-campaign');
+  });
+
+  it('a null roll leaves formula, total, and stamps untouched (honest skip, #945)', async () => {
+    rollExpression.mockReturnValueOnce(null);
+    const result = await sneakAttack.handler(baseSneakCtx());
+
+    expect(rollExpression).toHaveBeenCalledWith('2d6');
+    expect(result.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3], effectiveSneakDice: 2 });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });

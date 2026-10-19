@@ -1871,3 +1871,60 @@ run2#989: chargeEconomy (L5-002 bridge) -> maintained (9->6): faithful bridgeSto
 ## Batch #184 GREEN (canon + 1 adjudicated flake, now STABILIZED) — run2#976-#989 (14 files)
 ## Batch #184 — PROGRESS: completed 2125 / remaining 559 (total 2684)
 - Suite: lint clean; 2752 files, 32,331 passed, 2 canon FIXME fails (exact pair) + ElementalAttunementModal.player-save flake 2nd occurrence (passive-effect listener-registration race — reproduced pre-fix, fixed via live-listener anchor + state-anchored waitFors, 7x+5x stress green post-fix) + 3 expected = GREEN canon w/ flake fixed. Evidence /tmp/batch184.log. 32,289->32,331 net from #988 gate-table expansion (+) vs folds (-).
+run2#990: concentration/cleanupConcentrationEffects -> maintained (27->13): faithful two-tier store exposes real lane ordering (static mocks hid sweeps); 🔴 x3 LOGGED (:213-217 spill-last-write, :483 name-only cross-caster strip, :225-227 calm-any-caster); SP-011/012 twins absorbed
+run2#991: concentration/concentrationRules -> maintained (12->17 legs): 10-leg truth table clamp/consumption ordering; bogus floor-DC title fixed (max@21 genuine, floor@22); rawRolls pins dice consumption
+run2#992: concentration/cla107-hex-purge -> maintained (4->2): #992 armed-shape exemplar born — falsifier trio seeds, ONE write exact, deduped join log bytes, spell-name irrelevance leg; filter audited CLEAN (:97-98 correct)
+run2#993: concentration/sp128-er-purge -> maintained (3->2): full ordered 8-write lane pin; spell-KEYED dispatch control; honest over-purge CITE of #990 :179-180/:313-319 class (not re-reported); producer stamp was missing duration — fixed
+run2#994: concentration/concentrationService BASE CANON -> maintained (22->17): D1 dispatch-table census NEW (unregistered=>inert 4 keys); factory wrappers folded thru #990 rec; vacuous remove-by-copy delegates DELETED; faithful two-tier store
+run2#995: conditions/animal-spirit -> maintained (3->4): guard-removal control for unconditional advantage fallback NEW; toContain->exact writes; producer-stamped te verbatim; inert-row falsifier w/ dispatch proof
+run2#996: conditions/bolster -> maintained (4->4 sharpened): LATE-handler fold exact counts+reason bytes; zero-leak save bucket; foresight :483 assign-vs-add clobber observation LOGGED
+run2#997: conditions/clairvoyant -> maintained (3->2): producer-stamped bytes verbatim incl inert save-bytes zero-leak pin; count-goldens cut citing compute canon. REC conditionEffects :330-337 dup drop forwarded
+run2#998: conditions/conditionEffects BASE CANON -> maintained (46 it->15 blocks/212 cases): registry-imported 134-key dispatch census NEW; foresight clobber pinned BOTH directions (#996 face APPLIED); clairvoyant-half cut (rec #997 APPLIED); folded() diff helper; dispatch-order proof
+run2#999: conditions/conditionEffectsCombine -> maintained: adjudicated OWNER/SUPERSET not subset (#998 header forwards attacksOther gate); non-falsifiable test4 replaced w/ stacked-advantage gate falsifier; 4 its->1 it.each 5 rows
+run2#1000: conditions/conditionEffectsCompute CANON -> maintained (54 hand-typed->198 registry-diff cases): registry-import loop ~90 keys NEW coverage; 3 footgun empty-list-before-guard bytes pinned; recs #998 x3 APPLIED verified-both-blocks + 3 more vacuous cut
+run2#1001: conditions/conditionEffectsInternal -> maintained (61 it->93 cases): SAVE_GATE_TARGETS full gate table (5 targets implicit-before); bardic_inspiration d20-channel FIRST coverage in family; impossible-context short-circuit falsifier; combatContext-only faces not-subset-verified
+run2#1002: conditions/conditionSaveService.aura-immunity -> maintained (7->4): full byte-exact log envelopes incl unasserted tails; gate-order proofs; armed/unarmed controls; range-delegation honest
+run2#1003: conditions/conditionSaveService.conditionManagement -> maintained (9->8): activeConditionMeta strip NEW; meta-merge branch owned nowhere NEW (stale-key preservation); 3-leg guard isolation fix
+run2#1004: conditions/conditionSaveService.popup -> maintained (3->5 cases): branch cov ~60->100% (forcedMode ternary, conditional spread, rolls passthrough); tautological rechecks deleted; CLA-209 multi-roll NEW
+
+## Batch #185 GREEN — run2#990-#1004 (15 files)
+## Batch #185 — PROGRESS: completed 2140 / remaining 544 (total 2684)
+- Suite: lint clean; 2752 files, 32,530 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 14th consecutive; evidence /tmp/batch185.log). 32,331->32,530 (+199 net: registry censuses #998/#1000/#1001 folds-into-tables expanded case count while its-block count fell 46->15/54->4/61->21).
+run2#1005: conditionSaveService BASE CANON -> maintained (26->14): G2 Wild Shape CON shortcut + CircleOfPower/Poison/PowerfulBuild grapple channels FIRST coverage; export census #969; spy-leak kill rollD20.mockReset
+run2#1006: conditionUtils -> maintained (14->21 folded): golden census #985 replaces 7 membership loops; save:0 ladder falsifier; consumers-all-mock sole-ownership proof; abiLookup delegation pinned (no own test file). RECs npcFormUtils/CharConditions-mock forwarded
+run2#1007: deathSaveRules -> maintained (22 it->28 table): nat1-clamp->dead, nat20 wipe full-tracks, 18-treated + nat19 near-miss; spy leak afterEach fix NEW; sole state-machine owner verified
+run2#1008: exhaustionRules -> maintained (8->16 folded): ladder census 0-7 closes DC holes lv2/4; over-cap row NEW; guards 7-row pass-through = real restRules contract; data census agrees 5e+2024
+run2#1009: restoreBalance -> maintained (31->22 rows): recs #964/#998/#1000 APPLIED verified; #932 MA-1463 adjudicated NOT-here FORWARDED attackPostProcessing; vacuous legs -> double-cancel discriminators; collector dupes cut cited :116
+run2#1010: savePromptService -> maintained (21->15): transport copy-paste -> exact full-request tables; prismatic indigo/violet FIRST coverage; lying-title flesh-to-stone fixed; unhandledRejection-noise deleted -> rejection sweep falsifiable; URL-encode free via 'Campaign #1' rows
+run2#1011: slowEffects -> maintained (3->4): toHaveBeenCalledWith full-bytes; #990 name-only defect guard leg; truthy-non-array guard NEW; sole direct coverage verified
+run2#1012: targetEffectDefinitions REGISTRY CANON -> maintained (40 blocks->169 exact): full golden census ALL 134 keys verbatim cross-verified live; tautological arithmetic + exists-only loops deleted; group-set census +Lair; register/write full-tuple skipSync baked
+run2#1013: coverService -> maintained (11->10): REAL-PARSER FIX (old mock mis-parsed '80 ft'->null asserting false wrong-reason); hand-derived rays #815; #990 class guard; degenerate zero-writes; endpoint-tokens-never-tax boundary
+run2#1014: creatureTypeResolver -> maintained (3->9): SP-094 contradicting-bytes precedence falsifier; 636-row monsters.json census (never-tax carrier 'npc'); no-normalization authored-contract proof
+run2#1015: fallDamage -> maintained (4->3): ladder edge-pairs + cap falsifier 109/110; authored 2d10-vs-official-1d6 pinned as-written; exact log bytes rolls/footer; guard legs distinct
+run2#1016: lineOfSightGate -> maintained (12->8): master-off spans both entry points #989; first-blocker-wins falsified; consulted-keys census EXACTLY ['campaign.enforcement']; fail-open degrades honest
+run2#1017: movementBudget -> maintained (16->10): detour GTE->exact 20; unreachable:true branch NEW; exact-fit boundary legs; purity #989; trio split export-head evidence. ⚠ :125 NaN logged
+run2#1018: opportunityTrigger -> maintained (11 it->18 cases): fast-path read-census pins zero-reads; popup-sink + multi-defender ordered logs FIRST; co-located NPC-exclusion falsifier
+run2#1019: prompts/bardicInspirationPromptUtils -> maintained (16->4): UNFAITHFUL scan-all-stores mock DELETED (masked routing bug lane owns); faithful keyed read; Bard/Ally routing falsifier; campaignName-ignore strengthened
+
+## Batch #186 GREEN — run2#1005-#1019 (15 files)
+## Batch #186 — PROGRESS: completed 2155 / remaining 529 (total 2684)
+- Suite: lint clean; 2752 files, 32,334 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 15th consecutive; evidence /tmp/batch186.log). 32,530->32,334 (-196) combat top-level sweep folds (savePrompt 21->15, movementBudget 16->10, bardic 16->4, restoreBalance 31its->22rows, te-registry 40blocks->tables).
+run2#1020: restoreBalanceState -> maintained (7->6): #787 seam-flow faithful keyed store latch-bytes every seam; two-holder #948 falsifier; vision-before-range guard order; Date.now log-metadata-only verified #app
+run2#1021: sessionService -> maintained (7->6): campaign-KEYED store mock fix (cross-campaign leak silent-pass class); invalid-phase echoes CURRENT proves reads-not-defaults; .catch resilience branch NEW
+run2#1022: steps/attackRollBonuses-brutalStrike -> maintained (3->2): rec #986 APPLIED verified both files; distinguishable lv17 '2d10' bytes (old 1d10s byte-ambiguous); sticky-consume nulls; rec->automationBonuses forwarded + cla048 gap noted
+run2#1023: steps/cla048-celestial-rider -> maintained (9->3): rec #1022 CLOSED-WRONG-BRANCH source-evidence (CLA-048 stamps nothing :426-471, negative-pinned); real-token+parseConstant unique lane; #973 range-only deleted; disk-lock verbatim
+run2#1024: steps/lunarForm -> maintained (4->3): CLA-217 live-round crux campaign-pinned falsifier verified-live temp-flip (sole lane storedRound!=round); disk-lock verbatim; guards cut citing fold
+run2#1025: steps/spellDiscriminator -> maintained (3->3 stronger): five-SINGLE-flag disjunct matrix (old co-flagged, neither isolated); short-circuit zero-call proofs; near-miss rider falsifier; modal-fire cut citing CANON :278
+run2#1026: steps/frenzy-cla147 -> maintained (3->2): exact 29-byte application; armed two-invocation double-application fingerprint; ungated arm byte-identical cut; 🔴 :91 latch-stamps-unconditionally-on-zero-applied LOGGED
+run2#1027: steps/cla120-empowered-evocation -> maintained (4->2): fold-exactly-once contract two-call; re-parse-oracle->ROLL_TABLE+throwing sentinels; mod-0 cut citing damageRolling; INT-fixture misleading dropped
+run2#1028: steps/radiantSoul -> maintained (5->4): key-derivation whitespace pin read+write sym; second-call latch falsifier key-symmetric; zero-CHA 🔴 LOGGED (latch burned on zero bonus :37-46)
+run2#1029: steps/automationBonuses FOLD CANON -> maintained (60->40): recs #1022/#1023/#1027 APPLIED; Hamstring speed_reduction clock falsifier NEW app-wide; 9 cited #936 arms PRESERVED w/ cite table; parseConstant mock gap fixed. RECs weaponHitBonuses wholesale-dup + natural20 byte-identical fold forwarded
+run2#1030: steps/bonuses-basic -> maintained (31->12): steps 8/9/10 owners; stamp-read branch FIRST real pin (old passed default); silent {total:6} oracle deleted; index comments fixed
+run2#1031: steps/cleaveMastery -> maintained (19->6): RNG pinned (old rode unpin randomness); guard zero-write/latch falsifiers; WM-001 sibling stronger-cite; 🗑 :380-384 dead player-branch noted
+run2#1032: steps/damageRolling ROLL CANON -> maintained (40->18): re-parse-oracle mocks -> hand-derived byte tables loud-fail; cited arms PRESERVED + strengthened cite-refresh :152-165/:168-185; crit/maximize/overchannel mutually-not spies; 8 dead mocks purged
+run2#1033: steps/endgame -> maintained (17->8): idx 17/18 owners fixed stale 16/17; poisoned-weapons save flow CANON NEW app-wide (exact DC13, save_result/handoff ordering); anything()->sentinel-carriers; throw-sentinel rollers
+run2#1034: steps/featureDamage -> maintained (22->12): idx 15/16 off-by-one composition fix; popup short-circuit branch NEW; tautological structural cut; token-consume exact bytes [4,4] hand-derived
+
+## Batch #187 GREEN — run2#1020-#1034 (15 files)
+## Batch #187 — PROGRESS: completed 2170 / remaining 514 (total 2684)
+- Suite: lint clean; 2752 files, 32,226 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 16th consecutive; evidence /tmp/batch187.log). 32,334->32,226 (-108) steps-pipeline sweep folds.

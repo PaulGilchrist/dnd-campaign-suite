@@ -1,699 +1,227 @@
+// @maintained-by-ai
+// Compute-canon lane: per-te and per-modifier fold math of computeConditionEffects,
+// pinned as EXACT changed-fields diffs vs the engine defaults (folded() — the
+// #998 helper). Any byte a fixture moves beyond DEFAULTS must appear in the row;
+// {} proves inertness. Zero-leak falsifier built into every assertion.
+//
+// Family ownership (verified, nothing re-driven here):
+//   dispatch order + condition-handler census + combine matrix + readers
+//     → conditionEffects.test.js (base :155 crusher early+generic fold,
+//        :176 topple late-over-generic, :191 dodge, :230 combine matrix)
+//   attacksOther consumer gate (:864) → conditionEffectsCombine.test.js
+//     (its header :10 forwards the producer-side te→field folds back HERE)
+//   restoreBalance (incl. CLA-295 never-passive) → restoreBalance.test.js :105
+//   roles: marked_as_prey/pesky_swarm → animal-spirit.test.js · bolster
+//     → bolster.test.js · clairvoyant combine roles → clairvoyant.test.js
+//   clairvoyant COMPUTE fold (CLA-053 defender-leg) stays HERE (compute rows
+//     :263-272 are this file's per #997/#998) — the old :263 test is kept,
+//     restated as an exact diff.
+//
+// #998 applied recs (3 deletes, both blocks read + verified dupes):
+//   old :242 topple+CON ⊂ :308 topple (kept — exact diff, adds saveAbility+duration)
+//   old :250 mass_fear+WIS ⊂ :210 mass_fear (kept — now pins massFearRange bytes)
+//   old :257 incapacitated+saveType ⊂ :228 hurlThroughHell (kept — exact diff)
+// Other cuts: old :373 foresight ⊂ :274 (subset assertion); old :205
+// repeatingSave vacuous (asserts undefined on a field the engine never has);
+// old :571 restore_balance → restoreBalance.test.js :106 owns the identical
+// fixture. banishment/forcecage/prismatic/bane/bless/... one-field its → registry
+// census below (golden-once #820: iterate the REAL registry, never hand-type).
+// old→new: all single-field toContain/toBe its → exact folded rows below.
 import { describe, it, expect } from 'vitest';
 import { computeConditionEffects } from './conditionEffects.js';
+import { TARGET_EFFECT_DEFINITIONS } from './targetEffectDefinitions.js';
+
+// Engine default byte-shape — the census baseline (same pattern as base :72).
+const DEFAULTS = computeConditionEffects();
+const folded = (options) => {
+  const result = computeConditionEffects(options);
+  return Object.fromEntries(
+    Object.entries(result).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(DEFAULTS[k])),
+  );
+};
 
 // ---------------------------------------------------------------------------
-// computeConditionEffects — saveType-based modifier conditions
+// saveModifier folds — applyConditionSaveModifier keyword channel +
+// applySaveModifiers/applyTargetModifiers fold math (per #998: reroll /
+// lucky_point / specialEffects tables are owned HERE, preserved as a census).
 // ---------------------------------------------------------------------------
 
-describe('computeConditionEffects — saveType-based modifier conditions', () => {
-  it('applies charmed advantage when charmed condition is active', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'charmed', effect: 'advantage' }];
-    const result = computeConditionEffects({ conditions: ['charmed'], saveModifiers: modifiers });
-    expect(result.saveAdvantage).toContain('charmed');
-  });
-
-  it('applies charmed disadvantage when charmed condition is active', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'charmed', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ conditions: ['charmed'], saveModifiers: modifiers });
-    expect(result.saveDisadvantage).toContain('charmed');
-  });
-
-  it('applies frightened disadvantage when frightened condition is active', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'frightened', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ conditions: ['frightened'], saveModifiers: modifiers });
-    expect(result.saveDisadvantage).toContain('frightened');
-  });
-
-  it('applies poisoned advantage when poisoned condition is active', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'poison', effect: 'advantage' }];
-    const result = computeConditionEffects({ conditions: ['poisoned'], saveModifiers: modifiers });
-    expect(result.saveAdvantage).toContain('poisoned');
-  });
-
-  it('applies poisoned disadvantage when poisoned condition is active', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'poison', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ conditions: ['poisoned'], saveModifiers: modifiers });
-    expect(result.saveDisadvantage).toContain('poisoned');
-  });
-
-  it('applies against_spell advantage', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'against_spell', effect: 'advantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveAdvantage).toContain('against_spell');
-  });
-
-  it('applies against_spell disadvantage', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'against_spell', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveDisadvantage).toContain('against_spell');
-  });
-
-  it('tracks per-ability saveAdvantageAbilities for magic condition with abilities', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'magic', effect: 'advantage', abilities: ['DEX'] }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveAdvantageAbilities).toContain('DEX');
-  });
-
-  it('tracks per-ability saveDisadvantageAbilities for magic condition with abilities', () => {
-    const modifiers = [{ target: 'saving_throw', condition: 'magic', effect: 'disadvantage', abilities: ['CON', 'WIS'] }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveDisadvantageAbilities).toContain('CON');
-    expect(result.saveDisadvantageAbilities).toContain('WIS');
-  });
-
-  it('skips visible_effect modifiers when incapacitated', () => {
-    const modifiers = [
-      { target: 'saving_throw', effect: 'advantage', condition: 'visible_effect' },
-      { target: 'saving_throw', effect: 'advantage' },
-    ];
-    const result = computeConditionEffects({ conditions: ['incapacitated'], saveModifiers: modifiers });
-    // visible_effect is filtered, but the plain advantage still applies
-    expect(result.saveAdvantageCount).toBe(1);
-  });
-
-  it('includes visible_effect modifiers when not incapacitated', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'advantage', condition: 'visible_effect' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveAdvantageCount).toBe(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// computeConditionEffects — targetEffects
-// ---------------------------------------------------------------------------
-
-describe('computeConditionEffects — targetEffects', () => {
-  it('increments targetAdvantageCount for distracting_strike_advantage', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'distracting_strike_advantage' }] });
-    expect(result.targetAdvantageCount).toBe(1);
-  });
-
-  it('increments attackDisadvantageCount for disadvantage_next_attack', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'disadvantage_next_attack' }] });
-    expect(result.attackDisadvantageCount).toBe(1);
-  });
-
-  it('sets attacksOtherDisadvantageSource for compelled_duel', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'compelled_duel', source: 'Paladin' }] });
-    expect(result.attacksOtherDisadvantageSource).toBe('Paladin');
-  });
-
-  it('sets attacksOtherDisadvantageSource for taunting_step', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'taunting_step', source: 'Paladin' }] });
-    expect(result.attacksOtherDisadvantageSource).toBe('Paladin');
-  });
-
-  it('increments attackAdvantageCount for next_attack_advantage without vexTarget', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'next_attack_advantage' }] });
-    expect(result.attackAdvantageCount).toBe(1);
-  });
-
-  it('sets vexAdvantageTargets for next_attack_advantage with vexTarget', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'next_attack_advantage', vexTarget: 'Goblin' }] });
-    expect(result.vexAdvantageTargets).toContain('Goblin');
-  });
-
-  it('increments targetDisadvantageCount for escape_the_horde', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'escape_the_horde' }] });
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('increments targetDisadvantageCount for multiattack_defense', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'multiattack_defense' }] });
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('sets riderSaveDisadvantage and saveDisadvantageCount for disadvantage_on_next_save', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'disadvantage_on_next_save' }] });
-    expect(result.riderSaveDisadvantage).toBe(true);
-    expect(result.saveDisadvantageCount).toBe(1);
-  });
-
-  it('sets abilityCheckDisadvantage for disadvantage_perception_checks', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'disadvantage_perception_checks' }] });
-    expect(result.abilityCheckDisadvantage).toBe(true);
-  });
-
-  it('sets riderCannotOpportunityAttack when noOpportunityAttacks is true', () => {
-    const result = computeConditionEffects({ targetEffects: [{ noOpportunityAttacks: true }] });
-    expect(result.riderCannotOpportunityAttack).toBe(true);
-  });
-
-  it('sets riderNoReactions for no_reactions effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'no_reactions' }] });
-    expect(result.riderNoReactions).toBe(true);
-  });
-
-  it('adds speedReduction for speed_reduction effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'speed_reduction', value: 15 }] });
-    expect(result.speedReduction).toBe(15);
-  });
-
-  // MA-0995: the monster hit_target_effect passthrough (applyHitClauseTargetEffect)
-  // writes NO value — the consumer default 10 must equal the Hobgoblin Warlord
-  // Javelin RAW "Speed decreases by 10 feet".
-  it('MA-0995: speed_reduction te without value falls back to 10 ft (passthrough default)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'speed_reduction' }] });
-    expect(result.speedReduction).toBe(10);
-  });
-
-  // MA-1012: Ice Devil Ice Spear composite frozen_grip te — mirrors the
-  // MA-0087 trio consumers where live: speed_reduction numeric leg
-  // (te.value||10 = RAW −10 ft, charSummaryCalc consumes) + no_reactions
-  // marker. Bonus-Action block + move-or-action economy = §70 advisory.
-  it('MA-1012: frozen_grip te without value folds speedReduction 10 + riderNoReactions (passthrough default)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'frozen_grip' }] });
-    expect(result.speedReduction).toBe(10);
-    expect(result.riderNoReactions).toBe(true);
-  });
-
-  it('MA-1012: frozen_grip te with explicit value folds that value', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'frozen_grip', value: 15 }] });
-    expect(result.speedReduction).toBe(15);
-    expect(result.riderNoReactions).toBe(true);
-  });
-
-  it('sets pushEffect and pushDistance for push effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'push', value: 10 }] });
-    expect(result.pushEffect).toBe(true);
-    expect(result.pushDistance).toBe(10);
-  });
-
-  it('sets riderAttackBonus and damage info for damage_bonus effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'damage_bonus', value: 5, damageExpression: '2d6', damageType: 'fire' }] });
-    expect(result.riderAttackBonus).toBe(5);
-    expect(result.riderDamageExpression).toBe('2d6');
-    expect(result.riderDamageType).toBe('fire');
-  });
-
-  it('sets pushEffect, pushDistance, and proneEffect for prone_and_push', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'prone_and_push', value: 5 }] });
-    expect(result.pushEffect).toBe(true);
-    expect(result.pushDistance).toBe(5);
-    expect(result.proneEffect).toBe(true);
-  });
-
-  it('sets saveType/saveDc/saveAbility/conditionToApply/conditionDuration for save-based effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ saveType: 'DEX', condition: 'prone', saveDc: 15, saveAbility: 'DEX' }] });
-    expect(result.saveType).toBe('DEX');
-    expect(result.saveDc).toBe(15);
-    expect(result.saveAbility).toBe('DEX');
-    expect(result.conditionToApply).toBe('prone');
-    expect(result.conditionDuration).toBe('until_start_of_next_turn');
-  });
-
-  it('sets repeatingSave when repeatingSave is true on effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ saveType: 'DEX', condition: 'prone', repeatingSave: true }] });
-    expect(result.repeatingSave).toBe(undefined);
-  });
-
-  it('sets massFear fields for mass_fear effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'mass_fear', saveType: 'WIS', saveDc: 13, condition: 'frightened', range: '30_ft' }] });
-    expect(result.saveType).toBe('WIS');
-    expect(result.saveDc).toBe(13);
-    expect(result.conditionToApply).toBe('frightened');
-    expect(result.massFearRange).toBe('30_ft');
-  });
-
-  it('sets damageDoubled for death_strike effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'death_strike', damageDoubled: true }] });
-    expect(result.damageDoubled).toBe(true);
-  });
-
-  it('sets riderCannotOpportunityAttack for no_opportunity_attacks without saveType', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'no_opportunity_attacks' }] });
-    expect(result.riderCannotOpportunityAttack).toBe(true);
-  });
-
-  it('sets hurlThroughHell fields for incapacitated effect with saveType', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'incapacitated', saveType: 'WIS', saveDc: 15 }] });
-    expect(result.saveType).toBe('WIS');
-    expect(result.conditionToApply).toBe('incapacitated');
-    expect(result.hurlThroughHell).toBe(true);
-  });
-
-  it('ignores unknown effect keys without crashing', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'unknown_repeat_save' }] });
-    expect(result.saveType).toBeNull();
-    expect(result.conditionToApply).toBeNull();
-    expect(result.powerWordStun).toBeUndefined();
-  });
-
-  it('handles topple effect with CON save', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'topple', saveType: 'CON', saveDc: 15 }] });
-    expect(result.toppleEffect).toBe(true);
-    expect(result.saveType).toBe('CON');
-    expect(result.saveDc).toBe(15);
-    expect(result.conditionToApply).toBe('prone');
-  });
-
-  it('handles mass_fear effect with WIS save', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'mass_fear', saveType: 'WIS', saveDc: 13, condition: 'frightened' }] });
-    expect(result.saveType).toBe('WIS');
-    expect(result.saveDc).toBe(13);
-    expect(result.conditionToApply).toBe('frightened');
-  });
-
-  it('handles incapacitated effect with saveType', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'incapacitated', saveType: 'WIS', saveDc: 15 }] });
-    expect(result.saveType).toBe('WIS');
-    expect(result.conditionToApply).toBe('incapacitated');
-  });
-
-  it('settles attackerAdvantage + attacker-side targetAttackDisadvantageCount for clairvoyant_combatant (CLA-053 fold fix)', () => {
-    const result = computeConditionEffects({ targetEffects: [
-      { effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true },
-    ] });
-    expect(result.targetAdvantageCount).toBe(1);
-    // Defender-leg fold: te rides on the bonded creature — its own attacks
-    // take Disadvantage (attacker-bucket channel, combineAttackModes:849).
-    expect(result.targetAttackDisadvantageCount).toBe(1);
-    expect(result.targetDisadvantageCount).toBe(0);
-  });
-
-  it('sets all foresight fields for foresight effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'foresight' }] });
-    expect(result.attackAdvantageCount).toBe(1);
-    expect(result.saveAdvantageCount).toBe(1);
-    expect(result.abilityCheckAdvantage).toBe(true);
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('sets saveDisadvantage entry for hex_save_disadvantage', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'hex_save_disadvantage', ability: 'CON' }] });
-    expect(result.saveDisadvantage).toContain('con');
-    expect(result.saveDisadvantageCount).toBe(1);
-  });
-
-  it('sets strCheckDisadvantage and rayOfEnfeebleDamageReduction for ray_of_enfeeble_debuff', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'ray_of_enfeeble_debuff', strCheckDisadvantage: true, rayOfEnfeebleDamageReduction: true }] });
-    expect(result.strCheckDisadvantage).toBe(true);
-    expect(result.rayOfEnfeebleDamageReduction).toBe(true);
-  });
-
-  it('sets cleaveAttack fields for cleave effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'cleave', target: 'Goblin', source: 'Player' }] });
-    expect(result.cleaveAttack).toBe(true);
-    expect(result.cleaveTarget).toBe('Goblin');
-    expect(result.cleaveSource).toBe('Player');
-  });
-
-  it('sets nickExtraAttack fields for nick effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'nick', target: 'Goblin', source: 'Player' }] });
-    expect(result.nickExtraAttack).toBe(true);
-    expect(result.nickTarget).toBe('Goblin');
-    expect(result.nickSource).toBe('Player');
-  });
-
-  it('sets topple fields for topple effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'topple', saveType: 'CON', saveDc: 14 }] });
-    expect(result.toppleEffect).toBe(true);
-    expect(result.saveType).toBe('CON');
-    expect(result.saveDc).toBe(14);
-    expect(result.saveAbility).toBe('CON');
-    expect(result.conditionToApply).toBe('prone');
-  });
-
-  it('adds acPenalty for ac_penalty effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'ac_penalty', value: 3 }] });
-    expect(result.acPenalty).toBe(3);
-  });
-
-  it('sets slowDexSaveDisadvantage and saveDisadvantage for dex_save_disadvantage', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'dex_save_disadvantage' }] });
-    expect(result.slowDexSaveDisadvantage).toBe(true);
-    expect(result.saveDisadvantage).toContain('dex');
-  });
-
-  it('adds to targetAdvantageCount for crusher_enhanced_critical', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'crusher_enhanced_critical' }] });
-    expect(result.targetAdvantageCount).toBe(1);
-  });
-
-  it('handles banishment effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'banishment' }] });
-    expect(result.saveType).toBeNull();
-    expect(result.conditionToApply).toBeNull();
-  });
-
-  it('handles forcecage effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'forcecage', dc: 15 }] });
-    expect(result.saveType).toBeNull();
-    expect(result.conditionToApply).toBeNull();
-  });
-
-  it('handles prismatic_spray_indigo effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'prismatic_spray_indigo' }] });
-    expect(result.saveType).toBeNull();
-  });
-
-  it('handles prismatic_spray_violet effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'prismatic_spray_violet' }] });
-    expect(result.saveType).toBeNull();
-  });
-
-  it('handles pass_without_trace_bonus target effect', () => {
-    expect(computeConditionEffects({ targetEffects: [{ effect: 'pass_without_trace_bonus', bonusExpression: '10' }] }).passWithoutTraceBonus).toBe('10');
-  });
-
-  it('handles holy_aura target effect with source tracking', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'holy_aura', source: 'Paladin' }] });
-    expect(result.targetDisadvantageCount).toBe(1);
-    expect(result.saveAdvantageCount).toBe(1);
-    expect(result.saveAdvantageReasons).toContain('Holy Aura');
-    expect(result.saveAdvantageReasons).toContain('Paladin');
-  });
-
-  it('handles circle_of_power target effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'circle_of_power' }] });
-    expect(result.saveAdvantage).toContain('against_spell');
-    expect(result.saveAdvantageReasons).toContain('Circle of Power');
-  });
-
-  it('handles foresight without blindsight/truesight (targetDisadvantageCount)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'foresight' }] });
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('handles foresight with blindsight (no targetDisadvantageCount)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'foresight' }], attackerSenses: [{ name: 'Blindsight' }] });
-    expect(result.targetDisadvantageCount).toBe(0);
-  });
-
-  it('handles blur with blindsight (no targetDisadvantageCount)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'blur' }], attackerSenses: [{ name: 'Truesight' }] });
-    expect(result.targetDisadvantageCount).toBe(0);
-  });
-
-  it('handles blur without blindsight (targetDisadvantageCount)', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'blur' }] });
-    expect(result.targetDisadvantageCount).toBe(1);
-  });
-
-  it('handles faerie_fire effect with source tracking', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'faerie_fire', source: 'Cleric' }] });
-    expect(result.targetAdvantageCount).toBe(1);
-    expect(result.targetAdvantageReasons).toContain('Cleric');
-    expect(result.noAdvantageAgainstInvisible).toBe(true);
-  });
-
-  it('handles hex_ability_check_disadvantage effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'hex_ability_check_disadvantage', ability: 'CON' }] });
-    expect(result.abilityCheckDisadvantageAbilities).toContain('CON');
-  });
-
-  it('handles enhance_ability effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'enhance_ability', ability: 'stealth' }] });
-    expect(result.abilityCheckAdvantageAbilities).toContain('STEALTH');
-  });
-
-  it('handles advantage_abilities effect with source', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'advantage_abilities', source: 'Bard' }] });
-    expect(result.abilityCheckAdvantage).toBe(true);
-    expect(result.abilityCheckAdvantageReasons).toContain('Bard');
-  });
-
-  it('handles advantage_attacks effect with source', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'advantage_attacks', source: 'Bard' }] });
-    expect(result.attackAdvantageCount).toBe(1);
-    expect(result.attackAdvantageReasons).toContain('Bard');
-  });
-
-  it('handles advantage_saves effect with source', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'advantage_saves', source: 'Paladin' }] });
-    expect(result.saveAdvantageCount).toBe(1);
-    expect(result.saveAdvantageReasons).toContain('Paladin');
-  });
-
-  it('handles resistance_damage_reduction effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'resistance_damage_reduction' }] });
-    expect(result.resistanceDamageReduction).toBe(true);
-  });
-
-  it('handles bane_penalty effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'bane_penalty' }] });
-    expect(result.banePenalty).toBe(true);
-  });
-
-  it('handles bless_bonus effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'bless_bonus' }] });
-    expect(result.blessBonus).toBe(true);
-  });
-
-  it('handles beacon_of_hope target effect', () => {
-    const result = computeConditionEffects({ targetEffects: [{ effect: 'beacon_of_hope' }] });
-    expect(result.beaconOfHope).toBe(true);
-    expect(result.saveAdvantageAbilities).toContain('WIS');
-    expect(result.saveAdvantageReasons).toContain('Beacon of Hope');
-  });
-
-  it('MA-1531: attached te stamps attachedBy from source (darkmantle MA-0553 twin, stirge byte-identical consumer)', () => {
-    const dm = computeConditionEffects({ saveModifiers: [], targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Darkmantle 1' }] });
-    expect(dm.attachedBy).toBe('Darkmantle 1');
-    const stirge = computeConditionEffects({ saveModifiers: [], targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Stirge 1' }] });
-    expect(stirge.attachedBy).toBe('Stirge 1');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// computeConditionEffects — applied modifier effects
-// ---------------------------------------------------------------------------
-
-describe('computeConditionEffects — applied modifier effects', () => {
-  it('increments attackAdvantageCount for attack_rolls advantage', () => {
-    const modifiers = [{ target: 'attack_rolls', effect: 'advantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.attackAdvantageCount).toBe(1);
-  });
-
-  it('increments attackDisadvantageCount for attack_rolls disadvantage', () => {
-    const modifiers = [{ target: 'attack_rolls', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.attackDisadvantageCount).toBe(1);
-  });
-
-  it('sets autoRerollForSaves for reroll effect on saving_throw', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'reroll', condition: 'favored_enemy' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.autoRerollForSaves).toBe(true);
-    expect(result.autoRerollForChecks).toBe(false);
-    expect(result.autoRerollCondition).toBe('favored_enemy');
-  });
-
-  it('sets autoRerollForChecks, autoRerollForSaves and autoRerollForAttack for reroll on d20 target (CLA-216: a d20 Test covers attacks, checks and saves)', () => {
-    const modifiers = [{ target: 'd20', effect: 'reroll', condition: 'roll_equals_1' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.autoRerollForChecks).toBe(true);
-    expect(result.autoRerollForSaves).toBe(true);
-    expect(result.autoRerollForAttack).toBe(true);
-    expect(result.autoRerollCondition).toBe('roll_equals_1');
-  });
-
-  it('does NOT arm autoRerollForAttack for d20 reroll when condition is not roll_equals_1 (CLA-216)', () => {
-    const modifiers = [{ target: 'd20', effect: 'reroll', condition: 'convert_miss_to_hit' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.autoRerollForChecks).toBe(true);
-    expect(result.autoRerollForSaves).toBe(true);
-    expect(result.autoRerollForAttack).toBe(false);
-    expect(result.autoRerollCondition).toBe('convert_miss_to_hit');
-  });
-
-  it('sets autoRerollBonus when bonusExpression is provided', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'reroll', bonusExpression: '+5' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.autoRerollBonus).toBe('+5');
-  });
-
-  it('sets strSaveReplace for replacement effect with STR and saving_throw target', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'replacement', saveType: 'STR' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.strSaveReplace).toBe(true);
-  });
-
-  it('sets strCheckReplace for replacement effect with STR and check target', () => {
-    const modifiers = [{ target: 'check', effect: 'replacement', saveType: 'STR' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.strCheckReplace).toBe(true);
-  });
-
-  it('sets tacticalMind and tacticalMindBonus for tactical_mind effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'tactical_mind', bonusExpression: 'int_level' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.tacticalMind).toBe(true);
-    expect(result.tacticalMindBonus).toBe('int_level');
-  });
-
-  it('sets wisCheckReplace and wisCheckReplaceAbilities for wis_replacement effect', () => {
-    const modifiers = [{ target: 'check', effect: 'wis_replacement', abilities: ['CHA'] }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.wisCheckReplace).toBe(true);
-    expect(result.wisCheckReplaceAbilities).toEqual(['CHA']);
-  });
-
-  it('sets reliableTalent for reliable_talent effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'reliable_talent' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.reliableTalent).toBe(true);
-  });
-
-  it('sets strokeOfLuck for stroke_of_luck effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'stroke_of_luck' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.strokeOfLuck).toBe(true);
-  });
-
-  it('sets luckyAdvantage for lucky_point with advantage effectType', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'advantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.luckyAdvantage).toBe(true);
-  });
-
-  it('sets luckyDisadvantage for lucky_point with disadvantage effectType', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'disadvantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.luckyDisadvantage).toBe(true);
-  });
-
-  it('sets modifyD20Roll fields for modify_d20_roll effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'modify_d20_roll', diceExpression: '2d6', canBeBonusOrPenalty: true }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.modifyD20Roll).toBe(true);
-    expect(result.modifyD20RollDice).toBe('2d6');
-    expect(result.modifyD20RollCanBeBonusOrPenalty).toBe(true);
-  });
-
-  it('defaults modifyD20RollDice to 2d4 when diceExpression is missing', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'modify_d20_roll' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.modifyD20RollDice).toBe('2d4');
-  });
-
-  it('never sets restoreBalance passively for restore_balance effect (CLA-295)', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'restore_balance' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.restoreBalance).toBe(false);
-  });
-
-  it('sets d20Floor10 for d20_floor_10 effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'd20_floor_10' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.d20Floor10).toBe(true);
-  });
-
-  it('sets noAdvantageAgainst for no_advantage_against effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'no_advantage_against' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.noAdvantageAgainst).toBe(true);
-  });
-
-  it('sets darkOnesLuck for dark_ones_luck effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'dark_ones_luck' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.darkOnesLuck).toBe(true);
-  });
-
-  it('sets portent for portent effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'portent' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.portent).toBe(true);
-  });
-
-  it('sets improvedIllusions for improved_illusions effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'improved_illusions' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.improvedIllusions).toBe(true);
-  });
-
-  it('sets illusoryReality for illusory_reality effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'illusory_reality' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.illusoryReality).toBe(true);
-  });
-
-  it('sets potentCantrip for potent_cantrip effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'potent_cantrip' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.potentCantrip).toBe(true);
-  });
-
-  it('sets soulstitchSpells for soulstitch_spells effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'soulstitch_spells' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.soulstitchSpells).toBe(true);
-  });
-
-  it('sets passWithoutTraceBonus with default of 10 when bonusExpression is missing', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'pass_without_trace' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.passWithoutTraceBonus).toBe('10');
-  });
-
-  it('sets passWithoutTraceBonus from bonusExpression when provided', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'pass_without_trace', bonusExpression: '+5' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.passWithoutTraceBonus).toBe('+5');
-  });
-
-  it('sets strCheckDisadvantage for str_check_disadvantage effect', () => {
-    const modifiers = [{ target: 'check', effect: 'str_check_disadvantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.strCheckDisadvantage).toBe(true);
-  });
-
-  it('sets rayOfEnfeebleDamageReduction for ray_of_enfeeble_damage_reduction effect', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'ray_of_enfeeble_damage_reduction' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.rayOfEnfeebleDamageReduction).toBe(true);
-  });
-
-  it('increments saveDisadvantageCount for save disadvantage without abilities', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'disadvantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveDisadvantageCount).toBe(1);
-  });
-
-  it('increments saveAdvantageCount for save advantage without abilities', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'advantage' }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveAdvantageCount).toBe(1);
-  });
-
-  it('tracks per-ability saveDisadvantageAbilities when modifier has abilities and no abilityName', () => {
-    const modifiers = [{ target: 'saving_throw', effect: 'disadvantage', abilities: ['CON', 'WIS'] }];
-    const result = computeConditionEffects({ saveModifiers: modifiers });
-    expect(result.saveDisadvantageAbilities).toEqual(['CON', 'WIS']);
-    expect(result.saveDisadvantageCount).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// computeConditionEffects — peerless_athlete skills
-// ---------------------------------------------------------------------------
-
-describe('computeConditionEffects — peerless_athlete skills', () => {
-  it('populates peerlessAthleteAdvantageSkills from conditional_advantage with skills field', () => {
-    const modifiers = [
+describe('computeConditionEffects — saveModifier folds (exact diff vs defaults)', () => {
+  const adv = (o = {}) => ({ target: 'saving_throw', effect: 'advantage', ...o });
+  const dis = (o = {}) => ({ target: 'saving_throw', effect: 'disadvantage', ...o });
+  it.each([
+    // Keyword channel (:134): the label rides the bucket; applySaveModifiers
+    // is suppressed for CONDITION_KEYWORDS so counts stay untouched.
+    ['charmed + advantage (condition leg folds too)', { conditions: ['charmed'], saveModifiers: [adv({ condition: 'charmed' })] }, { attackDisadvantageCount: 1, saveAdvantage: ['charmed'], saveDisadvantage: ['dex'] }],
+    ['charmed + disadvantage', { conditions: ['charmed'], saveModifiers: [dis({ condition: 'charmed' })] }, { attackDisadvantageCount: 1, saveDisadvantage: ['charmed', 'dex'] }],
+    ['frightened + disadvantage', { conditions: ['frightened'], saveModifiers: [dis({ condition: 'frightened' })] }, { attackDisadvantageCount: 1, abilityCheckDisadvantage: true, saveDisadvantage: ['frightened'] }],
+    ['poison label maps to poisoned', { conditions: ['poisoned'], saveModifiers: [adv({ condition: 'poison' })] }, { attackDisadvantageCount: 1, abilityCheckDisadvantage: true, saveAdvantage: ['poisoned'] }],
+    ['poison label + disadvantage', { conditions: ['poisoned'], saveModifiers: [dis({ condition: 'poison' })] }, { attackDisadvantageCount: 1, abilityCheckDisadvantage: true, saveDisadvantage: ['poisoned'] }],
+    ['against_spell labels the bucket but never bumps the count', { saveModifiers: [adv({ condition: 'against_spell' })] }, { saveAdvantage: ['against_spell'] }],
+    ['against_spell disadvantage — same count guard', { saveModifiers: [dis({ condition: 'against_spell' })] }, { saveDisadvantage: ['against_spell'] }],
+    ['magic + abilities tracks per-ability, not count', { saveModifiers: [adv({ condition: 'magic', abilities: ['DEX'] })] }, { saveAdvantageAbilities: ['DEX'] }],
+    ['magic + abilities disadvantage', { saveModifiers: [dis({ condition: 'magic', abilities: ['CON', 'WIS'] })] }, { saveDisadvantageAbilities: ['CON', 'WIS'] }],
+    // visible_effect suppression (Danger Sense): dropped only while an
+    // action-stealing condition is active; siblings still fold (:71).
+    ['visible_effect suppressed when incapacitated, sibling survives', { conditions: ['incapacitated'], saveModifiers: [adv({ condition: 'visible_effect' }), adv()] }, { cannotAct: true, concentrationBroken: true, saveAdvantageCount: 1 }],
+    ['visible_effect applies when not incapacitated', { saveModifiers: [adv({ condition: 'visible_effect' })] }, { saveAdvantageCount: 1 }],
+    // Plain + attack-target counts
+    ['plain save advantage bumps count only', { saveModifiers: [adv()] }, { saveAdvantageCount: 1 }],
+    ['plain save disadvantage bumps count only', { saveModifiers: [dis()] }, { saveDisadvantageCount: 1 }],
+    ['ability-tagged save disadvantage tracks abilities, not count', { saveModifiers: [dis({ abilities: ['CON', 'WIS'] })] }, { saveDisadvantageAbilities: ['CON', 'WIS'] }],
+    ['attack_rolls advantage', { saveModifiers: [{ target: 'attack_rolls', effect: 'advantage' }] }, { attackAdvantageCount: 1 }],
+    ['attack_rolls disadvantage', { saveModifiers: [{ target: 'attack_rolls', effect: 'disadvantage' }] }, { attackDisadvantageCount: 1 }],
+    // Reroll family
+    ['reroll on saving_throw arms saves only, stamps condition + bonus', { saveModifiers: [{ target: 'saving_throw', effect: 'reroll', condition: 'favored_enemy', bonusExpression: '+5' }] }, { autoRerollForSaves: true, autoRerollCondition: 'favored_enemy', autoRerollBonus: '+5' }],
+    ['CLA-216: d20 reroll on roll_equals_1 arms attacks + checks + saves', { saveModifiers: [{ target: 'd20', effect: 'reroll', condition: 'roll_equals_1' }] }, { autoRerollForChecks: true, autoRerollForSaves: true, autoRerollForAttack: true, autoRerollCondition: 'roll_equals_1' }],
+    ['CLA-216: d20 reroll with another condition leaves attack unarmed', { saveModifiers: [{ target: 'd20', effect: 'reroll', condition: 'convert_miss_to_hit' }] }, { autoRerollForChecks: true, autoRerollForSaves: true, autoRerollCondition: 'convert_miss_to_hit' }],
+    // STR replacement routes by target (:358 gate on saveType STR)
+    ['STR replacement on saving_throw sets strSaveReplace only', { saveModifiers: [{ target: 'saving_throw', effect: 'replacement', saveType: 'STR' }] }, { strSaveReplace: true }],
+    ['STR replacement on check sets strCheckReplace only', { saveModifiers: [{ target: 'check', effect: 'replacement', saveType: 'STR' }] }, { strCheckReplace: true }],
+    ['wis_replacement stamps flag + abilities', { saveModifiers: [{ target: 'check', effect: 'wis_replacement', abilities: ['CHA'] }] }, { wisCheckReplace: true, wisCheckReplaceAbilities: ['CHA'] }],
+    ['tactical_mind carries its bonus expression', { saveModifiers: [{ target: 'saving_throw', effect: 'tactical_mind', bonusExpression: 'int_level' }] }, { tacticalMind: true, tacticalMindBonus: 'int_level' }],
+    // lucky_point rides its own effectType channel — the adv/dis counters
+    // never move (honest exact diff replaces the old single-field toBe).
+    ['lucky_point effectType advantage arms luckyAdvantage only', { saveModifiers: [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'advantage' }] }, { luckyAdvantage: true }],
+    ['lucky_point effectType disadvantage arms luckyDisadvantage only', { saveModifiers: [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'disadvantage' }] }, { luckyDisadvantage: true }],
+    ['modify_d20_roll with explicit dice', { saveModifiers: [{ target: 'saving_throw', effect: 'modify_d20_roll', diceExpression: '2d6', canBeBonusOrPenalty: true }] }, { modifyD20Roll: true, modifyD20RollDice: '2d6', modifyD20RollCanBeBonusOrPenalty: true }],
+    ['modify_d20_roll defaults to 2d4', { saveModifiers: [{ target: 'saving_throw', effect: 'modify_d20_roll' }] }, { modifyD20Roll: true, modifyD20RollDice: '2d4' }],
+    ['pass_without_trace default bonus 10', { saveModifiers: [{ target: 'saving_throw', effect: 'pass_without_trace' }] }, { passWithoutTraceBonus: '10' }],
+    ['pass_without_trace explicit bonus', { saveModifiers: [{ target: 'saving_throw', effect: 'pass_without_trace', bonusExpression: '+5' }] }, { passWithoutTraceBonus: '+5' }],
+    ['str_check_disadvantage', { saveModifiers: [{ target: 'check', effect: 'str_check_disadvantage' }] }, { strCheckDisadvantage: true }],
+    ['ray_of_enfeeble_damage_reduction', { saveModifiers: [{ target: 'saving_throw', effect: 'ray_of_enfeeble_damage_reduction' }] }, { rayOfEnfeebleDamageReduction: true }],
+    // Single-flag specialEffects table (owned here per #998) — one row each
+    ['reliable_talent', { saveModifiers: [{ target: 'saving_throw', effect: 'reliable_talent' }] }, { reliableTalent: true }],
+    ['stroke_of_luck', { saveModifiers: [{ target: 'saving_throw', effect: 'stroke_of_luck' }] }, { strokeOfLuck: true }],
+    ['d20_floor_10', { saveModifiers: [{ target: 'saving_throw', effect: 'd20_floor_10' }] }, { d20Floor10: true }],
+    ['no_advantage_against', { saveModifiers: [{ target: 'saving_throw', effect: 'no_advantage_against' }] }, { noAdvantageAgainst: true }],
+    ['dark_ones_luck', { saveModifiers: [{ target: 'saving_throw', effect: 'dark_ones_luck' }] }, { darkOnesLuck: true }],
+    ['portent', { saveModifiers: [{ target: 'saving_throw', effect: 'portent' }] }, { portent: true }],
+    ['improved_illusions', { saveModifiers: [{ target: 'saving_throw', effect: 'improved_illusions' }] }, { improvedIllusions: true }],
+    ['illusory_reality', { saveModifiers: [{ target: 'saving_throw', effect: 'illusory_reality' }] }, { illusoryReality: true }],
+    ['potent_cantrip', { saveModifiers: [{ target: 'saving_throw', effect: 'potent_cantrip' }] }, { potentCantrip: true }],
+    ['soulstitch_spells', { saveModifiers: [{ target: 'saving_throw', effect: 'soulstitch_spells' }] }, { soulstitchSpells: true }],
+    // Peerless Athlete: skills route to the skill list; abilities are NOT
+    // promoted to abilityCheckAdvantageAbilities (stays null → exact diff).
+    ['peerless_athlete skills route, abilities suppressed', { saveModifiers: [
       { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['STR'], skills: ['Athletics'] },
       { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['DEX'], skills: ['Acrobatics'] },
-    ];
-    const effects = computeConditionEffects({ saveModifiers: modifiers, isPeerlessAthlete: true });
-    expect(effects.peerlessAthleteAdvantageSkills).toEqual(['Athletics', 'Acrobatics']);
+    ], isPeerlessAthlete: true }, { peerlessAthleteAdvantageSkills: ['Athletics', 'Acrobatics'] }],
+    ['deception_performance_checks stores both skills', { saveModifiers: [{ target: 'deception_performance_checks', condition: 'disguised', effect: 'advantage', ability: 'Charisma' }] }, { abilityCheckAdvantageSkills: ['Deception', 'Performance'] }],
+    // CLA-295 restore_balance row dropped: identical fixture + pin lives in
+    // restoreBalance.test.js :105-130 (never-passive is that file's lane).
+  ])('%s', (_name, options, expected) => {
+    expect(folded(options)).toEqual(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Registry te census (#820): every GM-addable te key, granted bare
+// ({ effect }), must fold EXACTLY the documented bytes (OVERRIDE) or nothing
+// (default {}). Golden-once — iterate TARGET_EFFECT_DEFINITIONS, never
+// hand-type. Unregistered keys have no handler at all: inertness pinned
+// below (kept per #998, old :235).
+// ---------------------------------------------------------------------------
+
+describe('computeConditionEffects — registry te census (bare te, exact diff)', () => {
+  // Bare-te folds that non-trivially stamp fields (handlers with fallbacks).
+  const OVERRIDE = {
+    slasher_enhanced_critical: { targetAttackDisadvantageCount: 1 },
+    disadvantage_next_attack: { attackDisadvantageCount: 1 },
+    next_attack_bonus: { riderAttackBonus: 5 },
+    next_attack_advantage: { attackAdvantageCount: 1, attackAdvantageReasons: ['Next Attack Advantage'] },
+    distracting_strike_advantage: { targetAdvantageCount: 1, targetAdvantageReasons: ['Next Attack Adv vs Target'] },
+    disadvantage_attack_rolls: { attackDisadvantageCount: 1 },
+    reckless_attack: { targetAdvantageCount: 1, targetAdvantageReasons: ['Reckless Attack'] },
+    dodge: { targetDisadvantageCount: 1, saveAdvantage: ['dex'] }, // consumer matrix in base :191/:230; fold bytes pinned here
+    escape_the_horde: { targetDisadvantageCount: 1 },
+    multiattack_defense: { targetDisadvantageCount: 1 },
+    no_opportunity_attacks: { riderCannotOpportunityAttack: true },
+    no_reactions: { riderNoReactions: true },
+    protection: { targetDisadvantageCount: 1 },
+    advantage_abilities: { abilityCheckAdvantage: true },
+    advantage_attacks: { attackAdvantageCount: 1 },
+    advantage_saves: { saveAdvantageCount: 1 },
+    bane_penalty: { banePenalty: true },
+    bless_bonus: { blessBonus: true },
+    // Footgun byte kept honest: handler creates the empty Disadvantage list
+    // but addUniqueReason skips the undefined ability.
+    hex_ability_check_disadvantage: { abilityCheckDisadvantageAbilities: [] },
+    dex_save_disadvantage: { slowDexSaveDisadvantage: true, saveDisadvantage: ['dex'] },
+    disadvantage_perception_checks: { abilityCheckDisadvantage: true },
+    // Same empty-list footgun as the hex sibling (:528 creates before guard).
+    enhance_ability: { abilityCheckAdvantageAbilities: [] },
+    disadvantage_on_next_save: { riderSaveDisadvantage: true, saveDisadvantageCount: 1 },
+    holy_aura: { targetDisadvantageCount: 1, saveAdvantageCount: 1, saveAdvantageReasons: ['Holy Aura'] },
+    circle_of_power: { saveAdvantage: ['against_spell'], saveAdvantageReasons: ['Circle of Power'] },
+    death_strike: { saveType: 'CON' },
+    foresight: { attackAdvantageCount: 1, attackAdvantageReasons: ['Foresight'], saveAdvantageCount: 1, saveAdvantageReasons: ['Foresight'], abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight'], targetDisadvantageCount: 1 },
+    blur: { targetDisadvantageCount: 1 },
+    faerie_fire: { targetAdvantageCount: 1, noAdvantageAgainstInvisible: true },
+    resistance_damage_reduction: { resistanceDamageReduction: true },
+    beacon_of_hope: { beaconOfHope: true, saveAdvantageAbilities: ['WIS'], saveAdvantageReasons: ['Beacon of Hope'] },
+    pass_without_trace_bonus: { passWithoutTraceBonus: '10' },
+    ac_penalty: { acPenalty: 2 },
+    // MA-0995: the passthrough writes NO value — consumer default 10 must
+    // equal Hobgoblin Warlord Javelin RAW "−10 ft".
+    speed_reduction: { speedReduction: 10 },
+    // MA-1012: frozen_grip = speed_reduction numeric leg + no_reactions.
+    frozen_grip: { speedReduction: 10, riderNoReactions: true },
+    push: { pushEffect: true, pushDistance: 10 },
+    speed_half: { speedHalved: true },
+    attached: { attachedBy: 'Attacher' },
+  };
+  // Bare folds with the same shape are pinned in the owner file — skipped,
+  // not weakened: marked_as_prey/pesky_swarm → animal-spirit.test.js :39/:48;
+  // bolster_advantage → bolster.test.js :37; hex_save_disadvantage bare pushes
+  // [undefined] (te always carries ability in production) — the CON face is
+  // pinned in the parameterized-te table below.
+  const COVERED_ELSEWHERE = ['marked_as_prey', 'pesky_swarm', 'bolster_advantage', 'hex_save_disadvantage'];
+  const CENSUS = TARGET_EFFECT_DEFINITIONS.map(d => d.effect).filter(e => !COVERED_ELSEWHERE.includes(e));
+
+  it.each(CENSUS)('%s', (effect) => {
+    expect(folded({ targetEffects: [{ effect }] })).toEqual(OVERRIDE[effect] || {});
   });
 
-  it('does not populate abilityCheckAdvantageAbilities for peerless_athlete with skills field', () => {
-    const modifiers = [
-      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['STR'], skills: ['Athletics'] },
-      { target: 'ability_check', condition: 'peerless_athlete', effect: 'advantage', abilities: ['DEX'], skills: ['Acrobatics'] },
-    ];
-    const effects = computeConditionEffects({ saveModifiers: modifiers, isPeerlessAthlete: true });
-    expect(effects.abilityCheckAdvantageAbilities).toBeNull();
+  it('unregistered unknown te keys are inert — no crash, no byte moves (kept per #998)', () => {
+    expect(folded({ targetEffects: [{ effect: 'unknown_repeat_save' }] })).toEqual({});
   });
+});
 
-  it('populates abilityCheckAdvantageSkills for deception_performance_checks target', () => {
-    const modifiers = [
-      { target: 'deception_performance_checks', condition: 'disguised', effect: 'advantage', ability: 'Charisma' },
-    ];
-    const effects = computeConditionEffects({ saveModifiers: modifiers });
-    expect(effects.abilityCheckAdvantageSkills).toEqual(['Deception', 'Performance']);
-  });});
+// ---------------------------------------------------------------------------
+// Parameterized tes — folds that only appear when the te carries fields
+// (source/value/saveType/vexTarget/senses) or hits a registry-skipped key.
+// Exact diffs; MA tickets cited inline.
+// ---------------------------------------------------------------------------
 
+describe('computeConditionEffects — parameterized te folds (exact diff)', () => {
+  it.each([
+    ['next_attack_advantage with vexTarget routes to the vex channel', { targetEffects: [{ effect: 'next_attack_advantage', vexTarget: 'Goblin' }] }, { vexAdvantageTargets: ['Goblin'] }],
+    ['taunting_step stamps attacksOtherDisadvantageSource (gate in combine file)', { targetEffects: [{ effect: 'taunting_step', source: 'Paladin' }] }, { attacksOtherDisadvantageSource: 'Paladin' }],
+    ['compelled_duel stamps attacksOtherDisadvantageSource', { targetEffects: [{ effect: 'compelled_duel', source: 'Paladin' }] }, { attacksOtherDisadvantageSource: 'Paladin' }],
+    ['damage_bonus stamps bonus + expression + type', { targetEffects: [{ effect: 'damage_bonus', value: 5, damageExpression: '2d6', damageType: 'fire' }] }, { riderAttackBonus: 5, riderDamageExpression: '2d6', riderDamageType: 'fire' }],
+    ['prone_and_push folds push + prone', { targetEffects: [{ effect: 'prone_and_push', value: 5 }] }, { pushEffect: true, pushDistance: 5, proneEffect: true }],
+    ['topple CON save (kept :308 per #998)', { targetEffects: [{ effect: 'topple', saveType: 'CON', saveDc: 14 }] }, { toppleEffect: true, saveType: 'CON', saveDc: 14, saveAbility: 'CON', conditionToApply: 'prone', conditionDuration: 'until_start_of_next_turn' }],
+    ['generic saveType+condition stamps the five-slot bundle', { targetEffects: [{ saveType: 'DEX', condition: 'prone', saveDc: 15, saveAbility: 'DEX' }] }, { saveType: 'DEX', saveDc: 15, saveAbility: 'DEX', conditionToApply: 'prone', conditionDuration: 'until_start_of_next_turn' }],
+    ['mass_fear carries range + frightened (kept :210 per #998)', { targetEffects: [{ effect: 'mass_fear', saveType: 'WIS', saveDc: 13, condition: 'frightened', range: '30_ft' }] }, { saveType: 'WIS', saveDc: 13, conditionToApply: 'frightened', conditionDuration: 'until_start_of_next_turn', massFearRange: '30_ft' }],
+    ['mass_fear defaults frightened + 10_ft range', { targetEffects: [{ effect: 'mass_fear', saveType: 'WIS', saveDc: 13, condition: 'frightened' }] }, { saveType: 'WIS', saveDc: 13, conditionToApply: 'frightened', conditionDuration: 'until_start_of_next_turn', massFearRange: '10_ft' }],
+    ['death_strike damageDoubled legs (CON default)', { targetEffects: [{ effect: 'death_strike', damageDoubled: true }] }, { saveType: 'CON', damageDoubled: true }],
+    ['incapacitated+saveType = Hurl Through Hell (kept :228 per #998)', { targetEffects: [{ effect: 'incapacitated', saveType: 'WIS', saveDc: 15 }] }, { saveType: 'WIS', saveDc: 15, conditionToApply: 'incapacitated', conditionDuration: 'until_end_of_next_turn', hurlThroughHell: true }],
+    ['CLA-053 clairvoyant both legs: attacker adv + attacker-side defender disadv (compute rows are ours per #997)', { targetEffects: [{ effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true }] }, { targetAdvantageCount: 1, targetAdvantageReasons: ['Clairvoyant Combatant'], targetAttackDisadvantageCount: 1 }],
+    // Senses guards: Blindsight/Truesight suppress the defender-disadv leg.
+    ['foresight + blindsight → no target disadvantage leg', { targetEffects: [{ effect: 'foresight' }], attackerSenses: [{ name: 'Blindsight' }] }, { attackAdvantageCount: 1, attackAdvantageReasons: ['Foresight'], saveAdvantageCount: 1, saveAdvantageReasons: ['Foresight'], abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight'] }],
+    ['blur + truesight → fully inert', { targetEffects: [{ effect: 'blur' }], attackerSenses: [{ name: 'Truesight' }] }, {}],
+    ['MA-1012 frozen_grip honors explicit value', { targetEffects: [{ effect: 'frozen_grip', value: 15 }] }, { speedReduction: 15, riderNoReactions: true }],
+    ['speed_reduction honors explicit value', { targetEffects: [{ effect: 'speed_reduction', value: 15 }] }, { speedReduction: 15 }],
+    ['ac_penalty honors explicit value', { targetEffects: [{ effect: 'ac_penalty', value: 3 }] }, { acPenalty: 3 }],
+    ['enhance_ability upper-cases the chosen ability', { targetEffects: [{ effect: 'enhance_ability', ability: 'stealth' }] }, { abilityCheckAdvantageAbilities: ['STEALTH'] }],
+    ['hex_save_disadvantage lower-cases the chosen ability', { targetEffects: [{ effect: 'hex_save_disadvantage', ability: 'CON' }] }, { saveDisadvantage: ['con'], saveDisadvantageCount: 1 }],
+    ['hex_ability_check_disadvantage passes the ability through', { targetEffects: [{ effect: 'hex_ability_check_disadvantage', ability: 'CON' }] }, { abilityCheckDisadvantageAbilities: ['CON'] }],
+    ['advantage_attacks attributes the source (attribution exemplar)', { targetEffects: [{ effect: 'advantage_attacks', source: 'Bard' }] }, { attackAdvantageCount: 1, attackAdvantageReasons: ['Bard'] }],
+    ['faerie_fire attributes the source', { targetEffects: [{ effect: 'faerie_fire', source: 'Cleric' }] }, { targetAdvantageCount: 1, targetAdvantageReasons: ['Cleric'], noAdvantageAgainstInvisible: true }],
+    ['MA-1531 attached stamps attachedBy from source (darkmantle/stirge twin)', { targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Darkmantle 1' }] }, { attachedBy: 'Darkmantle 1' }],
+    ['MA-1531 attached byte-identical consumer for Stirge', { targetEffects: [{ target: 'Bandit 1', effect: 'attached', source: 'Stirge 1' }] }, { attachedBy: 'Stirge 1' }],
+  ])('%s', (_name, options, expected) => {
+    expect(folded(options)).toEqual(expected);
+  });
+});

@@ -1,4 +1,53 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// Base-canon lane for the conditionEffects engine (conditionEffects.js).
+// Owned HERE: CONDITIONS_THAT_* data sets, the per-condition handler census
+// (CONDITION_EFFECT_HANDLERS), the EARLY/LATE + generic-channel dispatch of
+// applyTargetEffect over the registry (imported, never hand-typed — #820),
+// the generic combineAttackModes net-mode matrix (#964 net-mode consumer
+// :854-856, incl. the CLA-053 attacker-side channel :856), and the
+// hasSaveModifier / hasSaveAdvantage / hasBeaconOfHope readers.
+//
+// Family map (who owns what elsewhere — faces verified absent here):
+//   per-te / per-modifier fold canon  → conditionEffectsCompute.test.js
+//   restoreBalance net-mode (getNet + combine) → restoreBalance.test.js
+//   attacksOtherDisadvantageSource gating → conditionEffectsCombine.test.js
+//   foresight/bolster family: #996 LATE fold — the assign-vs-addUnique
+//     reason-clobber asymmetry (foresight :483 vs bolster :501) is pinned
+//     HERE (this lane); per-effect folds live in compute + bolster file.
+//   clairvoyant_combatant → conditionEffects.clairvoyant.test.js (roles) +
+//     compute :263 (counts) — #997 rec: its leg in the old crusher/clairvoyant
+//     bundle exactly duplicated compute, so the clairvoyant leg is CUT here;
+//     the crusher leg stays.
+//   animal-spirit #995 · bolster #996 · clairvoyant #997 → dedicated files
+//   internal saveModifierApplies gate/predicate matrix → conditionEffectsInternal.test.js
+//   registerTargetEffect write bytes (:1497) → targetEffectDefinitions.test.js
+//   (not present in this module — nothing pinned here).
+//
+// old → new map (old :46-433 compute block):
+//   5 incapacitating + 6 mobility/disadvantage + invisible + slow one-offs
+//     → condition census it.each (exact changed-fields diff vs defaults =
+//        zero-leak falsifier; SP-111 "generic Poisoned never blocks" is the
+//        poisoned row's exact empty-of-cannotAct diff, cited inline)
+//   'combines effects from multiple conditions' → census multi-condition row
+//   'default values when called with no arguments' → census row 1
+//   saveModifiers block (adv/dis counts, ability tracking, attack_roll,
+//     fiend_undead, replacement, specialEffects ×15, reroll, lucky_point,
+//     wis_replacement, modify_d20_roll, pass_without_trace)
+//     → folded to a 6-row census of faces NOT pinned in compute; every
+//       other row duplicated conditionEffectsCompute.test.js :39-659 or
+//       conditionEffectsInternal.test.js (dropped, not weakened)
+//   targetEffects blocks → registry dispatch census (#820) + 2 dispatch-order
+//     tests (early-before-generic crusher row with both generic channels
+//     :675/:679; late-over-generic topple row) + foresight/bolster clobber
+//     pin (#996); per-effect byte folds live in compute (dropped here)
+//   getNetAttackMode 4 tests → 1 it.each (restoreBalance legs dropped:
+//     owned by restoreBalance.test.js :155)
+//   combineAttackModes 7 tests → 1 it.each (restoreBalance legs dropped:
+//     restoreBalance.test.js; attacksOther legs dropped: combine file)
+//   hasSaveModifier 3 → 1 it.each; hasSaveAdvantage 5 → 2; hasBeaconOfHope
+//     6 → 2 (nullish guard asserts store untouched; faithful-store call
+//     bytes pinned per row — #934).
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   computeConditionEffects,
   getNetAttackMode,
@@ -9,6 +58,7 @@ import {
   hasSaveAdvantage,
   hasBeaconOfHope,
 } from './conditionEffects.js';
+import { TARGET_EFFECT_DEFINITIONS } from './targetEffectDefinitions.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -16,6 +66,16 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
   setRuntimeBatch: vi.fn(),
 }));
+
+// Engine default byte-shape — the census baseline. Any field a fixture moves
+// beyond these defaults shows up in folded(); expecting {} proves inertness.
+const DEFAULTS = computeConditionEffects();
+const folded = (options) => {
+  const result = computeConditionEffects(options);
+  return Object.fromEntries(
+    Object.entries(result).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(DEFAULTS[k])),
+  );
+};
 
 describe('conditionEffects', () => {
   describe('CONDITIONS_THAT_CANNOT_ACT', () => {
@@ -32,582 +92,229 @@ describe('conditionEffects', () => {
     });
   });
 
-  describe('computeConditionEffects', () => {
-    describe('condition effects by type', () => {
-      it('returns default values when called with no arguments', () => {
-        const result = computeConditionEffects();
-        expect(result.cannotAct).toBe(false);
-        expect(result.speedZero).toBe(false);
-        expect(result.attackAdvantageCount).toBe(0);
-        expect(result.attackDisadvantageCount).toBe(0);
-        expect(result.saveAdvantageCount).toBe(0);
-        expect(result.saveDisadvantageCount).toBe(0);
-      });
-
-      it('combines effects from multiple conditions', () => {
-        const result = computeConditionEffects({ conditions: ['blinded', 'paralyzed'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.speedZero).toBe(true);
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.autoFailSaves).toEqual(['str', 'dex']);
-      });
-    });
-
-    describe('incapacitating conditions', () => {
-      it('sets cannotAct and concentrationBroken for incapacitated', () => {
-        const result = computeConditionEffects({ conditions: ['incapacitated'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.concentrationBroken).toBe(true);
-      });
-
-      it('sets cannotAct, speedZero, autoCritWithin5ft, and autoFailSaves for paralyzed', () => {
-        const result = computeConditionEffects({ conditions: ['paralyzed'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.speedZero).toBe(true);
-        expect(result.autoCritWithin5ft).toBe(true);
-        expect(result.targetAdvantageCount).toBe(1);
-        expect(result.autoFailSaves).toEqual(['str', 'dex']);
-      });
-
-      it('sets cannotAct, speedZero, resistantToAll, poisonImmune for petrified', () => {
-        const result = computeConditionEffects({ conditions: ['petrified'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.speedZero).toBe(true);
-        expect(result.resistantToAll).toBe(true);
-        expect(result.poisonImmune).toBe(true);
-        expect(result.autoFailSaves).toEqual(['str', 'dex']);
-      });
-
-      it('sets cannotAct, speedZero, autoFailSaves for stunned', () => {
-        const result = computeConditionEffects({ conditions: ['stunned'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.speedZero).toBe(true);
-        expect(result.autoFailSaves).toEqual(['str', 'dex']);
-        expect(result.targetAdvantageCount).toBe(1);
-      });
-
-      it('sets cannotAct, speedZero, autoCritWithin5ft for unconscious', () => {
-        const result = computeConditionEffects({ conditions: ['unconscious'] });
-        expect(result.cannotAct).toBe(true);
-        expect(result.speedZero).toBe(true);
-        expect(result.autoFailSaves).toEqual(['str', 'dex']);
-        expect(result.autoCritWithin5ft).toBe(true);
-      });
-    });
-
-    describe('mobility-restricting conditions', () => {
-      it('sets speedZero and grants attack disadvantage for grappled', () => {
-        const result = computeConditionEffects({ conditions: ['grappled'] });
-        expect(result.speedZero).toBe(true);
-        expect(result.attackDisadvantageCount).toBe(1);
-      });
-
-      it('sets speedZero for speed_zero condition', () => {
-        const result = computeConditionEffects({ conditions: ['speed_zero'] });
-        expect(result.speedZero).toBe(true);
-      });
-
-      it('sets speedHalved, acPenalty, and action restrictions for slow', () => {
-        const result = computeConditionEffects({ conditions: ['slow'] });
-        expect(result.speedHalved).toBe(true);
-        expect(result.acPenalty).toBe(2);
-        expect(result.slowNoReactions).toBe(true);
-        expect(result.slowActionLimit).toBe(true);
-        expect(result.slowSingleAttackLimit).toBe(true);
-        expect(result.slowSomaticFailure).toBe(true);
-      });
-    });
-
-    describe('combat-disadvantage conditions', () => {
-      it('grants attack disadvantage and target advantage for blinded', () => {
-        const result = computeConditionEffects({ conditions: ['blinded'] });
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.targetAdvantageCount).toBe(1);
-      });
-
-      it('grants attack disadvantage and save disadvantage for charmed', () => {
-        const result = computeConditionEffects({ conditions: ['charmed'] });
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.targetAdvantageCount).toBe(0);
-        expect(result.saveDisadvantage).toContain('dex');
-      });
-
-      it('grants attack disadvantage and ability check disadvantage for frightened', () => {
-        const result = computeConditionEffects({ conditions: ['frightened'] });
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.abilityCheckDisadvantage).toBe(true);
-      });
-
-      it('grants attack disadvantage and ability check disadvantage for poisoned', () => {
-        const result = computeConditionEffects({ conditions: ['poisoned'] });
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.abilityCheckDisadvantage).toBe(true);
-      });
-
-      it('grants conditional target advantage/disadvantage for prone', () => {
-        const result = computeConditionEffects({ conditions: ['prone'] });
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.targetAdvantageIfWithin5ft).toBe(true);
-        expect(result.targetDisadvantageIfBeyond5ft).toBe(true);
-      });
-
-      it('grants attack disadvantage, target advantage, and dex save disadvantage for restrained', () => {
-        const result = computeConditionEffects({ conditions: ['restrained'] });
-        expect(result.speedZero).toBe(true);
-        expect(result.attackDisadvantageCount).toBe(1);
-        expect(result.targetAdvantageCount).toBe(1);
-        expect(result.saveDisadvantage).toContain('dex');
-      });
-
-      it('sets dazed and grants target advantage for dazed', () => {
-        const result = computeConditionEffects({ conditions: ['dazed'] });
-        expect(result.dazed).toBe(true);
-        expect(result.targetAdvantageCount).toBe(1);
-      });
-    });
-
-    describe('invisible condition with seeInvisibility', () => {
-      it('grants attack advantage and target disadvantage when seeInvisibility is false', () => {
-        const result = computeConditionEffects({ conditions: ['invisible'] });
-        expect(result.attackAdvantageCount).toBe(1);
-        expect(result.targetDisadvantageCount).toBe(1);
-      });
-
-      it('grants no advantage when seeInvisibility is true', () => {
-        const result = computeConditionEffects({ conditions: ['invisible'], seeInvisibilityActive: true });
-        expect(result.attackAdvantageCount).toBe(0);
-        expect(result.targetDisadvantageCount).toBe(0);
-      });
-    });
-
-    describe('saveModifiers: advantage/disadvantage effects', () => {
-      it('counts advantage and disadvantage save modifiers', () => {
-        expect(computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', effect: 'advantage' }] }).saveAdvantageCount).toBe(1);
-        expect(computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', effect: 'disadvantage' }] }).saveDisadvantageCount).toBe(1);
-      });
-
-      it('tracks saveAdvantageAbilities when modifier has abilities', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR', 'DEX'] }];
-        const result = computeConditionEffects({ saveModifiers: modifiers });
-        expect(result.saveAdvantageAbilities).toEqual(['STR', 'DEX']);
-        expect(result.saveAdvantageCount).toBe(0);
-      });
-
-      it('applies advantage for attack_roll target', () => {
-        const result = computeConditionEffects({ saveModifiers: [{ target: 'attack_roll', effect: 'advantage' }] });
-        expect(result.attackAdvantageCount).toBe(1);
-      });
-
-      it('does not apply advantage when modifier.condition is an active condition keyword', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'advantage', condition: 'charmed' }];
-        const result = computeConditionEffects({ conditions: ['charmed'], saveModifiers: modifiers });
-        expect(result.saveAdvantageCount).toBe(0);
-      });
-
-      it('applies advantage for fiend_undead condition', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }];
-        const result = computeConditionEffects({ saveModifiers: modifiers });
-        expect(result.saveAdvantageCount).toBe(1);
-      });
-    });
-
-    describe('saveModifiers: replacement effects', () => {
-      it('sets strSaveReplace and strCheckReplace for replacement on saving_throw and ability_check', () => {
-        const strMod = { target: 'saving_throw', effect: 'replacement', saveType: 'STR' };
-        expect(computeConditionEffects({ saveModifiers: [strMod] }).strSaveReplace).toBe(true);
-
-        const checkMod = { target: 'ability_check', effect: 'replacement', saveType: 'STR' };
-        expect(computeConditionEffects({ saveModifiers: [checkMod] }).strCheckReplace).toBe(true);
-      });
-    });
-
-    describe('saveModifiers: special effects', () => {
-      const specialEffects = [
-        { modifier: { target: 'saving_throw', effect: 'tactical_mind', bonusExpression: '1d4' }, field: 'tacticalMind', value: true },
-        { modifier: { target: 'saving_throw', effect: 'reliable_talent' }, field: 'reliableTalent', value: true },
-        { modifier: { target: 'saving_throw', effect: 'stroke_of_luck' }, field: 'strokeOfLuck', value: true },
-        { modifier: { target: 'saving_throw', effect: 'd20_floor_10' }, field: 'd20Floor10', value: true },
-        { modifier: { target: 'saving_throw', effect: 'potent_cantrip' }, field: 'potentCantrip', value: true },
-        { modifier: { target: 'ability_check', effect: 'dex_jump' }, field: 'dexJump', value: true },
-        { modifier: { target: 'd20', effect: 'restore_balance' }, field: 'restoreBalance', value: false }, // CLA-295: reaction only, never passive
-        { modifier: { target: 'attack_roll', effect: 'no_advantage_against' }, field: 'noAdvantageAgainst', value: true },
-        { modifier: { target: 'attack_roll', effect: 'dark_ones_luck' }, field: 'darkOnesLuck', value: true },
-        { modifier: { target: 'attack_roll', effect: 'portent' }, field: 'portent', value: true },
-        { modifier: { target: 'attack_roll', effect: 'improved_illusions' }, field: 'improvedIllusions', value: true },
-        { modifier: { target: 'attack_roll', effect: 'illusory_reality' }, field: 'illusoryReality', value: true },
-        { modifier: { target: 'attack_roll', effect: 'soulstitch_spells' }, field: 'soulstitchSpells', value: true },
-        { modifier: { target: 'saving_throw', effect: 'str_check_disadvantage' }, field: 'strCheckDisadvantage', value: true },
-        { modifier: { target: 'attack_roll', effect: 'ray_of_enfeeble_damage_reduction' }, field: 'rayOfEnfeebleDamageReduction', value: true },
-      ];
-
-      for (const { modifier, field, value } of specialEffects) {
-        it(`handles ${modifier.effect}`, () => {
-          expect(computeConditionEffects({ saveModifiers: [modifier] })[field]).toBe(value);
-        });
-      }
-
-      it('handles pass_without_trace with bonusExpression', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'pass_without_trace', bonusExpression: '10' }];
-        expect(computeConditionEffects({ saveModifiers: modifiers }).passWithoutTraceBonus).toBe('10');
-      });
-
-      it('handles wis_replacement with abilities', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'wis_replacement', abilities: ['CHA'] }];
-        const result = computeConditionEffects({ saveModifiers: modifiers });
-        expect(result.wisCheckReplace).toBe(true);
-        expect(result.wisCheckReplaceAbilities).toContain('CHA');
-      });
-
-      it('handles modify_d20_roll with optional properties', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'modify_d20_roll', diceExpression: '2d4', canBeBonusOrPenalty: true }];
-        const result = computeConditionEffects({ saveModifiers: modifiers });
-        expect(result.modifyD20Roll).toBe(true);
-        expect(result.modifyD20RollDice).toBe('2d4');
-        expect(result.modifyD20RollCanBeBonusOrPenalty).toBe(true);
-      });
-
-      it('handles lucky_point with advantage and disadvantage effectType', () => {
-        expect(computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'advantage' }] }).luckyAdvantage).toBe(true);
-        expect(computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', effect: 'lucky_point', effectType: 'disadvantage' }] }).luckyDisadvantage).toBe(true);
-      });
-
-      it('handles reroll effect with and without bonusExpression', () => {
-        const withBonus = computeConditionEffects({ conditions: ['rage'], saveModifiers: [{ target: 'saving_throw', effect: 'reroll', condition: 'rage', bonusExpression: '1d4' }] });
-        expect(withBonus.autoRerollForSaves).toBe(true);
-        expect(withBonus.autoRerollCondition).toBe('rage');
-        expect(withBonus.autoRerollBonus).toBe('1d4');
-
-        const withoutBonus = computeConditionEffects({ conditions: ['rage'], saveModifiers: [{ target: 'saving_throw', effect: 'reroll', condition: 'rage' }] });
-        expect(withoutBonus.autoRerollBonus).toBeNull();
-      });
-    });
-
-    describe('targetEffects: save-related', () => {
-      it('handles disadvantage_on_next_save', () => {
-        const effects = [{ effect: 'disadvantage_on_next_save' }];
-        const result = computeConditionEffects({ targetEffects: effects });
-        expect(result.riderSaveDisadvantage).toBe(true);
-        expect(result.saveDisadvantageCount).toBe(1);
-      });
-
-      it('handles hex_save_disadvantage with ability', () => {
-        const effects = [{ effect: 'hex_save_disadvantage', ability: 'WIS' }];
-        const result = computeConditionEffects({ targetEffects: effects });
-        expect(result.saveDisadvantage).toContain('wis');
-        expect(result.saveDisadvantageCount).toBe(1);
-      });
-
-      it('handles death_strike with save parameters and damageDoubled', () => {
-        const effects = [{ effect: 'death_strike', saveType: 'CON', saveDc: 15, damageDoubled: true }];
-        const result = computeConditionEffects({ targetEffects: effects });
-        expect(result.saveType).toBe('CON');
-        expect(result.saveDc).toBe(15);
-        expect(result.damageDoubled).toBe(true);
-      });
-
-      it('ignores unknown effect keys without crashing', () => {
-        expect(() => computeConditionEffects({ targetEffects: [{ effect: 'unknown_effect' }] })).not.toThrow();
-        expect(() => computeConditionEffects({ targetEffects: [{ effect: 'speed_zero' }] })).not.toThrow();
-      });
-
-      it('handles Cunning Strike-style save with condition', () => {
-        const effects = [{ saveType: 'DEX', condition: 'stunned', saveDc: 15 }];
-        const result = computeConditionEffects({ targetEffects: effects });
-        expect(result.saveType).toBe('DEX');
-        expect(result.saveDc).toBe(15);
-        expect(result.conditionToApply).toBe('stunned');
-      });
-    });
-
-    describe('targetEffects: attack-related', () => {
-      it('handles next_attack_advantage and vexTarget', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'next_attack_advantage' }] }).attackAdvantageCount).toBe(1);
-        const vexResult = computeConditionEffects({ targetEffects: [{ effect: 'next_attack_advantage', target: 'Player', vexTarget: 'Goblin' }] });
-        expect(vexResult.attackAdvantageCount).toBe(0);
-        expect(vexResult.vexAdvantageTargets).toEqual(['Goblin']);
-      });
-
-      it('handles crusher_enhanced_critical and clairvoyant_combatant', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'crusher_enhanced_critical' }] }).targetAdvantageCount).toBe(1);
-        // CLA-053: defenderDisadvantage folds ATTACKER-side (te rides the bonded
-        // creature's bucket — its own attacks take Disadvantage vs the holder).
-        const clairResult = computeConditionEffects({ targetEffects: [{ effect: 'clairvoyant_combatant', attackerAdvantage: true, defenderDisadvantage: true }] });
-        expect(clairResult.targetAdvantageCount).toBe(1);
-        expect(clairResult.targetAttackDisadvantageCount).toBe(1);
-        expect(clairResult.targetDisadvantageCount).toBe(0);
-      });
-
-      it('handles multiattack_defense and escape_the_horde', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'multiattack_defense' }] }).targetDisadvantageCount).toBe(1);
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'escape_the_horde' }] }).targetDisadvantageCount).toBe(1);
-      });
-
-      it('handles disadvantage_perception_checks and ray_of_enfeeble_debuff', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'disadvantage_perception_checks' }] }).abilityCheckDisadvantage).toBe(true);
-        const rayResult = computeConditionEffects({ targetEffects: [{ effect: 'ray_of_enfeeble_debuff', strCheckDisadvantage: true, rayOfEnfeebleDamageReduction: true }] });
-        expect(rayResult.strCheckDisadvantage).toBe(true);
-        expect(rayResult.rayOfEnfeebleDamageReduction).toBe(true);
-      });
-
-      it('handles dodge effect with targetDisadvantageCount and saveAdvantage', () => {
-        const dodgeResult = computeConditionEffects({ targetEffects: [{ effect: 'dodge' }] });
-        expect(dodgeResult.targetDisadvantageCount).toBe(1);
-        expect(dodgeResult.saveAdvantage).toContain('dex');
-      });
-    });
-
-    describe('targetEffects: movement, positioning, and combat actions', () => {
-      it('handles speed_reduction, push, prone_and_push, and ac_penalty', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'speed_reduction', value: 20 }] }).speedReduction).toBe(20);
-        const pushResult = computeConditionEffects({ targetEffects: [{ effect: 'push', value: 10 }] });
-        expect(pushResult.pushEffect).toBe(true);
-        expect(pushResult.pushDistance).toBe(10);
-        const pronePushResult = computeConditionEffects({ targetEffects: [{ effect: 'prone_and_push', value: 15 }] });
-        expect(pronePushResult.pushEffect).toBe(true);
-        expect(pronePushResult.proneEffect).toBe(true);
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'ac_penalty', value: 3 }] }).acPenalty).toBe(3);
-      });
-
-      it('handles no_opportunity_attacks and no_reactions', () => {
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'no_opportunity_attacks' }] }).riderCannotOpportunityAttack).toBe(true);
-        expect(computeConditionEffects({ targetEffects: [{ noOpportunityAttacks: true }] }).riderCannotOpportunityAttack).toBe(true);
-        expect(computeConditionEffects({ targetEffects: [{ effect: 'no_reactions' }] }).riderNoReactions).toBe(true);
-      });
-
-      it('SP-111: generic Poisoned never blocks actions in computeConditionEffects', () => {
-        // The Poisoned-by-Stinking-Cloud block is a per-source te consumed at
-        // the sheet level (computeCharConditionEffects → cannotActActions) —
-        // generic Poisoned must not set cannotAct here (would block app-wide).
-        expect(computeConditionEffects({ conditions: ['poisoned'] }).cannotAct).toBe(false);
-        expect(computeConditionEffects({}).cannotActReason).toBeNull();
-      });
-
-      it('handles cleave, nick, and topple effects', () => {
-        const cleaveResult = computeConditionEffects({ targetEffects: [{ effect: 'cleave', target: 'creature1', source: 'creature2' }] });
-        expect(cleaveResult.cleaveAttack).toBe(true);
-        expect(cleaveResult.cleaveTarget).toBe('creature1');
-
-        const nickResult = computeConditionEffects({ targetEffects: [{ effect: 'nick', target: 'creature1', source: 'creature2' }] });
-        expect(nickResult.nickExtraAttack).toBe(true);
-
-        const toppleResult = computeConditionEffects({ targetEffects: [{ effect: 'topple', saveType: 'CON', saveDc: 15 }] });
-        expect(toppleResult.toppleEffect).toBe(true);
-        expect(toppleResult.conditionToApply).toBe('prone');
-      });
-    });
-
-    describe('targetEffects: damage and special', () => {
-      it('handles damage_bonus with all parameters', () => {
-        const result = computeConditionEffects({ targetEffects: [{ effect: 'damage_bonus', value: 5, damageExpression: '1d6', damageType: 'fire' }] });
-        expect(result.riderAttackBonus).toBe(5);
-        expect(result.riderDamageExpression).toBe('1d6');
-        expect(result.riderDamageType).toBe('fire');
-      });
-
-      it('handles foresight with comprehensive benefits', () => {
-        const result = computeConditionEffects({ targetEffects: [{ effect: 'foresight' }] });
-        expect(result.attackAdvantageCount).toBe(1);
-        expect(result.saveAdvantageCount).toBe(1);
-        expect(result.abilityCheckAdvantage).toBe(true);
-        expect(result.targetDisadvantageCount).toBe(1);
-      });
-
-      it('handles mass_fear and incapacitated (hurl through hell)', () => {
-        const massResult = computeConditionEffects({ targetEffects: [{ effect: 'mass_fear', saveType: 'WIS', saveDc: 15, range: '30_ft' }] });
-        expect(massResult.conditionToApply).toBe('frightened');
-        expect(massResult.massFearRange).toBe('30_ft');
-
-        const hurlResult = computeConditionEffects({ targetEffects: [{ effect: 'incapacitated', saveType: 'WIS', saveDc: 15 }] });
-        expect(hurlResult.hurlThroughHell).toBe(true);
-        expect(hurlResult.conditionToApply).toBe('incapacitated');
-      });
-    });
-
-    describe('saveModifiers: condition-conditional effects', () => {
-      it('applies advantage when modifier.condition matches an active condition', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }];
-        const result = computeConditionEffects({ conditions: ['fiend_undead'], saveModifiers: modifiers });
-        expect(result.saveAdvantageCount).toBe(1);
-      });
+  describe('computeConditionEffects — condition handler census (exact diff vs defaults)', () => {
+    it.each([
+      ['no arguments at all', undefined, {}],
+      ['blinded', { conditions: ['blinded'] }, { attackDisadvantageCount: 1, targetAdvantageCount: 1, targetAdvantageReasons: ['Blinded'] }],
+      ['charmed', { conditions: ['charmed'] }, { attackDisadvantageCount: 1, saveDisadvantage: ['dex'] }],
+      ['frightened', { conditions: ['frightened'] }, { attackDisadvantageCount: 1, abilityCheckDisadvantage: true }],
+      ['grappled', { conditions: ['grappled'] }, { speedZero: true, attackDisadvantageCount: 1 }],
+      ['incapacitated', { conditions: ['incapacitated'] }, { cannotAct: true, concentrationBroken: true }],
+      // SP-111: generic Poisoned must NOT set cannotAct (per-source block is
+      // sheet-level) — the exact diff below pins cannotAct untouched.
+      ['poisoned', { conditions: ['poisoned'] }, { attackDisadvantageCount: 1, abilityCheckDisadvantage: true }],
+      ['prone', { conditions: ['prone'] }, { attackDisadvantageCount: 1, targetAdvantageIfWithin5ft: true, targetDisadvantageIfBeyond5ft: true }],
+      ['speed_zero', { conditions: ['speed_zero'] }, { speedZero: true }],
+      ['restrained', { conditions: ['restrained'] }, { speedZero: true, attackDisadvantageCount: 1, targetAdvantageCount: 1, targetAdvantageReasons: ['Restrained'], saveDisadvantage: ['dex'] }],
+      ['paralyzed', { conditions: ['paralyzed'] }, { cannotAct: true, speedZero: true, autoFailSaves: ['str', 'dex'], targetAdvantageCount: 1, targetAdvantageReasons: ['Paralyzed'], autoCritWithin5ft: true }],
+      ['petrified', { conditions: ['petrified'] }, { cannotAct: true, speedZero: true, autoFailSaves: ['str', 'dex'], targetAdvantageCount: 1, targetAdvantageReasons: ['Petrified'], resistantToAll: true, poisonImmune: true }],
+      ['stunned', { conditions: ['stunned'] }, { cannotAct: true, speedZero: true, autoFailSaves: ['str', 'dex'], targetAdvantageCount: 1, targetAdvantageReasons: ['Stunned'] }],
+      ['unconscious', { conditions: ['unconscious'] }, { cannotAct: true, speedZero: true, autoFailSaves: ['str', 'dex'], targetAdvantageCount: 1, targetAdvantageReasons: ['Unconscious'], autoCritWithin5ft: true }],
+      ['dazed', { conditions: ['dazed'] }, { dazed: true, targetAdvantageCount: 1, targetAdvantageReasons: ['Dazed'] }],
+      ['slow', { conditions: ['slow'] }, { speedHalved: true, acPenalty: 2, slowNoReactions: true, slowActionLimit: true, slowSingleAttackLimit: true, slowSomaticFailure: true, saveDisadvantage: ['dex'] }],
+      ['forcecaged', { conditions: ['forcecaged'] }, { speedZero: true, cannotAct: true, concentrationBroken: true }],
+      ['mazed', { conditions: ['mazed'] }, { speedZero: true, cannotAct: true, concentrationBroken: true }],
+      // invisible folds advantage only while nothing reveals the holder
+      ['invisible', { conditions: ['invisible'] }, { attackAdvantageCount: 1, attackAdvantageReasons: ['Invisible'], targetDisadvantageCount: 1 }],
+      ['invisible + seeInvisibility (suppressed)', { conditions: ['invisible'], seeInvisibilityActive: true }, {}],
+      // multi-condition accumulation folds additively in one pass
+      ['blinded + paralyzed', { conditions: ['blinded', 'paralyzed'] }, { attackDisadvantageCount: 1, cannotAct: true, speedZero: true, autoFailSaves: ['str', 'dex'], targetAdvantageCount: 2, targetAdvantageReasons: ['Blinded', 'Paralyzed'], autoCritWithin5ft: true }],
+      ['unknown condition is inert', { conditions: ['not_a_condition'] }, {}],
+    ])('%s', (_name, options, expected) => {
+      expect(folded(options)).toEqual(expected);
     });
   });
 
-  describe('getNetAttackMode', () => {
-    it('returns advantage/disadvantage/normal based on net counts', () => {
-      expect(getNetAttackMode(3, 1, false)).toBe('advantage');
-      expect(getNetAttackMode(1, 3, false)).toBe('disadvantage');
-      expect(getNetAttackMode(2, 2, false)).toBe('normal');
-      expect(getNetAttackMode(0, 0, false)).toBe('normal');
-    });
-
-    it('neutralizes one advantage/disadvantage when restoreBalance is true', () => {
-      expect(getNetAttackMode(1, 0, true)).toBe('normal');
-      expect(getNetAttackMode(0, 1, true)).toBe('normal');
-    });
-
-    it('leaves excess counts after restoreBalance neutralization', () => {
-      expect(getNetAttackMode(2, 1, true)).toBe('advantage');
-      expect(getNetAttackMode(1, 2, true)).toBe('disadvantage');
-      expect(getNetAttackMode(0, 2, true)).toBe('disadvantage');
-    });
-
-    it('returns normal when restoreBalance with equal counts', () => {
-      expect(getNetAttackMode(2, 2, true)).toBe('normal');
+  describe('computeConditionEffects — saveModifiers channels not pinned in compute', () => {
+    it.each([
+      ['plain save advantage bumps count only', [{ target: 'saving_throw', effect: 'advantage' }], { saveAdvantageCount: 1 }],
+      ['plain save disadvantage bumps count only', [{ target: 'saving_throw', effect: 'disadvantage' }], { saveDisadvantageCount: 1 }],
+      ['ability-tagged advantage without abilityName tracks abilities, not count', [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR', 'DEX'] }], { saveAdvantageAbilities: ['STR', 'DEX'] }],
+      ['attack_roll (singular gate target) folds attack advantage', [{ target: 'attack_roll', effect: 'advantage' }], { attackAdvantageCount: 1 }],
+      ['fiend_undead applies without the condition active', [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }], { saveAdvantageCount: 1 }],
+      ['fiend_undead applies with the condition active', [{ target: 'saving_throw', effect: 'advantage', condition: 'fiend_undead' }], { saveAdvantageCount: 1 }],
+    ])('%s', (_name, saveModifiers, expected) => {
+      expect(folded({ saveModifiers })).toEqual(expected);
     });
   });
 
-  describe('combineAttackModes', () => {
-    it('combines attacker and target advantage/disadvantage counts', () => {
-      const attackerAdv = { attackAdvantageCount: 2, attackDisadvantageCount: 0, restoreBalance: false };
-      const targetAdv = { targetAdvantageCount: 1, targetDisadvantageCount: 0 };
-      expect(combineAttackModes(attackerAdv, targetAdv, 10)).toBe('advantage');
-
-      const attackerDis = { attackAdvantageCount: 0, attackDisadvantageCount: 2, restoreBalance: false };
-      const targetDis = { targetAdvantageCount: 0, targetDisadvantageCount: 1 };
-      expect(combineAttackModes(attackerDis, targetDis, 10)).toBe('disadvantage');
+  describe('applyTargetEffect dispatch', () => {
+    // #820: iterate the REAL registry — every GM-addable te key must pass
+    // through early → generic → late dispatch and return the engine shape.
+    it.each(TARGET_EFFECT_DEFINITIONS.map(d => d.effect))('registry te %s dispatches without throwing', (effect) => {
+      const result = computeConditionEffects({ targetEffects: [{ effect }] });
+      expect(typeof result.attackAdvantageCount).toBe('number');
+      expect(typeof result.saveAdvantageCount).toBe('number');
     });
 
-    it('returns normal when combined counts cancel out', () => {
-      const attacker = { attackAdvantageCount: 1, attackDisadvantageCount: 0, restoreBalance: false };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 1 };
-      expect(combineAttackModes(attacker, target, 10)).toBe('normal');
+    it('unregistered unknown te keys stay inert (no byte moves)', () => {
+      expect(folded({ targetEffects: [{ effect: 'unknown_effect' }] })).toEqual({});
+      expect(folded({ targetEffects: [{ effect: 'speed_zero' }] })).toEqual({});
     });
 
-    it('handles prone conditional advantage/disadvantage', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
-      const targetWithin = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetAdvantageIfWithin5ft: true };
-      const targetBeyond = { targetAdvantageCount: 0, targetDisadvantageCount: 0, targetDisadvantageIfBeyond5ft: true };
-
-      expect(combineAttackModes(attacker, targetWithin, 5)).toBe('advantage');
-      expect(combineAttackModes(attacker, targetWithin, 10)).toBe('normal');
-      expect(combineAttackModes(attacker, targetBeyond, 10)).toBe('disadvantage');
-      expect(combineAttackModes(attacker, targetBeyond, 5)).toBe('normal');
+    it('EARLY handler + both generic channels fold in one te (crusher leg stays, :675/:679)', () => {
+      // Crusher kept per #997 rec; its former clairvoyant bundle-mate is
+      // owned by compute :263 + .clairvoyant.test.js (exact duplicate cut).
+      expect(folded({ targetEffects: [{
+        effect: 'crusher_enhanced_critical',
+        source: 'Crusher 1',
+        noOpportunityAttacks: true,
+        saveType: 'DEX',
+        condition: 'stunned',
+        saveDc: 15,
+      }] })).toEqual({
+        targetAdvantageCount: 1,
+        targetAdvantageReasons: ['Crusher 1'],
+        riderCannotOpportunityAttack: true,
+        saveType: 'DEX',
+        saveDc: 15,
+        conditionToApply: 'stunned',
+        conditionDuration: 'until_start_of_next_turn',
+      });
     });
 
-    it('resets advantage with noAdvantageAgainst', () => {
-      const attacker = { attackAdvantageCount: 3, attackDisadvantageCount: 0, restoreBalance: false };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, noAdvantageAgainst: true };
-      expect(combineAttackModes(attacker, target, 10)).toBe('normal');
+    it('LATE handler overwrites the generic save branch (topple beats its own condition)', () => {
+      // te.saveType+te.condition trips generic :679 first; LATE topple then
+      // rewrites saveAbility and wins the conditionToApply byte.
+      expect(folded({ targetEffects: [{
+        effect: 'topple', saveType: 'STR', saveDc: 13, condition: 'restrained',
+      }] })).toEqual({
+        toppleEffect: true,
+        saveType: 'STR',
+        saveDc: 13,
+        saveAbility: 'CON',
+        conditionToApply: 'prone',
+        conditionDuration: 'until_start_of_next_turn',
+      });
     });
 
-    it('uses restoreBalance from target effects', () => {
-      const attacker = { attackAdvantageCount: 1, attackDisadvantageCount: 0, restoreBalance: false };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, restoreBalance: true };
-      expect(combineAttackModes(attacker, target, 10)).toBe('normal');
+    it('dodge folds target Disadvantage + dex save advantage', () => {
+      expect(folded({ targetEffects: [{ effect: 'dodge' }] })).toEqual({
+        targetDisadvantageCount: 1,
+        saveAdvantage: ['dex'],
+      });
     });
 
-    it('handles vexAdvantageTargets', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false, vexAdvantageTargets: ['Goblin'] };
-      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0 };
-      expect(combineAttackModes(attacker, target, 5, 'Goblin')).toBe('advantage');
-      expect(combineAttackModes(attacker, target, 5, 'Orc')).toBe('normal');
-      expect(combineAttackModes({ ...attacker, vexAdvantageTargets: null }, target, 5, 'Goblin')).toBe('normal');
+    it('#996 foresight ASSIGNS abilityCheckAdvantageReasons — clobbering a co-existing bolster reason', () => {
+      // bolster (:501) addUniqueReason; foresight (:483) plain assign.
+      // Both co-exist in the store; final bytes pinned honestly.
+      const bolster = { effect: 'bolster_advantage', source: 'Empyrean 1' };
+      const foresight = { effect: 'foresight' };
+      expect(folded({ targetEffects: [bolster, foresight] })).toEqual({
+        attackAdvantageCount: 2,
+        attackAdvantageReasons: ['Empyrean 1', 'Foresight'],
+        saveAdvantageCount: 2,
+        saveAdvantageReasons: ['Empyrean 1', 'Foresight'],
+        abilityCheckAdvantage: true,
+        abilityCheckAdvantageReasons: ['Foresight'], // bolster reason clobbered by assign
+        targetDisadvantageCount: 1,
+      });
+      // Reverse order: foresight assigns first, bolster's addUnique appends.
+      expect(folded({ targetEffects: [foresight, bolster] }).abilityCheckAdvantageReasons).toEqual(['Foresight', 'Empyrean 1']);
     });
+  });
 
-    it('handles dodge targetDisadvantageCount', () => {
-      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
-      const targetWithDodge = { targetAdvantageCount: 0, targetDisadvantageCount: 1 };
-      expect(combineAttackModes(attacker, targetWithDodge, 10)).toBe('disadvantage');
+  describe('getNetAttackMode — base net math (restoreBalance owned by restoreBalance.test.js)', () => {
+    it.each([
+      [3, 1, 'advantage'],
+      [1, 3, 'disadvantage'],
+      [2, 2, 'normal'],
+      [0, 0, 'normal'],
+      [1, 0, 'advantage'],
+      [0, 1, 'disadvantage'],
+    ])('%i adv vs %i dis → %s', (adv, dis, expected) => {
+      expect(getNetAttackMode(adv, dis, false)).toBe(expected);
+    });
+  });
+
+  describe('combineAttackModes — net-mode consumer matrix (#964 :854-856; RB and attacksOther legs owned by their files)', () => {
+    const ATT = (o = {}) => ({ attackAdvantageCount: 0, attackDisadvantageCount: 0, ...o });
+    const TGT = (o = {}) => ({ targetAdvantageCount: 0, targetDisadvantageCount: 0, ...o });
+    it.each([
+      ['attacker + target advantage stacks', ATT({ attackAdvantageCount: 2 }), TGT({ targetAdvantageCount: 1 }), 10, null, 'advantage'],
+      ['attacker + target disadvantage stacks', ATT({ attackDisadvantageCount: 2 }), TGT({ targetDisadvantageCount: 1 }), 10, null, 'disadvantage'],
+      ['one advantage cancels one disadvantage', ATT({ attackAdvantageCount: 1 }), TGT({ targetDisadvantageCount: 1 }), 10, null, 'normal'],
+      ['vex target named → advantage', ATT({ vexAdvantageTargets: ['Goblin'] }), TGT(), 5, 'Goblin', 'advantage'],
+      ['vex target not named → normal', ATT({ vexAdvantageTargets: ['Goblin'] }), TGT(), 5, 'Orc', 'normal'],
+      ['vex targets null → normal', ATT({ vexAdvantageTargets: null }), TGT(), 5, 'Goblin', 'normal'],
+      ['prone within 5ft → advantage', ATT(), TGT({ targetAdvantageIfWithin5ft: true }), 5, null, 'advantage'],
+      ['prone flag idle beyond 5ft → normal', ATT(), TGT({ targetAdvantageIfWithin5ft: true }), 10, null, 'normal'],
+      ['prone beyond 5ft → disadvantage', ATT(), TGT({ targetDisadvantageIfBeyond5ft: true }), 10, null, 'disadvantage'],
+      ['prone flag idle within 5ft → normal', ATT(), TGT({ targetDisadvantageIfBeyond5ft: true }), 5, null, 'normal'],
+      ['noAdvantageAgainst zeroes stacked attacker advantage', ATT({ attackAdvantageCount: 3 }), TGT({ noAdvantageAgainst: true }), 10, null, 'normal'],
+      ['attacker-side targetAttackDisadvantageCount channel (CLA-053/slasher :856)', ATT({ targetAttackDisadvantageCount: 1 }), TGT(), 10, null, 'disadvantage'],
+      ['dodge target disadvantage', ATT(), TGT({ targetDisadvantageCount: 1 }), 10, null, 'disadvantage'],
+    ])('%s', (_name, attacker, target, range, targetName, expected) => {
+      expect(combineAttackModes(attacker, target, range, targetName)).toBe(expected);
     });
   });
 
   describe('hasSaveModifier', () => {
-    it('returns false for empty/null modifiers or non-matching target/effect', () => {
-      expect(hasSaveModifier([], 'saving_throw', 'STR')).toBe(false);
-      expect(hasSaveModifier(null, 'saving_throw', 'STR')).toBe(false);
-      expect(hasSaveModifier([{ target: 'attack_roll', effect: 'advantage' }], 'saving_throw', 'STR')).toBe(false);
-      expect(hasSaveModifier([{ target: 'saving_throw', effect: 'disadvantage' }], 'saving_throw', 'STR')).toBe(false);
-    });
-
-    it('returns true for matching advantage save modifier', () => {
-      const modifiers = [{ target: 'saving_throw', effect: 'advantage' }];
-      expect(hasSaveModifier(modifiers, 'saving_throw', 'STR')).toBe(true);
-    });
-
-    it('matches ability-specific modifiers', () => {
-      const strMod = [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR'] }];
-      expect(hasSaveModifier(strMod, 'saving_throw', 'STR')).toBe(true);
-      expect(hasSaveModifier(strMod, 'saving_throw', 'DEX')).toBe(false);
-      expect(hasSaveModifier(strMod, 'saving_throw', null)).toBe(false);
+    it.each([
+      ['empty modifiers', [], 'saving_throw', 'STR', false],
+      ['null modifiers', null, 'saving_throw', 'STR', false],
+      ['target mismatch', [{ target: 'attack_roll', effect: 'advantage' }], 'saving_throw', 'STR', false],
+      ['disadvantage never matches', [{ target: 'saving_throw', effect: 'disadvantage' }], 'saving_throw', 'STR', false],
+      ['plain advantage matches any ability', [{ target: 'saving_throw', effect: 'advantage' }], 'saving_throw', 'STR', true],
+      ['ability-tagged match', [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR'] }], 'saving_throw', 'STR', true],
+      ['ability-tagged miss', [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR'] }], 'saving_throw', 'DEX', false],
+      ['ability-tagged, no ability asked', [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR'] }], 'saving_throw', null, false],
+    ])('%s', (_name, modifiers, target, ability, expected) => {
+      expect(hasSaveModifier(modifiers, target, ability)).toBe(expected);
     });
   });
 
   describe('hasSaveAdvantage', () => {
-    it('returns false for null/undefined effects or when no advantage exists', () => {
+    const PLAIN_ADV = computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', effect: 'advantage' }] });
+    const DOUBLE_ADV = computeConditionEffects({ saveModifiers: [
+      { target: 'saving_throw', effect: 'advantage' },
+      { target: 'saving_throw', effect: 'advantage' },
+    ] });
+    const CIRCLE = computeConditionEffects({ targetEffects: [{ effect: 'circle_of_power' }] });
+
+    it('returns false for null/undefined effects or a default (advantage-free) fold', () => {
       expect(hasSaveAdvantage(null, 'STR', false)).toBe(false);
       expect(hasSaveAdvantage(undefined, 'STR', false)).toBe(false);
-      expect(hasSaveAdvantage({ saveAdvantageCount: 0, saveAdvantage: [], saveAdvantageAbilities: [] }, 'STR', false)).toBe(false);
+      expect(hasSaveAdvantage(computeConditionEffects(), 'STR', false)).toBe(false);
     });
 
-    it('returns true when saveAdvantageCount is positive', () => {
-      const modifiers = [{ target: 'saving_throw', effect: 'advantage' }];
-      const effects = computeConditionEffects({ saveModifiers: modifiers });
-      expect(hasSaveAdvantage(effects, 'STR', false)).toBe(true);
-    });
-
-    it('handles condition-specific and ability-specific saveAdvantage', () => {
-      const condMod = [{ target: 'saving_throw', condition: 'charmed', effect: 'advantage' }];
-      const condEffects = computeConditionEffects({ conditions: ['charmed'], saveModifiers: condMod });
-      expect(hasSaveAdvantage(condEffects, 'charmed', false)).toBe(true);
-      expect(hasSaveAdvantage(condEffects, 'frightened', false)).toBe(false);
-
-      const abMod = [{ target: 'saving_throw', effect: 'advantage', abilities: ['STR'] }];
-      const abEffects = computeConditionEffects({ saveModifiers: abMod });
-      expect(hasSaveAdvantage(abEffects, 'STR', false)).toBe(true);
-      expect(hasSaveAdvantage(abEffects, 'DEX', false)).toBe(false);
-    });
-
-    it('applies restoreBalance reduction to saveAdvantageCount', () => {
-      const modifiers = [{ target: 'saving_throw', effect: 'advantage' }];
-      const effects = computeConditionEffects({ saveModifiers: modifiers });
-      expect(hasSaveAdvantage(effects, 'STR', true)).toBe(false);
-
-      const doubleEffects = computeConditionEffects({ saveModifiers: [
-        { target: 'saving_throw', effect: 'advantage' },
-        { target: 'saving_throw', effect: 'advantage' },
-      ] });
-      expect(hasSaveAdvantage(doubleEffects, 'STR', true)).toBe(true);
-    });
-
-    it('returns true for against_spell regardless of saveType', () => {
-      const effects = computeConditionEffects({ saveModifiers: [{ target: 'saving_throw', condition: 'against_spell', effect: 'advantage' }] });
-      expect(hasSaveAdvantage(effects, 'con', false)).toBe(true);
-      expect(hasSaveAdvantage(effects, 'dex', false)).toBe(true);
+    it.each([
+      ['plain advantage count', PLAIN_ADV, 'STR', false, true],
+      ['named save in saveAdvantage', { saveAdvantage: ['dex'], saveAdvantageCount: 0 }, 'dex', false, true],
+      ['other save not in saveAdvantage', { saveAdvantage: ['dex'], saveAdvantageCount: 0 }, 'str', false, false],
+      ['ability-list hit', { saveAdvantage: [], saveAdvantageCount: 0, saveAdvantageAbilities: ['STR'] }, 'STR', false, true],
+      ['ability-list miss', { saveAdvantage: [], saveAdvantageCount: 0, saveAdvantageAbilities: ['STR'] }, 'DEX', false, false],
+      ['against_spell (circle_of_power producer) matches con', CIRCLE, 'con', false, true],
+      ['against_spell matches dex too', CIRCLE, 'dex', false, true],
+      ['against_spell yields to restoreBalance', CIRCLE, 'con', true, false],
+      ['single advantage neutralized by restoreBalance', PLAIN_ADV, 'STR', true, false],
+      ['double advantage survives restoreBalance', DOUBLE_ADV, 'STR', true, true],
+    ])('%s → %s', (_name, effects, saveType, restoreBalance, expected) => {
+      expect(hasSaveAdvantage(effects, saveType, restoreBalance)).toBe(expected);
     });
   });
 
   describe('hasBeaconOfHope', () => {
-    it('returns false when targetName is null', () => {
+    beforeEach(() => vi.mocked(getRuntimeValue).mockReset());
+
+    it('returns false for nullish target without touching the store', () => {
       expect(hasBeaconOfHope(null, 'test-campaign')).toBe(false);
-    });
-
-    it('returns false when targetName is undefined', () => {
       expect(hasBeaconOfHope(undefined, 'test-campaign')).toBe(false);
+      expect(getRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns false when no targetEffects contain beacon_of_hope', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue([]);
-      expect(hasBeaconOfHope('Player', 'test-campaign')).toBe(false);
-    });
-
-    it('returns true when targetEffects contains beacon_of_hope for target', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue([
+    it.each([
+      ['empty store', [], false],
+      ['null store', null, false],
+      ['beacon on another target', [{ effect: 'beacon_of_hope', target: 'OtherPlayer' }], false],
+      ['beacon on Player among unrelated te', [
         { effect: 'beacon_of_hope', target: 'Player' },
         { effect: 'advantage_attacks', target: 'Enemy' },
-      ]);
-      expect(hasBeaconOfHope('Player', 'test-campaign')).toBe(true);
-    });
-
-    it('returns false when beacon_of_hope exists but target does not match', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue([
-        { effect: 'beacon_of_hope', target: 'OtherPlayer' },
-      ]);
-      expect(hasBeaconOfHope('Player', 'test-campaign')).toBe(false);
-    });
-
-    it('returns false when getRuntimeValue returns null', () => {
-      vi.mocked(getRuntimeValue).mockReturnValue(null);
-      expect(hasBeaconOfHope('Player', 'test-campaign')).toBe(false);
+      ], true],
+    ])('reads campaign targetEffects — %s', (_name, store, expected) => {
+      vi.mocked(getRuntimeValue).mockReturnValue(store);
+      expect(hasBeaconOfHope('Player', 'test-campaign')).toBe(expected);
+      expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', 'test-campaign');
     });
   });
 });

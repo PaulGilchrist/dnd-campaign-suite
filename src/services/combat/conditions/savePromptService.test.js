@@ -1,4 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// savePromptService lane: this file owns the transport bytes produced by the
+// service itself — exact POST/DELETE URLs (campaign encodeURIComponent'd,
+// '<family>-<targetName>' keys), exact { value } JSON envelopes, DELETEs with
+// no body/headers, fire-and-forget non-propagation, and the post-POST
+// CustomEvent envelopes (flesh-to-stone / prismatic indigo / violet).
+// Consumers (CreatureCard, SavePromptModal*, useLoggedDiceRollSaves,
+// automation savePrompt.js) all mock this module, so they verify CALL-ARGS
+// only (e.g. createRollConditionSaveHandler #1004 pins call-args through a
+// mock; buildConditionPopup envelope is @#1004). Endpoint bytes are here.
+// Turn-based canon: the source uses no timers — adjudication prompts wait
+// indefinitely and are removed only by explicit clear* calls. Verified.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import {
   sendSavePrompt,
@@ -13,371 +25,131 @@ import {
   sendFleshToStonePrompt,
   clearFleshToStonePrompt,
   sendFleshToStoneResult,
+  sendPrismaticSprayIndigoResult,
+  sendPrismaticSprayVioletResult,
 } from './savePromptService.js';
 
-// Suppress unhandled rejection warnings from the service's fire-and-forget
-// fetch calls (the service logs errors but re-throws, creating unhandled
-// promise rejections that Vitest detects). This is expected behavior for
-// fire-and-forget patterns and does not affect test validity.
-const noop = () => {};
-process.on('unhandledRejection', noop);
+// Campaign name with space/#/& exercised in EVERY row — pins the
+// encodeURIComponent output at each URL without a separate encode test.
+const CAMPAIGN = 'Campaign #1';
+const ENCODED_CAMPAIGN = 'Campaign%20%231';
 
-// ── Helpers ──────────────────────────────────────────────────────
+/** POST families: prompt sends take (campaign, promptData). */
+const PROMPT_POSTS = [
+  { fn: sendSavePrompt, key: 'savePrompt-Goblin', data: { targetName: 'Goblin', dc: 13 } },
+  { fn: sendDeathSavePrompt, key: 'deathSavePrompt-Fighter', data: { targetName: 'Fighter' } },
+  { fn: sendConcentrationPrompt, key: 'concentrationPrompt-Wizard', data: { targetName: 'Wizard' } },
+  { fn: sendFleshToStonePrompt, key: 'fleshToStonePrompt-Goblin', data: { targetName: 'Goblin', dc: 15, casterName: 'Wizard' } },
+];
 
-/**
- * Create a fetch mock that resolves with a minimal Response-like object.
- * The service never reads the response, so the shape is irrelevant.
- */
-function mockFetchResolved() {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
-}
+/** POST families: plain results take (campaign, targetName, resultData). */
+const RESULT_POSTS = [
+  { fn: sendSaveResult, key: 'saveResult-Goblin', result: { success: true } },
+  { fn: sendDeathSaveResult, key: 'deathSaveResult-Fighter', result: { success: false } },
+  { fn: sendConcentrationResult, key: 'concentrationResult-Wizard', result: { success: true } },
+];
 
-/**
- * Create a fetch mock that rejects. Useful for verifying the service
- * does not propagate errors to the caller (fire-and-forget).
- */
-function mockFetchRejected() {
-  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network fail'));
-}
+/** DELETE families: clears take (campaign, targetName). */
+const CLEARS = [
+  { fn: clearSavePrompt, key: 'savePrompt-Goblin' },
+  { fn: clearDeathSavePrompt, key: 'deathSavePrompt-Fighter' },
+  { fn: clearConcentrationPrompt, key: 'concentrationPrompt-Wizard' },
+  { fn: clearFleshToStonePrompt, key: 'fleshToStonePrompt-Goblin' },
+];
 
-/**
- * Assert that fetch was called with a POST request to the expected
- * campaign endpoint with the correct JSON body.
- */
-function expectPostToCampaign(fetchSpy, campaignName, key, bodyValue) {
-  const expectedUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${key}`;
-  expect(fetchSpy).toHaveBeenCalledWith(
-    expectedUrl,
-    expect.objectContaining({
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: bodyValue }),
-    })
-  );
-}
+/** POST families that dispatch a window CustomEvent once the POST resolves. */
+const RESULT_EVENTS = [
+  { fn: sendFleshToStoneResult, key: 'fleshToStoneResult-Goblin', event: 'flesh-to-stone-result', result: { success: false } },
+  { fn: sendPrismaticSprayIndigoResult, key: 'prismaticSprayIndigoResult-Goblin', event: 'prismatic-spray-indigo-result', result: { effect: 'petrified' } },
+  { fn: sendPrismaticSprayVioletResult, key: 'prismaticSprayVioletResult-Goblin', event: 'prismatic-spray-violet-result', result: { transported: true } },
+];
 
-// ── Tests ────────────────────────────────────────────────────────
+/** Every exported entry point, for the fire-and-forget sweep. */
+const ALL_SENDERS = [
+  ...PROMPT_POSTS.map(({ fn, data }) => () => fn(CAMPAIGN, data)),
+  ...RESULT_POSTS.map(({ fn, key, result }) => () => fn(CAMPAIGN, key.split('-').slice(1).join('-'), result)),
+  ...CLEARS.map(({ fn, key }) => () => fn(CAMPAIGN, key.split('-').slice(1).join('-'))),
+  ...RESULT_EVENTS.map(({ fn, key, result }) => () => fn(CAMPAIGN, key.split('-').slice(1).join('-'), result)),
+];
 
 describe('savePromptService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
   });
 
-  describe('sendSavePrompt', () => {
-    it('posts save prompt data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendSavePrompt('Test Campaign', { targetName: 'Goblin' });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'savePrompt-Goblin',
-        { targetName: 'Goblin' }
-      );
-    });
+  it.each(PROMPT_POSTS)(
+    'posts $key with the exact prompt envelope',
+    ({ fn, key, data }) => {
+      fn(CAMPAIGN, data);
 
-    it('URL-encodes special characters in the campaign name', () => {
-      mockFetchResolved();
-      sendSavePrompt('Campaign #1 & Test', { targetName: 'T' });
-
-      const expectedUrl = '/api/campaigns/Campaign%20%231%20%26%20Test/savePrompt-T';
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.any(Object)
+        `/api/campaigns/${ENCODED_CAMPAIGN}/${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: data }),
+        }
       );
-    });
+    }
+  );
 
-    it('returns undefined (fire-and-forget) and does not propagate fetch rejections', () => {
-      mockFetchRejected();
-      expect(sendSavePrompt('C', { targetName: 'T' })).toBeUndefined();
-    });
-  });
+  it.each(RESULT_POSTS)(
+    'posts $key with the exact result envelope',
+    ({ fn, key, result }) => {
+      const targetName = key.slice(key.indexOf('-') + 1);
+      fn(CAMPAIGN, targetName, result);
 
-  describe('sendSaveResult', () => {
-    it('posts result data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendSaveResult('Test Campaign', 'Goblin', { success: true });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'saveResult-Goblin',
-        { success: true }
-      );
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendSaveResult('C', 'T', {})).toBeUndefined();
-    });
-  });
-
-  describe('clearSavePrompt', () => {
-    it('sends a DELETE request to the correct endpoint with no body', () => {
-      mockFetchResolved();
-      clearSavePrompt('Test Campaign', 'Goblin');
-
-      const expectedUrl = '/api/campaigns/Test%20Campaign/savePrompt-Goblin';
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.objectContaining({
-          method: 'DELETE',
-        })
+        `/api/campaigns/${ENCODED_CAMPAIGN}/${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: result }),
+        }
       );
+    }
+  );
 
-      const callArgs = globalThis.fetch.mock.calls[0][1];
-      expect(callArgs.headers).toBeUndefined();
-      expect(callArgs.body).toBeUndefined();
-    });
+  it.each(CLEARS)(
+    'deletes $key with no body and no headers',
+    ({ fn, key }) => {
+      fn(CAMPAIGN, key.slice(key.indexOf('-') + 1));
 
-    it('URL-encodes special characters and does not propagate fetch rejections', () => {
-      mockFetchResolved();
-      clearSavePrompt('Campaign #1', 'T');
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      const [url, init] = globalThis.fetch.mock.calls[0];
+      expect(url).toBe(`/api/campaigns/${ENCODED_CAMPAIGN}/${key}`);
+      expect(init.method).toBe('DELETE');
+      expect(init.body).toBeUndefined();
+      expect(init.headers).toBeUndefined();
+    }
+  );
 
-      const expectedUrl = '/api/campaigns/Campaign%20%231/savePrompt-T';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.any(Object)
-      );
+  it.each(RESULT_EVENTS)(
+    'dispatches exactly one $event with the full result envelope after the POST resolves',
+    async ({ fn, key, event, result }) => {
+      const details = [];
+      const handler = (e) => details.push(e.detail);
+      window.addEventListener(event, handler);
 
-      mockFetchRejected();
-      expect(clearSavePrompt('C', 'T')).toBeUndefined();
-    });
-  });
+      const targetName = key.slice(key.indexOf('-') + 1);
+      fn(CAMPAIGN, targetName, result);
 
-  describe('sendDeathSavePrompt', () => {
-    it('posts death save prompt data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendDeathSavePrompt('Test Campaign', { targetName: 'Fighter' });
+      await vi.waitFor(() => expect(details).toHaveLength(1));
+      expect(details[0]).toEqual({ campaignName: CAMPAIGN, targetName, result });
 
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'deathSavePrompt-Fighter',
-        { targetName: 'Fighter' }
-      );
-    });
+      window.removeEventListener(event, handler);
+    }
+  );
 
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendDeathSavePrompt('C', { targetName: 'T' })).toBeUndefined();
-    });
-  });
+  it('never throws to the caller when the network fails (all 14 entry points, fire-and-forget)', async () => {
+    globalThis.fetch.mockRejectedValue(new Error('network fail'));
 
-  describe('clearDeathSavePrompt', () => {
-    it('sends a DELETE request to the correct endpoint with no body', () => {
-      mockFetchResolved();
-      clearDeathSavePrompt('Test Campaign', 'Fighter');
+    ALL_SENDERS.forEach((call) => expect(call()).toBeUndefined());
 
-      const expectedUrl = '/api/campaigns/Test%20Campaign/deathSavePrompt-Fighter';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
-
-      const callArgs = globalThis.fetch.mock.calls[0][1];
-      expect(callArgs.headers).toBeUndefined();
-      expect(callArgs.body).toBeUndefined();
-    });
-
-    it('URL-encodes special characters and does not propagate fetch rejections', () => {
-      mockFetchResolved();
-      clearDeathSavePrompt('Campaign #1', 'T');
-
-      const expectedUrl = '/api/campaigns/Campaign%20%231/deathSavePrompt-T';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.any(Object)
-      );
-
-      mockFetchRejected();
-      expect(clearDeathSavePrompt('C', 'T')).toBeUndefined();
-    });
-  });
-
-  describe('sendDeathSaveResult', () => {
-    it('posts death save result data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendDeathSaveResult('Test Campaign', 'Fighter', { save: true });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'deathSaveResult-Fighter',
-        { save: true }
-      );
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendDeathSaveResult('C', 'T', {})).toBeUndefined();
-    });
-  });
-
-  describe('sendConcentrationPrompt', () => {
-    it('posts concentration prompt data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendConcentrationPrompt('Test Campaign', { targetName: 'Wizard' });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'concentrationPrompt-Wizard',
-        { targetName: 'Wizard' }
-      );
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendConcentrationPrompt('C', { targetName: 'T' })).toBeUndefined();
-    });
-  });
-
-  describe('sendConcentrationResult', () => {
-    it('posts concentration result data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendConcentrationResult('Test Campaign', 'Wizard', { success: true });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'concentrationResult-Wizard',
-        { success: true }
-      );
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendConcentrationResult('C', 'T', {})).toBeUndefined();
-    });
-  });
-
-  describe('clearConcentrationPrompt', () => {
-    it('sends a DELETE request to the correct endpoint with no body', () => {
-      mockFetchResolved();
-      clearConcentrationPrompt('Test Campaign', 'Wizard');
-
-      const expectedUrl = '/api/campaigns/Test%20Campaign/concentrationPrompt-Wizard';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
-
-      const callArgs = globalThis.fetch.mock.calls[0][1];
-      expect(callArgs.headers).toBeUndefined();
-      expect(callArgs.body).toBeUndefined();
-    });
-
-    it('URL-encodes special characters and does not propagate fetch rejections', () => {
-      mockFetchResolved();
-      clearConcentrationPrompt('Campaign #1', 'T');
-
-      const expectedUrl = '/api/campaigns/Campaign%20%231/concentrationPrompt-T';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.any(Object)
-      );
-
-      mockFetchRejected();
-      expect(clearConcentrationPrompt('C', 'T')).toBeUndefined();
-    });
-  });
-
-  describe('sendFleshToStonePrompt', () => {
-    it('posts Flesh to Stone prompt data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendFleshToStonePrompt('Test Campaign', { targetName: 'Goblin', dc: 15, casterName: 'Wizard' });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'fleshToStonePrompt-Goblin',
-        { targetName: 'Goblin', dc: 15, casterName: 'Wizard' }
-      );
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendFleshToStonePrompt('C', { targetName: 'T' })).toBeUndefined();
-    });
-  });
-
-  describe('clearFleshToStonePrompt', () => {
-    it('sends a DELETE request to the correct endpoint with no body', () => {
-      mockFetchResolved();
-      clearFleshToStonePrompt('Test Campaign', 'Goblin');
-
-      const expectedUrl = '/api/campaigns/Test%20Campaign/fleshToStonePrompt-Goblin';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
-
-      const callArgs = globalThis.fetch.mock.calls[0][1];
-      expect(callArgs.headers).toBeUndefined();
-      expect(callArgs.body).toBeUndefined();
-    });
-
-    it('URL-encodes special characters and does not propagate fetch rejections', () => {
-      mockFetchResolved();
-      clearFleshToStonePrompt('Campaign #1', 'T');
-
-      const expectedUrl = '/api/campaigns/Campaign%20%231/fleshToStonePrompt-T';
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expectedUrl,
-        expect.any(Object)
-      );
-
-      mockFetchRejected();
-      expect(clearFleshToStonePrompt('C', 'T')).toBeUndefined();
-    });
-  });
-
-  describe('sendFleshToStoneResult', () => {
-    it('posts Flesh to Stone result data to the correct endpoint', () => {
-      mockFetchResolved();
-      sendFleshToStoneResult('Test Campaign', 'Goblin', { success: true });
-
-      expectPostToCampaign(
-        globalThis.fetch,
-        'Test Campaign',
-        'fleshToStoneResult-Goblin',
-        { success: true }
-      );
-    });
-
-    it('dispatches a CustomEvent on success', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-      const events = [];
-      const handler = (e) => events.push(e.detail);
-      globalThis.window.addEventListener('flesh-to-stone-result', handler);
-
-      sendFleshToStoneResult('Test Campaign', 'Goblin', { success: false });
-
-      await new Promise(r => setTimeout(r, 10));
-
-      expect(events).toHaveLength(1);
-      expect(events[0]).toEqual({
-        campaignName: 'Test Campaign',
-        targetName: 'Goblin',
-        result: { success: false },
-      });
-
-      globalThis.window.removeEventListener('flesh-to-stone-result', handler);
-    });
-
-    it('does not propagate fetch rejections to the caller', () => {
-      mockFetchRejected();
-      expect(sendFleshToStoneResult('C', 'T', {})).toBeUndefined();
-    });
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(ALL_SENDERS.length));
   });
 });
