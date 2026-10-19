@@ -1,3 +1,23 @@
+// @maintained-by-ai
+// Lane: automationPassives elementalAdept ticket slice (#867) — the unmocked
+// damage_type_choice/elemental_adept predicate branch of hasIgnoreResistance /
+// hasMinDamage (per-passive chosen-type resolution, minDamage consumption).
+// Family map: automationPassives.test.js (base lane) owns generic passive
+// dispatch/collection and single-passive elemental_adept happy/absence paths
+// for both predicates — cited, never duplicated here. fortifiedHealth /
+// landResistance / stormbornResistance / wm008-kindgate lanes own their
+// effects. Popup seam: handlePlainDamage.popupData.test.js #942 pins the
+// elementalAdeptBonus display byte (0/2) with hasIgnoreResistance MOCKED —
+// this lane tests the real predicate computation, not popup display.
+// Old -> new: 17 -> 5. Removed 10 base-lane verbatim duplicates (no-chosen,
+// CI match, null automation, minDamage unset/false/mismatch, foreign-effect
+// for hasMinDamage, no-passives) + 1 order-dependent implementation-detail
+// test ("first match per passive"). Rewrote mis-titled "empty damageTypes"
+// row: the adept branch never re-checks the declared damageTypes list — the
+// store byte governs (#910 honest titles). Folded falsifiable guard legs
+// (#936); foreign-effect and passive_rule-minDamage controls kept here.
+// Pure predicates: no logging, no timers, zero network.
+
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
 }));
@@ -15,218 +35,98 @@ const BASE_PS = {
     automation: { passives: [] },
 };
 
-function makePlayerStats(extra = {}) {
-    return { ...BASE_PS, ...extra };
+function withPassives(passives) {
+    return { ...BASE_PS, automation: { passives } };
 }
 
-const ENERGY_MASTERY_PASSIVE = {
-    type: 'damage_type_choice',
-    effect: 'elemental_adept',
-    name: 'Energy Mastery',
-    damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
-};
-
-const ENERGY_MASTERY_MIN_DAMAGE_PASSIVE = {
-    ...ENERGY_MASTERY_PASSIVE,
-    minDamage: true,
-};
-
-// ── hasIgnoreResistance – damage_type_choice elemental_adept ──────
-
-describe('hasIgnoreResistance – damage_type_choice elemental_adept', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getChosenRuntimeValue.mockReturnValue(undefined);
-    });
-
-    it('returns false when elemental_adept passive exists but no type chosen', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [ENERGY_MASTERY_PASSIVE] },
-        });
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
-    });
-
-    it('returns true when runtime chosen type matches (case-insensitive)', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [ENERGY_MASTERY_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);
-        expect(hasIgnoreResistance(ps, 'Lightning')).toBe(false);
-    });
-
-    it('returns false for non-elemental_adept damage_type_choice', () => {
-        const ps = makePlayerStats({
-            automation: {
-                passives: [{
-                    type: 'damage_type_choice',
-                    effect: 'elemental_affinity',
-                    name: 'Elemental Affinity',
-                    damageTypes: ['Fire'],
-                }],
-            },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
-    });
-
-    it('checks all elemental_adept passives when multiple exist', () => {
-        const ps = makePlayerStats({
-            automation: {
-                passives: [
-                    { ...ENERGY_MASTERY_PASSIVE, name: 'Elemental Adept (Fire)', damageTypes: ['Fire'] },
-                    { ...ENERGY_MASTERY_PASSIVE, name: 'Elemental Adept (Cold)', damageTypes: ['Cold'] },
-                ],
-            },
-        });
-        getChosenRuntimeValue
-            .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce('Cold');
-        expect(hasIgnoreResistance(ps, 'Cold')).toBe(true);
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
-    });
-
-    it('returns false when automation is null or passives array is missing', () => {
-        expect(hasIgnoreResistance(makePlayerStats({ automation: null }), 'Fire')).toBe(false);
-        expect(hasIgnoreResistance(makePlayerStats({ automation: {} }), 'Fire')).toBe(false);
-    });
-
-    it('returns true when damageTypes array is empty on the passive', () => {
-        const ps = makePlayerStats({
-            automation: {
-                passives: [{ ...ENERGY_MASTERY_PASSIVE, damageTypes: [] }],
-            },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);
-    });
-});
-
-// ── hasMinDamage – elemental_adept with minDamage ──────────────────
-
-describe('hasMinDamage – elemental_adept with minDamage', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getChosenRuntimeValue.mockReturnValue(undefined);
-    });
-
-    it('returns false when no passives, automation is null, or no type chosen', () => {
-        expect(hasMinDamage(makePlayerStats(), 'Fire')).toBe(false);
-        expect(hasMinDamage(makePlayerStats({ automation: null }), 'Fire')).toBe(false);
-
-        const ps = makePlayerStats({ automation: { passives: [ENERGY_MASTERY_MIN_DAMAGE_PASSIVE] } });
-        expect(hasMinDamage(ps, 'Fire')).toBe(false);
-    });
-
-    it('returns true when runtime chosen type matches and minDamage is set', () => {
-        const ps = makePlayerStats({ automation: { passives: [ENERGY_MASTERY_MIN_DAMAGE_PASSIVE] } });
-        getChosenRuntimeValue.mockReturnValue('Cold');
-        expect(hasMinDamage(ps, 'Cold')).toBe(true);
-        expect(hasMinDamage(ps, 'Fire')).toBe(false);
-    });
-
-    it('returns false when minDamage is not set or explicitly false', () => {
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasMinDamage(makePlayerStats({ automation: { passives: [ENERGY_MASTERY_PASSIVE] } }), 'Fire')).toBe(false);
-
-        const noMin = makePlayerStats({ automation: { passives: [{ ...ENERGY_MASTERY_PASSIVE, minDamage: false }] } });
-        expect(hasMinDamage(noMin, 'Fire')).toBe(false);
-    });
-
-    it('returns false for non-elemental_adept damage_type_choice even with minDamage', () => {
-        const ps = makePlayerStats({
-            automation: {
-                passives: [{
-                    type: 'damage_type_choice',
-                    effect: 'elemental_affinity',
-                    name: 'Elemental Affinity',
-                    damageTypes: ['Fire'],
-                    minDamage: true,
-                }],
-            },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasMinDamage(ps, 'Fire')).toBe(false);
-    });
-
-    it('is case-insensitive for chosen type matching', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [{ ...ENERGY_MASTERY_MIN_DAMAGE_PASSIVE, damageTypes: ['Fire'] }] },
-        });
-        getChosenRuntimeValue.mockReturnValue('fire');
-        expect(hasMinDamage(ps, 'FIRE')).toBe(true);
-    });
-
-    it('ignores passive_rule with ignore_resistance and minDamage', () => {
-        const ps = makePlayerStats({
-            automation: {
-                passives: [{
-                    type: 'passive_rule',
-                    effect: 'ignore_resistance',
-                    damageTypes: ['Fire'],
-                    minDamage: true,
-                }],
-            },
-        });
-        expect(hasMinDamage(ps, 'Fire')).toBe(false);
-    });
-});
-
-// ── hasIgnoreResistance – combined passive_rule and damage_type_choice ──
-
-describe('hasIgnoreResistance – combined passive_rule and damage_type_choice', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getChosenRuntimeValue.mockReturnValue(undefined);
-    });
-
-    const IGNORE_RESISTANCE_PASSIVE = {
-        type: 'passive_rule',
-        effect: 'ignore_resistance',
-        damageTypes: ['Fire'],
+// Faithful Elemental Adept shape (feat byte + declared damage types, #829).
+function elementAdept(name, extra = {}) {
+    return {
+        type: 'damage_type_choice',
+        effect: 'elemental_adept',
+        name,
+        damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
+        ...extra,
     };
+}
 
-    it('returns true for passive_rule damage type even when elemental_adept chosen type differs', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [IGNORE_RESISTANCE_PASSIVE, ENERGY_MASTERY_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Cold');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);
+// Faithful store: each adept passive resolves its OWN chosenType, keyed by
+// passive name — results below are falsifiable proof the branch queries by name.
+function chosenByPassive(map) {
+    getChosenRuntimeValue.mockImplementation((_ps, passiveName) => map[passiveName]);
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    chosenByPassive({}); // explicit falsy default (#940)
+});
+
+// ── hasIgnoreResistance – elemental_adept branch ─────────────────────
+
+describe('hasIgnoreResistance – elemental_adept chosen type', () => {
+    it('resolves each Elemental Adept passive by its own name across multiple passives', () => {
+        const ps = withPassives([
+            elementAdept('Elemental Adept (Fire)'),
+            elementAdept('Elemental Adept (Cold)'),
+        ]);
+        chosenByPassive({ 'Elemental Adept (Cold)': 'Cold' });
+
         expect(hasIgnoreResistance(ps, 'Cold')).toBe(true);
+        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
+        expect(getChosenRuntimeValue).toHaveBeenCalledWith(ps, 'Elemental Adept (Fire)', 'chosenType');
+        expect(getChosenRuntimeValue).toHaveBeenCalledWith(ps, 'Elemental Adept (Cold)', 'chosenType');
     });
 
-    it('returns true when only elemental_adept chosen type matches', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [IGNORE_RESISTANCE_PASSIVE, ENERGY_MASTERY_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Lightning');
-        expect(hasIgnoreResistance(ps, 'Lightning')).toBe(true);
-        expect(hasIgnoreResistance(ps, 'Cold')).toBe(false);
+    it('honours the stored chosen type even outside the declared damageTypes, case-insensitively', () => {
+        const ps = withPassives([elementAdept('Elemental Adept (Fire)', { damageTypes: ['Fire'] })]);
+        chosenByPassive({ 'Elemental Adept (Fire)': 'poison' });
+
+        // The store byte governs; the declared damageTypes list is not re-checked.
+        expect(hasIgnoreResistance(ps, 'POISON')).toBe(true);
+        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
     });
 
-    it('returns true when both passive_rule and elemental_adept match the same type', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [IGNORE_RESISTANCE_PASSIVE, ENERGY_MASTERY_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);
+    it('ignores foreign damage_type_choice effects — only elemental_adept qualifies', () => {
+        const ps = withPassives([{
+            type: 'damage_type_choice',
+            effect: 'elemental_affinity',
+            name: 'Elemental Affinity',
+            damageTypes: ['Fire'],
+        }]);
+        chosenByPassive({ 'Elemental Affinity': 'Fire' });
+
+        expect(hasIgnoreResistance(ps, 'Fire')).toBe(false);
     });
 
-    it('returns false when neither passive_rule nor elemental_adept match', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [IGNORE_RESISTANCE_PASSIVE, ENERGY_MASTERY_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Acid');
-        expect(hasIgnoreResistance(ps, 'Acid')).toBe(true);
-        expect(hasIgnoreResistance(ps, 'Thunder')).toBe(false);
-    });
+    it('unions the elemental_adept arm with the passive_rule arm in one passives array', () => {
+        const ps = withPassives([
+            { type: 'passive_rule', effect: 'ignore_resistance', damageTypes: ['Fire'] },
+            elementAdept('Elemental Adept (Cold)'),
+        ]);
+        chosenByPassive({ 'Elemental Adept (Cold)': 'Cold' });
 
-    it('evaluates passives in order and returns on first match per passive', () => {
-        const ps = makePlayerStats({
-            automation: { passives: [ENERGY_MASTERY_PASSIVE, IGNORE_RESISTANCE_PASSIVE] },
-        });
-        getChosenRuntimeValue.mockReturnValue('Fire');
-        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);
-        expect(hasIgnoreResistance(ps, 'Cold')).toBe(false);
+        expect(hasIgnoreResistance(ps, 'Fire')).toBe(true);    // rule arm alone
+        expect(hasIgnoreResistance(ps, 'Cold')).toBe(true);     // adept arm alone
+        expect(hasIgnoreResistance(ps, 'Thunder')).toBe(false); // neither arm
+    });
+});
+
+// ── hasMinDamage – elemental_adept minDamage consumption ──────────────
+
+describe('hasMinDamage – elemental_adept minDamage consumption', () => {
+    it('supplies minDamage only from elemental_adept, on the chosen type, case-insensitively', () => {
+        const ps = withPassives([elementAdept('Energy Mastery', { minDamage: true, damageTypes: ['Fire'] })]);
+        chosenByPassive({ 'Energy Mastery': 'fire' });
+
+        expect(hasMinDamage(ps, 'FIRE')).toBe(true);
+
+        // passive_rule never supplies minDamage, even armed with the flag + matching types.
+        const ruleMin = withPassives([{
+            type: 'passive_rule',
+            effect: 'ignore_resistance',
+            damageTypes: ['Fire'],
+            minDamage: true,
+        }]);
+        expect(hasMinDamage(ruleMin, 'Fire')).toBe(false);
     });
 });

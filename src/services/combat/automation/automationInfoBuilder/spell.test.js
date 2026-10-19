@@ -1,308 +1,448 @@
-import { describe, it, expect, vi } from 'vitest'
+// @maintained-by-ai
+// ── spell.test.js — automationInfoBuilder spell slice (lane #952 template) ──
+// Unit home for the EXACT emitted info bytes of spellHandlers (spell.js):
+// spell-oriented feature automation rows (free-cast pools, war magic, patron /
+// companion spell slots) → handler-input envelopes as STRINGS/defaults.
+// 18 handlers, censused below. Builder output only — executor math, upcast
+// flow, and render bytes are cited, never re-driven here.
+//
+// Distinguishing code paths inside the slice:
+//   • free_spell / fey_reinforcements / dragon_companion are the slice's
+//     ONLY playerStats readers: uses_expression runs through the REAL
+//     automationExpressions.evaluateAutoExpression with hand-derived goldens
+//     (#820 golden-once, #710 no formula oracle); result `|| 1` collapses
+//     falsy only and OVERWRITES a declared uses.
+//   • contact_patron emits uses_expression verbatim but NEVER resolves it
+//     (no usesMax key) — the collector's reresolveAutomationUsesMax
+//     (automationExpressions.js:196) re-resolves those entries later; the
+//     builder's non-resolution is pinned, not fixed.
+//   • overchannel pins effect:'overchannel' hardcoded (custom effect drops);
+//     dragon_companion hardcodes noConcentration:false (custom drops) —
+//     falsifiable hardcoded-override drop pins (#954/#959).
+//   • Everything else is per-field `||` fallbacks + `!!` flattening — zero
+//     mocks for pure handlers (#791/#953).
+//
+// Executor/render owners cited, never re-driven (this lane pins BUILDER
+// OUTPUT bytes only — info envelopes: damage/DC refs, save types, ranges as
+// STRINGS):
+//   • free-cast EXECUTOR trigger → automation/handlers castAction lane (#945)
+//   • spell pipeline lanes → actionPipeline owner tests
+//   • upcast flow → #947/#945 · spell position resolver → #946
+//   • spell_effect render → #884 · LogSpell render bytes → #887
+//   • spell overlay → #913/#914/#873
+//   • facade delegation → ../automationInfoBuilder.test.js (no per-type pins
+//     there; this file is the canonical home, incl. spell_modifier's
+//     resource:'sorcery_points' default — sorcery.test.js delegates it here)
+//   • collector inputs → automationCollector.* lanes · free-cast pool bake/
+//     re-resolve → automationService.feyReinforcements.test.js & CLA-229
+//     reresolve lane (usesMax re-resolve lives there, not here).
+//
+// Old → new map (old file: 35 per-field toMatchObject/toBe + 4 vi.spyOn
+// evaluator mocks its → 5 tests):
+//   per-handler 'returns correct structure with defaults' ×16
+//     → census of all 18 + BARE exact-byte envelope loop (1)  [the two
+//       untested handlers minor_telekinesis_spell & sanctuary now covered]
+//   per-handler 'passes through custom fields' ×15 + overchannel casting_time
+//     → one full-custom exact table (customs ≠ defaults #954), unknownKey
+//     injected per case (unread-key leak pin), hardcoded-override drop pins
+//     (overchannel effect, dragon_companion noConcentration), free_spell
+//     uses_expression > declared uses, contact_patron non-resolution (2)
+//   free_spell/fey/dragon 'resolves usesMax' + 'falls back to 1' ×5 vi.spyOn
+//     mocks → REAL-evaluator golden loop (proficiency_bonus→3, level→5,
+//     '0'→||1 collapse, prof-0 stats→1, truthy-string passthrough) (3)
+//   free_spell/spell_thief/war_magic 'coerces booleans' ×3 + silent ||
+//     defaults → coercion folded table: 0/'' collapse at || sites, !!
+//     flattens truthy/0 (this module's real operator sites only) #959 (4)
+//   (none)                              → null-automation throw loop (5)
+
+import { describe, it, expect } from 'vitest'
 import { spellHandlers } from './spell.js'
-import * as expressModule from '../automationExpressions.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.test-utils.js'
 
-// ── Shared helpers ───────────────────────────────────────────────────
+const NAME = 'Test Feature'
 
-/**
- * Assert that a handler returns the expected structural properties
- * (type, name, hasAutomation) and passes through a set of custom fields.
- * This replaces the brittle "defaults snapshot + custom fields snapshot"
- * pattern with a single behavioral test per handler.
- */
-function expectHandlerPassesThrough(featureType, customFields, expectedOverrides) {
-    const feature = makeFeature({ type: featureType, ...customFields })
-    const result = spellHandlers[featureType](feature, BASE_STATS)
-    for (const [key, value] of Object.entries(expectedOverrides)) {
-        if (Array.isArray(value)) {
-            expect(result[key]).toEqual(value)
-        } else {
-            expect(result[key]).toBe(value)
-        }
+// Hand-derived exact envelopes for a bare feature makeFeature({ type })
+// against BASE_STATS (level 5, proficiency 3, STR 4 DEX 2 CON 3 INT 1
+// WIS 5 CHA 2). Pins every default, the full key set (extra/dropped keys
+// fail), name forwarding and hasAutomation. Only free_spell carries a
+// description key; contact_patron carries NO usesMax key (uses_expression
+// is echoed unresolved — the collector re-resolves it later).
+const BARE = {
+    free_spell: {
+        type: 'free_spell',
+        name: NAME,
+        description: '',
+        spell: '',
+        uses: 1,
+        uses_expression: '',
+        usesMax: 1,
+        recharge: 'long_rest',
+        action: 'action',
+        duration: '',
+        concentration: false,
+        noConcentration: false,
+        resourceCost: '',
+        freeCasts: '',
+        casting_time: '',
+        perSpellTracking: false,
+        hasAutomation: true
+    },
+    fey_reinforcements: {
+        type: 'fey_reinforcements',
+        name: NAME,
+        spell: '',
+        uses: 1,
+        uses_expression: '',
+        usesMax: 1,
+        recharge: 'long_rest',
+        action: 'action',
+        duration: '',
+        casting_time: '',
+        hasAutomation: true
+    },
+    contact_patron: {
+        type: 'contact_patron',
+        name: NAME,
+        spell: '',
+        uses: 1,
+        uses_expression: '',
+        recharge: 'long_rest',
+        action: 'action',
+        casting_time: '',
+        hasAutomation: true
+    },
+    dragon_companion: {
+        type: 'dragon_companion',
+        name: NAME,
+        spell: '',
+        uses: 1,
+        uses_expression: '',
+        usesMax: 1,
+        recharge: 'long_rest',
+        action: 'action',
+        noConcentration: false,
+        hasAutomation: true
+    },
+    spell_modifier: {
+        type: 'spell_modifier',
+        name: NAME,
+        options: [],
+        resource: 'sorcery_points',
+        hasAutomation: true
+    },
+    spell_thief: {
+        type: 'spell_thief',
+        name: NAME,
+        saveType: 'INT',
+        saveDc: 'ability',
+        saveAbility: 'INT',
+        trigger: 'spell_cast',
+        oncePerLongRest: false,
+        casting_time: '1 reaction',
+        hasAutomation: true
+    },
+    war_magic_cantrip: {
+        type: 'war_magic_cantrip',
+        name: NAME,
+        spellList: 'wizard_cantrips',
+        action: 'action',
+        casting_time: '1 action',
+        hasAutomation: true
+    },
+    war_magic_spell: {
+        type: 'war_magic_spell',
+        name: NAME,
+        spellList: 'wizard_spells',
+        maxSpellLevel: 2,
+        action: 'action',
+        casting_time: '1 action',
+        replacesWarMagic: false,
+        hasAutomation: true
+    },
+    arcane_charge: {
+        type: 'arcane_charge',
+        name: NAME,
+        distance: '30 ft',
+        casting_time: '1 action',
+        hasAutomation: true
+    },
+    guarded_mind: {
+        type: 'guarded_mind',
+        name: NAME,
+        resource: 'psionicEnergy',
+        action: 'action',
+        casting_time: '1 action',
+        hasAutomation: true
+    },
+    bulwark_of_force: {
+        type: 'bulwark_of_force',
+        name: NAME,
+        range: '30_ft',
+        duration: '1_round',
+        casting_time: '1 bonus action',
+        hasAutomation: true
+    },
+    signature_spells: {
+        type: 'signature_spells',
+        name: NAME,
+        action: 'action',
+        casting_time: 'passive',
+        hasAutomation: true
+    },
+    spell_mastery: {
+        type: 'spell_mastery',
+        name: NAME,
+        action: 'action',
+        casting_time: 'passive',
+        hasAutomation: true
+    },
+    overchannel: {
+        type: 'overchannel',
+        name: NAME,
+        effect: 'overchannel',
+        casting_time: 'passive',
+        hasAutomation: true
+    },
+    pass_without_trace: {
+        type: 'pass_without_trace',
+        name: NAME,
+        duration: '1_hour',
+        auraRange: 30,
+        casting_time: '1 action',
+        hasAutomation: true
+    },
+    warding_bond: {
+        type: 'warding_bond',
+        name: NAME,
+        range: 'touch',
+        duration: '1 hour',
+        casting_time: '1 action',
+        hasAutomation: true
+    },
+    minor_telekinesis_spell: {
+        type: 'minor_telekinesis_spell',
+        name: NAME,
+        spell: '',
+        hasAutomation: true
+    },
+    sanctuary: {
+        type: 'sanctuary',
+        name: NAME,
+        range: '30 feet',
+        duration: '1 minute',
+        casting_time: '1 bonus action',
+        hasAutomation: true
     }
 }
 
-// ── free_spell ───────────────────────────────────────────────────────
+const TYPES = Object.keys(BARE)
 
-describe('spellHandlers – free_spell', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'free_spell' })
-        const result = spellHandlers.free_spell(feature, BASE_STATS)
-        expect(result).toMatchObject({
-            type: 'free_spell', name: 'Test Feature', hasAutomation: true,
-            usesMax: 1, concentration: false, noConcentration: false,
-            perSpellTracking: false,
-        })
+describe('spellHandlers', () => {
+    it('emits the exact default envelope for every handler (census of all 18)', () => {
+        // Census (#952): a new spell handler added to neither table fails here.
+        expect(Object.keys(spellHandlers).sort()).toEqual(TYPES.slice().sort())
+
+        for (const type of TYPES) {
+            expect(spellHandlers[type](makeFeature({ type }), BASE_STATS), type).toEqual(BARE[type])
+        }
     })
 
-    it('passes through custom fields', () => expectHandlerPassesThrough('free_spell', {
-        spell: 'fireball', uses: 3, recharge: 'short_rest', action: 'bonus_action',
-        duration: '1_minute', concentration: true, resourceCost: 'spell_slot',
-        freeCasts: 'once_per_rest', casting_time: '1 action', perSpellTracking: true,
-    }, {
-        spell: 'fireball', uses: 3, recharge: 'short_rest', action: 'bonus_action',
-        duration: '1_minute', concentration: true, resourceCost: 'spell_slot',
-        freeCasts: 'once_per_rest', casting_time: '1 action', perSpellTracking: true,
-    }))
+    it('copies declared fields verbatim, drops unread/hardcoded keys (all customs ≠ defaults)', () => {
+        // unknownKey + description are injected into EVERY case: exact toEqual
+        // fails if the builder ever leaks unread automation keys; description
+        // forwarding is free_spell-only (all other envelopes stay key-exact).
+        const build = (automation, name = NAME) =>
+            spellHandlers[automation.type]({ name, description: 'Some description', automation: { ...automation, unknownKey: 'leak?' } }, BASE_STATS)
 
-    it('coerces boolean and number fields to booleans', () => {
-        const feature = makeFeature({ type: 'free_spell', concentration: 'yes', noConcentration: 1 })
-        const result = spellHandlers.free_spell(feature, BASE_STATS)
-        expect(result.concentration).toBe(true)
-        expect(result.noConcentration).toBe(true)
+        const cases = [
+            {
+                // free_spell reads every declared field incl. noConcentration
+                // (contrast dragon_companion below) and forwards description.
+                feature: makeFeature({
+                    type: 'free_spell', spell: 'fireball', uses: 3, recharge: 'short_rest',
+                    action: 'bonus_action', duration: '1_minute', concentration: true,
+                    noConcentration: true, resourceCost: 'spell_slot', freeCasts: 'once_per_rest',
+                    casting_time: '1 action', perSpellTracking: true
+                }, 'Expeditious Retreat'),
+                expected: {
+                    ...BARE.free_spell, name: 'Expeditious Retreat', description: 'Some description', spell: 'fireball', uses: 3, usesMax: 3,
+                    recharge: 'short_rest', action: 'bonus_action', duration: '1_minute', concentration: true,
+                    noConcentration: true, resourceCost: 'spell_slot', freeCasts: 'once_per_rest',
+                    casting_time: '1 action', perSpellTracking: true
+                }
+            },
+            {
+                feature: makeFeature({
+                    type: 'fey_reinforcements', spell: 'call lightning', uses: 2,
+                    recharge: 'short_rest', action: 'bonus_action', duration: '1_round',
+                    casting_time: '1 reaction'
+                }, 'Fey Guard'),
+                expected: {
+                    ...BARE.fey_reinforcements, name: 'Fey Guard', spell: 'call lightning', uses: 2, usesMax: 2,
+                    recharge: 'short_rest', action: 'bonus_action', duration: '1_round', casting_time: '1 reaction'
+                }
+            },
+            {
+                // contact_patron NEVER evaluates uses_expression: uses stays at
+                // the declared constant and the envelope carries NO usesMax key
+                // (collector reresolveAutomationUsesMax owns later resolution).
+                feature: makeFeature({
+                    type: 'contact_patron', spell: 'contact other plane', uses: 3,
+                    uses_expression: 'proficiency_bonus', recharge: 'short_rest',
+                    action: 'bonus_action', casting_time: '1 minute'
+                }, 'Dark Pact'),
+                expected: {
+                    ...BARE.contact_patron, name: 'Dark Pact', spell: 'contact other plane', uses: 3,
+                    uses_expression: 'proficiency_bonus', recharge: 'short_rest',
+                    action: 'bonus_action', casting_time: '1 minute'
+                }
+            },
+            {
+                // dragon_companion hardcodes noConcentration:false — declared
+                // true must not leak (hardcoded-override drop pin #954).
+                feature: makeFeature({
+                    type: 'dragon_companion', spell: 'drakonir companion', uses: 2,
+                    recharge: 'short_rest', action: 'bonus_action', noConcentration: true
+                }, 'Drakonir'),
+                expected: {
+                    ...BARE.dragon_companion, name: 'Drakonir', spell: 'drakonir companion', uses: 2, usesMax: 2,
+                    recharge: 'short_rest', action: 'bonus_action'
+                }
+            },
+            {
+                feature: makeFeature({ type: 'spell_modifier', options: [{ name: 'Empowered' }], resource: 'spell_slot' }, 'Empower Spell'),
+                expected: { ...BARE.spell_modifier, name: 'Empower Spell', options: [{ name: 'Empowered' }], resource: 'spell_slot' }
+            },
+            {
+                feature: makeFeature({
+                    type: 'spell_thief', saveType: 'WIS', saveDc: 15, saveAbility: 'CHA',
+                    trigger: 'spell_miss', oncePerLongRest: true, casting_time: '1 action'
+                }, 'Arcane Theft'),
+                expected: {
+                    ...BARE.spell_thief, name: 'Arcane Theft', saveType: 'WIS', saveDc: 15, saveAbility: 'CHA',
+                    trigger: 'spell_miss', oncePerLongRest: true, casting_time: '1 action'
+                }
+            },
+            {
+                feature: makeFeature({ type: 'war_magic_cantrip', spellList: 'sorcerer_cantrips', action: 'bonus_action', casting_time: '1 bonus action' }, 'Battle Casting'),
+                expected: { ...BARE.war_magic_cantrip, name: 'Battle Casting', spellList: 'sorcerer_cantrips', action: 'bonus_action', casting_time: '1 bonus action' }
+            },
+            {
+                feature: makeFeature({ type: 'war_magic_spell', spellList: 'sorcerer_spells', maxSpellLevel: 3, action: 'reaction', casting_time: '1 reaction', replacesWarMagic: true }, 'Overwritten Spell'),
+                expected: { ...BARE.war_magic_spell, name: 'Overwritten Spell', spellList: 'sorcerer_spells', maxSpellLevel: 3, action: 'reaction', casting_time: '1 reaction', replacesWarMagic: true }
+            },
+            {
+                feature: makeFeature({ type: 'arcane_charge', distance: '60 ft', casting_time: '1 bonus action' }, 'Surge'),
+                expected: { ...BARE.arcane_charge, name: 'Surge', distance: '60 ft', casting_time: '1 bonus action' }
+            },
+            {
+                feature: makeFeature({ type: 'guarded_mind', resource: 'sorcery_points', action: 'bonus_action', casting_time: '1 bonus action' }, 'Iron Will'),
+                expected: { ...BARE.guarded_mind, name: 'Iron Will', resource: 'sorcery_points', action: 'bonus_action', casting_time: '1 bonus action' }
+            },
+            {
+                feature: makeFeature({ type: 'bulwark_of_force', range: '60_ft', duration: '1_minute', casting_time: '1 action' }, 'Force Bulwark'),
+                expected: { ...BARE.bulwark_of_force, name: 'Force Bulwark', range: '60_ft', duration: '1_minute', casting_time: '1 action' }
+            },
+            {
+                feature: makeFeature({ type: 'signature_spells', action: 'bonus_action', casting_time: '1 action' }, 'Signature Sigil'),
+                expected: { ...BARE.signature_spells, name: 'Signature Sigil', action: 'bonus_action', casting_time: '1 action' }
+            },
+            {
+                feature: makeFeature({ type: 'spell_mastery', action: 'bonus_action', casting_time: '1 action' }, 'Mastered Arcana'),
+                expected: { ...BARE.spell_mastery, name: 'Mastered Arcana', action: 'bonus_action', casting_time: '1 action' }
+            },
+            {
+                // overchannel: effect is hardcoded 'overchannel' — declared
+                // custom must not leak (falsifiable drop pin #842).
+                feature: makeFeature({ type: 'overchannel', casting_time: '1 action', effect: 'mega_channel', damage: '9d10' }, 'Overchannel Now'),
+                expected: { ...BARE.overchannel, name: 'Overchannel Now', casting_time: '1 action' }
+            },
+            {
+                feature: makeFeature({ type: 'pass_without_trace', duration: '8_hours', auraRange: 60, casting_time: '1 bonus action' }, 'Untraceable'),
+                expected: { ...BARE.pass_without_trace, name: 'Untraceable', duration: '8_hours', auraRange: 60, casting_time: '1 bonus action' }
+            },
+            {
+                feature: makeFeature({ type: 'warding_bond', range: '30 ft', duration: '8 hours', casting_time: '1 reaction' }, 'Symbiotic Bond'),
+                expected: { ...BARE.warding_bond, name: 'Symbiotic Bond', range: '30 ft', duration: '8 hours', casting_time: '1 reaction' }
+            },
+            {
+                feature: makeFeature({ type: 'minor_telekinesis_spell', spell: 'telekinetic' }, 'Minor Telekinesis'),
+                expected: { ...BARE.minor_telekinesis_spell, name: 'Minor Telekinesis', spell: 'telekinetic' }
+            },
+            {
+                feature: makeFeature({ type: 'sanctuary', range: 'touch', duration: '10 minutes', casting_time: '1 action' }, 'Hallow Shield'),
+                expected: { ...BARE.sanctuary, name: 'Hallow Shield', range: 'touch', duration: '10 minutes', casting_time: '1 action' }
+            }
+        ]
+
+        for (const { feature, expected } of cases) {
+            expect(build(feature.automation, feature.name), feature.name).toEqual(expected)
+        }
     })
 
-    it('resolves usesMax from uses_expression', () => {
-        const evaluateAutoExpression = vi.spyOn(expressModule, 'evaluateAutoExpression').mockReturnValue(5)
-        const result = spellHandlers.free_spell(makeFeature({ type: 'free_spell', uses_expression: 'proficiency_bonus' }), BASE_STATS)
-        expect(result.usesMax).toBe(5)
-        evaluateAutoExpression.mockRestore()
+    it('resolves uses_expression via the REAL evaluator for the 3 stats-reading handlers, || 1 collapsing falsy only', () => {
+        // Goldens hand-derived once from BASE_STATS (level 5, proficiency 3);
+        // evaluator internals are unit-owned (automationExpressions.test.js).
+        const build = (type, auto, stats = BASE_STATS) =>
+            spellHandlers[type](makeFeature({ type, ...auto }), stats)
+
+        // Token resolution is real, not copied: proficiency_bonus→3, level→5.
+        expect(build('free_spell', { uses_expression: 'proficiency_bonus' })).toEqual({ ...BARE.free_spell, uses: 3, usesMax: 3, uses_expression: 'proficiency_bonus' })
+        expect(build('free_spell', { uses_expression: 'level' })).toEqual({ ...BARE.free_spell, uses: 5, usesMax: 5, uses_expression: 'level' })
+        expect(build('fey_reinforcements', { uses_expression: 'proficiency_bonus' })).toEqual({ ...BARE.fey_reinforcements, uses: 3, usesMax: 3, uses_expression: 'proficiency_bonus' })
+        expect(build('dragon_companion', { uses_expression: 'level' })).toEqual({ ...BARE.dragon_companion, uses: 5, usesMax: 5, uses_expression: 'level' })
+
+        // Resolved expression OVERWRITES a declared uses (contrast
+        // contact_patron, which keeps uses:3 — pinned in the customs table).
+        expect(build('free_spell', { uses: 4, uses_expression: 'level' })).toEqual({ ...BARE.free_spell, uses: 5, usesMax: 5, uses_expression: 'level' })
+
+        // Falsy evaluator results collapse to 1 via `|| 1` — declared uses:4
+        // must NOT resurrect ('0' is pure arithmetic → numeric 0).
+        expect(build('free_spell', { uses: 4, uses_expression: '0' }).usesMax).toBe(1)
+        expect(build('dragon_companion', { uses_expression: 'proficiency_bonus' }, { ...BASE_STATS, proficiency: 0 }).usesMax).toBe(1)
+
+        // Truthy NON-numeric (unknown tokens pass through as a string, with a
+        // console.warn from the evaluator) — `|| 1` guards falsy only.
+        expect(build('fey_reinforcements', { uses_expression: 'no_such_token' }).usesMax).toBe('no_such_token')
     })
 
-    it('falls back to 1 when uses_expression returns falsy', () => {
-        const evaluateAutoExpression = vi.spyOn(expressModule, 'evaluateAutoExpression').mockReturnValue(null)
-        const result = spellHandlers.free_spell(makeFeature({ type: 'free_spell', uses_expression: 'proficiency_bonus', uses: 4 }), BASE_STATS)
-        expect(result.usesMax).toBe(1)
-        evaluateAutoExpression.mockRestore()
-    })
-})
+    it('collapses 0/"" at || sites back to defaults and flattens booleans at !! sites', () => {
+        const build = (type, auto) => spellHandlers[type](makeFeature({ type, ...auto }), BASE_STATS)
 
-// ── fey_reinforcements ───────────────────────────────────────────────
+        // uses || 1 — declared 0 collapses (all four handlers that mirror it).
+        expect(build('free_spell', { uses: 0 })).toEqual(BARE.free_spell)
+        expect(build('fey_reinforcements', { uses: 0 })).toEqual(BARE.fey_reinforcements)
+        expect(build('contact_patron', { uses: 0 })).toEqual(BARE.contact_patron)
+        expect(build('dragon_companion', { uses: 0 })).toEqual(BARE.dragon_companion)
 
-describe('spellHandlers – fey_reinforcements', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'fey_reinforcements' })
-        const result = spellHandlers.fey_reinforcements(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'fey_reinforcements', hasAutomation: true, usesMax: 1 })
-    })
+        // Numeric || sites collapse 0 (types differ from the fallback default).
+        expect(build('war_magic_spell', { maxSpellLevel: 0 }).maxSpellLevel).toBe(2)
+        expect(build('pass_without_trace', { auraRange: 0 }).auraRange).toBe(30)
+        expect(build('spell_thief', { saveDc: 0 }).saveDc).toBe('ability')
 
-    it('passes through custom fields', () => expectHandlerPassesThrough('fey_reinforcements', {
-        spell: 'call lightess', uses: 2, recharge: 'short_rest', action: 'bonus_action',
-        duration: '1_round', casting_time: '1 reaction',
-    }, {
-        spell: 'call lightess', uses: 2, recharge: 'short_rest', action: 'bonus_action',
-        duration: '1_round', casting_time: '1 reaction',
-    }))
+        // Empty-string || sites fall back to their defaults (= BARE).
+        expect(build('free_spell', { spell: '', recharge: '', action: '', duration: '', resourceCost: '', freeCasts: '', casting_time: '', uses_expression: '' })).toEqual(BARE.free_spell)
+        expect(build('spell_thief', { saveType: '', saveAbility: '', trigger: '', casting_time: '' })).toEqual(BARE.spell_thief)
+        expect(build('war_magic_cantrip', { spellList: '', action: '', casting_time: '' })).toEqual(BARE.war_magic_cantrip)
+        expect(build('signature_spells', { action: '', casting_time: '' })).toEqual(BARE.signature_spells)
+        expect(build('overchannel', { casting_time: '' })).toEqual(BARE.overchannel)
+        expect(build('warding_bond', { range: '', duration: '', casting_time: '' })).toEqual(BARE.warding_bond)
+        expect(build('sanctuary', { range: '', duration: '', casting_time: '' })).toEqual(BARE.sanctuary)
 
-    it('resolves usesMax from uses_expression', () => {
-        const evaluateAutoExpression = vi.spyOn(expressModule, 'evaluateAutoExpression').mockReturnValue(3)
-        const result = spellHandlers.fey_reinforcements(makeFeature({ type: 'fey_reinforcements', uses_expression: 'proficiency_bonus' }), BASE_STATS)
-        expect(result.usesMax).toBe(3)
-        evaluateAutoExpression.mockRestore()
-    })
-})
-
-// ── contact_patron ───────────────────────────────────────────────────
-
-describe('spellHandlers – contact_patron', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'contact_patron' })
-        const result = spellHandlers.contact_patron(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'contact_patron', hasAutomation: true })
+        // !! sites: truthy strings flatten to true …
+        expect(build('free_spell', { concentration: 'yes', noConcentration: 'yes', perSpellTracking: 'yes' })).toEqual(
+            { ...BARE.free_spell, concentration: true, noConcentration: true, perSpellTracking: true })
+        expect(build('war_magic_spell', { replacesWarMagic: 'yes' }).replacesWarMagic).toBe(true)
+        expect(build('spell_thief', { oncePerLongRest: 'yes' }).oncePerLongRest).toBe(true)
+        // … and 0/"" flatten to false (= BARE).
+        expect(build('spell_thief', { oncePerLongRest: 0 })).toEqual(BARE.spell_thief)
+        expect(build('free_spell', { concentration: 0, perSpellTracking: '' })).toEqual(BARE.free_spell)
     })
 
-    it('passes through custom fields', () => expectHandlerPassesThrough('contact_patron', {
-        spell: 'contact other plane', uses: 3, casting_time: '1 action',
-    }, { spell: 'contact other plane', uses: 3, casting_time: '1 action' }))
-})
-
-// ── dragon_companion ─────────────────────────────────────────────────
-
-describe('spellHandlers – dragon_companion', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'dragon_companion' })
-        const result = spellHandlers.dragon_companion(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'dragon_companion', hasAutomation: true, usesMax: 1, noConcentration: false })
+    it('throws TypeError for every handler when automation is null or undefined', () => {
+        for (const type of TYPES) {
+            expect(() => spellHandlers[type]({ name: NAME, automation: null }, BASE_STATS), `${type} null`).toThrow(TypeError)
+            expect(() => spellHandlers[type]({ name: NAME }, BASE_STATS), `${type} undefined`).toThrow(TypeError)
+        }
     })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('dragon_companion', {
-        spell: 'drakonir companion', uses: 2, recharge: 'short_rest', action: 'bonus_action',
-    }, { spell: 'drakonir companion', uses: 2, recharge: 'short_rest', action: 'bonus_action' }))
-
-    it('resolves usesMax from uses_expression', () => {
-        const evaluateAutoExpression = vi.spyOn(expressModule, 'evaluateAutoExpression').mockReturnValue(4)
-        const result = spellHandlers.dragon_companion(makeFeature({ type: 'dragon_companion', uses_expression: 'proficiency_bonus' }), BASE_STATS)
-        expect(result.usesMax).toBe(4)
-        evaluateAutoExpression.mockRestore()
-    })
-})
-
-// ── spell_modifier ───────────────────────────────────────────────────
-
-describe('spellHandlers – spell_modifier', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'spell_modifier' })
-        const result = spellHandlers.spell_modifier(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'spell_modifier', hasAutomation: true, options: [], resource: 'sorcery_points' })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('spell_modifier', {
-        options: [{ name: 'Empowered' }], resource: 'spell_slot',
-    }, { options: [{ name: 'Empowered' }], resource: 'spell_slot' }))
-})
-
-// ── spell_thief ──────────────────────────────────────────────────────
-
-describe('spellHandlers – spell_thief', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'spell_thief' })
-        const result = spellHandlers.spell_thief(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'spell_thief', hasAutomation: true, oncePerLongRest: false })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('spell_thief', {
-        saveType: 'WIS', saveDc: 15, saveAbility: 'CHA', trigger: 'spell_miss', oncePerLongRest: true, casting_time: '1 action',
-    }, { saveType: 'WIS', saveDc: 15, saveAbility: 'CHA', trigger: 'spell_miss', oncePerLongRest: true, casting_time: '1 action' }))
-
-    it('coerces oncePerLongRest to boolean', () => {
-        const result = spellHandlers.spell_thief(makeFeature({ type: 'spell_thief', oncePerLongRest: 'yes' }), BASE_STATS)
-        expect(result.oncePerLongRest).toBe(true)
-    })
-})
-
-// ── war_magic_cantrip ────────────────────────────────────────────────
-
-describe('spellHandlers – war_magic_cantrip', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'war_magic_cantrip' })
-        const result = spellHandlers.war_magic_cantrip(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'war_magic_cantrip', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('war_magic_cantrip', {
-        spellList: 'sorcerer_cantrips', action: 'bonus_action', casting_time: '1 bonus action',
-    }, { spellList: 'sorcerer_cantrips', action: 'bonus_action', casting_time: '1 bonus action' }))
-})
-
-// ── war_magic_spell ──────────────────────────────────────────────────
-
-describe('spellHandlers – war_magic_spell', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'war_magic_spell' })
-        const result = spellHandlers.war_magic_spell(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'war_magic_spell', hasAutomation: true, replacesWarMagic: false })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('war_magic_spell', {
-        spellList: 'sorcerer_spells', maxSpellLevel: 3, replacesWarMagic: true, action: 'bonus_action',
-    }, { spellList: 'sorcerer_spells', maxSpellLevel: 3, replacesWarMagic: true, action: 'bonus_action' }))
-
-    it('coerces replacesWarMagic to boolean', () => {
-        const result = spellHandlers.war_magic_spell(makeFeature({ type: 'war_magic_spell', replacesWarMagic: 'yes' }), BASE_STATS)
-        expect(result.replacesWarMagic).toBe(true)
-    })
-})
-
-// ── arcane_charge ────────────────────────────────────────────────────
-
-describe('spellHandlers – arcane_charge', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'arcane_charge' })
-        const result = spellHandlers.arcane_charge(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'arcane_charge', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('arcane_charge', {
-        distance: '60 ft', casting_time: '1 bonus action',
-    }, { distance: '60 ft', casting_time: '1 bonus action' }))
-})
-
-// ── guarded_mind ─────────────────────────────────────────────────────
-
-describe('spellHandlers – guarded_mind', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'guarded_mind' })
-        const result = spellHandlers.guarded_mind(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'guarded_mind', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('guarded_mind', {
-        resource: 'sorcery_points', action: 'bonus_action', casting_time: '1 bonus action',
-    }, { resource: 'sorcery_points', action: 'bonus_action', casting_time: '1 bonus action' }))
-})
-
-// ── bulwark_of_force ─────────────────────────────────────────────────
-
-describe('spellHandlers – bulwark_of_force', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'bulwark_of_force' })
-        const result = spellHandlers.bulwark_of_force(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'bulwark_of_force', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('bulwark_of_force', {
-        range: '60_ft', duration: '1_minute', casting_time: '1 action',
-    }, { range: '60_ft', duration: '1_minute', casting_time: '1 action' }))
-})
-
-// ── signature_spells ─────────────────────────────────────────────────
-
-describe('spellHandlers – signature_spells', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'signature_spells' })
-        const result = spellHandlers.signature_spells(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'signature_spells', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('signature_spells', {
-        action: 'bonus_action', casting_time: '1 action',
-    }, { action: 'bonus_action', casting_time: '1 action' }))
-})
-
-// ── spell_mastery ────────────────────────────────────────────────────
-
-describe('spellHandlers – spell_mastery', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'spell_mastery' })
-        const result = spellHandlers.spell_mastery(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'spell_mastery', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('spell_mastery', {
-        action: 'bonus_action', casting_time: '1 action',
-    }, { action: 'bonus_action', casting_time: '1 action' }))
-})
-
-// ── overchannel ──────────────────────────────────────────────────────
-
-describe('spellHandlers – overchannel', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'overchannel' })
-        const result = spellHandlers.overchannel(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'overchannel', hasAutomation: true, effect: 'overchannel' })
-    })
-
-    it('passes through custom casting_time', () => {
-        const result = spellHandlers.overchannel(makeFeature({ type: 'overchannel', casting_time: '1 action' }), BASE_STATS)
-        expect(result.casting_time).toBe('1 action')
-    })
-})
-
-// ── pass_without_trace ───────────────────────────────────────────────
-
-describe('spellHandlers – pass_without_trace', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'pass_without_trace' })
-        const result = spellHandlers.pass_without_trace(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'pass_without_trace', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('pass_without_trace', {
-        duration: '8_hours', auraRange: 60, casting_time: '1 bonus action',
-    }, { duration: '8_hours', auraRange: 60, casting_time: '1 bonus action' }))
-})
-
-// ── warding_bond ─────────────────────────────────────────────────────
-
-describe('spellHandlers – warding_bond', () => {
-    it('returns correct structure with defaults', () => {
-        const feature = makeFeature({ type: 'warding_bond' })
-        const result = spellHandlers.warding_bond(feature, BASE_STATS)
-        expect(result).toMatchObject({ type: 'warding_bond', hasAutomation: true })
-    })
-
-    it('passes through custom fields', () => expectHandlerPassesThrough('warding_bond', {
-        range: '30 ft', duration: '8 hours', casting_time: '1 reaction',
-    }, { range: '30 ft', duration: '8 hours', casting_time: '1 reaction' }))
 })

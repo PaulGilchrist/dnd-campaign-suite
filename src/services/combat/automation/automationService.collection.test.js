@@ -1,4 +1,57 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+// @maintained-by-ai
+// CITATION-OWNER (#957/#960): automationService.collection.test.js owns service-level catalog
+// categorization — which features the facade collects, what filters them out, and which bucket
+// each survivor lands in. Row-bytes belong to the builder lanes; exhaustive type→bucket dispatch
+// breadth belongs to the collector lanes.
+//
+// ── Collector-vs-service split ──────────────────────────────────────────────
+// | facet                                             | home                                  |
+// | type→bucket breadth matrix (≈100 types)        | automationCollector.types.test.js   |
+// | SPECIAL_AUTOMATIONS pre-router exact row bytes | automationCollector.coverage.test.js |
+// | builder row shapes (GWF feat, countercharm,     | automationInfoBuilder/*.test.js     |
+// | fortified_health rename, font_of_inspiration)    |                                   |
+// | filter legs + mixed-roster catalog envelope +   | THIS FILE (via facade import)       |
+// | processFeatureAutomation push/dedupe contract    |                                   |
+// ─────────────────────────────────────────────────────────────────────────────
+// Facade import './automationService.js' is intentional: it pins the service's public
+// re-export of collectAutomationFromFeatures/processFeatureAutomation (facade wiring was
+// closed in #971's buildAttackInfo lane; the collector lanes import './automationCollector.js'
+// directly, so this facade leg would go dark without it).
+//
+// attack_rider predicate routing (trigger/chooseOne/maxEffects → passives) REMOVED here:
+// strict-subset duplicate of automationCollector.types.test.js:252-265, per that file's
+// ATTACK_RIDER_OWNER-SPLIT-VERDICT (#2089) which rec'd this exact cut for this turn.
+// great_weapon_fighting / fortified_health / countercharm / font_of_inspiration kept as
+// CATALOG-BUCKET faces only (type+name fingerprint); their row bytes are cited-owned
+// by automationInfoBuilder/damage.test.js, passive.test.js, core-handlers.test.js and
+// diverse.test.js respectively — do not re-pin bytes here.
+//
+// Old → new line map (old file had 27 tests, now 5):
+//   old:17  null/undefined/empty buckets        → new "returns nine empty buckets"
+//   old:39  no-automation/null skip             → new "filter legs"
+//   old:50  empty automation array skip         → new "filter legs"
+//   old:66  save_attack/attack_rider/bonus_attacks/resource_pool → actions → golden
+//   old:78  healing/buff_ally action split       → golden
+//   old:91  warding_bond/font_of_magic actions   → golden (warding_bond name fingerprint)
+//   old:98  extra_action bonus_action skip       → golden (row ACTUALLY lands in actions,
+//                                                    not skipped — old title was dishonest)
+//   old:113 damage_reduction/auto_reroll/reaction_debuff → golden
+//   old:124 countercharm reaction                 → golden (bytes: infoBuilder/core-handlers)
+//   old:150 passive_rule/evasion/resistance       → golden
+//   old:161 fortified_health passive              → golden
+//   old:169 font_of_inspiration passive           → golden (now pins dual-bucket too)
+//   old:187 combat_stance special                 → golden
+//   old:196 attack_rider predicate routing        → REMOVED (types.test.js:252-265 superset)
+//   old:222 primalKnowledge skills extract        → golden (exact skills array)
+//   old:229 primalKnowledge empty legs            → golden (empty-skills feature)
+//   old:246 great_weapon_fighting catalog face    → golden (bytes: infoBuilder/damage.test.js)
+//   old:264 mixed categorization                  → golden
+//   old:280 array automation per-item             → golden (array feature in roster;
+//                                                    CLA-061 Contact Patron stays in types.test.js)
+//   old:292 unknown type skip                     → filter legs (full envelope)
+//   old:307/315/324 process empty/null buckets    → "returns the empty envelope"
+//   old:333/341/353/362 process push/dedupe      → "pushes new rows… deduped by name"
+import { describe, it, expect } from 'vitest'
 
 import {
   collectAutomationFromFeatures,
@@ -6,373 +59,174 @@ import {
 } from './automationService.js'
 import { makePlayerStats, makeFeature } from './automationService.test-utils.js'
 
-// ── collectAutomationFromFeatures: null/empty handling ──────────────
-describe('collectAutomationFromFeatures: null and empty handling', () => {
-  let playerStats
+const playerStats = makePlayerStats()
 
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
+const BUCKETS = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
 
-  it('returns all-empty buckets when features is null, undefined, or empty', () => {
-    const nullResult = collectAutomationFromFeatures(null, playerStats)
-    const undefResult = collectAutomationFromFeatures(undefined, playerStats)
-    const emptyResult = collectAutomationFromFeatures([], playerStats)
-
-    const buckets = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
-    for (const bucket of buckets) {
-      expect(nullResult[bucket]).toEqual([])
-      expect(undefResult[bucket]).toEqual([])
-      expect(emptyResult[bucket]).toEqual([])
+// Full-catalog fingerprint: every bucket pinned at once so a lost row, a double-push,
+// or the specialActions fallback cannot hide. Row objects are fingerprinted as
+// {type, name} — builder-owned bytes are pinned in the builder lanes, not here.
+function catalog(result) {
+    return {
+        ...Object.fromEntries(BUCKETS.filter(b => b !== 'primalKnowledge').map(b => [b, result[b].map(({ type, name }) => ({ type, name }))])),
+        primalKnowledge: [...result.primalKnowledge],
     }
-  })
+}
+
+const EMPTY_CATALOG = catalog(Object.fromEntries(BUCKETS.map(b => [b, []])))
+
+// ── collectAutomationFromFeatures (service facade) ─────────────────────────
+
+describe('collectAutomationFromFeatures – input contract', () => {
+    it('returns nine empty buckets for null, undefined, and empty feature arrays', () => {
+        expect(catalog(collectAutomationFromFeatures(null, playerStats))).toEqual(EMPTY_CATALOG)
+        expect(catalog(collectAutomationFromFeatures(undefined, playerStats))).toEqual(EMPTY_CATALOG)
+        expect(catalog(collectAutomationFromFeatures([], playerStats))).toEqual(EMPTY_CATALOG)
+    })
+
+    it('filters missing/null/empty automations and unknown types, keeping only the automation-bearing survivor', () => {
+        const result = collectAutomationFromFeatures([
+            { name: 'No Automation' },
+            { name: 'Null Automation', automation: null },
+            makeFeature([], 'Empty Automation Array'),
+            makeFeature({ type: 'some_unknown_type' }, 'Unknown Type'),
+            makeFeature({ type: 'warding_bond' }, 'Survivor'),
+        ], playerStats)
+
+        // Survivor proves the empty result of the four filter legs is a filter, not a broken collector.
+        expect(catalog(result)).toEqual({
+            ...EMPTY_CATALOG,
+            actions: [{ type: 'warding_bond', name: 'Survivor' }],
+        })
+    })
 })
 
-// ── collectAutomationFromFeatures: features without automation ─────
-describe('collectAutomationFromFeatures: features without automation', () => {
-  let playerStats
+describe('collectAutomationFromFeatures – mixed roster catalog envelope', () => {
+    it('routes every feature to its exact bucket, filtering the non-automation noise', () => {
+        const skills = ['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival']
+        const roster = [
+            { name: 'Plain Feature' },
+            makeFeature({ type: 'save_attack', damageType: 'cold', saveType: 'CON' }, 'Radiance'),
+            makeFeature({ type: 'healing', action: 'action' }, 'Action Heal'),
+            makeFeature({ type: 'buff_ally', action: 'action' }, 'Group Blessing'),
+            makeFeature({ type: 'healing', action: 'bonus_action' }, 'Bonus Heal'),
+            makeFeature({ type: 'buff_ally', action: 'bonus_action' }, 'Bonus Blessing'),
+            makeFeature({ type: 'extra_action', action: 'bonus_action' }, 'Extra Action'),
+            makeFeature({ type: 'resource_pool', resource: 'ki' }, 'Ki Pool'),
+            makeFeature({ type: 'font_of_magic' }, 'Font of Magic'),
+            makeFeature({ type: 'damage_reduction' }, 'Stone Skin'),
+            makeFeature({ type: 'auto_reroll' }, 'Skilled Reroll'),
+            makeFeature({ type: 'reaction_debuff' }, 'Vicious Hit'),
+            makeFeature({ type: 'countercharm', casting_time: '1 reaction' }, 'Countercharm'),
+            makeFeature([{ type: 'save_attack', damageType: 'poison' }, { type: 'resistance', damageTypes: ['fire'] }], 'Multi Automation'),
+            makeFeature({ type: 'evasion', saveType: 'DEX' }, 'Evasion'),
+            makeFeature({ type: 'font_of_inspiration' }, 'Font of Inspiration'),
+            makeFeature({ type: 'combat_stance' }, 'Combat Stance'),
+            makeFeature({ type: 'passive_rule', effect: 'fortified_health' }, 'Fortified Health'),
+            makeFeature({ type: 'great_weapon_fighting' }, 'Great Weapon Fighting'),
+            makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills }, 'Primal Knowledge'),
+            makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: [] }, 'Empty Primal'),
+        ]
 
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('skips features with no automation property or null automation', () => {
-    const features = [
-      { name: 'No Automation' },
-      { name: 'Null Automation', automation: null },
-    ]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.passives).toEqual([])
-    expect(result.specialActions).toEqual([])
-  })
-
-  it('skips features with empty automation array', () => {
-    const features = [makeFeature([], 'Empty Automation')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.passives).toEqual([])
-  })
+        // Hand-derived ONCE from router semantics (save-style/bonus splits, reaction triad,
+        // routePassiveSpecial dual-bucket for evasion + font_of_inspiration, passive_rule
+        // normalization of great_weapon_fighting, primalKnowledge spread) then pinned — never
+        // re-derived by re-running the loop.
+        expect(catalog(collectAutomationFromFeatures(roster, playerStats))).toEqual({
+            actions: [
+                { type: 'save_attack', name: 'Radiance' },
+                { type: 'healing', name: 'Action Heal' },
+                { type: 'buff_ally', name: 'Group Blessing' },
+                // extra_action lands in actions even with action:'bonus_action' — the builder
+                // does not carry action through, so routeCtPassiveBonusOrAction takes the default.
+                // (The retired old:98 test only checked bonusActions empty and mis-titled this "skipped".)
+                { type: 'extra_action', name: 'Extra Action' },
+                { type: 'resource_pool', name: 'Ki Pool' },
+                { type: 'font_of_magic', name: 'Font of Magic' },
+                { type: 'save_attack', name: 'Multi Automation' },
+            ],
+            bonusActions: [
+                { type: 'healing', name: 'Bonus Heal' },
+                { type: 'buff_ally', name: 'Bonus Blessing' },
+            ],
+            reactions: [
+                { type: 'damage_reduction', name: 'Stone Skin' },
+                { type: 'auto_reroll', name: 'Skilled Reroll' },
+                { type: 'reaction_debuff', name: 'Vicious Hit' },
+                { type: 'countercharm', name: 'Countercharm' },
+            ],
+            specialActions: [
+                { type: 'evasion', name: 'Evasion' },
+                { type: 'font_of_inspiration', name: 'Font of Inspiration' },
+                { type: 'combat_stance', name: 'Combat Stance' },
+            ],
+            passives: [
+                { type: 'resistance', name: 'Multi Automation' },
+                { type: 'evasion', name: 'Evasion' },
+                { type: 'font_of_inspiration', name: 'Font of Inspiration' },
+                { type: 'passive_rule', name: 'Fortified Health' },
+                { type: 'passive_rule', name: 'Great Weapon Fighting' },
+                { type: 'passive_rule', name: 'Primal Knowledge' },
+                { type: 'passive_rule', name: 'Empty Primal' },
+            ],
+            autoEffects: [],
+            saveModifiers: [],
+            primalKnowledge: skills,
+            ritualSpells: [],
+        })
+    })
 })
 
-// ── collectAutomationFromFeatures: action-type categorization ───────
-describe('collectAutomationFromFeatures: action-type categorization', () => {
-  let playerStats
+// ── processFeatureAutomation (wrapper contract, owned here per
+//    automationCollector.coverage.test.js header) ───────────────────────────
 
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('categorizes save_attack, attack_rider, bonus_attacks, and resource_pool as actions', () => {
-    const features = [
-      makeFeature({ type: 'save_attack', damageType: 'cold', saveType: 'CON' }),
-      makeFeature({ type: 'attack_rider' }),
-      makeFeature({ type: 'bonus_attacks' }),
-      makeFeature({ type: 'resource_pool', resource: 'ki' }),
-    ]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(4)
-    expect(result.actions.map(a => a.type)).toEqual(['save_attack', 'attack_rider', 'bonus_attacks', 'resource_pool'])
-  })
-
-  it('categorizes healing and buff_ally based on action property', () => {
-    const actionHeal = makeFeature({ type: 'healing', action: 'action' }, 'Heal')
-    const bonusHeal = makeFeature({ type: 'healing', action: 'bonus_action' }, 'Bonus Heal')
-    const actionBuff = makeFeature({ type: 'buff_ally', action: 'action' }, 'Group Heal')
-    const bonusBuff = makeFeature({ type: 'buff_ally', action: 'bonus_action' }, 'Bonus Group Heal')
-
-    const result = collectAutomationFromFeatures([actionHeal, bonusHeal, actionBuff, bonusBuff], playerStats)
-    expect(result.actions).toHaveLength(2)
-    expect(result.actions.map(a => a.type)).toEqual(['healing', 'buff_ally'])
-    expect(result.bonusActions).toHaveLength(2)
-    expect(result.bonusActions.map(a => a.type)).toEqual(['healing', 'buff_ally'])
-  })
-
-  it('categorizes warding_bond and font_of_magic as actions', () => {
-    const features = [makeFeature({ type: 'warding_bond' }), makeFeature({ type: 'font_of_magic' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(2)
-    expect(result.actions.map(a => a.type)).toEqual(['warding_bond', 'font_of_magic'])
-  })
-
-  it('skips extra_action when buildAttackInfo returns null', () => {
-    const features = [makeFeature({ type: 'extra_action', action: 'bonus_action' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.bonusActions).toEqual([])
-  })
-})
-
-// ── collectAutomationFromFeatures: reaction categorization ──────────
-describe('collectAutomationFromFeatures: reaction categorization', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('categorizes damage_reduction, auto_reroll, and reaction_debuff as reactions', () => {
-    const features = [
-      makeFeature({ type: 'damage_reduction' }),
-      makeFeature({ type: 'auto_reroll' }),
-      makeFeature({ type: 'reaction_debuff' }),
-    ]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.reactions).toHaveLength(3)
-    expect(result.reactions.map(r => r.type)).toEqual(['damage_reduction', 'auto_reroll', 'reaction_debuff'])
-  })
-
-  it('categorizes countercharm as a reaction', () => {
-    const features = [makeFeature({
-      type: 'countercharm',
-      trigger: 'failed_save_charmed_or_frightened',
-      range: '30 ft',
-      conditions: ['charmed', 'frightened'],
-      effect: 'reroll_with_advantage',
-      uses: 1,
-      recharge: 'long_rest',
-      casting_time: '1 reaction'
-    }, 'Countercharm')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.reactions).toHaveLength(1)
-    expect(result.reactions[0].type).toBe('countercharm')
-    expect(result.reactions[0].name).toBe('Countercharm')
-  })
-})
-
-// ── collectAutomationFromFeatures: passive categorization ───────────
-describe('collectAutomationFromFeatures: passive categorization', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('categorizes passive_rule, evasion, and resistance as passives', () => {
-    const features = [
-      makeFeature({ type: 'passive_rule', effect: 'superior_dice' }),
-      makeFeature({ type: 'evasion', saveType: 'DEX' }),
-      makeFeature({ type: 'resistance', damageTypes: ['fire', 'cold'] }),
-    ]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(3)
-    expect(result.passives.map(p => p.type)).toEqual(['passive_rule', 'evasion', 'resistance'])
-  })
-
-  it('categorizes fortified_health as a passive (not specialAction)', () => {
-    const features = [makeFeature({ type: 'passive_rule', effect: 'fortified_health', alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true } }, 'Fortified Health')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].effect).toBe('fortified_health')
-    expect(result.specialActions).toHaveLength(0)
-  })
-
-  it('categorizes font_of_inspiration as a passive', () => {
-    const features = [makeFeature({ type: 'font_of_inspiration' }, 'Font of Inspiration')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('font_of_inspiration')
-    expect(result.passives[0].name).toBe('Font of Inspiration')
-    expect(result.passives[0].casting_time).toBe('passive')
-  })
-})
-
-// ── collectAutomationFromFeatures: special action categorization ────
-describe('collectAutomationFromFeatures: special action categorization', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('categorizes combat_stance as a special action', () => {
-    const features = [makeFeature({ type: 'combat_stance' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.specialActions).toHaveLength(1)
-    expect(result.specialActions[0].type).toBe('combat_stance')
-  })
-})
-
-// ── collectAutomationFromFeatures: attack_rider routing logic ───────
-describe('collectAutomationFromFeatures: attack_rider routing logic', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('routes attack_rider with trigger, chooseOne, or maxEffects to passives', () => {
-    const triggerFeature = makeFeature({ type: 'attack_rider', trigger: 'piercing_damage_hit' })
-    const chooseOneFeature = makeFeature({ type: 'attack_rider', chooseOne: true })
-    const maxEffectsFeature = makeFeature({ type: 'attack_rider', maxEffects: 3 })
-
-    const result = collectAutomationFromFeatures([triggerFeature, chooseOneFeature, maxEffectsFeature], playerStats)
-    expect(result.passives).toHaveLength(3)
-    expect(result.passives.map(p => p.type)).toEqual(['attack_rider', 'attack_rider', 'attack_rider'])
-  })
-})
-
-// ── collectAutomationFromFeatures: primalKnowledge extraction ───────
-describe('collectAutomationFromFeatures: primalKnowledge extraction', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('extracts primalKnowledge skills from passive_rule with effect primal_knowledge', () => {
-    const skills = ['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival']
-    const features = [makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills }, 'Primal Knowledge')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.primalKnowledge).toEqual(skills)
-  })
-
-  it('does not populate primalKnowledge for passive_rule without skills or with empty skills', () => {
-    const noSkills = [makeFeature({ type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' }, 'Bonus Healing')]
-    expect(collectAutomationFromFeatures(noSkills, playerStats).primalKnowledge).toEqual([])
-
-    const emptySkills = [makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: [] }, 'Empty Primal')]
-    expect(collectAutomationFromFeatures(emptySkills, playerStats).primalKnowledge).toEqual([])
-  })
-})
-
-// ── collectAutomationFromFeatures: great_weapon_fighting ────────────
-describe('collectAutomationFromFeatures: great_weapon_fighting', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('collects great_weapon_fighting passive from features', () => {
-    const features = [makeFeature({ type: 'great_weapon_fighting' }, 'Great Weapon Fighting')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].type).toBe('passive_rule')
-    expect(result.passives[0].effect).toBe('great_weapon_fighting')
-    expect(result.passives[0].name).toBe('Great Weapon Fighting')
-  })
-})
-
-// ── collectAutomationFromFeatures: mixed features ───────────────────
-describe('collectAutomationFromFeatures: mixed features', () => {
-  let playerStats
-
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
-
-  it('correctly categorizes a mixed feature array', () => {
-    const features = [
-      makeFeature({ type: 'passive_rule' }, 'Passive1'),
-      makeFeature({ type: 'damage_reduction' }, 'Shield'),
-      makeFeature({ type: 'save_attack' }, 'Radiance'),
-      makeFeature({ type: 'resistance', damageTypes: ['fire'] }, 'Fire Resist'),
-    ]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.passives).toHaveLength(2)
-    expect(result.passives.map(p => p.type)).toEqual(['passive_rule', 'resistance'])
-    expect(result.reactions).toHaveLength(1)
-    expect(result.reactions[0].type).toBe('damage_reduction')
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].type).toBe('save_attack')
-  })
-
-  it('handles features with array automation by processing each item', () => {
-    const features = [makeFeature([
-      { type: 'save_attack', damageType: 'cold' },
-      { type: 'resistance', damageTypes: ['fire'] },
-    ], 'Multi-Automation')]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.actions[0].damageType).toBe('cold')
-    expect(result.passives).toHaveLength(1)
-    expect(result.passives[0].damageTypes).toEqual(['fire'])
-  })
-
-  it('skips unknown automation types when buildAttackInfo returns null', () => {
-    const features = [makeFeature({ type: 'some_unknown_type' })]
-    const result = collectAutomationFromFeatures(features, playerStats)
-    expect(result.specialActions).toEqual([])
-  })
-})
-
-// ── processFeatureAutomation ────────────────────────────────────────
 describe('processFeatureAutomation', () => {
-  let playerStats
+    it('returns the empty envelope for empty or null feature arrays without touching the inputs', () => {
+        const emptyInputs = [[], [], [], []]
+        expect(catalog(processFeatureAutomation(...emptyInputs, playerStats))).toEqual(EMPTY_CATALOG)
+        expect(emptyInputs.every(arr => arr.length === 0)).toBe(true)
 
-  beforeEach(() => {
-    playerStats = makePlayerStats()
-  })
+        // null arrays must not crash: the collect guard returns before any push.
+        expect(catalog(processFeatureAutomation(null, null, null, null, playerStats))).toEqual(EMPTY_CATALOG)
+    })
 
-  it('returns an automation object with all expected buckets', () => {
-    const result = processFeatureAutomation([], [], [], [], playerStats)
-    const expected = ['actions', 'bonusActions', 'reactions', 'specialActions', 'passives', 'autoEffects', 'saveModifiers', 'primalKnowledge', 'ritualSpells']
-    for (const key of expected) {
-      expect(result).toHaveProperty(key)
-    }
-  })
+    it('pushes collected action/special rows into their arrays, deduped by name, idempotently', () => {
+        const allActions = [{ name: 'Existing', description: '', automation: null }]
+        const allSpecialActions = [{ name: 'Existing Special', description: '', automation: null }]
+        const allBonusActions = [
+            // save_attack collected → actions lane; new name, so it is pushed into allActions
+            { name: 'New Action', description: 'Desc', automation: { type: 'save_attack' } },
+            // same-name collision: name-dedupe wins even though the existing entry has no automation
+            { name: 'Existing', description: 'Dup', automation: { type: 'font_of_magic' } },
+            // combat_stance collected → specialActions lane; new name, pushed
+            { name: 'New Special', description: 'Desc', automation: { type: 'combat_stance' } },
+            { name: 'Existing Special', description: 'Dup', automation: { type: 'combat_stance' } },
+        ]
 
-  it('returns empty arrays in all buckets when no features are provided', () => {
-    const result = processFeatureAutomation([], [], [], [], playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.bonusActions).toEqual([])
-    expect(result.reactions).toEqual([])
-    expect(result.specialActions).toEqual([])
-    expect(result.passives).toEqual([])
-  })
+        const automation = processFeatureAutomation(allActions, allBonusActions, [], allSpecialActions, playerStats)
+        expect(catalog(automation)).toEqual({
+            ...EMPTY_CATALOG,
+            actions: [{ type: 'save_attack', name: 'New Action' }, { type: 'font_of_magic', name: 'Existing' }],
+            specialActions: [{ type: 'combat_stance', name: 'New Special' }, { type: 'combat_stance', name: 'Existing Special' }],
+        })
 
-  it('handles null arrays gracefully by treating them as empty', () => {
-    const result = processFeatureAutomation(null, null, null, null, playerStats)
-    expect(result.actions).toEqual([])
-    expect(result.bonusActions).toEqual([])
-    expect(result.reactions).toEqual([])
-    expect(result.specialActions).toEqual([])
-    expect(result.passives).toEqual([])
-  })
+        expect(allActions).toHaveLength(2)
+        expect(allActions[0].name).toBe('Existing')
+        expect(allActions[1].name).toBe('New Action')
+        // description comes from the collected automation row, not the source feature —
+        // the feature's 'Desc' does not propagate through the wrapper.
+        expect(allActions[1].description).toBe('')
+        expect(allActions[1].hasAutomation).toBe(true)
+        expect(allActions[1].automation.type).toBe('save_attack')
 
-  it('combines features from all action arrays when collecting automation', () => {
-    const actionFeatures = [makeFeature({ type: 'save_attack' }, 'ActionFeature')]
-    const bonusActionFeatures = [makeFeature({ type: 'evasion', saveType: 'DEX' }, 'BonusFeature')]
-    const result = processFeatureAutomation(actionFeatures, bonusActionFeatures, [], [], playerStats)
-    expect(result.actions).toHaveLength(1)
-    expect(result.passives).toHaveLength(1)
-  })
+        expect(allSpecialActions).toHaveLength(2)
+        expect(allSpecialActions[1].name).toBe('New Special')
+        expect(allSpecialActions[1].hasAutomation).toBe(true)
+        expect(allSpecialActions[1].automation.type).toBe('combat_stance')
 
-  it('adds new automation items to the allActions array without duplicating existing ones', () => {
-    const allActions = [{ name: 'Existing Feature', description: '', automation: null }]
-    const allBonusActions = [{ name: 'New Feature', description: 'Desc', automation: { type: 'save_attack' } }]
-
-    processFeatureAutomation(allActions, allBonusActions, [], [], playerStats)
-
-    expect(allActions).toHaveLength(2)
-    const newEntry = allActions[1]
-    expect(newEntry.name).toBe('New Feature')
-    expect(newEntry.hasAutomation).toBe(true)
-  })
-
-  it('does not add a feature to allActions if a feature with the same name already exists', () => {
-    const allActions = [{ name: 'Existing', description: '', automation: null }]
-    const allBonusActions = [{ name: 'Existing', description: 'Desc', automation: { type: 'save_attack' } }]
-
-    processFeatureAutomation(allActions, allBonusActions, [], [], playerStats)
-
-    expect(allActions).toHaveLength(1)
-  })
-
-  it('adds new automation items to the allSpecialActions array without duplicating', () => {
-    const allActions = []
-    const allSpecialActions = [{ name: 'Existing Special', description: '', automation: null }]
-    const allBonusActions = [{ name: 'New Special', description: 'Desc', automation: { type: 'combat_stance' } }]
-
-    processFeatureAutomation(allActions, allBonusActions, [], allSpecialActions, playerStats)
-
-    expect(allSpecialActions).toHaveLength(2)
-    expect(allSpecialActions[1].name).toBe('New Special')
-    expect(allSpecialActions[1].hasAutomation).toBe(true)
-
-    // Duplicate name should not be added
-    const allBonusActionsDup = [{ name: 'Existing Special', description: 'Desc', automation: { type: 'combat_stance' } }]
-    processFeatureAutomation(allActions, allBonusActionsDup, [], allSpecialActions, playerStats)
-    expect(allSpecialActions).toHaveLength(2)
-  })
+        // Second pass over the same names adds nothing.
+        processFeatureAutomation(allActions, allBonusActions, [], allSpecialActions, playerStats)
+        expect(allActions).toHaveLength(2)
+        expect(allSpecialActions).toHaveLength(2)
+    })
 })

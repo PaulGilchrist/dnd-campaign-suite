@@ -1,3 +1,33 @@
+// @maintained-by-ai
+// ── MODIFIERS LANE: automationService-local evasion + save-proficiency rows ──
+// Family split (automationService.*, #971-#978):
+//   • THIS FILE — the ONLY owner of the transform bytes of the two local entry
+//     points defined in automationService.js (not re-exports):
+//       1. getEvasionEffects (automationService.js:126-144) — evasion-row stamp:
+//          DEX default, saveType uppercase, shareable/shareRange coerced, and
+//          automation-array flattening (hand-derived exact bytes, #815/#829).
+//       2. getAllSaveProficiencies (automationService.js:183-202) — save-row
+//          collection: null→all-six quirk, auto_reroll all-saves grant,
+//          save_proficiency primary→fallback chain with class-save guard,
+//          save-name normalization, and Set dedup/order.
+//   • automationService.core.test.js (#973) — facade-surface pin includes
+//     collectSaveModifiers/evasion/proficiency keys BY IDENTITY; modifier-row
+//     internals (registry dispatch, normalization roster legs) owned by
+//     automationModifiers.test.js (#964) — cited here, never re-run.
+//   • rules.cla396-saveProficiencies.test.js mocks these two functions
+//     (vi.fn(() => [])) — no transform coverage overlaps there.
+// APPLIED REC #973: owned faces trimmed to minimum strong form — 16→9 tests.
+// Old → new map:
+//   getEvasionEffects 8→4: null/empty + skip-filter 2→1; default-bytes +
+//     shareable-default 2→1 (defaults already inside the exact-shape pin);
+//     uppercase + shareable-range 2→1 exact stamp; multi-feature + multi-automation
+//     2→1 exact-array with interleaved skips.
+//   getAllSaveProficiencies 8→5: null + empty 2→1; auto_reroll all + d20-guard +
+//     reroll-all-dominates-combo 3→1 folded runs; primary + casing + fallbacks-
+//     unused-when-primary-free 3→1 folded runs; fallback-chain + none-left 2→1;
+//     multi-combine + dedup 2→1.
+// Mock hygiene: real service code, test-utils mocks consumer-exact;
+// zero timers, zero network, fully deterministic.
 import { describe, it, expect } from 'vitest'
 
 import {
@@ -6,191 +36,105 @@ import {
 } from './automationService.js'
 import { makeFeature, makePlayerStats } from './automationService.test-utils.js'
 
-// ── getEvasionEffects ─────────────────────────────────────────────
+const ALL_SAVES = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+
+// ── getEvasionEffects (automationService.js:126-144) ─────────────────
 describe('getEvasionEffects', () => {
-  describe('null/empty handling', () => {
-    it('returns empty array for null, undefined, or empty input', () => {
-      expect(getEvasionEffects(null)).toEqual([])
-      expect(getEvasionEffects(undefined)).toEqual([])
-      expect(getEvasionEffects([])).toEqual([])
-    })
+  it('returns [] for null/undefined/empty input and for features without evasion automation', () => {
+    expect(getEvasionEffects(null)).toEqual([])
+    expect(getEvasionEffects(undefined)).toEqual([])
+    expect(getEvasionEffects([])).toEqual([])
+    expect(getEvasionEffects([
+      { name: 'Passive', damageBonus: 2 },                          // no automation key
+      makeFeature({ type: 'damage_bonus' }, 'Damage'),               // non-evasion type
+    ])).toEqual([])
   })
 
-  describe('feature filtering', () => {
-    it('skips features without automation or with non-evasion type', () => {
-      expect(getEvasionEffects([{ name: 'Passive', damageBonus: 2 }])).toEqual([])
-      expect(getEvasionEffects([makeFeature({ type: 'damage_bonus' }, 'Damage')])).toEqual([])
-    })
+  it('stamps the exact evasion-row shape with defaults saveType DEX, shareable false, shareRange 0', () => {
+    expect(getEvasionEffects([makeFeature({ type: 'evasion' }, 'Uncanny')])).toEqual([{
+      source: 'Uncanny',
+      saveType: 'DEX',
+      shareable: false,
+      shareRange: 0,
+    }])
   })
 
-  describe('basic evasion extraction', () => {
-    it('returns evasion effect with default saveType DEX', () => {
-      const result = getEvasionEffects([makeFeature({ type: 'evasion' }, 'Uncanny')])
-      expect(result).toEqual([{
-        source: 'Uncanny',
-        saveType: 'DEX',
-        shareable: false,
-        shareRange: 0,
-      }])
-    })
-
-    it('handles custom saveType and uppercases it', () => {
-      const result1 = getEvasionEffects([makeFeature({ type: 'evasion', saveType: 'CON' }, 'Evasion')])
-      expect(result1[0].saveType).toBe('CON')
-
-      const result2 = getEvasionEffects([makeFeature({ type: 'evasion', saveType: 'wisdom' }, 'Evasion')])
-      expect(result2[0].saveType).toBe('WISDOM')
-    })
-
-    it('defaults shareable to false and shareRange to 0', () => {
-      const result = getEvasionEffects([makeFeature({ type: 'evasion' }, 'Basic')])
-      expect(result[0].shareable).toBe(false)
-      expect(result[0].shareRange).toBe(0)
-    })
+  it('uppercases custom saveType and passes shareable/shareRange through', () => {
+    expect(getEvasionEffects([
+      makeFeature({ type: 'evasion', saveType: 'CON' }, 'Evasion'),
+      makeFeature({ type: 'evasion', saveType: 'wisdom', shareable: true, shareRange: 30 }, 'Group Evasion'),
+    ])).toEqual([
+      { source: 'Evasion', saveType: 'CON', shareable: false, shareRange: 0 },
+      { source: 'Group Evasion', saveType: 'WISDOM', shareable: true, shareRange: 30 },
+    ])
   })
 
-  describe('shareable evasion', () => {
-    it('recognizes shareable evasion with range', () => {
-      const result = getEvasionEffects([makeFeature({ type: 'evasion', shareable: true, shareRange: 30 }, 'Group Evasion')])
-      expect(result).toEqual([{
-        source: 'Group Evasion',
-        saveType: 'DEX',
-        shareable: true,
-        shareRange: 30,
-      }])
-    })
-  })
-
-  describe('multiple evasion effects', () => {
-    it('collects evasion effects from different features', () => {
-      const features = [
-        makeFeature({ type: 'evasion', saveType: 'DEX' }, 'Evasion1'),
-        makeFeature({ type: 'passive_rule' }, 'Not Evasion'),
-        makeFeature({ type: 'evasion', saveType: 'WIS' }, 'Evasion2'),
-      ]
-      const result = getEvasionEffects(features)
-      expect(result).toHaveLength(2)
-      expect(result[0].source).toBe('Evasion1')
-      expect(result[1].source).toBe('Evasion2')
-    })
-
-    it('collects multiple evasion automations from a single feature', () => {
-      const result = getEvasionEffects([makeFeature([
-        { type: 'evasion', saveType: 'DEX' },
+  it('collects every evasion half across features and automation arrays, skipping everything else', () => {
+    const result = getEvasionEffects([
+      makeFeature({ type: 'evasion' }, 'Uncanny Dodge'),
+      makeFeature({ type: 'passive_rule' }, 'Not Evasion'),
+      makeFeature([
         { type: 'evasion', saveType: 'CON' },
-      ], 'Double Evasion')])
-      expect(result).toHaveLength(2)
-      expect(result[0].saveType).toBe('DEX')
-      expect(result[1].saveType).toBe('CON')
-    })
+        { type: 'damage_bonus' },
+        { type: 'evasion', shareable: true, shareRange: 30 },
+      ], 'Double Evasion'),
+    ])
+    expect(result).toEqual([
+      { source: 'Uncanny Dodge', saveType: 'DEX', shareable: false, shareRange: 0 },
+      { source: 'Double Evasion', saveType: 'CON', shareable: false, shareRange: 0 },
+      { source: 'Double Evasion', saveType: 'DEX', shareable: true, shareRange: 30 },
+    ])
   })
 })
 
-// ── getAllSaveProficiencies ───────────────────────────────────────
+// ── getAllSaveProficiencies (automationService.js:183-202) ───────────
 describe('getAllSaveProficiencies', () => {
-  describe('null handling', () => {
-    it('returns all six save types when features is null/undefined', () => {
-      const expected = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
-      expect(getAllSaveProficiencies(null)).toEqual(expected)
-      expect(getAllSaveProficiencies(undefined)).toEqual(expected)
-    })
-
-    it('returns empty array when features is empty', () => {
-      expect(getAllSaveProficiencies([])).toEqual([])
-    })
+  it('grants all six saves when features is null/undefined, none when the list is empty', () => {
+    expect(getAllSaveProficiencies(null)).toEqual(ALL_SAVES)
+    expect(getAllSaveProficiencies(undefined)).toEqual(ALL_SAVES)
+    expect(getAllSaveProficiencies([])).toEqual([])
   })
 
-  describe('auto_reroll targeting saving_throw', () => {
-    it('grants all save proficiencies when auto_reroll targets saving_throw', () => {
-      const result = getAllSaveProficiencies([makeFeature({
-        type: 'auto_reroll',
-        target: 'saving_throw',
-      }, 'Reroll All Saves')])
-      expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'])
-    })
-
-    it('does not grant all saves when auto_reroll targets something else', () => {
-      const result = getAllSaveProficiencies([makeFeature({
-        type: 'auto_reroll',
-        target: 'd20',
-      }, 'Reroll D20')])
-      expect(result).toEqual([])
-    })
+  it('auto_reroll granting saves: saving_throw grants all six in canonical order, other targets grant none, and reroll-all dominates combined rows', () => {
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'auto_reroll', target: 'saving_throw' }, 'Reroll All Saves'),
+    ])).toEqual(ALL_SAVES)
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'auto_reroll', target: 'd20' }, 'Reroll D20'),
+    ])).toEqual([])
+    // reroll-all already owns all six — a co-resident save_proficiency adds nothing
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'auto_reroll', target: 'saving_throw' }, 'Reroll All'),
+      makeFeature({ type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Charisma'] }, 'Iron Mind'),
+    ], makePlayerStats({ class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity'] } }))).toEqual(ALL_SAVES)
   })
 
-  describe('save_proficiency primary', () => {
-    it('grants the primary save proficiency', () => {
-      const result = getAllSaveProficiencies([makeFeature(
-        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
-        'Iron Mind',
-      )])
-      expect(result).toEqual(['Wisdom'])
-    })
-
-    it('normalizes saveType casing', () => {
-      expect(getAllSaveProficiencies([makeFeature({ type: 'save_proficiency', saveType: 'wisdom' }, 'A')])).toEqual(['Wisdom'])
-      expect(getAllSaveProficiencies([makeFeature({ type: 'save_proficiency', saveType: 'cHaRiSmA' }, 'B')])).toEqual(['Charisma'])
-    })
+  it('save_proficiency grants its case-normalized primary save and skips fallbacks while primary is free', () => {
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', saveType: 'wisdom', fallbackTypes: ['Intelligence', 'Charisma'] }, 'Iron Mind'),
+    ])).toEqual(['Wisdom'])
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', saveType: 'cHaRiSmA' }, 'B'),
+    ])).toEqual(['Charisma'])
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', fallbackTypes: ['Wisdom'] }, 'No Primary'),
+    ])).toEqual([])
   })
 
-  describe('save_proficiency fallback logic', () => {
-    it('falls back when primary save is already proficient', () => {
-      const playerStats = makePlayerStats({
-        class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity', 'Wisdom'] },
-      })
-      const result = getAllSaveProficiencies([makeFeature(
-        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
-        'Iron Mind',
-      )], playerStats)
-      expect(result).toEqual(['Intelligence'])
-    })
-
-    it('skips all fallbacks when all options are already proficient', () => {
-      const playerStats = makePlayerStats({
-        class: { name: 'Paladin', saving_throw_proficiencies: ['Wisdom', 'Charisma'] },
-      })
-      const result = getAllSaveProficiencies([makeFeature(
-        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Charisma'] },
-        'No Fallback Left',
-      )], playerStats)
-      expect(result).toEqual([])
-    })
-
-    it('uses result-set proficiency to avoid duplicates within same feature', () => {
-      const result = getAllSaveProficiencies([makeFeature(
-        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Wisdom', 'Charisma'] },
-        'Duplicate Fallback',
-      )])
-      expect(result).toEqual(['Wisdom'])
-    })
+  it('save_proficiency falls through fallbackTypes in order when class saves block, and adds nothing when every option is proficient', () => {
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] }, 'Iron Mind'),
+    ], makePlayerStats({ class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity', 'Wisdom'] } }))).toEqual(['Intelligence'])
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Charisma'] }, 'No Fallback Left'),
+    ], makePlayerStats({ class: { name: 'Paladin', saving_throw_proficiencies: ['Wisdom', 'Charisma'] } }))).toEqual([])
   })
 
-  describe('multiple features and combinations', () => {
-    it('combines proficiencies from multiple save_proficiency features', () => {
-      const result = getAllSaveProficiencies([
-        makeFeature({ type: 'save_proficiency', saveType: 'Wisdom' }, 'Iron Mind'),
-        makeFeature({ type: 'save_proficiency', saveType: 'Charisma' }, 'Charm Mind'),
-      ])
-      expect(result).toEqual(['Wisdom', 'Charisma'])
-    })
-
-    it('deduplicates when same save appears in multiple features', () => {
-      const result = getAllSaveProficiencies([
-        makeFeature({ type: 'save_proficiency', saveType: 'Wisdom' }, 'Iron Mind'),
-        makeFeature({ type: 'save_proficiency', saveType: 'wisdom' }, 'Second Iron Mind'),
-      ])
-      expect(result).toEqual(['Wisdom'])
-    })
-
-    it('combines auto_reroll all-saves with save_proficiency fallback', () => {
-      const playerStats = makePlayerStats({
-        class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity'] },
-      })
-      const result = getAllSaveProficiencies([
-        makeFeature({ type: 'auto_reroll', target: 'saving_throw' }, 'Reroll All'),
-        makeFeature({ type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Charisma'] }, 'Iron Mind'),
-      ], playerStats)
-      expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'])
-    })
+  it('combines multiple save_proficiency features in order, deduped case-insensitively', () => {
+    expect(getAllSaveProficiencies([
+      makeFeature({ type: 'save_proficiency', saveType: 'Wisdom' }, 'Iron Mind'),
+      makeFeature({ type: 'save_proficiency', saveType: 'Charisma' }, 'Charm Mind'),
+      makeFeature({ type: 'save_proficiency', saveType: 'wisdom' }, 'Second Iron Mind'),
+    ])).toEqual(['Wisdom', 'Charisma'])
   })
 })

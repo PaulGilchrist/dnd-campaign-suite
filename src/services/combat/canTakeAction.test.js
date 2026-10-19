@@ -1,9 +1,41 @@
+// @maintained-by-ai
+/**
+ * LANE: canTakeAction.js — the PURE gate decision table (L5-001, #815 hand-derived).
+ * Every bucket × state edge falsifiable in one row (#842), exact verdict bytes
+ * (#829), state read-only proof (#744), honest fallbacks (#945), no timers /
+ * no wall-clock — state only (no-timers CANON).
+ *
+ * ACTION-ECONOMY FAMILY MAP (who owns what, do not duplicate):
+ *  - turnState.test.js: budget math + reactionCap numbers (#983 state storage
+ *    transitions cited there :36-50) — the gate here only CONSUMES real hasBudget.
+ *  - assertCanAct.test.js / .charge.test.js: impure wrapper (popup/audit sinks,
+ *    charge-on-allow, race backstop) — same strings re-surfaced through that
+ *    wrapper are pinned THERE, not re-derived here.
+ *  - classifyBucket.test.js (#984): bucket CLASSIFICATION — this table feeds
+ *    bucket strings in; it never tests how an action got its bucket.
+ *  - chargeEconomy.test.js: chargeSlot persistence + queue-NEXT.
+ *
+ * OLD → NEW MAP (consolidations):
+ *  master-off it.each 4→3 rows (undefined/null hit one `!enforcement` branch)
+ *  'cannotAct denies every bucket…' + 'cannotActActions blocks…' → rows 14-18
+ *  turn-lock 3 tests → rows 19-20 (+ off-flag row 9)
+ *  economy 4 tests → rows 21-23 (+ off-flag row 10, no-checker row 11)
+ *  'free/special exempt' → row 4 (special/legendary stay turnState.test.js's)
+ *  D1 §18 test → rows 6 + 23 (cap consumed at the gate, exact reason byte)
+ *  D2 §18 4 tests → rows 12/13/24/25 (spend() math REMOVED —
+ *    owned by turnState.test.js 'is per-creature (multi-actor)' :66)
+ *  'resolveEnforcement' strengthened: garbage shape + exact toEqual key set.
+ */
 import { canTakeAction, resolveEnforcement, ENFORCEMENT_DEFAULTS } from './canTakeAction.js';
-import { hasBudget, spend } from './turnState.js';
+import { spend, registerCompanion, emptyTurnEntry, hasBudget } from './turnState.js';
 
 const ON = { mode: 'on', turnLock: true, actionEconomy: true };
+const ALLOW = { allowed: true, reason: null };
+const DENY = (reason) => ({ allowed: false, reason });
+
+/** Explicit falsy defaults (#940) — every ctx field named, nothing implicit. */
 const ctx = (over = {}) => ({
-    enforcement: ON,
+    enforcement: { ...ON },
     creatureName: 'Rakan',
     bucket: 'action',
     activeCreatureName: 'Rakan',
@@ -15,139 +47,126 @@ const ctx = (over = {}) => ({
     ...over,
 });
 
-describe('canTakeAction (L5-001)', () => {
-    describe('master switch off ⇒ allow everything (L1–4 guarantee)', () => {
-        it.each([
-            ['null enforcement', null],
-            ['undefined enforcement', undefined],
-            ['mode off', { mode: 'off', turnLock: true, actionEconomy: true }],
-            ['garbage enforcement', 'nonsense'],
-        ])('%s', (_name, enforcement) => {
-            const r = canTakeAction(ctx({
-                enforcement,
-                creatureName: 'NotActive',
-                activeCreatureName: 'Rakan',
-                cannotAct: true,
-                cannotActReason: 'Stunned',
-                turnState: spend({}, 'Rakan', 'action').turnState,
-            }));
-            expect(r).toEqual({ allowed: true, reason: null });
-        });
-    });
+// Turn-seam truth: spent states built by real spend(), never fabricated shapes.
+const spent = (name, bucket, state = {}) => spend(state, name, bucket).turnState;
+const allSpent = spent('Rakan', 'action', spent('Rakan', 'bonusAction', spent('Rakan', 'reaction')));
 
-    describe('condition gate', () => {
-        it('cannotAct denies every bucket including reactions', () => {
-            const r = canTakeAction(ctx({ cannotAct: true, cannotActReason: 'Stunned — you cannot take actions.' }));
-            expect(r.allowed).toBe(false);
-            expect(r.reason).toMatch(/Stunned/);
-            expect(canTakeAction(ctx({ cannotAct: true, bucket: 'reaction' })).allowed).toBe(false);
-            expect(canTakeAction(ctx({ cannotAct: true, bucket: 'free' })).allowed).toBe(false);
-        });
-
-        it('cannotActActions blocks action/bonusAction but not reactions/free', () => {
-            expect(canTakeAction(ctx({ cannotActActions: true, cannotActReason: 'Stinking Cloud' })).allowed).toBe(false);
-            expect(canTakeAction(ctx({ cannotActActions: true, bucket: 'bonusAction' })).allowed).toBe(false);
-            expect(canTakeAction(ctx({ cannotActActions: true, bucket: 'reaction' })).allowed).toBe(true);
-            expect(canTakeAction(ctx({ cannotActActions: true, bucket: 'free' })).allowed).toBe(true);
-        });
-    });
-
-    describe('turn-lock', () => {
-        it('denies non-active creature actions/bonus actions with a named reason', () => {
-            const r = canTakeAction(ctx({ creatureName: 'Goblin', activeCreatureName: 'Rakan' }));
-            expect(r.allowed).toBe(false);
-            expect(r.reason).toMatch(/Rakan's turn/);
-            expect(canTakeAction(ctx({ creatureName: 'Goblin', bucket: 'bonusAction' })).allowed).toBe(false);
-        });
-
-        it('allows reactions and free interactions off-turn (rules-correct)', () => {
-            expect(canTakeAction(ctx({ creatureName: 'Goblin', bucket: 'reaction' })).allowed).toBe(true);
-            expect(canTakeAction(ctx({ creatureName: 'Goblin', bucket: 'free' })).allowed).toBe(true);
-        });
-
-        it('off ⇒ any creature may act', () => {
-            const flags = { mode: 'on', turnLock: false, actionEconomy: false };
-            expect(canTakeAction(ctx({ enforcement: flags, creatureName: 'Goblin', activeCreatureName: 'Rakan' })).allowed).toBe(true);
-        });
-    });
-
-    describe('action economy', () => {
-        it('denies when the bucket budget is exhausted', () => {
-            const ts = spend({}, 'Rakan', 'action').turnState;
-            const r = canTakeAction(ctx({ turnState: ts }));
-            expect(r.allowed).toBe(false);
-            expect(r.reason).toMatch(/No action left/);
-        });
-
-        it('bonus + reaction buckets are independent budgets', () => {
-            let ts = spend({}, 'Rakan', 'action').turnState;
-            expect(canTakeAction(ctx({ turnState: ts, bucket: 'bonusAction' })).allowed).toBe(true);
-            expect(canTakeAction(ctx({ turnState: ts, bucket: 'reaction' })).allowed).toBe(true);
-        });
-
-        it('free/special/unknown buckets are exempt', () => {
-            const ts = spend({}, 'Rakan', 'action').turnState;
-            expect(canTakeAction(ctx({ turnState: ts, bucket: 'free' })).allowed).toBe(true);
-            expect(canTakeAction(ctx({ turnState: ts, bucket: 'special' })).allowed).toBe(true);
-        });
-
-        it('no injected budget checker ⇒ graceful allow (never invents enforcement)', () => {
-            expect(canTakeAction(ctx({ hasBudget: undefined })).allowed).toBe(true);
-        });
-    });
-
-    describe('resolveEnforcement', () => {
-        it('fills defaults for missing/partial config', () => {
-            expect(resolveEnforcement(null)).toEqual(ENFORCEMENT_DEFAULTS);
-            expect(resolveEnforcement({ mode: 'on' })).toMatchObject({
-                ...ENFORCEMENT_DEFAULTS,
-                mode: 'on',
-                turnLock: false,
-            });
-        });
+describe('canTakeAction master switch (L1–4 guarantee)', () => {
+    it.each([
+        ['null enforcement', null],
+        ['garbage enforcement (non-object)', 'nonsense'],
+        ['mode off with loud denial context', { mode: 'off', turnLock: true, actionEconomy: true }],
+    ])('%s ⇒ allow everything, reason null', (_name, enforcement) => {
+        const r = canTakeAction(ctx({
+            enforcement,
+            creatureName: 'NotActive',
+            activeCreatureName: 'Rakan',
+            cannotAct: true,
+            cannotActActions: true,
+            cannotActReason: 'Stunned',
+            turnState: allSpent,
+        }));
+        expect(r, `_name=${_name}`).toEqual(ALLOW);
     });
 });
 
-// §18 D1/D2 — feature-raised reaction caps + companion turn-lock exception.
-describe('D1 reaction cap at the gate (§18)', () => {
-    const economyOn = { mode: 'on', turnLock: false, actionEconomy: true };
-    it('default cap 1 denies the second reaction, raised cap 2 admits it', () => {
-        const spent = { Rakan: { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 1, movementUsedFeet: 0, hasMoved: false, turnActive: true } };
-        expect(canTakeAction(ctx({ enforcement: economyOn, bucket: 'reaction', turnState: spent })).allowed).toBe(false);
-        const raised = { Rakan: { ...spent.Rakan, reactionCap: 2 } };
-        expect(canTakeAction(ctx({ enforcement: economyOn, bucket: 'reaction', turnState: raised })).allowed).toBe(true);
+describe('canTakeAction gate decision table (§6.2 order, bucket × state)', () => {
+    it.each([
+        // ---- allows ----
+        ['own turn: action allowed on fresh state', {}, ALLOW],
+        ['own turn: bonus allowed even after the action is spent',
+            { bucket: 'bonusAction', turnState: spent('Rakan', 'action') }, ALLOW],
+        ['own turn: reaction allowed even after action+bonus are spent',
+            { bucket: 'reaction', turnState: spent('Rakan', 'bonusAction', spent('Rakan', 'action')) }, ALLOW],
+        ['free interaction exempt even with every slot spent',
+            { bucket: 'free', turnState: allSpent }, ALLOW],
+        ['unknown bucket: honest allow, no invented enforcement',
+            { bucket: 'mystery', turnState: allSpent }, ALLOW],
+        ['§18 D1: raised reactionCap admits the second reaction',
+            { bucket: 'reaction', turnState: { Rakan: { ...emptyTurnEntry(), reactionCap: 2, reactionsUsed: 1 } } }, ALLOW],
+        ['off-turn reaction allowed (rules-correct)',
+            { creatureName: 'Goblin', bucket: 'reaction' }, ALLOW],
+        ['off-turn free interaction allowed',
+            { creatureName: 'Goblin', bucket: 'free' }, ALLOW],
+        ['turnLock flag off admits another creature\'s action',
+            { enforcement: { mode: 'on', turnLock: false, actionEconomy: true }, creatureName: 'Goblin' }, ALLOW],
+        ['actionEconomy flag off admits an exhausted bucket',
+            { enforcement: { mode: 'on', turnLock: true, actionEconomy: false }, turnState: spent('Rakan', 'action') }, ALLOW],
+        ['missing budget checker never invents enforcement',
+            { hasBudget: undefined, turnState: spent('Rakan', 'action') }, ALLOW],
+        ['§18 D2: registered companion acts while its owner is active',
+            { creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', turnState: registerCompanion({}, 'Wolf 1', 'FeyRanger') }, ALLOW],
+        ['§18 D2: fresh companion acts while its owner is fully spent',
+            { creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', turnState: registerCompanion(spent('FeyRanger', 'action'), 'Wolf 1', 'FeyRanger') }, ALLOW],
+        // ---- denials (exact reason bytes) ----
+        ['cannotAct denies, surfacing the authored reason verbatim',
+            { cannotAct: true, cannotActReason: 'Stunned — you cannot take actions.' },
+            DENY('Stunned — you cannot take actions.')],
+        ['cannotAct denies a reaction too — the bucket does not matter',
+            { cannotAct: true, bucket: 'reaction' },
+            DENY('You cannot take actions while incapacitated.')],
+        ['cannotActActions denies bonusAction, authored reason verbatim',
+            { cannotActActions: true, cannotActReason: 'Stinking Cloud', bucket: 'bonusAction' },
+            DENY('Stinking Cloud')],
+        ['cannotActActions default reason pinned on the action bucket',
+            { cannotActActions: true },
+            DENY('Your condition blocks this action.')],
+        ['cannotActActions admits a reaction',
+            { cannotActActions: true, bucket: 'reaction' }, ALLOW],
+        ['turn-lock names both creatures in the denial',
+            { creatureName: 'Goblin' },
+            DENY(`It is Rakan's turn — Goblin cannot act now.`)],
+        ['turn-lock fallback names "another creature" when active name is missing',
+            { creatureName: 'Goblin', activeCreatureName: null },
+            DENY(`It is another creature's turn — Goblin cannot act now.`)],
+        ['economy: exhausted action — exact bytes',
+            { turnState: spent('Rakan', 'action') },
+            DENY('No action left this turn.')],
+        ['economy: exhausted bonusAction — exact bytes',
+            { bucket: 'bonusAction', turnState: spent('Rakan', 'bonusAction') },
+            DENY('No bonus action left this turn.')],
+        ['§18 D1: exhausted reaction at default cap — exact bytes',
+            { bucket: 'reaction', turnState: spent('Rakan', 'reaction') },
+            DENY('No reaction left this turn.')],
+        ['economy charges by name: exhausted owner denied, same turn as its companion',
+            { creatureName: 'FeyRanger', activeCreatureName: 'FeyRanger', turnState: spent('FeyRanger', 'action') },
+            DENY('No action left this turn.')],
+        ['§18 D2: companion denied on a stranger\'s turn',
+            { creatureName: 'Wolf 1', activeCreatureName: 'HexWarlock', turnState: registerCompanion({}, 'Wolf 1', 'FeyRanger') },
+            DENY(`It is HexWarlock's turn — Wolf 1 cannot act now.`)],
+    ])('%s', (title, over, expected) => {
+        expect(canTakeAction(ctx(over)), title).toEqual(expected);
     });
-});
 
-describe('D2 companion at the turn-lock gate (§18)', () => {
-    it('a registered companion acts while its OWNER is active', () => {
-        const ts = { 'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: false, companionOf: 'FeyRanger' } };
-        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', turnState: ts }));
-        expect(r.allowed).toBe(true);
+    it.each([
+        ['condition outranks turn-lock and economy',
+            { creatureName: 'Goblin', cannotAct: true, cannotActReason: 'Petrified', turnState: spent('Goblin', 'action') },
+            DENY('Petrified')],
+        ['turn-lock outranks economy',
+            { creatureName: 'Goblin', turnState: spent('Goblin', 'action') },
+            DENY(`It is Rakan's turn — Goblin cannot act now.`)],
+    ])('short-circuit order: %s', (title, over, expected) => {
+        expect(canTakeAction(ctx(over)), title).toEqual(expected);
     });
 
-    it('off the owner\'s turn the normal denial stands', () => {
-        const ts = { 'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: false, companionOf: 'FeyRanger' } };
-        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'HexWarlock', turnState: ts }));
-        expect(r.allowed).toBe(false);
-        expect(r.reason).toContain('HexWarlock');
-    });
-
-    it('companion economy charges itself: owner slots stay whole', () => {
-        const ts = {
-            FeyRanger: { actionsUsed: 1, bonusActionsUsed: 1, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: true, turnActive: true },
-            'Wolf 1': { actionsUsed: 0, bonusActionsUsed: 0, reactionsUsed: 0, movementUsedFeet: 0, hasMoved: false, turnActive: true, companionOf: 'FeyRanger' },
+    it('pure: frozen state on both verdicts — zero mutation, same bytes', () => {
+        const deepFreeze = (o) => {
+            Object.values(o).forEach((v) => { if (v && typeof v === 'object') deepFreeze(v); });
+            return Object.freeze(o);
         };
-        // Owner spent everything — the companion still has its own budget.
-        expect(canTakeAction(ctx({ creatureName: 'FeyRanger', activeCreatureName: 'FeyRanger', bucket: 'action', turnState: ts })).allowed).toBe(false);
-        expect(canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', bucket: 'action', turnState: ts })).allowed).toBe(true);
-        const after = spend(ts, 'Wolf 1', 'action').turnState;
-        expect(after.FeyRanger.actionsUsed).toBe(1); // owner untouched by companion spend
-        expect(after['Wolf 1'].actionsUsed).toBe(1);
+        const ts = deepFreeze(spent('Rakan', 'action'));
+        expect(canTakeAction(deepFreeze(ctx({ turnState: ts })))).toEqual(DENY('No action left this turn.'));
+        expect(canTakeAction(deepFreeze(ctx({ turnState: ts, bucket: 'bonusAction' })))).toEqual(ALLOW);
+        expect(ts).toEqual(spent('Rakan', 'action')); // untouched after both calls
     });
+});
 
-    it('turnLock off ⇒ companion exception is moot (master honesty)', () => {
-        const r = canTakeAction(ctx({ creatureName: 'Wolf 1', activeCreatureName: 'FeyRanger', enforcement: { mode: 'on', turnLock: false, actionEconomy: false } }));
-        expect(r.allowed).toBe(true);
+describe('resolveEnforcement', () => {
+    it('never trusts shape: defaults to all-off, merges overrides exactly', () => {
+        expect(resolveEnforcement(null)).toEqual(ENFORCEMENT_DEFAULTS);
+        expect(resolveEnforcement('nonsense')).toEqual(ENFORCEMENT_DEFAULTS);
+        expect(resolveEnforcement({ mode: 'on', lineOfSight: true })).toEqual({
+            ...ENFORCEMENT_DEFAULTS, mode: 'on', lineOfSight: true,
+        });
     });
 });

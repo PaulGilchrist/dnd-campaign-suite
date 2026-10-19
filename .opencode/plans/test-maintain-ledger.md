@@ -1812,3 +1812,62 @@ run2#945: useSpellCastExecutor.castAction -> maintained (20->8): 11 routing face
 ## Batch #181 GREEN — run2#933-#945 (15 files)
 ## Batch #181 — PROGRESS: completed 2081 / remaining 603 (total 2684)
 - Suite: lint clean; 2752 files, 32,651 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 12th consecutive; useNpcImageCache stabilization confirmed under full load). Evidence /tmp/batch181.log. 32,656 byte-stable vs #180 minus castAction 20->8 routing fold etc.
+run2#946: hooks/combat/useSpellPositionResolver -> maintained (26->14): pure resolvers de-mocked; 2 mock-accident passes fixed; real 3-second race test NEW replaces vacuous 100ms; stale-retention contract pinned (#945 consumer); 🔴 :26-34 half-coord cache logged
+run2#947: cla050 fixed-level -> maintained (4->7): 3 fixedLevelRow branches NEW; live-slot fixture falsifies free-ladder; paired clone proves flag drives clamp
+run2#948: reactions/interceptionHandler.targetEffects -> maintained (3->2): #871 defect-falsifier fixtures (same-source/target foreign te) over-removal NOT reproduced; title-lie fixed; inert expiration mock deleted
+run2#949: spells/expeditiousRetreatDash -> maintained (8->7): brittle latch-index -> faithful-store double-click refusal; guard trio -> table exact refusal payloads; duration policy verified; 4 sibling lanes cited
+run2#950: spells/featherFall -> maintained (5->5): partial-heal falsifier (actualHeal vs fallDamage); guard zero-stamp-write bytes NEW; faithful-store two-call latch proof
+run2#951: spells/findSteedSummon -> maintained (7->6): full cast ladder exact bytes + concentration-free policy; S1 FULL zero-write; 🔴 summonSpiritHandler ||10 despawn-clock RAW-violation logged
+run2#952: builder/passive -> maintained (35->4): census+BARE golden loop w/ keys guard; fortified_health NEW; hardcoded-'passive' overrides pinned honest
+run2#953: builder/primal -> maintained (14->3): template applied; coercion/falsy semantics legs NEW (slice's only distinguishing paths); toMatchObject weakness fixed
+run2#954: builder/protection -> maintained (3->3 stronger): requiresShield hardcode falsifiable vs false/0/''; unread-input drop pins; non-vacuous casting_time (reaction's was vacuous). RECs reaction :700-704 delete + census guard
+run2#955: builder/psionic -> maintained (18->3): rangeToFeet truthy-coercion legs falsify || refactor; 6 dead null-throw tests cut (facade guard); whole-slice junk-input pins
+run2#956: builder/reaction -> maintained (~80->8): 16 boilerplate loops -> census+BARE; 3 recs #954 applied; ??-vs-|| zero-operator discriminators NEW; falsifiable hardcoded-CHA legs
+run2#957: builder/resource -> maintained (13->5): circle_of_the_land_spells FIRST coverage; natural_recovery '/ 2'->2.5 REAL evaluator golden; ??-vs-|| falsifier
+run2#958: builder/save -> maintained (~70->9): 18-handler BARE census; hardcoded-override drop pins; prismatic_spray raw-bytes differential; REC save.test-utils.js ORPHANED
+run2#959: builder/sorcery -> maintained (23->5): warping_implosion rename + absent-key bytes; sole-?? site discriminator; real-evaluator saveDc goldens
+run2#960: builder/spell -> maintained (35->5): 2 silently-uncovered handlers NOW covered; all 4 vi.spyOn evaluator mocks deleted -> REAL goldens; contact_patron unresolved-echo cited; 📌 dragon_companion noConcentration hardcode suspect pinned as-is
+
+## Batch #182 GREEN — run2#946-#960 (15 files)
+## Batch #182 — PROGRESS: completed 2096 / remaining 588 (total 2684)
+- Suite: lint clean; 2752 files, 32,358 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 13th consecutive; evidence /tmp/batch182.log). 32,651->32,358 (-293) from builder-family sweep (reaction ~80->8, save ~70->9, spell 35->5, passive 35->4, sorcery 23->5, psionic 18->3, primal 14->3, resource 13->5) + resolver 26->14.
+run2#961: builder/starry -> maintained (12->4): dead-WRONG-PATH vi.mock deleted (never intercepted; old suite ran REAL evaluator); options:[] truthy-preserver discriminator
+run2#962: builder/temp -> maintained (45->5): 8 envelope keys silently missed by toMatchObject NOW pinned; usesMax table fixed indistinguishable 5-vs-5; camel-vs-snake cross-ignore pins
+run2#963: builder/utility-handlers -> maintained (3->6): saveDc boundary table ability-modifier-zero collapse; inert automation.description convention pinned; poison pair census
+run2#964: automationModifiers CANON -> maintained (45->33 exact): registry census fixed 15 NEVER-covered builders; module identity adjudicated registry-dispatch-not-stacking; restore_balance kept-owner cite
+run2#965: passives/elementalAdept -> maintained (17->5): 10 verbatim base-dupes cut; title-lie fixed (branch never consults damageTypes); dishonest false-assertion survives as honest leg; name-keyed mock over Once-chain
+run2#966: passives/fortifiedHealth -> maintained (15->19 folded): fixture-honesty fix (old bytes could never pass mark gate); seen-Set dedupe NEW; 🔴 :173-vs-:229 legacy-byte latch-never-engages LOGGED
+run2#967: passives/landResistance -> maintained (4->12 rows): CLA-237 runtime-over-class precedence falsifier; subclass fallback NEW; byte-exact classes.json fixtures, conditionImmunity non-leak
+run2#968: passives/stormbornResistance -> maintained (6->13 rows): no-store-reads parity pin (always-on); exact-match gate falsifier; vacuous not.toContain deleted
+run2#969: passives BASE CANON -> maintained (58->74 folded): delegate pins 6->ALL-15 wrappers; mastery-less+replace fallthrough falsifier NEW; mislabeled kind-mismatch removed (leg never executed)
+run2#970: passives/wm008-kindgate -> maintained (3->3 folded): #969-cited face PRESERVED @:66-80 full-envelope bytes; 3 legs byte-distinct; kindRoute mock w/ explicit nulls
+run2#971: automationService.buildAttackInfo facade -> maintained (3->4): last-half-return accident fixed (order+null-skip+merge bytes); re-export namesake pin NEW. REC core:31-48 subsumed
+run2#972: automationService.collection CANON -> maintained (27->5): 21-feature golden full-envelope 9-bucket census; 'skipped' title-lie fixed (row lands actions honestly); dedupe collision near-miss falsifiable
+run2#973: automationService.core -> maintained (20->8): rec #971 APPLIED verified; self-satisfying clamp fixed prof-2 binds; 20-iter random loop -> Math.random-stub exact bytes; 42-key facade surface pin NEW
+run2#974: automationService.feyReinforcements -> maintained (3->2): confirm-variant stays non-interactive falsifier NEW; verbatim authored class rows
+run2#975: interactive/mistyWanderer CLA-229 -> maintained (3->3 stronger): verbatim prod golden-row replaces hand-built; misty_wanderer_confirm non-clickable falsifier NEW
+
+## Batch #183 GREEN (canon + 2 adjudicated first-instance flakes) — run2#961-#975 (15 files)
+## Batch #183 — PROGRESS: completed 2111 / remaining 573 (total 2684)
+- Suite: lint clean; 2752 files, 32,289 passed, 2 canon FIXME fails (exact pair) + 2 NEW parallel-load flakes (ElementalAttunementModal.player-save 21/21 + WizardStepSpells.feature-touched 18/18 PASSED standalone — 1st occurrence, none dispatched-batch, stability-watch; stabilize on recurrence) + 3 expected = GREEN canon w/ adjudicated flakes. Evidence /tmp/batch183.log. 32,358->32,289 (-69) builder/passives/service sweep folds.
+run2#976: interactive FRAMEWORK CANON -> maintained (7->31 honest): passive_rule effect-census NEW unit home; row-branch asymmetry census audited CLEAN (interactive-but-undispatched empty); registered-but-row-inert class folded
+run2#977: interactive/twinkling -> maintained (4->3): fabricated-row fixed -> verbatim prod JSON + real builder output (fake emitted non-prod keys); _refused/_advisory inert falsifiers NEW. REC forwarded useMagicDevice
+rec #976: interactive generics consolidation complete (fey #974/misty #975/twinkling #977/useMagicDevice pending ITS turn)
+run2#978: interactive/useMagicDevice -> maintained (4->3): rec #977 APPLIED — fabricated family deleted, verbatim Thief lv13 row + builder stamps; payload-type inert falsifier NEW (no *_confirm exists — analog pinned)
+run2#979: automationService.modifiers -> maintained (16->9): rec #973 APPLIED; both methods adjudicated genuine local transforms (legit owners); interleaved-skip exact arrays. 🔴 :132-133 automation[null] throws (sibling :118 guards) LOGGED
+rec #973: modifiers mark+trim DONE (#979)
+run2#980: test-utils.mocks -> maintained (32->4): NOT pure-own-mock — 14 consumer lanes execute through factories; mock-contract pins kept, 28 shape/vi.fn-trivia deleted; quirk pins NEW (substring-offset, \\s+ strip branch)
+run2#981: test-utils -> maintained (10->4): pure-spread builders -> override-semantics smokes; no-deep-merge trap fixed (old overrode BOTH keys hiding default-loss); #980 pair split honored zero crossover
+run2#982: shadowArts.route -> maintained (2->1): weaker builder-forward cut cited core-handlers discriminating rows; full 9-bucket type-map + routed-row identity; verbatim Monk anchor
+run2#983: classifyBucket.2024-audit -> maintained restructured: transcribed-shape pseudo-audit -> honest real-JSON census (both spell files + feats + classes verbatim); twin split canon; 🔴 Aura-of-Vitality missing casting_time + ⚠ 'special' token gap LOGGED
+run2#984: classifyBucket BASE -> maintained (7->41 cases): untested tokens NEW (free/special/passive-family rows); precedence 1->4 falsifiable edges; BUCKETS partition tripwire. REC assertCanAct.charge :120-122 trim
+run2#985: baseCombatActions -> maintained (3->1 golden census): pure-data module anchor — full export roster vs fake-drift across 6 consumers; ESM-mechanics vacuous test deleted
+run2#986: brutalStrikeSelection -> maintained (5->10 rows): no-op-sort-accident FIXED (non-falsifiable folded); numeric-parse boundary '10d6'>'2d10' catches string-compare flip; tie-stability both permutations. REC steps/attackRollBonuses-brutalStrike t3 fold
+run2#987: buffs/buffService -> maintained (16->19 folded): co-located same-source-different-buff survivor (#871-class NOT reproduced); vacuous arg-order deleted; idempotent-write honest title. NOTE :29 redundant SSE nit
+rec #984: assertCanAct.charge :120-122 still pending ITS turn (logged #984)
+run2#988: canTakeAction GATE CANON -> maintained (19->32 rows): exact verdict-bytes everywhere incl default reasons; short-circuit order rows NEW (§6.2); deepFreeze purity proof; no wall-clock verified
+run2#989: chargeEconomy (L5-002 bridge) -> maintained (9->6): faithful bridgeStore NEW replaces scattered fixtures; off-mode no-op spans all 3 fns w/ state survives; junk-feet legs. ⚠ :11-12 doc-vs-impl refund divergence LOGGED
+
+## Batch #184 GREEN (canon + 1 adjudicated flake, now STABILIZED) — run2#976-#989 (14 files)
+## Batch #184 — PROGRESS: completed 2125 / remaining 559 (total 2684)
+- Suite: lint clean; 2752 files, 32,331 passed, 2 canon FIXME fails (exact pair) + ElementalAttunementModal.player-save flake 2nd occurrence (passive-effect listener-registration race — reproduced pre-fix, fixed via live-listener anchor + state-anchored waitFors, 7x+5x stress green post-fix) + 3 expected = GREEN canon w/ flake fixed. Evidence /tmp/batch184.log. 32,289->32,331 net from #988 gate-table expansion (+) vs folds (-).

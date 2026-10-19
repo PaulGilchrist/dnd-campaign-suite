@@ -1,21 +1,22 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest';
 import * as baseCombatActions from './baseCombatActions.js';
-import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from './baseCombatActions.js';
 
-describe('baseCombatActions module exports', () => {
-  it('exports OPPORTUNITY_ATTACK as a plain object with name and description', () => {
-    expect(OPPORTUNITY_ATTACK).toEqual({
-      name: 'Opportunity Attack',
-      description: 'Can attack creature that moves out of your reach',
+// Lane: golden census of authored combat constants — exact bytes, whole export
+// surface (SUT unmocked). Sole consumer anchor: CharReactions.jsx,
+// useLoggedDiceRollSaves.js, opportunityTrigger.js, bonusActionAttackHandler.js,
+// reactionDamageHandler.js, soulOfVengeanceHandler.js — every consumer test
+// vi.mock's this module with pinned copies of these bytes, so this census is
+// the anchor those fakes must not drift from. Adding, removing, or editing any
+// export fails here toEqual on both keys and values.
+describe('baseCombatActions', () => {
+  it('exports the full authored constant roster, byte-exact', () => {
+    expect({ ...baseCombatActions }).toEqual({
+      OPPORTUNITY_ATTACK: {
+        name: 'Opportunity Attack',
+        description: 'Can attack creature that moves out of your reach',
+      },
+      MELEE_REACH_FEET: 5,
     });
-  });
-
-  it('exports MELEE_REACH_FEET as the number 5', () => {
-    expect(MELEE_REACH_FEET).toBe(5);
-  });
-
-  it('exports are accessible via namespace import', () => {
-    expect(baseCombatActions.OPPORTUNITY_ATTACK).toBe(OPPORTUNITY_ATTACK);
-    expect(baseCombatActions.MELEE_REACH_FEET).toBe(MELEE_REACH_FEET);
   });
 });

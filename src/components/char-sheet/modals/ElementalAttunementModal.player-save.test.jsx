@@ -202,6 +202,10 @@ function clickElement(element) {
 async function clickElementAndWaitForPrompt(element) {
     clickElement(element);
     await screen.findByText(/Waiting for save roll/);
+    // Anti-lost-event lane: see saveResultBusLive() — the row bytes can surface before
+    // the listener effect's flush lands under load; anchor every save-result dispatch lane
+    // on the bus actually listening, never on row bytes alone.
+    await waitFor(() => expect(saveResultBusLive()).toBeGreaterThan(0));
 }
 
 function dispatchSaveResult(detail) {
@@ -214,11 +218,32 @@ function pendingRows() {
     return Array.from(document.querySelectorAll('.abjure-result-pending'));
 }
 
+// ── save-result bus registration anchor (flake fix CI #183 / #184) ──
+// The modal registers its 'save-result' listener in a passive effect keyed on
+// pendingPrompts (ElementalAttunementModal.jsx:489-532). Under full-suite CPU contention
+// findByText can resolve BEFORE that passive flush lands, so dispatchSaveResult hit a bus
+// nobody listened on: the prompt stayed pending forever and the count-anchored waitFors
+// timed out (observed victims: Thunder damage lane, Cold speed_reduction append lane).
+// Spying add/removeEventListener (pass-through) gives a live-listener anchor: dispatch
+// only once the bus demonstrably has a receiver. Assertions are unchanged — every commit
+// call-count pin and exact-byte check still runs at the same strength, just re-anchored
+// onto state bytes with the call pins folded in immediately after settle.
+let addSpy, removeSpy;
+
+function saveResultBusLive() {
+    return addSpy.mock.calls.filter(([type]) => type === 'save-result').length
+        - removeSpy.mock.calls.filter(([type]) => type === 'save-result').length;
+}
+
 // ── Setup / teardown ──
 
 beforeEach(() => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // promptId suffix 'i' (second prompt: 0.75 → 'r')
     vi.spyOn(Date, 'now').mockReturnValue(FROZEN_TS); // promptId prefix AND log timestamps
+    // Pass-through spies: record (do not intercept) the modal's save-result registration so
+    // saveResultBusLive() can gate dispatch (flake fix CI #183/#184 — see anchor above).
+    addSpy = vi.spyOn(window, 'addEventListener');
+    removeSpy = vi.spyOn(window, 'removeEventListener');
 });
 
 // House rule: mockReset (not clearAllMocks/resetAllMocks) + re-arm; live cells wiped;
@@ -470,7 +495,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: -10, total: -5, rawDamage: 5 });
 
-            await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalled());
+            // Flake fix (CI #183): anchor on STATE bytes moving on the live fixture (the
+            // live applyDamage mock mutates it), fold the call pins in AFTER settle.
+            await waitFor(() => expect(p1.currentHp).toBe(15));
+            expect(applyDamageToTarget).toHaveBeenCalled();
             expect(applyDamageToTarget).toHaveBeenCalledWith(summary, 'Player1', 5, ['thunder'], {
                 campaignName: CAMPAIGN, characters: [p1], ignoreResistance: false, attackerName: PLAYER, suppressHpLog: false,
             });
@@ -530,9 +558,10 @@ describe('ElementalAttunementModal — player save resolution', () => {
 
             await dispatchSaveResult({ promptId: PROMPT_ID_1, targetName: 'Player1', success: false, roll: 5, saveBonus: -10, total: -5 });
 
-            await waitFor(() => expect(runtime.setRuntimeValue).toHaveBeenCalled());
+            // Flake fix (CI #184): anchor on the LIVE CELL bytes (the actual commit), and
+            // fold the call pin in AFTER settle. Same evidence, race-free ordering.
+            await waitFor(() => expect(cells.get('Player1|activeConditions')).toEqual(['prone', 'restrained', 'speed_reduction']));
             expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Player1', 'activeConditions', ['prone', 'restrained', 'speed_reduction'], CAMPAIGN);
-            expect(cells.get('Player1|activeConditions')).toEqual(['prone', 'restrained', 'speed_reduction']);
         });
 
         it('saved: NO condition lands in the LIVE store and the exact saved ability_use row is logged', async () => {
@@ -636,6 +665,7 @@ describe('ElementalAttunementModal — player save resolution', () => {
             // lands via a .then microtask after fireEvent returns, and the save-result listener
             // registers in the same render — dispatching before the rows exist loses the event.
             await waitFor(() => expect(pendingRows()).toHaveLength(2));
+            await waitFor(() => expect(saveResultBusLive()).toBeGreaterThan(0)); // listener live (CI #183/#184 anchor)
             expect(savePromptService.sendSavePrompt).toHaveBeenCalledTimes(2);
 
             // Resolve Player2 FIRST (id '...-r'): only Player2 commits; Player1 stays pending.
