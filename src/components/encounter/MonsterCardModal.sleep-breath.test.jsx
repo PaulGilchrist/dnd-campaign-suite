@@ -1,50 +1,68 @@
-// MA-0068: Adult Brass Dragon Sleep Breath click-path enforcement —
-// data lock (Recharge 5-6, dc_success 'none', staged_sleep), recharge gate
-// + spend at picker open, cone picker armed with sleepStaging
-// (unconscious_minutes×10 rounds, CLA-334) and no half-damage dcSuccess,
-// spent row refuses with sleep_breath_refused zero prompts.
+// @maintained-by-ai
+// MA-0068/MA-0179 Brass Dragon Sleep Breath click lane — the staged-sleep
+// CONE producer seam of MonsterCardModal. This file owns the disk-row byte
+// locks (adult: recharge '5-6' + authored dc_success 'none' + staged_sleep
+// {unconscious_minutes:10} on DC 18 CON 60-ft Cone; ancient MA-0179: same
+// staged shape on DC 21 CON 90-ft Cone, NO recharge key) and the live
+// picker arm locked exact-shape BY NAME in one shot (#764 exact-shape
+// discipline): sleepStaging {unconsciousRounds:100} is THIS lane's LIVE
+// rider — sleepStagingForAction (MonsterCardModal.jsx:293-296, minutes×10
+// rounds CLA-334) — with honest nulls for every inert rider
+// (pushFeet/stagedParalysis/stagedPetrify/zoneTe/slowedClauses/secondary*),
+// dc_success 'none' overriding the app-wide 'half' default
+// (resolveBlockSaveDcSuccess, MonsterCardModal.jsx:283-287) and zero
+// inline rollSavingThrow (the picker IS target selection).
+// Adult press folds the ONE lifecycle test (#762/#764 precedent, CLA-384
+// picker-open spend, MonsterCardModal.jsx:465): fresh-spend → spent-refuse
+// (.mc-recharge-refusal popup + sleep_breath_refused refusal byte,
+// monsterRecharge.js:70-83) → recharged-refire, exact totals. The ancient
+// row is ungated on disk — its press pins the same staged contract with
+// ZERO recharge writes.
+// Cite-skips (covered elsewhere, never re-anchored here):
+// • recharge gate parse / d6 turn-start recovery / tri-state:
+//   monsterRecharge.test.js:41-57 — here only live arm/spend/refusal bytes
+// • picker failed-save grant leg (stageSleepTargets 100 rounds, Incapacitated
+//   staged NOT Unconscious, never half-damage copy):
+//   SaveAttackAoeModal.staged-sleep.test.jsx:151-183 (:178 no-Unconscious)
+// • turn-END sleep ladder: sleepService.staged-breath.test.js
+// • saveConditions prose-parse truth table: extractConditionsFromSaveEffect,
+//   MonsterCardHelpers.js:383-393
+// • damageless-row secondary transport honest nulls:
+//   MonsterCardModal.secondary-save-transport.test.js:139-151
+// • half-damage math (never applies here — dc_success 'none'):
+//   applyDamage.save-full.test.js:18-25
+// No diceRoller mock: this lane rolls nothing in the modal (recharge d6
+// lives at the turnStartEffects seam). No wall-clock timers — sleep duration
+// is rounds at GM seams (100 rounds), never a setTimeout auto-wake.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import monstersData from '../../../public/data/monsters.json';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
+import monsters from '../../../public/data/monsters.json';
 
-const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
+const aoeProps = vi.hoisted(() => ({ current: null }));
 
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     aoeProps.current = props;
-    aoeProps.onClose = props.onClose;
     return (
       <div className="sp-overlay cone-picker-stub">
         <div className="sp-body">{props.titleOverride}</div>
+        <button className="cone-picker-close" onClick={() => props.onClose()}>Close</button>
       </div>
     );
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
-}));
-
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const _setPopupHtml = vi.fn();
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
+    popupHtml: null,
     setPopupHtml: _setPopupHtml,
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
@@ -56,32 +74,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -101,32 +93,103 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 import { addEntry } from '../../services/ui/logService.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { MONSTER_RECHARGE_KEY } from '../../services/encounters/monsterRecharge.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
-const CREATURES = [
+const ADULT = monsters.find(m => m.index === 'adult-brass-dragon');
+const ANCIENT = monsters.find(m => m.index === 'ancient-brass-dragon');
+const ADULT_ROW = ADULT.actions.find(a => a.name === 'Sleep Breath');
+const ANCIENT_ROW = ANCIENT.actions.find(a => a.name === 'Sleep Breath');
+
+const ADULT_CREATURES = [
   { name: 'Adult Brass Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 172, maxHp: 172, ac: 18, conditions: [] },
   { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
 ];
+const ANCIENT_CREATURES = [
+  { name: 'Ancient Brass Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 546, maxHp: 546, ac: 22, conditions: [] },
+  { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
+];
 
-function brassActions() {
-  const dragon = monstersData.find(m => m.index === 'adult-brass-dragon');
-  return dragon.actions;
+function dragonProps(row, creatureName, creatures) {
+  const m = makeMonster({ name: row.name, actions: row.actions });
+  return makeProps(m, { creatureName, creatures });
 }
 
-function sleepBreathAction() {
-  return brassActions().find(a => a.name === 'Sleep Breath');
+function actionRow(namePrefix) {
+  return Array.from(document.querySelectorAll('.mc-action')).find(el => el.textContent.trim().startsWith(namePrefix)) || null;
 }
 
-function renderBrass() {
-  const m = makeMonster({ name: 'Adult Brass Dragon', actions: brassActions() });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Brass Dragon 1', creatures: CREATURES })} />);
+function chipInRow(namePrefix) {
+  const row = actionRow(namePrefix);
+  return row ? row.querySelector('.mc-dice-link') : null;
 }
 
-function sleepBreathLink() {
-  return Array.from(document.querySelectorAll('.mc-dice-link')).find(el => el.closest('div')?.textContent.includes('Sleep Breath')) || null;
+function logEntries(pred) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && pred(e));
 }
+
+// Picker-arm transport: exact-shape one-shot of every semantic prop the cone
+// row hands SaveAttackAoeModal — authored bytes plus honest nulls for every
+// rider this row does NOT write, so a wrongly-armed new rider fails here.
+// sleepStaging is the LIVE rider on this lane (#764 pinned it inert on the
+// repulsion row; here its exact payload is the MA-0068 contract).
+const PICKER_KEYS = ['action', 'playerStats', 'range', 'damage', 'damageType', 'secondaryDamage', 'secondaryDamageType', 'saveType', 'saveDc', 'dcSuccess', 'titleOverride', 'excludeNames', 'rangeGateFt', 'zoneTe', 'zoneOnly', 'saveConditions', 'sleepStaging', 'stagedParalysis', 'stagedPetrify', 'pushFeet', 'slowedClauses', 'weakeningBreath', 'acPenaltyClause', 'speedZeroClause', 'speedReduceClause', 'bothOutcomesClause', 'storeLastAttack'];
+const pickerArm = (props) => Object.fromEntries(PICKER_KEYS.map(k => [k, props[k]]));
+
+const ARMED_RIDERS_INERT = {
+  damage: null,
+  // honest empty-pool byte: no damage_type authored, pickerPrimaryDamageType
+  // (extractDamageTypes → [] → formatDamageTypes, damageUtils.js:16-19) = null
+  damageType: null,
+  secondaryDamage: null,
+  secondaryDamageType: null,
+  // raw prose parse of the ladder save_effect (MonsterCardHelpers.js:383);
+  // the picker's sleepStaging takes precedence on the grant leg
+  // (SaveAttackAoeModal.staged-sleep.test.jsx:151-183)
+  saveConditions: ['incapacitated', 'unconscious'],
+  stagedParalysis: null,
+  stagedPetrify: null,
+  pushFeet: null,
+  slowedClauses: null,
+  weakeningBreath: null,
+  acPenaltyClause: null,
+  speedZeroClause: null,
+  speedReduceClause: null,
+  bothOutcomesClause: null,
+  zoneTe: null,
+  zoneOnly: false,
+  storeLastAttack: false,
+};
+
+const ADULT_ARMED = {
+  action: ADULT_ROW,
+  playerStats: { name: 'Adult Brass Dragon 1' },
+  range: 60,
+  saveType: 'Constitution',
+  saveDc: 18,
+  dcSuccess: 'none',
+  titleOverride: '60-ft Cone (GM positions tokens; selection advisory)',
+  excludeNames: ['Adult Brass Dragon 1'],
+  rangeGateFt: 60,
+  sleepStaging: { unconsciousRounds: 100 },
+  ...ARMED_RIDERS_INERT,
+};
+
+const ANCIENT_ARMED = {
+  action: ANCIENT_ROW,
+  playerStats: { name: 'Ancient Brass Dragon 1' },
+  range: 90,
+  saveType: 'Constitution',
+  saveDc: 21,
+  dcSuccess: 'none',
+  titleOverride: '90-ft Cone (GM positions tokens; selection advisory)',
+  excludeNames: ['Ancient Brass Dragon 1'],
+  rangeGateFt: 90,
+  sleepStaging: { unconsciousRounds: 100 },
+  ...ARMED_RIDERS_INERT,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -134,76 +197,100 @@ beforeEach(() => {
   aoeProps.current = null;
 });
 
-describe('MA-0068 Adult Brass Dragon Sleep Breath data lock', () => {
-  it('row authors recharge 5-6, dc_success none, staged_sleep 10 minutes, DC 18 CON, no damage dice', () => {
-    const action = sleepBreathAction();
-    expect(action).toBeTruthy();
-    expect(action.save_dc).toBe(18);
-    expect(action.save_type).toBe('Constitution');
-    expect(action.recharge).toBe('5-6');
-    expect(action.dc_success).toBe('none');
-    expect(action.staged_sleep).toEqual({ unconscious_minutes: 10 });
-    expect(action.damage_dice_primary == null).toBe(true);
+describe('MA-0068/MA-0179 Brass Dragon Sleep Breath cone lane', () => {
+  it('disk rows lock the staged-sleep identity: adult recharge 5-6 + dc_success none + staged_sleep 10 min on DC 18 CON; ancient same shape ungated on DC 21; zero damage keys', () => {
+    // Full disk identity locks the byte contract behind the live press tests —
+    // the exact key set is part of the lock (no damage_dice_primary to leak).
+    expect(ADULT_ROW).toEqual({
+      name: 'Sleep Breath',
+      description: 'Constitution Saving Throw: DC 18, each creature in a 60-foot <strong>Cone</strong>. <strong>Failure:</strong> The target has the <strong>Incapacitated</strong> condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the <strong>Unconscious</strong> condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.',
+      save_dc: 18,
+      save_type: 'Constitution',
+      recharge: '5-6',
+      dc_success: 'none',
+      staged_sleep: { unconscious_minutes: 10 },
+      save_effect: 'The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the Unconscious condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it. Target repeats the save at the end of each of its turns.',
+    });
+    // MA-0179: the ancient row carries the same staged shape, ungated, no
+    // damage — dc_success 'none' keeps it out of the app-wide 'half' default.
+    expect(ANCIENT_ROW).toEqual({
+      name: 'Sleep Breath',
+      description: 'Constitution Saving Throw: DC 21, each creature in a 90-foot <strong>Cone</strong>. <strong>Failure:</strong> The target has the <strong>Incapacitated</strong> condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the <strong>Unconscious</strong> condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.',
+      save_dc: 21,
+      save_type: 'Constitution',
+      dc_success: 'none',
+      staged_sleep: { unconscious_minutes: 10 },
+      save_effect: 'Failure: The target has the Incapacitated condition until the end of its next turn, at which point it repeats the save. Second Failure: The target has the Unconscious condition for 10 minutes. This effect ends for the target if it takes damage or a creature within 5 feet of it takes an action to wake it.',
+    });
   });
-});
 
-describe('MA-0179 Ancient Brass Dragon Sleep Breath data lock', () => {
-  it('row authors dc_success none + staged_sleep 10 minutes on DC 21 CON, no damage dice, no generic unconscious over-apply', () => {
-    const dragon = monstersData.find(m => m.index === 'ancient-brass-dragon');
-    const action = dragon.actions.find(a => a.name === 'Sleep Breath');
-    expect(action).toBeTruthy();
-    expect(action.save_dc).toBe(21);
-    expect(action.save_type).toBe('Constitution');
-    expect(action.dc_success).toBe('none');
-    expect(action.staged_sleep).toEqual({ unconscious_minutes: 10 });
-    expect(action.damage_dice_primary == null).toBe(true);
-  });
-});
+  it('press lifecycle: fresh press spends at picker-open and arms the exact staged-sleep contract sleepStaging 100 rounds (zero inline roll); spent press refuses popup+log with zero spend; recharged row re-arms and refires', async () => {
+    const ui = render(<MonsterCardModal {...dragonProps(ADULT, 'Adult Brass Dragon 1', ADULT_CREATURES)} />);
 
-describe('MA-0068 Sleep Breath recharge gate + staged cone picker', () => {
-  it('fresh click spends the recharge and arms the cone picker with sleepStaging (100 rounds), dc_success none, no damage', async () => {
-    renderBrass();
-    const link = sleepBreathLink();
-    expect(link).toBeTruthy();
-    fireEvent.click(link);
+    // press 1 — fresh: cone routes to the picker, spend stamped, spend logged.
+    fireEvent.click(chipInRow('Sleep Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    // the picker IS target selection — no single-target block save on a cone row
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    await waitFor(() => expect(runtime.store['Adult Brass Dragon 1.monsterRecharge']).toBeTruthy());
-    expect(runtime.store['Adult Brass Dragon 1.monsterRecharge']).toEqual({ 'Sleep Breath': { recharged: false, threshold: 5 } });
-    expect(aoeProps.current).toBeTruthy();
-    expect(aoeProps.current.saveDc).toBe(18);
-    expect(aoeProps.current.saveType).toBe('Constitution');
-    expect(aoeProps.current.damage).toBe(null);
-    expect(aoeProps.current.dcSuccess).toBe('none');
-    expect(aoeProps.current.sleepStaging).toEqual({ unconsciousRounds: 100 });
-    expect(aoeProps.current.coneFt ?? aoeProps.current.range).toBe(60);
-    expect(aoeProps.current.excludeNames).toEqual(['Adult Brass Dragon 1']);
-    expect(aoeProps.current.storeLastAttack).toBe(false);
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(spend.description).toMatch(/Sleep Breath.*Recharge 5-6; unavailable until a d6 5\+/);
-  });
+    expect(runtime.store[`Adult Brass Dragon 1.${MONSTER_RECHARGE_KEY}`]).toEqual({ 'Sleep Breath': { recharged: false, threshold: 5 } });
+    expect(pickerArm(aoeProps.current)).toEqual(ADULT_ARMED);
+    const spends = logEntries(e => e.type === 'ability_use');
+    expect(spends).toHaveLength(1);
+    expect(spends[0].description).toMatch(/Sleep Breath.*Recharge 5-6; unavailable until a d6 5\+/);
+    // row re-rendered SPENT behind the open picker
+    expect(chipInRow('Sleep Breath').className).toContain('mc-dice-link-spell-spent');
 
-  it('spent row refuses: popup + sleep_breath_refused (not recharged), picker stays closed, zero prompts', () => {
-    runtime.store['Adult Brass Dragon 1.monsterRecharge'] = { 'Sleep Breath': { recharged: false, threshold: 5 } };
-    renderBrass();
-    const link = sleepBreathLink();
-    expect(link).toBeTruthy();
-    fireEvent.click(link);
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-    expect(aoeProps.current).toBeNull();
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Not Recharged');
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'sleep_breath_refused');
-    expect(refusal).toBeTruthy();
+    // close keeps it spent (picker-open spend convention, CLA-384)
+    fireEvent.click(document.querySelector('.cone-picker-close'));
+    expect(document.querySelector('.cone-picker-stub')).toBeNull();
+    expect(runtime.store[`Adult Brass Dragon 1.${MONSTER_RECHARGE_KEY}`]['Sleep Breath'].recharged).toBe(false);
+
+    // press 2 — spent: refusal popup byte + refused log, picker stays closed,
+    // zero rolls, zero extra spend, store bytes unchanged.
+    aoeProps.current = null;
+    fireEvent.click(chipInRow('Sleep Breath'));
+    await waitFor(() => expect(logEntries(e => e.automationType === 'sleep_breath_refused')).toHaveLength(1));
+    const refusal = logEntries(e => e.automationType === 'sleep_breath_refused')[0];
     expect(refusal.description).toMatch(/refused \(not recharged\)/);
     expect(refusal.characterName).toBe('Adult Brass Dragon 1');
+    expect(setPopupHtml.mock.calls.map(c => String(c[0])).some(h => h.includes('mc-recharge-refusal'))).toBe(true);
+    expect(document.querySelector('.cone-picker-stub')).toBeNull();
+    expect(aoeProps.current).toBeNull();
+    expect(runtime.store[`Adult Brass Dragon 1.${MONSTER_RECHARGE_KEY}`]).toEqual({ 'Sleep Breath': { recharged: false, threshold: 5 } });
+
+    // press 3 — recharged (turn-start d6 recovery is monsterRecharge.test.js-owned):
+    // row re-arms, picker RE-ARMS with the same staged-sleep contract and RE-SPENDS.
+    runtime.store[`Adult Brass Dragon 1.${MONSTER_RECHARGE_KEY}`] = { 'Sleep Breath': { recharged: true, threshold: 5 } };
+    ui.rerender(<MonsterCardModal {...dragonProps(ADULT, 'Adult Brass Dragon 1', ADULT_CREATURES)} />);
+    expect(chipInRow('Sleep Breath').className).not.toContain('mc-dice-link-spell-spent');
+    fireEvent.click(chipInRow('Sleep Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    await waitFor(() => expect(runtime.store[`Adult Brass Dragon 1.${MONSTER_RECHARGE_KEY}`]['Sleep Breath']).toEqual({ recharged: false, threshold: 5 }));
+    expect(pickerArm(aoeProps.current)).toEqual(ADULT_ARMED);
+
+    // lifecycle totals: two spends, one refusal, never a single-target roll
+    expect(logEntries(e => e.type === 'ability_use')).toHaveLength(2);
+    expect(logEntries(e => e.automationType === 'sleep_breath_refused')).toHaveLength(1);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('recharged row re-arms: picker opens again with sleepStaging', async () => {
-    runtime.store['Adult Brass Dragon 1.monsterRecharge'] = { 'Sleep Breath': { recharged: true, threshold: 5 } };
-    renderBrass();
-    fireEvent.click(sleepBreathLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.sleepStaging).toEqual({ unconsciousRounds: 100 });
-    aoeProps.onClose();
-    expect(runtime.store['Adult Brass Dragon 1.monsterRecharge']['Sleep Breath'].recharged).toBe(false);
+  it('MA-0179 ancient press: ungated disk row arms the DC 21 90-ft staged-sleep contract twice with ZERO recharge writes', async () => {
+    render(<MonsterCardModal {...dragonProps(ANCIENT, 'Ancient Brass Dragon 1', ANCIENT_CREATURES)} />);
+    fireEvent.click(chipInRow('Sleep Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+    expect(pickerArm(aoeProps.current)).toEqual(ANCIENT_ARMED);
+
+    fireEvent.click(document.querySelector('.cone-picker-close'));
+    fireEvent.click(chipInRow('Sleep Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    expect(pickerArm(aoeProps.current)).toEqual(ANCIENT_ARMED);
+
+    // no recharge key on disk → the gate never touches the runtime store,
+    // and the modal never emits a refusal (never gated).
+    expect(runtime.store[`Ancient Brass Dragon 1.${MONSTER_RECHARGE_KEY}`]).toBeUndefined();
+    expect(logEntries(e => e.automationType === 'sleep_breath_refused')).toHaveLength(0);
+    expect(logEntries(e => e.type === 'ability_use')).toHaveLength(0);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 });

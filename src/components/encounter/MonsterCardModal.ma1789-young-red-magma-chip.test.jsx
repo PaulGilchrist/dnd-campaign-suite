@@ -1,23 +1,18 @@
-// MA-1789: Young Red Dragon lair_actions[0] was a BARE STRING (inert static
-// span, zero affordance — MonsterCardBody.jsx string short-circuit first
-// disjunct). DATA fix promotes it to the adult-red MA-0128 byte-twin named
-// SAVE row (description soft-hyphen U+00AD "tak\xad ing" repaired to "taking"
-// as the only byte-diff vs adult) → row renders <strong>Magma Geyser.</strong>
-// + ONE .mc-dice-link-lair chip "DC 15 Dexterity"; click arms the picker at
-// DC 15 Dexterity with 6d6 Fire half-on-success (dcSuccess "half"), saveCondi-
-// tions [].
-// MA-1790 WIDENS this census 1→2: sibling [1] nameless magma dict promoted to
-// the distinct-named "Erupting Magma" save row (MA-1748/MA-1753/MA-1754/
-// MA-1767/MA-1773/MA-1784 distinct-sibling-naming precedent — [0] already owns
-// "Magma Geyser"; raw duplicate-mechanic rows named distinctly, never merged)
-// → lair block renders named rows, each with its own "DC 15 Dexterity"
-// .mc-dice-link-lair chip; chips arm the picker at DC 15 Dexterity,
-// 6d6 Fire, dcSuccess "half", saveConditions []. MA-1791 WIDENS this census
-// 2→3: sibling [2] nameless tremor dict promoted to the adult-red MA-0129
-// byte-twin named "Tremor" save row (dc_success "none", save_effect carries
-// the canonical prone word → saveConditions ['prone'], no damage dice) → its
-// chip arms the picker at DC 15 Dexterity with dcSuccess "none", damage null,
-// saveConditions ['prone']; zero static prose rows remain.
+// @maintained-by-ai
+// MA-1789/1790/1791 modal-seam lane: young-red-dragon lair_actions [0] was a
+// BARE STRING and [1]/[2] nameless dicts (all inert static spans —
+// MonsterCardBody.jsx MonsterLairAction string/nameless disjuncts). DATA fixes
+// promote them to three named SAVE rows: "Magma Geyser" + "Erupting Magma"
+// (both DC 15 Dexterity, 6d6 Fire, dcSuccess "half"; [0] mirrors the MA-0128
+// adult-red byte-twin) and "Tremor" (MA-0129 adult-red byte-twin: dc_success
+// "none", save_effect carries the canonical prone word, no damage dice).
+// This file pins ONLY the modal seam: the rendered chip census vs real disk +
+// each press arming SaveAttackAoeModal at the authored DC/type/damage through
+// handleLairRow → executeBlockSaveRoll's aoe!=null picker branch.
+// Cited owners, NOT re-pinned here: disk data locks (monsterLairActions.test.js
+// :3308-3320 young-red census, :3142 geyser row, :3219 Tremor byte-twin),
+// chip-vs-static render branches + inert gate + refusal machine
+// (MonsterCardModal.lair-actions.test.jsx:114/:153/:176).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -29,14 +24,14 @@ const pickerProps = vi.hoisted(() => ({ current: null }));
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     pickerProps.current = props;
-    return <div className="sp-overlay young-red-magma-picker-stub"><div className="sp-body">{props.title}</div></div>;
+    return <div className="sp-overlay young-red-magma-picker-stub"><div className="sp-body">{props.titleOverride}</div></div>;
   },
 }));
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 21, rolls: [4, 5, 6, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 42, rolls: [4, 5, 6, 6], modifier: 0 })),
+  rollExpression: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
+  rollExpressionDoubled: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
@@ -105,71 +100,65 @@ function lairChips() {
   return Array.from(document.querySelectorAll('.mc-dice-link-lair'));
 }
 
+// Per-chip picker contract: [0]/[1] are the DEX DC 15 half-damage magma twins
+// (5-ft Radius picker from the "5-foot-radius geyser" prose, 6d6 Fire);
+// [2] is the damageless tremor leg (60-ft Radius, dcSuccess none, prone).
+// Radius is GM point-placed so rangeGateFt stays null (selection advisory);
+// no zone/push markers on these rows — honest nulls. Nulling
+// pickerProps.current first proves THIS click (not a stale render) armed it.
+const PICKER_CASES = [
+  { i: 0, damage: '6d6', damageType: 'Fire', dcSuccess: 'half', saveConditions: [], range: 5, titleOverride: '5-ft Radius (GM positions tokens; selection advisory)' },
+  { i: 1, damage: '6d6', damageType: 'Fire', dcSuccess: 'half', saveConditions: [], range: 5, titleOverride: '5-ft Radius (GM positions tokens; selection advisory)' },
+  { i: 2, damage: null, damageType: null, dcSuccess: 'none', saveConditions: ['prone'], range: 60, titleOverride: '60-ft Radius (GM positions tokens; selection advisory)' },
+];
+
+async function clickChip({ i, damage, damageType, dcSuccess, saveConditions, range, titleOverride }) {
+  pickerProps.current = null;
+  fireEvent.click(lairChips()[i]);
+  await waitFor(() => expect(pickerProps.current, `chip ${i} did not open the picker`).toBeTruthy());
+  const p = pickerProps.current;
+  expect(p.saveDc, `chip ${i} saveDc`).toBe(15);
+  expect(p.saveType, `chip ${i} saveType`).toBe('Dexterity');
+  expect(p.dcSuccess, `chip ${i} dcSuccess`).toBe(dcSuccess);
+  expect(p.damage ?? null, `chip ${i} damage`).toBe(damage);
+  expect(p.damageType || null, `chip ${i} damageType`).toBe(damageType);
+  expect(p.saveConditions, `chip ${i} saveConditions`).toEqual(saveConditions);
+  expect(p.range, `chip ${i} range`).toBe(range);
+  expect(p.titleOverride, `chip ${i} titleOverride`).toBe(titleOverride);
+  expect(p.rangeGateFt, `chip ${i} rangeGateFt`).toBeNull();
+  expect(p.zoneOnly, `chip ${i} zoneOnly`).toBe(false);
+  expect(p.zoneTe ?? null, `chip ${i} zoneTe`).toBeNull();
+  expect(p.pushFeet ?? null, `chip ${i} pushFeet`).toBeNull();
+  expect(p.excludeNames, `chip ${i} excludeNames`).toEqual(['Young Red Dragon 1']);
+  expect(p.storeLastAttack, `chip ${i} storeLastAttack`).toBe(false);
+  expect(ROLLERS.rollSavingThrow, `chip ${i} rolled a save before the picker resolved`).not.toHaveBeenCalled();
+  return p;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  pickerProps.current = null;
 });
 
-describe('MA-1789/MA-1790 young-red-dragon magma lair chip lock', () => {
-  it('bare-string [0] promoted by MA-1789 + nameless [1] promoted by MA-1790 + nameless [2] tremor promoted by MA-1791: lair block renders THREE named rows ("Magma Geyser."/"Erupting Magma."/"Tremor."), THREE chips "DC 15 Dexterity"; zero static prose rows', () => {
+describe('MA-1789/1790/1791 young-red-dragon magma + tremor lair chip lock', () => {
+  it('lair block renders EXACTLY THREE clickable chips — "Magma Geyser." + "Erupting Magma." + "Tremor.", all "DC 15 Dexterity"; zero static prose rows', () => {
     renderDragon();
     const chips = lairChips();
     expect(chips).toHaveLength(3);
     expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Dexterity', 'DC 15 Dexterity', 'DC 15 Dexterity']);
-    chips.forEach(c => expect(c.getAttribute('title')).toMatch(/Lair action — DC 15 Dexterity/));
-    expect(chips[0].closest('.mc-action').querySelector('strong')?.textContent).toBe('Magma Geyser.');
-    expect(chips[1].closest('.mc-action').querySelector('strong')?.textContent).toBe('Erupting Magma.');
-    expect(chips[2].closest('.mc-action').querySelector('strong')?.textContent).toBe('Tremor.');
+    expect(chips.map(c => c.getAttribute('title'))).toEqual([
+      'Lair action — DC 15 Dexterity. Chosen on initiative 20, GM-enforced.',
+      'Lair action — DC 15 Dexterity. Chosen on initiative 20, GM-enforced.',
+      'Lair action — DC 15 Dexterity. Chosen on initiative 20, GM-enforced.',
+    ]);
+    expect(chips.map(c => c.closest('.mc-action').querySelector('strong')?.textContent)).toEqual(['Magma Geyser.', 'Erupting Magma.', 'Tremor.']);
     const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
     expect(staticRows).toHaveLength(0);
   });
 
-  it('[0] chip click arms the picker at DC 15 Dexterity, 6d6 Fire, dcSuccess half, zero conditions', async () => {
+  it('all three chip presses arm the picker at the authored save legs — DEX DC 15 6d6 Fire half twins (5-ft Radius) + damageless tremor knocker (60-ft Radius, prone), zero save rolled at press', async () => {
     renderDragon();
-    fireEvent.click(lairChips()[0]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.saveType).toBe('Dexterity');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('half');
-    expect(p.damage).toBe('6d6');
-    expect(p.damageType).toBe('Fire');
-    expect(p.saveConditions).toEqual([]);
-    expect(p.zoneOnly ?? false).toBe(false);
-    expect(p.excludeNames).toContain('Young Red Dragon 1');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('[1] chip click arms the picker identically (Erupting Magma — same DC/type/dice/half math seam)', async () => {
-    pickerProps.current = null;
-    renderDragon();
-    fireEvent.click(lairChips()[1]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.saveType).toBe('Dexterity');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('half');
-    expect(p.damage).toBe('6d6');
-    expect(p.damageType).toBe('Fire');
-    expect(p.saveConditions).toEqual([]);
-    expect(p.zoneOnly ?? false).toBe(false);
-    expect(p.excludeNames).toContain('Young Red Dragon 1');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('[2] chip click arms the picker at DC 15 Dexterity, dcSuccess none, no damage, saveConditions ["prone"] (MA-1791 Tremor — damageless prone row)', async () => {
-    pickerProps.current = null;
-    renderDragon();
-    fireEvent.click(lairChips()[2]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.saveType).toBe('Dexterity');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('none');
-    expect(p.damage).toBeNull();
-    expect(p.saveConditions).toEqual(['prone']);
-    expect(p.zoneOnly ?? false).toBe(false);
-    expect(p.excludeNames).toContain('Young Red Dragon 1');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    for (const c of PICKER_CASES) await clickChip(c);
   });
 });

@@ -1,6 +1,20 @@
+// @maintained-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import TravelPathLayer from './TravelPathLayer.jsx';
+import { HEX_SIZE } from '../../config/outdoorConfig';
+import { hexToPixel } from '../../services/maps/hexMapUtils.js';
+
+// Oracle: this layer converts hexes with the plain hexToPixel(q, r, HEX_SIZE)
+// it imports itself — build the expected point strings with that same real,
+// un-mocked converter and compare bytes verbatim.
+const pointsFor = (hexes) =>
+    hexes.map(({ q, r }) => {
+        const { x, y } = hexToPixel(q, r, HEX_SIZE);
+        return `${x},${y}`;
+    }).join(' ');
+
+const centerOf = (hex) => hexToPixel(hex.q, hex.r, HEX_SIZE);
 
 const defaultPath = [
     { q: 0, r: 0 },
@@ -13,127 +27,101 @@ const defaultPath = [
 const renderLayer = (overrides = {}) =>
     render(<TravelPathLayer path={defaultPath} pathIndex={2} {...overrides} />);
 
+const polylinesIn = (container) =>
+    Array.from(container.querySelectorAll('g.travel-path-layer polyline'));
+
 describe('TravelPathLayer', () => {
-    describe('null/empty path handling', () => {
-        it.each([
-            ['null', null],
-            ['undefined', undefined],
-            ['an empty array', []],
-        ])('returns null when path is %s', (_label, value) => {
-            const { container } = render(<TravelPathLayer path={value} pathIndex={2} />);
-            expect(container.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
-        });
+    it.each([
+        ['null', null],
+        ['undefined', undefined],
+        ['an empty array', []],
+    ])('renders nothing when path is %s', (_label, value) => {
+        const { container } = render(<TravelPathLayer path={value} pathIndex={2} />);
+        expect(container.querySelector('g.travel-path-layer')).not.toBeInTheDocument();
     });
 
-    describe('layer structure', () => {
-        it('renders a non-interactive travel-path-layer group', () => {
-            const { container } = renderLayer();
-            const layer = container.querySelector('g.travel-path-layer');
-            expect(layer).toBeInTheDocument();
-            expect(layer).toHaveAttribute('pointer-events', 'none');
-        });
+    it('splits traversed vs remaining path exactly at pathIndex, verbatim vs the oracle', () => {
+        const { container } = renderLayer();
+        const layer = container.querySelector('g.travel-path-layer');
+        expect(layer).toHaveAttribute('pointer-events', 'none');
+
+        const polylines = polylinesIn(container);
+        expect(polylines).toHaveLength(2);
+
+        const [behind, ahead] = polylines;
+        expect(behind).toHaveAttribute('points', pointsFor(defaultPath.slice(0, 2)));
+        expect(behind).toHaveAttribute('stroke', '#FFD700');
+        expect(behind).toHaveAttribute('stroke-width', '2');
+        expect(behind).toHaveAttribute('stroke-opacity', '0.4');
+        expect(behind).toHaveAttribute('stroke-dasharray', '4 3');
+
+        expect(ahead).toHaveAttribute('points', pointsFor(defaultPath.slice(2)));
+        expect(ahead).toHaveAttribute('stroke', '#FFD700');
+        expect(ahead).toHaveAttribute('stroke-width', '3');
+        expect(ahead).toHaveAttribute('stroke-opacity', '0.8');
+        expect(ahead).toHaveAttribute('stroke-dasharray', '6 4');
     });
 
-    describe('path polylines', () => {
-        it('renders the behind polyline with reduced opacity and dashed style', () => {
-            const { container } = renderLayer();
-            const layer = container.querySelector('g.travel-path-layer');
-            const polylines = layer.querySelectorAll('polyline');
-            const behindPolyline = polylines[0];
-            expect(behindPolyline).toHaveAttribute('stroke', '#FFD700');
-            expect(behindPolyline).toHaveAttribute('stroke-width', '2');
-            expect(behindPolyline).toHaveAttribute('stroke-opacity', '0.4');
-            expect(behindPolyline).toHaveAttribute('stroke-dasharray', '4 3');
-        });
+    it.each([0, 1, 3, 4])('marks the current position with a halo at the oracle center of path[%i]', (pathIndex) => {
+        const { container } = renderLayer({ pathIndex });
+        const oracle = centerOf(defaultPath[pathIndex]);
+        const circle = container.querySelector('g.travel-path-layer circle');
+        expect(circle).toBeInTheDocument();
+        expect(circle).toHaveAttribute('cx', String(oracle.x));
+        expect(circle).toHaveAttribute('cy', String(oracle.y));
+        expect(circle).toHaveAttribute('r', String(HEX_SIZE * 0.6));
+        expect(circle).toHaveAttribute('fill', 'rgba(255, 215, 0, 0.15)');
+        expect(circle).toHaveAttribute('stroke', '#FFD700');
+    });
 
-        it('renders the ahead polyline with full opacity and dashed style', () => {
-            const { container } = renderLayer();
-            const layer = container.querySelector('g.travel-path-layer');
-            const polylines = layer.querySelectorAll('polyline');
-            const aheadPolyline = polylines[1];
-            expect(aheadPolyline).toHaveAttribute('stroke', '#FFD700');
-            expect(aheadPolyline).toHaveAttribute('stroke-width', '3');
-            expect(aheadPolyline).toHaveAttribute('stroke-opacity', '0.8');
-            expect(aheadPolyline).toHaveAttribute('stroke-dasharray', '6 4');
-        });
-
-        it('omits the behind polyline when pathIndex is 0', () => {
-            const { container } = renderLayer({ pathIndex: 0 });
-            const layer = container.querySelector('g.travel-path-layer');
-            const polylines = layer.querySelectorAll('polyline');
+    it.each([0, defaultPath.length, defaultPath.length + 1])(
+        'keeps exactly one polyline across the whole progress range (pathIndex %i)',
+        (pathIndex) => {
+            const { container } = renderLayer({ pathIndex });
+            const polylines = polylinesIn(container);
             expect(polylines).toHaveLength(1);
-            expect(polylines[0]).toHaveAttribute('stroke-opacity', '0.8');
-        });
 
-        it.each([5, 10])('omits the ahead polyline when pathIndex (%i) reaches or passes the end', (pathIndex) => {
-            const { container } = renderLayer({ pathIndex });
-            const layer = container.querySelector('g.travel-path-layer');
-            const polylines = layer.querySelectorAll('polyline');
-            expect(polylines).toHaveLength(1);
-            expect(polylines[0]).toHaveAttribute('stroke-opacity', '0.4');
-        });
+            if (pathIndex === 0) {
+                expect(polylines[0]).toHaveAttribute('points', pointsFor(defaultPath));
+                expect(polylines[0]).toHaveAttribute('stroke-opacity', '0.8');
+                expect(container.querySelector('g.travel-path-layer circle')).toBeInTheDocument();
+            } else {
+                expect(polylines[0]).toHaveAttribute('points', pointsFor(defaultPath));
+                expect(polylines[0]).toHaveAttribute('stroke-opacity', '0.4');
+                expect(container.querySelector('g.travel-path-layer circle')).not.toBeInTheDocument();
+            }
+        }
+    );
+
+    it('anchors the destination marker on the oracle center of the last hex', () => {
+        const { container } = renderLayer({ pathIndex: 0 });
+        const oracle = centerOf(defaultPath[defaultPath.length - 1]);
+
+        const rect = container.querySelector('g.travel-path-layer rect');
+        expect(rect).toHaveAttribute('x', String(oracle.x - 18));
+        expect(rect).toHaveAttribute('y', String(oracle.y - 18));
+        expect(rect).toHaveAttribute('width', '36');
+        expect(rect).toHaveAttribute('height', '36');
+        expect(rect).toHaveAttribute('stroke-dasharray', '5 3');
+
+        const label = screen.getByText('D');
+        expect(label).toHaveAttribute('x', String(oracle.x));
     });
 
-    describe('current position halo', () => {
-        it('renders a halo circle when pathIndex points to a valid hex', () => {
-            const { container } = renderLayer();
-            const layer = container.querySelector('g.travel-path-layer');
-            const circle = layer.querySelector('circle');
-            expect(circle).toBeInTheDocument();
-            expect(circle).toHaveAttribute('fill', 'rgba(255, 215, 0, 0.15)');
-            expect(circle).toHaveAttribute('stroke', '#FFD700');
-            expect(circle).toHaveAttribute('stroke-width', '2');
-        });
+    it('renders a lone-hex path as one ahead point, halo, and destination at the same hex', () => {
+        const hex = { q: 2, r: -1 };
+        const { container } = render(<TravelPathLayer path={[hex]} pathIndex={0} />);
+        const oracle = centerOf(hex);
 
-        it.each([-1, 5, 10])('omits the halo circle when pathIndex (%i) is invalid', (pathIndex) => {
-            const { container } = renderLayer({ pathIndex });
-            const layer = container.querySelector('g.travel-path-layer');
-            expect(layer.querySelector('circle')).not.toBeInTheDocument();
-        });
-    });
+        const polylines = polylinesIn(container);
+        expect(polylines).toHaveLength(1);
+        expect(polylines[0]).toHaveAttribute('points', `${oracle.x},${oracle.y}`);
 
-    describe('destination marker', () => {
-        it.each([0, 2])('renders a dashed square at the last hex (pathIndex %i)', (pathIndex) => {
-            const { container } = renderLayer({ pathIndex });
-            const layer = container.querySelector('g.travel-path-layer');
-            const rect = layer.querySelector('rect[stroke-dasharray="5 3"]');
-            expect(rect).toBeInTheDocument();
-            expect(rect).toHaveAttribute('fill', 'none');
-            expect(rect).toHaveAttribute('stroke', '#FFD700');
-        });
+        const circle = container.querySelector('g.travel-path-layer circle');
+        expect(circle).toHaveAttribute('cx', String(oracle.x));
+        expect(circle).toHaveAttribute('cy', String(oracle.y));
 
-        it('renders a "D" label at the destination', () => {
-            renderLayer();
-            expect(screen.getByText('D')).toBeInTheDocument();
-        });
-    });
-
-    describe('edge cases', () => {
-        it('renders correctly for a single-element path at index 0', () => {
-            const { container } = render(<TravelPathLayer path={[{ q: 0, r: 0 }]} pathIndex={0} />);
-            const layer = container.querySelector('g.travel-path-layer');
-            // No behind polyline, one ahead polyline since pathIndex=0 includes the only hex
-            expect(layer.querySelectorAll('polyline')).toHaveLength(1);
-            // Halo should appear at the single hex
-            expect(layer.querySelector('circle')).toBeInTheDocument();
-            // Destination marker should appear at the same hex
-            expect(layer.querySelector('rect[stroke-dasharray="5 3"]')).toBeInTheDocument();
-        });
-
-        it('renders halo and destination at the same hex when pathIndex is at the end', () => {
-            const { container } = renderLayer({ pathIndex: defaultPath.length - 1 });
-            const layer = container.querySelector('g.travel-path-layer');
-            const polylines = layer.querySelectorAll('polyline');
-            // Both polylines visible: behind has 5 hexes, ahead has the last hex
-            expect(polylines).toHaveLength(2);
-            expect(polylines[0]).toHaveAttribute('stroke-opacity', '0.4');
-            expect(polylines[1]).toHaveAttribute('stroke-opacity', '0.8');
-            const circle = layer.querySelector('circle');
-            expect(circle).toBeInTheDocument();
-            expect(circle).toHaveAttribute('fill', 'rgba(255, 215, 0, 0.15)');
-            const rect = layer.querySelector('rect[stroke-dasharray="5 3"]');
-            expect(rect).toBeInTheDocument();
-            expect(rect).toHaveAttribute('stroke', '#FFD700');
-        });
+        const rect = container.querySelector('g.travel-path-layer rect');
+        expect(rect).toHaveAttribute('x', String(oracle.x - 18));
     });
 });

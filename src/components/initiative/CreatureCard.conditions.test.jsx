@@ -1,7 +1,7 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
-import * as buffToggle from '../../services/automation/common/buffToggle.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath }) => {
@@ -45,16 +45,11 @@ vi.mock('../../services/automation/common/buffToggle.js', () => ({
     isBuffActive: vi.fn(() => false),
 }));
 
+// Only the exports CreatureCard (and its unmocked child TurnEconomyStrip) import from this module.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getStore: vi.fn(() => new Map()),
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
-    useRuntimeValue: vi.fn((_campaignName, key) => {
-        if (key === 'targetEffects') return [];
-        return null;
-    }),
-    getRuntimeValue: vi.fn(),
+    useRuntimeValue: vi.fn((_characterKey, key) => key === 'targetEffects' ? [] : null),
+    getRuntimeValue: vi.fn(() => undefined),
     setRuntimeValue: vi.fn(),
-    listeners: new Map(),
 }));
 
 describe('CreatureCard - conditions', () => {
@@ -104,23 +99,23 @@ describe('CreatureCard - conditions', () => {
             onRollConcentrationSave: vi.fn(),
             onBreakConcentration: vi.fn(),
         };
-        buffToggle.isBuffActive.mockReturnValue(false);
     });
 
     describe('condition badges', () => {
-        it('should call onRollConditionSave when condition badge is clicked for player', () => {
+        it('should call onRollConditionSave exactly once when a player clicks their condition badge', () => {
             const conditions = [{ id: 'c1', label: 'Blinded', dc: 12, ability: 'Wisdom' }];
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, conditions }} />);
             fireEvent.click(screen.getByText('Blinded DC 12'));
+            expect(props.onRollConditionSave).toHaveBeenCalledTimes(1);
             expect(props.onRollConditionSave).toHaveBeenCalledWith('Alice', conditions[0]);
         });
 
-        it('should not trigger onRollConditionSave when condition badge is clicked for non-localhost NPC', () => {
+        it('should render a non-clickable, non-removable condition badge for non-localhost NPCs', () => {
             const conditions = [{ id: 'c1', label: 'Blinded', dc: 12, ability: 'Wisdom' }];
             render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, conditions }} isLocalhost={false} />);
-            const conditionBadge = screen.getByText('Blinded DC 12');
-            fireEvent.click(conditionBadge);
+            fireEvent.click(screen.getByText('Blinded DC 12'));
             expect(props.onRollConditionSave).not.toHaveBeenCalled();
+            expect(screen.queryByTitle('Remove effect')).not.toBeInTheDocument();
         });
 
         it('should call onBreakCondition when break button is clicked', () => {
@@ -146,7 +141,8 @@ describe('CreatureCard - conditions', () => {
         it('should call onRollConcentrationSave when concentration badge is clicked', () => {
             const concentration = { spell: 'Fireball', dc: 15 };
             render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
-            fireEvent.click(screen.getByText(/Fireball DC 15/));
+            fireEvent.click(screen.getByText('Fireball DC 15'));
+            expect(props.onRollConcentrationSave).toHaveBeenCalledTimes(1);
             expect(props.onRollConcentrationSave).toHaveBeenCalledWith('Alice');
         });
 
@@ -156,17 +152,25 @@ describe('CreatureCard - conditions', () => {
             fireEvent.click(screen.getByTitle('Remove effect'));
             expect(props.onBreakConcentration).toHaveBeenCalledWith('Alice');
         });
+
+        it('should render concentration as fully inert for non-localhost clients', () => {
+            const concentration = { spell: 'Fireball', dc: 15 };
+            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} isLocalhost={false} />);
+            fireEvent.click(screen.getByText('Fireball DC 15'));
+            expect(props.onRollConcentrationSave).not.toHaveBeenCalled();
+            expect(props.onBreakConcentration).not.toHaveBeenCalled();
+            expect(screen.queryByTitle('Remove effect')).not.toBeInTheDocument();
+        });
     });
 
     describe('effect add button', () => {
-        it('should call onOpenEffectAdder when add effect button is clicked', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
+        it('opens the effect adder with the creature and target lane for localhost, and is absent for players', () => {
+            const { rerender } = render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
             fireEvent.click(screen.getByTitle('Add condition, effect, or concentration to Alice'));
+            expect(props.onOpenEffectAdder).toHaveBeenCalledTimes(1);
             expect(props.onOpenEffectAdder).toHaveBeenCalledWith(defaultPlayerCreature, 'conditions');
-        });
 
-        it('should not render add button for non-localhost', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={false} />);
+            rerender(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={false} />);
             expect(screen.queryByTitle('Add condition, effect, or concentration to Alice')).not.toBeInTheDocument();
         });
     });

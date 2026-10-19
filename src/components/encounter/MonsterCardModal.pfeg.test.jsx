@@ -1,18 +1,17 @@
+// @maintained-by-ai
 // SP-094: monster-attack attacker-type lookup must resolve the real monsterType
 // (EB combatSummary monsters carry type:'npc' with the real D&D type in monsterType).
+// Lane: attack-chip click → real findCreatureByName/getTargetFromAttacker →
+// applyProtectionFromEvilPenalty → isCreatureWarded(resolveCreatureType(attacker)) →
+// REAL combineAttackModes folds targetDisadvantageCount → rollAttack opts.forcedMode.
+// Resolver unit bytes live in services/combat/creatureTypeResolver.test.js —
+// this lane locks the consumer wiring end-to-end, not the resolver itself.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
+// Capture seam: rollAttack's options carry the resolved forcedMode.
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const mockHook = vi.fn(() => ({
@@ -29,123 +28,77 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   return { default: mockHook, _rollAttack };
 });
 
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  // Honour PfE disadvantage: a warded attacker's targetDisadvantageCount forces 'disadvantage'.
-  combineAttackModes: vi.fn((_attacker, targetEffectData) => {
-    const dis = targetEffectData?.targetDisadvantageCount || 0;
-    return dis > 0 ? 'disadvantage' : 'normal';
-  }),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => {
-  let _findCreatureReturn = null;
-  return {
-    extractDamageTypes: vi.fn(() => []),
-    formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-    getTargetFromAttacker: vi.fn(() => null),
-    getResistanceNotice: vi.fn(() => null),
-    findCreatureByName: vi.fn(() => _findCreatureReturn),
-    getCombatContext: vi.fn().mockResolvedValue(null),
-    __setFindCreatureReturn(val) { _findCreatureReturn = val; },
-  };
-});
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 5),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn(() => Promise.resolve(null)),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
-const WARDED = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];
-
+// PfE handler mocked only where runtime-store reads must be steered; the mock's
+// ward check mirrors the real case-insensitive type comparison (:190-195).
 vi.mock('../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
   isProtectionFromEvilAndGoodActive: vi.fn(() => false),
-  isCreatureWarded: vi.fn((type) => WARDED.some(t => t.toLowerCase() === String(type).toLowerCase())),
+  isCreatureWarded: vi.fn((type) => ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead']
+    .some(t => t.toLowerCase() === String(type).toLowerCase())),
   handle: vi.fn(),
 }));
 
+// Runtime-store stub: no SSE/fetch on this lane (null → every active-buff/te fold inert).
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => []),
   getRuntimeValue: vi.fn(() => null),
 }));
 
 import { _rollAttack } from '../../hooks/combat/useLoggedDiceRoll.js';
-import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import * as pfeg from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 
-function clickAttackLink(text) {
-  const link = Array.from(document.querySelectorAll('.mc-dice-link')).find(el => el.textContent.trim() === text);
-  expect(link, `attack link "${text}"`).toBeTruthy();
-  fireEvent.click(link);
-}
+const CASES = [
+  {
+    desc: 'warded Undead attacker vs PfE-protected target → forcedMode disadvantage',
+    pfActive: true, attacker: 'Wight 1', monsterType: 'Undead',
+    wardedArg: 'Undead', forcedMode: 'disadvantage',
+  },
+  {
+    desc: 'PfE inactive on target → warded check skipped, no forcedMode',
+    pfActive: false, attacker: 'Wight 1', monsterType: 'Undead',
+    wardedArg: null, forcedMode: undefined,
+  },
+  {
+    desc: 'non-warded Giant attacker vs PfE-protected target → no forcedMode',
+    pfActive: true, attacker: 'Ogre 1', monsterType: 'Giant',
+    wardedArg: 'Giant', forcedMode: undefined,
+  },
+];
 
-describe('MonsterCardModal - Protection from Evil and Good attacker-type lookup (SP-094)', () => {
+describe('MonsterCardModal - SP-094 PfE attacker-type lookup on the attack-roll lane', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.clearAllMocks(); // clears call history; factory implementations persist
     pfeg.isProtectionFromEvilAndGoodActive.mockReturnValue(false);
-    pfeg.isCreatureWarded.mockImplementation((type) => WARDED.some(t => t.toLowerCase() === String(type).toLowerCase()));
-    damageUtils.__setFindCreatureReturn(null);
   });
 
-  it('resolves attacker monsterType (not npc) so a warded Undead attacker forces Disadvantage', () => {
-    pfeg.isProtectionFromEvilAndGoodActive.mockReturnValue(true);
-    // EB combatSummary monster: type 'npc', real type 'Undead'
-    damageUtils.__setFindCreatureReturn({ name: 'Wight 1', type: 'npc', monsterType: 'Undead', targetName: 'HexWarlock' });
-
+  it.each(CASES)('$desc', ({ pfActive, attacker, monsterType, wardedArg, forcedMode }) => {
+    pfeg.isProtectionFromEvilAndGoodActive.mockReturnValue(pfActive);
+    // EB combatSummary row shape: type 'npc', real D&D type in monsterType.
+    const creatures = [
+      { name: attacker, type: 'npc', monsterType, targetName: 'HexWarlock' },
+      { name: 'HexWarlock', type: 'player' },
+    ];
     const m = makeMonster({ actions: [{ name: 'Necrotic Sword', attack_bonus: 4, description: 'Melee Attack.' }] });
     render(<MonsterCardModal {...makeProps(m, {
-      monsterName: 'Wight 1', creatureName: 'Wight 1',
-      creatures: [{ name: 'Wight 1', type: 'npc', monsterType: 'Undead', targetName: 'HexWarlock' }, { name: 'HexWarlock', type: 'player' }],
+      monsterName: attacker, creatureName: attacker, creatures,
     })} />);
 
-    clickAttackLink('+4');
+    const link = Array.from(document.querySelectorAll('.mc-dice-link'))
+      .find(el => el.textContent.trim() === '+4');
+    expect(link, 'attack link "+4"').toBeTruthy();
+    fireEvent.click(link);
 
-    expect(pfeg.isCreatureWarded).toHaveBeenCalled();
-    const wardedArg = pfeg.isCreatureWarded.mock.calls[0][0];
-    expect(wardedArg).toBe('Undead');
-    expect(wardedArg).not.toBe('npc');
-    expect(_rollAttack.mock.calls[0][2].forcedMode).toBe('disadvantage');
-  });
-
-  it('does NOT apply disadvantage to an unprotected protected-target (control: PfE inactive)', () => {
-    pfeg.isProtectionFromEvilAndGoodActive.mockReturnValue(false);
-    damageUtils.__setFindCreatureReturn({ name: 'Wight 1', type: 'npc', monsterType: 'Undead', targetName: 'HexWarlock' });
-
-    const m = makeMonster({ actions: [{ name: 'Necrotic Sword', attack_bonus: 4, description: 'Melee Attack.' }] });
-    render(<MonsterCardModal {...makeProps(m, {
-      monsterName: 'Wight 1', creatureName: 'Wight 1',
-      creatures: [{ name: 'Wight 1', type: 'npc', monsterType: 'Undead', targetName: 'HexWarlock' }, { name: 'HexWarlock', type: 'player' }],
-    })} />);
-
-    clickAttackLink('+4');
-    expect(_rollAttack.mock.calls[0][2].forcedMode).toBeUndefined();
-  });
-
-  it('does NOT apply disadvantage to a non-warded monsterType attacker (control: Beast)', () => {
-    pfeg.isProtectionFromEvilAndGoodActive.mockReturnValue(true);
-    damageUtils.__setFindCreatureReturn({ name: 'Ogre 1', type: 'npc', monsterType: 'Giant', targetName: 'HexWarlock' });
-
-    const m = makeMonster({ name: 'Ogre', actions: [{ name: 'Greatclub', attack_bonus: 6, description: 'Melee Attack.' }] });
-    render(<MonsterCardModal {...makeProps(m, {
-      monsterName: 'Ogre 1', creatureName: 'Ogre 1',
-      creatures: [{ name: 'Ogre 1', type: 'npc', monsterType: 'Giant', targetName: 'HexWarlock' }, { name: 'HexWarlock', type: 'player' }],
-    })} />);
-
-    clickAttackLink('+6');
-
-    expect(pfeg.isCreatureWarded).toHaveBeenCalled();
-    expect(pfeg.isCreatureWarded.mock.calls[0][0]).toBe('Giant');
-    expect(_rollAttack.mock.calls[0][2].forcedMode).toBeUndefined();
+    // Gate queries the PfE-protected target by name.
+    expect(pfeg.isProtectionFromEvilAndGoodActive).toHaveBeenCalledWith('HexWarlock', 'test-campaign');
+    if (wardedArg === null) {
+      expect(pfeg.isCreatureWarded).not.toHaveBeenCalled();
+    } else {
+      // SP-094 byte lock: real monsterType reaches the ward check, never 'npc'.
+      expect(pfeg.isCreatureWarded).toHaveBeenCalledTimes(1);
+      expect(pfeg.isCreatureWarded).toHaveBeenCalledWith(wardedArg, 'HexWarlock', 'test-campaign');
+    }
+    expect(_rollAttack).toHaveBeenCalledTimes(1);
+    expect(_rollAttack.mock.calls[0][0]).toBe('Necrotic Sword');
+    expect(_rollAttack.mock.calls[0][1]).toBe(4);
+    expect(_rollAttack.mock.calls[0][2].forcedMode).toBe(forcedMode);
   });
 });

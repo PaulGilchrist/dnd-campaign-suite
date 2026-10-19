@@ -1,67 +1,50 @@
+// @maintained-by-ai
 import { render } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import HexGridLayer from './HexGridLayer.jsx';
-import { getAllHexes } from '../../services/maps/hexMapUtils.js';
+import { HEX_SIZE } from '../../config/outdoorConfig.js';
+import { hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
-vi.mock('../../config/outdoorConfig.js', () => ({
-    HEX_SIZE: 30,
-}));
-
-vi.mock('../../services/maps/hexMapUtils.js', () => ({
-    getAllHexes: vi.fn(() => []),
-    hexToPixel: vi.fn(() => ({ x: 10, y: 20 })),
-    hexToSVGPath: vi.fn(() => 'M10,20 l30,0'),
-}));
-
-function makeHexes(hexCols, hexRows) {
-    const hexes = [];
-    for (let r = 0; r < hexRows; r++) {
-        for (let q = 0; q < hexCols; q++) {
-            hexes.push({ q, r });
-        }
-    }
-    return hexes;
+// Converters are exercised via their real implementation; their math is owned
+// and tested in services/maps/hexMapUtils.test.js (getAllHexes counts,
+// hexToSVGPath shape). Here we pin only the layer's wiring + render output.
+function pathForHex(q, r) {
+    const center = hexToPixel(q, r, HEX_SIZE);
+    return hexToSVGPath(center.x, center.y, HEX_SIZE);
 }
 
 describe('HexGridLayer', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+    it('renders one outlined hex path per hex, positioned by the converter', () => {
+        const { container } = render(<HexGridLayer hexCols={2} hexRows={3} />);
+
+        const group = container.querySelector('g.hex-grid-layer');
+        expect(group).toBeInTheDocument();
+
+        const paths = Array.from(group.querySelectorAll('path'));
+        expect(paths).toHaveLength(6);
+
+        // Grid lines: unfilled hex outlines with the authored stroke
+        expect(paths[0]).toHaveAttribute('fill', 'none');
+        expect(paths[0]).toHaveAttribute('stroke', '#999');
+        expect(paths[0]).toHaveAttribute('stroke-width', '0.3');
+
+        // Wiring: first/last paths (getAllHexes iterates r then q) sit exactly
+        // where the converter owner puts hexes (0,0) and (1,2) at HEX_SIZE
+        expect(paths[0]).toHaveAttribute('d', pathForHex(0, 0));
+        expect(paths[5]).toHaveAttribute('d', pathForHex(1, 2));
+
+        // Every hex renders at its own position (no collapsed grid)
+        const distinctD = new Set(paths.map((p) => p.getAttribute('d')));
+        expect(distinctD).toHaveLength(6);
     });
 
-    describe('Rendering', () => {
-        it('should render the hex-grid-layer group', () => {
-            const { container } = render(<HexGridLayer hexCols={3} hexRows={2} />);
-            expect(container.querySelector('g.hex-grid-layer')).toBeInTheDocument();
-        });
+    it('re-renders the full grid when dimensions change', () => {
+        const { container, rerender } = render(<HexGridLayer hexCols={2} hexRows={2} />);
+        expect(container.querySelectorAll('path')).toHaveLength(4);
 
-        it.each`
-            hexCols | hexRows | expectedPaths
-            ${0}    | ${3}    | ${0}
-            ${3}    | ${0}    | ${0}
-            ${0}    | ${0}    | ${0}
-            ${1}    | ${1}    | ${1}
-            ${3}    | ${2}    | ${6}
-            ${5}    | ${4}    | ${20}
-        `('should render one path per hex ($expectedPaths paths for $hexCols x $hexRows)', ({ hexCols, hexRows, expectedPaths }) => {
-            vi.mocked(getAllHexes).mockReturnValue(makeHexes(hexCols, hexRows));
-            const { container } = render(<HexGridLayer hexCols={hexCols} hexRows={hexRows} />);
-            expect(container.querySelectorAll('path')).toHaveLength(expectedPaths);
-        });
-
-        it('should render large grids without crashing', () => {
-            vi.mocked(getAllHexes).mockReturnValue(makeHexes(20, 15));
-            expect(() => render(<HexGridLayer hexCols={20} hexRows={15} />)).not.toThrow();
-        });
-    });
-
-    describe('Memoization', () => {
-        it('should regenerate paths when grid dimensions change', () => {
-            vi.mocked(getAllHexes).mockImplementation((cols, rows) => makeHexes(cols, rows));
-            const { container, rerender } = render(<HexGridLayer hexCols={2} hexRows={2} />);
-            expect(container.querySelectorAll('path')).toHaveLength(4);
-
-            rerender(<HexGridLayer hexCols={3} hexRows={3} />);
-            expect(container.querySelectorAll('path')).toHaveLength(9);
-        });
+        rerender(<HexGridLayer hexCols={3} hexRows={2} />);
+        const paths = Array.from(container.querySelectorAll('path'));
+        expect(paths).toHaveLength(6);
+        expect(paths[5]).toHaveAttribute('d', pathForHex(2, 1));
     });
 });

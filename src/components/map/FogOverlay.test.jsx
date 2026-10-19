@@ -1,74 +1,57 @@
+// @maintained-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import FogOverlay from './FogOverlay.jsx';
 
-const getRects = (queryContainer) => queryContainer.querySelectorAll('rect');
+// FogOverlay unit lane: props → fog rects, exact bytes.
+// Owns: cell count, verbatim geometry from an authored fixture, role class
+// string per role, empty/null fog honesty, props-driven re-render.
+// Not owned (owner cited):
+//   - fog visibility/expansion math ......... useFogOfWar service
+//   - hiding placed items under fog ......... PlacedItems-fog.test.jsx
+//   - mounted SVG + role wiring ............. Map.test.jsx ("Map - fog of war role rendering")
+//   - fill/opacity/pointer-events bytes ..... Map.css (.fog-cell rules)
+
+const rectFacts = (container) => Array.from(container.querySelectorAll('rect')).map((rect) => ({
+    x: Number(rect.getAttribute('x')),
+    y: Number(rect.getAttribute('y')),
+    width: Number(rect.getAttribute('width')),
+    height: Number(rect.getAttribute('height')),
+    cls: rect.getAttribute('class'),
+}));
 
 describe('FogOverlay', () => {
-    describe('early return guards', () => {
-        it('renders null when fog is falsy even if isLocalhost is true', () => {
-            const { container } = render(
-                <FogOverlay isLocalhost />
-            );
-            expect(container.innerHTML).toBe('');
-        });
+    it.each([
+        { name: 'undefined fog', props: {} },
+        { name: 'null fog', props: { fog: null } },
+        { name: 'empty fog set', props: { fog: new Set() } },
+    ])('renders nothing for $name', ({ props }) => {
+        const { container } = render(<FogOverlay {...props} isLocalhost />);
+        expect(container.innerHTML).toBe('');
     });
 
-    describe('role-specific fog classes', () => {
-        it('uses the translucent fog-cell class for the GM (localhost)', () => {
-            const { container } = render(
-                <FogOverlay fog={new Set(['0,0'])} isLocalhost />
-            );
-            const rect = container.querySelector('rect');
-            expect(rect).toHaveClass('no-print');
-            expect(rect).toHaveClass('fog-cell');
-            expect(rect).not.toHaveClass('fog-cell-player');
-        });
+    it.each([
+        { isLocalhost: true, cellClass: 'fog-cell' },
+        { isLocalhost: false, cellClass: 'fog-cell-player' },
+    ])('renders one exact rect per fog cell for class "$cellClass"', ({ isLocalhost, cellClass }) => {
+        // Authored fixture: CELL_SIZE = 40 px per grid cell.
+        const fog = new Set(['0,0', '1,0', '2,1']);
+        const { container } = render(<FogOverlay fog={fog} isLocalhost={isLocalhost} />);
 
-        it('uses the opaque fog-cell-player class for players', () => {
-            const { container } = render(
-                <FogOverlay fog={new Set(['0,0'])} isLocalhost={false} />
-            );
-            const rect = container.querySelector('rect');
-            expect(rect).toHaveClass('no-print');
-            expect(rect).toHaveClass('fog-cell-player');
-            expect(rect).not.toHaveClass('fog-cell');
-        });
+        expect(rectFacts(container)).toEqual([
+            { x: 0, y: 0, width: 40, height: 40, cls: `no-print ${cellClass}` },
+            { x: 40, y: 0, width: 40, height: 40, cls: `no-print ${cellClass}` },
+            { x: 80, y: 40, width: 40, height: 40, cls: `no-print ${cellClass}` },
+        ]);
     });
 
-    describe('rect rendering', () => {
-        it('renders no rects for empty fog set', () => {
-            const { container } = render(
-                <FogOverlay fog={new Set()} isLocalhost />
-            );
-            expect(getRects(container).length).toBe(0);
-        });
+    it('re-renders to the new fog exactly when fog changes (no stale cells)', () => {
+        const { container, rerender } = render(
+            <FogOverlay fog={new Set(['0,0'])} isLocalhost={false} />
+        );
+        expect(rectFacts(container).map((r) => `${r.x},${r.y}`)).toEqual(['0,0']);
 
-        it('renders one rect per fog entry for both roles', () => {
-            for (const isLocalhost of [true, false]) {
-                const { container, unmount } = render(
-                    <FogOverlay fog={new Set(['0,0', '1,0', '2,1'])} isLocalhost={isLocalhost} />
-                );
-                expect(getRects(container).length).toBe(3);
-                unmount();
-            }
-        });
-
-        it('positions rects at correct pixel coordinates based on CELL_SIZE', () => {
-            const fog = new Set(['0,0', '1,0', '2,1']);
-            const { container } = render(
-                <FogOverlay fog={fog} isLocalhost={false} />
-            );
-            const rects = getRects(container);
-
-            const positions = Array.from(rects).map((rect) => ({
-                x: Number(rect.getAttribute('x')),
-                y: Number(rect.getAttribute('y')),
-            }));
-
-            expect(positions).toContainEqual({ x: 0, y: 0 });
-            expect(positions).toContainEqual({ x: 40, y: 0 });
-            expect(positions).toContainEqual({ x: 80, y: 40 });
-        });
+        rerender(<FogOverlay fog={new Set(['1,0', '2,1'])} isLocalhost={false} />);
+        expect(rectFacts(container).map((r) => `${r.x},${r.y}`)).toEqual(['40,0', '80,40']);
     });
 });

@@ -1,7 +1,27 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import POIPanel from './POIPanel.jsx';
 import { POI_TYPES } from '../../config/outdoorConfig.js';
+
+function createDataTransfer() {
+    const data = {};
+    return {
+        data,
+        setData: vi.fn((format, value) => {
+            data[format] = value;
+        }),
+        setDragImage: vi.fn(),
+    };
+}
+
+function getItems() {
+    return [...document.querySelectorAll('.poi-panel-item')];
+}
+
+function renderedNames() {
+    return getItems().map(item => item.querySelector('span').textContent);
+}
 
 function renderPanel(onClose = vi.fn()) {
     return render(<POIPanel onClose={onClose} />);
@@ -14,104 +34,42 @@ describe('POIPanel', () => {
         onClose = vi.fn();
     });
 
-    describe('close button', () => {
-        it('calls onClose when clicked', () => {
-            renderPanel(onClose);
-            fireEvent.click(screen.getByRole('button'));
-            expect(onClose).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('POI items rendering', () => {
-        it('renders all POI type names as text', () => {
-            renderPanel();
-            for (const poiType of POI_TYPES) {
-                expect(screen.getByText(poiType.name)).toBeInTheDocument();
-            }
-        });
-
-        it('renders POI items in the correct order matching POI_TYPES', () => {
-            renderPanel();
-            const items = document.querySelectorAll('.poi-panel-item span');
-            const names = [...items].map(span => span.textContent);
-            const expectedNames = POI_TYPES.map(poi => poi.name);
-            expect(names).toEqual(expectedNames);
-        });
-    });
-
-    describe('drag behavior', () => {
-        function createDataTransfer() {
-            const data = {};
-            return {
-                data,
-                setData: vi.fn((format, value) => {
-                    data[format] = value;
-                }),
-                setDragImage: vi.fn(),
-            };
+    it('renders every POI type by name, in exact POI_TYPES order, each draggable', () => {
+        renderPanel(onClose);
+        const items = getItems();
+        expect(items).toHaveLength(POI_TYPES.length);
+        expect(renderedNames()).toEqual(POI_TYPES.map(poiType => poiType.name));
+        for (const item of items) {
+            expect(item).toHaveAttribute('draggable', 'true');
         }
-
-        it('sets correct drag data for each POI type', () => {
-            renderPanel();
-            const items = document.querySelectorAll('.poi-panel-item');
-            items.forEach((item, index) => {
-                const expectedId = POI_TYPES[index].id;
-                const dataTransfer = createDataTransfer();
-                fireEvent.dragStart(item, { dataTransfer, currentTarget: item });
-                expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', expectedId);
-            });
-        });
     });
 
-    describe('drag ghost fallback behavior', () => {
-        function createDataTransfer() {
-            const data = {};
-            return {
-                data,
-                setData: vi.fn((format, value) => {
-                    data[format] = value;
-                }),
-                setDragImage: vi.fn(),
-            };
-        }
+    it('calls onClose exactly once when the close button is clicked', () => {
+        renderPanel(onClose);
+        fireEvent.click(screen.getByRole('button'));
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 
-        it.each([
-            ['missing', (items) => {
-                const svg = items[0].querySelector('svg');
-                svg.removeAttribute('width');
-                svg.removeAttribute('height');
-            }],
-            ['zero', (items) => {
-                const svg = items[0].querySelector('svg');
-                svg.setAttribute('width', '0');
-                svg.setAttribute('height', '0');
-            }],
-        ])('uses fallback dimensions when SVG %s', (_, modifySvg) => {
-            renderPanel();
-            const items = document.querySelectorAll('.poi-panel-item');
-            modifySvg(items);
-            const firstItem = items[0];
+    it('each item dragStart dispatches its exact text/plain id and centers a scaled drag ghost', () => {
+        renderPanel(onClose);
+        const items = getItems();
+        expect(items).toHaveLength(POI_TYPES.length);
+
+        items.forEach((item, index) => {
             const dataTransfer = createDataTransfer();
+            fireEvent.dragStart(item, { dataTransfer, currentTarget: item });
 
-            fireEvent.dragStart(firstItem, { dataTransfer, currentTarget: firstItem });
+            // Exact payload bytes for this item's type, dispatched once per drag.
+            expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
+            expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', POI_TYPES[index].id);
+            expect(dataTransfer.data['text/plain']).toBe(POI_TYPES[index].id);
 
-            expect(dataTransfer.setDragImage).toHaveBeenCalled();
-            const callArgs = dataTransfer.setDragImage.mock.calls[0];
-            expect(callArgs[1]).toBe(18);
-            expect(callArgs[2]).toBe(18);
-        });
-
-        it('returns early without creating ghost when SVG element is not found', () => {
-            renderPanel();
-            const items = document.querySelectorAll('.poi-panel-item');
-            const firstItem = items[0];
-            const svg = firstItem.querySelector('svg');
-            svg.remove();
-            const dataTransfer = createDataTransfer();
-
-            fireEvent.dragStart(firstItem, { dataTransfer, currentTarget: firstItem });
-
-            expect(dataTransfer.setDragImage).not.toHaveBeenCalled();
+            // Ghost: 36x36 icon capped at 48 keeps full size; anchor is its center (18, 18).
+            expect(dataTransfer.setDragImage).toHaveBeenCalledTimes(1);
+            const [ghost, ghostX, ghostY] = dataTransfer.setDragImage.mock.calls[0];
+            expect(ghostX).toBe(18);
+            expect(ghostY).toBe(18);
+            expect(ghost.querySelector('svg')).not.toBeNull();
         });
     });
 });

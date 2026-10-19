@@ -1,13 +1,21 @@
+// @maintained-by-ai
 // MA-1742 data lock: Yochlol Spellcasting rode the MA-0421 markup-gap
 // family — plain-text spell names (zero affordances, row inert). DATA-MARKUP
 // fix wraps the four spell names in <em> with <strong> tier headers on the
-// archmage/spirit-naga house shape (inline "; " tier delimiters preserved for
-// strip-tags byte-equality); the row already carried the save_dc 15 +
-// save_type Charisma pair buildAbilitySaveRollContext reads (MA-0532 fork).
-// "At Will:"/"1/Day:" headers end ":" → fake-chip guard skips them
-// (MonsterCardHelpers.js:399); "1/Day:" matches the uses-header regex (:440)
-// binding Dominate Person maxUses 1. 1/Day refusal = monsterSpellUses key +
-// "automation blocked" (§57); At-Will ungated by design.
+// archmage/spirit-naga house shape (inline "; " tier delimiters byte-kept).
+// Row-level numeric save_dc 15 + save_type Charisma pair was ALREADY authored
+// (§89) — buildAbilitySaveRollContext reads it (§676/MA-1294 fork); the 15
+// rides the save seam instead of a chip. "(self only)" stays OUTSIDE the
+// <em> (night-hag MA-1230 / ultroloth MA-1625 suffix precedent) so the
+// harvested "Gaseous Form" resolves vs spells.json. Headers end ":" → the
+// colon-guard skips them (MonsterCardHelpers.js:399) — no fake chips (§161);
+// "1/Day:" matches the uses-header regex (:440), binding Dominate Person
+// maxUses 1. At Will trio is ADVISORY (all three: no dc, no damage in spell
+// DBs) — save-less lane never rolls, so the diceRoller mock is purged dead.
+// Generic lanes are OWNED by spellcasting.test.jsx and not re-asserted here:
+// counter badge render :275, exhausted spend + spell-named refusal :288-302,
+// multi-key independence :522-548, At Will null store :327/:561. DC
+// arithmetic restatement removed (row dc bytes pinned once).
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,29 +24,24 @@ import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardMo
 import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const allSpells = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
+const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
 const spells2024 = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8'));
-const realSpells = (names) => allSpells.filter(s => names.includes(s.name));
-
-const YOCHLOL_SPELLS = ['Detect Thoughts', 'Gaseous Form', 'Web', 'Dominate Person'];
-
-// Pre-fix description fingerprint (git HEAD, monsters.json) — the markup-only
-// diff proof: strip every tag from the FIXED row and it must equal the
-// original prose byte-for-byte.
-const YOCHLOL_PLAIN_ORIGINAL = 'The yochlol casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): At Will: Detect Thoughts, Gaseous Form (self only), Web; 1/Day: Dominate Person';
-const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const yochlol = monsters.find(m => m.index === 'yochlol');
 const row = yochlol.actions.find(a => a.name === 'Spellcasting');
+const NAMES = ['Detect Thoughts', 'Gaseous Form', 'Web', 'Dominate Person'];
+const AT_WILL = ['Detect Thoughts', 'Gaseous Form', 'Web'];
+
+// Exact byte-lock: two <strong> headers + four <em> names, "(self only)"
+// OUTSIDE the <em>, "; " tier delimiter byte-kept (no <br>/\n). The
+// extractor exact-map below proves no fake chips (§161/§648).
+const YOCHLOL_FIXED_BYTES = 'The yochlol casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 15): <strong>At Will:</strong> <em>Detect Thoughts</em>, <em>Gaseous Form</em> (self only), <em>Web</em>; <strong>1/Day:</strong> <em>Dominate Person</em>';
+
+const DOMINATE = spells5e.find(s => s.name === 'Dominate Person');
+const SPELLS_5E = spells5e.filter(s => NAMES.includes(s.name));
+const SPELLS_2024 = spells2024.filter(s => NAMES.includes(s.name));
+
 const MONSTER_NAME = 'Yochlol 1';
-
-// ── Mocks (mirror MonsterCardModal.ma0421-bone-naga-spellcasting.test.jsx) ─
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 21, rolls: [4, 5, 6, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 42, rolls: [4, 5, 6, 6, 4, 5, 6, 6], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -47,7 +50,9 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn((version) => Promise.resolve(version === '2024' ? spells2024 : realSpells(YOCHLOL_SPELLS))),
+  // §177 ruleset-branch pitfall: findMonsterSpell is 5e-first, falling back
+  // to loadSpells('2024') — both branches serve the four names here (§158).
+  loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? SPELLS_2024 : SPELLS_5E)),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -75,10 +80,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
   return {
     default: mockHook,
-    _rollAttack,
-    _rollDamage,
     _rollSavingThrow,
-    _setPopupHtml,
   };
 });
 
@@ -93,7 +95,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
+  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
 }));
 
@@ -129,8 +131,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: runtime.getRuntimeValue,
 }));
 
-import { addEntry } from '../../services/ui/logService.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 
@@ -146,12 +148,12 @@ function abilityUseEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
 }
 
-function refusals() {
-  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked');
+function refusals(name) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked' && e.abilityName === name);
 }
 
 function renderYochlol() {
-  const m = makeMonster({ name: yochlol.name, actions: [row] });
+  const m = makeMonster({ name: yochlol.name, index: 'yochlol', type: 'fiend', actions: [row] });
   const creatures = [
     { name: MONSTER_NAME, type: 'npc', monsterType: 'fiend', targetName: 'TestPC', currentHp: yochlol.hit_points, maxHp: yochlol.hit_points, conditions: [] },
     { name: 'TestPC', type: 'player', currentHp: 60, maxHp: 60, conditions: [], computedStats: {} },
@@ -159,100 +161,94 @@ function renderYochlol() {
   render(<MonsterCardModal {...makeProps(m, { creatureName: MONSTER_NAME, creatures })} />);
 }
 
-// ── Data lock ────────────────────────────────────────────────────────────────
+// ── Data lock: yochlol Spellcasting row ──────────────────────────────────────
 
 describe('MA-1742 monsters.json data lock: Yochlol Spellcasting row', () => {
-  it('carries <em> markup on each of the four spell names and <strong> tier headers', () => {
-    for (const name of YOCHLOL_SPELLS) {
-      expect(row.description).toContain(`<em>${name}</em>`);
-    }
-    expect(row.description).toContain('<strong>At Will:</strong>');
-    expect(row.description).toContain('<strong>1/Day:</strong>');
+  it('description is byte-exact house style + numeric save_dc 15 / save_type Charisma pair kept byte-untouched (§89)', () => {
+    expect(row.description).toBe(YOCHLOL_FIXED_BYTES);
+    expect(row.save_dc).toBe(15);
+    expect(row.save_type).toBe('Charisma');
   });
 
-  it('extractSpellNamesFromSpellcasting returns the four spell names (was [] zero chips)', () => {
-    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(YOCHLOL_SPELLS);
-  });
-
-  it('extractSpellcastingSpellUses binds the 1/Day gate to Dominate Person only', () => {
+  it('extractor harvests exactly the four names and gates Dominate Person only — headers and "(self only)" never enter the harvest (§57/§144, no fake chips §161/§648)', () => {
+    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(NAMES);
     expect(extractSpellcastingSpellUses(row.description)).toEqual({ 'Dominate Person': 1 });
   });
 
-  it('carries save_dc 15 + save_type Charisma (8 + CHA + PB) — seam was already byte-present', () => {
-    expect(row.save_dc).toBe(15);
-    expect(row.save_type).toBe('Charisma');
-    expect(8 + yochlol.ability_score_modifiers.cha + yochlol.proficiency_bonus).toBe(15);
-  });
-
-  it('all four spells resolve in both 5e and 2024 spell data (no fake chips)', () => {
-    for (const name of YOCHLOL_SPELLS) {
-      expect(allSpells.some(s => s.name === name)).toBe(true);
-      expect(spells2024.some(s => s.name === name)).toBe(true);
-    }
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
-    expect(stripTags(row.description)).toBe(YOCHLOL_PLAIN_ORIGINAL);
+  it('all four names resolve in BOTH spell DBs (§158 trap INACTIVE); spell-side shapes — Dominate Person enforced WIS/other, At Will trio damage-free and dc-free (advisory, never rolls)', () => {
+    NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+    expect(DOMINATE.dc.dc_type).toBe('WIS');
+    expect(DOMINATE.dc.dc_success).toBe('other');
+    expect(DOMINATE.damage ?? null).toBeNull();
+    AT_WILL.forEach(n => {
+      const s = spells5e.find(sp => sp.name === n);
+      expect(s.damage ?? null).toBeNull();
+      expect(s.dc ?? null).toBeNull();
+    });
   });
 });
 
-// ── Modal: chips + cast routing ──────────────────────────────────────────────
+// ── Modal: chips + advisory/gate e2e ─────────────────────────────────────────
 
 describe('MA-1742 MonsterCardModal Yochlol Spellcasting chips', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    runtime.setRuntimeValue.mockImplementation((characterKey, propertyName, value) => { runtime.store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); });
+    runtime.getRuntimeValue.mockImplementation((characterKey, propertyName) => runtime.store[`${characterKey}.${propertyName}`] ?? null);
+    runtime.useRuntimeValue.mockImplementation((characterKey, propertyName) => runtime.store[`${characterKey}.${propertyName}`] ?? null);
   });
 
-  it('renders four clickable spell chips (was zero affordances)', () => {
+  it('renders four chips — counter on Dominate Person only, At Will trio bare (the zero-chip inert row is gone)', () => {
     renderYochlol();
-    expect(stripTags(row.description)).toBe(YOCHLOL_PLAIN_ORIGINAL);
-    const names = spellLinks().map(el => el.textContent.split('(')[0].trim());
-    expect(names.sort()).toEqual([...YOCHLOL_SPELLS].sort());
-  });
-
-  it('Dominate Person carries the 1/Day counter, At Will chips do not', () => {
-    renderYochlol();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
     expect(linkByText('Dominate Person').textContent).toMatch(/\(1\/Day · 1 left\)/);
-    for (const name of ['Detect Thoughts', 'Gaseous Form', 'Web']) {
-      expect(linkByText(name).textContent).not.toMatch(/\/Day/);
-    }
+    AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
   });
 
-  it('At Will casts are advisory records — repeated casts, zero spend, zero refusal', async () => {
+  it('At Will casts ungated — "(self only)" Gaseous Form LIVE-resolves and recasts; advisory logs print row DC 15 Charisma, zero refusals', async () => {
     renderYochlol();
-    await act(async () => { fireEvent.click(linkByText('Detect Thoughts')); });
-    await act(async () => { fireEvent.click(linkByText('Detect Thoughts')); });
-    await act(async () => { fireEvent.click(linkByText('Gaseous Form')); });
-    await act(async () => { fireEvent.click(linkByText('Web')); });
-
-    await waitFor(() => expect(abilityUseEntries('Detect Thoughts').length).toBe(2));
+    for (const n of ['Detect Thoughts', 'Web']) {
+      await act(async () => { fireEvent.click(linkByText(n)); });
+      await waitFor(() => expect(abilityUseEntries(n).length).toBe(1));
+    }
+    const gaseous = linkByText('Gaseous Form');
+    await act(async () => { fireEvent.click(gaseous); });
+    await waitFor(() => expect(abilityUseEntries('Gaseous Form').length).toBe(1));
+    expect(abilityUseEntries('Gaseous Form')[0].description).toMatch(/\(spell save DC 15, Charisma\)/);
     expect(abilityUseEntries('Detect Thoughts')[0].description).toMatch(/Yochlol 1 casts Detect Thoughts via Spellcasting/);
     expect(abilityUseEntries('Detect Thoughts')[0].description).toMatch(/GM-enforced/);
-    expect(abilityUseEntries('Gaseous Form').length).toBe(1);
-    expect(abilityUseEntries('Web').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+    await act(async () => { fireEvent.click(gaseous); });
+    await waitFor(() => expect(abilityUseEntries('Gaseous Form').length).toBe(2));
+    expect(rollSavingThrow).toHaveBeenCalledTimes(0);
     expect(refusals().length).toBe(0);
+    // null monsterSpellUses store is owned by spellcasting.test.jsx:327/:561.
   });
 
-  it('Dominate Person spends its 1/Day, routes a DC 15 WIS save, refuses the re-cast', async () => {
+  it('Dominate Person spends its 1/Day and routes the enforced DC 15 WIS save; re-cast refuses, store and save calls unchanged', async () => {
     renderYochlol();
     await act(async () => { fireEvent.click(linkByText('Dominate Person')); });
 
     await waitFor(() => expect(abilityUseEntries('Dominate Person').length).toBe(1));
-    const saveCalls = rollSavingThrow.mock.calls.filter(c => String(c[2]?.spellName) === 'Dominate Person');
-    expect(saveCalls.length).toBe(1);
-    expect(saveCalls[0][2].saveDc).toBe(15);
-    expect(saveCalls[0][2].saveType).toBe('WIS');
-    expect(saveCalls[0][2].isSpellDamage).toBe(true);
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
+    const context = rollSavingThrow.mock.calls[0][2];
+    expect(context.spellName).toBe('Dominate Person');
+    expect(context.saveDc).toBe(15);
+    expect(context.saveType).toBe('WIS');
+    expect(context.isSpellDamage).toBe(true);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dominate Person': 1 });
     expect(abilityUseEntries('Dominate Person')[0].description).toMatch(/1\/Day use spent — 0 remaining today/);
 
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:288-302; this
+    // pins only the yochlol-specific refusal byte + gate holding the save.
     await act(async () => { fireEvent.click(linkByText('Dominate Person')); });
+    await waitFor(() => expect(refusals('Dominate Person').length).toBe(1));
+    expect(refusals('Dominate Person')[0].description).toMatch(/already cast Dominate Person today \(1\/Day\)/);
+    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
     expect(abilityUseEntries('Dominate Person').length).toBe(1);
-    const refusal = refusals().find(e => e.abilityName === 'Dominate Person');
-    expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/already cast Dominate Person today \(1\/Day\)/);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dominate Person': 1 });
   });
 });

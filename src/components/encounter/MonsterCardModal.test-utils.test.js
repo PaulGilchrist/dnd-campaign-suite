@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import * as utils from './MonsterCardModal.test-utils.js';
 
@@ -36,30 +37,39 @@ describe('MonsterCardModal.test-utils', () => {
   });
 
   describe('makeMonster', () => {
-    it('returns a default Goblin with the core stat block fields', () => {
-      const monster = utils.makeMonster();
-      expect(monster.name).toBe('Goblin');
-      expect(monster.size).toBe('Small');
-      expect(monster.type).toBe('humanoid');
-      expect(monster.alignment).toBe('neutral evil');
-      expect(monster.armor_class).toBe(15);
-      expect(monster.hit_points).toBe(7);
-      expect(monster.hit_dice).toBe('2d6');
-      expect(monster.speed).toEqual({ walk: '30 ft.' });
-      expect(monster.ability_scores).toEqual({ str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 10 });
-      expect(monster.ability_score_modifiers).toEqual({ str: -1, dex: 2, con: 0, int: 0, wis: -1, cha: 0 });
-      expect(monster.saving_throws).toEqual({});
-      expect(monster.skills).toEqual({});
-      expect(monster.senses).toBeNull();
-      expect(monster.languages).toBe('Common');
-      expect(monster.challenge_rating).toBe('1/4');
-      expect(monster.xp).toBe(25);
-      expect(monster.actions).toEqual([]);
-      expect(monster.traits).toEqual([]);
-      expect(monster.reactions).toEqual([]);
-      expect(monster.legendary_actions).toEqual([]);
-      expect(monster.lair_actions).toEqual([]);
-      expect(monster.regional_effects).toEqual([]);
+    it('returns a default Goblin with the complete stat block fields', () => {
+      expect(utils.makeMonster()).toEqual({
+        name: 'Goblin',
+        size: 'Small',
+        type: 'humanoid',
+        subtype: '',
+        alignment: 'neutral evil',
+        armor_class: 15,
+        hit_points: 7,
+        hit_dice: '2d6',
+        speed: { walk: '30 ft.' },
+        ability_scores: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 10 },
+        ability_score_modifiers: { str: -1, dex: 2, con: 0, int: 0, wis: -1, cha: 0 },
+        saving_throws: {},
+        skills: {},
+        senses: null,
+        languages: 'Common',
+        damage_vulnerabilities: [],
+        damage_resistances: [],
+        damage_immunities: [],
+        condition_immunities: [],
+        challenge_rating: '1/4',
+        xp: 25,
+        actions: [],
+        traits: [],
+        reactions: [],
+        legendary_actions: [],
+        lair_actions: [],
+        regional_effects: [],
+        desc: null,
+        book: null,
+        page: null,
+      });
     });
 
     it('merges overrides on top of the defaults', () => {
@@ -69,12 +79,14 @@ describe('MonsterCardModal.test-utils', () => {
       expect(monster.size).toBe('Small');
     });
 
-    it('returns a fresh object on every call so tests cannot mutate shared fixtures', () => {
+    it('returns fresh nested objects on every call so tests cannot mutate shared fixtures', () => {
       const first = utils.makeMonster();
       first.name = 'Mutated';
+      first.speed.walk = '5 ft.';
       const second = utils.makeMonster();
-      expect(second.name).toBe('Goblin');
       expect(second).not.toBe(first);
+      expect(second.name).toBe('Goblin');
+      expect(second.speed).toEqual({ walk: '30 ft.' });
     });
   });
 
@@ -91,56 +103,44 @@ describe('MonsterCardModal.test-utils', () => {
       expect(vi.isMockFunction(props.onClose)).toBe(true);
     });
 
-    it('overrides defaults with the provided values', () => {
+    it('overrides defaults with the provided values, including onClose', () => {
+      const onClose = vi.fn();
       const monster = utils.makeMonster();
-      const props = utils.makeProps(monster, { campaignName: 'other-campaign', creatureName: 'Goblin' });
+      const props = utils.makeProps(monster, { campaignName: 'other-campaign', creatureName: 'Goblin', onClose });
+      expect(props.monster).toBe(monster);
       expect(props.campaignName).toBe('other-campaign');
       expect(props.creatureName).toBe('Goblin');
-      expect(props.monster).toBe(monster);
-    });
-
-    it('honors a custom onClose handler', () => {
-      const onClose = vi.fn();
-      const props = utils.makeProps(utils.makeMonster(), { onClose });
       expect(props.onClose).toBe(onClose);
     });
   });
 
   describe('hasEntries', () => {
-    it('is falsy for null, undefined, and empty objects', () => {
-      expect(utils.hasEntries(null)).toBeFalsy();
-      expect(utils.hasEntries(undefined)).toBeFalsy();
-      expect(utils.hasEntries({})).toBeFalsy();
-    });
-
-    it('is truthy for a non-empty object', () => {
-      expect(utils.hasEntries({ key: 'value' })).toBeTruthy();
+    it.each([
+      [null, false],
+      [undefined, false],
+      [{}, false],
+      [{ key: 'value' }, true],
+    ])('hasEntries(%j) is %s', (input, expected) => {
+      expect(Boolean(utils.hasEntries(input))).toBe(expected);
     });
   });
 
   describe('hasSenseEntries', () => {
-    it('is falsy for null, undefined, empty objects, and objects with no sense keys', () => {
-      expect(utils.hasSenseEntries(null)).toBeFalsy();
-      expect(utils.hasSenseEntries(undefined)).toBeFalsy();
-      expect(utils.hasSenseEntries({})).toBeFalsy();
-      expect(utils.hasSenseEntries({ ac: 20 })).toBeFalsy();
-    });
-
-    it('is truthy when any recognized sense is present', () => {
-      expect(utils.hasSenseEntries({ blindsight: 60 })).toBeTruthy();
-      expect(utils.hasSenseEntries({ darkvision: 60 })).toBeTruthy();
-      expect(utils.hasSenseEntries({ truesight: 120 })).toBeTruthy();
-      expect(utils.hasSenseEntries({ tremorsense: 60 })).toBeTruthy();
-      expect(utils.hasSenseEntries({ passive_perception: 15 })).toBeTruthy();
-    });
-
-    it('is truthy when multiple senses are combined', () => {
-      expect(utils.hasSenseEntries({ blindsight: 60, darkvision: 120, passive_perception: 20 })).toBeTruthy();
-    });
-
-    it('is falsy when sense values are falsy (e.g. 0 or null)', () => {
-      expect(utils.hasSenseEntries({ blindsight: 0 })).toBeFalsy();
-      expect(utils.hasSenseEntries({ darkvision: null })).toBeFalsy();
+    it.each([
+      [null, false],
+      [undefined, false],
+      [{}, false],
+      [{ ac: 20 }, false],
+      [{ blindsight: 0 }, false],
+      [{ darkvision: null }, false],
+      [{ blindsight: 60 }, true],
+      [{ darkvision: 60 }, true],
+      [{ truesight: 120 }, true],
+      [{ tremorsense: 60 }, true],
+      [{ passive_perception: 15 }, true],
+      [{ blindsight: 60, darkvision: 120, passive_perception: 20 }, true],
+    ])('hasSenseEntries(%j) is %s', (input, expected) => {
+      expect(Boolean(utils.hasSenseEntries(input))).toBe(expected);
     });
   });
 
@@ -176,14 +176,15 @@ describe('MonsterCardModal.test-utils', () => {
   });
 
   describe('parseInitiativeBonus', () => {
-    it.each([null, undefined, '', '3', 'no bonus here', '  +2', '--2', '+'])(
-      'returns null for %j',
-      (input) => {
-        expect(utils.parseInitiativeBonus(input)).toBeNull();
-      }
-    );
-
     it.each([
+      [null, null],
+      [undefined, null],
+      ['', null],
+      ['3', null],
+      ['no bonus here', null],
+      ['  +2', null],
+      ['--2', null],
+      ['+', null],
       ['+2', 2],
       ['-1', -1],
       ['+0', 0],
@@ -191,39 +192,26 @@ describe('MonsterCardModal.test-utils', () => {
       ['-4', -4],
       ['+10', 10],
       ['-10', -10],
-    ])('parses "%s" as %d', (input, expected) => {
+      ['+2 (from Dexterity)', 2],
+      ['-4 bonus', -4],
+    ])('parses %j as %s', (input, expected) => {
       expect(utils.parseInitiativeBonus(input)).toBe(expected);
-    });
-
-    it('parses the leading sign even when the string has trailing context', () => {
-      expect(utils.parseInitiativeBonus('+2 (from Dexterity)')).toBe(2);
-      expect(utils.parseInitiativeBonus('-4 bonus')).toBe(-4);
     });
   });
 
   describe('formatSenses', () => {
-    it('returns an empty string for an empty object', () => {
-      expect(utils.formatSenses({})).toBe('');
-    });
-
     it.each([
+      [{}, ''],
       [{ blindsight: 60 }, 'blindsight 60'],
       [{ darkvision: 60 }, 'darkvision 60'],
       [{ truesight: 120 }, 'truesight 120'],
       [{ tremorsense: 60 }, 'tremorsense 60'],
       [{ passive_perception: 15 }, 'passive Perception 15'],
+      [{ blindsight: 60, darkvision: 120, passive_perception: 15 }, 'blindsight 60, darkvision 120, passive Perception 15'],
+      [{ darkvision: 0 }, ''],
+      [{ blindsight: 60, darkvision: null }, 'blindsight 60'],
     ])('formats %j as "%s"', (senses, expected) => {
       expect(utils.formatSenses(senses)).toBe(expected);
-    });
-
-    it('joins multiple senses with commas in a fixed order', () => {
-      expect(utils.formatSenses({ blindsight: 60, darkvision: 120, passive_perception: 15 }))
-        .toBe('blindsight 60, darkvision 120, passive Perception 15');
-    });
-
-    it('skips falsy sense values', () => {
-      expect(utils.formatSenses({ darkvision: 0 })).toBe('');
-      expect(utils.formatSenses({ blindsight: 60, darkvision: null })).toBe('blindsight 60');
     });
 
     it('throws when passed null, so callers must guard with hasSenseEntries', () => {

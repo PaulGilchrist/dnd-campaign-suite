@@ -1,49 +1,47 @@
-// MA-0031: Abominable Yeti Cold Breath (Recharge 6) click-path enforcement.
-// Fresh row → area picker opens (spend at click, picker-open convention),
-// recharge map stamps unavailable, row reads "(Recharge 6 — unavailable)",
-// second click refuses with popup + cold_breath_refused (not recharged) zero
-// prompts; recharged row re-arms. Non-cone save rows keep the byte-identical
-// single-target block save (rollSavingThrow).
+// @maintained-by-ai
+// MA-0031: Abominable Yeti Cold Breath (Recharge 6) — the recharge CONE lane of
+// MonsterCardModal. This file owns the row-specific click lane only: fresh press
+// spends at picker-open (CLA-384 convention) and routes the "30-foot Cone" save
+// row to the SaveAttackAoeModal picker (the picker IS target selection — zero
+// single-target rollSavingThrow); a spent press refuses with the .mc-recharge-refusal
+// popup byte + cold_breath_refused log and zero spend; a recharged row re-arms and
+// refires. Parse/gate semantics (threshold, suffix-stripped key, display text,
+// turn-start d6 recovery) are canonically owned by monsterRecharge.test.js:41-57 /
+// :145 / :203-237 — here only rechargeUsageOf(ROW)+monsterRechargeGate(ROW, null)
+// arm bytes on the disk row. dc_success unauthored on the cone row → honest app-wide
+// 'half' default (ma1859 :131 discipline); the Chilling Gaze row's authored
+// dc_success:"none" override is asserted live on its own block-save press (MA-0030;
+// immunity helper log shape owned by MonsterCardHelpers.gaze-immunity.test.js).
+// Half-damage math: applyDamage.save-full.test.js:18-25. No diceRoller mock: this
+// lane rolls nothing in the modal (recharge d6 lives at the turnStartEffects seam).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import monstersData from '../../../public/data/monsters.json';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
+import monsters from '../../../public/data/monsters.json';
 
-const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
+const aoeProps = vi.hoisted(() => ({ current: null }));
 
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     aoeProps.current = props;
-    aoeProps.onClose = props.onClose;
     return (
       <div className="sp-overlay cone-picker-stub">
         <div className="sp-body">{props.titleOverride}</div>
+        <button className="cone-picker-close" onClick={() => props.onClose()}>Close</button>
       </div>
     );
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
   const mockHook = vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
@@ -57,32 +55,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -102,28 +74,43 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 import { addEntry } from '../../services/ui/logService.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { MONSTER_RECHARGE_KEY, monsterRechargeGate, rechargeUsageOf } from '../../services/encounters/monsterRecharge.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
+
+const KEY = `Abominable Yeti 1.${MONSTER_RECHARGE_KEY}`;
+const YETI = monsters.find(m => m.index === 'abominable-yeti');
+const ROW = YETI.actions.find(a => a.name === 'Cold Breath (Recharge 6)');
 
 const CREATURES = [
   { name: 'Abominable Yeti 1', type: 'npc', monsterType: 'monstrosity', targetName: 'ElderPaladin', currentHp: 137, maxHp: 137, ac: 15, conditions: [] },
   { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
 ];
 
-function yetiActions() {
-  const yeti = monstersData.find(m => m.index === 'abominable-yeti');
-  return yeti.actions;
+function yetiProps() {
+  const m = makeMonster({ name: 'Abominable Yeti', actions: YETI.actions });
+  return makeProps(m, { creatureName: 'Abominable Yeti 1', creatures: CREATURES });
 }
 
-function renderYeti() {
-  const m = makeMonster({ name: 'Abominable Yeti', actions: yetiActions() });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Abominable Yeti 1', creatures: CREATURES })} />);
+function actionRow(namePrefix) {
+  return Array.from(document.querySelectorAll('.mc-action')).find(el => el.textContent.trim().startsWith(namePrefix)) || null;
 }
 
-function coldBreathLink() {
-  return Array.from(document.querySelectorAll('.mc-dice-link')).find(el => el.closest('div')?.textContent.includes('Cold Breath')) || null;
+function chipInRow(namePrefix) {
+  const row = actionRow(namePrefix);
+  return row ? row.querySelector('.mc-dice-link') : null;
 }
+
+function logEntries(pred) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && pred(e));
+}
+
+// Picker-arm transport: exact-shape one-shot of the semantic props the cone row
+// hands SaveAttackAoeModal — authored bytes plus honest nulls for every clause the
+// Cold Breath row does NOT write (zoneTe/pushFeet/staging family).
+const PICKER_KEYS = ['range', 'damage', 'damageType', 'secondaryDamage', 'secondaryDamageType', 'saveType', 'saveDc', 'dcSuccess', 'titleOverride', 'excludeNames', 'rangeGateFt', 'zoneTe', 'zoneOnly', 'saveConditions', 'sleepStaging', 'stagedParalysis', 'pushFeet'];
+const pickerArm = (props) => Object.fromEntries(PICKER_KEYS.map(k => [k, props[k]]));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -131,66 +118,104 @@ beforeEach(() => {
   aoeProps.current = null;
 });
 
-describe('MA-0031 Cold Breath recharge gate + cone routing', () => {
-  it('fresh click spends the recharge, routes the CONE row to the area picker (no single-target roll)', async () => {
-    renderYeti();
-    const link = coldBreathLink();
-    expect(link).toBeTruthy();
-    fireEvent.click(link);
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-    await waitFor(() => expect(runtime.store['Abominable Yeti 1.monsterRecharge']).toBeTruthy());
-    expect(runtime.store['Abominable Yeti 1.monsterRecharge']).toEqual({ 'Cold Breath': { recharged: false, threshold: 6 } });
-    expect(aoeProps.current).toBeTruthy();
-    expect(aoeProps.current.saveDc).toBe(18);
-    expect(aoeProps.current.saveType).toBe('Constitution');
-    expect(aoeProps.current.damage).toBe('10d8');
-    expect(aoeProps.current.dcSuccess).toBe('half');
-    expect(aoeProps.current.storeLastAttack).toBe(false);
-    expect(aoeProps.current.excludeNames).toEqual(['Abominable Yeti 1']);
-    expect(aoeProps.current.rangeGateFt).toBe(30);
-    expect(aoeProps.current.titleOverride).toBe('30-ft Cone (GM positions tokens; selection advisory)');
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use');
-    expect(spend.description).toMatch(/Cold Breath.*Recharge 6; unavailable until a d6 6\+/);
+describe('MA-0031 Cold Breath (Recharge 6) cone lane', () => {
+  it('disk row arms the gate: flat recharge:"6" → threshold 6, suffix-stripped key "Cold Breath"', () => {
+    // Full disk identity locks the byte contract behind the live press tests.
+    expect(ROW).toEqual({
+      name: 'Cold Breath (Recharge 6)',
+      description: 'Constitution Saving Throw: DC 18, each creature in a 30-foot <strong>Cone</strong>. <strong>Failure:</strong> 45 (10d8) Cold damage. <strong>Success:</strong> Half damage.',
+      save_dc: 18,
+      save_type: 'Constitution',
+      recharge: '6',
+      damage_dice_primary: '10d8',
+      damage_type_primary: 'Cold',
+      save_effect: 'Failure: 45 (10d8) Cold damage. Success: Half damage.',
+    });
+    expect(rechargeUsageOf(ROW)).toEqual({ threshold: 6 });
+    expect(monsterRechargeGate(ROW, null)).toEqual({ key: 'Cold Breath', threshold: 6, available: true });
   });
 
-  it('spent row shows "(Recharge 6 — unavailable)" + refused popup/log, zero prompts, picker stays closed', async () => {
-    runtime.store['Abominable Yeti 1.monsterRecharge'] = { 'Cold Breath': { recharged: false, threshold: 6 } };
-    renderYeti();
-    const link = coldBreathLink();
-    expect(document.body.textContent).toContain('(Recharge 6 — unavailable)');
-    expect(coldBreathLink()).toBeTruthy();
-    expect(link.className).toContain('mc-dice-link-spell-spent');
-    fireEvent.click(link);
+  it('press lifecycle: fresh press spends at picker-open (zero single-target roll); spent press refuses popup+log with zero spend; recharged row re-arms and refires', async () => {
+    const ui = render(<MonsterCardModal {...yetiProps()} />);
+
+    // press 1 — fresh: cone routes to the picker, spend stamped, spend logged.
+    fireEvent.click(chipInRow('Cold Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    // the picker IS target selection — no single-target block save on a cone row
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    expect(aoeProps.current).toBeNull();
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Not Recharged');
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'cold_breath_refused');
-    expect(refusal).toBeTruthy();
+    expect(runtime.store[KEY]).toEqual({ 'Cold Breath': { recharged: false, threshold: 6 } });
+    const spends = logEntries(e => e.type === 'ability_use');
+    expect(spends).toHaveLength(1);
+    expect(spends[0].description).toMatch(/Cold Breath.*Recharge 6; unavailable until a d6 6\+/);
+    expect(pickerArm(aoeProps.current)).toEqual({
+      range: 30,
+      damage: '10d8',
+      damageType: 'Cold',
+      secondaryDamage: null,
+      secondaryDamageType: null,
+      saveType: 'Constitution',
+      saveDc: 18,
+      // dc_success unauthored on disk → honest app-wide half-on-save default
+      dcSuccess: 'half',
+      titleOverride: '30-ft Cone (GM positions tokens; selection advisory)',
+      excludeNames: ['Abominable Yeti 1'],
+      rangeGateFt: 30,
+      zoneTe: null,
+      zoneOnly: false,
+      saveConditions: [],
+      sleepStaging: null,
+      stagedParalysis: null,
+      pushFeet: null,
+    });
+    // row re-rendered SPENT behind the open picker
+    expect(chipInRow('Cold Breath').className).toContain('mc-dice-link-spell-spent');
+    expect(actionRow('Cold Breath').textContent).toContain('(Recharge 6 — unavailable)');
+
+    // close keeps it spent (picker-open spend convention, CLA-384)
+    fireEvent.click(document.querySelector('.cone-picker-close'));
+    expect(document.querySelector('.cone-picker-stub')).toBeNull();
+    expect(runtime.store[KEY]['Cold Breath'].recharged).toBe(false);
+
+    // press 2 — spent: refusal popup byte + refused log, picker stays closed,
+    // zero rolls, zero extra spend.
+    aoeProps.current = null;
+    fireEvent.click(chipInRow('Cold Breath'));
+    await waitFor(() => expect(logEntries(e => e.automationType === 'cold_breath_refused')).toHaveLength(1));
+    const refusal = logEntries(e => e.automationType === 'cold_breath_refused')[0];
     expect(refusal.description).toMatch(/refused \(not recharged\)/);
     expect(refusal.characterName).toBe('Abominable Yeti 1');
-  });
-
-  it('recharged row re-arms: label "(Recharge 6)" and picker opens again', async () => {
-    runtime.store['Abominable Yeti 1.monsterRecharge'] = { 'Cold Breath': { recharged: true, threshold: 6 } };
-    renderYeti();
-    expect(document.body.textContent).toContain('(Recharge 6)');
-    expect(document.body.textContent).not.toContain('unavailable');
-    fireEvent.click(coldBreathLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    // re-fire re-spends (picker-open spend convention); close keeps it spent
-    aoeProps.onClose();
-    expect(runtime.store['Abominable Yeti 1.monsterRecharge']['Cold Breath'].recharged).toBe(false);
-  });
-
-  it('non-cone save row keeps the byte-compatible single-target block save', async () => {
-    runtime.store['Abominable Yeti 1.monsterRecharge'] = { 'Cold Breath': { recharged: false, threshold: 6 } };
-    renderYeti();
-    const gaze = Array.from(document.querySelectorAll('.mc-dice-link')).find(el => (el.closest('.mc-action')?.textContent || '').startsWith('Chilling Gaze'));
-    fireEvent.click(gaze);
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
+    expect(setPopupHtml.mock.calls.map(c => String(c[0])).some(h => h.includes('mc-recharge-refusal'))).toBe(true);
+    expect(document.querySelector('.cone-picker-stub')).toBeNull();
     expect(aoeProps.current).toBeNull();
-    expect(rollSavingThrow.mock.calls[0][2].saveDc).toBe(18);
-    expect(rollSavingThrow.mock.calls[0][2].dcSuccess).toBe('none');
+    expect(runtime.store[KEY]).toEqual({ 'Cold Breath': { recharged: false, threshold: 6 } });
+
+    // press 3 — recharged (turn-start d6 recovery is monsterRecharge.test.js-owned):
+    // label drops "unavailable", picker re-arms and RE-SPENDS.
+    runtime.store[KEY] = { 'Cold Breath': { recharged: true, threshold: 6 } };
+    ui.rerender(<MonsterCardModal {...yetiProps()} />);
+    expect(chipInRow('Cold Breath').className).not.toContain('mc-dice-link-spell-spent');
+    expect(actionRow('Cold Breath').textContent).toContain('(Recharge 6)');
+    expect(actionRow('Cold Breath').textContent).not.toContain('unavailable');
+    fireEvent.click(chipInRow('Cold Breath'));
+    await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeTruthy());
+    await waitFor(() => expect(runtime.store[KEY]['Cold Breath']).toEqual({ recharged: false, threshold: 6 }));
+    expect(aoeProps.current.titleOverride).toBe('30-ft Cone (GM positions tokens; selection advisory)');
+
+    // lifecycle totals: two spends, one refusal, never a single-target roll
+    expect(logEntries(e => e.type === 'ability_use')).toHaveLength(2);
+    expect(logEntries(e => e.automationType === 'cold_breath_refused')).toHaveLength(1);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+  });
+
+  it('non-cone save row on the same card stays the block-save lane: authored dc_success:"none" rides the roll, a spent cone row never blocks it', async () => {
+    runtime.store[KEY] = { 'Cold Breath': { recharged: false, threshold: 6 } };
+    render(<MonsterCardModal {...yetiProps()} />);
+    fireEvent.click(chipInRow('Chilling Gaze'));
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('.cone-picker-stub')).toBeNull();
+    const opts = rollSavingThrow.mock.calls[0][2];
+    expect(opts.saveDc).toBe(18);
+    // MA-0030: authored dc_success:"none" overrides the app-wide 'half' default
+    expect(opts.dcSuccess).toBe('none');
   });
 });

@@ -1,71 +1,50 @@
-// MA-1881 regression: Demogorgon legendary_actions[1] "Gaze"
-// (`delegates_to:"Gaze"`) inherited the MA-1878 dead lane — the chip press
-// spent honestly, opened a plain (fake 60-ft Line) save picker, offered ZERO
-// chooser arms, rolled ZERO d6 branch, and applied the master's FIRST clause
-// with zero condition/te grant. Fix: legendaryDelegateChooserAction
-// (MonsterCardModal) copies the parent's variants[] + save fields onto the
-// child BEFORE the first-clause shortcut, so the legendary panel reaches the
-// SAME MA-1436/MA-1878 chooser seam (tryOpenVariantChoosers →
-// SaveVariantChooserModal) as the parent row. Chip press now: gate → spend →
-// chooser (Beguiling / Confusing / Hypnotic arms) → pick → inline WIS DC 23
-// save with the picked variant stamped on the save context (te→targetEffects
-// consumer grantSaveVariantClause, MA-1878, rides downstream).
+// @maintained-by-ai
+// MA-1881 RENDER lane: Demogorgon legendary "Gaze" (`delegates_to:"Gaze"`) —
+// the chip press used to ride the MA-1878 dead lane (fake 60-ft Line picker,
+// ZERO chooser arms, first-clause collapse with zero condition/te grant).
+// Fix: legendaryDelegateChooserAction copies the parent's variants[] + save
+// fields onto the child BEFORE the first-clause shortcut, so the legendary
+// panel reaches the SAME chooser seam (tryOpenVariantChoosers →
+// SaveVariantChooserModal) as the parent row. Owned flow faces pinned here:
+// gate → spend → chooser arms → pick → save-context stamp → skip → latch →
+// exhausted, one press per distinct arm payload shape (beguiling =
+// conditions[], confusing = te-only; hypnotic shares the conditions[] shape —
+// its bytes are pinned by the inherit lane below).
+// CITED, not re-pinned here:
+// - inherit contract (child.variants inherit, passthrough, chooser resolve):
+//   MonsterCardModal.ma1881-demogorgon-legendary-gaze-inherit.test.js (#743)
+// - master Gaze parse + data lock: MonsterCardHelpers.save-variant-chooser
+//   .test.js + saveProcessing.ma1878-demogorgon-gaze.test.js
+// - fake-Line pure-parse face: MonsterCardModal.save-variant-shape.test.jsx:37-42
+// - generic exhausted popup / turn-latch economy (shared gate
+//   monsterLegendaryUses.js): MonsterCardModal.legendary-uses.test.jsx:195-212, :309-316
+// - multi-spend Cast-a-Spell lane: monsterLegendaryUses.ma1883-demogorgon-cast-a-spell.test.js:136-210
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
+// Mock hygiene (#739/#740 baseline): every mock bisected — diceRoller,
+// sanitize, dataLoader, mapsService, rangeValidation and damageUtils mocks
+// dropped (deletion stays green; all dice flow through the mocked hook and
+// the real helper modules run offline). The three mocks kept are load-
+// bearing: rolls/popup capture (asserted), log capture (asserted), runtime
+// store (economy seeding + asserted).
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-const ROLLERS = vi.hoisted(() => {
-  const r = { rollAttack: null, rollDamage: null, rollSavingThrow: null };
-  return r;
-});
+const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-  const rollAttack = vi.fn();
-  const rollDamage = vi.fn();
   const rollSavingThrow = vi.fn();
-  ROLLERS.rollAttack = rollAttack;
-  ROLLERS.rollDamage = rollDamage;
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
-    rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
+    rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
   })), _setPopupHtml };
 });
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-const ctx = vi.hoisted(() => ({ value: { round: 1, activeCreatureName: 'Bandit 1', creatures: [] } }));
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((t) => (t || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
-}));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 120),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
@@ -93,12 +72,14 @@ const CREATURES = [
 const demogorgon = () => monstersData.find(m => m.index === 'demogorgon');
 const laRow = (name) => Array.from(document.querySelectorAll('.mc-action'))
   .find(r => (r.querySelector('strong')?.textContent || '').startsWith(name) && r.querySelector('.mc-dice-link-legendary'));
+const chooseArms = () => Array.from(document.querySelectorAll('.mc-overlay--save-variant .save-variant-row'));
+const legendarySpendLogs = () => addEntry.mock.calls
+  .map(c => c[1]).filter(e => e.type === 'ability_use' && /expends a legendary use for Gaze/.test(e.description));
 
 describe('MA-1881 Demogorgon legendary Gaze — chooser reachable from the legendary panel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
@@ -116,16 +97,15 @@ describe('MA-1881 Demogorgon legendary Gaze — chooser reachable from the legen
     renderDemo({ max: 2, used: 0 });
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(document.querySelector('.mc-overlay--save-variant')).not.toBe(null));
-    const arms = Array.from(document.querySelectorAll('.mc-overlay--save-variant .save-variant-row'));
-    expect(arms.map(a => a.querySelector('strong')?.textContent)).toEqual([
+    // Pre-fix fingerprint: fake Line picker instead of chooser arms.
+    expect(document.querySelector('.mc-overlay--cone')).toBe(null);
+    expect(chooseArms().map(a => a.querySelector('strong')?.textContent)).toEqual([
       'Beguiling Gaze (1-2)', 'Confusing Gaze (3-4)', 'Hypnotic Gaze (5-6)',
     ]);
-    // Zero save rolled, zero fake-Line picker, economy honest.
+    // Economy honest: exactly one spend, nothing rolled before the pick.
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(document.querySelector('.mc-overlay--cone')).toBe(null);
     expect(runtime.store['Demogorgon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 });
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /expends a legendary use for Gaze/.test(e.description));
-    expect(spend).toBeTruthy();
+    expect(legendarySpendLogs()).toHaveLength(1);
   });
 
   it('pick Beguiling → inline WIS DC 23 save with the variant stamped (stunned arm, dc_success none, no damage)', async () => {
@@ -133,8 +113,9 @@ describe('MA-1881 Demogorgon legendary Gaze — chooser reachable from the legen
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(document.querySelector('.mc-overlay--save-variant')).not.toBe(null));
-    fireEvent.click(document.querySelectorAll('.mc-overlay--save-variant .save-variant-row')[0]);
+    fireEvent.click(chooseArms()[0]);
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1);
     expect(ROLLERS.rollSavingThrow.mock.calls[0][0]).toBe('WIS');
     const saveCtx = ROLLERS.rollSavingThrow.mock.calls[0][2];
     expect(saveCtx.saveDc).toBe(23);
@@ -143,17 +124,17 @@ describe('MA-1881 Demogorgon legendary Gaze — chooser reachable from the legen
     expect(saveCtx.saveVariant).toMatchObject({ key: 'beguiling', conditions: ['stunned'], rounds: 2 });
     expect(saveCtx.targetName).toBe('Bandit 1');
     expect(saveCtx.attackerName).toBe('Demogorgon 1');
-    const selected = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'save_variant_selected');
-    expect(selected).toBeTruthy();
+    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'save_variant_selected')).toBe(true);
+    // MA-1878 dead-lane fingerprint must not reappear on this seam.
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
   });
 
-  it('pick Confusing → the te arm rides the save context (confusion te, MA-1878 consumer downstream)', async () => {
+  it('pick Confusing → the te-only arm shape rides the save context (confusion te, MA-1878 consumer downstream)', async () => {
     renderDemo({ max: 2, used: 0 });
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(document.querySelector('.mc-overlay--save-variant')).not.toBe(null));
-    fireEvent.click(document.querySelectorAll('.mc-overlay--save-variant .save-variant-row')[1]);
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    fireEvent.click(chooseArms()[1]);
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
     const saveCtx = ROLLERS.rollSavingThrow.mock.calls[0][2];
     expect(saveCtx.saveVariant).toMatchObject({ key: 'confusing', te: 'confusion', rounds: 2 });
     expect(saveCtx.saveVariant.conditions).toEqual([]);
@@ -168,29 +149,33 @@ describe('MA-1881 Demogorgon legendary Gaze — chooser reachable from the legen
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('same-boundary refire refuses on the turn latch — chooser never reopens, zero extra spend', async () => {
+  it('same-boundary refire refuses on the turn latch — chooser never reopens, zero extra spend, no second save', async () => {
     renderDemo({ max: 2, used: 0 });
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(document.querySelector('.mc-overlay--save-variant')).not.toBe(null));
-    fireEvent.click(document.querySelectorAll('.mc-overlay--save-variant .save-variant-row')[0]);
+    fireEvent.click(chooseArms()[0]);
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
     setPopupHtml.mockClear();
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    // Latch-specific wording distinguishes this refusal from exhausted.
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
     expect(document.querySelectorAll('.mc-overlay--save-variant').length).toBe(0);
     expect(runtime.store['Demogorgon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 });
     expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1);
   });
 
-  it('exhausted (2/2): press refuses with popup + legendary_use_refused, zero chooser, zero roll', async () => {
+  // Refused-press popup wording + legendary_use_refused log byte: canonical
+  // in legendary-uses.test.jsx:195-212 (shared monsterLegendaryUses.js gate).
+  // This leg pins only the chooser-lane ordering fingerprint: the gate runs
+  // BEFORE the chooser seam, so an exhausted press never opens a picker.
+  it('exhausted (2/2): press refuses before the chooser — picker never opens, zero spend, zero roll', async () => {
     renderDemo({ max: 2, used: 2 });
     fireEvent.click(laRow('Gaze').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(document.querySelector('.mc-overlay--save-variant')).toBe(null);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(legendarySpendLogs()).toHaveLength(0);
     expect(runtime.store['Demogorgon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 2 });
   });
 });

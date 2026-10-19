@@ -1,54 +1,48 @@
-// MA-1855: Archlich Dread Word (legendary_actions[3]) was a stranded save
-// shell — the row authored save_dc/save_type + row-level conditions:[] but NO
-// damage_dice_primary/damage_type_primary and NO save_effect, so the prose
-// "takes 22 (5d8) Psychic damage" (no Hit|Failure|Success: anchor, §255) let
-// extractDamageDiceFromDescription return null and extractConditionsFromSaveEffect
-// saw undefined → failed save paid ZERO damage and granted ZERO condition (live
-// proof: lastAttack.saveResult:"failure", zero roll-damage, zero hp_change,
-// activeConditions absent). Data fix (MA-1847/MA-0622 byte-shape siblings):
-// damage_dice_primary "5d8" + damage_type_primary "Psychic" + save_effect
-// carrying the canonical "Frightened" word (§346 save-lane word-scan).
-// dc_success stays ABSENT — engine default 'half' (§335) is RAW ("half as much
-// damage on a successful save"); live ledger post-fix: fail nat 8 → full 5d8
-// raw 22 (hp −22), success +23 wb → floor(29/2)=14 (hp −14), zero Frightened
-// on success (fail-only grant lane).
+// @maintained-by-ai
+// MA-1855: Archlich Dread Word (legendary save row) was a stranded save shell —
+// save_dc/save_type authored but NO damage_dice_primary and NO save_effect, so
+// the prose "takes 22 (5d8) Psychic damage" (no Hit|Failure|Success: anchor, §255)
+// let extractDamageDiceFromDescription return null → failed save paid ZERO damage
+// and granted ZERO condition. Data fix (MA-1847/MA-0622 byte-shape siblings):
+// damage_dice_primary "5d8" + damage_type_primary "Psychic" + save_effect carrying
+// the canonical "Frightened" word (§346 save-lane word-scan). dc_success stays
+// ABSENT — engine default 'half' (§335) is RAW ("half as much damage on a
+// successful save").
+// Lane cites (not re-asserted here): exhausted refusal legendary-uses.test.jsx
+// :195-210, same-boundary latch :309-326, per-action cooldown :404+ (shared
+// uses:3 header gate owns the economy — Dread Word authors NO own uses);
+// multi-spend ma1883; non-legendary cantrip press ma1853; computeDamageAfterSave
+// full/half math applyDamage.save-full.test.js ('half' row fail=full/success=half);
+// Frightened landing on the target: saveProcessing lane.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal from './MonsterCardModal.jsx';
+import MonsterCardModal, { saveChipPlan } from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import { extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
-import { canRollExpression } from '../../services/dice/diceRoller.js';
 
 const archlich = () => monstersData.find((m) => m.name === 'Archlich');
 const dreadRow = () => archlich().legendary_actions.find((a) => a.name === 'Dread Word');
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 29, rolls: [8, 6, 3, 6, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 58, rolls: [8, 6, 3, 6, 6, 8, 6, 3, 6, 6], modifier: 0 })),
-}));
+// diceRoller + storage mocks purged (bisect): rollExpression/rollExpressionDoubled
+// fire only on handleDamage legs (MonsterCardModal.jsx:2431) — this save lane rolls
+// through the mocked rollSavingThrow; the real canRollExpression stays live for chip
+// gating inside saveChipPlan/ActionSaveRoll.
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn(() => Promise.resolve()), get: vi.fn(() => Promise.resolve(null)) } }));
-const ROLLERS = vi.hoisted(() => ({ rollAttack: null, rollDamage: null, rollSavingThrow: null }));
+const ROLLERS = vi.hoisted(() => ({ rollAttack: null, rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const rollAttack = vi.fn();
-  const rollDamage = vi.fn();
   const rollSavingThrow = vi.fn();
   ROLLERS.rollAttack = rollAttack;
-  ROLLERS.rollDamage = rollDamage;
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack, rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })), _setPopupHtml, _resetPopup: () => { _popupHtml = null; } };
+  })) };
 });
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
@@ -89,8 +83,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import { addEntry } from '../../services/ui/logService.js';
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-const resetPopup = useLoggedDiceRoll._resetPopup;
 
 const CREATURES = [
   { name: 'Archlich 1', type: 'npc', targetName: 'Bandit 1', currentHp: 475, maxHp: 475, ac: 17, conditions: [] },
@@ -106,66 +98,55 @@ function renderArchlich(uses) {
 }
 
 function dreadWordRow() {
-  const rows = [...document.querySelectorAll('.mc-action')].filter((r) => r.querySelector('strong')?.textContent.trim().startsWith('Dread Word'));
-  expect(rows.length).toBeGreaterThan(0);
-  return rows[0];
-}
-
-function dreadWordSaveChip() {
-  return Array.from(dreadWordRow().querySelectorAll('.mc-dice-link-save-clickable')).find((el) => el.textContent.includes('DC 22 Wisdom')) || null;
+  const row = [...document.querySelectorAll('.mc-action')].find((r) => r.querySelector('strong')?.textContent.trim().startsWith('Dread Word'));
+  expect(row).toBeDefined();
+  return row;
 }
 
 describe('MA-1855 monsters.json data lock: Archlich Dread Word row', () => {
-  it('legendary_actions[3] is Dread Word, DC 22 Wisdom save riding the uses:3 header', () => {
-    const la = archlich().legendary_actions;
-    expect(la[0].uses).toBe(3);
-    expect(la[3].name).toBe('Dread Word');
-    expect(dreadRow().save_dc).toBe(22);
-    expect(dreadRow().save_type).toBe('Wisdom');
-  });
-
-  it('damage + save_effect authored: 5d8 Psychic + canonical Frightened transport, dc_success ABSENT (engine default half, §335)', () => {
-    const row = dreadRow();
-    expect(row.damage_dice_primary).toBe('5d8');
-    expect(row.damage_type_primary).toBe('Psychic');
-    expect(canRollExpression(row.damage_dice_primary)).toBe(true);
-    expect(row.save_effect).toMatch(/\bFrightened\b/);
-    expect(row.dc_success).toBeUndefined();
-    // MV-31 transport proof: the REAL save-lane extractor word-scans the row
+  it('FULL row bytes BY NAME: 5d8 Psychic + canonical Frightened save_effect, dc_success ABSENT (engine default half, §335) — economy rides the uses:3 header, row authors NO own uses', () => {
+    expect(dreadRow()).toEqual({
+      name: 'Dread Word',
+      save_type: 'Wisdom',
+      save_dc: 22,
+      conditions: ['frightened'],
+      description: 'Wisdom Saving Throw: DC 22, each creature within 30 ft. A creature that can hear the word has the Frightened condition until the end of its next turn and takes 22 (5d8) Psychic damage. No damage other than Psychic. The target has the Frightened condition on a failed save.',
+      damage_dice_primary: '5d8',
+      damage_type_primary: 'Psychic',
+      save_effect: 'The target has the Frightened condition until the end of its next turn.',
+    });
+    expect(archlich().legendary_actions[0].uses).toBe(3);
+    // MV-31 transport proof: the REAL save-lane extractor word-scans the disk
     // bytes to exactly one canonical condition — no spray of other words.
-    expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['frightened']);
+    expect(extractConditionsFromSaveEffect(dreadRow().save_effect)).toEqual(['frightened']);
   });
 
-  it('save chip damage pool resolves from the authored field, not the unanchored prose (§255)', () => {
-    // Prose carries no Hit|Failure|Success: anchor — without the authored
-    // damage_dice_primary the extract lane returns null (the original defect).
-    expect(dreadRow().description).toMatch(/takes 22 \(5d8\) Psychic damage/);
-    expect(/(?:Hit|Failure|Success):\s*22\s*\(5d8\)/i.test(dreadRow().description)).toBe(false);
+  it('saveChipPlan exact shape rides the authored 5d8 pool — §255 discriminator: stripped of damage_dice_primary the unanchored prose yields formula null (the stranded-shell defect)', () => {
+    expect(saveChipPlan(dreadRow(), false)).toEqual({ riderOnly: false, formula: '5d8', rollable: true, clickable: true });
+    const shell = { ...dreadRow() };
+    delete shell.damage_dice_primary;
+    expect(saveChipPlan(shell, false)).toEqual({ riderOnly: false, formula: null, rollable: false, clickable: true });
   });
 });
 
 describe('MA-1855 MonsterCardModal Dread Word save lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetPopup();
     Object.keys(runtime.store).forEach((k) => delete runtime.store[k]);
     armed.target = CREATURES[1];
   });
 
-  it('row renders its own 5d8 + DC 22 Wisdom chips (chip identity unchanged by the fix)', () => {
+  it('renders its own 5d8 + DC 22 Wisdom chips; press spends ONE use and arms the SAVE transport: WIS/22, 5d8 Psychic, half, frightened — never the attack lane', async () => {
     renderArchlich({ max: 3, used: 0 });
-    const chips = [...dreadWordRow().querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
-    expect(chips).toEqual(['5d8', 'DC 22 Wisdom']);
-  });
-
-  it('press spends 1 legendary use and rides the SAVE lane with 5d8 Psychic + frightened armed, dcSuccess half', async () => {
-    renderArchlich({ max: 3, used: 0 });
-    fireEvent.click(dreadWordSaveChip());
+    const row = dreadWordRow();
+    expect([...row.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim())).toEqual(['5d8', 'DC 22 Wisdom']);
+    fireEvent.click(row.querySelector('.mc-dice-link-save-clickable'));
     await waitFor(() => expect(runtime.store['Archlich 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
-    const context = ROLLERS.rollSavingThrow.mock.calls[0][2];
-    expect(String(ROLLERS.rollSavingThrow.mock.calls[0][0]).toUpperCase()).toContain('WIS');
+    const [label, , context] = ROLLERS.rollSavingThrow.mock.calls[0];
+    expect(label).toBe('WIS');
     expect(context.saveDc).toBe(22);
+    expect(context.saveType).toBe('Wisdom');
     expect(context.targetName).toBe('Bandit 1');
     expect(context.autoDamageFormula).toBe('5d8');
     expect(context.autoDamageDamageType).toBe('Psychic');
@@ -174,27 +155,5 @@ describe('MA-1855 MonsterCardModal Dread Word save lane', () => {
     const spend = addEntry.mock.calls.map((c) => c[1]).find((e) => e.type === 'ability_use');
     expect(spend.abilityName).toBe('Dread Word');
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('FAILED save pays FULL 5d8 raw (live ledger: raw 22, hp −22)', () => {
-    expect(computeDamageAfterSave(22, false, 'half')).toBe(22);
-    expect(computeDamageAfterSave(5, false, 'half')).toBe(5);
-    expect(computeDamageAfterSave(40, false, 'half')).toBe(40);
-  });
-
-  it('SUCCESS save pays half floored (live ledger: raw 29 → finalDamage 14)', () => {
-    expect(computeDamageAfterSave(29, true, 'half')).toBe(14);
-    expect(computeDamageAfterSave(23, true, 'half')).toBe(11);
-    expect(computeDamageAfterSave(22, true, 'half')).toBe(11);
-  });
-
-  it('same-boundary refire after spend: honest latch refusal, no second save (economy unchanged)', async () => {
-    renderArchlich({ max: 3, used: 0 });
-    fireEvent.click(dreadWordSaveChip());
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
-    fireEvent.click(dreadWordSaveChip());
-    await waitFor(() => expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Archlich 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1);
   });
 });

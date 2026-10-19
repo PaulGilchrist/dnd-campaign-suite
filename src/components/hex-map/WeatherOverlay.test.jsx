@@ -1,85 +1,78 @@
+// @maintained-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import WeatherOverlay from './WeatherOverlay.jsx';
 
+// Owns the overlay's render contract only: how a weather prop maps to rendered
+// bytes. Forwarding/reroll lives in HexMap.additional.test.jsx (#792), the
+// extreme_weather travel guard in HexMap.travel.test.jsx (#794), and weather
+// math in services/campaign/weatherService.test.js — none re-tested here.
+//
+// Oracle: OVERLAY_CONFIG in WeatherOverlay.jsx plus each effect component's
+// authored literals. Particle counts (rain 300, snow 150, wind 60, fog 12,
+// cloud 5) and storm's 5 lightning flashes are copied verbatim as the spec;
+// per-particle positions/opacities are Math.random per render and are
+// deliberately NOT pinned. CSS animation delays are benign presentation.
+// pointer-events: none is authored in HexMap.css:853 (not visible to jsdom).
+
+// Present conditions: exact root className, particle variant + exact count,
+// lightning count. Decorative containers (particles, lightning) must be
+// aria-hidden; nothing else may be.
+const PRESENT_CONTRACT = [
+  { condition: 'cloudy', rootClass: 'weather-overlay weather-cloudy', particleClass: 'cloud-shadow', particleCount: 5, lightningCount: 0 },
+  { condition: 'rain', rootClass: 'weather-overlay weather-rain', particleClass: 'rain-drop', particleCount: 300, lightningCount: 0 },
+  { condition: 'storm', rootClass: 'weather-overlay weather-storm', particleClass: 'rain-drop', particleCount: 300, lightningCount: 5 },
+  { condition: 'fog', rootClass: 'weather-overlay weather-fog', particleClass: 'fog-patch', particleCount: 12, lightningCount: 0 },
+  { condition: 'mist', rootClass: 'weather-overlay weather-mist', particleClass: 'fog-patch', particleCount: 12, lightningCount: 0 },
+  { condition: 'snow', rootClass: 'weather-overlay weather-snow', particleClass: 'snow-flake', particleCount: 150, lightningCount: 0 },
+  { condition: 'wind', rootClass: 'weather-overlay weather-wind', particleClass: 'wind-line', particleCount: 60, lightningCount: 0 },
+  { condition: 'extreme', rootClass: 'weather-overlay weather-extreme', particleClass: null, particleCount: 0, lightningCount: 0 },
+];
+
 describe('WeatherOverlay', () => {
-    describe('renders nothing for absent or unrecognized weather', () => {
-        it.each([
-            [null, 'absent weather (null)'],
-            [{ condition: 'clear' }, 'clear condition (explicit null config)'],
-            [{ condition: 'blizzard' }, 'unrecognized condition'],
-        ])('renders nothing for %s', (weather) => {
-            const { container } = render(<WeatherOverlay weather={weather} />);
-            expect(container.innerHTML).toBe('');
-        });
-    });
+  it.each(PRESENT_CONTRACT)(
+    'renders $condition as $rootClass with $particleCount $particleClass particle(s) and $lightningCount lightning',
+    ({ condition, rootClass, particleClass, particleCount, lightningCount }) => {
+      const { container } = render(<WeatherOverlay weather={{ condition }} />);
+      const overlay = container.querySelector('.weather-overlay');
+      expect(overlay).not.toBeNull();
+      expect(overlay.className).toBe(rootClass);
 
-    describe('overlay class per condition', () => {
-        const conditionsWithClasses = [
-            ['cloudy', 'weather-cloudy'],
-            ['rain', 'weather-rain'],
-            ['storm', 'weather-storm'],
-            ['fog', 'weather-fog'],
-            ['mist', 'weather-mist'],
-            ['snow', 'weather-snow'],
-            ['wind', 'weather-wind'],
-            ['extreme', 'weather-extreme'],
-        ];
+      const particles = overlay.querySelector('.weather-particles');
+      if (particleClass) {
+        expect(particles).toBeInTheDocument();
+        expect(particles.querySelectorAll(`.${particleClass}`)).toHaveLength(particleCount);
+        // No cross-variant particles leaked into this condition.
+        for (const other of PRESENT_CONTRACT) {
+          if (other.particleClass && other.particleClass !== particleClass) {
+            expect(particles.querySelectorAll(`.${other.particleClass}`)).toHaveLength(0);
+          }
+        }
+      } else {
+        expect(particles).toBeNull();
+      }
 
-        it.each(conditionsWithClasses)(
-            'adds %s class for the %s condition',
-            (condition, expectedClass) => {
-                const { container } = render(<WeatherOverlay weather={{ condition }} />);
-                expect(container.querySelector('.weather-overlay')).toHaveClass(expectedClass);
-            },
-        );
-    });
+      const lightning = overlay.querySelector('.lightning-flashes');
+      expect(overlay.querySelectorAll('.lightning-flash')).toHaveLength(lightningCount);
+      if (lightningCount) {
+        expect(lightning).toBeInTheDocument();
+      } else {
+        expect(lightning).toBeNull();
+      }
 
-    describe('particle effects per condition', () => {
-        it.each([
-            ['rain drops', 'rain', '.rain-drop'],
-            ['snow flakes', 'snow', '.snow-flake'],
-            ['wind lines', 'wind', '.wind-line'],
-            ['fog patches', 'fog', '.fog-patch'],
-            ['cloud shadows', 'cloudy', '.cloud-shadow'],
-        ])('renders %s for the %s condition', (particleName, condition, particleSelector) => {
-            const { container } = render(<WeatherOverlay weather={{ condition }} />);
-            const particles = container.querySelector('.weather-particles');
-            expect(particles).toBeInTheDocument();
-            expect(particles.querySelectorAll(particleSelector).length).toBeGreaterThan(0);
-        });
+      // Only decorative layers are hidden from assistive tech.
+      expect(overlay.querySelectorAll('[aria-hidden="true"]')).toHaveLength(
+        (particles ? 1 : 0) + (lightning ? 1 : 0)
+      );
+    }
+  );
 
-        it.each(['clear', 'extreme'])(
-            'renders no particles for the %s condition',
-            (condition) => {
-                const { container } = render(<WeatherOverlay weather={{ condition }} />);
-                expect(container.querySelector('.weather-particles')).not.toBeInTheDocument();
-            },
-        );
-    });
-
-    describe('lightning effect', () => {
-        it('renders lightning flashes for the storm condition', () => {
-            const { container } = render(<WeatherOverlay weather={{ condition: 'storm' }} />);
-            expect(container.querySelectorAll('.lightning-flash').length).toBeGreaterThan(0);
-        });
-    });
-
-    describe('accessibility', () => {
-        it('marks particle containers as aria-hidden', () => {
-            const { container } = render(<WeatherOverlay weather={{ condition: 'rain' }} />);
-            const particles = container.querySelector('.weather-particles');
-            expect(particles).toHaveAttribute('aria-hidden', 'true');
-        });
-
-        it('marks the lightning container as aria-hidden', () => {
-            const { container } = render(<WeatherOverlay weather={{ condition: 'storm' }} />);
-            expect(container.querySelector('.lightning-flashes')).toHaveAttribute('aria-hidden', 'true');
-        });
-
-        it('hides nothing when the condition has no decorative effects', () => {
-            const { container } = render(<WeatherOverlay weather={{ condition: 'extreme' }} />);
-            expect(container.querySelector('[aria-hidden]')).toBeNull();
-        });
-    });
+  it.each([
+    { weather: null, label: 'absent weather (null)' },
+    { weather: { condition: 'clear' }, label: 'clear (config maps to null overlay)' },
+    { weather: { condition: 'blizzard' }, label: 'unrecognized condition' },
+  ])('renders nothing for $label', ({ weather }) => {
+    const { container } = render(<WeatherOverlay weather={weather} />);
+    expect(container.innerHTML).toBe('');
+  });
 });

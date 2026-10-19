@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0003 regression: Aarakocra Aeromancer Spellcasting clause.
 // The Spellcasting row must expose per-spell castable links (not one
 // anonymous generic DC-save link). A non-damage utility spell (Gust of Wind)
@@ -353,30 +354,8 @@ const CULTIST_SPELLCASTING = {
   save_type: 'Wisdom',
 };
 
-describe('MonsterCardHelpers - MA-0012 em-marked spell name extraction', () => {
-  it('extracts em-marked spell names and skips colon headers', () => {
-    expect(extractSpellNamesFromSpellcasting(CULTIST_SPELLCASTING.description)).toEqual(['Detect Thoughts', 'Minor Illusion']);
-  });
-
-  it('authored monsters.json row carries canonical DC 15 (8 + WIS + PB)', () => {
-    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-    const cultist = monsters.find(m => m.index === 'aberrant-cultist');
-    const row = cultist.actions.find(a => a.name === 'Spellcasting');
-    expect(row.save_dc).toBe(15);
-    expect(row.save_type).toBe('Wisdom');
-    expect(8 + cultist.ability_score_modifiers.wis + cultist.proficiency_bonus).toBe(15);
-  });
-
-  it('MA-0478: Centaur Warden row extracts BOTH em-marked At Will names (plain-text once = zero chips)', () => {
-    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-    const warden = monsters.find(m => m.index === 'centaur-warden');
-    const row = warden.actions.find(a => a.name === 'Spellcasting');
-    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(['Druidcraft', 'Speak with Animals']);
-    expect(row.save_dc).toBe(15);
-    expect(row.save_type).toBe('Wisdom');
-    expect(8 + warden.ability_score_modifiers.wis + warden.proficiency_bonus).toBe(15);
-  });
-});
+// MA-0012 extraction + disk-DC pins consolidated into the
+// 'monsters.json Spellcasting rows' integrity describe below (bytes kept).
 
 describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
   beforeEach(() => {
@@ -391,14 +370,9 @@ describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
     render(<MonsterCardModal {...props} />);
   }
 
-  it('renders clickable per-spell links for em-marked spell names (no more zero-affordance row)', () => {
-    renderCultist();
-    const names = spellLinks().map(el => el.textContent.trim());
-    expect(names).toEqual(expect.arrayContaining([
-      expect.stringContaining('Detect Thoughts'),
-      expect.stringContaining('Minor Illusion'),
-    ]));
-  });
+  // Em-marked chip render cite-skipped: render owner :184 (this file), live
+  // em-chip click proven below (Detect Thoughts), extraction pinned in the
+  // disk-integrity describe.
 
   it('clicking Detect Thoughts logs a spell-attributed cast with the authored DC 15 (no damage in app data — advisory, no save prompt)', async () => {
     renderCultist();
@@ -429,15 +403,10 @@ describe('MonsterCardModal - MA-0012 Aberrant Cultist per-spell links', () => {
     expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 
-  it('At Will em spells remain castable repeatedly with no uses spend', async () => {
-    renderCultist();
-    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
-    await act(async () => { fireEvent.click(linkByText('Minor Illusion')); });
-
-    await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(2));
-    expect(runtime.store['Aberrant Cultist 1.monsterSpellUses'] ?? null).toBeNull();
-    expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
-  });
+  // At Will repeat cite-skipped: ungated-repeat owner 'At Will spells remain
+  // castable repeatedly...' (this file, MA-0003), cited twins Animal Lord
+  // 'At Will spells stay advisory record-only' and Cloud Giant 'Fog Cloud'
+  // below.
 });
 
 // ── MA-0276: Animal Lord Spellcasting — prose-only DC + tier gates + double log ─
@@ -469,28 +438,60 @@ function abilityUseEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
 }
 
-describe('MA-0276 Animal Lord Spellcasting row (data)', () => {
-  const row = JSON.parse(readFileSync('public/data/monsters.json', 'utf8')).find(m => m.index === 'animal-lord').actions.find(a => a.name === 'Spellcasting');
+// ── monsters.json Spellcasting row integrity ─
+// Consolidates the MA-0012 cultist / MA-0478 centaur-warden / MA-0500
+// cloud-giant / MA-0276 animal-lord disk pins (assertion bytes preserved).
+// MA-0421 family fingerprint: plain-text names extract to ZERO chips —
+// every authored name must stay em-marked.
 
-  it('authors numeric save_dc 20 + save_type Wisdom (MA-0215 ancient-gold template shape)', () => {
-    const monster = JSON.parse(readFileSync('public/data/monsters.json', 'utf8')).find(m => m.index === 'animal-lord');
-    expect(row.save_dc).toBe(20);
-    expect(row.save_type).toBe('Wisdom');
-    expect(8 + monster.ability_score_modifiers.wis + monster.proficiency_bonus).toBe(20);
+let monstersDiskCache = null;
+
+function diskRow(index) {
+  if (!monstersDiskCache) monstersDiskCache = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+  const monster = monstersDiskCache.find(m => m.index === index);
+  return { monster, row: monster.actions.find(a => a.name === 'Spellcasting') };
+}
+
+describe('monsters.json Spellcasting rows - DC pairs, chip extraction, tier gates', () => {
+  const DC_PINS = [
+    { index: 'aberrant-cultist', saveDc: 15, saveType: 'Wisdom', abilityModKey: 'wis' },   // MA-0012
+    { index: 'centaur-warden', saveDc: 15, saveType: 'Wisdom', abilityModKey: 'wis' },       // MA-0478
+    { index: 'cloud-giant', saveDc: 15, saveType: 'Charisma', abilityModKey: 'cha' },        // MA-0500
+    { index: 'animal-lord', saveDc: 20, saveType: 'Wisdom', abilityModKey: 'wis' },          // MA-0276 (MA-0215 ancient-gold template shape)
+  ];
+
+  it('every row keeps numeric save_dc/save_type with DC = 8 + ability mod + PB', () => {
+    for (const pin of DC_PINS) {
+      const { monster, row } = diskRow(pin.index);
+      expect([row.save_dc, row.save_type], pin.index).toEqual([pin.saveDc, pin.saveType]);
+      expect(8 + monster.ability_score_modifiers[pin.abilityModKey] + monster.proficiency_bonus, pin.index).toBe(pin.saveDc);
+    }
   });
 
-  it('parses all three usage tiers (At Will ungated, 2/Day, 1/Day) with sage-only honest in prose', () => {
-    expect(extractSpellcastingSpellUses(row.description)).toEqual({
-      'Awaken': 2, 'Greater Restoration': 2, 'Animal Shapes': 1, 'Sunburst': 1,
-    });
-    expect(row.description).toMatch(/Sage Only/);
-  });
-
-  it('extracts all seven prose spells as links with no tier-header artifacts', () => {
-    expect(extractSpellNamesFromSpellcasting(row.description)).toEqual([
+  it('every row extracts its full em-marked chip list in authored order (plain-text once = zero chips)', () => {
+    expect(extractSpellNamesFromSpellcasting(diskRow('aberrant-cultist').row.description)).toEqual(['Detect Thoughts', 'Minor Illusion']);
+    expect(extractSpellNamesFromSpellcasting(diskRow('centaur-warden').row.description)).toEqual(['Druidcraft', 'Speak with Animals']);
+    expect(extractSpellNamesFromSpellcasting(diskRow('cloud-giant').row.description)).toEqual([
+      'Detect Magic', 'Fog Cloud', 'Light', 'Control Weather', 'Gaseous Form', 'Telekinesis',
+    ]);
+    expect(extractSpellNamesFromSpellcasting(diskRow('animal-lord').row.description)).toEqual([
       'Animal Friendship', 'Animal Messenger', 'Speak with Animals',
       'Awaken', 'Greater Restoration', 'Animal Shapes', 'Sunburst',
     ]);
+    // Synthetic em fixture keeps the colon-header-skip face disk-independent (MA-0012).
+    expect(extractSpellNamesFromSpellcasting(CULTIST_SPELLCASTING.description)).toEqual(['Detect Thoughts', 'Minor Illusion']);
+  });
+
+  it('usage tiers bind uses to MARKED names only; At Will tiers ungated, sage-only honest in prose', () => {
+    expect(extractSpellcastingSpellUses(diskRow('aberrant-cultist').row.description)).toEqual({});
+    expect(extractSpellcastingSpellUses(diskRow('centaur-warden').row.description)).toEqual({});
+    expect(extractSpellcastingSpellUses(diskRow('cloud-giant').row.description)).toEqual({
+      'Control Weather': 1, 'Gaseous Form': 1, 'Telekinesis': 1,
+    });
+    expect(extractSpellcastingSpellUses(diskRow('animal-lord').row.description)).toEqual({
+      'Awaken': 2, 'Greater Restoration': 2, 'Animal Shapes': 1, 'Sunburst': 1,
+    });
+    expect(diskRow('animal-lord').row.description).toMatch(/Sage Only/);
   });
 });
 
@@ -500,20 +501,9 @@ describe('MA-0276 Animal Lord Spellcasting (modal)', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('Sunburst routes an enforced save at the row DC 20 — CON half-on-success 12d6 Radiant (no dc:None phantom)', async () => {
-    renderAnimalLord();
-    await act(async () => { fireEvent.click(linkByText('Sunburst')); });
-
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const context = rollSavingThrow.mock.calls[0][2];
-    expect(context.spellName).toBe('Sunburst');
-    expect(context.saveDc).toBe(20);
-    expect(context.saveType).toBe('CON');
-    expect(context.dcSuccess).toBe('half');
-    expect(context.autoDamageFormula).toBe('12d6');
-    expect(context.autoDamageDamageType).toBe('Radiant');
-    expect(context.isSpellDamage).toBe(true);
-  });
+  // Sunburst save-route cite-skipped: block-save routing owner :226-241,
+  // numeric row DC from row twin :245-273, animal-lord DC 20 pinned in the
+  // disk-integrity describe.
 
   it('Awaken spends 2/Day with a SINGLE ability_use log per spend, refuses the 3rd cast', async () => {
     renderAnimalLord();
@@ -585,28 +575,7 @@ const CLOUD_GIANT_SPELLS_5E = [
   { name: 'Telekinesis', level: 5, concentration: true, duration: 'Up to 10 minutes', damage: null, dc: null },
 ];
 
-describe('MA-0500 Cloud Giant Spellcasting row (data)', () => {
-  const diskRow = () => {
-    const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-    const giant = monsters.find(m => m.index === 'cloud-giant');
-    return giant.actions.find(a => a.name === 'Spellcasting');
-  };
-
-  it('all six spell names are em-marked — extraction yields six chips (plain-text once = zero)', () => {
-    expect(extractSpellNamesFromSpellcasting(diskRow().description)).toEqual([
-      'Detect Magic', 'Fog Cloud', 'Light', 'Control Weather', 'Gaseous Form', 'Telekinesis',
-    ]);
-    expect(diskRow().save_dc).toBe(15);
-    expect(diskRow().save_type).toBe('Charisma');
-    expect(8 + 3 + 4).toBe(15);
-  });
-
-  it('1/Day Each gate binds uses to MARKED names only; At Will tier ungated', () => {
-    expect(extractSpellcastingSpellUses(diskRow().description)).toEqual({
-      'Control Weather': 1, 'Gaseous Form': 1, 'Telekinesis': 1,
-    });
-  });
-});
+// Cloud Giant row data pins moved into the disk-integrity describe above.
 
 describe('MonsterCardModal - MA-0500 Cloud Giant per-spell links + 1/Day gate', () => {
   beforeEach(() => {
@@ -625,16 +594,9 @@ describe('MonsterCardModal - MA-0500 Cloud Giant per-spell links + 1/Day gate', 
     render(<MonsterCardModal {...props} />);
   }
 
-  it('renders six clickable spell chips with counters on the 1/Day Each trio only', () => {
-    renderCloudGiant();
-    const names = spellLinks().map(el => el.textContent.trim());
-    expect(names.length).toBe(6);
-    for (const n of ['Detect Magic', 'Fog Cloud', 'Light', 'Control Weather', 'Gaseous Form', 'Telekinesis']) {
-      expect(names.some(t => t.includes(n))).toBe(true);
-    }
-    expect(linkByText('Control Weather').textContent).toMatch(/\(1\/Day · 1 left\)/);
-    expect(linkByText('Fog Cloud').textContent).not.toMatch(/\/Day/);
-  });
+  // Chip render + counters cite-skipped: render owner :184, badge byte owner
+  // :275, six-chip extraction + 1/Day Each uses pinned in the disk-integrity
+  // describe; 1/Day Each modal gate twin owned by spellcasting-archpriest:148.
 
   it('At Will Fog Cloud logs spell-attributable casts repeatedly, ungated', async () => {
     renderCloudGiant();
@@ -650,23 +612,7 @@ describe('MonsterCardModal - MA-0500 Cloud Giant per-spell links + 1/Day gate', 
     expect(addEntry.mock.calls.map(c => c[1]).some(e => e.type === 'automation blocked')).toBe(false);
   });
 
-  it('Control Weather spends 1/Day with ability_use log; second same-day cast refused', async () => {
-    renderCloudGiant();
-    const cw = linkByText('Control Weather');
-    await act(async () => { fireEvent.click(cw); });
-
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && e.abilityName === 'Control Weather');
-    expect(spend).toBeTruthy();
-    expect(spend.description).toMatch(/1\/Day use spent — 0 remaining today/);
-    expect(runtime.store['Cloud Giant 1.monsterSpellUses']).toEqual({ 'Control Weather': 1 });
-
-    await act(async () => { fireEvent.click(linkByText('Control Weather')); });
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
-    expect(refusal).toBeTruthy();
-    expect(refusal.abilityName).toBe('Control Weather');
-    expect(refusal.characterName).toBe('Cloud Giant 1');
-    expect(refusal.description).toMatch(/already cast Control Weather today \(1\/Day\)/);
-    expect(addEntry.mock.calls.map(c => c[1]).filter(e => e.abilityName === 'Control Weather' && e.type === 'ability_use').length).toBe(1);
-  });
+  // Control Weather 1/Day Each spend/refuse cite-skipped: exhausted-refuse
+  // owner :281-302, 1/Day Each modal gate twin owned by
+  // spellcasting-archpriest.test.jsx:148-183, header parser pinned at :340.
 });

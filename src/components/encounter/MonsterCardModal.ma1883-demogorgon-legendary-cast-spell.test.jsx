@@ -1,56 +1,53 @@
+// @maintained-by-ai
 // MA-1883 modal seam: Demogorgon legendary_actions[3] "Cast a Spell (Costs 2
 // Actions)" — pre-fix the single "Expend Legendary" chip press spent 1 and
-// rolled a zero-payload save (MA-1874 CAN-route shell, "DC Unknown" popup,
-// registry-verified FAIL). Now: the row arms the delegated Spellcasting
-// master's SEVEN spell chips (MA-1879 lane rendered by
-// LegendarySpellCastLinks), the bare expend chip self-suppresses (MA-1488
-// sole-press mandate), and a spell-named press spends the parsed RAW cost 2
-// (2→0) then resolves through the LIVE handleSpellCast lane — spells.json
-// lookup, the spell's own save axis + row DC 23, N/Day charge tracking.
-// Refusals stay honest and check-BEFORE-spend (MA-1150): exhausted spell and
-// unarmed save press never burn a legendary use; 1-of-2 pool refuses
-// insufficient-cost with zero spend; same-boundary re-press refuses zero-spend.
-import { render, fireEvent, waitFor } from '@testing-library/react';
+// rolled a zero-payload save (MA-1874 CAN-route shell, "DC Unknown" popup).
+// THIS file owns the MODAL flow only: the row arms the delegated Spellcasting
+// master's SEVEN spell chips (MA-1879 lane, rendered by LegendarySpellCastLinks)
+// with the bare expend chip self-suppressed (MA-1488 sole-press mandate); a
+// spell-named press spends the parsed RAW cost 2 (2→0) and resolves through the
+// LIVE handleSpellCast lane; refusals check-BEFORE-spend (MA-1150) with zero
+// legendary burn. Cited, not re-pinned: cost-parse/refusal economy
+// monsterLegendaryUses.ma1883-demogorgon-cast-a-spell.test.js :136-210;
+// master-row spell bytes + gate loops MonsterCardModal.ma1879-demogorgon-
+// spellcasting.test.jsx :201-241; canonical exhausted faces
+// monsterLegendaryUses.test.jsx:190-212/:304-326. The exhausted Feeblemind
+// press stays byte-pinned HERE (ma1879's map cites this file :208-equivalent).
+import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import spellsData from '../../../public/data/spells.json';
-import spells2024Data from '../../../public/data/2024/spells.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4, 2], modifier: 0 })),
-}));
+// Mock hygiene (#739-#744 bisect): diceRoller, rangeValidation, mapsService and
+// conditionEffects purged — the pressed lane never reaches rollExpression
+// (spell damage adjudicates inside the mocked save roller), rangeValidation's
+// rangeToFeet is a pure parser, mapName=null short-circuits loadMapData at
+// modal :2131, and computeConditionEffects on conditions:[] is inert. Kept:
+// logService (assertion target), sanitize (body render), dataLoader (the
+// modal loads BOTH rulesets at :1541-1544 — one 5e list satisfies lookup since
+// findMonsterSpell is 5e-exact-first, §177), useLoggedDiceRoll (destructured
+// whole at modal :2211; only the save axis + popup capture have consumers),
+// damageUtils (getCombatContext fires at :2125), reactive runtime store below.
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-// §177: branch on ruleset — 5e-exact-first; the 7 names resolve in 5e.
 vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? spells2024Data : spellsData)),
+  loadSpells: vi.fn(() => Promise.resolve(spellsData)),
 }));
-const ROLLERS = vi.hoisted(() => ({ rollAttack: null, rollDamage: null, rollSavingThrow: null }));
+const ROLLERS = vi.hoisted(() => ({ rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-  const rollAttack = vi.fn();
-  const rollDamage = vi.fn();
   const rollSavingThrow = vi.fn();
-  ROLLERS.rollAttack = rollAttack;
-  ROLLERS.rollDamage = rollDamage;
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
-    rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
+    rollAttack: vi.fn(), rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
   })), _setPopupHtml };
 });
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
 const ctx = vi.hoisted(() => ({ value: { round: 1, activeCreatureName: 'Bandit 1', creatures: [] } }));
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   extractDamageTypes: vi.fn(() => []),
@@ -60,13 +57,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 120),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
 // Reactive store lane (§56): setRuntimeValue notifies subscribers so the
 // legendary counter re-renders after spends — the mocked dice hook rolls no
@@ -147,6 +137,8 @@ const entries = () => addEntry.mock.calls.map(c => c[1]);
 // Actions) (<spell>)" on purpose — a loose regex would double-count casts.
 const abilityUses = (name) => entries().filter(e => e.type === 'ability_use' && String(e.abilityName) === name);
 const spendUses = () => entries().filter(e => e.type === 'ability_use' && /^Cast a Spell/.test(String(e.abilityName)));
+const refusals = (name) => entries().filter(e => e.type === 'automation blocked' && e.abilityName === name);
+const popups = (re) => setPopupHtml.mock.calls.map(c => String(c[0])).filter(h => re.test(h));
 
 describe('MA-1883 modal: legendary Cast a Spell arms the live spell chips, not a save shell', () => {
   beforeEach(() => {
@@ -161,8 +153,7 @@ describe('MA-1883 modal: legendary Cast a Spell arms the live spell chips, not a
     const row = castRow();
     expect(row).not.toBe(null);
     expect(row.querySelector('.mc-dice-link-legendary')).toBe(null); // sole-press mandate (MA-1488)
-    const chips = row.querySelectorAll('.mc-dice-link-spell');
-    expect(chips.length).toBe(7);
+    expect(row.querySelectorAll('.mc-dice-link-spell')).toHaveLength(7);
     expect(chipByText('Feeblemind').textContent).toMatch(/\(1\/Day · 1 left\)/);
     expect(chipByText('Fear').textContent).toMatch(/\(3\/Day · 3 left\)/);
     expect(chipByText('Detect Magic').textContent).not.toMatch(/\/Day/); // At Will ungated (§57)
@@ -175,7 +166,7 @@ describe('MA-1883 modal: legendary Cast a Spell arms the live spell chips, not a
     fireEvent.click(chipByText('Feeblemind'));
     await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 }));
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
     const [abbr, , saveCtx] = ROLLERS.rollSavingThrow.mock.calls[0];
     expect(abbr).toBe('INT'); // the spell's own axis — never the generic shell
     expect(saveCtx.saveDc).toBe(23);
@@ -184,60 +175,63 @@ describe('MA-1883 modal: legendary Cast a Spell arms the live spell chips, not a
     expect(saveCtx.autoDamageFormula).toBe('4d6');
     // spell charge tracked on the same N/Day lane as the master row chips (MA-1879)
     await waitFor(() => expect(runtime.store[USES]).toEqual({ Feeblemind: 1 }));
-    const spend = spendUses().find(e => /spends 2 legendary uses/.test(String(e.description)));
-    expect(spend.description).toMatch(/Cast a Spell \(Costs 2 Actions\) \(Feeblemind\).*0 of 2 left/);
-    const cast = abilityUses('Feeblemind').find(e => /casts Feeblemind via Spellcasting/.test(String(e.description)));
-    expect(cast).toBeTruthy();
+    const spends = spendUses().filter(e => /spends 2 legendary uses/.test(String(e.description)));
+    expect(spends).toHaveLength(1);
+    expect(spends[0].description).toMatch(/Cast a Spell \(Costs 2 Actions\) \(Feeblemind\).*0 of 2 left/);
+    expect(abilityUses('Feeblemind')).toHaveLength(1);
+    expect(abilityUses('Feeblemind')[0].description).toMatch(/casts Feeblemind via Spellcasting/);
     // the MA-1874 defect signatures never appear
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     expect(entries().some(e => /DC Unknown/.test(String(e.description)))).toBe(false);
-    errSpy.mockRestore();
   });
 
-  it('press At-Will Detect Magic: named spell record carries DC 23, NO save rolled (no effect-less save), LA 2→0, charges untouched', async () => {
+  it('At-Will Detect Magic press casts ungated (DC 23 record, NO save rolled, charges untouched, LA 2→0), then same-boundary re-press refuses zero-spend with the honest latch', async () => {
     renderDemo({ max: 2, used: 0 });
     fireEvent.click(chipByText('Detect Magic'));
     await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 }));
-    await waitFor(() => expect(abilityUses('Detect Magic').length).toBe(1));
+    await waitFor(() => expect(abilityUses('Detect Magic')).toHaveLength(1));
     expect(abilityUses('Detect Magic')[0].description).toMatch(/casts Detect Magic via Spellcasting/);
     expect(abilityUses('Detect Magic')[0].description).toMatch(/spell save DC 23/);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled(); // self-cast: the zero-payload save shell is GONE
     expect(runtime.store[USES] ?? null).toBeNull(); // At Will ungated
+    expect(runtime.store[LATCH]).toEqual({ round: 1, activeCreature: 'Bandit 1' });
+    // same-boundary re-press: refused, zero extra spend (parse byte at service twin :226)
+    addEntry.mockClear();
+    fireEvent.click(chipByText('Detect Magic'));
+    await waitFor(() => expect(entries().some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
+    expect(abilityUses('Detect Magic')).toHaveLength(0);
   });
 
   it('exhausted Feeblemind (1/Day spent): press refuses with <spell>_refused BEFORE the LA spend — zero legendary burn', async () => {
     renderDemo({ max: 2, used: 0 });
     runtime.store[USES] = { Feeblemind: 1 };
-    setPopupHtml.mockClear();
-    addEntry.mockClear();
     fireEvent.click(chipByText('Feeblemind'));
-    await waitFor(() => expect(entries().some(e => e.type === 'automation blocked' && e.abilityName === 'Feeblemind')).toBe(true));
+    await waitFor(() => expect(refusals('Feeblemind')).toHaveLength(1));
     expect(runtime.store[KEY]).toEqual({ max: 2, used: 0 }); // check-BEFORE-spend (MA-1150 twin)
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(spendUses().length).toBe(0);
+    expect(spendUses()).toHaveLength(0);
   });
 
-  it('1 of 2 left (used:1): spell press refuses insufficient-cost, ZERO spend, zero roll', async () => {
+  it('economy refusals burn nothing: 1-of-2 press shows the insufficient-cost byte, exhausted pool press routes the honest refusal — chips stay clickable, zero roll, zero spend', async () => {
     renderDemo({ max: 2, used: 1 });
     fireEvent.click(chipByText('Telekinesis'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    const popup = String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => /Legendary Action Refused/.test(h)));
-    expect(popup).toMatch(/costs 2 legendary uses but Demogorgon 1 has only 1 left/);
+    expect(popups(/Legendary Action Refused/)[0]).toMatch(/costs 2 legendary uses but Demogorgon 1 has only 1 left/);
     expect(runtime.store[KEY]).toEqual({ max: 2, used: 1 });
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(entries().some(e => e.automationType === 'legendary_use_refused' && /insufficient-cost: costs 2, 1 left/.test(String(e.description)))).toBe(true);
-  });
-
-  it('same-boundary re-press after a successful cast: refused, zero extra spend, latch honest', async () => {
-    renderDemo({ max: 2, used: 0 });
-    fireEvent.click(chipByText('Detect Magic'));
-    await waitFor(() => expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 }));
-    expect(runtime.store[LATCH]).toEqual({ round: 1, activeCreature: 'Bandit 1' });
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    // drive the pool to exhausted through the reactive lane, then re-press another chip
+    await act(async () => { runtime.setRuntimeValue('Demogorgon 1', 'monsterLegendaryUses', { max: 2, used: 2 }); });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
     addEntry.mockClear();
-    fireEvent.click(chipByText('Detect Magic'));
-    await waitFor(() => expect(entries().some(e => e.automationType === 'legendary_use_refused')).toBe(true));
+    setPopupHtml.mockClear();
+    fireEvent.click(chipByText('Fear'));
+    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
+    expect(popups(/Legendary Action Refused/)).toHaveLength(1);
     expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
-    expect(abilityUses('Detect Magic').length).toBe(0);
+    expect(spendUses()).toHaveLength(0);
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 
   it('unarmed save-spell press refuses no-target BEFORE the legendary spend (MA-1150)', async () => {
@@ -246,20 +240,9 @@ describe('MA-1883 modal: legendary Cast a Spell arms the live spell chips, not a
     fireEvent.click(chipByText('Feeblemind'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     // MA-1150 reuses the MA-0049 no-target refusal byte-identically
-    expect(String(setPopupHtml.mock.calls.map(c => String(c[0])).find(h => /No Target/.test(h)) || '')).toMatch(/no target is armed.*No save rolled, nothing spent/s);
+    expect(popups(/No Target/)[0]).toMatch(/no target is armed.*No save rolled, nothing spent/s);
     expect(runtime.store[KEY]).toEqual({ max: 2, used: 0 }); // zero LA burn
     expect(runtime.store[USES] ?? null).toBeNull();
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('exhausted LA (2/2): chips stay clickable and route the honest exhausted refusal, zero roll, zero spell record', async () => {
-    renderDemo({ max: 2, used: 2 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(chipByText('Fear'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    expect(runtime.store[KEY]).toEqual({ max: 2, used: 2 });
-    expect(spendUses().length).toBe(0);
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

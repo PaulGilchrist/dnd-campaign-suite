@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-0622: Dracolich "Terrifying Presence" (legendary, DC 19 WIS, 2d10
 // Psychic, range "30-foot Emanation") listed damage under FAILURE ONLY —
 // RAW carries no "Success: half damage" clause, so a successful save must pay
@@ -10,12 +11,17 @@
 // RANGE byte rides the area picker, never the single-target block save). The
 // "Failure or Success:" prose clause gates only the MA-0073 once-per-turn
 // recharge latch — save_effect stays fail-only Frightened (§157).
+// Lane canon: computeDamageAfterSave none/half math → applyDamage.save-full
+// .test.js:23-24 + applyDamage.helpers.test.js:88-102 (re-pin cut #744);
+// exhausted legendary refusal → legendary-uses.test.jsx:196-211 canonical
+// gate, picker-rows arm → ma1881-demogorgon-legendary-gaze.test.jsx:172 +
+// thunderclap-sphere.test.jsx:183 (re-pin cut); FP canonical objects →
+// dracolich-fp.test.jsx / frightfulPresenceService.test.js.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
-import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import { hasLegendaryCooldownClause } from '../../services/encounters/monsterLegendaryUses.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
@@ -30,16 +36,7 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 11, rolls: [6, 5], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 22, rolls: [6, 5], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
-vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
@@ -58,34 +55,11 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
 
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
 const ctx = vi.hoisted(() => ({ value: { round: 2, activeCreatureName: 'Bandit 1', creatures: [] } }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
+vi.mock('../../services/rules/combat/damageUtils.js', async (importActual) => ({
+  ...(await importActual()),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 30),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
-vi.mock('../../services/rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(async () => true),
-  isDistanceInRange: vi.fn(() => true),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -128,30 +102,24 @@ function presenceSaveLink() {
 }
 
 describe('MA-0622 monsters.json data lock: Dracolich Terrifying Presence row', () => {
-  it('authors dc_success none (failure-only damage) with DC 19 Wisdom 2d10 Psychic', () => {
-    const row = presenceRow();
-    expect(row.save_dc).toBe(19);
-    expect(row.save_type).toBe('Wisdom');
-    expect(row.dc_success).toBe('none');
-    expect(row.damage_dice_primary).toBe('2d10');
-    expect(row.damage_type_primary).toBe('Psychic');
-    expect(row.range).toBe('30-foot Emanation');
-    expect(row.save_effect).toBe('The target has the Frightened condition until the end of its next turn.');
-    expect(row.description).toMatch(/can'?t take this action again until the start of its next turn/i);
-    expect(hasLegendaryCooldownClause(row)).toBe(true);
+  it('authors the full RAW row by name: dc_success none (failure-only damage), DC 19 Wisdom 2d10 Psychic, 30-foot Emanation, fail-only Frightened save_effect, once-per-turn recharge clause', () => {
+    expect(presenceRow()).toEqual({
+      name: 'Terrifying Presence',
+      description: "Wisdom Saving Throw: DC 19, each creature in a 30-foot <strong>Emanation</strong> originating from the dracolich. <strong>Failure:</strong> 11 (2d10) Psychic damage, and the target has the <strong>Frightened</strong> condition until the end of its next turn. Failure or Success: The dracolich can't take this action again until the start of its next turn.",
+      save_dc: 19,
+      save_type: 'Wisdom',
+      range: '30-foot Emanation',
+      save_effect: 'The target has the Frightened condition until the end of its next turn.',
+      damage_dice_primary: '2d10',
+      damage_type_primary: 'Psychic',
+      dc_success: 'none',
+    });
+    expect(hasLegendaryCooldownClause(presenceRow())).toBe(true);
   });
 
   it('legendary header authors numeric uses:1 (MA-0620) arming the economy', () => {
     expect(dracolich().legendary_actions[0].name).toBe('Legendary Action Uses: 1');
     expect(dracolich().legendary_actions[0].uses).toBe(1);
-  });
-});
-
-describe('MA-0622 computeDamageAfterSave: none pays ZERO on success, FULL on failure', () => {
-  it('success pays 0, failure pays raw — the old half-default leak is gone', () => {
-    expect(computeDamageAfterSave(11, true, 'none')).toBe(0);
-    expect(computeDamageAfterSave(11, false, 'none')).toBe(11);
-    expect(computeDamageAfterSave(11, true, 'half')).toBe(5);
   });
 });
 
@@ -167,25 +135,19 @@ describe('MA-0622 Terrifying Presence picker threads dcSuccess none live', () =>
     fireEvent.click(presenceSaveLink());
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
     const props = aoeProps.current;
-    expect(props.titleOverride).toBe('30-ft Radius (GM positions tokens; selection advisory)');
-    expect(props.range).toBe(30);
-    expect(props.rangeGateFt).toBe(30);
-    expect(props.saveDc).toBe(19);
-    expect(props.saveType).toBe('Wisdom');
-    expect(props.dcSuccess).toBe('none');
-    expect(props.damage).toBe('2d10');
-    expect(props.damageType).toBe('Psychic');
+    expect(props).toMatchObject({
+      titleOverride: '30-ft Radius (GM positions tokens; selection advisory)',
+      range: 30,
+      rangeGateFt: 30,
+      saveDc: 19,
+      saveType: 'Wisdom',
+      dcSuccess: 'none',
+      damage: '2d10',
+      damageType: 'Psychic',
+    });
     expect(props.saveConditions).toEqual(['frightened']);
     expect(props.excludeNames).toEqual(['Dracolich 1']);
     expect(rollSavingThrow).not.toHaveBeenCalled();
     expect(runtime.store['Dracolich 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 });
-  });
-
-  it('exhausted row refuses: zero spend, NO picker, no save rolled', async () => {
-    renderDracolich({ max: 1, used: 1 });
-    fireEvent.click(presenceSaveLink());
-    await waitFor(() => expect(runtime.store['Dracolich 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 }));
-    expect(aoeProps.current).toBeNull();
-    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 });

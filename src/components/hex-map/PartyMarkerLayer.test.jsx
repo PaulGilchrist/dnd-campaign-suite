@@ -1,23 +1,15 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
+import { hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
-vi.mock('../../services/maps/hexMapUtils.js', () => ({
-    hexToPixel: vi.fn((q, r, size) => ({
-        x: size * Math.sqrt(3) * (q + r / 2),
-        y: (size * 3) / 2 * r,
-    })),
-    pixelToHexSnapped: vi.fn((x, y, size) => ({
-        q: Math.round(x / (size * Math.sqrt(3))),
-        r: Math.round((2 / 3 * y) / size),
-    })),
-    hexToSVGPath: vi.fn((cx, cy) => `M${cx},${cy} Z`),
-}));
+const HEX_SIZE = 30;
 
 function makeProps(overrides = {}) {
     return {
         position: { q: 0, r: 0 },
-        HEX_SIZE: 30,
+        HEX_SIZE,
         hexCols: 10,
         hexRows: 10,
         onPositionChange: vi.fn(),
@@ -38,6 +30,9 @@ function renderMarker(overrides = {}) {
     return { props, ...view };
 }
 
+// Transport fake only: jsdom does not implement the SVG CTM DOM APIs
+// (createSVGPoint / getScreenCTM). Contains no hex-math — the component's
+// real pixelToHexSnapped conversion runs un-mocked on the returned point.
 function createMockSvg(svgPoint) {
     return {
         current: {
@@ -52,10 +47,9 @@ function createMockSvg(svgPoint) {
 }
 
 function simulateDrag({ travelMode = 'inactive', button = 0, svgPoint = { x: 60, y: 60 } } = {}) {
-    const { props } = renderMarker({ travelMode, svgRef: createMockSvg(svgPoint) });
-    const path = document.querySelector('g.party-marker-layer path');
+    const { props, ...view } = renderMarker({ travelMode, svgRef: createMockSvg(svgPoint) });
+    const path = view.container.querySelector('g.party-marker-layer path');
     fireEvent.pointerDown(path, { button, clientX: 100, clientY: 100 });
-    fireEvent.pointerMove(document, { clientX: 100, clientY: 100 });
     return {
         props,
         move: () => fireEvent.pointerMove(document, { clientX: 200, clientY: 200 }),
@@ -64,10 +58,6 @@ function simulateDrag({ travelMode = 'inactive', button = 0, svgPoint = { x: 60,
 }
 
 describe('PartyMarkerLayer', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     describe('rendering', () => {
         it('renders nothing when position is null or undefined', () => {
             const { container: c1 } = renderMarker({ position: null });
@@ -77,92 +67,83 @@ describe('PartyMarkerLayer', () => {
             expect(c2.querySelector('g.party-marker-layer')).not.toBeInTheDocument();
         });
 
-        it('renders the marker hex and the party label when position is set', () => {
+        it('renders the P marker at the hex center given by the real converter', () => {
             const { container } = renderMarker({ position: { q: 5, r: 3 } });
-            expect(container.querySelector('g.party-marker-layer path')).toBeInTheDocument();
-            expect(screen.getByText('P')).toBeInTheDocument();
-        });
+            const oracle = hexToPixel(5, 3, HEX_SIZE);
 
-        it('renders the marker at the pixel position of its hex coordinate', () => {
-            renderMarker({ position: { q: 5, r: 3 } });
-            const expectedX = 30 * Math.sqrt(3) * (5 + 3 / 2);
-            const expectedY = (30 * 3) / 2 * 3;
-            const text = document.querySelector('g.party-marker-layer text');
-            expect(parseFloat(text.getAttribute('x'))).toBeCloseTo(expectedX);
-            expect(parseFloat(text.getAttribute('y'))).toBeGreaterThan(expectedY);
-            const path = document.querySelector('g.party-marker-layer path');
-            expect(path.getAttribute('d')).toMatch(/^M[0-9.]+,[0-9.]+ Z$/);
+            const text = container.querySelector('g.party-marker-layer text');
+            expect(text).toHaveTextContent('P');
+            expect(text.getAttribute('x')).toBe(String(oracle.x));
+            expect(text.getAttribute('text-anchor')).toBe('middle');
+            expect(parseFloat(text.getAttribute('y'))).toBeGreaterThan(oracle.y);
+
+            // Hex shape itself is owned by hexToSVGPath (hexMapUtils.test.js) —
+            // verify the layer wires the converted center through, verbatim.
+            const path = container.querySelector('g.party-marker-layer path');
+            expect(path.getAttribute('d')).toBe(hexToSVGPath(oracle.x, oracle.y, HEX_SIZE));
         });
     });
 
     describe('context menu', () => {
         it.each([
-            ['inactive', ['Start Encounter'], ['Advance One Hex', 'Cancel Travel']],
-            ['active', ['Advance One Hex', 'Cancel Travel'], ['Start Encounter']],
-        ])('shows %s menu items when contextMenuOpen is true and travelMode is %s', (travelMode, expected, notExpected) => {
-            renderMarker({ contextMenuOpen: true, travelMode });
-            for (const item of expected) {
+            { travelMode: 'inactive', open: true, visible: ['Start Encounter'], hidden: ['Advance One Hex', 'Cancel Travel'] },
+            { travelMode: 'active', open: true, visible: ['Advance One Hex', 'Cancel Travel'], hidden: ['Start Encounter'] },
+            { travelMode: 'active', open: false, visible: [], hidden: ['Start Encounter', 'Advance One Hex', 'Cancel Travel'] },
+        ])('shows the $travelMode menu only when open ($open)', ({ travelMode, open, visible, hidden }) => {
+            renderMarker({ contextMenuOpen: open, travelMode, position: { q: 5, r: 3 } });
+            for (const item of visible) {
                 expect(screen.getByText(item)).toBeInTheDocument();
             }
-            for (const item of notExpected) {
+            for (const item of hidden) {
                 expect(screen.queryByText(item)).not.toBeInTheDocument();
             }
-        });
-
-        it('shows no menu when contextMenuOpen is false', () => {
-            renderMarker({ contextMenuOpen: false });
-            expect(screen.queryByText('Start Encounter')).not.toBeInTheDocument();
-            expect(screen.queryByText('Advance One Hex')).not.toBeInTheDocument();
-            expect(screen.queryByText('Cancel Travel')).not.toBeInTheDocument();
         });
     });
 
     describe('context menu interactions', () => {
         it('forwards the marker position to onContextMenu on right-click', () => {
-            const { props } = renderMarker({ position: { q: 5, r: 3 } });
-            fireEvent.contextMenu(document.querySelector('g.party-marker-layer path'));
+            const { props, container } = renderMarker({ position: { q: 5, r: 3 } });
+            fireEvent.contextMenu(container.querySelector('g.party-marker-layer path'));
             expect(props.onContextMenu).toHaveBeenCalledWith(5, 3);
         });
 
         it.each([
-            ['Start Encounter', 'inactive', 'onEncounter', { q: 5, r: 3 }],
-            ['Advance One Hex', 'active', 'onAdvance', null],
-            ['Cancel Travel', 'active', 'onCancelTravel', null],
-        ])('invokes %s when its menu item is clicked', (label, travelMode, callback, position) => {
-            const { props } = renderMarker({ contextMenuOpen: true, travelMode, position: { q: 5, r: 3 } });
-            const hitRect = screen.getByText(label).previousElementSibling;
-            fireEvent.click(hitRect);
-            if (position) {
-                expect(props[callback]).toHaveBeenCalledWith(position.q, position.r);
-            } else {
-                expect(props[callback]).toHaveBeenCalledWith();
-            }
+            { travelMode: 'inactive', items: [['Start Encounter', 'onEncounter', [5, 3]]] },
+            {
+                travelMode: 'active',
+                items: [['Advance One Hex', 'onAdvance', []], ['Cancel Travel', 'onCancelTravel', []]],
+            },
+        ])('invokes each $travelMode menu action from its hit target', ({ travelMode, items }) => {
+            const { props, container } = renderMarker({ contextMenuOpen: true, travelMode, position: { q: 5, r: 3 } });
+            const hits = container.querySelectorAll('.party-menu-hit');
+            expect(hits).toHaveLength(items.length);
+            items.forEach(([label, callbackName, args], i) => {
+                expect(screen.getByText(label)).toBeInTheDocument();
+                fireEvent.click(hits[i]);
+                expect(props[callbackName]).toHaveBeenCalledWith(...args);
+            });
         });
     });
 
     describe('dragging', () => {
-        it('reports the snapped hex as the new position while dragging', () => {
-            const { props, release } = simulateDrag();
+        it('reports the snapped hex while dragging and stops after release', () => {
+            const { props, move, release } = simulateDrag();
+            move();
             expect(props.onPositionChange).toHaveBeenCalledWith({ q: 1, r: 1 });
             release();
+            move();
+            expect(props.onPositionChange).toHaveBeenCalledTimes(1);
         });
 
-        it('does not update the position when dropping outside the map bounds', () => {
-            const { props, release } = simulateDrag({ svgPoint: { x: 3000, y: 3000 } });
-            expect(props.onPositionChange).not.toHaveBeenCalled();
+        it.each([
+            { label: 'right-click', opts: { button: 2 } },
+            { label: 'travel active', opts: { travelMode: 'active' } },
+            { label: 'drop outside map bounds', opts: { svgPoint: { x: 3000, y: 3000 } } },
+       ])('does not move the marker on $label', ({ opts }) => {
+            const { props, move, release } = simulateDrag(opts);
+            move();
             release();
-        });
-
-        it('does not start a drag on right-click', () => {
-            const { props, release } = simulateDrag({ button: 2 });
             expect(props.onPositionChange).not.toHaveBeenCalled();
-            release();
-        });
-
-        it('does not drag while travel mode is active', () => {
-            const { props, release } = simulateDrag({ travelMode: 'active' });
-            expect(props.onPositionChange).not.toHaveBeenCalled();
-            release();
         });
     });
 });

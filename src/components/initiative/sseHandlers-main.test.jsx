@@ -1,16 +1,38 @@
+// @maintained-by-ai
+// LANE: sseHandlers-main — dispatch table behind the app's ONE shared SSE connection (#app mandate:
+// Initiative.jsx registers a single <Subscriber>; this module owns only event→dataKey routing + the
+// SSE-mirrored turn seam). Other owners: subscriber registration + combat-summary-updated adoption
+// (container #865, Initiative.jsx:526-539); initiative-rolled window seam (#864); overlay event bodies
+// (sseHandlers-overlay.test.jsx); local click-driven turn navigation (navigationHandlers.* tests — a
+// separate module, the mirror of what is pinned here).
+//
+// Event → owner (this module, sseHandlers.js):
+//   spell-overlay-*                          → handleOverlayEvent (routing byte only)
+//   change-{campaign}-combatSummary          → adoption: enrich activeCreatureName, round-regression guard, cache write (:62-81)
+//   change-{campaign}-lastAttack             → noop, zero writes (:142)
+//   change-{campaign}-activeCreatureName     → turn mirror: name state, CLA-307/MN-003 outgoing turn-end (skipSync), round-scoped turn-start gate (:106-135)
+//   change-{campaign}-<other key>            → setRuntimeStateTick catch-all; 'log'/'spell-overlay' excluded (:156-163)
+//
+// Old→new map (29→15): nullish-key/data→T2 · overlay-delegate→T1 · foreign-campaign→T2 ·
+// no/undefined-creatures-skip + empty-adopt→T6 · valid-event→T4 · fill-activeName + no-override→T5 ·
+// round-regression + default-round→T7 · lastAttack-noop→T2 · update-refs + expire + cache→T8 ·
+// apply-on-change + persist-gate-key + combatSummary-update→T11 · no-apply-prev-same/no-apply-gate-match/
+// no-combatSummary-update-when-equal→T9 · CLA-170→T10 · undefined-computedStats→T12 · CLA-307→T13 ·
+// fallback-read + null-summary + cs-null-still-applies→T14/T15 · tick-unknown + excluded-keys→T3.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSseEventHandler } from './sseHandlers.js';
 import * as combatData from '../../services/encounters/combatData.js';
 import * as expirations from '../../services/rules/effects/expirations.js';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
+import * as combatSuperiority from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
     getRuntimeValue: vi.fn(),
 }));
 vi.mock('../../services/encounters/combatData.js', () => ({
-    getActiveCreatureName: vi.fn(() => null),
-    getCombatSummary: vi.fn(() => null),
+    getActiveCreatureName: vi.fn(),
+    getCombatSummary: vi.fn(),
     setCombatSummaryCache: vi.fn(),
 }));
 vi.mock('../../services/rules/effects/expirations.js', () => ({
@@ -18,27 +40,40 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
     applyTurnStartEffects: vi.fn(),
     applyTurnEndConditionRemoval: vi.fn(() => Promise.resolve()),
 }));
+// Stub the MN-003 mirror so its real dependency chain (dice, log, damage) never runs here
+// and the skipSync=true call can be asserted (zero-network).
+vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js', () => ({
+    applyCommanderStrikeTurnEnd: vi.fn(() => Promise.resolve()),
+}));
+
+const campaignName = 'test-campaign';
+const CHARACTERS = [
+    { name: 'Alice', computedStats: { hitPoints: 20 } },
+    { name: 'Bob', computedStats: { hitPoints: 15 } },
+];
 
 describe('createSseEventHandler', () => {
     let handler;
     let refs;
     let mocks;
 
-    const campaignName = 'test-campaign';
-    const characters = [
-        { name: 'Alice', computedStats: { hitPoints: 20 } },
-        { name: 'Bob', computedStats: { hitPoints: 15 } },
-    ];
+    const summaryEvent = (data) => ({ key: `change-${campaignName}-combatSummary`, data });
+    const activeEvent = (name) => ({ key: `change-${campaignName}-activeCreatureName`, data: name });
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // Explicit per-test defaults (determinism — no reliance on clearAllMocks impl retention, #827)
+        combatData.getActiveCreatureName.mockReturnValue(null);
+        combatData.getCombatSummary.mockReturnValue(null);
+        expirations.applyTurnStartEffects.mockResolvedValue(undefined);
+        expirations.applyTurnEndConditionRemoval.mockResolvedValue(undefined);
+        combatSuperiority.applyCommanderStrikeTurnEnd.mockResolvedValue(undefined);
 
         refs = {
             combatSummaryRef: { current: { round: 1, creatures: [{ name: 'Alice', type: 'player' }] } },
             activeCreatureNameRef: { current: 'Alice' },
             lastAppliedTurnStartCreatureRef: { current: null },
         };
-
         mocks = {
             setCombatSummary: vi.fn(),
             setCombatSummaryG: vi.fn(),
@@ -46,10 +81,9 @@ describe('createSseEventHandler', () => {
             setRuntimeStateTick: vi.fn(),
             handleOverlayEvent: vi.fn(),
         };
-
         handler = createSseEventHandler({
             campaignName,
-            characters,
+            characters: CHARACTERS,
             combatSummaryRef: refs.combatSummaryRef,
             activeCreatureNameRef: refs.activeCreatureNameRef,
             lastAppliedTurnStartCreatureRef: refs.lastAppliedTurnStartCreatureRef,
@@ -61,233 +95,172 @@ describe('createSseEventHandler', () => {
         });
     });
 
-    // ---- Early returns / routing ----
+    // ---- Routing ----
 
-    describe('early returns', () => {
-        it('should return early when event.key or event.data is nullish', () => {
-            handler({ key: null, data: null });
-            expect(mocks.setCombatSummary).not.toHaveBeenCalled();
-            handler({ key: undefined, data: null });
-            expect(mocks.setCombatSummary).not.toHaveBeenCalled();
-        });
-
-        it('should delegate spell-overlay events to handleOverlayEvent and return', () => {
-            const overlayEvent = { key: 'spell-overlay-test-campaign', data: { action: 'clear' } };
-            handler(overlayEvent);
-            expect(mocks.handleOverlayEvent).toHaveBeenCalledWith(overlayEvent);
-        });
-
-        it('should ignore non-matching campaign prefix', () => {
-            handler({ key: 'change-other-campaign-combatSummary', data: { creatures: [] } });
-            expect(mocks.setCombatSummary).not.toHaveBeenCalled();
-        });
+    it('routes spell-overlay events to handleOverlayEvent and nothing else', async () => {
+        const overlayEvent = { key: `spell-overlay-${campaignName}`, data: { action: 'clear' } };
+        await handler(overlayEvent);
+        expect(mocks.handleOverlayEvent).toHaveBeenCalledWith(overlayEvent);
+        expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
+        expect(mocks.setActiveCreatureNameG).not.toHaveBeenCalled();
+        expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
     });
 
-    // ---- combatSummary handling ----
-
-    describe('combatSummary dataKey', () => {
-        const baseCombatSummary = { round: 2, creatures: [{ name: 'Alice', type: 'player' }] };
-
-        it('should skip when event.data has no creatures or creatures is undefined', () => {
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 2 } });
-            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 2, creatures: undefined } });
-            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
-        });
-
-        it('should process event.data with empty creatures array', () => {
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 2, creatures: [] } });
-            expect(mocks.setCombatSummaryG).toHaveBeenCalled();
-        });
-
-        it('should process a valid combatSummary event', () => {
-            handler({ key: 'change-test-campaign-combatSummary', data: baseCombatSummary });
-            expect(mocks.setCombatSummaryG).toHaveBeenCalledWith(
-                expect.objectContaining({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] }),
-            );
-        });
-
-        it('should fill in activeCreatureName from getActiveCreatureName when missing', () => {
-            combatData.getActiveCreatureName.mockReturnValue('Bob');
-            const data = { round: 2, creatures: [{ name: 'Alice', type: 'player' }] };
-            handler({ key: 'change-test-campaign-combatSummary', data });
-            expect(mocks.setCombatSummaryG).toHaveBeenCalledWith(
-                expect.objectContaining({ activeCreatureName: 'Bob' }),
-            );
-        });
-
-        it('should not override existing activeCreatureName from event data', () => {
-            const data = { round: 2, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Alice' };
-            handler({ key: 'change-test-campaign-combatSummary', data });
-            expect(mocks.setCombatSummaryG).toHaveBeenCalledWith(
-                expect.objectContaining({ activeCreatureName: 'Alice' }),
-            );
-            expect(combatData.getActiveCreatureName).not.toHaveBeenCalled();
-        });
-
-        it('should skip when merged.round < prevRound (round regression)', () => {
-            refs.combatSummaryRef.current = { round: 5, creatures: [] };
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 3, creatures: [] } });
-            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
-        });
-
-        it('should use combatSummaryRef.current.round default of 1 when ref is nullish', () => {
-            refs.combatSummaryRef.current = undefined;
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 0, creatures: [] } });
-            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
-            refs.combatSummaryRef.current = null;
-            handler({ key: 'change-test-campaign-combatSummary', data: { round: 0, creatures: [] } });
-            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
-        });
+    it('writes nothing for nullish key/data, foreign campaigns, and the lastAttack echo', async () => {
+        await handler({ key: null, data: { creatures: [] } });
+        await handler({ key: `change-${campaignName}-combatSummary`, data: null });
+        await handler({ key: 'change-other-campaign-combatSummary', data: { round: 2, creatures: [] } });
+        await handler({ key: `change-${campaignName}-lastAttack`, data: { attackerName: 'Goblin' } });
+        expect(mocks.setCombatSummary).not.toHaveBeenCalled();
+        expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
+        expect(mocks.setActiveCreatureNameG).not.toHaveBeenCalled();
+        expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
+        expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
     });
 
-    // ---- lastAttack dataKey ----
+    it('ticks a re-render for unrecognised character dataKeys, never for log or spell-overlay', async () => {
+        await handler({ key: `change-${campaignName}-someCharacterKey`, data: { foo: 'bar' } });
+        expect(mocks.setRuntimeStateTick).toHaveBeenCalledTimes(1);
+        expect(mocks.setRuntimeStateTick.mock.calls[0][0](0)).toBe(1);
 
-    describe('lastAttack dataKey', () => {
-        it('should process lastAttack events without side effects', () => {
-            handler({ key: 'change-test-campaign-lastAttack', data: { attackerName: 'Goblin' } });
-            expect(mocks.setCombatSummary).not.toHaveBeenCalled();
-            expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
-        });
+        await handler({ key: `change-${campaignName}-log`, data: [] });
+        await handler({ key: `change-${campaignName}-spell-overlay`, data: {} });
+        expect(mocks.setRuntimeStateTick).toHaveBeenCalledTimes(1);
     });
 
-    // ---- activeCreatureName dataKey ----
+    // ---- combatSummary ----
 
-    describe('activeCreatureName dataKey', () => {
-        beforeEach(() => {
-            refs.combatSummaryRef.current = { round: 1, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Alice' };
-        });
+    it('adopts a valid combatSummary with exact bytes into ref, cache, and state', async () => {
+        await handler(summaryEvent({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] }));
+        expect(mocks.setCombatSummaryG).toHaveBeenCalledWith({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] });
+        expect(combatData.setCombatSummaryCache).toHaveBeenCalledWith({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] }, campaignName);
+        expect(refs.combatSummaryRef.current).toEqual({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] });
+    });
 
-        it('should update refs and state when active creature changes', () => {
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(refs.activeCreatureNameRef.current).toBe('Bob');
-            expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Bob');
-        });
+    it('fills a missing activeCreatureName from getActiveCreatureName but preserves the provided one', async () => {
+        combatData.getActiveCreatureName.mockReturnValue('Bob');
+        await handler(summaryEvent({ round: 2, creatures: [{ name: 'Alice', type: 'player' }] }));
+        expect(combatData.getActiveCreatureName).toHaveBeenCalledWith(campaignName);
+        expect(mocks.setCombatSummaryG).toHaveBeenCalledWith({ round: 2, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Bob' });
 
-        it('should call expireStaleEffects with campaign name and new active creature', () => {
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(
-                campaignName, 'Bob',
-            );
-        });
+        vi.clearAllMocks();
+        await handler(summaryEvent({ round: 2, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Alice' }));
+        expect(mocks.setCombatSummaryG).toHaveBeenCalledWith({ round: 2, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Alice' });
+        expect(combatData.getActiveCreatureName).not.toHaveBeenCalled();
+    });
 
-        it('should update combatSummary cache', () => {
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(combatData.setCombatSummaryCache).toHaveBeenCalled();
-        });
-
-        it('should apply turn-start effects when creature actually changes', async () => {
-            refs.lastAppliedTurnStartCreatureRef.current = null;
-            await handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.applyTurnStartEffects).toHaveBeenCalled();
-            expect(mocks.setRuntimeStateTick).toHaveBeenCalled();
-        });
-
-        it('should NOT apply turn-start effects when prevActive === event.data', () => {
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Alice' });
-            expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
-        });
-
-        it('should NOT apply turn-start effects when round-scoped lastApplied matches', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = '1:Bob';
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
-        });
-
-        it('BUG CLA-170: should re-apply turn-start effects to the same creature in a new round', async () => {
-            refs.lastAppliedTurnStartCreatureRef.current = '1:Bob';
-            refs.activeCreatureNameRef.current = 'Alice';
-            refs.combatSummaryRef.current = { round: 2, creatures: [{ name: 'Bob', type: 'npc' }] };
-            await handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Bob', expect.any(Object), campaignName, characters);
-            expect(refs.lastAppliedTurnStartCreatureRef.current).toBe('2:Bob');
-        });
-
-        it('should update lastAppliedTurnStartCreature in runtime store with round-scoped key when applying', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = null;
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                '__initiative__', 'lastAppliedTurnStartCreature', '1:Bob', campaignName,
-            );
-        });
-
-        it('should update combatSummary.lastAppliedTurnStartCreature when different', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = null;
-            refs.combatSummaryRef.current = { round: 1, creatures: [], lastAppliedTurnStartCreature: 'Alice' };
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(mocks.setCombatSummary).toHaveBeenCalled();
-        });
-
-        it('should NOT update combatSummary when lastApplied already equals round-scoped key', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = '1:Bob';
-            refs.combatSummaryRef.current = { round: 1, creatures: [], lastAppliedTurnStartCreature: '1:Bob' };
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(mocks.setCombatSummary).not.toHaveBeenCalled();
-        });
-
-        it('should pass undefined computedStats when character not found', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = null;
-            refs.combatSummaryRef.current = { round: 1, creatures: [] };
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Unknown' });
-            expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith(
-                'Unknown', undefined, campaignName, characters,
-            );
-        });
-
-        it('BUG CLA-307: runs outgoing owner turn-END condition removal with skipSync on echo', async () => {
-            refs.activeCreatureNameRef.current = 'Alice';
-            await handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.applyTurnEndConditionRemoval).toHaveBeenCalledWith(
-                'Alice', { hitPoints: 20 }, campaignName, true,
-            );
-        });
-
-        it('BUG CLA-307: does NOT run turn-END removal when prevActive === newActive (no dupes)', async () => {
-            refs.activeCreatureNameRef.current = 'Alice';
-            await handler({ key: 'change-test-campaign-activeCreatureName', data: 'Alice' });
-            expect(expirations.applyTurnEndConditionRemoval).not.toHaveBeenCalled();
-        });
-
-        it('should get combatSummary from getCombatSummary when ref is null', () => {
-            refs.combatSummaryRef.current = null;
-            combatData.getCombatSummary.mockReturnValue({
-                round: 1, creatures: [], activeCreatureName: 'Bob',
-            });
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(combatData.getCombatSummary).toHaveBeenCalledWith(campaignName);
-        });
-
-        it('should handle null combatSummary by still updating state and calling side effects', () => {
-            refs.combatSummaryRef.current = null;
-            combatData.getCombatSummary.mockReturnValue(null);
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Bob');
-            expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+    it('skips combatSummary payloads without a creatures array but adopts an empty roster', async () => {
+        for (const data of [{ round: 2 }, { round: 2, creatures: undefined }]) {
+            await handler(summaryEvent(data));
+            expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
             expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
-        });
-
-        it('should call applyTurnStartEffects even when cs is null', () => {
-            refs.lastAppliedTurnStartCreatureRef.current = null;
-            refs.combatSummaryRef.current = null;
-            combatData.getCombatSummary.mockReturnValue(null);
-            handler({ key: 'change-test-campaign-activeCreatureName', data: 'Bob' });
-            expect(expirations.applyTurnStartEffects).toHaveBeenCalled();
-        });
+        }
+        await handler(summaryEvent({ round: 2, creatures: [] }));
+        expect(mocks.setCombatSummaryG).toHaveBeenCalledWith({ round: 2, creatures: [] });
     });
 
-    // ---- Character-level dataKey changes ----
+    it('rejects round regressions (default prev round 1) and adopts same-or-later rounds', async () => {
+        refs.combatSummaryRef.current = { round: 5, creatures: [] };
+        await handler(summaryEvent({ round: 3, creatures: [] }));
+        expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
 
-    describe('character-level dataKey changes', () => {
-        it('should trigger re-render tick for unknown dataKeys', () => {
-            handler({ key: 'change-test-campaign-someCharacterKey', data: { foo: 'bar' } });
-            expect(mocks.setRuntimeStateTick).toHaveBeenCalled();
-        });
+        for (const empty of [undefined, null]) {
+            refs.combatSummaryRef.current = empty;
+            await handler(summaryEvent({ round: 0, creatures: [] }));
+        }
+        expect(mocks.setCombatSummaryG).not.toHaveBeenCalled();
 
-        it('should NOT trigger tick for excluded dataKeys (log, spell-overlay)', () => {
-            handler({ key: 'change-test-campaign-log', data: [] });
-            expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
-            handler({ key: 'change-test-campaign-spell-overlay', data: {} });
-            expect(mocks.setRuntimeStateTick).not.toHaveBeenCalled();
+        refs.combatSummaryRef.current = { round: 2, creatures: [{ name: 'Alice', type: 'player' }] };
+        await handler(summaryEvent({ round: 2, creatures: [] }));
+        expect(mocks.setCombatSummaryG).toHaveBeenCalledWith({ round: 2, creatures: [] });
+    });
+
+    // ---- activeCreatureName (SSE-mirrored turn seam) ----
+
+    it('applies an active-creature change: ref, state setter, stale-effect expiry, cache update', async () => {
+        refs.lastAppliedTurnStartCreatureRef.current = '1:Bob'; // isolate: gate off, no turn-start stamp
+        await handler(activeEvent('Bob'));
+        expect(refs.activeCreatureNameRef.current).toBe('Bob');
+        expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Bob');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Bob');
+        expect(combatData.setCombatSummaryCache).toHaveBeenCalledWith(
+            { round: 1, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Bob' }, campaignName,
+        );
+    });
+
+    it('gates the turn-start pass: no-op when the creature is unchanged or the round-scoped gate already matched', async () => {
+        await handler(activeEvent('Alice')); // prev === new: no turn movement at all
+        expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
+        expect(expirations.applyTurnEndConditionRemoval).not.toHaveBeenCalled();
+        expect(combatSuperiority.applyCommanderStrikeTurnEnd).not.toHaveBeenCalled();
+
+        vi.clearAllMocks();
+        refs.lastAppliedTurnStartCreatureRef.current = '1:Bob';
+        await handler(activeEvent('Bob')); // gate '1:Bob' already applied this round
+        expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
+        expect(mocks.setCombatSummary).not.toHaveBeenCalled();
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('CLA-170: re-applies turn-start effects to the same creature in a new round with exact bytes', async () => {
+        refs.lastAppliedTurnStartCreatureRef.current = '1:Bob';
+        refs.activeCreatureNameRef.current = 'Alice';
+        refs.combatSummaryRef.current = { round: 2, creatures: [{ name: 'Bob', type: 'npc' }] };
+        await handler(activeEvent('Bob'));
+        expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Bob', { hitPoints: 15 }, campaignName, CHARACTERS);
+        expect(refs.lastAppliedTurnStartCreatureRef.current).toBe('2:Bob');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '2:Bob', campaignName);
+        expect(mocks.setRuntimeStateTick).toHaveBeenCalledTimes(1);
+    });
+
+    it('persists the round-scoped gate key to the runtime store, the ref, and combatSummary on a fresh turn', async () => {
+        await handler(activeEvent('Bob'));
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Bob', campaignName);
+        expect(refs.lastAppliedTurnStartCreatureRef.current).toBe('1:Bob');
+        expect(mocks.setCombatSummary).toHaveBeenCalledWith({
+            round: 1, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Bob', lastAppliedTurnStartCreature: '1:Bob',
         });
+        expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Bob', { hitPoints: 15 }, campaignName, CHARACTERS);
+    });
+
+    it('passes undefined computedStats for an active creature with no matching character', async () => {
+        await handler(activeEvent('Zed'));
+        expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Zed');
+        expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Zed', undefined, campaignName, CHARACTERS);
+    });
+
+    it('CLA-307/MN-003: mirrors the outgoing creature turn-end pass with skipSync=true (no SSE echo loop)', async () => {
+        refs.lastAppliedTurnStartCreatureRef.current = '1:Bob'; // isolate: gate matched, turn-start pass skipped
+        await handler(activeEvent('Bob'));
+        expect(expirations.applyTurnEndConditionRemoval).toHaveBeenCalledWith('Alice', { hitPoints: 20 }, campaignName, true);
+        expect(combatSuperiority.applyCommanderStrikeTurnEnd).toHaveBeenCalledWith(campaignName, 'Alice', true);
+        expect(expirations.applyTurnStartEffects).not.toHaveBeenCalled();
+    });
+
+    it('resolves combatSummary via the cache when the ref is null and adopts the post-effects copy so damage reaches the UI', async () => {
+        refs.combatSummaryRef.current = null;
+        const fallback = { round: 1, creatures: [], activeCreatureName: 'Alice' };
+        const damaged = { round: 1, creatures: [{ name: 'Bob', type: 'player', currentHp: 12 }] };
+        combatData.getCombatSummary.mockReturnValueOnce(fallback).mockReturnValue(damaged);
+
+        await handler(activeEvent('Bob'));
+
+        expect(combatData.getCombatSummary).toHaveBeenCalledWith(campaignName);
+        expect(combatData.setCombatSummaryCache).toHaveBeenCalledWith({ round: 1, creatures: [], activeCreatureName: 'Bob' }, campaignName);
+        expect(mocks.setCombatSummary).toHaveBeenCalledWith(damaged);
+        expect(refs.combatSummaryRef.current).toBe(damaged);
+        expect(mocks.setRuntimeStateTick).toHaveBeenCalledTimes(1);
+    });
+
+    it('still applies the turn change with zero cache writes when no combatSummary exists anywhere', async () => {
+        refs.combatSummaryRef.current = null;
+        await handler(activeEvent('Zed'));
+        expect(refs.activeCreatureNameRef.current).toBe('Zed');
+        expect(mocks.setActiveCreatureNameG).toHaveBeenCalledWith('Zed');
+        expect(expirations.expireStaleEffects).toHaveBeenCalledWith(campaignName, 'Zed');
+        expect(combatData.setCombatSummaryCache).not.toHaveBeenCalled();
+        expect(mocks.setCombatSummary).not.toHaveBeenCalled();
+        expect(expirations.applyTurnStartEffects).toHaveBeenCalledWith('Zed', undefined, campaignName, CHARACTERS);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('__initiative__', 'lastAppliedTurnStartCreature', '1:Zed', campaignName);
     });
 });

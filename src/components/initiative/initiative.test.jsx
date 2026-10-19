@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Initiative CONTAINER lane: proves only what the real Initiative.jsx wiring can prove —
+// (1) mount census: exact card set per combatSummary roster, ONE shared Subscriber (app SSE
+// mandate), GM controls + their contract tooltip, onNpcsChange push to the parent;
+// (2) combat-summary-updated adoption seam (inline listener, owned here — not #863's
+// concentration/death-save pair, not #864's initiative-rolled seam);
+// (3) Clear-button DOM→handler flow through window.confirm (factory internals: cite
+// createCreatureHandlers.test.jsx #837 "handleClear confirmed/declined"; cancelled path
+// folded here per REC #837, shrunk to one click assertion).
+// CUT (owners cited): handler internals #833-#847, inline concentration/death-save
+// listeners #863, initiative-rolled seam #864, card render/dispatch/prompts #848-#853,
+// EffectAdder #855-#861/#838-#839, HpBar #862, keydown/nav seams → navigationHandlers
+// lanes (queued). Boundary-mocked per REC #837 + zero-network guard #841:
+// sessionService, autoRewardService, zoneDurationClock, spellOverlayService (mount fetch).
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
@@ -54,9 +68,18 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
 }));
 vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn(() => Promise.resolve({ npcs: [] })) }));
 vi.mock('../../services/encounters/npcStatBlockUtils.js', () => ({ npcToMonsterFormat: vi.fn(() => null), npcHasStatBlock: vi.fn(() => true) }));
-vi.mock('../../services/rules/effects/expirations.js', () => ({ expireStaleEffects: vi.fn(), applyTurnStartEffects: vi.fn(), applyTurnEndConditionRemoval: vi.fn(() => Promise.resolve()) }));
+vi.mock('../../services/rules/effects/expirations.js', () => ({ expireStaleEffects: vi.fn(), applyTurnStartEffects: vi.fn(), applyTurnEndConditionRemoval: vi.fn(() => Promise.resolve()), clearExpirationEffects: vi.fn() }));
+// REC #837 boundary mocks — handleClear reaches these for REAL otherwise (fetches in jsdom).
+vi.mock('../../services/combat/sessionService.js', () => ({ setSessionPhase: vi.fn(() => Promise.resolve()) }));
+vi.mock('../../services/items/autoRewardService.js', () => ({ autoAwardCombatRewards: vi.fn(() => Promise.resolve()) }));
+vi.mock('../../services/rules/effects/zoneDurationClock.js', () => ({ sweepNewCombatClocks: vi.fn(() => Promise.resolve()) }));
+// Zero-network guard #841: mount fetches spell overlays for real otherwise.
+vi.mock('../../services/maps/spellOverlayService.js', () => ({
+    fetchSpellOverlays: vi.fn(() => Promise.resolve([])),
+    overlayTargetId: vi.fn(() => null),
+}));
 vi.mock('../../services/encounters/combatData.js', () => ({
-    loadCombatSummary: vi.fn(() => Promise.resolve(null)),
+    loadCombatSummary: vi.fn(),
     getCombatSummary: vi.fn(() => null),
     getActiveCreatureName: vi.fn(() => null),
     setCombatSummaryCache: vi.fn(),
@@ -110,6 +133,13 @@ describe('Initiative', () => {
         syncStateStore.clear();
         window.confirm = vi.fn(() => true);
         Element.prototype.scrollIntoView = vi.fn();
+        // Determinism #827: every summary source re-pinned per test, no cross-test leak.
+        vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 3, creatures: [
+            { name: 'Alice', type: 'player', initiative: '18', targetName: null, concentration: null },
+            { name: 'Bob', type: 'player', initiative: '12', targetName: null, concentration: null },
+            { name: 'Goblin', type: 'npc', initiative: '8', targetName: null, concentration: null, maxHp: 7, currentHp: 7 },
+        ] });
+        vi.mocked(combatData.getCombatSummary).mockReturnValue(null);
         props = {
             characters: [
                 { name: 'Alice', computedStats: { hitPoints: 20, currentHitPoints: 20, armorClass: 15 } },
@@ -122,50 +152,61 @@ describe('Initiative', () => {
         };
     });
 
-    describe('rendering', () => {
-        it('should render initiative heading with round number, subscriber, carousel, and combat controls', async () => {
-            vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => {
-                expect(screen.getByText(/Initiative \(round 1\)/)).toBeInTheDocument();
-                expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-                expect(document.querySelector('.carousel-container')).toBeInTheDocument();
-                expect(screen.getByText('Clear')).toBeInTheDocument();
-                expect(screen.getByText('+ NPC')).toBeInTheDocument();
-                expect(screen.getByText('← Prev')).toBeInTheDocument();
-                expect(screen.getByText('Next →')).toBeInTheDocument();
-            });
-        });
+    it('renders round heading, exact card census, ONE shared Subscriber, GM controls, and reports the NPC roster to the parent', async () => {
+        await act(async () => { render(<Initiative {...props} />); });
 
-        it('should give the + NPC button a title explaining the auto-naming and 10 HP default', async () => {
-            vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
-            await act(async () => { render(<Initiative {...props} />); });
-            const npcButton = await screen.findByText('+ NPC');
-            const title = npcButton.getAttribute('title');
-            expect(title).toContain('NPC 1');
-            expect(title).toContain('NPC 2');
-            expect(title).toContain('10 HP');
-            expect(title).toMatch(/statless/i);
+        await waitFor(() => {
+            expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
+        });
+        // Card census #781: exact set by name — no deep card content (that's CreatureCard lanes #848-#853).
+        const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
+        expect([...cardNames].sort()).toEqual(['Alice', 'Bob', 'Goblin']);
+        // App mandate: subscription flows through the single shared Subscriber component, never a second EventSource.
+        expect(screen.getAllByTestId('subscriber')).toHaveLength(1);
+        // GM controls present, with the + NPC button's exact auto-naming/10-HP contract tooltip.
+        const npcButton = screen.getByText('+ NPC');
+        expect(screen.getByText('Clear')).toBeInTheDocument();
+        expect(screen.getByText('← Prev')).toBeInTheDocument();
+        expect(screen.getByText('Next →')).toBeInTheDocument();
+        expect(npcButton.getAttribute('title')).toBe('Adds a statless NPC named "NPC 1", "NPC 2", … at 10 HP (AC 10) — rename it to a monster name or drop a monster from the Encounter Builder to set real stats');
+        // Container push to parent: exactly the NPCs on the tracker, imageless until resolved.
+        await waitFor(() => {
+            expect(props.onNpcsChange).toHaveBeenCalledWith([{ name: 'Goblin', type: 'npc', imageUrl: null }]);
         });
     });
 
-    describe('clear combat', () => {
-        it('should clear combat when Clear button is clicked and confirmed', async () => {
-            vi.mocked(clearCombat).mockReturnValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', initiative: '', targetName: null, concentration: null }, { name: 'Bob', type: 'player', initiative: '', targetName: null, concentration: null }] });
-            vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 3, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }, { name: 'Goblin', type: 'npc' }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.getByText(/Initiative \(round 3\)/)).toBeInTheDocument(); });
-            await act(async () => { fireEvent.click(screen.getByText('Clear')); });
-            await waitFor(() => { expect(screen.getByText(/Initiative \(round 1\)/)).toBeInTheDocument(); });
-        });
+    it('adopts the combat-summary cache when combat-summary-updated fires', async () => {
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
 
-        it('should not clear combat when cancelled', async () => {
-            window.confirm = vi.fn(() => false);
-            vi.mocked(combatData.loadCombatSummary).mockResolvedValue({ round: 3, creatures: [{ name: 'Alice', type: 'player' }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.getByText(/Initiative \(round 3\)/)).toBeInTheDocument(); });
-            await act(async () => { fireEvent.click(screen.getByText('Clear')); });
-            await waitFor(() => { expect(screen.getByText(/Initiative \(round 3\)/)).toBeInTheDocument(); });
-        });
+        vi.mocked(combatData.getCombatSummary).mockReturnValue({ round: 5, creatures: [
+            { name: 'Alice', type: 'player', initiative: '18', targetName: null, concentration: null },
+            { name: 'Ogre', type: 'npc', initiative: '6', targetName: null, concentration: null, maxHp: 20, currentHp: 20 },
+        ] });
+        await act(async () => { window.dispatchEvent(new Event('combat-summary-updated')); });
+
+        await waitFor(() => { expect(screen.getByText('Initiative (round 5)')).toBeInTheDocument(); });
+        // Adoption replaces the roster byte-adopted from the cache (no merge at this seam).
+        const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
+        expect([...cardNames].sort()).toEqual(['Alice', 'Ogre']);
+    });
+
+    it('Clear button clears combat only after confirm, resetting the tracker to round 1', async () => {
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument(); });
+
+        // Cancelled path (shrunk per REC #837 — factory declined-row internals cited there).
+        window.confirm = vi.fn(() => false);
+        fireEvent.click(screen.getByText('Clear'));
+        expect(clearCombat).not.toHaveBeenCalled();
+        expect(screen.getByText('Initiative (round 3)')).toBeInTheDocument();
+
+        // Confirmed path: DOM click reaches the factory handler and the UI round-trips to round 1.
+        window.confirm = vi.fn(() => true);
+        await act(async () => { fireEvent.click(screen.getByText('Clear')); });
+        expect(clearCombat).toHaveBeenCalledWith(props.characters, 1, expect.any(Function));
+        await waitFor(() => { expect(screen.getByText('Initiative (round 1)')).toBeInTheDocument(); });
+        const cardNames = screen.getAllByTestId(/^creature-card-/).map((el) => el.getAttribute('data-testid').replace('creature-card-', ''));
+        expect([...cardNames].sort()).toEqual(['Alice', 'Bob']);
     });
 });

@@ -1,3 +1,24 @@
+// @maintained-by-ai
+/*
+ * useMapLoader — travelInit derivation lane.
+ *
+ * Owns here: the loaded map's travelState block → travelInit exact shape —
+ * verbatim restore, fresh defaults, the inactive/destination gate, junk/null
+ * field coercion, and dailyBudget resolution (explicit wins, zero preserved,
+ * junk/missing recomputed from pace).
+ *
+ * Lane map (do NOT duplicate across these files):
+ * - mount/load args + loaded-field application  -> useMapLoader.loadExisting.test.js
+ * - pre-load defaults and ref seeding           -> useMapLoader.init.test.js
+ * - create-new-map bytes (miss / load reject)   -> useMapLoader.createNew.test.js
+ * - setTravelInit / setTravelStateRef + persistence -> useMapLoader.api.test.js
+ *
+ * Fake only the transport seam (#791). Config, hexKey, and travelService run
+ * real (#800/#802), so the budget bytes surfaced by this lane are pinned to
+ * actual rules once: slow 2, normal 4, fast 5. Passthrough vs recomputation is
+ * proven by value (12 ≠ fast-derived 5; 0 ≠ 5), so no call-count assertions
+ * on the real service are needed.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -7,26 +28,7 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
     saveMapData: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/maps/hexMapUtils.js', () => ({
-    hexKey: vi.fn((q, r) => `${q},${r}`),
-}));
-
-vi.mock('../../../services/campaign/travelService.js', () => ({
-    getDailyHexBudget: vi.fn((paceId) => {
-        const budgets = { slow: 2, normal: 4, fast: 6 };
-        return budgets[paceId] ?? 4;
-    }),
-}));
-
-vi.mock('../../../config/outdoorConfig.js', () => ({
-    DEFAULT_GRID_SIZE: 10,
-    GRID_COLS_MULTIPLIER: 2,
-    MIN_ZOOM: 2,
-    DEFAULT_TERRAIN: 'plains',
-}));
-
 import * as mapsService from '../../../services/maps/mapsService.js';
-import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 
 const CAMPAIGN = 'test-campaign';
 const MAP = 'test-map';
@@ -36,7 +38,7 @@ const characters = [
     { name: 'Gandalf' },
 ];
 
-const baseMapData = {
+const createMapData = (overrides = {}) => ({
     terrain: {},
     rivers: [],
     roads: [],
@@ -48,13 +50,12 @@ const baseMapData = {
     marchingOrder: [],
     partyPosition: null,
     weather: null,
-};
+    ...overrides,
+});
 
-const createMapData = (overrides = {}) => ({ ...baseMapData, ...overrides });
-
-// Renders the hook against a map whose load resolves and waits for the load to
-// finish with waitFor (no fixed timers), so the post-load state is observed
-// deterministically.
+// Renders the hook against a map whose load resolves and waits for the load
+// to finish with waitFor (no fixed timers, #783), so the post-load state is
+// observed deterministically.
 const renderLoadedMap = async (mapDataOverrides) => {
     mapsService.loadMapData.mockResolvedValue(createMapData(mapDataOverrides));
     const { result } = renderHook(() => useMapLoader(CAMPAIGN, MAP, characters));
@@ -67,227 +68,125 @@ describe('useMapLoader - travel state', () => {
         vi.clearAllMocks();
     });
 
-    describe('travelInit from existing map data', () => {
-        it('loads a full active travel state into travelInit', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    travelPace: 'fast',
-                    forcedMarchHours: 2,
-                    accruedCost: 10,
-                    dailyBudget: 6,
-                    destination: 'City A',
-                    path: [{ q: 0, r: 0 }],
-                    pathIndex: 0,
-                },
-            });
-
-            expect(result.current.travelInit).toEqual({
+    it('restores a full travel block verbatim, keeping an explicit numeric dailyBudget over pace derivation', async () => {
+        const result = await renderLoadedMap({
+            travelState: {
                 travelMode: 'active',
                 travelPace: 'fast',
                 forcedMarchHours: 2,
                 accruedCost: 10,
-                dailyBudget: 6,
+                dailyBudget: 12,
                 destination: 'City A',
                 path: [{ q: 0, r: 0 }],
-                pathIndex: 0,
-            });
+                pathIndex: 3,
+            },
         });
 
-        it('keeps travelInit null for an inactive trip without a destination', async () => {
-            const result = await renderLoadedMap({
-                travelState: { travelMode: 'inactive', destination: null },
-            });
-
-            expect(result.current.travelInit).toBeNull();
-        });
-
-        it('sets travelInit from a destination even when travelMode is inactive', async () => {
-            const result = await renderLoadedMap({
-                travelState: { travelMode: 'inactive', destination: 'Distant City' },
-            });
-
-            expect(result.current.travelInit).toMatchObject({
-                travelMode: 'inactive',
-                destination: 'Distant City',
-            });
-        });
-
-        it.each([
-            ['missing', {}],
-            ['empty', { travelState: {} }],
-        ])('keeps travelInit null when travelState is $label', async (_label, overrides) => {
-            const result = await renderLoadedMap(overrides);
-
-            expect(result.current.travelInit).toBeNull();
-        });
-
-        it('sets travelInit for an active trip even when no destination is set', async () => {
-            const result = await renderLoadedMap({
-                travelState: { travelMode: 'active' },
-            });
-
-            expect(result.current.travelInit).toMatchObject({
-                travelMode: 'active',
-                destination: null,
-            });
-        });
-
-        it('applies defaults for every missing travel field', async () => {
-            const result = await renderLoadedMap({
-                travelState: { destination: 'City' },
-            });
-
-            expect(result.current.travelInit).toEqual({
-                travelMode: 'inactive',
-                travelPace: 'normal',
-                forcedMarchHours: 0,
-                accruedCost: 0,
-                dailyBudget: 4,
-                destination: 'City',
-                path: [],
-                pathIndex: 0,
-            });
-        });
-
-        it('falls back to defaults for empty-string and null travel fields', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    travelPace: '',
-                    forcedMarchHours: null,
-                    accruedCost: null,
-                    dailyBudget: null,
-                    destination: '',
-                    path: null,
-                    pathIndex: null,
-                },
-            });
-
-            expect(result.current.travelInit).toEqual({
-                travelMode: 'active',
-                travelPace: 'normal',
-                forcedMarchHours: 0,
-                accruedCost: 0,
-                dailyBudget: 4,
-                destination: null,
-                path: [],
-                pathIndex: 0,
-            });
+        // dailyBudget 12 ≠ the fast-derived 5, proving the explicit value wins.
+        expect(result.current.travelInit).toEqual({
+            travelMode: 'active',
+            travelPace: 'fast',
+            forcedMarchHours: 2,
+            accruedCost: 10,
+            dailyBudget: 12,
+            destination: 'City A',
+            path: [{ q: 0, r: 0 }],
+            pathIndex: 3,
         });
     });
 
-    describe('dailyBudget resolution', () => {
-        it('uses an explicit numeric dailyBudget without consulting getDailyHexBudget', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                    dailyBudget: 12,
-                },
-            });
-
-            expect(getDailyHexBudget).not.toHaveBeenCalled();
-            expect(result.current.travelInit.dailyBudget).toBe(12);
+    it('derives fresh defaults from a destination-only travel block', async () => {
+        const result = await renderLoadedMap({
+            travelState: { destination: 'City' },
         });
 
-        it('computes dailyBudget from travelPace when it is missing', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    travelPace: 'slow',
-                    destination: 'City',
-                },
-            });
-
-            expect(getDailyHexBudget).toHaveBeenCalledWith('slow');
-            expect(result.current.travelInit.dailyBudget).toBe(2);
-        });
-
-        it('calls getDailyHexBudget with normal when travelPace is missing', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                },
-            });
-
-            expect(getDailyHexBudget).toHaveBeenCalledWith('normal');
-            expect(result.current.travelInit.dailyBudget).toBe(4);
-        });
-
-        it('recomputes dailyBudget when it is not a number', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                    dailyBudget: 'not a number',
-                    travelPace: 'fast',
-                },
-            });
-
-            expect(getDailyHexBudget).toHaveBeenCalledWith('fast');
-            expect(result.current.travelInit.dailyBudget).toBe(6);
-        });
-
-        it('keeps a zero dailyBudget instead of recomputing it', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    travelPace: 'fast',
-                    destination: 'City',
-                    dailyBudget: 0,
-                },
-            });
-
-            expect(getDailyHexBudget).not.toHaveBeenCalled();
-            expect(result.current.travelInit.dailyBudget).toBe(0);
+        // Pins normal-pace budget 4 from the real travelService.
+        expect(result.current.travelInit).toEqual({
+            travelMode: 'inactive',
+            travelPace: 'normal',
+            forcedMarchHours: 0,
+            accruedCost: 0,
+            dailyBudget: 4,
+            destination: 'City',
+            path: [],
+            pathIndex: 0,
         });
     });
 
-    describe('type coercion', () => {
-        it('coerces non-numeric forcedMarchHours, accruedCost, and pathIndex to 0', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                    forcedMarchHours: 'not a number',
-                    accruedCost: 'not a number',
-                    pathIndex: 'not a number',
-                },
-            });
+    it.each([
+        ['absent', {}],
+        ['empty', { travelState: {} }],
+        ['inactive without a destination', { travelState: { travelMode: 'inactive', destination: null } }],
+    ])('keeps travelInit null when travelState is %s', async (_label, overrides) => {
+        const result = await renderLoadedMap(overrides);
 
-            expect(result.current.travelInit.forcedMarchHours).toBe(0);
-            expect(result.current.travelInit.accruedCost).toBe(0);
-            expect(result.current.travelInit.pathIndex).toBe(0);
+        expect(result.current.travelInit).toBeNull();
+    });
+
+    it.each([
+        ['active without a destination', { travelMode: 'active' }, {
+            travelMode: 'active',
+            travelPace: 'normal',
+            forcedMarchHours: 0,
+            accruedCost: 0,
+            dailyBudget: 4,
+            destination: null,
+            path: [],
+            pathIndex: 0,
+        }],
+        ['inactive with a destination', { travelMode: 'inactive', destination: 'Distant City' }, {
+            travelMode: 'inactive',
+            travelPace: 'normal',
+            forcedMarchHours: 0,
+            accruedCost: 0,
+            dailyBudget: 4,
+            destination: 'Distant City',
+            path: [],
+            pathIndex: 0,
+        }],
+    ])('surfaces an exact travelInit when the trip is %s', async (_label, travelState, expected) => {
+        const result = await renderLoadedMap({ travelState });
+
+        expect(result.current.travelInit).toEqual(expected);
+    });
+
+    it('coerces null and junk travel fields to defaults, recomputing a junk dailyBudget from the preserved pace', async () => {
+        const result = await renderLoadedMap({
+            travelState: {
+                travelMode: 'active',
+                travelPace: 'fast',
+                forcedMarchHours: null,
+                accruedCost: 'not a number',
+                dailyBudget: 'not a number',
+                destination: '',
+                path: 'not an array',
+                pathIndex: null,
+            },
         });
 
-        it('preserves valid numeric values', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                    forcedMarchHours: 3,
-                    accruedCost: 15,
-                    pathIndex: 2,
-                },
-            });
+        // A truthy-but-invalid pace is preserved and drives the recompute
+        // (real fast budget is 5); everything invalid falls back to defaults.
+        expect(result.current.travelInit).toEqual({
+            travelMode: 'active',
+            travelPace: 'fast',
+            forcedMarchHours: 0,
+            accruedCost: 0,
+            dailyBudget: 5,
+            destination: null,
+            path: [],
+            pathIndex: 0,
+        });
+    });
 
-            expect(result.current.travelInit.forcedMarchHours).toBe(3);
-            expect(result.current.travelInit.accruedCost).toBe(15);
-            expect(result.current.travelInit.pathIndex).toBe(2);
+    it.each([
+        ['keeps an explicit zero dailyBudget instead of recomputing it', { travelPace: 'fast', dailyBudget: 0 }, 0],
+        ['derives a missing dailyBudget from the pace', { travelPace: 'slow' }, 2],
+    ])('%s', async (_label, travelState, expectedBudget) => {
+        const result = await renderLoadedMap({
+            travelState: { travelMode: 'active', destination: 'City', ...travelState },
         });
 
-        it('coerces a non-array path to an empty array', async () => {
-            const result = await renderLoadedMap({
-                travelState: {
-                    travelMode: 'active',
-                    destination: 'City',
-                    path: 'not an array',
-                },
-            });
-
-            expect(result.current.travelInit.path).toEqual([]);
-        });
+        // Zero survives the typeof guard (fast-derived would be 5).
+        expect(result.current.travelInit.dailyBudget).toBe(expectedBudget);
     });
 });

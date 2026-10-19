@@ -1,3 +1,11 @@
+// @maintained-by-ai
+// Lane: EffectAdder concentration-tab UI seam — form render/defaults, DC sanitiser,
+// Apply disabled state-machine bytes (never click-blocked), exact onSubmit payload once,
+// zero-write cancel. NOT owned here (cited): dispatch handler branches, exact service
+// literals, Rage guards → createEffectAdderHandlers.test.jsx #839 :295-347 (+ guards :73-92),
+// falling lane → createEffectAdderHandlers.falling.test.js #838, tab-button existence →
+// EffectAdder.rendering.test.jsx, conditions tab → EffectAdder.conditions.test.jsx.
+// Concentration is free-text (no registry select), so no targetEffectDefinitions census here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EffectAdder from './EffectAdder.jsx';
@@ -8,7 +16,7 @@ describe('EffectAdder - concentration tab', () => {
   beforeEach(() => {
     props = {
       targetName: 'Goblin',
-      initialTab: 'conditions',
+      initialTab: 'concentration',
       onCancel: vi.fn(),
       onApply: vi.fn(),
       creatures: [
@@ -19,51 +27,43 @@ describe('EffectAdder - concentration tab', () => {
     };
   });
 
-  it('should render spell name input, DC field, and placeholder', () => {
+  it('should show the concentration form when its tab is selected, with spell name and default DC 10', () => {
     render(<EffectAdder {...props} initialTab='conditions' />);
     fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
-    expect(screen.getByText('Spell Name')).toBeInTheDocument();
-    expect(screen.getByText('DC')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('e.g. Hold Person')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('e.g. Hold Person')).toHaveFocus();
+    const spellInput = screen.getByLabelText('Spell Name');
+    expect(spellInput).toBeInTheDocument();
+    expect(spellInput).toHaveAttribute('placeholder', 'e.g. Hold Person');
+    expect(spellInput).toHaveFocus();
     expect(screen.getByLabelText('DC')).toHaveValue(10);
   });
 
-  it('should disable Apply with empty spell name and enable when entered', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
-    const spellInput = screen.getByPlaceholderText('e.g. Hold Person');
-    fireEvent.change(spellInput, { target: { value: 'Fireball' } });
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
-  });
-
-  it('should remain disabled when spell name is only whitespace', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
-    const spellInput = screen.getByPlaceholderText('e.g. Hold Person');
-    fireEvent.change(spellInput, { target: { value: '   ' } });
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
-  });
-
-  it('should default DC to 10 when entering invalid text or 0', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
+  it('should keep valid DC edits and fall back to 10 for invalid or zero input', () => {
+    render(<EffectAdder {...props} />);
     const dcInput = screen.getByLabelText('DC');
-    fireEvent.change(dcInput, { target: { value: 'xyz' } });
-    expect(dcInput).toHaveValue(10);
+    fireEvent.change(dcInput, { target: { value: '13' } });
+    expect(dcInput).toHaveValue(13);
     fireEvent.change(dcInput, { target: { value: '0' } });
     expect(dcInput).toHaveValue(10);
+    fireEvent.change(dcInput, { target: { value: 'xyz' } });
+    expect(dcInput).toHaveValue(10);
   });
 
-  it('should call onApply with trimmed spell name and DC when applying', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
-    const spellInput = screen.getByPlaceholderText('e.g. Hold Person');
-    fireEvent.change(spellInput, { target: { value: '  Shield  ' } });
-    const dcInput = screen.getByLabelText('DC');
-    fireEvent.change(dcInput, { target: { value: '15' } });
+  it('should disable Apply until spell name is non-blank text', () => {
+    render(<EffectAdder {...props} />);
+    const apply = screen.getByRole('button', { name: 'Apply' });
+    expect(apply).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Spell Name'), { target: { value: '   ' } });
+    expect(apply).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Spell Name'), { target: { value: 'Shield' } });
+    expect(apply).toBeEnabled();
+  });
+
+  it('should dispatch tab and exact trimmed payload to onApply exactly once on Apply', () => {
+    render(<EffectAdder {...props} />);
+    fireEvent.change(screen.getByLabelText('Spell Name'), { target: { value: '  Shield  ' } });
+    fireEvent.change(screen.getByLabelText('DC'), { target: { value: '15' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(props.onApply).toHaveBeenCalledTimes(1);
     expect(props.onApply).toHaveBeenCalledWith('concentration', {
       target: 'Goblin',
       spellName: 'Shield',
@@ -71,21 +71,10 @@ describe('EffectAdder - concentration tab', () => {
     });
   });
 
-  it('should not call onApply when Apply is clicked with empty or whitespace spell name', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(props.onApply).not.toHaveBeenCalled();
-    const spellInput = screen.getByPlaceholderText('e.g. Hold Person');
-    fireEvent.change(spellInput, { target: { value: '   ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(props.onApply).not.toHaveBeenCalled();
-  });
-
-  it('should call onCancel when Cancel is clicked', () => {
-    render(<EffectAdder {...props} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Concentration' }));
+  it('should call onCancel exactly once with zero writes from the concentration tab', () => {
+    render(<EffectAdder {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(props.onCancel).toHaveBeenCalled();
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(props.onApply).not.toHaveBeenCalled();
   });
 });

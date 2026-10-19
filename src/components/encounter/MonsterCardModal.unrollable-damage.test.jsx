@@ -1,14 +1,34 @@
-// MA-0014: handleDamage / auto-damage roll on an unparseable formula must log
-// an `automation blocked` refusal + console.error — never vanish silently.
+// @maintained-by-ai
+// MA-0014 modal press-refusal lane (owner): a dispatched damage-chip press whose roll
+// resolves null must console.error + emit exactly ONE 'automation blocked' log carrying
+// the authored formula bytes — zero rollDamage, no fabricated total, never silence.
+// The null is forced at the roll seam (rollExpression→null): post-fix render gates keep
+// unrollable formulas from ever becoming clickable, so a press can only meet a null when
+// the roll itself fails to resolve — defense-in-depth, not a dead code path (chip press
+// reaches handleDamage via MonsterCardBody :241 passthrough, the bug's original lane).
+// logBlockedDamageRoll (MonsterCardModal.jsx:1491-1500) is the ONE shared refusal
+// producer for every damage seam — its console + log bytes are pinned exactly once here.
+// Cited, NOT duplicated (inverse ownership cuts):
+// - unrollable chip render, canRollExpression rollability-isolated + disk verbatim:
+//   MonsterAction.unrollable-damage.test.jsx :53-99 (test.jsx #781 map / #763 render faces).
+// - attack-row missing-to-hit suppression (Eye Ray 'Ranged Spell Attack' wording):
+//   MonsterAction.ma0286-slam-suppression.test.jsx :45-59.
+// - autoDamageRoll blocked seam face ("MA-0014 inert face ... once"):
+//   MonsterCardModal.flat-hit-damage.test.jsx:152-170 — recommend adding there (report-only):
+//   console.error + exact blocked-description pins, so seam-face assertions match this producer.
+// - generic autoDamageRoll Done seam / rollDamage payloads:
+//   MonsterCardModal.auto-damage-roll.test.jsx:201-253.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
+// canRollExpression stays REAL so the Club chip arms and is genuinely clickable;
+// only rollExpression is forced null to arm the refusal branch deterministically
+// (rollExpressionDoubled never fires — popupHtml is null, wasCrit falsy).
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
   rollExpression: vi.fn(() => null),
-  rollExpressionDoubled: vi.fn(() => null),
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
@@ -18,28 +38,20 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
-  let _opts = null;
-  const mockHook = vi.fn((_monsterName, _campaignName, opts) => {
-    _opts = opts;
-    return {
+  return {
+    default: vi.fn(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
-      rollAttack: _rollAttack,
+      rollAttack: vi.fn(),
       rollDamage: _rollDamage,
       rollAbilityCheck: vi.fn(),
       rollSavingThrow: vi.fn(),
       rollSkillCheck: vi.fn(),
       rollInitiative: vi.fn(),
       quickRollPlayerSave: vi.fn(),
-    };
-  });
-  return {
-    default: mockHook,
-    _rollAttack,
+    })),
     _rollDamage,
-    __getOpts: () => _opts,
   };
 });
 
@@ -80,8 +92,6 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const rollDamage = useLoggedDiceRoll._rollDamage;
 
-const CREATURES = [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }];
-
 let consoleErrorSpy;
 
 beforeEach(() => {
@@ -93,54 +103,29 @@ afterEach(() => {
   consoleErrorSpy.mockRestore();
 });
 
-describe('MA-0014 MonsterCardModal unrollable damage', () => {
-  it('renders no clickable Eye Ray chip for unparseable formula', () => {
-    const m = makeMonster({
-      actions: [{
-        name: 'Eye Ray',
-        description: 'Ranged Spell Attack: +spell attack modifier, range 150 ft. Hit: 1d8+3+spell level Psychic damage.',
-        attack_bonus: null,
-        damage_dice_primary: '1d8+3+spell level',
-        damage_type_primary: 'Psychic',
-      }],
-    });
-    const { container } = render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES })} />);
-    const chips = [...container.querySelectorAll('.mc-dice-link')];
-    expect(chips.some(el => el.textContent.includes('spell level'))).toBe(false);
-    expect(container.textContent).toContain('Ranged Spell Attack');
-  });
-
-  it('logs automation blocked (not silence) when a clicked chip rolls null', () => {
+describe('MA-0014 MonsterCardModal press refusal', () => {
+  it('refuses a damage-chip press that resolves null: console.error + exactly one automation-blocked log, zero rollDamage', () => {
+    // Damage-only wording (no Spell/Weapon Attack token) so the MA-0286 suppression
+    // gate cannot interfere: the chip is live, the press dispatches, and the refusal
+    // is attributable to the roll seam alone (no false green on an absent chip).
     const m = makeMonster({
       actions: [{ name: 'Club', attack_bonus: null, damage_dice_primary: '1d6+2', damage_type_primary: 'Bludgeoning', description: 'Melee Attack.' }],
     });
-    const { container } = render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES })} />);
+    const { container } = render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
     const chip = [...container.querySelectorAll('.mc-dice-link')].find(el => el.textContent.includes('1d6+2'));
     expect(chip).toBeTruthy();
+
     fireEvent.click(chip);
+
     expect(rollDamage).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Goblin — Club: "1d6+2"'));
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
       type: 'automation blocked',
       characterName: 'Goblin',
       abilityName: 'Club',
-      description: expect.stringContaining('1d6+2'),
-    }));
-  });
-
-  it('logs automation blocked for unparseable auto-damage after an attack', async () => {
-    const m = makeMonster({
-      actions: [{ name: 'Eye Ray', attack_bonus: null, damage_dice_primary: '1d8+3+spell level', damage_type_primary: 'Psychic', description: 'Ranged Spell Attack.' }],
+      description: 'Goblin Club: damage formula "1d6+2" could not be rolled — GM adjudicate manually.',
+      timestamp: expect.any(Number),
     });
-    render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES })} />);
-    const opts = useLoggedDiceRoll.__getOpts();
-    await opts.autoDamageRoll({ name: 'Eye Ray', formula: '1d8+3+spell level' }, false);
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'automation blocked',
-      characterName: 'Goblin',
-      abilityName: 'Eye Ray',
-    }));
   });
 });

@@ -1,199 +1,138 @@
+// @maintained-by-ai
+// LANE: sseHandlers-overlay — createOverlayHandler BODY: setOverlays semantics for
+// spell-overlay SSE events (sseHandlers.js:10-45), behind the app's ONE shared SSE
+// connection (#app mandate). Owned elsewhere: delegate/routing byte + excluded-keys
+// tick (sseHandlers-main.test.jsx #872); Subscriber registration, mount fetch, and
+// overlay UI (initiative.overlays.test.jsx / container #865).
+//
+// Event → behavior (this file's contract):
+//   null event / no key / non-overlay prefix → zero writes (:12)
+//   spell-overlay-<foreign campaign>         → zero writes; own campaign writes (:13)
+//   add    → dedupe by id, append exact payload objects; updater returns prev when nothing new (:16-24)
+//   update → replace by id with the exact payload object, untouched otherwise (:25-32)
+//   remove → drop EVERY overlay with id === overlayId (:33-37)
+//   clear  → setOverlays([]) literal (:38-40)
+//   empty/missing overlays, missing overlayId, unknown/missing/null action → zero writes
+//
+// Old→new map (16→7): null-event + no-key + wrong-prefix→T1 · foreign-campaign→T2(+own-campaign
+// positive control) · add-unique + dedupe→T3(+prev-bailout) · update-replace + no-match→T4 ·
+// remove-one + remove-all-dupes→T5 · clear + clear-empty→T6(clear ignores prev) ·
+// remove-from-empty→cut(vacuous, same path as T5) · all guard tests→T7.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createOverlayHandler } from './sseHandlers.js';
 
+// Stub sseHandlers.js transitive imports so no real dice/log/fetch chain is reachable
+// from this lane (zero-network, #872 mock hygiene). The overlay body touches none of them.
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(),
+}));
+vi.mock('../../services/encounters/combatData.js', () => ({
+    getActiveCreatureName: vi.fn(),
+    getCombatSummary: vi.fn(),
+    setCombatSummaryCache: vi.fn(),
+}));
+vi.mock('../../services/rules/effects/expirations.js', () => ({
+    expireStaleEffects: vi.fn(),
+    applyTurnStartEffects: vi.fn(),
+    applyTurnEndConditionRemoval: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityUtils.js', () => ({
+    applyCommanderStrikeTurnEnd: vi.fn(() => Promise.resolve()),
+}));
+
+const campaignName = 'test-campaign';
+const overlayKey = `spell-overlay-${campaignName}`;
+
 describe('createOverlayHandler', () => {
     let handler;
+    let state;
     let setOverlays;
-    let prev;
+
+    const event = (data) => ({ key: overlayKey, data });
 
     beforeEach(() => {
-        vi.clearAllMocks();
-        prev = [];
-        setOverlays = vi.fn((fn) => {
-            const next = typeof fn === 'function' ? fn(prev) : fn;
-            prev = next;
-            return next;
+        state = [];
+        // Stateful fake mirroring React setState: accepts an updater fn or a literal,
+        // applies it to the current state, and records the call.
+        setOverlays = vi.fn((update) => {
+            state = typeof update === 'function' ? update(state) : update;
         });
-        handler = createOverlayHandler('test-campaign');
+        handler = createOverlayHandler(campaignName);
     });
 
-    describe('early returns', () => {
-        it('should ignore null event', () => {
-            handler(null, setOverlays);
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
-
-        it('should ignore event with no key', () => {
-            handler({ data: {} }, setOverlays);
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
-
-        it('should ignore event with key not starting with spell-overlay-', () => {
-            handler({ key: 'change-test-campaign-combatSummary' }, setOverlays);
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
-
-        it('should ignore spell-overlay events for a different campaign', () => {
-            handler({ key: 'spell-overlay-other-campaign', data: {} }, setOverlays);
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+    it('ignores events that are not the spell-overlay channel', () => {
+        handler(null, setOverlays);
+        handler({ data: { action: 'clear' } }, setOverlays);
+        handler({ key: `change-${campaignName}-combatSummary`, data: { action: 'clear' } }, setOverlays);
+        expect(setOverlays).not.toHaveBeenCalled();
+        expect(state).toEqual([]);
     });
 
-    describe('add action', () => {
-        it('should add unique overlays to the list', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'add', overlays: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] } },
-                setOverlays,
-            );
-            expect(setOverlays).toHaveBeenCalledTimes(1);
-            const result = setOverlays.mock.calls[0][0]([]);
-            expect(result).toEqual([{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]);
-        });
+    it('writes only for its own campaign overlay key', () => {
+        const addPayload = { action: 'add', overlays: [{ id: 'x', label: 'X' }] };
+        handler({ key: 'spell-overlay-other-campaign', data: addPayload }, setOverlays);
+        expect(setOverlays).not.toHaveBeenCalled();
 
-        it('should filter out duplicates by id, keeping existing entries', () => {
-            prev = [{ id: 'a', label: 'A' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'add', overlays: [{ id: 'a', label: 'A updated' }, { id: 'c', label: 'C' }] } },
-                setOverlays,
-            );
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([{ id: 'a', label: 'A' }, { id: 'c', label: 'C' }]);
-        });
-
-        it('should not call setOverlays when overlays array is empty', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'add', overlays: [] } },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
-
-        it('should not call setOverlays when data is missing overlays property', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'add' } },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+        handler(event(addPayload), setOverlays);
+        expect(setOverlays).toHaveBeenCalledTimes(1);
+        expect(state).toEqual([{ id: 'x', label: 'X' }]);
     });
 
-    describe('update action', () => {
-        it('should replace overlays matching by id', () => {
-            prev = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'update', overlays: [{ id: 'a', label: 'A updated' }] } },
-                setOverlays,
-            );
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([{ id: 'a', label: 'A updated' }, { id: 'b', label: 'B' }]);
-        });
+    it('adds only new ids, appends the exact payload objects, and returns prev when nothing is new', () => {
+        state = [{ id: 'a', label: 'A' }];
+        const fresh = { id: 'b', label: 'B' };
+        const dup = { id: 'a', label: 'A overwritten' };
 
-        it('should not change overlays with no matching id', () => {
-            prev = [{ id: 'a', label: 'A' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'update', overlays: [{ id: 'z', label: 'Z' }] } },
-                setOverlays,
-            );
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([{ id: 'a', label: 'A' }]);
-        });
+        handler(event({ action: 'add', overlays: [dup, fresh] }), setOverlays);
+        expect(state).toEqual([{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]);
+        expect(state[1]).toBe(fresh); // exact payload literal, not recomputed
+        expect(state[0]).not.toBe(dup); // existing entry wins over the duplicate
 
-        it('should not call setOverlays when overlays array is empty', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'update', overlays: [] } },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+        const before = state;
+        handler(event({ action: 'add', overlays: [{ id: 'a', label: 'again' }] }), setOverlays);
+        expect(state).toBe(before); // updater bails out on identity — no re-render churn
     });
 
-    describe('remove action', () => {
-        it('should remove the overlay matching overlayId', () => {
-            prev = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'remove', overlayId: 'b' } },
-                setOverlays,
-            );
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([{ id: 'a', label: 'A' }, { id: 'c', label: 'C' }]);
-        });
+    it('replaces matching ids with the exact payload object and leaves others untouched', () => {
+        state = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
+        const updatedA = { id: 'a', label: 'A updated' };
 
-        it('should filter out all overlays with matching overlayId', () => {
-            prev = [{ id: 'b', label: 'B' }, { id: 'b', label: 'B dup' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'remove', overlayId: 'b' } },
-                setOverlays,
-            );
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([]);
-        });
-
-        it('should not call setOverlays when overlayId is missing', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'remove' } },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
-
-        it('should call setOverlays when removing from empty array', () => {
-            prev = [];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'remove', overlayId: 'a' } },
-                setOverlays,
-            );
-            expect(setOverlays).toHaveBeenCalledTimes(1);
-            const result = setOverlays.mock.calls[0][0](prev);
-            expect(result).toEqual([]);
-        });
+        handler(event({ action: 'update', overlays: [updatedA, { id: 'z', label: 'Z' }] }), setOverlays);
+        expect(state).toEqual([{ id: 'a', label: 'A updated' }, { id: 'b', label: 'B' }]);
+        expect(state[0]).toBe(updatedA); // exact payload literal, not recomputed
+        expect(state.some((o) => o.id === 'z')).toBe(false); // unknown update id never lands
     });
 
-    describe('clear action', () => {
-        it('should clear all overlays by passing empty array to setOverlays', () => {
-            prev = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'clear' } },
-                setOverlays,
-            );
-            expect(setOverlays).toHaveBeenCalledTimes(1);
-            expect(setOverlays.mock.calls[0][0]).toEqual([]);
-        });
+    it('removes every overlay matching overlayId', () => {
+        state = [{ id: 'a' }, { id: 'b', label: 'B' }, { id: 'c' }, { id: 'b', label: 'B dup' }];
 
-        it('should clear even when existing overlays is empty', () => {
-            prev = [];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'clear' } },
-                setOverlays,
-            );
-            expect(setOverlays).toHaveBeenCalledTimes(1);
-            expect(setOverlays.mock.calls[0][0]).toEqual([]);
-        });
-
-        it('should not call setOverlays when event.data is null (action undefined)', () => {
-            prev = [{ id: 'a', label: 'A' }];
-            handler(
-                { key: 'spell-overlay-test-campaign', data: null },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+        handler(event({ action: 'remove', overlayId: 'b' }), setOverlays);
+        expect(state).toEqual([{ id: 'a' }, { id: 'c' }]);
     });
 
-    describe('unknown action', () => {
-        it('should ignore unknown action types', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: { action: 'unknown' } },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+    it('clears to a literal empty array regardless of existing state', () => {
+        state = [{ id: 'a' }, { id: 'b' }];
 
-        it('should ignore event with no action', () => {
-            handler(
-                { key: 'spell-overlay-test-campaign', data: {} },
-                setOverlays,
-            );
-            expect(setOverlays).not.toHaveBeenCalled();
-        });
+        handler(event({ action: 'clear' }), setOverlays);
+        expect(setOverlays).toHaveBeenCalledTimes(1);
+        expect(setOverlays).toHaveBeenCalledWith([]);
+        expect(state).toEqual([]);
+    });
+
+    it('never writes for malformed payloads', () => {
+        state = [{ id: 'a', label: 'A' }];
+        [
+            null,                          // data null → action undefined
+            {},                            // no action
+            { action: 'unknown' },
+            { action: 'add', overlays: [] },
+            { action: 'add' },             // missing overlays
+            { action: 'update', overlays: [] },
+            { action: 'update' },         // missing overlays
+            { action: 'remove' },         // missing overlayId
+        ].forEach((data) => handler(event(data), setOverlays));
+        expect(setOverlays).not.toHaveBeenCalled();
+        expect(state).toEqual([{ id: 'a', label: 'A' }]);
     });
 });

@@ -1,13 +1,17 @@
-// MA-1847 modal seam: the Apep "Devour the Boat (Costs 2 Actions)" row now
-// renders its OWN "DC 26 Constitution" save chip riding the shared legendary
-// gate (MA-0567 rows[1+] twin). resolveLegendaryRow refuses an armed-target
-// prerequisite failure BEFORE the spend (MA-0023 pre-spend refusal model,
-// MA-0019 evaluateTargetPrerequisiteGate helpers reused): un-grappled armed
-// target → popup + devour_the_boat_costs_2_actions_refused log, ZERO
-// legendary spend, no save prompt, no roll. Grappled armed target → spend 1
-// (advisory cost-2 stays name-text — MA-1839 engine residual) then the
-// DC 26 CON save fires with the 6d10 Piercing pool and the no_healing rider
-// armed on the save context (§233 grammar, MA-0016 hit-lane twin).
+// @maintained-by-ai
+// MA-1847 modal seam: the Apep "Devour the Boat (Costs 2 Actions)" row renders its
+// OWN "DC 26 Constitution" save chip riding the shared legendary gate (MA-0567 twin).
+// OWNED HERE (modal accept/refuse lane): chips-on-card wiring through the modal
+// (MonsterAction-level chip set + onSaveRoll payload → MonsterAction.ma1847-apep-
+// devour-the-boat-save.test.jsx:69); pre-spend refusal via evaluateTargetPrerequisite-
+// Gate — popup + devour_the_boat_costs_2_actions_refused log, ZERO spend/roll/stamp
+// (MA-0023 pre-spend model, MA-0019 gate copy owner); MA-1883 RAW cost-parsed spend
+// ("(Costs 2 Actions)" spends 2, "spends 2 legendary uses" copy — monsterLegendaryUses.
+// js:310 owner) then the DC 26 CON save ctx with the 6d10 Piercing pool + no_healing
+// rider threaded (§233 grammar; grant/choke → saveProcessing.ma1847-apep-devour-no-
+// healing.test.js); same-boundary refire → MA-0021 turn-latch refusal on the monster-
+// LegendaryUses lane (vocabulary + latch copy owners: monsterLegendaryUses.js:187-199,
+// :260-277 — cited, not re-pinned). No wall-clock timers in this lane.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -16,37 +20,25 @@ import monstersData from '../../../public/data/monsters.json';
 
 const apep = monstersData.find((m) => m.index === 'apep');
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 7, rolls: [7], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 14, rolls: [7, 7], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
 vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn(() => Promise.resolve()), get: vi.fn(() => Promise.resolve(null)) } }));
-const ROLLERS = vi.hoisted(() => ({ rollAttack: null, rollDamage: null, rollSavingThrow: null }));
+const ROLLERS = vi.hoisted(() => ({ rollAttack: null, rollSavingThrow: null }));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const rollAttack = vi.fn();
-  const rollDamage = vi.fn();
   const rollSavingThrow = vi.fn();
   ROLLERS.rollAttack = rollAttack;
-  ROLLERS.rollDamage = rollDamage;
   ROLLERS.rollSavingThrow = rollSavingThrow;
   return { default: vi.fn(() => ({
     get popupHtml() { return _popupHtml; },
     setPopupHtml: _setPopupHtml,
-    rollAttack, rollDamage, rollAbilityCheck: vi.fn(),
+    rollAttack, rollDamage: vi.fn(), rollAbilityCheck: vi.fn(),
     rollSavingThrow, rollSkillCheck: vi.fn(), rollInitiative: vi.fn(), quickRollPlayerSave: vi.fn(),
   })), _setPopupHtml, _resetPopup: () => { _popupHtml = null; } };
 });
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ noAdvantageAgainst: false, targetDisadvantageCount: 0, riderSaveDisadvantage: false, riderAttackBonus: 0, riderCannotOpportunityAttack: false, speedZero: false })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
 const ctx = vi.hoisted(() => ({ value: { round: 1, activeCreatureName: 'ElderPaladin', creatures: [] } }));
 const armed = vi.hoisted(() => ({ target: null }));
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
@@ -56,12 +48,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
-}));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 30),
 }));
 vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
@@ -90,19 +76,25 @@ const CREATURES = [
   { name: 'ElderPaladin', type: 'player', currentHp: 175, maxHp: 175, conditions: [] },
 ];
 
-function renderApep(uses) {
-  runtime.store['Apep 1.monsterLegendaryUses'] = uses;
+function renderApep() {
+  runtime.store['Apep 1.monsterLegendaryUses'] = { max: 3, used: 0 };
   runtime.store['Apep 1._legendaryUses_usedRound'] = null;
   ctx.value = { round: 2, activeCreatureName: 'ElderPaladin', creatures: CREATURES };
   const m = makeMonster({ name: 'Apep', legendary_actions: apep.legendary_actions });
   render(<MonsterCardModal {...makeProps(m, { creatureName: 'Apep 1', creatures: CREATURES })} />);
 }
 
-function devourChip() {
+function devourRow() {
   const rows = [...document.querySelectorAll('.mc-action')].filter((r) => r.querySelector('strong')?.textContent.startsWith('Devour the Boat'));
-  expect(rows.length).toBeGreaterThan(0);
-  return rows[0].querySelector('.mc-dice-link-save-clickable');
+  expect(rows.length).toBe(1);
+  return rows[0];
 }
+
+function devourChip() {
+  return devourRow().querySelector('.mc-dice-link-save-clickable');
+}
+
+const devourLogs = () => addEntry.mock.calls.map((c) => c[1]);
 
 describe('MA-1847 Devour chip rides the legendary gate with its own save', () => {
   beforeEach(() => {
@@ -113,62 +105,61 @@ describe('MA-1847 Devour chip rides the legendary gate with its own save', () =>
   });
 
   it('row renders its own 6d10 + DC 26 Constitution chips on the card (no Expend chip, no delegated attack chip)', () => {
-    renderApep({ max: 3, used: 0 });
-    const row = [...document.querySelectorAll('.mc-action')].find((r) => r.querySelector('strong')?.textContent.startsWith('Devour the Boat'));
-    const chips = [...row.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
+    renderApep();
+    const chips = [...devourRow().querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
     expect(chips).toEqual(['6d10', 'DC 26 Constitution']);
   });
 
-  it('UN-grappled armed target: refused BEFORE the spend — popup + refused log, zero LA, no save', async () => {
+  it('UN-grappled armed target: refused BEFORE the spend — popup + devour_the_boat_costs_2_actions_refused log, zero LA, no stamp, no save', async () => {
     runtime.store['ElderPaladin.activeConditions'] = [];
     runtime.store['ElderPaladin.activeConditionMeta'] = {};
-    renderApep({ max: 3, used: 0 });
+    renderApep();
     fireEvent.click(devourChip());
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Prerequisite Not Met');
-    await waitFor(() => expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(true));
+    await waitFor(() => expect(devourLogs().some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(true));
     expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 0 });
+    expect(runtime.store['Apep 1._legendaryUses_usedRound']).toBeNull(); // refused press stamps no turn latch
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.type === 'ability_use')).toBe(false);
+    expect(devourLogs().some((e) => e.type === 'ability_use')).toBe(false);
   });
 
-  it('grappled armed target: spends 2 (MA-1883 cost-parsed RAW cost), DC 26 CON save fires with 6d10 Piercing + no_healing rider armed', async () => {
+  it('grappled armed target: spends 2 (MA-1883 RAW cost), DC 26 CON save ctx carries 6d10 Piercing + no_healing rider; same-boundary refire refuses on the turn latch, no second save', async () => {
     runtime.store['ElderPaladin.activeConditions'] = ['grappled'];
     runtime.store['ElderPaladin.activeConditionMeta'] = { grappled: { dc: 26, source: 'Apep 1' } };
-    renderApep({ max: 3, used: 0 });
+    renderApep();
     fireEvent.click(devourChip());
 
-    // MA-1883: "(Costs 2 Actions)" now pays its RAW cost (was spends-1 floor).
+    // MA-1883: "(Costs 2 Actions)" pays its RAW cost with the honest multi-spend copy.
     await waitFor(() => expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalled());
+    expect(runtime.store['Apep 1._legendaryUses_usedRound']).toEqual({ round: 2, activeCreature: 'ElderPaladin' });
+    const spend = devourLogs().find((e) => e.type === 'ability_use');
+    expect(spend.abilityName).toBe('Devour the Boat (Costs 2 Actions)');
+    expect(spend.description).toMatch(/spends 2 legendary uses/);
+    expect(devourLogs().some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(false);
+
+    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
     const call = ROLLERS.rollSavingThrow.mock.calls[0];
-    expect(String(call[0]).toUpperCase()).toContain('CON');
+    expect(call[0]).toBe('CON');
     expect(call[2]).toMatchObject({
+      attackerName: 'Apep 1',
+      actionName: 'Devour the Boat (Costs 2 Actions)',
       saveDc: 26,
+      saveType: 'Constitution',
       targetName: 'ElderPaladin',
       autoDamageFormula: '6d10',
       autoDamageDamageType: 'Piercing',
       dcSuccess: 'half',
       saveTargetEffect: { effect: 'no_healing' },
     });
-    const spend = addEntry.mock.calls.map((c) => c[1]).find((e) => e.type === 'ability_use');
-    expect(spend.abilityName).toBe('Devour the Boat (Costs 2 Actions)');
-    expect(spend.description).toContain('Devour the Boat (Costs 2 Actions)');
-    expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(false);
-  });
 
-  it('same-boundary refire after spend: honest turn-latch refusal, no second save', async () => {
-    runtime.store['ElderPaladin.activeConditions'] = ['grappled'];
-    runtime.store['ElderPaladin.activeConditionMeta'] = { grappled: { dc: 26, source: 'Apep 1' } };
-    renderApep({ max: 3, used: 0 });
+    // Same-boundary refire: turn-latch refusal BEFORE any re-check (MA-0021 lane),
+    // zero extra spend, no second victim save, no devour refusal vocabulary.
     fireEvent.click(devourChip());
-    await waitFor(() => expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1));
-    fireEvent.click(devourChip());
-    // MA-1883: RAW cost 2 paid on the first press (used 2, 1 left); the
-    // same-boundary refire refuses on the turn latch (MA-1847 vocabulary).
-    await waitFor(() => expect(addEntry.mock.calls.map((c) => c[1]).some((e) => e.automationType === 'legendary_use_refused' && /refused \(turn\)/.test(e.description))).toBe(true));
+    await waitFor(() => expect(devourLogs().some((e) => e.automationType === 'legendary_use_refused' && /refused \(turn\)/.test(String(e.description)))).toBe(true));
     expect(runtime.store['Apep 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
     expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(1);
+    expect(devourLogs().some((e) => e.automationType === 'devour_the_boat_costs_2_actions_refused')).toBe(false);
   });
 });

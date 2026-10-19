@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1958 data lock: Orcus Spellcasting rode the MA-0421/MA-1879 twin
 // markup-gap template. Pre-fix the WHOLE description was plain text —
 // extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses
@@ -9,13 +10,30 @@
 // for rows named "Spellcasting" — MA-0532/§118). DATA fix, markup-only:
 // house-style <strong>Tier:</strong> <em>Spell</em> INLINE (originally-inline
 // prose, no <br> — demogorgon MA-1879 byte-shape twin, same DC 23 tier
-// ladder), strip-tags byte-equality pinned. save_dc 23 + save_type "Wisdom"
-// pair byte-untouched per ticket scope (§89 pair present; the row-level DC
-// rides every chip's cast adjudication via buildMonsterSpellCastLog — the
-// §1883-style prose-ability save_type adjudication is a separate axis, not
-// this ticket). All three names resolve in BOTH spell indexes with zero
-// dc/attack_type → chips are advisory-cast affordances with uses gates
-// (§204 lane); DC 23 = 8 + PB 8 + CHA +7 (prose ability Charisma).
+// ladder), emphasis-census + strip-tags byte-equality pinned. All three names
+// resolve in BOTH spell indexes with zero dc/attack_type → chips are
+// advisory-cast affordances with uses gates (§204 lane); DC 23 rides every
+// chip's cast record via buildMonsterSpellCastLog.
+// SOURCE axis, not this ticket: row save_type "Wisdom" contradicts the row's
+// OWN prose ("using Charisma as the spellcasting ability", WIS +5 → 8+8+5=21
+// ≠ 23; CHA +7 → 23) — the MA-1883 prose-ability adjudication axis; bytes
+// pinned as-is (§89 pair present, byte-untouched per ticket scope).
+// Cited owners, not absorbed here: generic counter badge :275, spend/refusal
+// bytes :281-302, At-Will advisory/null-store :317/:561, store independence
+// :522-548, Spellcasting-row no-save-shell :192 — all
+// MonsterCardModal.spellcasting.test.jsx; Orcus wand lane (item-cast seam,
+// DC 18, charges advisory) is ma1959-orcus-wand-spellcasting.test.jsx on the
+// SAME card — spellbook rows only here; canonical legendary-uses lane
+// :190-212/:304-326. THIS file owns only this row's spell bytes + the
+// 3/Day+1/Day gated modal lane.
+// Mock hygiene (#739-#748): diceRoller purged — all three Orcus spellbook
+// spells damage-less (no rollExpression consumer in this lane); rangeValidation
+// purged (pure parsers); mapsService purged (mapName=null short-circuits at
+// modal :2132); abilityLookup purged (not imported by the modal tree);
+// useLoggedDiceRoll popup-capture/roll exports purged (no test consumes them).
+// Kept: logService (assertion target), sanitize (body render), dataLoader
+// §177 below, conditionEffects + damageUtils (getCombatContext fires at
+// :2125), runtime store.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -35,6 +53,7 @@ const AT_WILL = ['Detect Magic'];
 const THREE_DAY = ['Dispel Magic'];
 const ONE_DAY = ['Time Stop'];
 const HEADERS = ['At Will:', '3/Day:', '1/Day:'];
+const USES_KEY = 'monsterSpellUses';
 
 // Pre-fix plain baseline (git HEAD, monsters.json): identical text, names and
 // tier headers unmarked.
@@ -42,12 +61,6 @@ const PRE_FIX_DESCRIPTION = 'Orcus casts one of the following spells, requiring 
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Orcus 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -64,37 +77,19 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? SPELLS_2024 : SPELLS_5E)),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
-
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
-  };
-});
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    rollAbilityCheck: vi.fn(),
+    rollSavingThrow: vi.fn(),
+    rollSkillCheck: vi.fn(),
+    rollInitiative: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
+  })),
+}));
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
@@ -111,26 +106,10 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
-}));
-
 const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -173,42 +152,24 @@ function renderOrcus() {
 // ── Data lock: Orcus Spellcasting row ─────────────────────────────────────────
 
 describe('MA-1958 monsters.json data lock: Orcus Spellcasting row', () => {
-  it('extracts all three spell names as chips — tier headers ending ":" skipped', () => {
+  it('extractors exact-map: three <em> names in authored order (colon headers skipped); 3/Day: binds Dispel Magic, 1/Day: binds Time Stop, At Will ungated (§58/§251)', () => {
     const names = extractSpellNamesFromSpellcasting(orcusRow.description);
     expect(names).toEqual(CHIP_NAMES);
     HEADERS.forEach(h => expect(names).not.toContain(h.replace(/:$/, '')));
-  });
-
-  it('usage tokens arm: 3/Day: binds Dispel Magic, 1/Day: binds Time Stop, At Will ungated (§58/§251)', () => {
     expect(extractSpellcastingSpellUses(orcusRow.description)).toEqual({
       'Dispel Magic': 3,
       'Time Stop': 1,
     });
   });
 
-  it('row-level numeric save_dc 23 + save_type "Wisdom" pair byte-untouched (§89 pair present; save_type adjudication is MA-1883-scope, not this ticket)', () => {
+  it('row-level numeric save_dc 23 + save_type "Wisdom" pair byte-untouched (§89 pair present; prose says Charisma — MA-1883-scope adjudication axis, not this ticket)', () => {
     expect(orcusRow.save_dc).toBe(23);
     expect(orcusRow.save_type).toBe('Wisdom');
-    expect(orcusRow.description).toMatch(/spell save DC 23/);
-    // prose ability is Charisma: DC 23 = 8 + PB 8 + CHA +7
-    expect(orcus.proficiency_bonus).toBe(8);
-    expect(orcus.ability_score_modifiers.cha).toBe(7);
-    expect(8 + orcus.ability_score_modifiers.cha + orcus.proficiency_bonus).toBe(23);
   });
 
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
-    expect(stripTags(orcusRow.description)).toBe(PRE_FIX_DESCRIPTION);
-  });
-
-  it('house style: tier headers <strong>-wrapped ending ":", spell names <em>-wrapped inline, no <br> (demogorgon MA-1879 twin)', () => {
-    expect(orcusRow.description).not.toMatch(/<br>/);
-    HEADERS.forEach(h => expect(orcusRow.description).toContain(`<strong>${h}</strong>`));
-    CHIP_NAMES.forEach(n => expect(orcusRow.description).toContain(`<em>${n}</em>`));
-  });
-
-  it('emphasis census: ONLY the three tier headers + three spell names carry markup — no §161 fake-chip decoys', () => {
-    const tokens = (orcusRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
-    expect(tokens).toEqual([
+  it('markup-only house style: emphasis census exact (three <strong> ":" headers + three <em> names, no decoys §161), no <br>, stripped text byte-exact pre-fix baseline; all three names resolve in BOTH indexes with zero dc/attack_type — advisory cast lane (§204)', () => {
+    const desc = orcusRow.description;
+    expect(desc.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g)).toEqual([
       '<strong>At Will:</strong>',
       '<em>Detect Magic</em>',
       '<strong>3/Day:</strong>',
@@ -216,9 +177,8 @@ describe('MA-1958 monsters.json data lock: Orcus Spellcasting row', () => {
       '<strong>1/Day:</strong>',
       '<em>Time Stop</em>',
     ]);
-  });
-
-  it('all three spells exist in BOTH 5e and 2024 indexes with zero dc/attack_type — advisory cast lane, no save prompts (§204)', () => {
+    expect(desc).not.toMatch(/<br>/);
+    expect(stripTags(desc)).toBe(PRE_FIX_DESCRIPTION);
     CHIP_NAMES.forEach(n => {
       const s = spells5e.find(sp => sp.name === n);
       expect(s).toBeDefined();
@@ -227,13 +187,9 @@ describe('MA-1958 monsters.json data lock: Orcus Spellcasting row', () => {
       expect(spells2024.some(sp => sp.name === n)).toBe(true);
     });
   });
-
-  it('no 2024 monsters.json twin exists — single-file fix scope (§3)', () => {
-    expect(() => readFileSync('public/data/2024/monsters.json', 'utf8')).toThrow();
-  });
 });
 
-// ── Modal: three chips, counters rendered, usage gates live ───────────────────
+// ── Modal: three chips with counters, usage gates live ────────────────────────
 
 describe('MA-1958 MonsterCardModal Orcus Spellcasting chips', () => {
   beforeEach(() => {
@@ -241,65 +197,46 @@ describe('MA-1958 MonsterCardModal Orcus Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders three spell chips — the zero-chip inert row is gone', () => {
+  it('renders the three spell chips in authored order — counters on the 3/Day + 1/Day names only, the zero-chip inert row is gone', () => {
     renderOrcus();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(CHIP_NAMES);
-    expect(spellLinks().length).toBe(3);
-  });
-
-  it('the 3/Day and 1/Day names carry counters; the At Will name does not', () => {
-    renderOrcus();
     THREE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(3\/Day · 3 left\)/));
     ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
     AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
   });
 
-  it('At-Will Detect Magic casts ungated twice — zero uses, advisory log prints row DC 23 (§204)', async () => {
+  it('At-Will Detect Magic casts ungated twice — zero uses stored, log prints row DC 23 (§204)', async () => {
     renderOrcus();
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
     expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/spell save DC 23/);
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`] ?? null).toBeNull();
   });
 
-  it('Dispel Magic 3/Day gate live (§58): three casts spend 1→2→3, fourth refused zero extra spend', async () => {
+  it('usage gates live (§58): Dispel Magic spends 1→2→3 then fourth refused; Time Stop spends its 1/Day then refire refused — refusals name the spell, zero extra spend', async () => {
     renderOrcus();
-    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 1 });
+    for (let cast = 1; cast <= 3; cast++) {
+      await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
+      await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(cast));
+      expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Dispel Magic': cast });
+    }
     expect(abilityUseEntries('Dispel Magic')[0].description).toMatch(/spell save DC 23/);
-
-    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 2 });
-
-    await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
-    await waitFor(() => expect(abilityUseEntries('Dispel Magic').length).toBe(3));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 3 });
 
     await act(async () => { fireEvent.click(linkByText('Dispel Magic')); });
     await waitFor(() => expect(refusalEntries('Dispel Magic').length).toBe(1));
     expect(abilityUseEntries('Dispel Magic').length).toBe(3);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Dispel Magic': 3 });
-  });
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Dispel Magic': 3 });
 
-  it('Time Stop 1/Day gate live: cast spends the single use, second refused — zero extra spend', async () => {
-    renderOrcus();
     await act(async () => { fireEvent.click(linkByText('Time Stop')); });
     await waitFor(() => expect(abilityUseEntries('Time Stop').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Time Stop': 1 });
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Dispel Magic': 3, 'Time Stop': 1 });
     expect(abilityUseEntries('Time Stop')[0].description).toMatch(/1\/Day use spent/);
 
     await act(async () => { fireEvent.click(linkByText('Time Stop')); });
     await waitFor(() => expect(refusalEntries('Time Stop').length).toBe(1));
     expect(abilityUseEntries('Time Stop').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Time Stop': 1 });
-  });
-
-  it('no save shells on this card — Spellcasting row XOR keeps the row DC unrendered (§676/MA-1294)', () => {
-    renderOrcus();
-    expect(document.querySelectorAll('.mc-dice-link-save-clickable').length).toBe(0);
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Dispel Magic': 3, 'Time Stop': 1 });
   });
 });

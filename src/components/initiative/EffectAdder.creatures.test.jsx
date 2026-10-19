@@ -1,79 +1,80 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EffectAdder from './EffectAdder.jsx';
 
-describe('EffectAdder - creature names sorting', () => {
+// Lane: CREATURES-selection UI — how the `creatures` prop composes the
+// effects-tab "Source (who caused this)" dropdown (exact census BY NAME).
+// NOT owned here: tab/overlay machinery (rendering.test.jsx), config field
+// defaults + onApply payload flow incl. source byte mapping and custom
+// "Other…" input (effects-config.test.jsx), conditions dispatch (#856),
+// concentration dispatch (#855), handler write-side landing (#839).
+// Old -> new: sort + filter-nullish + dedupe + special-chars censuses ->
+// single exact-option census (#1); empty/undefined/null honesty kept (#2);
+// whitespace-name truthiness characterization removed (impl detail of
+// `.filter(Boolean)`, not authored game data).
+
+const openGoadSourceConfig = () => {
+  // 'Goad' declares fields: ['source'] — the only combobox in the config view.
+  fireEvent.click(screen.getByRole('button', { name: 'Goad' }));
+};
+
+const sourceOptionValues = () =>
+  Array.from(screen.getByRole('combobox').options).map(o => o.value);
+
+describe('EffectAdder - creatures populate the source dropdown', () => {
   let props;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     props = {
       targetName: 'Goblin',
-      initialTab: 'conditions',
+      initialTab: 'effects',
       onCancel: vi.fn(),
       onApply: vi.fn(),
-      creatures: [
-        { name: 'Alice' },
-        { name: 'Bob' },
-        { name: 'Dragon' },
-      ],
     };
   });
 
-  it('should sort creature names alphabetically in source dropdown', () => {
-    const sortedProps = {
-      ...props,
-      creatures: [
-        { name: 'Zombie' },
-        { name: 'Alice' },
-        { name: 'Dragon' },
-        { name: 'Bob' },
-      ],
-    };
-    render(<EffectAdder {...sortedProps} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
-    const select = screen.getByRole('combobox');
-    const options = Array.from(select.querySelectorAll('option')).map(o => o.value);
-    expect(options).toEqual(['', 'Alice', 'Bob', 'Dragon', 'Zombie', '__other__']);
-  });
+  it('lists unique creature names alphabetically, dropping nameless entries, with default preselection', () => {
+    render(
+      <EffectAdder
+        {...props}
+        creatures={[
+          { name: 'Zombie' },
+          { name: 'Bob' },
+          { name: 'Alice' },
+          { name: 'Alice' }, // duplicate collapses to one option
+          { name: null }, // nameless entries are dropped
+          { name: undefined },
+          { name: '' },
+          { name: "Dreadnought's Bane" }, // special characters pass through
+          { name: 'Elf-Prince' },
+        ]}
+      />
+    );
+    openGoadSourceConfig();
 
-  it('should filter out creatures with no name', () => {
-    const filteredProps = {
-      ...props,
-      creatures: [
-        { name: 'Alice' },
-        { name: null },
-        { name: undefined },
-        { name: '' },
-        { name: 'Bob' },
-      ],
-    };
-    render(<EffectAdder {...filteredProps} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
     const select = screen.getByRole('combobox');
-    const values = Array.from(select.querySelectorAll('option')).map(o => o.value);
-    expect(values).toContain('Alice');
-    expect(values).toContain('Bob');
-    expect(values.filter(v => v !== '' && v !== '__other__')).toEqual(['Alice', 'Bob']);
-  });
-
-  it('should deduplicate creature names', () => {
-    const dupProps = {
-      ...props,
-      creatures: [
-        { name: 'Alice' },
-        { name: 'Alice' },
-        { name: 'Bob' },
-      ],
-    };
-    render(<EffectAdder {...dupProps} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
-    const select = screen.getByRole('combobox');
-    const aliceOptions = Array.from(select.querySelectorAll('option')).filter(o => o.value === 'Alice');
-    expect(aliceOptions).toHaveLength(1);
+    expect(sourceOptionValues()).toEqual([
+      '',
+      'Alice',
+      'Bob',
+      "Dreadnought's Bane",
+      'Elf-Prince',
+      'Zombie',
+      '__other__',
+    ]);
+    // Option labels show the creature name byte-for-byte.
+    expect(Array.from(select.options).map(o => o.textContent)).toEqual([
+      'Select source…',
+      'Alice',
+      'Bob',
+      "Dreadnought's Bane",
+      'Elf-Prince',
+      'Zombie',
+      'Other…',
+    ]);
+    // No authored default source for Goad — nothing preselected.
+    expect(select).toHaveValue('');
   });
 
   it.each`
@@ -81,54 +82,10 @@ describe('EffectAdder - creature names sorting', () => {
     ${[]}
     ${undefined}
     ${null}
-  `('should handle empty/undefined/null creatures gracefully', ({ creatures }) => {
-    const testProps = { ...props, creatures };
-    render(<EffectAdder {...testProps} initialTab='conditions' />);
+  `('offers only placeholder options when creatures is $creatures', ({ creatures }) => {
+    render(<EffectAdder {...props} creatures={creatures} />);
+    openGoadSourceConfig();
     expect(document.querySelector('.ea-modal')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
-    const select = screen.getByRole('combobox');
-    const options = Array.from(select.querySelectorAll('option')).map(o => o.value);
-    expect(options).toEqual(['', '__other__']);
-  });
-
-  it('should include whitespace-only creature names as truthy strings', () => {
-    const whitespaceProps = {
-      ...props,
-      creatures: [
-        { name: 'Alice' },
-        { name: '   ' },
-        { name: '\t' },
-        { name: 'Bob' },
-      ],
-    };
-    render(<EffectAdder {...whitespaceProps} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
-    const select = screen.getByRole('combobox');
-    const values = Array.from(select.querySelectorAll('option')).map(o => o.value);
-    expect(values).toContain('Alice');
-    expect(values).toContain('Bob');
-    expect(values).toContain('   ');
-    expect(values).toContain('\t');
-  });
-
-  it('should include creature names with special characters', () => {
-    const specialProps = {
-      ...props,
-      creatures: [
-        { name: "Dragon's Lair" },
-        { name: 'Elf-Prince' },
-        { name: 'Wizard_1' },
-      ],
-    };
-    render(<EffectAdder {...specialProps} initialTab='conditions' />);
-    fireEvent.click(screen.getByRole('button', { name: 'Effects' }));
-    fireEvent.click(screen.getByText('Goad'));
-    const select = screen.getByRole('combobox');
-    const values = Array.from(select.querySelectorAll('option')).map(o => o.value);
-    expect(values).toContain("Dragon's Lair");
-    expect(values).toContain('Elf-Prince');
-    expect(values).toContain('Wizard_1');
+    expect(sourceOptionValues()).toEqual(['', '__other__']);
   });
 });

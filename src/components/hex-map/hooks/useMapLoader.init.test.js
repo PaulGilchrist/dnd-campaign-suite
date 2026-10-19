@@ -1,28 +1,41 @@
+// @maintained-by-ai
+/*
+ * useMapLoader — init lane (observable state before any load resolves).
+ *
+ * Owns here: while the initial load is pending the hook reports loading with
+ * no map data and persists nothing (pins the hasLoaded mount-save guard at
+ * :189), and ref state is seeded from the mount props before any load lands.
+ *
+ * Lane map (do NOT duplicate across these files):
+ * - post-load setters + envelope persistence        -> useMapLoader.api.test.js
+ * - mount/load args + loaded-field application      -> useMapLoader.loadExisting.test.js
+ * - create-new-map bytes (real config defaults)     -> useMapLoader.createNew.test.js
+ * - travelInit derivation from loaded travelState   -> useMapLoader.travelState.test.js
+ *
+ * Trimmed vs prior version: pre-load numeric/collection defaults
+ * (gridSize/zoom/pan/terrain/rivers/roads/pois/marchingOrder/partyPosition/
+ * weather/travelInit/travelSaveVersion) were raw useState literal
+ * pass-throughs — gridSize/zoom pinned the fixture-mocked config numbers
+ * (tautological) and the same defaults are proven end-to-end with real
+ * config bytes in useMapLoader.createNew.test.js and applied-from-load in
+ * useMapLoader.loadExisting.test.js. Removed: 4 default pass-through
+ * assertions, 2 tests consolidated into 1.
+ *
+ * Honest scoping notes (known source bugs, not masked here): fixtures use a
+ * constant mapName, so the never-reset isInitialized (:161) and stale
+ * hexMapNameRef (:210/:190) on a mapName change are not exercised; the
+ * pending-load promise makes the :188-210 mount-save race observable via the
+ * hasLoaded guard, which this lane pins.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
 
+// Fake only the transport seam — config, hexKey, and travelService run real
+// (none of them execute while the load is pending, so no fixture drift).
 vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
     saveMapData: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../services/maps/hexMapUtils.js', () => ({
-    hexKey: vi.fn((q, r) => `${q},${r}`),
-}));
-
-vi.mock('../../../services/campaign/travelService.js', () => ({
-    getDailyHexBudget: vi.fn((paceId) => {
-        const budgets = { slow: 2, normal: 4, fast: 6 };
-        return budgets[paceId] ?? 4;
-    }),
-}));
-
-vi.mock('../../../config/outdoorConfig.js', () => ({
-    DEFAULT_GRID_SIZE: 10,
-    GRID_COLS_MULTIPLIER: 2,
-    MIN_ZOOM: 2,
-    DEFAULT_TERRAIN: 'plains',
 }));
 
 import * as mapsService from '../../../services/maps/mapsService.js';
@@ -44,40 +57,12 @@ describe('useMapLoader - initial state before load completes', () => {
         vi.clearAllMocks();
     });
 
-    it('stays in loading state with no map data while the load is pending', () => {
+    it('reports loading with no map data and persists nothing while the load is pending', () => {
         const { result } = renderWithPendingLoad();
 
         expect(result.current.loading).toBe(true);
         expect(result.current.mapData).toBeNull();
-    });
-
-    it('does not persist anything while the load is pending', () => {
-        renderWithPendingLoad();
-
         expect(mapsService.saveMapData).not.toHaveBeenCalled();
-    });
-
-    it('exposes default map configuration before the load completes', () => {
-        const { result } = renderWithPendingLoad();
-
-        expect(result.current.gridSize).toBe(10);
-        expect(result.current.zoom).toBe(2);
-        expect(result.current.panX).toBe(0);
-        expect(result.current.panY).toBe(0);
-        expect(result.current.terrain).toEqual({});
-        expect(result.current.rivers).toEqual([]);
-        expect(result.current.roads).toEqual([]);
-        expect(result.current.pois).toEqual([]);
-    });
-
-    it('exposes default party, travel, and weather state before the load completes', () => {
-        const { result } = renderWithPendingLoad();
-
-        expect(result.current.marchingOrder).toEqual([]);
-        expect(result.current.partyPosition).toBeNull();
-        expect(result.current.weather).toBeNull();
-        expect(result.current.travelInit).toBeNull();
-        expect(result.current.travelSaveVersion).toBe(0);
     });
 
     it('seeds refs from the given props before the load completes', () => {

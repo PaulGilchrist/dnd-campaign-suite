@@ -1,11 +1,27 @@
+// @maintained-by-ai
 // MA-0104: banished_demiplane te renders its own badge (monster legendary
-// Banish) — honest non-concentration tooltip, distinct from the PC spell
-// `banishment` badge. Wrong target excluded; GM-removable on localhost.
-import { render, screen } from '@testing-library/react';
+// Banish, Adult Gold Dragon) — honest non-concentration tooltip, distinct
+// from the PC spell `banishment` badge. GM removal filters only this te and
+// leaves a same-target banishment te in place.
+//
+// Lane ownership (do not re-pin here):
+// - Badge render mechanics / localhost gating / counts: CreatureBadge +
+//   ConditionEffectBadges.auras.test.jsx (#820).
+// - Wrong-target exclusion via findDirect: the generic machinery is covered
+//   by ConditionEffectBadges.control-spells.test.jsx:115-121 and
+//   auras.test.jsx:84-87 — banished_demiplane shares the identical
+//   findDirect shape (jsx:457), so no wrong-target pin here.
+// - Generic target_effect remove-click dispatch:
+//   ConditionEffectBadges.target-effect-removal.test.jsx:104-138 (tests
+//   'banishment' there; the banished_demiplane payload pin lives here).
+// - PC spell banishment permanent/concentration tooltips:
+//   ConditionEffectBadges.control-spells.test.jsx:180-195.
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
+import { getEffectDefinition } from '../../services/combat/conditions/targetEffectDefinitions.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => new Map()),
@@ -15,10 +31,9 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/ui/storage.js', () => ({
-    default: { set: vi.fn() },
-}));
-
+// Isolate the banish lane: badge presence is driven purely by the
+// targetEffects array, not by derived condition aggregation (owned by
+// ConditionEffectBadges.test.jsx).
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
     computeConditionEffects: vi.fn(() => ({})),
 }));
@@ -27,16 +42,23 @@ const CREATURE_NAME = 'ElderPaladin';
 const CAMPAIGN_NAME = 'test-campaign';
 const DRAGON = 'Adult Gold Dragon 1';
 
-function renderWithTargetEffect(targetEffect) {
-    getRuntimeValue.mockImplementation((name, key) => {
-        if (name === CREATURE_NAME && key === 'activeBuffs') return [];
-        return null;
-    });
+// The te shape saveProcessing writes on a failed dragon Banish save.
+const demiplaneTe = (target = CREATURE_NAME) => ({
+    target,
+    effect: 'banished_demiplane',
+    source: DRAGON,
+    duration: 'until_start_of_attacker_next_turn',
+});
+
+function renderBadges(targetEffects) {
+    getRuntimeValue.mockImplementation((name, key) =>
+        name === 'campaign' && key === 'targetEffects' ? targetEffects : null
+    );
     computeConditionEffects.mockReturnValue({});
     return render(
         <ConditionEffectBadges
             conditions={[]}
-            targetEffects={targetEffect ? [targetEffect] : []}
+            targetEffects={targetEffects}
             creatureName={CREATURE_NAME}
             campaignName={CAMPAIGN_NAME}
             isLocalhost={true}
@@ -47,27 +69,50 @@ function renderWithTargetEffect(targetEffect) {
 describe('MA-0104 ConditionEffectBadges banished_demiplane badge', () => {
     beforeEach(() => { vi.clearAllMocks(); });
 
-    it('renders the Banished (Demiplane) badge with honest dragon-turn tooltip', () => {
-        renderWithTargetEffect({ effect: 'banished_demiplane', target: CREATURE_NAME, source: DRAGON, duration: 'until_start_of_attacker_next_turn' });
-        const badge = screen.getByText('Banished (Demiplane)');
-        expect(badge).toBeInTheDocument();
-        const title = badge.closest('[title]')?.getAttribute('title') || badge.closest('button')?.getAttribute('title');
-        expect(title).toMatch(/Banished by Adult Gold Dragon 1/);
-        expect(title).toMatch(/demiplane/i);
-        expect(title).toMatch(/until the start of the dragon's next turn/i);
-        expect(title).toMatch(/120 f/i);
-        expect(title).toMatch(/GM-enforced/i);
-        expect(title).not.toMatch(/concentration/i);
+    it('renders the monster Banish badge with exact registry bytes and an honest non-concentration tooltip', () => {
+        const def = getEffectDefinition('banished_demiplane');
+        renderBadges([demiplaneTe()]);
+
+        // Exactly one badge, exactly one GM remove — nothing else leaked in.
+        expect(screen.getAllByTestId('creature-badge')).toHaveLength(1);
+        expect(screen.getAllByTitle('Remove effect')).toHaveLength(1);
+
+        const badge = screen.getByText(def.label);
+        expect(badge.className).toBe(`creature-badge ${def.cls}`);
+        expect(badge.querySelector('i').className).toBe(`fa-solid ${def.icon}`);
+
+        const tooltip = badge.getAttribute('title');
+        expect(tooltip).toContain(`Banished by ${DRAGON}`);
+        expect(tooltip).toContain('demiplane');
+        expect(tooltip).toContain("until the start of the dragon's next turn");
+        expect(tooltip).toContain('120 ft');
+        expect(tooltip).toContain('GM-enforced');
+        // MA-0104 honesty contract: monster legendary Banish is NOT
+        // concentration (unlike the PC spell badge owned by control-spells).
+        expect(tooltip).not.toMatch(/concentration/i);
     });
 
-    it('does not render for a wrong target', () => {
-        renderWithTargetEffect({ effect: 'banished_demiplane', target: 'SomeoneElse', source: DRAGON });
-        expect(screen.queryByText('Banished (Demiplane)')).not.toBeInTheDocument();
-    });
+    it('is a distinct te from PC spell banishment — both badges render, and removing Demiplane spares Banished', () => {
+        const def = getEffectDefinition('banished_demiplane');
+        const pcBanishment = { target: CREATURE_NAME, effect: 'banishment', source: 'Cleric' };
+        const bystander = { target: 'SomeoneElse', effect: 'banishment', source: 'Cleric' };
+        renderBadges([demiplaneTe(), pcBanishment, bystander]);
 
-    it('PC spell banishment still renders its own distinct badge', () => {
-        renderWithTargetEffect({ effect: 'banishment', target: CREATURE_NAME, source: 'Cleric' });
+        // Two distinct badges, never conflated (exact count).
+        expect(screen.getAllByTestId('creature-badge')).toHaveLength(2);
+        expect(screen.getByText(def.label)).toBeInTheDocument();
         expect(screen.getByText('Banished')).toBeInTheDocument();
-        expect(screen.queryByText('Banished (Demiplane)')).not.toBeInTheDocument();
+
+        // GM remove on the Demiplane badge posts its own effectType filter:
+        // the same-target PC banishment te and the bystander te survive.
+        const demiplaneRemove = screen.getByText(def.label)
+            .parentElement.querySelector('.creature-badge-remove');
+        fireEvent.click(demiplaneRemove);
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'targetEffects',
+            [pcBanishment, bystander],
+            CAMPAIGN_NAME
+        );
     });
 });

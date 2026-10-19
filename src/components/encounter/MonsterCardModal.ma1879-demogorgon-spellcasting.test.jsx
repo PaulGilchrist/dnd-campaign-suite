@@ -1,19 +1,27 @@
+// @maintained-by-ai
 // MA-1879 data lock: Demogorgon Spellcasting rode the MA-0421/MA-1850 twin
 // markup-gap template. Pre-fix the WHOLE description was plain text —
 // extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses
-// {} → SpellCastLinks null → ZERO .mc-dice-link-spell chips card-wide, no spell
-// on the card castable, and the 3/Day + 1/Day usage lane dead-by-construction
-// (extractSpellcastingSpellUses binds MARKED names only, §144/§251). DATA fix,
-// markup-only: house-style <strong>Tier:</strong> <em>Spell</em> INLINE
-// (originally-inline prose, no <br> — MA-1850 archlich byte-shape), strip-tags
-// byte-equality pinned. All SEVEN names resolve in 5e spells.json (every marked
-// token is a ":" header or a resolvable name — MA-0599 fake-chip guard N/A,
-// emphasis marks resolvable names only). "3/Day:"/"1/Day:" headers arm the
-// per-spell uses gates WITHOUT "Each" (optional group, Helpers:440) —
-// At-Will names stay ungated by design (§57). save_dc 23 + save_type "Wisdom"
-// pair was already authored and stays byte-untouched (§89/§167; row-level DC on
-// a Spellcasting row is structurally unrenderable as a DC chip — MA-1294 — the
-// DC rides every chip's cast adjudication via buildMonsterSpellCastLog instead).
+// {} → SpellCastLinks null → ZERO .mc-dice-link-spell chips card-wide and the
+// 3/Day + 1/Day usage lane dead-by-construction (uses bind MARKED names only,
+// §144/§251). DATA fix, markup-only: house-style <strong>Tier:</strong>
+// <em>Spell</em> INLINE (originally-inline prose, no <br> — MA-1850 archlich
+// byte-shape); stripped-text byte-exact proof below. All SEVEN names resolve in
+// 5e spells.json (every marked token is a ":" header or a resolvable name —
+// MA-0599 fake-chip guard). "3/Day:"/"1/Day:" headers arm the per-spell uses
+// gates WITHOUT "Each" (optional group, Helpers:440) — At-Will names stay ungated
+// by design (§57). save_dc 23 + save_type "Charisma" pair byte-untouched
+// (§89/§167; MA-1883 fixed the ability); row-level DC on a Spellcasting row is
+// structurally unrenderable as a DC chip (MA-1294) — the DC rides every chip's
+// cast record via buildMonsterSpellCastLog.
+// Cited owners, not absorbed here: generic counter/gate/refusal/At-Will lanes
+// MonsterCardModal.spellcasting.test.jsx :275/:281-302/:317 (null-store :317 and
+// :561); store independence :522-548; demogorgon legendary Cast-a-Spell
+// multi-spend monsterLegendaryUses.ma1883-demogorgon-cast-a-spell.test.js
+// :136-210 and its modal shape ma1883-demogorgon-legendary-cast-spell.test.jsx
+// :151-255 (incl. Feeblemind exhausted press :208); tentacles/summon lanes
+// ma1877 transport #741. THIS file owns only this row's spell bytes + the
+// un-"Each" 3/Day+1/Day gated modal lane.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -37,6 +45,7 @@ const AT_WILL = ['Detect Magic', 'Major Image'];
 const THREE_DAY = ['Dispel Magic', 'Fear', 'Telekinesis'];
 const ONE_DAY = ['Feeblemind', 'Project Image'];
 const HEADERS = ['At Will:', '3/Day:', '1/Day:'];
+const USES_KEY = 'monsterSpellUses';
 
 // Pre-fix plain baseline: identical text, names unmarked.
 const PRE_FIX_DESCRIPTION = 'The demogorgon casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): At Will: Detect Magic, Major Image. 3/Day: Dispel Magic, Fear, Telekinesis. 1/Day: Feeblemind, Project Image.';
@@ -44,12 +53,13 @@ const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Demogorgon 1';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
-
+// Mock hygiene (#739/#740): diceRoller purged — all SEVEN demogorgon spells are
+// damage-less (no rollExpression/rollExpressionDoubled reachable from this cast
+// lane); rangeValidation purged (pure parsers); mapsService purged (mapName=null
+// short-circuits loadMapData at modal :2132); abilityLookup purged (not imported
+// by the modal tree). Kept: logService (assertion target), sanitize (body render),
+// dataLoader §177 below, useLoggedDiceRoll (destructured whole at modal :2211),
+// conditionEffects + damageUtils (getCombatContext fires at :2125), runtime store.
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -67,33 +77,20 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
 
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
-
   return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+      rollInitiative: vi.fn(),
+      quickRollPlayerSave: vi.fn(),
+    })),
   };
 });
 
@@ -110,21 +107,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -174,13 +156,10 @@ function renderDemogorgon() {
 // ── Data lock: demogorgon Spellcasting row ───────────────────────────────────
 
 describe('MA-1879 monsters.json data lock: Demogorgon Spellcasting row', () => {
-  it('extracts all seven spell names as chips — tier headers ending ":" skipped', () => {
+  it('extractors exact-map: seven <em> names in authored order (colon headers skipped); 3/Day: binds its three names, 1/Day: its two, At Will ungated (§58/§251)', () => {
     const names = extractSpellNamesFromSpellcasting(demogorgonRow.description);
     expect(names).toEqual(CHIP_NAMES);
     HEADERS.forEach(h => expect(names).not.toContain(h.replace(/:$/, '')));
-  });
-
-  it('usage tokens arm: 3/Day: binds its three names, 1/Day: its two, At Will ungated (§58/§251)', () => {
     expect(extractSpellcastingSpellUses(demogorgonRow.description)).toEqual({
       'Dispel Magic': 3, 'Fear': 3, 'Telekinesis': 3,
       'Feeblemind': 1, 'Project Image': 1,
@@ -198,26 +177,20 @@ describe('MA-1879 monsters.json data lock: Demogorgon Spellcasting row', () => {
     expect(demogorgonRow.description).toMatch(/spell save DC 23/);
   });
 
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
-    expect(stripTags(demogorgonRow.description)).toBe(PRE_FIX_DESCRIPTION);
-  });
-
-  it('house style: tier headers <strong>-wrapped ending ":", spell names <em>-wrapped inline, no <br>', () => {
-    expect(demogorgonRow.description).not.toMatch(/<br>/);
-    HEADERS.forEach(h => expect(demogorgonRow.description).toContain(`<strong>${h}</strong>`));
-    CHIP_NAMES.forEach(n => expect(demogorgonRow.description).toContain(`<em>${n}</em>`));
-  });
-
-  it('no fake chips: every marked token is a ":" header or a resolvable 5e spell name', () => {
-    const marked = [...demogorgonRow.description.matchAll(/<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g)].map(m => m[1]);
-    marked.forEach(t => {
+  it('markup-only house style: stripped text byte-exact pre-fix baseline, <strong> headers + <em> resolvable 5e names inline, no <br>, no fake chips (MA-0599 guard)', () => {
+    const desc = demogorgonRow.description;
+    expect(desc).not.toMatch(/<br>/);
+    HEADERS.forEach(h => expect(desc).toContain(`<strong>${h}</strong>`));
+    CHIP_NAMES.forEach(n => expect(desc).toContain(`<em>${n}</em>`));
+    [...desc.matchAll(/<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g)].map(m => m[1]).forEach(t => {
       const ok = t.endsWith(':') || (CHIP_NAMES.includes(t) && spells5e.some(s => s.name === t));
       expect(ok, `marked token must be header or resolvable spell name: ${t}`).toBe(true);
     });
+    expect(stripTags(desc)).toBe(PRE_FIX_DESCRIPTION);
   });
 });
 
-// ── Modal: seven chips, counters rendered, usage gates live ──────────────────
+// ── Modal: seven chips with counters, gates live ─────────────────────────────
 
 describe('MA-1879 MonsterCardModal Demogorgon Spellcasting chips', () => {
   beforeEach(() => {
@@ -225,67 +198,45 @@ describe('MA-1879 MonsterCardModal Demogorgon Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders seven spell chips — the zero-chip inert row is gone', () => {
+  it('renders the seven spell chips in authored order — counters on the 3/Day trio + 1/Day pair only, the zero-chip inert row is gone', () => {
     renderDemogorgon();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(CHIP_NAMES);
-    expect(spellLinks().length).toBe(7);
-  });
-
-  it('the three 3/Day and two 1/Day names carry counters; the two At Will names do not', () => {
-    renderDemogorgon();
     THREE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(3\/Day · 3 left\)/));
     ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
     AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
   });
 
-  it('At-Will Detect Magic casts ungated twice — zero uses, log prints row DC 23', async () => {
+  it('At-Will Detect Magic casts ungated twice — zero uses stored, log prints row DC 23', async () => {
     renderDemogorgon();
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(1));
     expect(abilityUseEntries('Detect Magic')[0].description).toMatch(/spell save DC 23/);
     await act(async () => { fireEvent.click(linkByText('Detect Magic')); });
     await waitFor(() => expect(abilityUseEntries('Detect Magic').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`] ?? null).toBeNull();
   });
 
-  it('Fear 3/Day gate live (§58): three casts spend 1→2→3, fourth refused zero extra spend', async () => {
+  it('usage gates live (§58): Fear spends 1→2→3 then fourth refused; Feeblemind spends its 1/Day then refire refused — refusals name the spell, zero extra spend', async () => {
     renderDemogorgon();
-    await act(async () => { fireEvent.click(linkByText('Fear')); });
-    await waitFor(() => expect(abilityUseEntries('Fear').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fear': 1 });
+    for (let cast = 1; cast <= 3; cast++) {
+      await act(async () => { fireEvent.click(linkByText('Fear')); });
+      await waitFor(() => expect(abilityUseEntries('Fear').length).toBe(cast));
+      expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Fear': cast });
+    }
     expect(abilityUseEntries('Fear')[0].description).toMatch(/spell save DC 23/);
-
-    await act(async () => { fireEvent.click(linkByText('Fear')); });
-    await waitFor(() => expect(abilityUseEntries('Fear').length).toBe(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fear': 2 });
-
-    await act(async () => { fireEvent.click(linkByText('Fear')); });
-    await waitFor(() => expect(abilityUseEntries('Fear').length).toBe(3));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fear': 3 });
 
     await act(async () => { fireEvent.click(linkByText('Fear')); });
     await waitFor(() => expect(refusalEntries('Fear').length).toBe(1));
     expect(abilityUseEntries('Fear').length).toBe(3);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Fear': 3 });
-  });
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Fear': 3 });
 
-  it('Feeblemind 1/Day gate live: cast spends the single use, second refused — zero extra spend', async () => {
-    renderDemogorgon();
     await act(async () => { fireEvent.click(linkByText('Feeblemind')); });
     await waitFor(() => expect(abilityUseEntries('Feeblemind').length).toBe(1));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Feeblemind': 1 });
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Fear': 3, 'Feeblemind': 1 });
 
     await act(async () => { fireEvent.click(linkByText('Feeblemind')); });
     await waitFor(() => expect(refusalEntries('Feeblemind').length).toBe(1));
     expect(abilityUseEntries('Feeblemind').length).toBe(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Feeblemind': 1 });
-  });
-
-  it('Telekinesis 3/Day cast records the row DC 23 on the ability_use lane (DC affordance live)', async () => {
-    renderDemogorgon();
-    await act(async () => { fireEvent.click(linkByText('Telekinesis')); });
-    await waitFor(() => expect(abilityUseEntries('Telekinesis').length).toBe(1));
-    expect(abilityUseEntries('Telekinesis')[0].description).toMatch(/spell save DC 23/);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Telekinesis': 1 });
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`]).toEqual({ 'Fear': 3, 'Feeblemind': 1 });
   });
 });

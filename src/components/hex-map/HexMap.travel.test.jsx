@@ -1,3 +1,9 @@
+// @maintained-by-ai
+// HexMap travel lane — travel-tool destination selection (arm → click payload, every guard,
+// right-click) and exact advance-log bytes (advance / advance_with_event / arrived /
+// day_exhausted / extreme_weather / silence, incl. branch precedence).
+// Base container wiring lives in HexMap.test.jsx (#793); camp / forced-march / weather-reroll /
+// event accept-skip-reroll live in HexMap.additional.test.jsx (#792) — not re-tested here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -12,53 +18,41 @@ if (!globalThis.PointerEvent) {
     };
 }
 
-// ── Mock child components (travel-aware mocks) ──
+// ── Mock child components — trimmed to this lane's consumers: only the travel
+// toolbar button (tool arming) and the Advanced travel-panel button are interactive here.
 vi.mock('./TerrainLayer.jsx', () => ({ default: () => <g data-testid="terrain-layer" /> }));
 vi.mock('./HexGridLayer.jsx', () => ({ default: () => <g data-testid="hex-grid-layer" /> }));
 vi.mock('./HexMapToolbar.jsx', () => ({
-    default: ({ onBack, mapName, zoomIn, zoomOut, resetView, tool, setTool }) =>
-        <div data-testid="toolbar">
-            <button data-testid="toolbar-back" onClick={onBack}>Back</button>
-            <span data-testid="toolbar-name">{mapName}</span>
-            <button data-testid="toolbar-zoomin" onClick={zoomIn}>+</button>
-            <button data-testid="toolbar-zoomout" onClick={zoomOut}>-</button>
-            <button data-testid="toolbar-resetview" onClick={resetView}>Reset</button>
-            <button data-testid="tool-travel" onClick={() => setTool('travel')}>Travel</button>
-            <span data-testid="current-tool">{tool}</span>
-        </div>,
+    default: ({ setTool }) => <button data-testid="tool-travel" onClick={() => setTool('travel')}>Travel</button>,
 }));
 vi.mock('./POILayer.jsx', () => ({ default: () => <g data-testid="poi-layer" /> }));
-vi.mock('./POIPanel.jsx', () => ({ default: ({ onClose }) => <div data-testid="poi-panel"><button onClick={onClose}>Close</button></div> }));
-vi.mock('./POIContextMenu.jsx', () => ({ default: ({ selectedPoi, onClose }) => selectedPoi ? <g data-testid="poi-context-menu"><text onClick={onClose}>Close</text></g> : null }));
+vi.mock('./POIPanel.jsx', () => ({ default: () => <div data-testid="poi-panel" /> }));
+vi.mock('./POIContextMenu.jsx', () => ({ default: () => <g data-testid="poi-context-menu" /> }));
 vi.mock('./MarchingOrderPanel.jsx', () => ({ default: () => <div data-testid="marching-panel" /> }));
-vi.mock('./PartyMarkerLayer.jsx', () => ({ default: ({ position }) => position ? <g data-testid="party-marker" /> : null }));
+vi.mock('./PartyMarkerLayer.jsx', () => ({ default: () => <g data-testid="party-marker" /> }));
 vi.mock('./RiverLayer.jsx', () => ({ default: () => <g data-testid="river-layer" /> }));
 vi.mock('./RoadLayer.jsx', () => ({ default: () => <g data-testid="road-layer" /> }));
-vi.mock('./WeatherOverlay.jsx', () => ({ default: ({ weather }) => weather ? <div data-testid="weather-overlay" /> : null }));
-vi.mock('./EventDialog.jsx', () => ({ default: ({ event, onAccept, onSkip, onReroll }) => event ? <div data-testid="event-dialog"><button data-testid="event-accept" onClick={onAccept}>Accept</button><button data-testid="event-skip" onClick={onSkip}>Skip</button><button data-testid="event-reroll" onClick={onReroll}>Reroll</button></div> : null }));
+vi.mock('./WeatherOverlay.jsx', () => ({ default: () => <div data-testid="weather-overlay" /> }));
+// EventDialog / camp-command buttons inside TravelPanel are owned by HexMap.additional.test.jsx (#792).
+vi.mock('./EventDialog.jsx', () => ({ default: () => <div data-testid="event-dialog" /> }));
 vi.mock('./TravelPanel.jsx', () => ({
-    default: ({ isTravelActive, onAdvance, onForceCamp, onForcedMarch, onCancel, onChangePace, onToggleHorseback }) =>
+    default: ({ isTravelActive, onAdvance }) =>
         <div data-testid="travel-panel">
-            {isTravelActive && <>
-                <button data-testid="btn-advance" onClick={onAdvance}>Advance</button>
-                <button data-testid="btn-camp" onClick={onForceCamp}>Camp</button>
-                <button data-testid="btn-forced-march" onClick={onForcedMarch}>Forced March</button>
-                <button data-testid="btn-cancel" onClick={onCancel}>Cancel</button>
-                <button data-testid="btn-pace" onClick={onChangePace}>Change Pace</button>
-                <button data-testid="btn-horseback" onClick={onToggleHorseback}>Horseback</button>
-            </>}
+            {isTravelActive && <button data-testid="btn-advance" onClick={onAdvance}>Advance</button>}
         </div>,
 }));
-vi.mock('./TravelPathLayer.jsx', () => ({ default: ({ path }) => path && path.length > 0 ? <g data-testid="travel-path-layer" /> : null }));
-vi.mock('./svg/CampSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/CitySVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/DungeonSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/HazardSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/LandmarkSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/LoreSiteSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/NaturalWonderSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/SettlementSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
-vi.mock('./svg/TowerSVG.jsx', () => ({ default: (props) => <g {...props} /> }));
+vi.mock('./TravelPathLayer.jsx', () => ({ default: () => <g data-testid="travel-path-layer" /> }));
+vi.mock('./svg/CampSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/CitySVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/DungeonSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/HazardSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/LandmarkSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/LoreSiteSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/NaturalWonderSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/SettlementSVG.jsx', () => ({ default: () => <g /> }));
+vi.mock('./svg/TowerSVG.jsx', () => ({ default: () => <g /> }));
+// Shared SSE connection — mock keeps the container off the network; the wiring byte itself
+// is pinned by the base lane (HexMap.test.jsx #793), not re-pinned here.
 vi.mock('../common/Subscriber.jsx', () => ({ default: () => <div data-testid="subscriber" /> }));
 
 // ── Mock hooks and services ──
@@ -67,18 +61,18 @@ vi.mock('./hooks/useZoomPan.js', () => ({ default: vi.fn() }));
 vi.mock('./hooks/useHexHover.js', () => ({ default: vi.fn() }));
 vi.mock('./hooks/useTerrainPainting.js', () => ({ default: vi.fn() }));
 vi.mock('./hooks/usePoiManagement.js', () => ({ default: vi.fn() }));
+// Real useTravelToolSync flips the tool via effects — no-op keeps tool arming deterministic.
 vi.mock('./hooks/useTravelToolSync.js', () => ({ default: vi.fn() }));
 vi.mock('./hooks/useEncounterGeneration.js', () => ({ default: vi.fn() }));
 vi.mock('./hooks/useHexMapSSESync.js', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/management/useTravelManagement.js', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({ useMonstersData: vi.fn() }));
 vi.mock('../../hooks/runtime/useLog.js', () => ({ default: vi.fn() }));
-vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: vi.fn((setter) => setter) }));
+// Only the mapsService calls HexMap.jsx makes at render time (formatMapName in the header);
+// loadMaps/loadMapData keep the mount effects from hitting the network.
 vi.mock('../../services/maps/mapsService.js', () => ({
     loadMaps: vi.fn(() => Promise.resolve({ maps: [] })),
     loadMapData: vi.fn(() => Promise.resolve(null)),
-    saveMapData: vi.fn(() => Promise.resolve({})),
-    createMap: vi.fn(() => Promise.resolve({ name: 'test', alreadyExists: false })),
     formatMapName: vi.fn((name) => name || ''),
 }));
 vi.mock('../../services/campaign/weatherService.js', () => ({
@@ -95,10 +89,7 @@ import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
-import * as mapsService from '../../services/maps/mapsService.js';
 import HexMap from './HexMap.jsx';
-
-const MODES = { INACTIVE: 'inactive', PLANNING: 'planning', TRAVELING: 'traveling', PAUSED: 'paused' };
 
 function makeMapLoader(overrides = {}) {
     return {
@@ -147,7 +138,6 @@ function makeTravelMgmt(overrides = {}) {
         forceCamp: vi.fn(), forcedMarch: vi.fn(),
         acceptEvent: vi.fn(), skipEvent: vi.fn(), rerollEvent: vi.fn(),
         setEventFrequency: vi.fn(), setTravelLog: vi.fn(), setLastMessage: vi.fn(),
-        MODES,
         ...overrides,
     };
 }
@@ -163,13 +153,12 @@ function setupDefaultMocks() {
     useMonstersData.mockReturnValue({ monsters: [], loading: false, error: null });
     useTravelManagement.mockReturnValue(makeTravelMgmt());
     useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry: vi.fn() });
-    mapsService.formatMapName.mockReturnValue('Test Map');
 }
 
 /** Returns the map SVG element for interaction tests. */
 const mapSvg = () => screen.getByTestId('hex-svg');
 
-/** Renders HexMap with the travel tool pre-activated. Returns the travel management mock. */
+/** Renders HexMap with the travel tool pre-armed. Returns the travel management mock. */
 function renderWithTravelTool({ tmOverrides = {}, hoverOverrides = {}, mapOverrides = {} }) {
     const tm = makeTravelMgmt(tmOverrides);
     useTravelManagement.mockReturnValue(tm);
@@ -180,9 +169,160 @@ function renderWithTravelTool({ tmOverrides = {}, hoverOverrides = {}, mapOverri
     return tm;
 }
 
+const PARTY = { q: 15, r: 8 };
+const DEST = { q: 20, r: 10 };
+
+describe('HexMap travel', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        setupDefaultMocks();
+    });
+
+    describe('travel-tool destination selection', () => {
+        // One row per branch of HexMap.jsx's travel onClick (button guard, partyPosition
+        // guard, hex-null/bounds/party-hex guards, startPlanning guard) — #793 anchors :212.
+        it.each([
+            { label: 'starts planning and sets the destination while idle', isTravelActive: false, partyPosition: PARTY, hex: DEST, button: 0, expectStartPlanning: true, expectDestination: true },
+            { label: 'sets a new destination without restarting planning while travelling', isTravelActive: true, partyPosition: PARTY, hex: DEST, button: 0, expectStartPlanning: false, expectDestination: true },
+            { label: 'does nothing when there is no party position', isTravelActive: false, partyPosition: null, hex: DEST, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing when the click resolves to no hex', isTravelActive: false, partyPosition: PARTY, hex: null, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing when the hex is outside the grid bounds', isTravelActive: false, partyPosition: PARTY, hex: { q: -1, r: 5 }, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing when the click resolves to the party hex', isTravelActive: false, partyPosition: PARTY, hex: PARTY, button: 0, expectStartPlanning: false, expectDestination: false },
+            { label: 'does nothing on a right-click', isTravelActive: false, partyPosition: PARTY, hex: DEST, button: 2, expectStartPlanning: false, expectDestination: false },
+        ])('$label', ({ isTravelActive, partyPosition, hex, button, expectStartPlanning, expectDestination }) => {
+            const tm = renderWithTravelTool({
+                tmOverrides: { isTravelActive },
+                hoverOverrides: { getHexFromEvent: vi.fn(() => hex) },
+                mapOverrides: { partyPosition },
+            });
+            fireEvent.click(mapSvg(), { button });
+            if (expectStartPlanning) {
+                expect(tm.startPlanning).toHaveBeenCalledTimes(1);
+            } else {
+                expect(tm.startPlanning).not.toHaveBeenCalled();
+            }
+            if (expectDestination) {
+                expect(tm.setDestinationAndPath).toHaveBeenCalledWith(hex);
+                expect(tm.setDestinationAndPath).toHaveBeenCalledTimes(1);
+            } else {
+                expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
+            }
+        });
+    });
+
+    describe('advance logging', () => {
+        // One row per branch of HexMap.jsx handleAdvance + logTravel bytes (#793 anchors :259):
+        // moved → advance | advance_with_event | arrived (precedence), blocked → day_exhausted
+        // | extreme_weather (precedence) | silence. Exact full payload per #786/#792.
+        it.each([
+            {
+                label: 'a full advance entry',
+                advanceResult: { moved: true, arrived: false, event: null },
+                mapOverrides: { terrain: { '11,5': 'forest' }, weather: { label: 'Overcast', icon: 'cloud' } },
+                expected: {
+                    action: 'advance',
+                    hex: { q: 11, r: 5 }, terrain: 'forest',
+                    weather: 'Overcast', weatherIcon: 'cloud',
+                    eventType: null, eventTitle: null,
+                },
+            },
+            {
+                label: 'advance_with_event with event details when an event triggers',
+                advanceResult: { moved: true, arrived: false, event: { type: 'combat', title: 'Ambush' } },
+                mapOverrides: { terrain: { '11,5': 'plains' }, weather: { label: 'Clear', icon: 'sun' } },
+                expected: {
+                    action: 'advance_with_event',
+                    hex: { q: 11, r: 5 }, terrain: 'plains',
+                    weather: 'Clear', weatherIcon: 'sun',
+                    eventType: 'combat', eventTitle: 'Ambush',
+                },
+            },
+            {
+                label: 'arrived without a target hex when the path ends',
+                advanceResult: { moved: true, arrived: true, event: null },
+                pathIndex: 1,
+                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
+                expected: {
+                    action: 'arrived',
+                    hex: null, terrain: null,
+                    weather: 'Clear', weatherIcon: 'sun',
+                    eventType: null, eventTitle: null,
+                },
+            },
+            {
+                label: 'advance_with_event over arrived when both apply',
+                advanceResult: { moved: true, arrived: true, event: { type: 'combat', title: 'Ambush' } },
+                pathIndex: 1,
+                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
+                expected: {
+                    action: 'advance_with_event',
+                    hex: null, terrain: null,
+                    weather: 'Clear', weatherIcon: 'sun',
+                    eventType: 'combat', eventTitle: 'Ambush',
+                },
+            },
+            {
+                label: 'day_exhausted when the party cannot move and the day is spent',
+                advanceResult: { moved: false },
+                dayExhausted: true,
+                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
+                expected: {
+                    action: 'day_exhausted',
+                    hex: null, terrain: null,
+                    weather: 'Clear', weatherIcon: 'sun',
+                    eventType: null, eventTitle: null,
+                },
+            },
+            {
+                label: 'extreme_weather when the party cannot move due to blocking weather',
+                advanceResult: { moved: false },
+                mapOverrides: { weather: { condition: 'storm', moveCostMod: null, label: 'Storm', icon: 'storm' } },
+                expected: {
+                    action: 'extreme_weather',
+                    hex: null, terrain: null,
+                    weather: 'Storm', weatherIcon: 'storm',
+                    eventType: null, eventTitle: null,
+                },
+            },
+            {
+                label: 'day_exhausted over extreme_weather when both conditions apply',
+                advanceResult: { moved: false },
+                dayExhausted: true,
+                mapOverrides: { weather: { condition: 'storm', moveCostMod: null } },
+                expected: {
+                    action: 'day_exhausted',
+                    hex: null, terrain: null,
+                    weather: null, weatherIcon: null,
+                    eventType: null, eventTitle: null,
+                },
+            },
+            {
+                label: 'nothing when the party cannot move for an unclassified reason',
+                advanceResult: { moved: false },
+                mapOverrides: { weather: { condition: 'clear', moveCostMod: 1 } },
+                expected: null,
+            },
+        ])('logs $label', ({ advanceResult, mapOverrides, pathIndex = 0, expected, ...tmRest }) => {
+            const { tm, addEntry } = renderWithActiveTravel({
+                ...tmRest,
+                pathIndex,
+                advanceOneHex: vi.fn(() => advanceResult),
+                mapOverrides,
+            });
+            fireEvent.click(screen.getByTestId('btn-advance'));
+            expect(tm.advanceOneHex).toHaveBeenCalledTimes(1);
+            if (expected) {
+                expect(addEntry).toHaveBeenCalledWith({ type: 'travel', ...expected });
+            } else {
+                expect(addEntry).not.toHaveBeenCalled();
+            }
+        });
+    });
+});
+
 /**
- * Renders HexMap with an active travel session and a two-hex path.
- * Returns `{ tm, addEntry }` for assertions.
+ * Renders HexMap with an active travel session and a two-hex path
+ * ({q:10,r:5} → {q:11,r:5}), so a move lands on 11,5. Returns `{ tm, addEntry }`.
  */
 function renderWithActiveTravel({ mapOverrides = {}, ...tmOverrides }) {
     const tm = makeTravelMgmt({
@@ -198,188 +338,3 @@ function renderWithActiveTravel({ mapOverrides = {}, ...tmOverrides }) {
     render(<HexMap campaignName="test" mapName="test-map" />);
     return { tm, addEntry };
 }
-
-function clickAdvance() {
-    fireEvent.click(screen.getByTestId('btn-advance'));
-}
-
-describe('HexMap travel', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        setupDefaultMocks();
-    });
-
-    describe('Travel tool destination selection', () => {
-        it.each([
-            { label: 'starts planning', isTravelActive: false, expectStartPlanning: true },
-            { label: 'does not start planning', isTravelActive: true, expectStartPlanning: false },
-        ])('sets destination $label when travel is $isTravelActive', ({ isTravelActive, expectStartPlanning }) => {
-            const tm = renderWithTravelTool({
-                tmOverrides: { isTravelActive },
-                hoverOverrides: { getHexFromEvent: vi.fn(() => ({ q: 20, r: 10 })) },
-                mapOverrides: { partyPosition: { q: 15, r: 8 } },
-            });
-            fireEvent.click(mapSvg());
-            if (expectStartPlanning) {
-                expect(tm.startPlanning).toHaveBeenCalledTimes(1);
-            } else {
-                expect(tm.startPlanning).not.toHaveBeenCalled();
-            }
-            expect(tm.setDestinationAndPath).toHaveBeenCalledWith({ q: 20, r: 10 });
-        });
-
-        it.each([
-            { scenario: 'when there is no party position', partyPosition: null, getHexResult: { q: 20, r: 10 } },
-            { scenario: 'when the click resolves to the party hex', partyPosition: { q: 15, r: 8 }, getHexResult: { q: 15, r: 8 } },
-            { scenario: 'when the click resolves to no hex', partyPosition: { q: 15, r: 8 }, getHexResult: null },
-            { scenario: 'when the hex is outside the grid bounds', partyPosition: { q: 15, r: 8 }, getHexResult: { q: -1, r: 5 } },
-        ])('does nothing $scenario', ({ partyPosition, getHexResult }) => {
-            const tm = renderWithTravelTool({
-                tmOverrides: { isTravelActive: false },
-                hoverOverrides: { getHexFromEvent: vi.fn(() => getHexResult) },
-                mapOverrides: { partyPosition },
-            });
-            fireEvent.click(mapSvg());
-            expect(tm.startPlanning).not.toHaveBeenCalled();
-            expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
-        });
-
-        it('does not set a destination on a right-click', () => {
-            const tm = renderWithTravelTool({
-                tmOverrides: { isTravelActive: false },
-                hoverOverrides: { getHexFromEvent: vi.fn(() => ({ q: 20, r: 10 })) },
-                mapOverrides: { partyPosition: { q: 15, r: 8 } },
-            });
-            fireEvent.click(mapSvg(), { button: 2 });
-            expect(tm.startPlanning).not.toHaveBeenCalled();
-            expect(tm.setDestinationAndPath).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('Advance logging', () => {
-        it.each([
-            {
-                label: 'a full advance entry',
-                advanceResult: { moved: true, arrived: false, event: null },
-                mapOverrides: {
-                    terrain: { '11,5': 'forest' },
-                    weather: { label: 'Overcast', icon: 'cloud' },
-                },
-                expected: {
-                    action: 'advance',
-                    hex: { q: 11, r: 5 }, terrain: 'forest',
-                    weather: 'Overcast', weatherIcon: 'cloud',
-                    eventType: null, eventTitle: null,
-                },
-            },
-            {
-                label: 'advance_with_event with event details when an event triggers',
-                advanceResult: { moved: true, arrived: false, event: { type: 'combat', title: 'Ambush' } },
-                mapOverrides: {
-                    terrain: { '11,5': 'plains' },
-                    weather: { label: 'Clear', icon: 'sun' },
-                },
-                expected: {
-                    action: 'advance_with_event',
-                    hex: { q: 11, r: 5 }, terrain: 'plains',
-                    weather: 'Clear', weatherIcon: 'sun',
-                    eventType: 'combat', eventTitle: 'Ambush',
-                },
-            },
-            {
-                label: 'arrived without a target hex when the path ends',
-                advanceResult: { moved: true, arrived: true, event: null },
-                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
-                pathIndex: 1,
-                expected: {
-                    action: 'arrived',
-                    hex: null, terrain: null,
-                    weather: 'Clear', weatherIcon: 'sun',
-                    eventType: null, eventTitle: null,
-                },
-            },
-        ])('logs $label', ({ advanceResult, mapOverrides, pathIndex, expected }) => {
-            const { tm, addEntry } = renderWithActiveTravel({
-                pathIndex: pathIndex ?? 0,
-                advanceOneHex: vi.fn(() => advanceResult),
-                mapOverrides,
-            });
-            clickAdvance();
-            expect(tm.advanceOneHex).toHaveBeenCalledTimes(1);
-            expect(addEntry).toHaveBeenCalledWith({
-                type: 'travel', ...expected,
-            });
-        });
-
-        it('logs day_exhausted when the party cannot move and the day is spent', () => {
-            const { addEntry } = renderWithActiveTravel({
-                dayExhausted: true,
-                advanceOneHex: vi.fn(() => ({ moved: false })),
-                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
-            });
-            clickAdvance();
-            expect(addEntry).toHaveBeenCalledWith({
-                type: 'travel', action: 'day_exhausted',
-                hex: null, terrain: null,
-                weather: 'Clear', weatherIcon: 'sun',
-                eventType: null, eventTitle: null,
-            });
-        });
-
-        it('logs extreme_weather when the party cannot move due to blocking weather', () => {
-            const { addEntry } = renderWithActiveTravel({
-                advanceOneHex: vi.fn(() => ({ moved: false })),
-                mapOverrides: {
-                    weather: { condition: 'storm', moveCostMod: null, label: 'Storm', icon: 'storm' },
-                },
-            });
-            clickAdvance();
-            expect(addEntry).toHaveBeenCalledWith({
-                type: 'travel', action: 'extreme_weather',
-                hex: null, terrain: null,
-                weather: 'Storm', weatherIcon: 'storm',
-                eventType: null, eventTitle: null,
-            });
-        });
-
-        it('does not log when the party cannot move for an unclassified reason', () => {
-            const { tm, addEntry } = renderWithActiveTravel({
-                advanceOneHex: vi.fn(() => ({ moved: false })),
-                mapOverrides: { weather: { condition: 'clear', moveCostMod: 1 } },
-            });
-            clickAdvance();
-            expect(tm.advanceOneHex).toHaveBeenCalledTimes(1);
-            expect(addEntry).not.toHaveBeenCalled();
-        });
-
-        it('logs day_exhausted over extreme_weather when both conditions apply', () => {
-            const { addEntry } = renderWithActiveTravel({
-                dayExhausted: true,
-                advanceOneHex: vi.fn(() => ({ moved: false })),
-                mapOverrides: { weather: { condition: 'storm', moveCostMod: null } },
-            });
-            clickAdvance();
-            expect(addEntry).toHaveBeenCalledWith({
-                type: 'travel', action: 'day_exhausted',
-                hex: null, terrain: null,
-                weather: null, weatherIcon: null,
-                eventType: null, eventTitle: null,
-            });
-        });
-
-        it('logs advance_with_event over arrived when both apply', () => {
-            const { addEntry } = renderWithActiveTravel({
-                pathIndex: 1,
-                advanceOneHex: vi.fn(() => ({ moved: true, arrived: true, event: { type: 'combat', title: 'Ambush' } })),
-                mapOverrides: { weather: { label: 'Clear', icon: 'sun' } },
-            });
-            clickAdvance();
-            expect(addEntry).toHaveBeenCalledWith({
-                type: 'travel', action: 'advance_with_event',
-                hex: null, terrain: null,
-                weather: 'Clear', weatherIcon: 'sun',
-                eventType: 'combat', eventTitle: 'Ambush',
-            });
-        });
-    });
-});

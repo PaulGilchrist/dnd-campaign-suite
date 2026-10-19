@@ -1,7 +1,10 @@
-// HexMap integration tests: rendering, toolbar wiring, panel/overlay visibility,
-// SVG pointer interaction, background-click state cleanup, and POI drag-and-drop.
-// Travel-tool/advance behavior lives in HexMap.travel.test.jsx and event-handler
-// behavior lives in HexMap.additional.test.jsx; this file does not duplicate those.
+// @maintained-by-ai
+// HexMap container lane — rendering/loading transition, toolbar wiring (back/name/tool-select/
+// viewport/panels), SVG pointer·wheel·context routing, background-click cleanup, exact child
+// prop forwarding, and POI/character drag-and-drop.
+// Travel-tool destination selection + advance logging live in HexMap.travel.test.jsx and
+// event-dialog dispatch, camp/weather commands, POI linked-map validation, TravelPanel flag
+// forwarding, and weather-overlay visibility live in HexMap.additional.test.jsx (#792 split).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -16,31 +19,31 @@ if (!globalThis.PointerEvent) {
     };
 }
 
-// ── Mock child components ──
-vi.mock('./TerrainLayer.jsx', () => ({ default: () => <g data-testid="terrain-layer" /> }));
-vi.mock('./HexGridLayer.jsx', () => ({ default: () => <g data-testid="hex-grid-layer" /> }));
-vi.mock('./RiverLayer.jsx', () => ({ default: () => <g data-testid="river-layer" /> }));
-vi.mock('./RoadLayer.jsx', () => ({ default: () => <g data-testid="road-layer" /> }));
-vi.mock('./PartyMarkerLayer.jsx', () => ({ default: ({ position }) => position ? <g data-testid="party-marker" /> : null }));
-vi.mock('./TravelPathLayer.jsx', () => ({ default: ({ path }) => path && path.length > 0 ? <g data-testid="travel-path-layer" /> : null }));
-vi.mock('./WeatherOverlay.jsx', () => ({ default: ({ weather }) => weather ? <div data-testid="weather-overlay" /> : null }));
-vi.mock('./EventDialog.jsx', () => ({ default: ({ event, onAccept, onSkip, onReroll }) => event ? <div data-testid="event-dialog"><button data-testid="event-accept" onClick={onAccept}>Accept</button><button data-testid="event-skip" onClick={onSkip}>Skip</button><button data-testid="event-reroll" onClick={onReroll}>Reroll</button></div> : null }));
-vi.mock('./TravelPanel.jsx', () => ({ default: ({ isTravelActive }) => isTravelActive ? <div data-testid="travel-panel" /> : null }));
-
-// POI layer captures props so tests can inspect what HexMap passes to it.
-const { poiLayerProps } = vi.hoisted(() => ({ poiLayerProps: { current: null } }));
-vi.mock('./POILayer.jsx', () => ({
-    default: (props) => {
-        poiLayerProps.current = props;
-        return <g data-testid="poi-layer" />;
-    },
+// Capture props forwarded to each child so one render can verify container→child wiring
+// against the exact values HexMap.jsx computes from its hooks.
+const { childProps } = vi.hoisted(() => ({
+    childProps: { terrain: null, river: null, grid: null, road: null, poi: null, party: null, travelPath: null, subscriber: null },
 }));
 
-vi.mock('./POIPanel.jsx', () => ({ default: ({ onClose }) => <div data-testid="poi-panel"><button data-testid="poi-panel-close" onClick={onClose}>Close</button></div> }));
+// ── Mock child components ──
+vi.mock('./TerrainLayer.jsx', () => ({ default: (props) => { childProps.terrain = props; return <g data-testid="terrain-layer" />; } }));
+vi.mock('./HexGridLayer.jsx', () => ({ default: (props) => { childProps.grid = props; return <g data-testid="hex-grid-layer" />; } }));
+vi.mock('./RiverLayer.jsx', () => ({ default: (props) => { childProps.river = props; return <g data-testid="river-layer" />; } }));
+vi.mock('./RoadLayer.jsx', () => ({ default: (props) => { childProps.road = props; return <g data-testid="road-layer" />; } }));
+vi.mock('./PartyMarkerLayer.jsx', () => ({ default: (props) => { childProps.party = props; return props.position ? <g data-testid="party-marker" /> : null; } }));
+vi.mock('./TravelPathLayer.jsx', () => ({ default: (props) => { childProps.travelPath = props; return <g data-testid="travel-path-layer" />; } }));
+vi.mock('./POILayer.jsx', () => ({ default: (props) => { childProps.poi = props; return <g data-testid="poi-layer" />; } }));
+vi.mock('./WeatherOverlay.jsx', () => ({ default: ({ weather }) => weather ? <div data-testid="weather-overlay" /> : null }));
+vi.mock('./EventDialog.jsx', () => ({ default: ({ event }) => event ? <div data-testid="event-dialog" /> : null }));
+vi.mock('./TravelPanel.jsx', () => ({ default: ({ isTravelActive }) => isTravelActive ? <div data-testid="travel-panel" /> : null }));
+
+// POIContextMenu only mounts when a POI menu is open; its Close byte drives the container's
+// own dismiss handler tested in the click-cleanup lane below.
 vi.mock('./POIContextMenu.jsx', () => ({ default: ({ selectedPoi, onClose }) => selectedPoi ? <g data-testid="poi-context-menu"><text onClick={onClose}>Close</text></g> : null }));
+vi.mock('./POIPanel.jsx', () => ({ default: ({ onClose }) => <div data-testid="poi-panel"><button data-testid="poi-panel-close" onClick={onClose}>Close</button></div> }));
 vi.mock('./MarchingOrderPanel.jsx', () => ({ default: ({ onClose }) => <div data-testid="marching-panel"><button data-testid="marching-panel-close" onClick={onClose}>Close</button></div> }));
 
-// Catch-all SVG mock: all svg/* components render the same generic element.
+// Catch-all SVG mocks: icons live inside <defs> and are inert at this level.
 vi.mock('./svg/CampSVG.jsx', () => ({ default: () => <g data-testid="svg-camp" /> }));
 vi.mock('./svg/CitySVG.jsx', () => ({ default: () => <g data-testid="svg-city" /> }));
 vi.mock('./svg/DungeonSVG.jsx', () => ({ default: () => <g data-testid="svg-dungeon" /> }));
@@ -50,14 +53,18 @@ vi.mock('./svg/LoreSiteSVG.jsx', () => ({ default: () => <g data-testid="svg-lor
 vi.mock('./svg/NaturalWonderSVG.jsx', () => ({ default: () => <g data-testid="svg-wonder" /> }));
 vi.mock('./svg/SettlementSVG.jsx', () => ({ default: () => <g data-testid="svg-settlement" /> }));
 vi.mock('./svg/TowerSVG.jsx', () => ({ default: () => <g data-testid="svg-tower" /> }));
-vi.mock('../common/Subscriber.jsx', () => ({ default: () => <div data-testid="subscriber" /> }));
 
-// ── Toolbar mock: uses tool string values matching outdoorConfig constants ──
+// Subscriber is the app's single shared SSE connection — capture props to prove the
+// container wires its own handleSSEEvent into it (never a raw EventSource).
+vi.mock('../common/Subscriber.jsx', () => ({ default: (props) => { childProps.subscriber = props; return <div data-testid="subscriber" />; } }));
+
+// ── Toolbar mock: tool strings match outdoorConfig constants ──
 vi.mock('./HexMapToolbar.jsx', () => ({
-    default: ({ onBack, mapName, zoomIn, zoomOut, resetView, setTool, setPoiPanelOpen, setMarchingOrderOpen }) =>
+    default: ({ onBack, mapName, zoomIn, zoomOut, resetView, tool, setTool, setPoiPanelOpen, setMarchingOrderOpen }) =>
         <div data-testid="toolbar">
             <button data-testid="toolbar-back" onClick={onBack}>Back</button>
             <span data-testid="toolbar-name">{mapName}</span>
+            <span data-testid="current-tool">{tool}</span>
             <button data-testid="toolbar-zoomin" onClick={zoomIn}>+</button>
             <button data-testid="toolbar-zoomout" onClick={zoomOut}>-</button>
             <button data-testid="toolbar-resetview" onClick={resetView}>Reset</button>
@@ -80,12 +87,11 @@ vi.mock('./hooks/useHexMapSSESync.js', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/management/useTravelManagement.js', () => ({ default: vi.fn() }));
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({ useMonstersData: vi.fn() }));
 vi.mock('../../hooks/runtime/useLog.js', () => ({ default: vi.fn() }));
-vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: vi.fn((setter) => setter) }));
+// Only the three mapsService calls HexMap.jsx itself makes (indoor-map loads are
+// owned by HexMap.additional.test.jsx; save/load of map data lives in useMapLoader).
 vi.mock('../../services/maps/mapsService.js', () => ({
     loadMaps: vi.fn(() => Promise.resolve({ maps: [] })),
     loadMapData: vi.fn(() => Promise.resolve(null)),
-    saveMapData: vi.fn(() => Promise.resolve({})),
-    createMap: vi.fn(() => Promise.resolve({ name: 'test', alreadyExists: false })),
     formatMapName: vi.fn((name) => name || ''),
 }));
 vi.mock('../../services/campaign/weatherService.js', () => ({
@@ -103,6 +109,7 @@ import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useLog from '../../hooks/runtime/useLog.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import * as mapsService from '../../services/maps/mapsService.js';
+import { GRID_COLS_MULTIPLIER, HEX_SIZE } from '../../config/outdoorConfig.js';
 import HexMap from './HexMap.jsx';
 
 // ── Mock factory helpers ──
@@ -214,7 +221,7 @@ function setupDefaultMocks() {
     useHexMapSSESync.mockReturnValue({ handleSSEEvent: vi.fn() });
     useMonstersData.mockReturnValue({ monsters: [], loading: false, error: null });
     useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry: vi.fn() });
-    mapsService.formatMapName.mockReturnValue('Test Map');
+    mapsService.formatMapName.mockImplementation((name) => name || '');
 }
 
 /** Renders the map in its default (loaded, idle) state. */
@@ -227,150 +234,267 @@ const mapSvg = () => document.querySelector('.hex-svg');
 describe('HexMap', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        poiLayerProps.current = null;
+        Object.keys(childProps).forEach(k => { childProps[k] = null; });
         setupDefaultMocks();
     });
 
-    describe('Rendering', () => {
-        it('shows a loading message while the map is loading', () => {
-            useMapLoader.mockReturnValue(makeMapLoader({ loading: true }));
-            renderMap();
-            expect(screen.getByText('Loading map...')).toBeInTheDocument();
-        });
+    it('shows a loading message until the map loads, then the full canvas', () => {
+        useMapLoader.mockReturnValue(makeMapLoader({ loading: true }));
+        const { rerender } = render(<HexMap campaignName="test" mapName="test-map" />);
+        expect(screen.getByText('Loading map...')).toBeInTheDocument();
+        // Toolbar stays mounted during load; the canvas itself does not exist yet.
+        expect(mapSvg()).not.toBeInTheDocument();
+        expect(screen.getByTestId('toolbar')).toBeInTheDocument();
 
-        it('renders the full canvas once loaded', () => {
-            renderMap();
-            expect(screen.queryByText('Loading map...')).not.toBeInTheDocument();
-            expect(screen.getByText('1 hex = 6 miles')).toBeInTheDocument();
-            expect(mapSvg()).toBeInTheDocument();
-        });
-
-        it('does not crash when onBack is not provided', () => {
-            expect(() => renderMap({ onBack: undefined })).not.toThrow();
-            expect(screen.getByTestId('toolbar')).toBeInTheDocument();
-        });
+        useMapLoader.mockReturnValue(makeMapLoader());
+        rerender(<HexMap campaignName="test" mapName="test-map" />);
+        expect(screen.queryByText('Loading map...')).not.toBeInTheDocument();
+        expect(mapSvg()).toBeInTheDocument();
+        expect(screen.getByText('1 hex = 6 miles')).toBeInTheDocument();
     });
 
-    describe('Toolbar wiring', () => {
-        it('calls onBack when the back button is clicked', () => {
-            const onBack = vi.fn();
-            renderMap({ onBack });
-            fireEvent.click(screen.getByTestId('toolbar-back'));
-            expect(onBack).toHaveBeenCalledTimes(1);
-        });
-
-        it('formats and passes the map name to the toolbar', () => {
-            mapsService.formatMapName.mockReturnValue('My Map');
-            renderMap();
-            expect(mapsService.formatMapName).toHaveBeenCalledWith('test-map');
-            expect(screen.getByTestId('toolbar-name')).toHaveTextContent('My Map');
-        });
+    it('calls onBack when the back button is clicked', () => {
+        const onBack = vi.fn();
+        renderMap({ onBack });
+        fireEvent.click(screen.getByTestId('toolbar-back'));
+        expect(onBack).toHaveBeenCalledTimes(1);
     });
 
-    describe('Panels and overlays', () => {
-        it('opens and closes the POI panel from the toolbar', () => {
-            renderMap();
-            expect(screen.queryByTestId('poi-panel')).not.toBeInTheDocument();
-            fireEvent.click(screen.getByTestId('toolbar-poi-panel'));
-            expect(screen.getByTestId('poi-panel')).toBeInTheDocument();
-            fireEvent.click(screen.getByTestId('poi-panel-close'));
-            expect(screen.queryByTestId('poi-panel')).not.toBeInTheDocument();
-        });
-
-        it('opens and closes the marching order panel from the toolbar', () => {
-            renderMap();
-            expect(screen.queryByTestId('marching-panel')).not.toBeInTheDocument();
-            fireEvent.click(screen.getByTestId('toolbar-marching'));
-            expect(screen.getByTestId('marching-panel')).toBeInTheDocument();
-            fireEvent.click(screen.getByTestId('marching-panel-close'));
-            expect(screen.queryByTestId('marching-panel')).not.toBeInTheDocument();
-        });
+    it('formats and passes the map name to the toolbar', () => {
+        mapsService.formatMapName.mockReturnValue('My Map');
+        renderMap();
+        expect(mapsService.formatMapName).toHaveBeenCalledWith('test-map');
+        expect(screen.getByTestId('toolbar-name')).toHaveTextContent('My Map');
     });
 
-    describe('SVG interaction events', () => {
-        it('routes wheel events to the zoom/pan handler', () => {
-            const zp = makeZoomPan();
-            useZoomPan.mockReturnValue(zp);
-            renderMap();
-            fireEvent.wheel(mapSvg());
-            expect(zp.handleWheel).toHaveBeenCalledTimes(1);
-        });
-
-        it('prevents the browser context menu on the map', () => {
-            renderMap();
-            const e = new Event('contextmenu', { bubbles: true, cancelable: true });
-            const spy = vi.spyOn(e, 'preventDefault');
-            fireEvent(mapSvg(), e);
-            expect(spy).toHaveBeenCalled();
-        });
+    it('selects the paint tool and routes pointer-down to the terrain painter', () => {
+        const tp = makeTerrainPainting();
+        const zp = makeZoomPan();
+        useTerrainPainting.mockReturnValue(tp);
+        useZoomPan.mockReturnValue(zp);
+        renderMap();
+        fireEvent.click(screen.getByTestId('toolbar-paint'));
+        expect(screen.getByTestId('current-tool')).toHaveTextContent('paint');
+        fireEvent.pointerDown(mapSvg(), { button: 0, pointerId: 1 });
+        expect(tp.handleTerrainPointerDown).toHaveBeenCalledTimes(1);
+        expect(tp.handleTerrainPointerDown.mock.calls[0][1]).toBe('paint');
+        expect(zp.handlePanStart).not.toHaveBeenCalled();
     });
 
-    describe('Map background click', () => {
-        it('clears the POI menu and rename panel when the map is clicked', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            renderMap();
-            fireEvent.click(mapSvg());
-            expect(pm.setSelectedPoiMenu).toHaveBeenCalledWith(null);
-            expect(pm.setShowRename).toHaveBeenCalledWith(null);
-        });
+    it('opens and closes the POI and marching order panels from the toolbar', () => {
+        renderMap();
+        fireEvent.click(screen.getByTestId('toolbar-poi-panel'));
+        expect(screen.getByTestId('poi-panel')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('poi-panel-close'));
+        expect(screen.queryByTestId('poi-panel')).not.toBeInTheDocument();
 
-        it('clears the pending road connection when the road tool is active', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            renderMap();
-            fireEvent.click(screen.getByTestId('toolbar-road'));
-            fireEvent.click(mapSvg());
-            expect(pm.setRoadStartPoiId).toHaveBeenCalledWith(null);
-        });
-
-        it('does not clear road start when the road tool is not active', () => {
-            const pm = makePoiManagement();
-            usePoiManagement.mockReturnValue(pm);
-            renderMap();
-            fireEvent.click(mapSvg());
-            expect(pm.setRoadStartPoiId).not.toHaveBeenCalled();
-        });
+        fireEvent.click(screen.getByTestId('toolbar-marching'));
+        expect(screen.getByTestId('marching-panel')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('marching-panel-close'));
+        expect(screen.queryByTestId('marching-panel')).not.toBeInTheDocument();
     });
 
-    describe('POI layer props', () => {
-        it('passes partyPosition to the POI layer when set', () => {
-            useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: { q: 10, r: 5 } }));
-            renderMap();
-            expect(poiLayerProps.current.partyPosition).toEqual({ q: 10, r: 5 });
-        });
+    it('routes wheel, zoom, and reset clicks to the zoom/pan hook', () => {
+        const zp = makeZoomPan();
+        useZoomPan.mockReturnValue(zp);
+        renderMap();
+        fireEvent.wheel(mapSvg());
+        expect(zp.handleWheel).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByTestId('toolbar-zoomin'));
+        expect(zp.zoomIn).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByTestId('toolbar-zoomout'));
+        expect(zp.zoomOut).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByTestId('toolbar-resetview'));
+        expect(zp.resetView).toHaveBeenCalledTimes(1);
+    });
 
-        it('passes null partyPosition to the POI layer when not set', () => {
-            renderMap();
-            expect(poiLayerProps.current.partyPosition).toBeNull();
+    it('suppresses the browser context menu on the map', () => {
+        renderMap();
+        // fireEvent returns false only when the handler called preventDefault.
+        expect(fireEvent.contextMenu(mapSvg())).toBe(false);
+    });
+
+    it('routes pointer down/move/up/leave on the map to the pan, terrain, POI, and hover hooks', () => {
+        const zp = makeZoomPan();
+        const tp = makeTerrainPainting();
+        const pm = makePoiManagement();
+        const hh = makeHexHover();
+        useZoomPan.mockReturnValue(zp);
+        useTerrainPainting.mockReturnValue(tp);
+        usePoiManagement.mockReturnValue(pm);
+        useHexHover.mockReturnValue(hh);
+        renderMap();
+
+        // Default tool (none) → pointer-down starts a pan, not a paint stroke.
+        fireEvent.pointerDown(mapSvg(), { button: 0, pointerId: 1 });
+        expect(zp.handlePanStart).toHaveBeenCalledTimes(1);
+
+        fireEvent.pointerMove(mapSvg(), { pointerId: 1 });
+        expect(zp.handlePanMove).toHaveBeenCalledTimes(1);
+        expect(tp.handleTerrainPointerMove).toHaveBeenCalledTimes(1);
+        expect(pm.handlePoiPointerMove).toHaveBeenCalledTimes(1);
+        expect(hh.handleHexHover).toHaveBeenCalledTimes(1);
+
+        fireEvent.pointerUp(mapSvg(), { pointerId: 1 });
+        expect(zp.handlePanEnd).toHaveBeenCalledTimes(1);
+        expect(tp.handleTerrainPointerUp).toHaveBeenCalledTimes(1);
+        expect(pm.handlePoiPointerUp).toHaveBeenCalledTimes(1);
+
+        fireEvent.pointerLeave(mapSvg(), { pointerId: 1 });
+        expect(hh.setHoveredHex).toHaveBeenCalledWith(null);
+    });
+
+    it('dismisses POI menu and rename state via background click or menu close, not right-click', () => {
+        const pm = makePoiManagement({ selectedPoiMenu: { id: 'poi-1', q: 3, r: 4 } });
+        usePoiManagement.mockReturnValue(pm);
+        renderMap();
+        expect(screen.getByTestId('poi-context-menu')).toBeInTheDocument();
+
+        // The context menu's own close button routes through the container's onClose closure.
+        fireEvent.click(screen.getByText('Close'));
+        expect(pm.setSelectedPoiMenu).toHaveBeenCalledWith(null);
+        expect(pm.setShowRename).toHaveBeenCalledWith(null);
+
+        pm.setSelectedPoiMenu.mockClear();
+        pm.setShowRename.mockClear();
+        fireEvent.click(mapSvg());
+        expect(pm.setSelectedPoiMenu).toHaveBeenCalledTimes(1);
+        expect(pm.setSelectedPoiMenu).toHaveBeenCalledWith(null);
+        expect(pm.setShowRename).toHaveBeenCalledWith(null);
+
+        pm.setSelectedPoiMenu.mockClear();
+        pm.setShowRename.mockClear();
+        fireEvent.click(mapSvg(), { button: 2 });
+        expect(pm.setSelectedPoiMenu).not.toHaveBeenCalled();
+        expect(pm.setShowRename).not.toHaveBeenCalled();
+    });
+
+    it('clears the pending road start only when the road tool is active', () => {
+        const pm = makePoiManagement();
+        usePoiManagement.mockReturnValue(pm);
+        renderMap();
+        fireEvent.click(mapSvg());
+        expect(pm.setRoadStartPoiId).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByTestId('toolbar-road'));
+        expect(screen.getByTestId('current-tool')).toHaveTextContent('road');
+        fireEvent.click(mapSvg());
+        expect(pm.setRoadStartPoiId).toHaveBeenCalledTimes(1);
+        expect(pm.setRoadStartPoiId).toHaveBeenCalledWith(null);
+    });
+
+    it('forwards exact container state to every child layer', () => {
+        const ml = makeMapLoader({
+            gridSize: 12,
+            terrain: { '3,4': 'forest' },
+            rivers: ['4,5'],
+            roads: [{ id: 'road-1' }],
+            pois: [{ id: 'poi-1', q: 3, r: 4, type: 'city', visible: true, label: 'City' }],
+            partyPosition: { q: 10, r: 5 },
         });
+        const pm = makePoiManagement();
+        const tm = makeTravelMgmt();
+        const eg = makeEncounterGeneration();
+        const sse = { handleSSEEvent: vi.fn() };
+        useMapLoader.mockReturnValue(ml);
+        usePoiManagement.mockReturnValue(pm);
+        useTravelManagement.mockReturnValue(tm);
+        useEncounterGeneration.mockReturnValue(eg);
+        useHexMapSSESync.mockReturnValue(sse);
+
+        render(<HexMap campaignName="test" mapName="test-map" isLocalhost />);
+
+        // hexCols is derived from the config oracle, never hand-computed.
+        const hexCols = 12 * GRID_COLS_MULTIPLIER;
+        expect(childProps.terrain).toEqual({ hexCols, hexRows: 12, terrain: ml.terrain });
+        expect(childProps.river).toEqual({ rivers: ml.rivers, hexCols, hexRows: 12 });
+        expect(childProps.grid).toEqual({ hexCols, hexRows: 12 });
+        expect(childProps.road).toEqual({ roads: ml.roads });
+        expect(childProps.travelPath).toEqual({ path: [], pathIndex: 0, partyPosition: ml.partyPosition });
+        expect(childProps.poi).toEqual({
+            pois: ml.pois,
+            onPoiPointerDown: pm.handlePoiPointerDown,
+            onPoiContextMenu: pm.handlePoiContextMenu,
+            poiDragging: null,
+            poiHover: null,
+            isLocalhost: true,
+            partyPosition: ml.partyPosition,
+            onPoiEnter: expect.any(Function),
+            validLinkedMaps: new Set(),
+            roadStartPoiId: null,
+        });
+        expect(childProps.party).toEqual({
+            position: ml.partyPosition,
+            HEX_SIZE,
+            hexCols,
+            hexRows: 12,
+            onPositionChange: ml.setPartyPosition,
+            svgRef: expect.any(Object),
+            onEncounter: eg.handleStartEncounter,
+            contextMenuOpen: false,
+            onContextMenu: expect.any(Function),
+            travelMode: 'inactive',
+            onAdvance: expect.any(Function),
+            onCancelTravel: tm.cancelTravel,
+        });
+        // Single shared SSE connection: the container's sync handler must be forwarded.
+        expect(childProps.subscriber).toEqual({ campaignName: 'test', handleEvent: sse.handleSSEEvent });
     });
 
     describe('POI drag and drop', () => {
-        function dropOnMap({ dragData, getHexFromEvent, mapOverrides = {} }) {
-            const dt = { getData: vi.fn(() => dragData) };
+        function dropWith({ dragData, hex, mapOverrides = {} }) {
             const ml = makeMapLoader(mapOverrides);
-            useHexHover.mockReturnValue(makeHexHover({ getHexFromEvent }));
             useMapLoader.mockReturnValue(ml);
+            useHexHover.mockReturnValue(makeHexHover({ getHexFromEvent: vi.fn(() => hex) }));
             renderMap();
-            fireEvent.drop(mapSvg(), { dataTransfer: dt });
-            return { dt, ml };
+            const dt = { getData: vi.fn(() => dragData) };
+            const allowed = fireEvent.drop(mapSvg(), { dataTransfer: dt });
+            return { ml, dt, allowed };
         }
 
-        it('adds a dropped POI to the map, preserving existing POIs', () => {
-            const { dt, ml } = dropOnMap({
-                dragData: 'city',
-                getHexFromEvent: vi.fn(() => ({ q: 10, r: 5 })),
-            });
+        it('adds a dropped POI with exact payload bytes, preserving existing POIs', () => {
+            const { ml, dt, allowed } = dropWith({ dragData: 'city', hex: { q: 10, r: 5 } });
+            expect(allowed).toBe(false); // handleDrop always calls preventDefault
+            expect(dt.getData).toHaveBeenCalledTimes(1);
             expect(dt.getData).toHaveBeenCalledWith('text/plain');
             expect(ml.setPois).toHaveBeenCalledTimes(1);
 
-            const existingPois = [{ id: 'poi-0', q: 0, r: 0, type: 'camp', visible: true, label: 'Camp' }];
-            const newPois = ml.setPois.mock.calls[0][0](existingPois);
-            expect(newPois).toHaveLength(2);
-            expect(newPois[0]).toBe(existingPois[0]);
-            expect(newPois[1]).toMatchObject({ type: 'city', q: 10, r: 5, visible: true, label: 'City' });
-            expect(newPois[1].id).toBeTruthy();
+            const existing = [{ id: 'poi-0', q: 0, r: 0, type: 'camp', visible: true, label: 'Camp' }];
+            expect(ml.setPois.mock.calls[0][0](existing)).toEqual([
+                existing[0],
+                { id: expect.any(String), type: 'city', q: 10, r: 5, visible: true, label: 'City' },
+            ]);
+        });
+
+        it('drops a character onto the marching order and seeds party position once', () => {
+            const { ml, allowed } = dropWith({ dragData: 'character:Thorin', hex: { q: 4, r: 7 } });
+            expect(allowed).toBe(false);
+            expect(ml.setPois).not.toHaveBeenCalled();
+            expect(ml.setMarchingOrder).toHaveBeenCalledTimes(1);
+            expect(ml.setMarchingOrder.mock.calls[0][0]([])).toEqual(['Thorin']);
+            const present = ['Thorin'];
+            expect(ml.setMarchingOrder.mock.calls[0][0](present)).toBe(present); // no duplicates
+            expect(ml.setPartyPosition).toHaveBeenCalledTimes(1);
+            expect(ml.setPartyPosition.mock.calls[0][0](null)).toEqual({ q: 4, r: 7 });
+            const existingPos = { q: 1, r: 1 };
+            expect(ml.setPartyPosition.mock.calls[0][0](existingPos)).toBe(existingPos); // never overwrites
+        });
+
+        it('ignores drops with an unknown type, out-of-bounds hex, or an occupied hex', () => {
+            const existing = [{ id: 'poi-0', q: 10, r: 5, type: 'camp', visible: true, label: 'Camp' }];
+            const getHex = vi.fn(() => ({ q: 10, r: 5 }));
+            const ml = makeMapLoader({ pois: existing });
+            useMapLoader.mockReturnValue(ml);
+            useHexHover.mockReturnValue(makeHexHover({ getHexFromEvent: getHex }));
+            renderMap();
+
+            const drop = (data) => fireEvent.drop(mapSvg(), { dataTransfer: { getData: vi.fn(() => data) } });
+            expect(drop('not-a-poi-type')).toBe(false);  // unknown drag data
+            expect(drop('city')).toBe(false);              // hex already occupied by existing POI
+            getHex.mockReturnValue({ q: 10, r: 999 });     // outside hexRows bound
+            expect(drop('tower')).toBe(false);
+            expect(ml.setPois).not.toHaveBeenCalled();
+            expect(ml.setMarchingOrder).not.toHaveBeenCalled();
         });
     });
 });

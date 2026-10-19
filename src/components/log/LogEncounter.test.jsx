@@ -1,66 +1,89 @@
-import { screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+// @maintained-by-ai
+// EncounterEntry lane: owned contract = encounter log-entry RENDER bytes only —
+// leg polarity (container class, icon, title) for every producer-emitted action,
+// exact ordered roster bytes (roster census #781) on the start leg, exact
+// xpPerChar/loot bytes (#875 exemplar: exact numbers, not regex) on the end leg,
+// falsy-field suppression asserting the surviving sibling byte (#842), and
+// cross-leg field suppression.
+// CUT (owners cited): container type-dispatch → LogEntryRendering.test.jsx (#876,
+// queued NEXT); producer payload bytes (#871 encounter entries: EncounterBuilder.jsx:305
+// action:'joined'; useLootHandlers.js:58 and autoRewardService.js:59 action:'loot_awarded'
+// — autoRewardService owns the award-number payloads, we only pin how they render).
+// Family-standard setup (useLog fake, zero-network, zero added mocks) from
+// log-test-utils.jsx; #876 rule: fixed timestamps, never assert Date.now() output.
+// Old→new map: started-core(1)+timestamp(1)+completed-core(1) → polarityMatrix;
+// monster-list bytes → startLegDetails; xp+loot bytes → endLegDetails;
+// hide-monsters(1)+hide-xp(1)+hide-loot(1) → falsyMatrix; NEW: cross-leg
+// suppression, exact separator/nbsp bytes, producer action fall-through legs.
+import { beforeEach } from 'vitest';
 import { enc, q, setup, beforeEachSetup } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
 
-describe('Log - EncounterEntry rendering', () => {
+const TS = 1700000000000; // fixed timestamp — never Date.now() in assertions
+
+describe('Log > EncounterEntry', () => {
   beforeEach(() => {
     beforeEachSetup();
   });
 
-  describe('started encounter', () => {
-    it('renders encounter name, skull icon, monster list, and CSS classes', () => {
-      setup(Log, [enc({ action: 'started', monsters: ['Gob x4', 'Troll'] })]);
-      expect(screen.getByText(/Encounter Started/i)).toBeInTheDocument();
-      expect(q('.log-encounter i.fa-skull')).toBeInTheDocument();
-      expect(q('.log-entry.log-encounter.log-encounter-start')).toBeInTheDocument();
-      expect(q('.log-encounter-name')).toHaveTextContent(/Orc Ambush/i);
-      expect(screen.getByText(/Gob x4/i)).toBeInTheDocument();
-      expect(q('.log-encounter-monster')).toBeInTheDocument();
-    });
-
-    it('renders timestamp', () => {
-      setup(Log, [enc({ action: 'started', timestamp: 1700000000000 })]);
-      expect(q('.log-time')).toBeInTheDocument();
-    });
-
-    it('renders without monsters when monsters is falsy or empty', () => {
-      setup(Log, [enc({ action: 'started', monsters: [] })]);
-      expect(screen.getByText(/Encounter Started/i)).toBeInTheDocument();
-      expect(q('.log-encounter-monsters')).not.toBeInTheDocument();
-
-      setup(Log, [enc({ action: 'started', monsters: undefined })]);
-      expect(q('.log-encounter-monsters')).not.toBeInTheDocument();
-    });
+  // Only the literal 'started' selects the start leg. Real producers emit
+  // 'joined' (EncounterBuilder.jsx:307) and 'loot_awarded' (useLootHandlers.js:60,
+  // autoRewardService.js:61); BOTH non-'started' actions fall through to the
+  // completed leg — 'joined' renders "Encounter Completed" with a trophy
+  // (pinned honestly — SOURCE BUGS).
+  it.each([
+    ['started', 'log-encounter-start', 'fa-skull', 'Encounter Started'],
+    ['joined', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
+    ['completed', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
+    ['loot_awarded', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
+  ])('action "%s" renders the %s leg: class, icon, title, fixed-epoch time', (action, legCls, iconCls, title) => {
+    setup(Log, [enc({ timestamp: TS, action })]);
+    expect(q('.log-entry')).toHaveClass('log-entry', 'log-encounter', legCls);
+    expect(q('.log-encounter .log-icon i')).toHaveClass(iconCls);
+    expect(q('.log-name').textContent).toBe(title);
+    expect(q('.log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
   });
 
-  describe('completed encounter', () => {
-    it('renders encounter completed text, trophy icon, XP, loot items, and CSS classes', () => {
-      setup(Log, [enc({ action: 'completed', xpPerChar: 750, lootItems: ['Sword'] })]);
-      expect(screen.getByText(/Encounter Completed/i)).toBeInTheDocument();
-      expect(q('.log-encounter i.fa-trophy')).toBeInTheDocument();
-      expect(q('.log-entry.log-encounter.log-encounter-end')).toBeInTheDocument();
-      expect(screen.getByText(/750 XP per character/i)).toBeInTheDocument();
-      expect(q('.log-encounter-xp i.fa-star')).toBeInTheDocument();
-      expect(screen.getByText(/Sword/i)).toBeInTheDocument();
-      expect(q('.log-encounter-loot-item')).toBeInTheDocument();
-    });
+  it('start leg renders the roster as exact ordered bytes with comma separators', () => {
+    setup(Log, [enc({ timestamp: TS, action: 'started', encounterName: 'Orc Ambush', monsters: ['Gob x4', 'Troll'] })]);
+    expect(q('.log-encounter-name').textContent).toBe('Orc Ambush');
+    expect([...document.querySelectorAll('.log-encounter-monsters .log-encounter-monster')].map((n) => n.textContent))
+      .toEqual(['Gob x4,\u00a0', 'Troll\u00a0']);
+  });
 
-    it('hides XP display when xpPerChar is zero or negative', () => {
-      setup(Log, [enc({ action: 'completed', xpPerChar: 0 })]);
-      expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
+  it('end leg renders exact XP byte with star icon and exact ordered loot item bytes', () => {
+    setup(Log, [enc({ timestamp: TS, action: 'completed', xpPerChar: 750, lootItems: ['Sword', 'Potion of Healing'] })]);
+    expect(q('.log-encounter-xp i')).toHaveClass('fa-star');
+    expect(q('.log-encounter-xp').textContent).toBe('\u00a0750 XP per character');
+    expect([...document.querySelectorAll('.log-encounter-loot .log-encounter-loot-item')].map((n) => n.textContent))
+      .toEqual(['Sword', 'Potion of Healing']);
+  });
 
-      setup(Log, [enc({ action: 'completed', xpPerChar: -100 })]);
-      expect(screen.queryByText(/XP per character/i)).not.toBeInTheDocument();
-    });
+  // Cross-leg suppression: fields authored for the other leg must not render.
+  // Scoped to each render's container (setup returns render result) so the
+  // two renders in one test can't shadow each other's selectors.
+  it('started entry suppresses xpPerChar/lootItems and completed entry suppresses monsters', () => {
+    const end = setup(Log, [enc({ timestamp: TS, action: 'completed', monsters: ['Troll'], xpPerChar: 750 })]);
+    expect(end.container.querySelector('.log-encounter-monsters')).toBeNull();
+    expect(end.container.querySelector('.log-encounter-xp').textContent).toBe('\u00a0750 XP per character');
 
-    it('hides loot list when lootItems is falsy or empty', () => {
-      setup(Log, [enc({ action: 'completed', lootItems: [] })]);
-      expect(q('.log-encounter-loot')).not.toBeInTheDocument();
+    const start = setup(Log, [enc({ timestamp: TS, action: 'started', monsters: ['Gob x4'], xpPerChar: 750, lootItems: ['Sword'] })]);
+    expect(start.container.querySelector('.log-encounter-monsters')).toBeInTheDocument(); // this leg owns the roster
+    expect(start.container.querySelector('.log-encounter-xp')).toBeNull();
+    expect(start.container.querySelector('.log-encounter-loot')).toBeNull();
+  });
 
-      setup(Log, [enc({ action: 'completed', lootItems: undefined })]);
-      expect(q('.log-encounter-loot')).not.toBeInTheDocument();
-    });
+  it.each([
+    ['started', { monsters: [] }, '.log-encounter-monsters', '.log-encounter-name', 'Orc Ambush'],
+    ['started', { monsters: undefined }, '.log-encounter-monsters', '.log-encounter-name', 'Orc Ambush'],
+    ['completed', { xpPerChar: 0, lootItems: ['Sword'] }, '.log-encounter-xp', '.log-encounter-loot-item', 'Sword'],
+    ['completed', { xpPerChar: -100, lootItems: ['Sword'] }, '.log-encounter-xp', '.log-encounter-loot-item', 'Sword'],
+    ['completed', { xpPerChar: 750, lootItems: [] }, '.log-encounter-loot', '.log-encounter-xp', '\u00a0750 XP per character'],
+    ['completed', { xpPerChar: 750, lootItems: undefined }, '.log-encounter-loot', '.log-encounter-xp', '\u00a0750 XP per character'],
+  ])('%s with falsy field hides %s while sibling renders exact byte "%s"', (action, override, hiddenSel, siblingSel, siblingText) => {
+    setup(Log, [enc({ timestamp: TS, action, ...override })]);
+    expect(q(hiddenSel)).not.toBeInTheDocument();
+    expect(q(siblingSel).textContent).toBe(siblingText);
   });
 });

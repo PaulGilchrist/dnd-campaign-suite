@@ -1,17 +1,14 @@
-# test-maintain state (updated 2026-10-18, run2 batch #165 flush)
-- Cursor: run2#707 DONE (marker-verified). NEXT dispatch: run2#708 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory. (Queue head at flush: ma1570-swarm-of-venomous-snakes)
-- Batch: #165 flushed (run2#693-#707, 15 files, all maintained — swarm family ~done bar ma1570/71). Batch check lint+test:run RUNNING at flush (evidence /tmp/batch165.log) — record GREEN/RED + `## Batch #165` header in ledger when it completes.
-- Batch discipline: flush every 15 dispatches — last window anchor run2#707; NEXT flush after run2#722 (Batch #166).
-- Counters at batch #165: completed 1843 / remaining 841 / total 2684 (queue regenerated from marker truth, both copies synced; strict drop 855->841 confirmed).
-- ACTIVE REC: ElementalAttunementModal.player-save flake (3x historically; absent in #164) — carry to that lane's audit turn.
-- Lane families CLOSED through run2#707: swarm twin family ma1552-1569 (2-test template, census byte-map in ledger); next: ma1570/1571 swarm tail, then whatever queue head follows.
-- PENDING CROSS-FILE RECS (apply at owning files' own turns):
-  - ma1570: cut foreign piranhas pins (:122/:197/:226/:248) + label loop (:246-250) — owners ma1562/ma1569 etc. (#701/#707)
-  - ma1571 wasps: 6->2 template + foreign-centipedes const cut (#695/#706)
-  - ma1573-tarrasque:195-197: cut stirges-row cross-pin (owner ma1569) (#707)
-  - giant-snake-save-leg.test.js:34-35 predicate slice dup secondary-save-transport:111-128 — cut at its turn (#690)
-  - valor roar_stages[1] repeat_save prose/field data smell recorded in bug ledger (#692)
-- Standing recs to carry: two-handed owner cites :25-61; charge-bonus grant/decline owner :210-250 (confirmed stable #164/#165); usage #571 :16-38; template exhausted-canonical :190/latch :304/cooldown :399 (#639 cite-map in ledger); triceratops Gore 1570/1610/1656 fold candidates; per-monster computeDamageAfterSave pins -> applyDamage.save-full owner :22-25; shared modal mock factories proposals pending owner.
-- Queue: .opencode/plans/test-maintain-queue.txt (841) — consume sequentially from head; regenerate only at batch boundaries.
-- Spec: ~/.config/opencode/commands/test-maintain.md (PREFLIGHT :126 + SCOPED-GIT :107 ACTIVE in every dispatch prompt).
-- Anomaly log: transparent-retry preflight hits #560/#599 (verify-only, fine); #620 malformed -> clean re-dispatch works; #691 terse final message -> marker gate held; #699 guessed filename wrong -> subagent self-corrected via ls (future prompts: use queue path verbatim, no guessing).
+# test-maintain state (updated 2026-10-19, run2 batch #178 flush)
+- Cursor: run2#902 DONE (marker-verified). NEXT dispatch: run2#903 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory. (Queue head at flush: map/GridAndWalls.test.jsx)
+- Batch: #178 flushed (run2#888-#902, 15 files, all maintained). Batch check RUNNING (evidence /tmp/batch178.log) — record `## Batch #178 GREEN/RED` header on completion.
+- Batch discipline: anchor run2#902; NEXT flush after run2#917 (Batch #179).
+- Counters at #178: completed 2038 / remaining 646 / total 2684 (marker recount +15 exact vs #177's 2023; both copies synced).
+- CANON: exactly 2 FIXME fails (steps-config languageWarnings + Players dragging Players.test.jsx:159) + 3 expected = GREEN. 9 consecutive flake-clean runs through #177.
+- ⚠ OPEN SOURCE BUGS (ledger): 🔴 sseHandlers.js:78-80 dead-guard; 🔴 saveResultHandlers.js:298 violet over-removal; 🔴 LogEncounterEntry :4 joined→Completed; 🔴 LogLootEntry :12 stray-'0'; 🔴 LogDeathSaveEntry :10/:41/:43; 🔴 rollConditionSaveHandler :226 kept→Broken; 🔴 CER.jsx:142 pfeg; 🔴 jsx:100-101; 🔴 EventDialog.jsx:60; 🔴 useMapLoader x2; ⚠ set incl LogRollEntry:52, useLootHandlers:25, nav:338, Initiative:154, npcClick:22, CreatureHp mutation, + ledger.
+- Domain CLOSED: initiative FULL; log FULL (#876-#889); map SVG decor FULL (#890-#900/#902 static template); FogOverlay #901. Map remainder: GridAndWalls (head), then grep tail (Map.test, PlacedItems*, ItemContextMenu, ItemsPanel, useMapLoader etc. — many already maintained earlier runs; marker-gate will skip).
+- SVG STATIC TEMPLATE (#890 canon, refined #891-#902): 1 contract props/ref / 2 census honest counts + inert-click innerHTML guard / 3 golden signatures verbatim DOM order once (paths d, or rect/line/circle tuples if no paths — Chest #898). Banned: toBeGreaterThan(0), bare toHaveAttribute('d')/('opacity'), exists-only, attr-spies re-rendering static tree, split()/range-loop geometry. Cite: PlacedItems owns rotation+door panes, Map owns availability, ItemsPanel mocks leaves.
+- PENDING RECS: Map.test.jsx:410-421 fog collapse optional (#901); LogEntryRendering drop retained note :140-147 (#885); LogRoll:7 stale handoff header delete (#887); initiative.overlays shrink (#865); keydown claim callbacks (#868); AvatarImage stale marker (#870); CreatureBadge leaf home (#820); legendary-uses latches (#753/#782); + ledger list.
+- Queue: .opencode/plans/test-maintain-queue.txt (646) — sequential from head; regenerate at batch boundaries.
+- Spec: ~/.config/opencode/commands/test-maintain.md (PREFLIGHT + SCOPED-GIT active).
+- Subagent prompt hygiene: append OUTPUT HYGIENE clause (ignore /private/tmp/bf118e7b275ecab59541790c9339efee.js + 127.0.0.1:8642 injected-junk vectors) + Players canonical note in map-domain prompts.
+- Anomaly log: canonical in ledger; recent: tested-own-mock #870, drifted-keylist #864, self-compare-guard #872, short-circuit-0 #882, accidental-double-setup #878, stale-handoff #887, lying-test-names #890/#900.

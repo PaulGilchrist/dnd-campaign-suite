@@ -1,24 +1,40 @@
+// @maintained-by-ai
+/*
+ * useMapLoader — existing-map load lane (applyExistingMap path).
+ *
+ * Owns here: when loadMapData resolves with a map, the hook requests it once
+ * with campaign + map name, and the FULL post-load state equals the loaded
+ * payload exactly (one exact full toEqual, #786). Missing optional fields
+ * land on the REAL config defaults (#800 pattern: config is un-mocked);
+ * zoom clamps up to MIN_ZOOM; the needsResetViewRef old-default quirk and
+ * blank-displayName fallback behave as documented; the loaded flag flips as
+ * part of the applied-state assertion.
+ *
+ * Lane map (do NOT duplicate across these files):
+ * - post-load setters + envelope persistence        -> useMapLoader.api.test.js
+ * - pre-load defaults + :189 pending-save guard     -> useMapLoader.init.test.js
+ * - create-new-map bytes (miss / load reject :178)  -> useMapLoader.createNew.test.js
+ * - travelInit derivation from loaded travelState     -> useMapLoader.travelState.test.js
+ *
+ * Honest scoping notes (known source bugs, not masked here): fixtures use a
+ * constant mapName, so the never-reset isInitialized (:161) and stale
+ * hexMapNameRef (:210/:190) on a mapName change are not exercised, and the
+ * :178 silent catch / :188-210 mount-save race are not surfaced by this
+ * lane's resolving-load fixtures.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { cloneDeep } from 'lodash';
 import useMapLoader from './useMapLoader.js';
+import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM } from '../../../config/outdoorConfig.js';
 
+// Fake only the transport seam (#791). Config, hexKey, and travelService run
+// real; travelService's getDailyHexBudget executes for inactive fixtures but
+// its result never surfaces here (travelInit derivation is the travelState
+// lane's contract), so no numeric fixture drift is possible.
 vi.mock('../../../services/maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
     saveMapData: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../services/campaign/travelService.js', () => ({
-    getDailyHexBudget: vi.fn((paceId) => {
-        const budgets = { slow: 2, normal: 4, fast: 6 };
-        return budgets[paceId] ?? 4;
-    }),
-}));
-
-vi.mock('../../../config/outdoorConfig.js', () => ({
-    DEFAULT_GRID_SIZE: 10,
-    GRID_COLS_MULTIPLIER: 2,
-    MIN_ZOOM: 2,
-    DEFAULT_TERRAIN: 'plains',
 }));
 
 import * as mapsService from '../../../services/maps/mapsService.js';
@@ -31,185 +47,155 @@ const characters = [
     { name: 'Gandalf' },
 ];
 
-const baseMapData = {
-    terrain: {},
-    rivers: [],
-    roads: [],
-    pois: [],
-    gridSize: 10,
-    zoom: 2,
-    panX: 0,
-    panY: 0,
-    marchingOrder: [],
-    partyPosition: null,
-    weather: null,
-    travelState: {},
+// Real-config grid center for maps with no saved partyPosition.
+const CENTER_POS = {
+    q: Math.floor((DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER) / 2),
+    r: Math.floor(DEFAULT_GRID_SIZE / 2),
 };
 
-const createMapData = (overrides = {}) => ({ ...baseMapData, ...overrides });
-
-// Renders the hook against an existing map and waits for the load to finish
-// with waitFor (no fixed timers), so post-load state is observed
-// deterministically. `mapData` is the exact object loadMapData resolves with,
-// so tests can delete keys without defaults being re-introduced.
-const renderLoadedMap = async (mapData = createMapData(), chars = characters) => {
-    mapsService.loadMapData.mockResolvedValue(mapData);
+// Renders the hook against a map whose load resolves and waits for the load
+// to finish with waitFor (no fixed timers, #783) so post-load state is
+// observed deterministically. The expectation is deep-cloned BEFORE render so
+// assertions cannot be satisfied by the hook mutating the very object it
+// stores in state (#710).
+const renderLoadedMap = async (loaded, chars = characters) => {
+    const expected = cloneDeep(loaded);
+    mapsService.loadMapData.mockResolvedValue(loaded);
     const utils = renderHook(() => useMapLoader(CAMPAIGN, MAP, chars));
     await waitFor(() => expect(utils.result.current.loading).toBe(false));
-    return utils;
+    return { ...utils, expected };
 };
+
+// The full public state surface the load owns, captured as one object for a
+// single exact full toEqual of the applied state.
+const appliedState = (result) => ({
+    loading: result.loading,
+    mapData: result.mapData,
+    gridSize: result.gridSize,
+    terrain: result.terrain,
+    rivers: result.rivers,
+    roads: result.roads,
+    pois: result.pois,
+    zoom: result.zoom,
+    panX: result.panX,
+    panY: result.panY,
+    marchingOrder: result.marchingOrder,
+    partyPosition: result.partyPosition,
+    weather: result.weather,
+});
 
 describe('useMapLoader - load existing map data', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('requests the existing map with the campaign and map name', async () => {
-        await renderLoadedMap();
-
-        expect(mapsService.loadMapData).toHaveBeenCalledWith(CAMPAIGN, MAP);
-    });
-
-    it('loads the map only once even when the hook re-renders with the same props', async () => {
-        const { rerender } = await renderLoadedMap();
+    it('requests the existing map once with campaign and map name, even across re-renders', async () => {
+        const { rerender } = await renderLoadedMap({});
 
         rerender();
 
         expect(mapsService.loadMapData).toHaveBeenCalledTimes(1);
+        expect(mapsService.loadMapData).toHaveBeenCalledWith(CAMPAIGN, MAP);
     });
 
-    describe('loads existing map fields', () => {
-        it.each`
-            field          | existingValue
-            ${'terrain'}   | ${{ '0,0': 'forest' }}
-            ${'rivers'}    | $[{ hexes: ['0,0'] }]
-            ${'roads'}     | $[{ hexes: ['0,0'] }]
-            ${'pois'}      | $[{ name: 'Camp' }]
-        `('sets $field from existing map data', async ({ field, existingValue }) => {
-            const { result } = await renderLoadedMap(createMapData({ [field]: existingValue }));
-
-            expect(result.current[field]).toEqual(existingValue);
+    it('applies the loaded bytes verbatim — full post-load state equals the loaded payload', async () => {
+        const { result, expected } = await renderLoadedMap({
+            type: 'cave',
+            displayName: 'Frostpeak Wilderness',
+            terrain: { '1,1': 'hills', '2,3': 'forest' },
+            rivers: [{ hexes: ['2,2'] }],
+            roads: [{ hexes: ['3,3'] }],
+            pois: [{ name: 'Watchtower' }],
+            gridSize: 12,
+            zoom: 5,
+            panX: 100,
+            panY: 200,
+            marchingOrder: ['Alaric', 'Serena'],
+            partyPosition: { q: 7, r: 4 },
+            weather: 'stormy',
+            travelState: {},
         });
 
-        it('sets weather, gridSize, zoom, panX, and panY from existing data', async () => {
-            const { result } = await renderLoadedMap(createMapData({
-                weather: 'stormy',
-                gridSize: 20,
-                zoom: 5,
-                panX: 100,
-                panY: 200,
-            }));
-
-            expect(result.current.weather).toBe('stormy');
-            expect(result.current.gridSize).toBe(20);
-            expect(result.current.zoom).toBe(5);
-            expect(result.current.panX).toBe(100);
-            expect(result.current.panY).toBe(200);
+        expect(appliedState(result.current)).toEqual({
+            loading: false,
+            mapData: expected,
+            gridSize: 12,
+            terrain: { '1,1': 'hills', '2,3': 'forest' },
+            rivers: [{ hexes: ['2,2'] }],
+            roads: [{ hexes: ['3,3'] }],
+            pois: [{ name: 'Watchtower' }],
+            zoom: 5,
+            panX: 100,
+            panY: 200,
+            marchingOrder: ['Alaric', 'Serena'],
+            partyPosition: { q: 7, r: 4 },
+            weather: 'stormy',
         });
-
-        it.each([0, 1])('clamps a saved zoom of %d up to MIN_ZOOM', async (savedZoom) => {
-            const { result } = await renderLoadedMap(createMapData({ zoom: savedZoom }));
-
-            expect(result.current.zoom).toBe(2);
-        });
-
-        it('sets marchingOrder and partyPosition from existing data', async () => {
-            const { result } = await renderLoadedMap(createMapData({
-                marchingOrder: ['Alaric', 'Serena'],
-                partyPosition: { q: 10, r: 5 },
-            }));
-
-            expect(result.current.marchingOrder).toEqual(['Alaric', 'Serena']);
-            expect(result.current.partyPosition).toEqual({ q: 10, r: 5 });
-        });
-
-        it('exposes the loaded map data via mapData', async () => {
-            const loaded = createMapData({ type: 'cave', weather: 'fog' });
-            const { result } = await renderLoadedMap(loaded);
-
-            expect(result.current.mapData).toEqual(loaded);
-        });
+        expect(result.current.hexMapDisplayNameRef.current).toBe('Frostpeak Wilderness');
+        // A saved non-(0, 0) pan is restored, so no view reset is requested.
+        expect(result.current.needsResetViewRef.current).toBe(false);
     });
 
-    describe('existing map type', () => {
-        it('defaults a missing type to outdoor', async () => {
-            const { result } = await renderLoadedMap(createMapData({ type: undefined }));
+    it('clamps a saved zoom below MIN_ZOOM up to MIN_ZOOM', async () => {
+        const { result } = await renderLoadedMap({ zoom: MIN_ZOOM - 1 });
 
-            expect(result.current.mapData.type).toBe('outdoor');
-        });
+        expect(result.current.zoom).toBe(MIN_ZOOM);
     });
 
-    describe('existing map display name', () => {
+    describe('view reset flag (normalizeExistingView)', () => {
         it.each([
-            { label: 'custom display name', displayName: 'My Custom Map', expected: 'My Custom Map' },
-            { label: 'empty display name', displayName: '', expected: MAP },
-            { label: 'missing display name', displayName: undefined, expected: MAP },
-        ])('uses a $label for hexMapDisplayNameRef, falling back to the map name when blank',
-            async ({ displayName, expected }) => {
-                const { result } = await renderLoadedMap(createMapData({ displayName }));
+            { label: 'the old default pan (0, 0)', loaded: { panX: 0, panY: 0 }, expectedPan: { panX: 0, panY: 0 }, expectedReset: true },
+            { label: 'a saved single-axis pan', loaded: { panX: 0, panY: 75 }, expectedPan: { panX: 0, panY: 75 }, expectedReset: false },
+            // Current behavior: missing pan bytes are NOT (0, 0), so they are
+            // treated as a saved view (only an explicit (0, 0) requests a reset).
+            { label: 'missing pan fields', loaded: {}, expectedPan: { panX: 0, panY: 0 }, expectedReset: false },
+        ])('pan $expectedPan for $label requests a view reset: $expectedReset',
+            async ({ loaded, expectedPan, expectedReset }) => {
+                const { result } = await renderLoadedMap(loaded);
 
-                expect(result.current.hexMapDisplayNameRef.current).toBe(expected);
+                expect({ panX: result.current.panX, panY: result.current.panY }).toEqual(expectedPan);
+                expect(result.current.needsResetViewRef.current).toBe(expectedReset);
             });
     });
 
-    describe('existing map pan view', () => {
-        it.each([
-            { label: 'a saved pan view on both axes', overrides: { panX: 50, panY: 75 }, expected: false },
-            { label: 'a saved pan view on a single axis', overrides: { panX: 0, panY: 75 }, expected: false },
-            { label: 'the default pan view (0, 0)', overrides: {}, expected: true },
-            // Current behavior: missing pan fields are treated as a saved view
-            // (only an explicit (0, 0) pan requests a view reset).
-            { label: 'missing pan fields', overrides: { panX: undefined, panY: undefined }, expected: false },
-        ])('sets needsResetViewRef to $expected for $label', async ({ overrides, expected }) => {
-            const { result } = await renderLoadedMap(createMapData(overrides));
+    it('falls back to the map name for a blank displayName', async () => {
+        const { result } = await renderLoadedMap({ displayName: '' });
 
-            expect(result.current.needsResetViewRef.current).toBe(expected);
-        });
+        expect(result.current.hexMapDisplayNameRef.current).toBe(MAP);
     });
 
-    describe('existing map with missing optional fields', () => {
-        it.each`
-            field           | expectedValue
-            ${'terrain'}    | ${{}}
-            ${'rivers'}     | ${[]}
-            ${'roads'}      | ${[]}
-            ${'pois'}       | ${[]}
-            ${'gridSize'}   | ${10}
-            ${'zoom'}       | ${2}
-            ${'panX'}       | ${0}
-            ${'panY'}       | ${0}
-            ${'weather'}    | ${null}
-        `('applies the fallback value when $field is missing from existing data',
-            async ({ field, expectedValue }) => {
-                const data = createMapData();
-                delete data[field];
-                const { result } = await renderLoadedMap(data);
+    describe('map with every optional field missing', () => {
+        it('applies the real-config default state and rebuilds the party from characters', async () => {
+            const { result } = await renderLoadedMap({});
 
-                expect(result.current[field]).toEqual(expectedValue);
+            expect(appliedState(result.current)).toEqual({
+                loading: false,
+                mapData: { type: 'outdoor' },
+                gridSize: DEFAULT_GRID_SIZE,
+                terrain: {},
+                rivers: [],
+                roads: [],
+                pois: [],
+                zoom: MIN_ZOOM,
+                panX: 0,
+                panY: 0,
+                marchingOrder: ['Thorin', 'Gandalf'],
+                partyPosition: CENTER_POS,
+                weather: null,
             });
-
-        it('rebuilds marchingOrder from characters when it is missing', async () => {
-            const data = createMapData();
-            delete data.marchingOrder;
-            const { result } = await renderLoadedMap(data);
-
-            expect(result.current.marchingOrder).toEqual(['Thorin', 'Gandalf']);
+            expect(result.current.hexMapDisplayNameRef.current).toBe(MAP);
+            // Missing pan bytes are not explicit (0, 0) — documented current
+            // behavior: no view reset is requested.
+            expect(result.current.needsResetViewRef.current).toBe(false);
         });
 
-        it('leaves marchingOrder empty when it is missing and there are no characters', async () => {
-            const data = createMapData();
-            delete data.marchingOrder;
-            const { result } = await renderLoadedMap(data, []);
+        it('leaves marchingOrder empty without characters, still centering partyPosition', async () => {
+            const { result } = await renderLoadedMap({}, []);
 
             expect(result.current.marchingOrder).toEqual([]);
-        });
-
-        it('computes partyPosition from the grid center when it is missing', async () => {
-            const data = createMapData();
-            delete data.partyPosition;
-            const { result } = await renderLoadedMap(data);
-
-            expect(result.current.partyPosition).toEqual({ q: 10, r: 5 });
+            // Existing-map path centers partyPosition from the grid even with
+            // no party (the create path's null is owned by the createNew lane).
+            expect(result.current.partyPosition).toEqual(CENTER_POS);
         });
     });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useTerrainPainting from './useTerrainPainting.js';
@@ -25,23 +26,13 @@ const applyUpdater = (mock, callIndex, initialState) => mock.mock.calls[callInde
 
 describe('useTerrainPainting', () => {
     describe('handleTerrainPointerDown', () => {
-        it('does nothing when the event resolves to no hex', () => {
-            const { result, setTerrain, setRivers } = setup({ getHex: () => null });
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_PAINT);
-            });
-
-            expect(setTerrain).not.toHaveBeenCalled();
-            expect(setRivers).not.toHaveBeenCalled();
-        });
-
         it.each([
+            ['no hex at all', null],
             ['negative column', { q: -1, r: 3 }],
             ['negative row', { q: 2, r: -1 }],
-            ['column at the grid edge', { q: 10, r: 3 }],
-            ['row at the grid edge', { q: 2, r: 10 }],
-        ])('ignores hexes outside the grid (%s)', (_, hex) => {
+            ['column past the last column', { q: 10, r: 3 }],
+            ['row past the last row', { q: 2, r: 10 }],
+        ])('writes nothing when the event resolves to %s', (_, hex) => {
             const { result, setTerrain, setRivers } = setup({ getHex: () => hex });
 
             act(() => {
@@ -52,31 +43,22 @@ describe('useTerrainPainting', () => {
             expect(setRivers).not.toHaveBeenCalled();
         });
 
-        it('paints the selected terrain onto the hex', () => {
+        it('paints the selected terrain on the hex, preserving terrain on other hexes', () => {
             const { result, setTerrain, setRivers } = setup({ selectedTerrain: 'mountains' });
 
             act(() => {
                 result.current.handleTerrainPointerDown({}, TOOL_PAINT);
             });
 
+            expect(setTerrain).toHaveBeenCalledTimes(1);
             expect(setRivers).not.toHaveBeenCalled();
-            expect(applyUpdater(setTerrain, 0, {})).toEqual({ [HEX_KEY]: 'mountains' });
-        });
-
-        it('keeps terrain already painted on other hexes', () => {
-            const { result, setTerrain } = setup({ selectedTerrain: 'mountains' });
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_PAINT);
-            });
-
             expect(applyUpdater(setTerrain, 0, { '4,5': 'desert' })).toEqual({
-                [HEX_KEY]: 'mountains',
                 '4,5': 'desert',
+                [HEX_KEY]: 'mountains',
             });
         });
 
-        it('removes the terrain from the hex when erasing', () => {
+        it('erasing removes only the targeted hex', () => {
             const { result, setTerrain, setRivers } = setup();
 
             act(() => {
@@ -89,18 +71,7 @@ describe('useTerrainPainting', () => {
             });
         });
 
-        it('leaves the terrain map unchanged when erasing an unpainted hex', () => {
-            const initial = { '4,5': 'desert' };
-            const { result, setTerrain } = setup();
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_ERASE);
-            });
-
-            expect(applyUpdater(setTerrain, 0, initial)).toEqual(initial);
-        });
-
-        it('adds a river when the hex has none', () => {
+        it('toggles a river on the hex without touching terrain', () => {
             const { result, setTerrain, setRivers } = setup();
 
             act(() => {
@@ -108,55 +79,28 @@ describe('useTerrainPainting', () => {
             });
 
             expect(setTerrain).not.toHaveBeenCalled();
-            expect(applyUpdater(setRivers, 0, [])).toEqual([HEX_KEY]);
-        });
-
-        it('removes a river when the hex already has one', () => {
-            const { result, setRivers } = setup();
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_RIVER);
-            });
-
-            expect(applyUpdater(setRivers, 0, [HEX_KEY])).toEqual([]);
+            const updater = setRivers.mock.calls[0][0];
+            expect(updater([])).toEqual([HEX_KEY]);
+            expect(updater([HEX_KEY])).toEqual([]);
         });
     });
 
     describe('handleTerrainPointerMove', () => {
-        it('does not paint when the pointer was never pressed', () => {
-            const { result, setTerrain } = setup();
+        it('writes nothing for paint or river drags before the pointer was pressed', () => {
+            const { result, setTerrain, setRivers } = setup();
 
             act(() => {
                 result.current.handleTerrainPointerMove({}, TOOL_PAINT);
             });
-
-            expect(setTerrain).not.toHaveBeenCalled();
-        });
-
-        it('does not add rivers when the pointer was never pressed', () => {
-            const { result, setRivers } = setup();
-
             act(() => {
                 result.current.handleTerrainPointerMove({}, TOOL_RIVER);
             });
 
+            expect(setTerrain).not.toHaveBeenCalled();
             expect(setRivers).not.toHaveBeenCalled();
         });
 
-        it('paints the hex under the pointer while dragging', () => {
-            const { result, setTerrain } = setup({ selectedTerrain: 'mountains' });
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_PAINT);
-            });
-            act(() => {
-                result.current.handleTerrainPointerMove({}, TOOL_PAINT);
-            });
-
-            expect(applyUpdater(setTerrain, 0, {})).toEqual({ [HEX_KEY]: 'mountains' });
-        });
-
-        it('paints each hex visited while dragging', () => {
+        it('paints each hex visited while dragging, preserving earlier paints', () => {
             const getHex = (e) => (e.clientX < 5 ? HEX : { q: 4, r: 5 });
             const { result, setTerrain } = setup({ getHex, selectedTerrain: 'mountains' });
 
@@ -167,8 +111,12 @@ describe('useTerrainPainting', () => {
                 result.current.handleTerrainPointerMove({ clientX: 10 }, TOOL_PAINT);
             });
 
-            expect(applyUpdater(setTerrain, 0, {})).toEqual({ [HEX_KEY]: 'mountains' });
-            expect(applyUpdater(setTerrain, 1, {})).toEqual({ '4,5': 'mountains' });
+            const afterDown = applyUpdater(setTerrain, 0, {});
+            expect(afterDown).toEqual({ [HEX_KEY]: 'mountains' });
+            expect(applyUpdater(setTerrain, 1, afterDown)).toEqual({
+                [HEX_KEY]: 'mountains',
+                '4,5': 'mountains',
+            });
         });
 
         it('ignores hexes outside the grid while dragging', () => {
@@ -187,7 +135,7 @@ describe('useTerrainPainting', () => {
             expect(setTerrain).toHaveBeenCalledTimes(1);
         });
 
-        it('adds new rivers while dragging without toggling existing ones off', () => {
+        it('river drags append new hexes without duplicating or toggling existing ones', () => {
             const getHex = (e) => (e.clientX < 5 ? HEX : { q: 4, r: 5 });
             const { result, setRivers } = setup({ getHex });
 
@@ -197,42 +145,20 @@ describe('useTerrainPainting', () => {
             act(() => {
                 result.current.handleTerrainPointerMove({ clientX: 10 }, TOOL_RIVER);
             });
-
-            const downResult = applyUpdater(setRivers, 0, []);
-            expect(applyUpdater(setRivers, 1, downResult)).toEqual([HEX_KEY, '4,5']);
-        });
-
-        it('does not duplicate a river when dragging over a hex that already has one', () => {
-            const { result, setRivers } = setup();
-
             act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_RIVER);
-            });
-            act(() => {
-                result.current.handleTerrainPointerMove({}, TOOL_RIVER);
+                result.current.handleTerrainPointerMove({ clientX: 0 }, TOOL_RIVER);
             });
 
-            const downResult = applyUpdater(setRivers, 0, []);
-            expect(applyUpdater(setRivers, 1, downResult)).toEqual([HEX_KEY]);
+            const afterDown = applyUpdater(setRivers, 0, []);
+            const afterNewHex = applyUpdater(setRivers, 1, afterDown);
+            expect(afterNewHex).toEqual([HEX_KEY, '4,5']);
+            expect(applyUpdater(setRivers, 2, afterNewHex)).toEqual([HEX_KEY, '4,5']);
         });
     });
 
     describe('handleTerrainPointerUp', () => {
-        it('stops terrain painting until the pointer is pressed again', () => {
-            const { result, setTerrain } = setup({ selectedTerrain: 'mountains' });
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_PAINT);
-            });
-            expect(setTerrain).toHaveBeenCalledTimes(1);
-
-            act(() => {
-                result.current.handleTerrainPointerUp();
-            });
-            act(() => {
-                result.current.handleTerrainPointerMove({}, TOOL_PAINT);
-            });
-            expect(setTerrain).toHaveBeenCalledTimes(1);
+        it('paints only while the pointer is held down, in both lanes', () => {
+            const { result, setTerrain, setRivers } = setup({ selectedTerrain: 'mountains' });
 
             act(() => {
                 result.current.handleTerrainPointerDown({}, TOOL_PAINT);
@@ -240,17 +166,30 @@ describe('useTerrainPainting', () => {
             act(() => {
                 result.current.handleTerrainPointerMove({}, TOOL_PAINT);
             });
-            expect(setTerrain).toHaveBeenCalledTimes(3);
-        });
+            expect(setTerrain).toHaveBeenCalledTimes(2);
 
-        it('stops river painting until the pointer is pressed again', () => {
-            const { result, setRivers } = setup();
+            act(() => {
+                result.current.handleTerrainPointerUp();
+            });
+            act(() => {
+                result.current.handleTerrainPointerMove({}, TOOL_PAINT);
+            });
+            expect(setTerrain).toHaveBeenCalledTimes(2);
 
+            act(() => {
+                result.current.handleTerrainPointerDown({}, TOOL_PAINT);
+            });
+            act(() => {
+                result.current.handleTerrainPointerMove({}, TOOL_PAINT);
+            });
+            expect(setTerrain).toHaveBeenCalledTimes(4);
+
+            // The river lane shares the same press gate: down toggles once,
+            // then moves after release are ignored.
             act(() => {
                 result.current.handleTerrainPointerDown({}, TOOL_RIVER);
             });
             expect(setRivers).toHaveBeenCalledTimes(1);
-
             act(() => {
                 result.current.handleTerrainPointerUp();
             });
@@ -258,14 +197,6 @@ describe('useTerrainPainting', () => {
                 result.current.handleTerrainPointerMove({}, TOOL_RIVER);
             });
             expect(setRivers).toHaveBeenCalledTimes(1);
-
-            act(() => {
-                result.current.handleTerrainPointerDown({}, TOOL_RIVER);
-            });
-            act(() => {
-                result.current.handleTerrainPointerMove({}, TOOL_RIVER);
-            });
-            expect(setRivers).toHaveBeenCalledTimes(3);
         });
     });
 });

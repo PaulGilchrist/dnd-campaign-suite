@@ -1,26 +1,27 @@
+// @maintained-by-ai
 // MA-1867: Cthulhu "Tentacles" — compound attack+save row shipped attack-only;
-// the DC 26 Strength save half (post-hit rider save → pulled 20 ft. + Grappled,
+// the DC 26 Strength rider save half (post-hit → pulled 20 ft. + Grappled,
 // escape DC 26) was structurally absent (no save_dc/save_type → ActionSaveRoll
-// returns null, MonsterAction.jsx:116; zero save adjudication; grapple never
-// granted). DATA fix on cthulhu.actions[2]: save_dc:26 + save_type:"Strength" +
-// dc_success:"none" + save_effect byte-carrying the canonical word "Grappled" +
-// the RAW pull clause + escape_dc:26 (MA-0010 byte-shape). Two-chip fork
-// (MA-0551/§159): "+18" attack chip pays FULL fixed 4d8+10 with saveDc nulled
-// (buildAttackChipSaveOptions); standalone "DC 26 Strength" chip adjudicates the
-// rider alone — rider-only (saveLegIsConditionRider, MA-0551 Death Dog twin,
-// MA-0586/MA-0927 grell sibling): save_effect carries NO damage POOL (the
-// ongoing "4d8 … damage" clause stays in description — inside save_effect it
-// would flip riderOnly=false and render the DC chip UNCLICKABLE or double-charge
-// the primary pool, §259). Grapple is on SAVE-FAIL via save lane (§346 word
-// scan → applyFailedSaveConditions, MA-0368 live); NO hit_conditions authored —
-// the attack-lane hit-clause clause stays null (grapple on hit = wrong axis).
-// RESIDUALS (locked here as pins, not defects): save-lane condition meta is
-// {source} only — activeConditionMeta.grappled carries NO dc/ability (MA-0010
-// escape badge is the attack-lane hit-clause seam, handlePlainDamage:660) —
-// save-lane escape badge stays a documented gap; ongoing 4d8 turn-start tick has
-// NO save-lane producer (MA-1842 grapple_ongoing_damage rides handlePlainDamage
-// hit-clause ATTACK lane only, saveProcessing grep-zero — MA-1842-b/§70
-// advisory); 20 ft. pull save-path unthreaded (§235, gridless advisory anyway).
+// returns null, MonsterAction.jsx:116). DATA fix on cthulhu.actions[2]:
+// save_dc:26 + save_type:"Strength" + dc_success:"none" + save_effect
+// byte-carrying canonical "Grappled" + RAW pull clause + escape_dc:26
+// (MA-0010 byte-shape). Two-chip fork (MA-0551/§159): "+18" attack chip pays
+// FULL 4d8+10 (action passed byte-exact, MonsterAction.jsx:480); standalone
+// "DC 26 Strength" chip adjudicates the rider alone — rider-only because
+// save_effect carries NO damage POOL (§259: dice+"damage" inside save_effect
+// would flip riderOnly false → UNCLICKABLE chip or double-charge the primary
+// pool). Grapple lands on SAVE-FAIL via the save lane word scan (§346 →
+// applyFailedSaveConditions, MA-0368 canonical in
+// saveProcessing.failed-save-conditions.test.js); NO hit_conditions authored —
+// attack-lane hit-clause stays null (grapple on hit = wrong axis).
+// Owned elsewhere (not re-derived here): riderOnly truth table (MA-1000
+// ma1000:74), grell two-chip twin (MA-0927), buildAbilitySaveRollContext
+// transport + Cthulhu saveRiderAttackDamage byte-inert (MA-1877), escape-badge
+// dc/ability (MA-0010 ATTACK-lane seam, handlePlainDamage:660).
+// RESIDUALS (pinned, not defects): save-lane condition meta is {source} only;
+// ongoing 4d8 turn-start tick has NO save-lane producer (MA-1842 rides the
+// attack-lane hit clause only — MA-1842-b/§70 advisory); 20 ft. pull
+// save-path unthreaded (§235 gridless advisory).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -32,8 +33,10 @@ const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalD
 const addExpiration = vi.fn();
 
 // Partial mocks (§385 barrel-surface rule): automation/index links every
-// named export of these modules, so spread the original and override ONLY
-// the behaviour keys this row's save lane touches.
+// named export of these modules, so spread the original and override ONLY the
+// behaviour keys this row's save lane touches. rollExpression/applyDamageToTarget/
+// addExpiration stay as ZERO-CALL canaries — a rider-only row must never roll
+// the primary pool, apply damage, or start a clock (§259/§346/no-timers).
 vi.mock('../../hooks/runtime/useRuntimeState.js', async (importOriginal) => ({
     ...(await importOriginal()),
     getRuntimeValue: (name, key) => runtimeStore[`${name}.${key}`],
@@ -45,7 +48,8 @@ vi.mock('../../services/dice/diceRoller.js', async (importOriginal) => ({
     rollExpression: (...args) => rollExpression(...args),
 }));
 
-// EB-NPC inline lane never opens a save prompt — stub the listener.
+// EB-NPC inline lane never opens a save prompt — stub keeps the lane
+// deterministic if the seam ever regresses into a hanging listener.
 vi.mock('../../services/automation/common/savePrompt.js', async (importOriginal) => ({
     ...(await importOriginal()),
     createSaveListener: () => ({ promise: Promise.resolve({ success: true, roll: 20, total: 20, saveBonus: 0, rawRolls: [], mode: 'normal' }) }),
@@ -59,8 +63,6 @@ vi.mock('../../services/ui/logService.js', async (importOriginal) => ({
 vi.mock('../../services/encounters/combatData.js', async (importOriginal) => ({
     ...(await importOriginal()),
     loadCombatSummary: async () => ({ creatures: [], activeCreatureName: 'Cthulhu 1' }),
-    getCurrentCombatRound: () => 1,
-    getCombatSummary: () => null,
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', async (importOriginal) => ({
@@ -85,8 +87,8 @@ vi.mock('../../services/rules/effects/expirationQueue.js', async (importOriginal
 
 import { processSaveRoll } from '../../hooks/combat/saveProcessing.js';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
-import { isCompositeAttackSaveRow, saveLegIsConditionRider, saveLegCarriesSecondaryDamage, saveChipPlan } from './MonsterCardModal.jsx';
+import { buildHitConditionClause, extractConditionsFromSaveEffect } from './MonsterCardHelpers.js';
+import { isCompositeAttackSaveRow, saveLegCarriesSecondaryDamage, saveChipPlan } from './MonsterCardModal.jsx';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const TENTACLES = monsters.find((m) => m.index === 'cthulhu').actions[2];
@@ -119,56 +121,35 @@ beforeEach(() => {
 });
 
 describe('MA-1867 disk fingerprint: cthulhu Tentacles save half armed (DATA fix)', () => {
-    it('save fields armed after damage_type_primary (MA-0927/MA-0860 byte-shape): DC 26 Strength, dc_success none, escape_dc 26', () => {
-        expect(TENTACLES.name).toBe('Tentacles');
-        expect(TENTACLES.save_dc).toBe(26);
-        expect(TENTACLES.save_type).toBe('Strength');
-        expect(TENTACLES.dc_success).toBe('none');
-        expect(TENTACLES.escape_dc).toBe(26);
-        const keys = Object.keys(TENTACLES);
-        expect(keys.indexOf('save_dc')).toBe(keys.indexOf('damage_type_primary') + 1);
-        expect(keys.indexOf('save_type')).toBe(keys.indexOf('save_dc') + 1);
-        expect(keys.indexOf('dc_success')).toBe(keys.indexOf('save_type') + 1);
-        expect(keys.indexOf('save_effect')).toBe(keys.indexOf('dc_success') + 1);
-        expect(keys.indexOf('escape_dc')).toBe(keys.indexOf('save_effect') + 1);
-    });
-
-    it('save_effect byte-carries canonical "Grappled" + RAW pull clause, escape DC 26 — and NO damage POOL (rider-only pin: the ongoing 4d8 clause stays description-only, §259)', () => {
-        expect(TENTACLES.save_effect).toBe('The target is pulled 20 ft. toward Cthulhu and has the Grappled condition (escape DC 26).');
-        expect(extractConditionsFromSaveEffect(TENTACLES.save_effect)).toEqual(['grappled']);
-        // §259 discriminator: dice + "damage" word in save_effect would disarm the
-        // clickable rider chip (or re-roll the primary pool) — must stay absent.
-        expect(/\d+\s*d\s*\d+/i.test(TENTACLES.save_effect)).toBe(false);
-    });
-
-    it('grapple axis is SAVE-FAIL only: NO hit_conditions authored, hit-clause stays null (attack chip never grants)', () => {
-        expect(TENTACLES.hit_conditions).toBeUndefined();
+    it('full-row byte-lock (MA-0927/MA-0860 byte-shape): save half armed after damage_type_primary, NO hit_conditions (grapple axis = save-fail only), save_effect dice-free (§259 rider-only)', () => {
+        expect(TENTACLES).toEqual({
+            name: 'Tentacles',
+            description: RAW_DESCRIPTION,
+            reach: '20 ft.',
+            attack_bonus: 18,
+            damage_dice_primary: '4d8 + 10',
+            damage_type_primary: 'Bludgeoning',
+            save_dc: 26,
+            save_type: 'Strength',
+            dc_success: 'none',
+            save_effect: 'The target is pulled 20 ft. toward Cthulhu and has the Grappled condition (escape DC 26).',
+            escape_dc: 26,
+        });
+        // Key-order pins the MA-0010 authoring seam (save fields slot in
+        // immediately after damage_type_primary; escape_dc trails save_effect).
+        expect(Object.keys(TENTACLES)).toEqual(['name', 'description', 'reach', 'attack_bonus', 'damage_dice_primary', 'damage_type_primary', 'save_dc', 'save_type', 'dc_success', 'save_effect', 'escape_dc']);
+        // toEqual already forbids hit_conditions — the attack lane must never
+        // grant grapple (grapple on hit = wrong axis); assert the clause itself.
         expect(buildHitConditionClause(TENTACLES)).toBeNull();
-    });
-
-    it('attack half byte-unchanged: +18 / reach 20 ft. / 4d8 + 10 / Bludgeoning / RAW description intact', () => {
-        expect(TENTACLES.attack_bonus).toBe(18);
-        expect(TENTACLES.reach).toBe('20 ft.');
-        expect(TENTACLES.damage_dice_primary).toBe('4d8 + 10');
-        expect(TENTACLES.damage_type_primary).toBe('Bludgeoning');
-        expect(TENTACLES.description).toBe(RAW_DESCRIPTION);
-        expect(attackRowMissingToHit(TENTACLES)).toBe(false);
     });
 });
 
-describe('MA-1867 compound two-chip fork (MA-0551/§159)', () => {
-    it('rider-only composite save chip: no secondary, no formula, CLICKABLE (pre-fix the row had no save_dc at all)', () => {
+describe('MA-1867 two-chip fork (MA-0551/§159): rider-only plan + live dispatch', () => {
+    it('plan is formula-less riderOnly CLICKABLE (no pool re-roll, no secondary), renders "+18" + "DC 26 Strength" only, and dispatches attack byte-exact / save rider-only [grappled]', () => {
         expect(isCompositeAttackSaveRow(TENTACLES)).toBe(true);
         expect(saveLegCarriesSecondaryDamage(TENTACLES)).toBe(false);
-        expect(saveLegIsConditionRider(TENTACLES)).toBe(true);
-        const plan = saveChipPlan(TENTACLES, false);
-        expect(plan.riderOnly).toBe(true);
-        expect(plan.formula).toBeNull();
-        expect(plan.rollable).toBe(false);
-        expect(plan.clickable).toBe(true);
-    });
+        expect(saveChipPlan(TENTACLES, false)).toEqual({ riderOnly: true, formula: null, rollable: false, clickable: true });
 
-    it('renders TWO chips: "+18" attack + "DC 26 Strength" save; save chip press threads (action, null formula, [grappled])', () => {
         const onAttack = vi.fn();
         const onSaveRoll = vi.fn();
         const { container } = render(
@@ -187,17 +168,16 @@ describe('MA-1867 compound two-chip fork (MA-0551/§159)', () => {
         const chips = [...container.querySelectorAll('.mc-dice-link')].map((c) => c.textContent.trim());
         expect(chips).toEqual(['+18', 'DC 26 Strength']);
         fireEvent.click(container.querySelectorAll('.mc-dice-link')[0]);
-        expect(onAttack).toHaveBeenCalledWith('Tentacles', 18, expect.objectContaining({ name: 'Tentacles' }));
-        const saveChip = container.querySelector('.mc-dice-link-save-clickable');
-        expect(saveChip).not.toBeNull();
-        expect(saveChip.textContent.trim()).toBe('DC 26 Strength');
-        fireEvent.click(saveChip);
+        expect(onAttack).toHaveBeenCalledWith('Tentacles', 18, TENTACLES);
+        const saveChips = container.querySelectorAll('.mc-dice-link-save-clickable');
+        expect(saveChips).toHaveLength(1);
+        fireEvent.click(saveChips[0]);
         expect(onSaveRoll).toHaveBeenCalledWith(TENTACLES, null, ['grappled']);
     });
 });
 
-describe('MA-1867 save-lane adjudication (MA-0586/MA-0368 EB-NPC inline seam)', () => {
-    it('failed STR save: Grappled granted with source meta, zero save-damage, no roll, no clock', async () => {
+describe('MA-1867 save-lane adjudication (MA-0368/§346 EB-NPC inline seam)', () => {
+    it('failed STR save: Grappled granted with {source}-only meta + grant log, zero save-damage, zero clock', async () => {
         // EB-NPC inline lane (§159/MA-0586): dice stamped upstream on
         // context.effectiveD20, total folded at processNpcSave. FAIL: 5+0 < 26.
         const logEntry = vi.fn();
@@ -215,27 +195,24 @@ describe('MA-1867 save-lane adjudication (MA-0586/MA-0368 EB-NPC inline seam)', 
         });
 
         expect(runtimeStore[`${VICTIM}.activeConditions`]).toEqual(['grappled']);
-        // §346: save-lane meta is {source} only — escape-badge dc/ability stays
-        // the MA-0010 ATTACK-lane seam (residual pinned, NOT a fake grant).
+        // §346 residual pin: save-lane meta is {source} only — escape-badge
+        // dc/ability stays the MA-0010 ATTACK-lane seam, NOT a fake grant.
         expect(runtimeStore[`${VICTIM}.activeConditionMeta`].grappled).toEqual({ source: CTHULHU });
 
         const grant = addEntryLogs.find((e) => e.type === 'condition' && e.action === 'applied');
         expect(grant).toBeTruthy();
-        expect(grant.characterName).toBe(VICTIM);
-        expect(grant.condition).toBe('Grappled');
-        expect(grant.sourceName).toBe(CTHULHU);
-        expect(grant.sourceAbility).toBe('Tentacles');
+        expect({ ...grant }).toMatchObject({ characterName: VICTIM, condition: 'Grappled', sourceName: CTHULHU, sourceAbility: 'Tentacles' });
 
-        // ZERO save-damage on both halves: no damage rolls, no applier, no hp entries.
+        // Rider-only: zero save-damage — no rolls, no applier, no hp entries,
+        // no expiration clock on a condition-only lane (§259/§346/no-timers).
         expect(rollExpression).not.toHaveBeenCalled();
         expect(applyDamageToTarget).not.toHaveBeenCalled();
         expect(logEntry.mock.calls.some(([e]) => e.rollType === 'save-damage' || e.rollType === 'damage')).toBe(false);
         expect(addEntryLogs.some((e) => e.type === 'hp_change')).toBe(false);
-        // Condition-only lane carries no addExpiration clock (§346).
         expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('successful STR save: zero grant, zero log-condition, zero damage (dc_success none, rider fail-only)', async () => {
+    it('successful STR save (dc_success:"none" canary, MV-20/§335): zero grant, zero damage — half-default never leaks a save-damage leg', async () => {
         // SUCCESS face: nat20 + STR-proficient +6 = 26 ≥ 26 (ElderPaladin-class).
         const logEntry = vi.fn();
         await processSaveRoll({

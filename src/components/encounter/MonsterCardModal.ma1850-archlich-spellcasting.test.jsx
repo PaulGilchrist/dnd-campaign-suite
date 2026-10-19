@@ -1,19 +1,20 @@
+// @maintained-by-ai
 // MA-1850 data lock: Archlich Spellcasting rode the MA-0421/MA-0611/MA-0619
 // twin markup-gap template. Pre-fix the WHOLE description was plain text —
-// extractSpellNamesFromSpellcasting returned [] and extractSpellcastingSpellUses
-// {} → SpellCastLinks null → ZERO .mc-dice-link-spell chips, no spell on the
-// card castable, no DC/save/attack adjudication possible on the row (the only
-// "DC 22 Wisdom" chip on the card belonged to legendary Dread Word — decoy).
-// Row already carried the required save_dc 22 + save_type "Intelligence" pair
-// (§89/§167 satisfied — MA-0614 spell_save_dc-only trap N/A). DATA fix:
-// house-style <strong>Tier:</strong> <em>Spell</em> INLINE (originally-inline
-// prose, no <br> — yochlol MA-1742 byte-shape), strip-tags byte-equality
-// pinned; cosmetic "Mage Hand,Mage Armor" missing space fixed in the same
-// pass. Phantasmagoria is ABSENT from BOTH spells.json (MA-0599 junk-log /
-// console "Spell not found" fingerprint, Modal:2339 no resolvable-name guard
-// in this lane) — it stays PLAIN TEXT: emphasis marks resolvable names only,
-// the authored prose list survives byte-intact and no fake chip is armed.
-// Blade Ward is 2024-only — casts live via the 5e→2024 fallback (§207/MA-0680).
+// extractors returned []/{} → SpellCastLinks null → ZERO .mc-dice-link-spell
+// chips, nothing castable on the row. DATA fix: house-style
+// <strong>Tier:</strong> <em>Spell</em> INLINE (yochlol MA-1742 byte-shape,
+// no <br>); cosmetic "Mage Hand,Mage Armor" missing space fixed in the same
+// pass. Row already carried save_dc 22 + save_type "Intelligence" (§89).
+// Phantasmagoria is ABSENT from BOTH spells.json (MA-0599 junk-log lane) —
+// it stays PLAIN TEXT: emphasis marks resolvable names only, no fake chip.
+// Blade Ward is 2024-only — casts live via the 5e→2024 fallback (§207).
+// Lane owns Spellcasting-ROW bytes only: Fire Bolt legendary-cast lane is
+// ma1853, Dread Word DC 22 chip lane is ma1855 — cited, not absorbed.
+// Generic owners cited (not duplicated here): 1/Day spend+refusal
+// spellcasting.test.jsx:281-304 (this row authors NO gates — uses map {},
+// so no spend cascade exists in this lane); Lightning Bolt save routing
+// (half/8d6) spellcasting.test.jsx:226-241.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -33,19 +34,15 @@ const CHIP_NAMES = [
   'Counterspell', 'Dispel Magic', 'Fly', 'Hold Monster', 'Lightning Bolt', 'Shield',
   'Mind Blank', 'Power Word Stun', 'Dominate Monster', 'Meteor Swarm', 'Time Stop', 'Wish',
 ];
-const HEADERS = ['Cantrips (at will)', '1st-7th level (at will)', '8th-9th level (3 slots total per spell level)'];
 
-// Pre-fix plain baseline: identical text, names unmarked, cosmetic typo fixed.
+// Post-fix authored markup, byte-locked: tier headers <strong>-wrapped ending
+// ":", resolvable spells <em>-wrapped inline, no <br>, Phantasmagoria plain.
+const EXACT_DESCRIPTION = 'The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: <strong>Cantrips (at will):</strong> <em>Blade Ward</em>, <em>Fire Bolt</em>, <em>Mage Hand</em>, <em>Mage Armor</em>. <strong>1st-7th level (at will):</strong> <em>Counterspell</em>, <em>Dispel Magic</em>, <em>Fly</em>, <em>Hold Monster</em>, <em>Lightning Bolt</em>, Phantasmagoria, <em>Shield</em>. <strong>8th-9th level (3 slots total per spell level):</strong> <em>Mind Blank</em>, <em>Power Word Stun</em>, <em>Dominate Monster</em>, <em>Meteor Swarm</em>, <em>Time Stop</em>, <em>Wish</em>.';
+// Pre-fix plain baseline: identical text, names unmarked, typo fixed.
 const PRE_FIX_DESCRIPTION = 'The archlich is a 20th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 22, +14 to hit with spell attacks). It has the following Wizard spells prepared: Cantrips (at will): Blade Ward, Fire Bolt, Mage Hand, Mage Armor. 1st-7th level (at will): Counterspell, Dispel Magic, Fly, Hold Monster, Lightning Bolt, Phantasmagoria, Shield. 8th-9th level (3 slots total per spell level): Mind Blank, Power Word Stun, Dominate Monster, Meteor Swarm, Time Stop, Wish.';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Archlich 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -63,37 +60,19 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? SPELLS_2024 : SPELLS_5E)),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
-
-  return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
-  };
-});
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    rollAbilityCheck: vi.fn(),
+    rollSavingThrow: vi.fn(),
+    rollSkillCheck: vi.fn(),
+    rollInitiative: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
+  })),
+}));
 
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
@@ -129,7 +108,6 @@ const runtime = vi.hoisted(() => {
   const store = {};
   return {
     store,
-    key: (characterKey, propertyName) => `${characterKey}.${propertyName}`,
     setRuntimeValue: vi.fn((characterKey, propertyName, value) => { store[`${characterKey}.${propertyName}`] = value; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
     useRuntimeValue: vi.fn((characterKey, propertyName) => store[`${characterKey}.${propertyName}`] ?? null),
@@ -172,61 +150,31 @@ function renderArchlich() {
 // ── Data lock: archlich Spellcasting row ─────────────────────────────────────
 
 describe('MA-1850 monsters.json data lock: Archlich Spellcasting row', () => {
-  it('extracts all sixteen resolvable spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(archlichRow.description);
-    expect(names).toEqual(CHIP_NAMES);
-    expect(names.length).toBeGreaterThanOrEqual(1);
-    HEADERS.forEach(h => expect(names).not.toContain(h));
-    // MA-0599 guard: the unresolvable name never becomes a chip.
-    expect(names).not.toContain('Phantasmagoria');
+  it('raw description byte-locked: house-style inline markup, Phantasmagoria plain, stripped text equals the pre-fix baseline (typo fixed)', () => {
+    expect(archlichRow.description).toBe(EXACT_DESCRIPTION);
+    expect(stripTags(archlichRow.description)).toBe(PRE_FIX_DESCRIPTION);
+    expect(archlichRow.description).not.toMatch(/<(?:strong|em)>Phantasmagoria<\/(?:strong|em)>/);
   });
 
-  it('no 1/Day headers on this row — every chip ungated (At-Will/level bands by design §57)', () => {
+  it('extractor exact-map: all sixteen resolvable names harvest, tier headers and the unresolvable name never enter the harvest (§57, no fake chips)', () => {
+    expect(extractSpellNamesFromSpellcasting(archlichRow.description)).toEqual(CHIP_NAMES);
+  });
+
+  it('no 1/Day headers on this row — every chip ungated (At-Will/level bands by design §57; spend-cascade lane N/A, owner spellcasting.test.jsx:281-304)', () => {
     expect(extractSpellcastingSpellUses(archlichRow.description)).toEqual({});
   });
 
-  it('row-level numeric save_dc 22 + save_type Intelligence pair authored (§89 requirement)', () => {
+  it('row adjudication pair: numeric save_dc 22 + save_type Intelligence (§89); +14 spell-attack seam resolves from the prose (monsterSpellAttackBonus)', () => {
     expect(archlichRow.save_dc).toBe(22);
     expect(archlichRow.save_type).toBe('Intelligence');
-    expect(archlichRow.description).toMatch(/spell save DC 22/);
-  });
-
-  it('+14 spell attack seam resolves from the row prose (monsterSpellAttackBonus)', () => {
     expect(monsterSpellAttackBonus(archlichRow)).toBe(14);
   });
 
-  it('markup-only diff proof: stripped text equals the pre-fix description (typo fixed) byte-for-byte', () => {
-    expect(stripTags(archlichRow.description)).toBe(PRE_FIX_DESCRIPTION);
-  });
-
-  it('house style: tier headers <strong>-wrapped ending ":", spell names <em>-wrapped inline, no <br>', () => {
-    expect(archlichRow.description).not.toMatch(/<br>/);
-    HEADERS.forEach(h => expect(archlichRow.description).toContain(`<strong>${h}:</strong>`));
-    CHIP_NAMES.forEach(n => expect(archlichRow.description).toContain(`<em>${n}</em>`));
-  });
-
-  it('no fake chips: every marked token is a ":" header or a resolvable spell name (Phantasmagoria stays plain)', () => {
-    expect(archlichRow.description).toContain(', Phantasmagoria,');
-    expect(archlichRow.description).not.toMatch(/<(?:strong|em)>Phantasmagoria<\/(?:strong|em)>/);
-    const marked = [...archlichRow.description.matchAll(/<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g)].map(m => m[1]);
-    marked.forEach(t => {
-      const ok = t.endsWith(':') || CHIP_NAMES.includes(t);
-      expect(ok, `marked token must be header or spell name: ${t}`).toBe(true);
-    });
-  });
-
-  it('Phantasmagoria absent from BOTH spells.json (the reason it stays unmarked); Blade Ward 2024-only via §207 fallback', () => {
+  it('spell-DB pins: Phantasmagoria absent from BOTH spells.json (why it stays unmarked); Blade Ward 2024-only (§207 fallback). Lightning Bolt half/8d6 shape owned by spellcasting.test.jsx:226-241', () => {
     expect(spells5e.some(s => s.name === 'Phantasmagoria')).toBe(false);
     expect(spells2024.some(s => s.name === 'Phantasmagoria')).toBe(false);
     expect(spells5e.some(s => s.name === 'Blade Ward')).toBe(false);
     expect(spells2024.some(s => s.name === 'Blade Ward')).toBe(true);
-  });
-
-  it('Lightning Bolt adjudicates with the row DC: DEX save, half on success, 8d6 at level 3', () => {
-    const lb = spells5e.find(s => s.name === 'Lightning Bolt');
-    expect(lb.dc.dc_type).toBe('DEX');
-    expect(lb.dc.dc_success).toBe('half');
-    expect(lb.damage.damage_at_slot_level['3']).toBe('8d6');
   });
 });
 
@@ -238,18 +186,12 @@ describe('MA-1850 MonsterCardModal Archlich Spellcasting chips', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders sixteen spell chips — the zero-chip inert row is gone', () => {
+  it('renders sixteen spell chips in authored order, none carrying a /Day counter (exact-name match subsumes counter check)', () => {
     renderArchlich();
     expect(spellLinks().map(el => el.textContent.trim())).toEqual(CHIP_NAMES);
-    expect(spellLinks().length).toBeGreaterThan(0);
   });
 
-  it('no chip carries a /Day counter (no 1/Day tier authored)', () => {
-    renderArchlich();
-    spellLinks().forEach(el => expect(el.textContent).not.toMatch(/\/Day/));
-  });
-
-  it('At-Will Fly casts ungated twice — zero uses, advisory log prints row DC 22', async () => {
+  it('cast lane: At-Will Fly repeats ungated, advisory log prints row DC 22, zero uses spent; Hold Monster records DC 22 WIS (§336 row-local axis)', async () => {
     renderArchlich();
     await act(async () => { fireEvent.click(linkByText('Fly')); });
     await waitFor(() => expect(abilityUseEntries('Fly').length).toBe(1));
@@ -257,16 +199,14 @@ describe('MA-1850 MonsterCardModal Archlich Spellcasting chips', () => {
     await act(async () => { fireEvent.click(linkByText('Fly')); });
     await waitFor(() => expect(abilityUseEntries('Fly').length).toBe(2));
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
-  });
 
-  it('Hold Monster records DC 22 WIS on the cast log (§336 row-local axis)', async () => {
-    renderArchlich();
     await act(async () => { fireEvent.click(linkByText('Hold Monster')); });
     await waitFor(() => expect(abilityUseEntries('Hold Monster').length).toBe(1));
     expect(abilityUseEntries('Hold Monster')[0].description).toMatch(/spell save DC 22, WIS/);
+    expect(refusalEntries('Fly').length + refusalEntries('Hold Monster').length).toBe(0);
   });
 
-  it('Fire Bolt routes the spell-attack seam at +14 and refuses honestly pre-spend (cantrip-ladder data gap, zero spend)', async () => {
+  it('Fire Bolt routes the spell-attack seam at +14 and refuses honestly pre-spend (cantrip-ladder data gap, zero spend) — Spellcasting-row lane, legendary-cast lane owned by ma1853', async () => {
     renderArchlich();
     await act(async () => { fireEvent.click(linkByText('Fire Bolt')); });
     await waitFor(() => expect(refusalEntries('Fire Bolt').length).toBe(1));

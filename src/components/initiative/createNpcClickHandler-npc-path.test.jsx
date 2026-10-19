@@ -1,3 +1,30 @@
+// @maintained-by-ai
+// LANE: createNpcClickHandler.js :22-28 campaign-NPC hit + :22 lookup-miss skips —
+// the plain-NPC popup path (no monster twin, no form) and its fall-INTO-fallback seam.
+// The chain under test is NOT mocked (#791/#841 discipline): NPC_FORM_HANDLERS runs its
+// real matchers against an absent runtimeCreature; dataLoader/monsterUtils are stubbed
+// only as a zero-network guard.
+// Cite map (siblings own the rest — do not duplicate here):
+//   localhost guard truth table (blocked + obeyed)    → createNpcClickHandler-early-return.test.jsx
+//   fallback hit + no-statblock no-op                 → createNpcClickHandler-fallback.test.jsx
+//   runtime monsterIndex merge bytes + retention      → createNpcClickHandler-monster-path.test.jsx
+//   wildshape / polymorph / shapechange form handlers → createNpcClickHandler-{wildshape,polymorph,shapechange}.test.jsx
+//   npcToMonsterFormat output bytes                   → src/services/encounters/npcStatBlockUtils.test.js
+// Old -> new map:
+//   'should format NPC via npcToMonsterFormat and set viewing monster when NPC is found'
+//     + 'should perform case-insensitive NPC name matching'
+//     → test 1 (consolidated; strengthened: verbatim popup-object identity, exact-once
+//        counts, and early-return-before-chain attribution — getCombatSummary/getMonsterData
+//       /loadMonsters all untouched on a hit)
+//   'should fall through to getMonsterData when npcToMonsterFormat returns null for a found NPC'
+//     → test 2 (strengthened: click-name differs in case from the matched npc's name, so
+//        the fallback lookup is pinned to the CLICKED bytes, not npc.name; exact-once;
+//        real-chain-ran / bestiary-merge-not-taken attribution)
+//   'should skip npcToMonsterFormat and fall to getMonsterData when NPC lookup fails
+//    (empty list, null name, missing name)' + 'should skip npcToMonsterFormat when
+//    creature name is null'
+//     → test 3 (consolidated: all four miss shapes assert one fallback-lookup byte
+//        sequence; no mid-test clearAllMocks — determinism, #827)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createNpcClickHandler } from './createNpcClickHandler.js';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
@@ -5,6 +32,9 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.js';
 
+// Zero-network guard: dataLoader and monsterUtils are stubbed. The real NPC_FORM_HANDLERS
+// are NOT mocked (~#841) — they run unharmed here only to prove none of them intercepts
+// a plain-NPC click (all matches() are false without a runtimeCreature).
 vi.mock('../../services/ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(() => Promise.resolve([])),
     fetchRaceData: vi.fn(() => Promise.resolve(null)),
@@ -15,227 +45,105 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 vi.mock('../../services/npcs/monsterUtils.js', () => ({
     getMonsterData: vi.fn(() => Promise.resolve(null)),
 }));
+// Routing seam only — the formatter's output bytes are pinned in npcStatBlockUtils.test.js.
 vi.mock('../../services/encounters/npcStatBlockUtils.js', () => ({
     npcToMonsterFormat: vi.fn(() => null),
 }));
 
 describe('createNpcClickHandler - NPC stat block path', () => {
-    let handler;
     let setViewingMonster;
     let setViewingMonsterCreatureName;
-    let campaignNpcs;
-    let characters;
 
     beforeEach(() => {
         vi.clearAllMocks();
         setViewingMonster = vi.fn();
         setViewingMonsterCreatureName = vi.fn();
-        campaignNpcs = [];
-        characters = [
-            {
-                name: 'DruidAlice',
-                computedStats: {
-                    hitPoints: 20,
-                    currentHitPoints: 20,
-                    armorClass: 15,
-                    abilities: [
-                        { name: 'Intelligence', score: 16 },
-                        { name: 'Wisdom', score: 14 },
-                        { name: 'Charisma', score: 12 },
-                    ],
-                    languages: ['Common', 'Elvish'],
-                    class: { major: { name: 'Circle of the Moon' } },
-                },
-            },
-        ];
         vi.mocked(loadMonsters).mockResolvedValue([]);
         vi.mocked(getCombatSummary).mockReturnValue(null);
         vi.mocked(getMonsterData).mockResolvedValue(null);
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
+        vi.mocked(npcToMonsterFormat).mockReturnValue(null);
     });
 
-    it('should format NPC via npcToMonsterFormat and set viewing monster when NPC is found', async () => {
-        campaignNpcs = [
-            {
-                name: 'Goblin Warrior',
-                armorClass: 15,
-                hitPoints: 7,
-                abilityScores: { str: 8, dex: 14, con: 10, int: 8, wis: 8, cha: 8 },
-                size: 'Small',
-                classRole: 'NPC',
-                speed: { walk: '30 ft.' },
-                savingThrowBonuses: { dex: 4 },
-                skillBonuses: {},
-                initiativeBonus: 2,
-                traits: [],
-                actions: [],
-                reactions: [],
-                damageResistances: [],
-                damageImmunities: [],
-                conditionImmunities: [],
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
+    const makeHandler = (campaignNpcs) => createNpcClickHandler({
+        isLocalhost: true,
+        campaignNpcs,
+        campaignName: 'test-campaign',
+        characters: [], // inert in this lane: no form handler run() executes (#841 discipline)
+        setViewingMonster,
+        setViewingMonsterCreatureName,
+    });
+
+    it('opens the popup with the formatted campaign NPC verbatim, exactly once, and never reaches the chain', async () => {
+        const goblinNpc = {
+            name: 'Goblin Warrior',
+            armorClass: 15,
+            hitPoints: 7,
+            abilityScores: { str: 8, dex: 14, con: 10, int: 8, wis: 8, cha: 8 },
+        };
         const formatted = { name: 'Goblin Warrior', armor_class: 15 };
         vi.mocked(npcToMonsterFormat).mockReturnValue(formatted);
 
-        await handler({ name: 'Goblin Warrior' });
+        // Click differs in case from the roster entry: pins the case-insensitive find (:22).
+        const result = await makeHandler([goblinNpc])({ name: 'GOBLIN WARRIOR' });
 
-        expect(npcToMonsterFormat).toHaveBeenCalledWith(campaignNpcs[0]);
-        expect(setViewingMonster).toHaveBeenCalledWith(formatted);
-        expect(setViewingMonsterCreatureName).toHaveBeenCalledWith('Goblin Warrior');
-    });
-
-    it('should fall through to getMonsterData when npcToMonsterFormat returns null for a found NPC', async () => {
-        campaignNpcs = [
-            {
-                name: 'Goblin Warrior',
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-        vi.mocked(npcToMonsterFormat).mockReturnValue(null);
-        const fallbackMonster = { index: 'goblin', name: 'Goblin' };
-        vi.mocked(getMonsterData).mockResolvedValue(fallbackMonster);
-
-        await handler({ name: 'Goblin Warrior' });
-
-        expect(npcToMonsterFormat).toHaveBeenCalled();
-        expect(getMonsterData).toHaveBeenCalledWith('Goblin Warrior');
-        expect(setViewingMonster).toHaveBeenCalledWith(fallbackMonster);
-    });
-
-    it('should skip npcToMonsterFormat and fall to getMonsterData when NPC lookup fails (empty list, null name, missing name)', async () => {
-        const fallbackMonster = { index: 'goblin', name: 'Goblin' };
-        vi.mocked(getMonsterData).mockResolvedValue(fallbackMonster);
-
-        // Empty campaignNpcs
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs: [],
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-        await handler({ name: 'Goblin' });
-        expect(npcToMonsterFormat).not.toHaveBeenCalled();
-        expect(getMonsterData).toHaveBeenCalledWith('Goblin');
-        vi.clearAllMocks();
-        vi.mocked(getMonsterData).mockResolvedValue(fallbackMonster);
-
-        // campaignNpcs with NPC that has no name property
-        campaignNpcs = [
-            {
-                armorClass: 15,
-                hitPoints: 7,
-                abilityScores: {},
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-        await handler({ name: 'Goblin' });
-        expect(npcToMonsterFormat).not.toHaveBeenCalled();
-        expect(getMonsterData).toHaveBeenCalledWith('Goblin');
-        vi.clearAllMocks();
-        vi.mocked(getMonsterData).mockResolvedValue(fallbackMonster);
-
-        // campaignNpcs with NPC that has null name
-        campaignNpcs = [
-            {
-                name: null,
-                armorClass: 15,
-                hitPoints: 7,
-                abilityScores: {},
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-        await handler({ name: 'Goblin' });
-        expect(npcToMonsterFormat).not.toHaveBeenCalled();
-        expect(getMonsterData).toHaveBeenCalledWith('Goblin');
-    });
-
-    it('should skip npcToMonsterFormat when creature name is null', async () => {
-        campaignNpcs = [
-            {
-                name: 'Goblin',
-                armorClass: 15,
-                hitPoints: 7,
-                abilityScores: {},
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-
-        await handler({ name: null });
-
-        expect(npcToMonsterFormat).not.toHaveBeenCalled();
-        expect(setViewingMonster).not.toHaveBeenCalled();
-    });
-
-    it('should perform case-insensitive NPC name matching', async () => {
-        campaignNpcs = [
-            {
-                name: 'goblin warrior',
-                armorClass: 15,
-                hitPoints: 7,
-                abilityScores: { str: 8, dex: 14, con: 10, int: 8, wis: 8, cha: 8 },
-            },
-        ];
-        handler = createNpcClickHandler({
-            isLocalhost: true,
-            campaignNpcs,
-            campaignName: 'test-campaign',
-            characters,
-            setViewingMonster,
-            setViewingMonsterCreatureName,
-        });
-        const formatted = { name: 'goblin warrior', armor_class: 15 };
-        vi.mocked(npcToMonsterFormat).mockReturnValue(formatted);
-
-        await handler({ name: 'GOBLIN WARRIOR' });
-
-        expect(npcToMonsterFormat).toHaveBeenCalledWith(campaignNpcs[0]);
-        expect(setViewingMonster).toHaveBeenCalledWith(formatted);
+        expect(result).toBeUndefined();
+        expect(npcToMonsterFormat).toHaveBeenCalledTimes(1);
+        expect(npcToMonsterFormat).toHaveBeenCalledWith(goblinNpc);
+        expect(setViewingMonster).toHaveBeenCalledTimes(1);
+        // Verbatim object identity — no merge, no clone, no re-format (#829).
+        expect(setViewingMonster.mock.calls[0][0]).toBe(formatted);
+        expect(setViewingMonsterCreatureName).toHaveBeenCalledTimes(1);
+        // The popup label is the CLICKED bytes, not the roster's casing.
         expect(setViewingMonsterCreatureName).toHaveBeenCalledWith('GOBLIN WARRIOR');
+        // Early-return attribution (:28): a hit never falls through to the chain or the
+        // bestiary fallback — bisect: delete lines 26-28 → red.
+        expect(getCombatSummary).not.toHaveBeenCalled();
+        expect(loadMonsters).not.toHaveBeenCalled();
+        expect(getMonsterData).not.toHaveBeenCalled();
+    });
+
+    it('falls INTO the fallback via the real form chain when a matched NPC formats to null, looking up the clicked name', async () => {
+        const goblinNpc = { name: 'Goblin Warrior', armorClass: 15 };
+        const fallbackMonster = { index: 'goblin', name: 'Goblin' };
+        vi.mocked(getMonsterData).mockResolvedValue(fallbackMonster);
+
+        // Click bytes differ in case from the roster: the fallback must be keyed on
+        // creature.name (:41/:44), not the matched npc's casing.
+        await makeHandler([goblinNpc])({ name: 'goblin warrior' });
+
+        expect(npcToMonsterFormat).toHaveBeenCalledTimes(1);
+        expect(npcToMonsterFormat).toHaveBeenCalledWith(goblinNpc);
+        // Reached attribution: format-null did NOT early-return (bisect: return at :29
+        // unconditionally → red); the click fell through the unmocked matcher loop.
+        expect(getCombatSummary).toHaveBeenCalledTimes(1);
+        expect(loadMonsters).not.toHaveBeenCalled(); // real matchers: none matched, none ran
+        expect(getMonsterData).toHaveBeenCalledTimes(1);
+        expect(getMonsterData).toHaveBeenCalledWith('goblin warrior');
+        expect(setViewingMonster).toHaveBeenCalledTimes(1);
+        expect(setViewingMonster.mock.calls[0][0]).toBe(fallbackMonster);
+        expect(setViewingMonsterCreatureName).toHaveBeenCalledTimes(1);
+        expect(setViewingMonsterCreatureName).toHaveBeenCalledWith('goblin warrior');
+    });
+
+    it('skips npcToMonsterFormat for every lookup miss (empty, nameless, null-named, null-clicked) and reaches the fallback with the clicked bytes', async () => {
+        // Every miss shape must: skip the format call, skip form-handler runs, and reach
+        // getMonsterData exactly once with the raw click bytes (stub resolves null → silence).
+        const misses = [
+            [[], 'Goblin'],
+            [[{ armorClass: 15, hitPoints: 7 }], 'Goblin'], // NPC with no name property
+            [[{ name: null, armorClass: 15 }], 'Goblin'],    // NPC with null name
+            [[{ name: 'Goblin', armorClass: 15 }], null],     // null clicked name
+        ];
+        for (const [campaignNpcs, clickName] of misses) {
+            await makeHandler(campaignNpcs)({ name: clickName });
+        }
+
+        expect(npcToMonsterFormat).not.toHaveBeenCalled();
+        expect(loadMonsters).not.toHaveBeenCalled();
+        expect(getCombatSummary).toHaveBeenCalledTimes(misses.length);
+        expect(setViewingMonster).not.toHaveBeenCalled();
+        expect(setViewingMonsterCreatureName).not.toHaveBeenCalled();
+        // One fallback lookup per miss, in order, with the exact clicked bytes (:41).
+        expect(getMonsterData.mock.calls.map(call => call[0])).toEqual(['Goblin', 'Goblin', 'Goblin', null]);
     });
 });

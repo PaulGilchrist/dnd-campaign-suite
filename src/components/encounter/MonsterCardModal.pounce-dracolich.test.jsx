@@ -1,16 +1,24 @@
-// MA-0620 regression: Dracolich legendary rows[0] "Pounce" carried `uses:1`
-// with no header row above it — legendaryHeaderAction() swallowed Pounce as
-// the economy header (name+counter render, zero affordance; MA-0567/MA-0510
-// header-swallow) and the prose spellcast child "Sickening Ray" had no
-// numeric mechanic, so its gated "Expend Legendary" chip silently BURNED the
-// use with console.error "no resolvable mechanic" (§46). Fix is DATA-only,
-// header+children SAME pass: canonical header rows[0]
+// @maintained-by-ai
+// MA-0620/MA-0621 regression: Dracolich legendary rows carried `uses:1` on
+// "Pounce" with no header row — legendaryHeaderAction() swallowed Pounce as
+// the economy header (MA-0567/MA-0510 header-swallow) and the prose spellcast
+// child "Sickening Ray" had no numeric mechanic, so its gated chip silently
+// BURNED the use with console.error "no resolvable mechanic" (§46). Fix is
+// DATA-only, header+children SAME pass: canonical header rows[0]
 // "Legendary Action Uses: 1" (MA-0040/Death Knight byte-shape, §165);
 // Pounce delegates_to:"Rend" resolving the dracolich's OWN Rend numbers
 // (+13 / 2d10 + 7 Slashing + 1d8 Necrotic) through the MA-0022 delegate
 // attack seam, half-Speed movement advisory (§70 twin); Sickening Ray rides
 // the MA-0219 Guiding Light numeric-spellchild seam (+11 spell attack,
-// 3d8 Poison per 2024 Ray of Sickness level 2).
+// 3d8 Poison per 2024 Ray of Sickness level 2) and MA-0621 authors RAW
+// level-2 poison-on-hit transport via hit_conditions (§150, MA-0010/MA-0452
+// byte-shape twins — Assassin Shortsword, Bearded Devil Beard).
+// Refusal legs are cite-skipped to their owners: exhausted pool
+// MonsterCardModal.legendary-uses.test.jsx:195-212 (used>=max gate is
+// monster-independent — dracolich max:1 adds no distinct math vs the
+// canonical max:3 leg), turn latch same file :309-316, own-turn full-popup
+// bytes pounce-shadow-dragon.test.jsx:300-305; header uses:1 data byte also
+// pinned at terrifying-presence-dracolich.test.jsx:144-146 (FP owner).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -18,18 +26,12 @@ import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import { legendaryHeaderAction, legendaryDelegateAction, legendaryDelegateAttackName } from '../../services/encounters/monsterLegendaryUses.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
-const ROLLERS = vi.hoisted(() => {
-  const r = { rollAttack: null, rollDamage: null, rollSavingThrow: null };
-  return r;
-});
+const ROLLERS = vi.hoisted(() => ({
+  rollAttack: null, rollDamage: null, rollSavingThrow: null,
+}));
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
@@ -60,13 +62,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 60),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -84,8 +79,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import { addEntry } from '../../services/ui/logService.js';
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
 const CREATURES = [
   { name: 'Dracolich 1', type: 'npc', monsterType: 'dragon', targetName: 'Bandit 1', currentHp: 225, maxHp: 225, ac: 20, conditions: [] },
@@ -95,78 +88,69 @@ const CREATURES = [
 
 const dracolich = () => monstersData.find(m => m.name === 'Dracolich');
 const legendaryRows = () => dracolich().legendary_actions;
-const headerRow = () => legendaryRows()[0];
-const pounceRow = () => legendaryRows().find(a => a.name === 'Pounce');
-const sickeningRayRow = () => legendaryRows().find(a => a.name === 'Sickening Ray');
-const rendRow = () => dracolich().actions.find(a => a.name === 'Rend');
 
-// MA-0620 data lock: header-swallow fixed — rows[0] is the canonical header
-// (numeric uses, no mechanic of its own); children carry no per-child `uses`
-// (§165 Colossus/Death Knight verified templates).
-describe('MA-0620 monsters.json data: dracolich legendary block header + children', () => {
-  it('rows[0] is the canonical header "Legendary Action Uses: 1" with numeric uses', () => {
-    const h = headerRow();
+// MA-0620 data lock (folded, #757 press-fold shape): rows[0] is the canonical
+// economy header (numeric uses, MA-0040 Death Knight byte-shape) — NOT a
+// swallowed Pounce; children carry no per-child `uses` (§165); the Pounce row
+// is the full-row {name, delegates_to, description} shape with the half-Speed
+// advisory annotated into description (byte-distinct "dracolich" subject
+// suffix vs the MA-0197 gold-family "dragon" twins), no own numeric mechanic,
+// resolving the dracolich's OWN Rend row (+13 / 2d10 + 7 Slashing + 1d8
+// Necrotic) through the delegate seam, labelled "Pounce (Rend attack)".
+describe('MA-0620 monsters.json data: dracolich legendary header + Pounce delegate', () => {
+  it('rows[0] canonical header uses:1; children childless of uses; Pounce full-row delegates_to Rend (advisory prose, no own numbers); own Rend +13 / 2d10 + 7 Slashing + 1d8 Necrotic resolves through the delegate seam', () => {
+    const h = legendaryRows()[0];
+    expect(Object.keys(h)).toEqual(['name', 'uses', 'description']);
     expect(h.name).toBe('Legendary Action Uses: 1');
     expect(h.uses).toBe(1);
     expect(h.description).toContain('regains expended legendary uses at the start of its turn');
-    expect(h.delegates_to).toBeUndefined();
     expect(legendaryHeaderAction(dracolich())).toBe(h);
-  });
-
-  it('children carry no per-child uses (header owns the economy, §165)', () => {
     for (const child of legendaryRows().slice(1)) {
       expect(child.uses).toBeUndefined();
     }
-  });
-
-  it('Pounce child delegates_to Rend with the half-Speed movement advisory', () => {
-    const row = pounceRow();
+    const row = legendaryRows().find(a => a.name === 'Pounce');
+    expect(Object.keys(row)).toEqual(['name', 'delegates_to', 'description']);
     expect(row.delegates_to).toBe('Rend');
     expect(row.description).toBe('The dracolich moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
     expect(row.attack_bonus).toBeUndefined();
     expect(row.save_dc).toBeUndefined();
-  });
-
-  it('delegates to the dracolich own Rend row: +13 / 2d10 + 7 Slashing + 1d8 Necrotic', () => {
-    const rend = rendRow();
+    const rend = dracolich().actions.find(a => a.name === 'Rend');
     expect(rend.attack_bonus).toBe(13);
     expect(rend.damage_dice_primary).toBe('2d10 + 7');
     expect(rend.damage_type_primary).toBe('Slashing');
     expect(rend.damage_dice_secondary).toBe('1d8');
     expect(rend.damage_type_secondary).toBe('Necrotic');
-    const delegate = legendaryDelegateAction(dracolich(), pounceRow());
-    expect(delegate).toBe(rend);
-    expect(legendaryDelegateAttackName(pounceRow(), rend)).toBe('Pounce (Rend attack)');
+    expect(legendaryDelegateAction(dracolich(), row)).toBe(rend);
+    expect(legendaryDelegateAttackName(row, rend)).toBe('Pounce (Rend attack)');
   });
+});
 
-  it('Sickening Ray child authors numeric spell fields (MA-0219 Guiding Light seam) — no silent-burn', () => {
-    const row = sickeningRayRow();
+// MA-0219/MA-0621 data lock: Sickening Ray authors its own numeric spell
+// fields (+11 attack_bonus mirrored on spell_attack_bonus, 3d8 Poison per 2024
+// Ray of Sickness level 2) — no silent-burn — plus RAW poison-on-hit transport
+// via hit_conditions, and NO save leg (no save_dc/save_type).
+describe('MA-0621 monsters.json data: Sickening Ray numeric spellchild + hit_conditions', () => {
+  it('+11 spell attack / 3d8 Poison / 60 feet authored with hit_conditions ["poisoned"] and no save leg', () => {
+    const row = legendaryRows().find(a => a.name === 'Sickening Ray');
     expect(row.attack_bonus).toBe(11);
     expect(row.spell_attack_bonus).toBe(11);
     expect(row.damage_dice_primary).toBe('3d8');
     expect(row.damage_type_primary).toBe('Poison');
     expect(row.range).toBe('60 feet');
-  });
-
-  // MA-0621: RAW level-2 Ray of Sickness poisons on hit (no save). Transport
-  // is authored hit_conditions (§150: buildHitConditionClause reads
-  // action.hit_conditions only; MA-0010/MA-0452 byte-shape twins —
-  // Assassin Shortsword, Bearded Devil Beard).
-  it('MA-0621 Sickening Ray authors hit_conditions ["poisoned"] (MA-0010 hit-clause seam)', () => {
-    const row = sickeningRayRow();
     expect(row.hit_conditions).toEqual(['poisoned']);
     expect(row.save_dc).toBeUndefined();
     expect(row.save_type).toBeUndefined();
   });
 });
 
-// MA-0620 live seam: header renders "Legendary Action Uses: 1" (counter),
-// Pounce renders the gated "Expend Legendary" chip; a boundary click spends
-// the single use then rolls the delegated +13 Rend attack (armed target,
-// 2d10 + 7 Slashing auto-damage + 1d8 Necrotic secondary). Sickening Ray
-// renders the +11 spell chip which spends + rolls 3d8 Poison — no
-// console.error silent burn. Exhausted click refuses zero-spend.
-describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
+// MA-0620 live seam (press-folded, #757 shape): header renders the canonical
+// "Legendary Action Uses: 1" counter (NOT a swallowed Pounce); the gated
+// "Expend Legendary" chip on the prose Pounce row spends the single use then
+// rolls the delegated +13 Rend attack (armed target, 2d10 + 7 Slashing
+// auto-damage + 1d8 Necrotic secondary, non-spell, no save leg) and logs the
+// spend — zero console "no resolvable mechanic". Refusal legs (exhausted/
+// latch/own-turn) are owned elsewhere — see header cites.
+describe('MA-0620 MonsterCardModal dracolich Pounce gated delegate press', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
@@ -186,21 +170,16 @@ describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => (r.querySelector('strong')?.textContent || '').startsWith(name));
   }
 
-  it('header renders "Legendary Action Uses: 1" — NOT a swallowed Pounce header', () => {
+  it('counter (1 left) + header NOT swallowed by Pounce; gated chip press spends 1 and rolls the delegated +13 Rend attack (armed target, 2d10 + 7 + 1d8 Necrotic), logs the spend, no save leg, zero console dead-end', async () => {
     renderDracolich({ max: 1, used: 0 });
     const header = document.querySelector('.mc-legendary-header-row');
-    expect(header).not.toBe(null);
     expect(header.textContent).toContain('Legendary Action Uses: 1');
     expect(header.textContent).not.toContain('Pounce');
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(1 left)');
-  });
-
-  it('Pounce renders the gated Expend Legendary chip; click spends the 1 use and rolls the delegated +13 Rend attack', async () => {
-    renderDracolich({ max: 1, used: 0 });
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const chip = laRow('Pounce').querySelector('.mc-dice-link-legendary');
     expect(chip).not.toBe(null);
     expect(chip.textContent).toContain('Expend Legendary');
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fireEvent.click(chip);
     await waitFor(() => expect(runtime.store['Dracolich 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 }));
     await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
@@ -212,6 +191,7 @@ describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
     expect(options.damageType).toBe('Slashing');
     expect(options.autoDamageSecondaryFormula).toBe('1d8');
     expect(options.autoDamageSecondaryDamageType).toBe('Necrotic');
+    expect(options.isSpellDamage).toBe(false);
     expect(options.targetName).toBe('Bandit 1');
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
     expect(spend.description).toMatch(/expends a legendary use for Pounce/);
@@ -219,11 +199,30 @@ describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
   });
+});
 
-  it('Sickening Ray +11 spell chip spends and rolls 3d8 Poison (spell-origin) — zero silent burn', async () => {
-    renderDracolich({ max: 1, used: 0 });
+// MA-0219/MA-0621 live seam: the numeric spellchild row renders the +11
+// spell chip (generic .mc-dice-link, not the gated legendary-prose chip);
+// press spends the use, rolls +11 with 3d8 Poison spell-origin damage and the
+// MA-0010 hitClause ["poisoned"] labelled "Sickening Ray" — no save leg, no
+// console silent-burn.
+describe('MA-0621 MonsterCardModal Sickening Ray spellchild press — spend, +11 roll, poisoned hitClause, zero silent burn', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+    ctx.value = { round: 1, activeCreatureName: 'Bandit 1', creatures: CREATURES };
+  });
+
+  it('+11 spell chip press spends 1, rolls 3d8 Poison spell-origin with poisoned hitClause, no save leg, zero console dead-end', async () => {
+    runtime.store['Dracolich 1.monsterLegendaryUses'] = { max: 1, used: 0 };
+    const m = makeMonster({
+      name: 'Dracolich',
+      actions: dracolich().actions,
+      legendary_actions: dracolich().legendary_actions,
+    });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Dracolich 1', creatures: CREATURES })} />);
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const row = laRow('Sickening Ray');
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(r => (r.querySelector('strong')?.textContent || '').startsWith('Sickening Ray'));
     expect(row.querySelector('.mc-dice-link-legendary')).toBe(null);
     const chip = row.querySelector('.mc-dice-link');
     expect(chip.textContent).toContain('+11');
@@ -239,19 +238,8 @@ describe('MA-0620 MonsterCardModal dracolich legendary gated rows', () => {
     expect(options.hitClause).not.toBeNull();
     expect(options.hitClause.conditions).toEqual(['poisoned']);
     expect(options.hitClause.attackName).toBe('Sickening Ray');
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     expect(errSpy.mock.calls.flat().some(a => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
-  });
-
-  it('exhausted (1/1): Pounce chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderDracolich({ max: 1, used: 1 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Dracolich 1.monsterLegendaryUses']).toEqual({ max: 1, used: 1 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// HexMap container wiring — event/command overflow file. Three-way split of the HexMap container tests:
+//   HexMap.test.jsx        — rendering/loading, toolbar, panel open/close, SVG wheel/context/click cleanup,
+//                            POI layer partyPosition prop, drop-to-add-POI.
+//   HexMap.travel.test.jsx — travel-tool destination selection and advanceOneHex logging.
+//   this file              — EventDialog accept/skip/reroll dispatch + logging, force camp / forced march /
+//                            weather reroll command handlers, POI linked-map validation & enter gating,
+//                            TravelPanel flag forwarding, WeatherOverlay visibility.
+// EventDialog's own rendering is owned by EventDialog.test.jsx — every accept/skip/reroll click below
+// also proves the dialog is mounted with the wired callbacks, so no separate "dialog appears" tests here.
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -12,31 +22,24 @@ if (!globalThis.PointerEvent) {
     };
 }
 
-// Capture POI layer props so tests can inspect values HexMap passes to it.
+// Capture POI layer props so tests can inspect values HexMap passes to it
+// (validLinkedMaps is async state HexMap computes, onPoiEnter is the container's own handler).
 const { poiLayerProps } = vi.hoisted(() => ({ poiLayerProps: { current: null } }));
 
 // ── Mock child components ──
+// Static layers and the toolbar are inert here (their wiring is owned by HexMap.test.jsx);
+// panels stay mocked because their modules import services we keep off the network.
 vi.mock('./TerrainLayer.jsx', () => ({ default: () => <g data-testid="terrain-layer" /> }));
 vi.mock('./HexGridLayer.jsx', () => ({ default: () => <g data-testid="hex-grid-layer" /> }));
-vi.mock('./HexMapToolbar.jsx', () => ({
-    default: ({ onBack, mapName, zoomIn, zoomOut, resetView, setTool }) =>
-        <div data-testid="toolbar">
-            <button data-testid="toolbar-back" onClick={onBack}>Back</button>
-            <span data-testid="toolbar-name">{mapName}</span>
-            <button data-testid="toolbar-zoomin" onClick={zoomIn}>+</button>
-            <button data-testid="toolbar-zoomout" onClick={zoomOut}>-</button>
-            <button data-testid="toolbar-resetview" onClick={resetView}>Reset</button>
-            <button data-testid="tool-paint" onClick={() => setTool('paint')}>Paint</button>
-        </div>,
-}));
+vi.mock('./HexMapToolbar.jsx', () => ({ default: () => <div data-testid="toolbar" /> }));
 vi.mock('./POILayer.jsx', () => ({
     default: (props) => {
         poiLayerProps.current = props;
         return <g data-testid="poi-layer" />;
     },
 }));
-vi.mock('./POIPanel.jsx', () => ({ default: ({ onClose }) => <div data-testid="poi-panel"><button onClick={onClose}>Close</button></div> }));
-vi.mock('./POIContextMenu.jsx', () => ({ default: ({ selectedPoi, onClose }) => selectedPoi ? <g data-testid="poi-context-menu"><text onClick={onClose}>Close</text></g> : null }));
+vi.mock('./POIPanel.jsx', () => ({ default: () => <div data-testid="poi-panel" /> }));
+vi.mock('./POIContextMenu.jsx', () => ({ default: ({ selectedPoi }) => selectedPoi ? <g data-testid="poi-context-menu" /> : null }));
 vi.mock('./MarchingOrderPanel.jsx', () => ({ default: () => <div data-testid="marching-panel" /> }));
 vi.mock('./PartyMarkerLayer.jsx', () => ({ default: ({ position }) => position ? <g data-testid="party-marker" /> : null }));
 vi.mock('./RiverLayer.jsx', () => ({ default: () => <g data-testid="river-layer" /> }));
@@ -53,16 +56,15 @@ vi.mock('./EventDialog.jsx', () => ({
             <button data-testid="event-reroll" onClick={onReroll}>Reroll</button>
         </div> : null,
 }));
+// TravelPanel mock exposes forwarded travel state as readable spans and buttons only for the
+// commands exercised in this file (advance click is owned by HexMap.travel.test.jsx).
 vi.mock('./TravelPanel.jsx', () => ({
-    default: ({ isTravelActive, onAdvance, onForceCamp, onForcedMarch, onCancel, onChangePace, onToggleHorseback, onReRollWeather, _onSetEventFrequency, eventFrequency, horseback, forcedMarchHours, exhaustionMultiplier, partyHasMaxExhaustion }) =>
+    default: ({ isTravelActive, onAdvance, onForceCamp, onForcedMarch, onReRollWeather, eventFrequency, horseback, forcedMarchHours, exhaustionMultiplier, partyHasMaxExhaustion }) =>
         <div data-testid="travel-panel">
             {isTravelActive && <>
                 <button data-testid="btn-advance" onClick={onAdvance}>Advance</button>
                 <button data-testid="btn-camp" onClick={onForceCamp}>Camp</button>
                 <button data-testid="btn-forced-march" onClick={onForcedMarch}>Forced March</button>
-                <button data-testid="btn-cancel" onClick={onCancel}>Cancel</button>
-                <button data-testid="btn-pace" onClick={onChangePace}>Change Pace</button>
-                <button data-testid="btn-horseback" onClick={onToggleHorseback}>Horseback</button>
                 <button data-testid="btn-reroll-weather" onClick={onReRollWeather}>Reroll Weather</button>
                 <span data-testid="event-frequency">{eventFrequency}</span>
                 <span data-testid="horseback">{horseback ? 'true' : 'false'}</span>
@@ -213,14 +215,14 @@ function setupDefaultMocks() {
     useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry: vi.fn() });
     mapsService.formatMapName.mockImplementation((name) => name || '');
     // Linked maps are "valid" by default; tests opt into the failure path with
-    // mockRejectedValue so the Promise.allSettled filter is exercised honestly.
+    // mockImplementation so the Promise.allSettled filter is exercised honestly.
     mapsService.loadMapData.mockImplementation(() => Promise.resolve({}));
 }
 
 /**
- * Renders HexMap with a pending event and an active travel session, then clicks
- * the dialog's Accept button. `acceptEvent` returns the same pendingEvent by
- * default. Returns `{ tm, addEntry }`.
+ * Renders HexMap at party/travel hex {q:10,r:5} with a pending event and an active
+ * travel session, then the caller clicks `event-accept`. `acceptEvent` returns the
+ * same pendingEvent (the real hook's contract). Returns `{ tm, addEntry }`.
  */
 function renderEventAccept({ pendingEvent, travelOverrides = {}, mapOverrides = {}, encounter }) {
     const addEntry = vi.fn();
@@ -234,126 +236,91 @@ function renderEventAccept({ pendingEvent, travelOverrides = {}, mapOverrides = 
     useTravelManagement.mockReturnValue(tm);
     useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
     useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: { q: 10, r: 5 }, ...mapOverrides }));
-    if (encounter) useEncounterGeneration.mockReturnValue(encounter);
+    useEncounterGeneration.mockReturnValue(encounter);
     render(<HexMap campaignName="test" mapName="test-map" />);
     return { tm, addEntry };
 }
 
-describe('HexMap additional coverage', () => {
+describe('HexMap event & command wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         poiLayerProps.current = null;
         setupDefaultMocks();
     });
 
-    describe('Force camp and forced march handlers', () => {
+    describe('Force camp and forced march commands', () => {
         it.each([
-            { handler: 'forceCamp', action: 'camp', btnTestId: 'btn-camp', pos: { q: 15, r: 8 }, weather: 'Clear' },
-            { handler: 'forcedMarch', action: 'forced_march', btnTestId: 'btn-forced-march', pos: { q: 15, r: 8 }, weather: 'Storm' },
-            { handler: 'forceCamp', action: 'camp', btnTestId: 'btn-camp', pos: null, fallbackPos: { q: 20, r: 12 }, weather: 'Storm' },
-            { handler: 'forcedMarch', action: 'forced_march', btnTestId: 'btn-forced-march', pos: null, fallbackPos: { q: 20, r: 12 }, weather: 'Rain' },
-        ])('handles %s with position $pos (fallback: $fallbackPos)', ({ handler, action, btnTestId, pos, fallbackPos, weather }) => {
+            { label: 'camps at the travel position', handler: 'forceCamp', action: 'camp', btnTestId: 'btn-camp', currentPosition: { q: 15, r: 8 }, fallbackPos: { q: 10, r: 5 }, weather: 'Clear', regeneratesWeather: true },
+            { label: 'forced-marches at the travel position', handler: 'forcedMarch', action: 'forced_march', btnTestId: 'btn-forced-march', currentPosition: { q: 15, r: 8 }, fallbackPos: { q: 10, r: 5 }, weather: 'Storm', regeneratesWeather: false },
+            { label: 'camps at the party hex when travel has no position', handler: 'forceCamp', action: 'camp', btnTestId: 'btn-camp', currentPosition: null, fallbackPos: { q: 20, r: 12 }, weather: 'Storm', regeneratesWeather: true },
+            { label: 'forced-marches at the party hex when travel has no position', handler: 'forcedMarch', action: 'forced_march', btnTestId: 'btn-forced-march', currentPosition: null, fallbackPos: { q: 20, r: 12 }, weather: 'Rain', regeneratesWeather: false },
+        ])('$label: dispatches the handler and logs once', ({ handler, action, btnTestId, currentPosition, fallbackPos, weather, regeneratesWeather }) => {
             const addEntry = vi.fn();
-            const tm = makeTravelMgmt({
-                isTravelActive: true,
-                [handler]: vi.fn(),
-                currentPosition: pos,
-            });
+            const tm = makeTravelMgmt({ isTravelActive: true, [handler]: vi.fn(), currentPosition });
             useTravelManagement.mockReturnValue(tm);
             useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
-            useMapLoader.mockReturnValue(makeMapLoader({
-                partyPosition: fallbackPos || { q: 10, r: 5 },
-                weather: { label: weather },
-            }));
+            useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: fallbackPos, weather: { label: weather } }));
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId(btnTestId));
             expect(tm[handler]).toHaveBeenCalledTimes(1);
-            if (handler === 'forceCamp') {
-                expect(generateWeather).toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith({
+                type: 'travel', action, hex: currentPosition || fallbackPos,
+                terrain: null, weather, weatherIcon: null, eventType: null, eventTitle: null,
+            });
+            if (regeneratesWeather) {
+                expect(generateWeather).toHaveBeenCalledTimes(1);
+            } else {
+                expect(generateWeather).not.toHaveBeenCalled();
             }
-            expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-                action,
-                hex: pos || fallbackPos,
-                weather,
-            }));
         });
     });
 
-    describe('POI enter handler', () => {
-        function renderWithPoi({ linkedMap, onPoiEntered }) {
+    describe('Weather reroll command', () => {
+        it('panel weather reroll regenerates weather from the party terrain and resumes the current pace', () => {
+            const addEntry = vi.fn();
+            const tm = makeTravelMgmt({ isTravelActive: true, travelPace: 'fast' });
+            useTravelManagement.mockReturnValue(tm);
+            useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
             useMapLoader.mockReturnValue(makeMapLoader({
-                pois: [{ id: 'poi-1', q: 10, r: 5, type: 'dungeon', visible: true, ...(linkedMap ? { linkedMap } : {}) }],
+                partyPosition: { q: 10, r: 5 },
+                terrain: { '10,5': 'desert' },
             }));
-            render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
-        }
-
-        it('calls onPoiEntered with the linked map name when the map is valid', async () => {
-            const onPoiEntered = vi.fn();
-            renderWithPoi({ linkedMap: 'dungeon-1', onPoiEntered });
-            await vi.waitFor(() => {
-                expect(poiLayerProps.current.validLinkedMaps.has('dungeon-1')).toBe(true);
-            });
-            poiLayerProps.current.onPoiEnter({ id: 'poi-1', linkedMap: 'dungeon-1' });
-            expect(onPoiEntered).toHaveBeenCalledWith('dungeon-1');
-        });
-
-        it('does not call onPoiEntered when the POI has no linked map', () => {
-            const onPoiEntered = vi.fn();
-            renderWithPoi({ linkedMap: null, onPoiEntered });
-            poiLayerProps.current.onPoiEnter({ id: 'poi-1' });
-            expect(onPoiEntered).not.toHaveBeenCalled();
+            render(<HexMap campaignName="test" mapName="test-map" />);
+            fireEvent.click(screen.getByTestId('btn-reroll-weather'));
+            expect(generateWeather).toHaveBeenCalledWith('desert');
+            expect(tm.changePace).toHaveBeenCalledWith('fast');
+            // The reroll button is a manual GM weather action — it must not log travel entries.
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
-    describe('Linked map validation', () => {
-        it('loads each unique linked map and exposes only the valid ones to the POI layer', async () => {
-            const pois = [
-                { id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'dungeon-1', visible: true },
-                { id: 'poi-2', q: 20, r: 10, type: 'dungeon', linkedMap: 'dungeon-2', visible: true },
-            ];
-            useMapLoader.mockReturnValue(makeMapLoader({ pois }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect([...poiLayerProps.current.validLinkedMaps].sort()).toEqual(['dungeon-1', 'dungeon-2']);
-            });
-            expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'dungeon-1');
-            expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'dungeon-2');
-        });
-
-        it('deduplicates linked maps when multiple POIs reference the same map', async () => {
+    describe('POI linked-map validation and entry gating', () => {
+        it('validates each unique linked map once and fires onPoiEntered only for validated links', async () => {
+            mapsService.loadMapData.mockImplementation((campaign, name) =>
+                name === 'missing' ? Promise.reject(new Error('Map not found')) : Promise.resolve({}));
+            const onPoiEntered = vi.fn();
             const pois = [
                 { id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'dungeon-1', visible: true },
                 { id: 'poi-2', q: 20, r: 10, type: 'dungeon', linkedMap: 'dungeon-1', visible: true },
+                { id: 'poi-3', q: 12, r: 6, type: 'tower', linkedMap: 'missing', visible: true },
+                { id: 'poi-4', q: 3, r: 3, type: 'camp', visible: true },
             ];
             useMapLoader.mockReturnValue(makeMapLoader({ pois }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
+            render(<HexMap campaignName="test" mapName="test-map" onPoiEntered={onPoiEntered} />);
             await vi.waitFor(() => {
                 expect([...poiLayerProps.current.validLinkedMaps]).toEqual(['dungeon-1']);
             });
-            // Should only load the unique map once
-            expect(mapsService.loadMapData).toHaveBeenCalledTimes(1);
-            expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'dungeon-1');
-        });
-
-        it('excludes linked maps that fail to load', async () => {
-            const pois = [
-                { id: 'poi-1', q: 10, r: 5, type: 'city', linkedMap: 'dungeon-1', visible: true },
-                { id: 'poi-2', q: 20, r: 10, type: 'dungeon', linkedMap: 'missing', visible: true },
-            ];
-            mapsService.loadMapData.mockImplementation((campaign, name) => {
-                if (name === 'dungeon-1') return Promise.resolve({});
-                return Promise.reject(new Error('Map not found'));
-            });
-            useMapLoader.mockReturnValue(makeMapLoader({ pois }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            await vi.waitFor(() => {
-                expect([...poiLayerProps.current.validLinkedMaps]).toEqual(['dungeon-1']);
-            });
+            expect(mapsService.loadMapData).toHaveBeenCalledTimes(2);
             expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'dungeon-1');
             expect(mapsService.loadMapData).toHaveBeenCalledWith('test', 'missing');
+            poiLayerProps.current.onPoiEnter(pois[0]);
+            expect(onPoiEntered).toHaveBeenCalledWith('dungeon-1');
+            poiLayerProps.current.onPoiEnter(pois[2]); // link failed validation
+            poiLayerProps.current.onPoiEnter(pois[3]); // no linked map
+            expect(onPoiEntered).toHaveBeenCalledTimes(1);
         });
 
-        it('passes an empty set when no POIs have linked maps', async () => {
+        it('exposes an empty valid set and performs no loads when no POI links a map', async () => {
             useMapLoader.mockReturnValue(makeMapLoader({
                 pois: [{ id: 'poi-1', q: 10, r: 5, type: 'city', visible: true }],
             }));
@@ -365,174 +332,142 @@ describe('HexMap additional coverage', () => {
         });
     });
 
-    describe('Event acceptance', () => {
-        it('starts a combat encounter with monster placements when monsters are specified', () => {
-            const generateMonsterPlacements = vi.fn(() => [{ id: 'mon-1', name: 'goblin' }]);
-            const handleStartEncounter = vi.fn();
-            const pendingEvent = { type: 'combat', encounter: { monsters: [{ name: 'goblin', qty: 2 }] } };
-            renderEventAccept({
-                pendingEvent,
+    describe('Event accept', () => {
+        it('accepting a combat event with monsters generates placements and starts the encounter at the travel hex', () => {
+            const placements = [{ id: 'mon-1', name: 'goblin' }];
+            const encounter = { generateMonsterPlacements: vi.fn(() => placements), handleStartEncounter: vi.fn() };
+            const { tm } = renderEventAccept({
+                pendingEvent: { type: 'combat', encounter: { monsters: [{ name: 'goblin', qty: 2 }] } },
                 travelOverrides: { currentPosition: { q: 15, r: 8 } },
                 mapOverrides: { partyPosition: { q: 15, r: 8 }, terrain: { '15,8': 'plains' } },
-                encounter: { generateMonsterPlacements, handleStartEncounter },
+                encounter,
             });
             fireEvent.click(screen.getByTestId('event-accept'));
-            expect(generateMonsterPlacements).toHaveBeenCalledWith([{ name: 'goblin', qty: 2 }], 30);
-            expect(handleStartEncounter).toHaveBeenCalledWith(15, 8, [{ id: 'mon-1', name: 'goblin' }]);
+            expect(tm.acceptEvent).toHaveBeenCalledTimes(1);
+            expect(encounter.generateMonsterPlacements).toHaveBeenCalledWith([{ name: 'goblin', qty: 2 }], 30);
+            expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8, placements);
         });
 
-        it('starts a combat encounter without monster placements when no monsters are specified', () => {
-            const handleStartEncounter = vi.fn();
-            const pendingEvent = { type: 'combat' };
+        it.each([
+            { scenario: 'starts a bare encounter when the event has no monsters', pos: { q: 15, r: 8 }, expectStart: true },
+            { scenario: 'starts no encounter when there is no position', pos: null, expectStart: false },
+        ])('$scenario', ({ pos, expectStart }) => {
+            const encounter = { generateMonsterPlacements: vi.fn(), handleStartEncounter: vi.fn() };
             const { tm } = renderEventAccept({
-                pendingEvent,
-                travelOverrides: { currentPosition: { q: 15, r: 8 } },
-                mapOverrides: { partyPosition: { q: 15, r: 8 }, terrain: { '15,8': 'plains' } },
-                encounter: { generateMonsterPlacements: vi.fn(), handleStartEncounter },
+                pendingEvent: { type: 'combat' },
+                travelOverrides: { currentPosition: pos },
+                mapOverrides: { partyPosition: pos },
+                encounter,
             });
             fireEvent.click(screen.getByTestId('event-accept'));
-            expect(tm.acceptEvent).toHaveBeenCalled();
-            expect(handleStartEncounter).toHaveBeenCalledWith(15, 8);
+            expect(tm.acceptEvent).toHaveBeenCalledTimes(1);
+            expect(encounter.generateMonsterPlacements).not.toHaveBeenCalled();
+            if (expectStart) {
+                expect(encounter.handleStartEncounter).toHaveBeenCalledWith(15, 8);
+            } else {
+                expect(encounter.handleStartEncounter).not.toHaveBeenCalled();
+            }
         });
 
-        it('does not call handleStartEncounter when there is no position', () => {
-            const handleStartEncounter = vi.fn();
-            const { tm } = renderEventAccept({
-                pendingEvent: { type: 'combat', encounter: { monsters: [{ name: 'goblin', qty: 1 }] } },
-                travelOverrides: { currentPosition: null },
-                mapOverrides: { partyPosition: null, terrain: {} },
-                encounter: { generateMonsterPlacements: vi.fn(), handleStartEncounter },
-            });
-            fireEvent.click(screen.getByTestId('event-accept'));
-            expect(tm.acceptEvent).toHaveBeenCalled();
-            expect(handleStartEncounter).not.toHaveBeenCalled();
-        });
-
-        it('regenerates weather and resumes pace for weather change during travel', () => {
+        it.each([
+            { eventType: 'weatherChange', isTravelActive: true, expectWeatherRegen: true, expectPaceResume: true },
+            { eventType: 'weatherChange', isTravelActive: false, expectWeatherRegen: true, expectPaceResume: false },
+            { eventType: 'skirmish', isTravelActive: true, expectWeatherRegen: false, expectPaceResume: false },
+        ])('accepting $eventType (travel active=$isTravelActive) applies side effects and logs the exact entry', async ({ eventType, isTravelActive, expectWeatherRegen, expectPaceResume }) => {
+            const encounter = { generateMonsterPlacements: vi.fn(), handleStartEncounter: vi.fn() };
             const { tm, addEntry } = renderEventAccept({
-                pendingEvent: { type: 'weatherChange' },
-                mapOverrides: { terrain: { '10,5': 'plains' } },
-            });
-            fireEvent.click(screen.getByTestId('event-accept'));
-            expect(generateWeather).toHaveBeenCalled();
-            expect(tm.changePace).toHaveBeenCalledWith('normal');
-            expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-                action: 'event_accept', eventType: 'weatherChange',
-            }));
-        });
-
-        it('regenerates weather but does not resume pace when travel is not active', () => {
-            const { tm } = renderEventAccept({
-                pendingEvent: { type: 'weatherChange' },
-                travelOverrides: { isTravelActive: false },
+                pendingEvent: { type: eventType, title: 'Storm Front' },
+                travelOverrides: { isTravelActive, travelPace: 'fast' },
                 mapOverrides: { terrain: { '10,5': 'desert' } },
+                encounter,
             });
             fireEvent.click(screen.getByTestId('event-accept'));
-            expect(generateWeather).toHaveBeenCalled();
-            expect(tm.changePace).not.toHaveBeenCalled();
-        });
-
-        it('logs event acceptance with terrain and event type for a skirmish event', () => {
-            const { addEntry } = renderEventAccept({
-                pendingEvent: { type: 'skirmish' },
-                travelOverrides: { isTravelActive: false },
-                mapOverrides: { terrain: { '10,5': 'desert' } },
+            expect(tm.acceptEvent).toHaveBeenCalledTimes(1);
+            if (expectWeatherRegen) {
+                expect(generateWeather).toHaveBeenCalledWith('desert');
+            } else {
+                expect(generateWeather).not.toHaveBeenCalled();
+            }
+            if (expectPaceResume) {
+                expect(tm.changePace).toHaveBeenCalledWith('fast');
+            } else {
+                expect(tm.changePace).not.toHaveBeenCalled();
+            }
+            expect(encounter.handleStartEncounter).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledWith({
+                type: 'travel', action: 'event_accept', hex: { q: 10, r: 5 }, terrain: 'desert',
+                weather: null, weatherIcon: null, eventType, eventTitle: 'Storm Front',
             });
-            fireEvent.click(screen.getByTestId('event-accept'));
-            expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-                action: 'event_accept', hex: { q: 10, r: 5 }, terrain: 'desert', eventType: 'skirmish',
-            }));
         });
     });
 
-    describe('Event skip and reroll handlers', () => {
+    describe('Event skip and reroll', () => {
         it.each([
-            { handler: 'skipEvent', action: 'event_skip', btnTestId: 'event-skip', eventType: 'skirmish', eventTitle: 'Goblin Ambush', hex: { q: 12, r: 6 }, weather: 'Cloudy' },
-            { handler: 'rerollEvent', action: 'event_reroll', btnTestId: 'event-reroll', eventType: 'wild-magic', eventTitle: 'Wild Surge', hex: { q: 12, r: 6 }, weather: 'Fog' },
-        ])('handles %s and logs with event details', ({ handler, action, btnTestId, eventType, eventTitle, hex, weather }) => {
+            { handler: 'skipEvent', action: 'event_skip', btnTestId: 'event-skip', eventType: 'skirmish', eventTitle: 'Goblin Ambush', weather: 'Cloudy' },
+            { handler: 'rerollEvent', action: 'event_reroll', btnTestId: 'event-reroll', eventType: 'wild-magic', eventTitle: 'Wild Surge', weather: 'Fog' },
+        ])('handles $handler and logs the exact travel entry', ({ handler, action, btnTestId, eventType, eventTitle, weather }) => {
             const addEntry = vi.fn();
             const tm = makeTravelMgmt({
                 isTravelActive: true,
                 pendingEvent: { type: eventType, title: eventTitle },
                 [handler]: vi.fn(),
-                currentPosition: hex,
+                currentPosition: { q: 12, r: 6 },
             });
             useTravelManagement.mockReturnValue(tm);
             useLog.mockReturnValue({ logEntries: [], initialized: true, addEntry });
             useMapLoader.mockReturnValue(makeMapLoader({ partyPosition: { q: 10, r: 5 }, weather: { label: weather } }));
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.click(screen.getByTestId(btnTestId));
-            expect(tm[handler]).toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith(expect.objectContaining({
-                action, eventType, eventTitle,
-            }));
-        });
-
-    });
-
-    describe('TravelPanel wiring', () => {
-        it.each([true, false])('renders travel controls only while a session is active (isTravelActive=%s)', (isTravelActive) => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({ isTravelActive }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            const advanceBtn = screen.queryByTestId('btn-advance');
-            const campBtn = screen.queryByTestId('btn-camp');
-            if (isTravelActive) {
-                expect(advanceBtn).toBeInTheDocument();
-                expect(campBtn).toBeInTheDocument();
-            } else {
-                expect(advanceBtn).not.toBeInTheDocument();
-                expect(campBtn).not.toBeInTheDocument();
-            }
-        });
-    });
-
-    describe('Event dialog visibility', () => {
-        it('renders the event dialog when there is a pending event', () => {
-            const tm = makeTravelMgmt({
-                isTravelActive: true,
-                pendingEvent: { type: 'skirmish', title: 'Goblin Ambush' },
+            expect(tm[handler]).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith({
+                type: 'travel', action, hex: { q: 12, r: 6 }, terrain: null,
+                weather, weatherIcon: null, eventType, eventTitle,
             });
-            useTravelManagement.mockReturnValue(tm);
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('event-dialog')).toBeInTheDocument();
         });
+    });
 
-        it('does not render the event dialog when there is no pending event', () => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({ isTravelActive: true, pendingEvent: null }));
+    describe('TravelPanel and EventDialog mounting', () => {
+        it.each([true, false])('forwards travel state to TravelPanel only while active (isTravelActive=%s)', (isTravelActive) => {
+            useTravelManagement.mockReturnValue(makeTravelMgmt({
+                isTravelActive,
+                horseback: true,
+                forcedMarchHours: 6,
+                exhaustionMultiplier: 50,
+                partyHasMaxExhaustion: true,
+                eventFrequency: 'frequent',
+            }));
             render(<HexMap campaignName="test" mapName="test-map" />);
+            if (isTravelActive) {
+                expect(screen.getByTestId('btn-advance')).toBeInTheDocument();
+                expect(screen.getByTestId('btn-camp')).toBeInTheDocument();
+                expect(screen.getByTestId('btn-forced-march')).toBeInTheDocument();
+                expect(screen.getByTestId('btn-reroll-weather')).toBeInTheDocument();
+                expect(screen.getByTestId('event-frequency')).toHaveTextContent('frequent');
+                expect(screen.getByTestId('horseback')).toHaveTextContent('true');
+                expect(screen.getByTestId('forced-march-hours')).toHaveTextContent('6');
+                expect(screen.getByTestId('exhaustion-multiplier')).toHaveTextContent('50');
+                expect(screen.getByTestId('party-max-exhaustion')).toHaveTextContent('true');
+            } else {
+                expect(screen.queryByTestId('btn-advance')).not.toBeInTheDocument();
+                expect(screen.queryByTestId('event-frequency')).not.toBeInTheDocument();
+            }
+            // No pending event in either case — the dialog stays unmounted.
             expect(screen.queryByTestId('event-dialog')).not.toBeInTheDocument();
         });
     });
 
     describe('Weather overlay visibility', () => {
-        it('renders the weather overlay when weather is set', () => {
-            useMapLoader.mockReturnValue(makeMapLoader({ weather: { label: 'Rain', icon: 'cloud-rain' } }));
+        it.each([
+            { weather: { label: 'Rain', icon: 'cloud-rain' }, visible: true },
+            { weather: null, visible: false },
+        ])('shows the weather overlay when weather is set=%s', ({ weather, visible }) => {
+            useMapLoader.mockReturnValue(makeMapLoader({ weather }));
             render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('weather-overlay')).toBeInTheDocument();
-        });
-
-        it('does not render the weather overlay when weather is null', () => {
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.queryByTestId('weather-overlay')).not.toBeInTheDocument();
+            if (visible) {
+                expect(screen.getByTestId('weather-overlay')).toBeInTheDocument();
+            } else {
+                expect(screen.queryByTestId('weather-overlay')).not.toBeInTheDocument();
+            }
         });
     });
-
-    describe('TravelPanel props', () => {
-        it('passes horseback, forcedMarchHours, exhaustionMultiplier, and partyHasMaxExhaustion to TravelPanel', () => {
-            useTravelManagement.mockReturnValue(makeTravelMgmt({
-                isTravelActive: true,
-                horseback: true,
-                forcedMarchHours: 6,
-                exhaustionMultiplier: 50,
-                partyHasMaxExhaustion: true,
-            }));
-            render(<HexMap campaignName="test" mapName="test-map" />);
-            expect(screen.getByTestId('horseback')).toHaveTextContent('true');
-            expect(screen.getByTestId('forced-march-hours')).toHaveTextContent('6');
-            expect(screen.getByTestId('exhaustion-multiplier')).toHaveTextContent('50');
-            expect(screen.getByTestId('party-max-exhaustion')).toHaveTextContent('true');
-        });
-
-    });
-
 });

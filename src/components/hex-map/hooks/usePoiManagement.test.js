@@ -1,20 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import usePoiManagement from './usePoiManagement.js';
-import { isRoadConnectable, findHexPath } from '../../../services/maps/hexMapUtils.js';
 import { TOOL_NONE, TOOL_POI, TOOL_ROAD } from '../../../config/outdoorConfig.js';
 
-vi.mock('../../../services/maps/hexMapUtils.js', () => ({
-    isRoadConnectable: vi.fn(),
-    findHexPath: vi.fn(),
-}));
+// hexMapUtils is pure (no side effects, no DOM) — kept real, not mocked.
+// findHexPath on an open all-plains grid returns the unique optimal path
+// between two hexes 2 steps apart on the same row, so created-road hexes
+// are pinned exactly; repaths are checked by endpoints + optimal length.
 
 const DEFAULT_HEX = { q: 2, r: 0 };
-const DEFAULT_PATH = [
-    { q: 1, r: 0 },
-    { q: 2, r: 0 },
-    { q: 3, r: 0 },
-];
 
 const basePois = [
     { id: 'poi-1', label: 'City A', type: 'city', q: 1, r: 0, visible: true },
@@ -52,153 +47,108 @@ const applyUpdater = (mock, callIndex, initialState) => mock.mock.calls[callInde
 const pointerEvent = () => ({ preventDefault: vi.fn(), stopPropagation: vi.fn() });
 
 describe('usePoiManagement', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        isRoadConnectable.mockImplementation((typeA, typeB) =>
-            ['city', 'settlement'].includes(typeA) && ['city', 'settlement'].includes(typeB)
-        );
-        findHexPath.mockImplementation(() => DEFAULT_PATH);
+    it('opens the POI menu at the clicked poi and leaves it untouched for unknown ids', () => {
+        const { result } = setup();
+        act(() => {
+            result.current.handlePoiContextMenu('poi-1');
+        });
+        expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
+
+        act(() => {
+            result.current.handlePoiContextMenu('missing-poi');
+        });
+        expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
     });
 
-    describe('handlePoiContextMenu', () => {
-        it('sets selectedPoiMenu to the poi id and coordinates', () => {
-            const { result } = setup();
-            act(() => {
-                result.current.handlePoiContextMenu('poi-1');
-            });
-            expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
+    it('toggles visibility of exactly the target poi and closes the menu', () => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handlePoiContextMenu('poi-1');
         });
-
-        it('does nothing for an unknown poi id', () => {
-            const { result } = setup();
-            act(() => {
-                result.current.handlePoiContextMenu('missing-poi');
-            });
-            expect(result.current.selectedPoiMenu).toBeNull();
+        act(() => {
+            result.current.handleTogglePoiVisibility('poi-1');
         });
+        expect(applyUpdater(setPois, 0, basePois)).toEqual([
+            { id: 'poi-1', label: 'City A', type: 'city', q: 1, r: 0, visible: false },
+            basePois[1],
+            basePois[2],
+        ]);
+        expect(result.current.selectedPoiMenu).toBeNull();
     });
 
-    describe('handleTogglePoiVisibility', () => {
-        it('toggles visible on the target poi and leaves the rest unchanged', () => {
-            const { result, setPois } = setup();
-            act(() => {
-                result.current.handleTogglePoiVisibility('poi-1');
-            });
-            const nextPois = applyUpdater(setPois, 0, basePois);
-            expect(nextPois).toHaveLength(3);
-            expect(nextPois.find(p => p.id === 'poi-1').visible).toBe(false);
-            expect(nextPois.find(p => p.id === 'poi-2').visible).toBe(true);
-            expect(nextPois.find(p => p.id === 'poi-3').visible).toBe(false);
-        });
-
-        it('closes the selected poi menu when toggled', () => {
-            const { result } = setup();
-            act(() => {
-                result.current.handlePoiContextMenu('poi-1');
-            });
-            act(() => {
-                result.current.handleTogglePoiVisibility('poi-1');
-            });
-            expect(result.current.selectedPoiMenu).toBeNull();
-        });
-    });
-
-    describe('handleDeletePoi', () => {
+    it('deletes the poi and every road touching it, and closes the menu', () => {
         const roads = [
             { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: ['1,0', '2,0'] },
             { id: 'road-2', fromPoiId: 'poi-2', toPoiId: 'poi-3', hexes: ['3,0', '4,0'] },
             { id: 'road-3', fromPoiId: 'poi-1', toPoiId: 'poi-3', hexes: ['1,0', '2,0', '3,0'] },
         ];
-
-        it('removes the poi and every road that has it as an endpoint', () => {
-            const { result, setPois, setRoads } = setup({ roads });
-            act(() => {
-                result.current.handleDeletePoi('poi-2');
-            });
-            const nextPois = applyUpdater(setPois, 0, basePois);
-            expect(nextPois).toHaveLength(2);
-            expect(nextPois.find(p => p.id === 'poi-2')).toBeUndefined();
-            const nextRoads = applyUpdater(setRoads, 0, roads);
-            expect(nextRoads.map(r => r.id)).toEqual(['road-3']);
+        const { result, setPois, setRoads } = setup({ roads });
+        act(() => {
+            result.current.handlePoiContextMenu('poi-1');
         });
-
-        it('closes the selected poi menu when deleted', () => {
-            const { result } = setup({ roads });
-            act(() => {
-                result.current.handlePoiContextMenu('poi-1');
-            });
-            act(() => {
-                result.current.handleDeletePoi('poi-1');
-            });
-            expect(result.current.selectedPoiMenu).toBeNull();
+        act(() => {
+            result.current.handleDeletePoi('poi-2');
         });
+        expect(applyUpdater(setPois, 0, basePois)).toEqual([basePois[0], basePois[2]]);
+        expect(applyUpdater(setRoads, 0, roads).map(r => r.id)).toEqual(['road-3']);
+        expect(result.current.selectedPoiMenu).toBeNull();
     });
 
-    describe('handleRenamePoi', () => {
-        it('updates the label on the target poi and clears rename and menu state', () => {
-            const { result, setPois } = setup();
-            act(() => {
-                result.current.handleRenamePoi('poi-1', 'New City Name');
-            });
-            const nextPois = applyUpdater(setPois, 0, basePois);
-            expect(nextPois.find(p => p.id === 'poi-1').label).toBe('New City Name');
-            expect(nextPois.find(p => p.id === 'poi-2').label).toBe('Settlement B');
-            expect(result.current.showRename).toBeNull();
-            expect(result.current.selectedPoiMenu).toBeNull();
+    it('renames the target poi only and clears rename plus menu state', () => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handleRenamePoi('poi-1', 'New City Name');
         });
-    });
-
-    describe('handleLinkMap', () => {
-        it('sets linkedMap on the target poi and clears the menu', () => {
-            const { result, setPois } = setup();
-            act(() => {
-                result.current.handleLinkMap('poi-1', 'dungeon-map.json');
-            });
-            const nextPois = applyUpdater(setPois, 0, basePois);
-            expect(nextPois.find(p => p.id === 'poi-1').linkedMap).toBe('dungeon-map.json');
-            expect(nextPois.find(p => p.id === 'poi-2').linkedMap).toBeUndefined();
-            expect(result.current.selectedPoiMenu).toBeNull();
-        });
-    });
-
-    describe('handleUnlinkMap', () => {
-        const poisWithMap = [
-            { ...basePois[0], linkedMap: 'some-map.json' },
-            { ...basePois[1], linkedMap: 'map2.json' },
+        expect(applyUpdater(setPois, 0, basePois)).toEqual([
+            { id: 'poi-1', label: 'New City Name', type: 'city', q: 1, r: 0, visible: true },
+            basePois[1],
             basePois[2],
-        ];
-
-        it('removes linkedMap from the target poi and keeps other maps', () => {
-            const { result, setPois } = setup({ pois: poisWithMap });
-            act(() => {
-                result.current.handleUnlinkMap('poi-1');
-            });
-            const nextPois = applyUpdater(setPois, 0, poisWithMap);
-            expect(nextPois.find(p => p.id === 'poi-1').linkedMap).toBeUndefined();
-            expect(nextPois.find(p => p.id === 'poi-2').linkedMap).toBe('map2.json');
-            expect(result.current.selectedPoiMenu).toBeNull();
-        });
+        ]);
+        expect(result.current.showRename).toBeNull();
+        expect(result.current.selectedPoiMenu).toBeNull();
     });
 
-    describe('handleRemoveRoads', () => {
+    it('links then unlinks a map on the target poi without disturbing other pois', () => {
+        const { result, setPois } = setup();
+        act(() => {
+            result.current.handleLinkMap('poi-1', 'dungeon-map.json');
+        });
+        const linked = applyUpdater(setPois, 0, basePois);
+        expect(linked).toEqual([
+            { ...basePois[0], linkedMap: 'dungeon-map.json' },
+            basePois[1],
+            basePois[2],
+        ]);
+        expect(result.current.selectedPoiMenu).toBeNull();
+
+        act(() => {
+            result.current.handleLinkMap('poi-2', 'map2.json');
+        });
+        const linkedBoth = applyUpdater(setPois, 1, linked);
+        act(() => {
+            result.current.handleUnlinkMap('poi-1');
+        });
+        const unlinked = applyUpdater(setPois, 2, linkedBoth);
+        expect(unlinked[0].linkedMap).toBeUndefined();
+        expect(unlinked[1].linkedMap).toBe('map2.json');
+        expect(unlinked[2].linkedMap).toBeUndefined();
+    });
+
+    it('removes roads having the poi as either endpoint', () => {
         const roads = [
             { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: [] },
             { id: 'road-2', fromPoiId: 'poi-3', toPoiId: 'poi-1', hexes: [] },
             { id: 'road-3', fromPoiId: 'poi-2', toPoiId: 'poi-3', hexes: [] },
         ];
-
-        it('removes roads that have the poi as either endpoint', () => {
-            const { result, setRoads } = setup({ roads });
-            act(() => {
-                result.current.handleRemoveRoads('poi-1');
-            });
-            const nextRoads = applyUpdater(setRoads, 0, roads);
-            expect(nextRoads.map(r => r.id)).toEqual(['road-3']);
+        const { result, setRoads } = setup({ roads });
+        act(() => {
+            result.current.handleRemoveRoads('poi-1');
         });
+        expect(applyUpdater(setRoads, 0, roads)).toEqual([roads[2]]);
     });
 
     describe('handlePoiPointerDown', () => {
-        it('starts dragging for non-road tools and stops the event', () => {
+        it('starts a drag at the poi position and claims the event', () => {
             const { result } = setup({ tool: TOOL_POI });
             const event = pointerEvent();
             act(() => {
@@ -209,43 +159,37 @@ describe('usePoiManagement', () => {
             expect(result.current.poiDragging).toEqual({ poiId: 'poi-1', startQ: 1, startR: 0 });
         });
 
-        it('does not start dragging for an unknown poi', () => {
-            const { result } = setup({ tool: TOOL_POI });
+        it.each([
+            ['poi tool', TOOL_POI],
+            ['road tool', TOOL_ROAD],
+        ])('ignores an unknown poi (%s)', (_name, tool) => {
+            const { result, setRoads } = setup({ tool });
             act(() => {
                 result.current.handlePoiPointerDown('missing-poi', pointerEvent());
             });
             expect(result.current.poiDragging).toBeNull();
+            expect(result.current.roadStartPoiId).toBeNull();
+            expect(setRoads).not.toHaveBeenCalled();
         });
+    });
 
-        it('creates a road between two connectable pois on the second click', () => {
+    describe('road tool selection', () => {
+        it('creates a road between two connectable pois on the second click and disarms', () => {
             const { result, setRoads } = setup({ tool: TOOL_ROAD });
-            const event = pointerEvent();
             act(() => {
-                result.current.handlePoiPointerDown('poi-1', event);
+                result.current.handlePoiPointerDown('poi-1', pointerEvent());
             });
             expect(result.current.roadStartPoiId).toBe('poi-1');
 
             act(() => {
-                result.current.handlePoiPointerDown('poi-2', event);
+                result.current.handlePoiPointerDown('poi-2', pointerEvent());
             });
-            expect(event.preventDefault).toHaveBeenCalled();
-            expect(event.stopPropagation).toHaveBeenCalled();
-            expect(isRoadConnectable).toHaveBeenCalledWith('settlement', 'settlement');
-            expect(findHexPath).toHaveBeenCalledWith(
-                expect.objectContaining({ id: 'poi-1', q: 1, r: 0 }),
-                expect.objectContaining({ id: 'poi-2', q: 3, r: 0 }),
-                hexCols,
-                hexRows,
-                baseTerrain
-            );
-            const nextRoads = applyUpdater(setRoads, 0, baseRoads);
-            expect(nextRoads).toHaveLength(1);
-            expect(nextRoads[0]).toMatchObject({
+            expect(applyUpdater(setRoads, 0, baseRoads)).toEqual([{
+                id: expect.stringMatching(/^road-\d+-[a-z0-9]+$/),
                 fromPoiId: 'poi-1',
                 toPoiId: 'poi-2',
                 hexes: ['1,0', '2,0', '3,0'],
-            });
-            expect(nextRoads[0].id).toMatch(/^road-/);
+            }]);
             expect(result.current.roadStartPoiId).toBeNull();
         });
 
@@ -261,7 +205,7 @@ describe('usePoiManagement', () => {
             expect(setRoads).not.toHaveBeenCalled();
         });
 
-        it('removes the existing road between the two pois instead of creating a duplicate', () => {
+        it('removes the existing road between two pois instead of creating a duplicate', () => {
             const roads = [
                 { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: ['1,0', '2,0', '3,0'] },
             ];
@@ -272,27 +216,22 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handlePoiPointerDown('poi-2', pointerEvent());
             });
-            expect(findHexPath).not.toHaveBeenCalled();
-            const nextRoads = applyUpdater(setRoads, 0, roads);
-            expect(nextRoads).toEqual([]);
+            expect(applyUpdater(setRoads, 0, roads)).toEqual([]);
             expect(result.current.roadStartPoiId).toBeNull();
         });
 
-        it('does not arm road selection for non-connectable poi types', () => {
+        it('never arms or completes a road through a non-connectable poi type', () => {
             const { result, setRoads } = setup({ tool: TOOL_ROAD });
             act(() => {
                 result.current.handlePoiPointerDown('poi-3', pointerEvent());
             });
-            expect(isRoadConnectable).toHaveBeenCalledWith('dungeon', 'dungeon');
             expect(result.current.roadStartPoiId).toBeNull();
-            expect(setRoads).not.toHaveBeenCalled();
-        });
 
-        it('cancels a pending road selection when the second poi is not connectable', () => {
-            const { result, setRoads } = setup({ tool: TOOL_ROAD });
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', pointerEvent());
             });
+            expect(result.current.roadStartPoiId).toBe('poi-1');
+
             act(() => {
                 result.current.handlePoiPointerDown('poi-3', pointerEvent());
             });
@@ -300,21 +239,14 @@ describe('usePoiManagement', () => {
             expect(setRoads).not.toHaveBeenCalled();
         });
 
-        it('ignores an unknown poi with the road tool', () => {
-            const { result, setRoads } = setup({ tool: TOOL_ROAD });
-            act(() => {
-                result.current.handlePoiPointerDown('missing-poi', pointerEvent());
-            });
-            expect(result.current.roadStartPoiId).toBeNull();
-            expect(setRoads).not.toHaveBeenCalled();
-        });
-
-        it('clears the pending road when no path is found between the pois', () => {
-            const { result, setRoads } = setup({ tool: TOOL_ROAD });
-            findHexPath.mockReturnValue(null);
+        it('clears the pending road when no path exists between the pois', () => {
+            // hexCols of 2 makes q=3 unreachable for the real A* pathfinder.
+            const { result, setRoads } = setup({ tool: TOOL_ROAD, hexCols: 2 });
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', pointerEvent());
             });
+            expect(result.current.roadStartPoiId).toBe('poi-1');
+
             act(() => {
                 result.current.handlePoiPointerDown('poi-2', pointerEvent());
             });
@@ -324,31 +256,8 @@ describe('usePoiManagement', () => {
     });
 
     describe('handlePoiPointerMove', () => {
-        it('moves the dragged poi to the hex under the pointer', () => {
+        it('moves only the dragged poi to the hex under the pointer', () => {
             const getHex = vi.fn(() => ({ q: 4, r: 1 }));
-            const { result, setPois, setRoads } = setup({ getHex, tool: TOOL_POI });
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', pointerEvent());
-            });
-            act(() => {
-                result.current.handlePoiPointerMove({});
-            });
-            const nextPois = applyUpdater(setPois, 0, basePois);
-            expect(nextPois.find(p => p.id === 'poi-1')).toMatchObject({ q: 4, r: 1 });
-            expect(nextPois.find(p => p.id === 'poi-2')).toMatchObject({ q: 3, r: 0 });
-            expect(setRoads).not.toHaveBeenCalled();
-        });
-
-        it('does nothing when no poi is being dragged', () => {
-            const { result, setPois } = setup({ tool: TOOL_POI });
-            act(() => {
-                result.current.handlePoiPointerMove({});
-            });
-            expect(setPois).not.toHaveBeenCalled();
-        });
-
-        it('does nothing when the event does not resolve to a hex', () => {
-            const getHex = vi.fn(() => null);
             const { result, setPois } = setup({ getHex, tool: TOOL_POI });
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', pointerEvent());
@@ -356,24 +265,48 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handlePoiPointerMove({});
             });
-            expect(setPois).not.toHaveBeenCalled();
+            expect(applyUpdater(setPois, 0, basePois)).toEqual([
+                { ...basePois[0], q: 4, r: 1 },
+                basePois[1],
+                basePois[2],
+            ]);
         });
 
-        it.each([
-            ['negative column', { q: -1, r: 0 }],
-            ['negative row', { q: 0, r: -1 }],
-            ['column at the grid edge', { q: hexCols, r: 0 }],
-            ['row at the grid edge', { q: 0, r: hexRows }],
-        ])('does not move the poi to an out-of-bounds hex (%s)', (_, hex) => {
-            const getHex = vi.fn(() => hex);
+        it('does nothing without an active drag or an unresolved hex', () => {
+            const getHex = vi.fn(() => ({ q: 4, r: 1 }));
             const { result, setPois } = setup({ getHex, tool: TOOL_POI });
+            act(() => {
+                result.current.handlePoiPointerMove({});
+            });
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', pointerEvent());
             });
+            getHex.mockReturnValue(null);
             act(() => {
                 result.current.handlePoiPointerMove({});
             });
             expect(setPois).not.toHaveBeenCalled();
+        });
+
+        it('rejects every out-of-bounds hex but still allows a valid one', () => {
+            const getHex = vi.fn();
+            const { result, setPois } = setup({ getHex, tool: TOOL_POI });
+            act(() => {
+                result.current.handlePoiPointerDown('poi-1', pointerEvent());
+            });
+            for (const hex of [{ q: -1, r: 0 }, { q: 0, r: -1 }, { q: hexCols, r: 0 }, { q: 0, r: hexRows }]) {
+                getHex.mockReturnValue(hex);
+                act(() => {
+                    result.current.handlePoiPointerMove({});
+                });
+            }
+            expect(setPois).not.toHaveBeenCalled();
+
+            getHex.mockReturnValue({ q: 4, r: 1 });
+            act(() => {
+                result.current.handlePoiPointerMove({});
+            });
+            expect(setPois).toHaveBeenCalledTimes(1);
         });
 
         it('does not move the poi onto a hex occupied by another poi', () => {
@@ -390,27 +323,13 @@ describe('usePoiManagement', () => {
     });
 
     describe('handlePoiPointerUp', () => {
-        it('clears the dragging state', () => {
-            const { result } = setup({ tool: TOOL_POI });
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', pointerEvent());
-            });
-            act(() => {
-                result.current.handlePoiPointerUp();
-            });
-            expect(result.current.poiDragging).toBeNull();
-        });
-
-        it('re-paths roads connected to the poi after it is dropped at a new position', () => {
+        it('re-paths connected roads to the dropped position and clears the drag', () => {
             const roads = [
                 { id: 'road-1', fromPoiId: 'poi-1', toPoiId: 'poi-2', hexes: ['1,0', '2,0', '3,0'] },
+                { id: 'road-2', fromPoiId: 'poi-2', toPoiId: 'poi-3', hexes: ['3,0', '4,0'] },
             ];
-            const { result, rerender, setPois, setRoads, getHex } = setup({
-                roads,
-                getHex: vi.fn(() => ({ q: 4, r: 1 })),
-                tool: TOOL_POI,
-            });
-            findHexPath.mockReturnValue([{ q: 9, r: 9 }, { q: 8, r: 8 }]);
+            const getHex = vi.fn(() => ({ q: 4, r: 1 }));
+            const { result, rerender, setPois, setRoads } = setup({ roads, getHex, tool: TOOL_POI });
 
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', pointerEvent());
@@ -418,9 +337,9 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handlePoiPointerMove({});
             });
-            const nextPois = applyUpdater(setPois, 0, basePois);
+            const movedPois = applyUpdater(setPois, 0, basePois);
             rerender({
-                pois: nextPois,
+                pois: movedPois,
                 setPois,
                 roads,
                 setRoads,
@@ -435,14 +354,11 @@ describe('usePoiManagement', () => {
             });
 
             const nextRoads = applyUpdater(setRoads, 0, roads);
-            expect(findHexPath).toHaveBeenCalledWith(
-                expect.objectContaining({ id: 'poi-1', q: 4, r: 1 }),
-                expect.objectContaining({ id: 'poi-2' }),
-                hexCols,
-                hexRows,
-                baseTerrain
-            );
-            expect(nextRoads[0].hexes).toEqual(['9,9', '8,8']);
+            const repathed = nextRoads.find(r => r.id === 'road-1');
+            expect(repathed.hexes[0]).toBe('4,1');
+            expect(repathed.hexes.at(-1)).toBe('3,0');
+            expect(repathed.hexes).toHaveLength(3);
+            expect(nextRoads.find(r => r.id === 'road-2')).toEqual(roads[1]);
             expect(result.current.poiDragging).toBeNull();
         });
 

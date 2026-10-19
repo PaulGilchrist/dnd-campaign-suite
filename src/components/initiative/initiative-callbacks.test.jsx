@@ -1,3 +1,16 @@
+// @maintained-by-ai
+// Owned contract: Initiative.jsx's two INLINE window-event listeners —
+//   concentration-result (Initiative.jsx:457-474) and death-save-result
+//   (Initiative.jsx:476-494). These listeners are not factory-owned: no lane
+//   in createConcentrationHandlers (#833-#835), createCreatureHandlers
+//   (#836-#837), createEffectAdderHandlers (#838-#839), createNpcClickHandler
+//   (#840-#846) or createRollConditionSaveHandler (#847) dispatches or handles
+//   these events, and initiative.test.jsx / initiative.overlays.test.jsx never
+//   fire them (verified by grep, 2026-10-19). Dispatch-side contracts live in
+//   ConcentrationPromptModal/DeathSavePromptModal tests; this file pins only
+//   what the listeners DO with a dispatched event: name matching (exact and
+//   "Name " prefix), runtime-store vs combatSummary persistence split,
+//   concentration teardown, and no-op honesty on every guard branch.
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './Initiative.jsx';
@@ -114,13 +127,11 @@ vi.mock('./CreatureCard.jsx', () => ({ default: ({ creature }) => (
 ) }));
 vi.mock('./EffectAdder.jsx', () => ({ default: ({ targetName }) => (<div data-testid="effect-adder"><span>{targetName}</span></div>) }));
 
-describe('Initiative - Window Event Handlers', () => {
+describe('Initiative window-event listeners', () => {
     let props;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        window.confirm = vi.fn(() => true);
-        Element.prototype.scrollIntoView = vi.fn();
         props = {
             characters: [
                 { name: 'Alice', computedStats: { hitPoints: 20, currentHitPoints: 20, armorClass: 15 } },
@@ -133,68 +144,100 @@ describe('Initiative - Window Event Handlers', () => {
         };
     });
 
-    describe('death-save-result window event', () => {
-        it('should update player HP when death-save-result fires with restoredToHp', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+    // Mount the container with a loaded combat summary and wait until the
+    // listeners have a non-null combatSummary closure (cards rendered).
+    const renderWithSummary = async (summary, ...cardNames) => {
+        vi.mocked(loadCombatSummary).mockResolvedValue(summary);
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => {
+            for (const name of cardNames) {
+                expect(screen.queryByTestId(`creature-card-${name}`)).toBeInTheDocument();
+            }
+        });
+    };
 
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('death-save-result', {
-                    detail: { targetName: 'Alice', restoredToHp: 5 },
-                }));
-            });
+    const dispatchEvent = async (event, detail) => {
+        await act(async () => {
+            window.dispatchEvent(new CustomEvent(event, { detail }));
+        });
+    };
+
+    const latestStoredSummary = () => {
+        const calls = storage.set.mock.calls.filter(([key]) => key === 'combatSummary');
+        return calls[calls.length - 1]?.[1];
+    };
+
+    const writeCounts = () => ({
+        storage: storage.set.mock.calls.length,
+        runtime: setRuntimeValue.mock.calls.length,
+        cleanup: cleanupConcentrationEffects.mock.calls.length,
+    });
+
+    describe('death-save-result', () => {
+        it('restores a player via the runtime store without stamping HP into combatSummary', async () => {
+            await renderWithSummary({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] }, 'Alice');
+
+            await dispatchEvent('death-save-result', { targetName: 'Alice', restoredToHp: 5 });
 
             expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'currentHitPoints', 5, 'test-campaign');
+            expect(latestStoredSummary().creatures.find(c => c.name === 'Alice').currentHp).toBeUndefined();
         });
 
-        it('should update NPC currentHp in storage when death-save-result fires for NPC', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc' }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
+        it('restores an NPC by prefix-matched full name and persists currentHp in combatSummary', async () => {
+            await renderWithSummary(
+                { round: 1, creatures: [{ name: 'Goblin 1', type: 'npc', currentHp: 10 }] },
+                'Goblin 1'
+            );
 
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('death-save-result', {
-                    detail: { targetName: 'Goblin', restoredToHp: 3 },
-                }));
-            });
+            await dispatchEvent('death-save-result', { targetName: 'Goblin', restoredToHp: 3 });
 
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin 1', 'currentHitPoints', 3, 'test-campaign');
+            expect(latestStoredSummary().creatures.find(c => c.name === 'Goblin 1').currentHp).toBe(3);
+        });
+
+        it.each([
+            ['no restoredToHp (save succeeded)', { targetName: 'Goblin 1' }],
+            ['no creature matches the target', { targetName: 'Goblin Slayer', restoredToHp: 5 }],
+        ])('is ignored when %s', async (_label, detail) => {
+            await renderWithSummary(
+                { round: 1, creatures: [{ name: 'Goblin 1', type: 'npc', currentHp: 10 }] },
+                'Goblin 1'
+            );
+
+            const before = writeCounts();
+            await dispatchEvent('death-save-result', detail);
+
+            expect(setRuntimeValue).toHaveBeenCalledTimes(before.runtime);
+            expect(storage.set).toHaveBeenCalledTimes(before.storage);
         });
     });
 
-    describe('concentration-result window event', () => {
-        it('should clear concentration and clean up effects on failed save', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', concentration: { spell: 'Shield', dc: 10 } }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+    describe('concentration-result', () => {
+        const withConcentration = () => ({
+            round: 1,
+            creatures: [{ name: 'Alice', type: 'player', concentration: { spell: 'Shield', dc: 10 } }],
+        });
 
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('concentration-result', {
-                    detail: { targetName: 'Alice', success: false },
-                }));
-            });
+        it('breaks concentration on a failed save, persisting the cleared summary and cleaning up effects', async () => {
+            await renderWithSummary(withConcentration(), 'Alice');
 
-            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+            await dispatchEvent('concentration-result', { targetName: 'Alice', success: false });
+
+            expect(latestStoredSummary().creatures.find(c => c.name === 'Alice').concentration).toBeNull();
             expect(cleanupConcentrationEffects).toHaveBeenCalledWith('Alice', 'Shield', 'test-campaign');
         });
 
-        it('should not clear concentration on successful save', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', concentration: { spell: 'Shield', dc: 10 } }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        it.each([
+            ['the save succeeds', { targetName: 'Alice', success: true }],
+            ['no creature matches the target', { targetName: 'Nobody', success: false }],
+        ])('is a no-op when %s', async (_label, detail) => {
+            await renderWithSummary(withConcentration(), 'Alice');
 
-            const storageCallsBefore = storage.set.mock.calls.length;
-            const cleanupCallsBefore = cleanupConcentrationEffects.mock.calls.length;
+            const before = writeCounts();
+            await dispatchEvent('concentration-result', detail);
 
-            await act(async () => {
-                window.dispatchEvent(new CustomEvent('concentration-result', {
-                    detail: { targetName: 'Alice', success: true },
-                }));
-            });
-
-            expect(storage.set).toHaveBeenCalledTimes(storageCallsBefore);
-            expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(cleanupCallsBefore);
+            expect(storage.set).toHaveBeenCalledTimes(before.storage);
+            expect(cleanupConcentrationEffects).toHaveBeenCalledTimes(before.cleanup);
         });
     });
 });

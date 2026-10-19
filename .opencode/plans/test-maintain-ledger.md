@@ -1510,3 +1510,250 @@ run2#707: encounter/MonsterCardModal.ma1569-swarm-of-stirges-proboscises -> main
 ## Batch #165 — PROGRESS: completed 1843 / remaining 841 (total 2684)
 - Suite: lint clean; 2752 files, 33,981 passed, 2 canon FIXME fails (steps-config languageWarnings + Players dragging — exact canon pair) + 3 expected = GREEN canon. player-save flake absent (evidence /tmp/batch165.log)
 - Test count 34,127->33,981 (-146): swarm family template trims (1552:8->2 ... 1569:16->2)
+run2#708: encounter/MonsterCardModal.ma1570-swarm-of-venomous-snakes-bites-bloodied -> maintained (11->2): 1d4+4 census-unique cd sole lock + dual-pool transport press; carried recs #701/#707 applied. REC: future ma0647 drow Staff owner file
+run2#709: encounter/MonsterCardModal.ma1571-swarm-of-wasps-bites-half-hp -> maintained (8->2, 297->188): byte-twin of spiders documented; lone-wasp n/a honest; foreign-centipedes const cut (#695 rec)
+run2#710: encounter/MonsterCardModal.ma1573-tarrasque-bite-grapple -> maintained (10->3): full-row byte pin grappled/restrained escapeDc20; claw leak-guard negative; self-satisfying seam-contract test cut; stirges pin cut (#707 rec)
+run2#711: encounter/MonsterCardModal.ma1577-tarrasque-frightful-presence -> maintained (14->3, 289->~170): arm->EOT-success immunity chain headline merged (te 10rd + immunity 14400rd); EOT-fail refusal + LISTENER_OPTS empty neg; dracolich twin->owner. RECS: ma1578:167 shrink (done #712); frightfulPresenceService :144-221 mirrors collapse
+run2#712: encounter/MonsterCardModal.ma1578-tarrasque-swallow -> maintained (12->4, zero mocks): owned swarm save bytes kept; transport press real discriminator (formula:null pre-fix); FP guard reduced (#711 rec). SOURCE BUG ⚠ Swallow dc_success unauthored -> default 'half' pays dmg on RAW-success (Modal.jsx:286->applyDamage.js:93); honest canary now pinned
+run2#713: encounter/MonsterCardModal.ma1584-thri-kreen-bite-margin -> maintained (16->9): band-boundary + repeat-save full-cycle merged; saveChipPlan exact-shape; generic cycles->repeatSaveService cites; savePrompt mock bisected. REC: repeatSaveService/save-margin-rider overlap consolidation
+run2#714: encounter/MonsterCardModal.ma1591-thri-kreen-psion-spellcasting -> maintained (14->7): exact-map merges; advisory dc-null x3 spells; vacuous negatives purged; independence->spellcasting:522-542. REC: family skip dedicated counter tests (inline store equality)
+run2#715: encounter/MonsterCardModal.ma1595-tiger-rend-prone -> maintained (10->2): converted to REAL modal render — new click->ctx prone clause transport pin (:1180/:1407 first-time); landing->hitClause owners; 14 mocks bisected (useLoggedDiceRoll+damageUtils LIVE). REC: add tiger to hitClause.test.js HIT_CLAUSE_ROWS :224-282
+run2#716: encounter/MonsterCardModal.ma1610-triceratops-gore-charge -> maintained (6->2): goat-shape twin honest; 2d8 + recharge-key-ABSENT distinct bytes; feet-token head live vs skeleton inert documented
+run2#717: encounter/MonsterCardModal.ma1625-ultroloth-spellcasting -> maintained (13->7): extractor+badge merges; inline multi-key #714 rec; exhausted-refuse->spellcasting:288-302; DC-sum+strip-tags proofs purged; sync-race fixed via waitFor
+run2#718: encounter/MonsterCardModal.ma1634-unicorn-spellcasting -> maintained (13->8): byte-lock canonical; PWT live-store strengthened; calm-refuse twin->owner; diceRoller purged; legendary lane #636 boundary held
+run2#719: encounter/MonsterCardModal.ma1656-hunger-of-hadar -> maintained (7->3): full-row disk identity + authority-linked status_effects; 12-key opts exact-map folds rider inertness + dcSuccess-none vs half-default
+run2#720: encounter/MonsterCardModal.ma1676-warhorse-hooves-charge -> maintained (14->4, 362->~200): describe.each dual rows (wereboar MA-1699 sole-owner folded); grant/recharge->owners; dead mocks purged
+run2#721: encounter/MonsterCardModal.ma1742-yochlol-spellcasting -> maintained (10->6): byte-lock merge; both-DB evidence strengthened (dc_type WIS justification); (self only) LIVE claim kept; diceRoller bisected-dead
+run2#722: encounter/MonsterCardModal.ma1766-young-bronze-fog-chip -> maintained (4->2): triple click-blocks->loop + stale-capture nulled-props; noun==='fog' + /No saving throw/ strengthened; shared lair_fog_cloud effectKey pinned
+
+## Batch #166 GREEN — run2#708-#722 (15 files)
+## Batch #166 — PROGRESS: completed 1858 / remaining 826 (total 2684)
+- Suite: lint clean; 2752 files, 33,865 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (evidence /tmp/batch166.log). 33,981->33,865 (-116) from swarm/tarrasque/spellcast trims.
+run2#723: encounter/MonsterCardModal.ma1783-young-green-roots-chip -> maintained (5->2): click-loop stale-capture guard; exact titles + 120-ft gate + honest zoneTe/pushFeet nulls; owners 601/601
+run2#724: encounter/MonsterCardModal.ma1789-young-red-magma-chip -> maintained (4->2, 175->158): dup click bodies folded; full picker contract + range/titleOverride bytes; disk/render->owners
+run2#725: encounter/MonsterCardModal.ma1802-young-silver-fog-chip -> maintained (3->2): advisory-vs-zone lane adjudicated honestly (not bronze twin); census join + zero-store pins. REC ma1807:148-162 fold
+run2#726: encounter/MonsterCardModal.ma1807-young-white-fog-chip -> maintained (fold rec #725 applied; terse return, orchestrator re-verified 2/2+lint green)
+run2#727: encounter/MonsterCardModal.ma1814-yuan-ti-abomination-spellcasting -> maintained (12->7): byte-lock replace strip-tags; gated spend cascade 3->0; owners 38/38
+run2#728: encounter/MonsterCardModal.ma1818-yuan-ti-infiltrator-spellcasting -> maintained (12->6): DC-12/2-per-day distinct vs twin; twin-row cite ma1814:178-190; owners 39/39
+run2#729: encounter/MonsterCardModal.ma1827-yuan-ti-malison-type-1-spellcasting -> maintained (10->6): TRIPLE-TWIN rec recorded (type-1/2/3 rows byte-identical DC13)
+run2#730: encounter/MonsterCardModal.ma1830-yuan-ti-malison-type-2-spellcasting -> maintained (14->6): fold w/ drift-guard; type-2 name bytes + 2/Day lane; owners 45/45
+run2#731: encounter/MonsterCardModal.ma1834-yuan-ti-malison-type-3-spellcasting -> maintained (12->6): triple-twin identity reverified vs both twins; type-3 store/sibling bytes kept; owners 51/51
+run2#732: encounter/MonsterCardModal.ma1847-devour-the-boat -> maintained (4->3): refire folded + zero-stamp canary + latch bytes; turn-gated, timer-free; 3 dead mocks bisected
+run2#733: encounter/MonsterCardModal.ma1850-archlich-spellcasting -> maintained (14->8): sole DB-absence pins kept (Phantasmagoria/Blade-2024); lightning-Bolt DB->spellcasting:226-241
+run2#734: encounter/MonsterCardModal.ma1853-archlich-cast-cantrip -> maintained (9->4): full-row identity + provenance ladder; exhausted->legendary-uses canon :195-210; 6 mocks LIVE-confirmed
+run2#735: encounter/MonsterCardModal.ma1855-archlich-dread-word -> maintained (7->3): chip-plan exact + stranding discriminator; refire->latch owner; popup machinery purged
+run2#736: encounter/MonsterCardModal.ma1859-behemoth-earthshaker -> maintained (7->4, 228->169): gate arm e2e kept; recharge/math->owners; refusal surface-marker convention; 7 dead mocks purged. REC monsterRecharge :203-207/:231-236 dup triples
+run2#737: encounter/MonsterCardModal.ma1863-behemoth-trumpet -> maintained (10->2): full-row absences in one shot; RAW-2-of-3 press w/ slowed clauses; parse/fork->saveProcessing.ma1863 owner; 132/132. REC ma1872:238 exhausted-refusal twin cut
+
+## Batch #167 GREEN — run2#723-#737 (15 files)
+## Batch #167 — PROGRESS: completed 1873 / remaining 811 (total 2684)
+- Suite: lint clean; 2752 files, 33,797 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (evidence /tmp/batch167.log). 33,865->33,797 (-68) from batch trims.
+run2#738: encounter/MonsterCardModal.ma1867-cthulhu-tentacles -> maintained (8->4): full-row lock + plan exact-shape + fail/success canaries; dead combat-stubs purged; canonical failed-save faces->owner cites
+run2#739: encounter/MonsterCardModal.ma1868-cthulhu-psychic-shatter -> maintained (5->2): lifecycle fold fire->refuse->regain->refire exact-count; fingerprint->service twin :53-84; mocks 11->4 bisected
+run2#740: encounter/MonsterCardModal.ma1872-cthulhu-madness-whisper -> maintained (10->4): REC #737 APPLIED :238 exhausted twin cut->legendary-uses:1236; setRuntimeObject mock fix; owners 475 green
+run2#741: encounter/MonsterCardModal.ma1877-tentacle-rider-transport -> maintained (4->3): plan-face cut->ma1867/ma1000/ma1563; magnitude-precedence pin folded into arms; byte-inert owned claim honored
+run2#742: encounter/MonsterCardModal.ma1879-demogorgon-spellcasting -> maintained (12->6): #653 fold applied; Feeblemind merged into Fear gated cascade; 4 dead mocks bisected; owners 62/62
+run2#743: encounter/MonsterCardModal.ma1881-legendary-gaze-inherit(.js) -> maintained (7->4): pure-function inherit contract, all 5 branches pinned; clean split w/ render twin cited
+run2#744: encounter/MonsterCardModal.ma1881-legendary-gaze(.jsx) -> maintained (6 kept, 196->175): exact-count spend/refuse strengthen; canonical exhausted face cut->:195-212; 6/9 mocks purged bisect
+run2#745: encounter/MonsterCardModal.ma1883-legendary-cast-spell MODAL -> maintained (8->6): economy refusals merged; Feeblemind exhausted press owned here per ma1879 map; stale-cite note logged for ma1879 header
+run2#746: encounter/MonsterCardModal.ma1890-fenrir-devour-gates -> maintained (7->5): by_attacker:true OWNER truth table kept; provenance 'by Fenrir 1' copy pinned first-time; recharge tri-state->canonical
+run2#747: encounter/MonsterCardModal.ma1894-fenrir-winters-howl -> maintained (3->2): cost-suffix name-suffix pin added (machine-read marker); cost-parse fold->ma1883 owner
+run2#748: encounter/MonsterCardModal.ma1898-ma1901-garmr-gates -> maintained (7->2): fingerprint folds; inert clause vacuity pin removed (#710 lesson); exact-name finders hardened
+run2#749: encounter/MonsterCardModal.ma1958-orcus-spellcasting -> maintained (14->6): markup census mega-lock; 2024-twin meta + no-save-shell cuts->owner. SOURCE BUG ⚠ Orcus save_type Wisdom vs prose Charisma (WIS+5=21!=23 DC; CHA+7=23) pinned honestly
+run2#750: encounter/MonsterCardModal.ma1959-orcus-wand -> maintained (14->7): byte-lock absorbs 4 markup asserts; filesystem-absence vacuity cut; press folds + pressChip helper; owners 38/38
+run2#751: encounter/MonsterCardModal.ma1975-quetzal-wind-step -> maintained (11->3, -89/+27): key-set proves absences; 4 refusal faces->canonical owners (#636 latch rec honored); teleport prose-only. REC: 7-file latch re-pin fold list recorded
+run2#752: encounter/MonsterCardModal.ma1990-simurgh-healing-breath -> maintained (7->2): latch cut per REC #751; header pin sole-home移至 ma1991; press exemplar shape; owners 144 green. REC: ma1991 latch/shortfall chip folds
+
+## Batch #168 GREEN(+known flake) — run2#738-#752 (15 files)
+## Batch #168 — PROGRESS: completed 1888 / remaining 796 (total 2684)
+- Suite: lint clean; 2752 files, 33,731 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon; plus ElementalAttunementModal.player-save FLAKE fail under parallel load — confirmed green 21/21 standalone immediately after (4th sighting; watch active, evidence /tmp/batch168.log). 33,797->33,731 (-66) from batch trims.
+run2#753: encounter/MonsterCardModal.ma1991-simurgh-soothing-cry -> maintained (7->3): 3 carried recs applied (latch->:309-316, chip fold, shortfall cites); header sole-home moved here; zero-condition honesty canary
+run2#754: encounter/MonsterCardModal.ma2012-wukong-somersault-leap -> maintained (8->2): advisory fold #752 exemplar; refusal faces->canonical; header sole-home kept (Wukong-unique)
+run2#755: encounter/MonsterCardModal.paralyzing-breath -> maintained (6->4): 2-monster lanes; PICKER exact-shape inert riders; 7 dead mocks purged; FALSE-GREEN bisect refusal (restored store mock); POLICY FLAG MonsterCardModal.jsx:307 paralyzed_minutes:1->rounds:10 vs minutes x10 retire
+run2#756: encounter/MonsterCardModal.pfeg -> maintained (3->1 it.each): replay-mocks removed (combineAttackModes/damageUtils) -> real fold runs; latent mock-hoist bug fixed
+run2#757: encounter/MonsterCardModal.pounce-ancient-gold -> maintained (5->2, 207->176): own-turn twin cut rec #751; exhausted->canonical absorbs-face; gold suffix+byte distinct kept; owners 138/138. REC pounce-dracolich:246 + pounce-shadow:288-298 exhausted twins
+run2#758: encounter/MonsterCardModal.pounce-dracolich -> maintained (8->4): exhausted cut (max:1 gate monster-independent); Sickening Ray press sole-owner grep-verified; FP header cite
+run2#759: encounter/MonsterCardModal.pounce-shadow-dragon -> maintained (12->7, -92/+51): canonical own-turn popup KEPT+strengthened (mandate); exhausted+latch cut w/ honest adjudication; owners 127/127
+run2#760: encounter/MonsterCardModal.psychic-drain -> maintained (4->1): folded lifecycle refuse->provenance->spend->save->heal; real disk fixtures; heal range->exact byte; owners 108/108
+run2#761: encounter/MonsterCardModal.ranged-variant -> maintained (24->11 blocks/23 cases): it.each disk tables; offer arms exact 8-key; MA-0539 internals->rangeValidation:115-119; twin-lane seams cut
+run2#762: encounter/MonsterCardModal.recharge-cone -> maintained (4->3): lifecycle fold exact totals; disk-identity arm added; 6 dead mocks purged, 4 zero-write pins kept; encounter folder 375/1864 green
+run2#763: encounter/MonsterCardModal.rendering -> maintained (7->5, mocks 7->0): sole pins kept (terminal name fallback, multi-mode speed join, falsy-zero leg-res); fixture-faking anti-pattern purged; sibling 53/53
+run2#764: encounter/MonsterCardModal.repulsion-breath -> maintained (4->2): PICKER exact-shape honest nulls; live extractor beat template '' guess (false-green avoided); 7/11 mocks purged per #755 rec; push-seam cited owner
+run2#765: encounter/MonsterCardModal.save-modifier -> maintained (12->7, mocks 9->6): full-branch table sole direct-pin lane; !=null zero canary added; abilityLookup unmocked real fold; no-target vacuity->behavioral refusal. REC suite-wide: 40+ getAbilitySaveModifier stubs unmock candidates
+run2#766: encounter/MonsterCardModal.save-variant-shape -> maintained (8->7): breathAoeShape SHAPE-lane ownership verified vs #743/#744 map; census all 21 emanation rows; false-green sanitize guard armed+fixed; cite drift notes for 3 siblings
+run2#767: encounter/MonsterCardModal.scorching-ray -> maintained (7->4): data locks folded; press byte-exact isSpellDamage TRUE; 2024 raw bytes->legendary-uses:844-861; 6 dead mocks purged; owners 207/207. REC spell-attack.test.jsx mock dedupe
+
+## Batch #169 GREEN — run2#753-#767 (15 files)
+## Batch #169 — PROGRESS: completed 1903 / remaining 781 (total 2684)
+- Suite: lint clean; 2752 files, 33,679 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (player-save clean this round; evidence /tmp/batch169.log). 33,731->33,679 (-52) from batch trims.
+run2#768: encounter/MonsterCardModal.secondary-save-transport (CANON owner) -> maintained (13->5 templates/22 cases): all canonical bytes preserved full toEqual; mutation-honest (brazen secondary => 2 red); zero-mock pure DI; full cite-shift map recorded
+run2#769: encounter/MonsterCardModal.senses-and-fallback -> maintained (14->5/12 cases, 220->107 lines): ZERO mocks (real store pattern); canonical senses/AC bytes kept; {} arm->test.jsx:575-580; NOTE computeShieldOfFaithBonus hardcodes +2 (ignores acBonus, display correct)
+run2#770: encounter/MonsterCardModal.sleep-breath -> maintained (6->3): sleepStaging LIVE rider bytes {unconsciousRounds:100} + inert-null block; ancient MA-0179 got REAL live press (old was prose-only); lifecycle fold exact totals; 7 mocks purged per #755 rec
+run2#771: encounter/MonsterCardModal.spell-attack -> maintained (12->5, 368->280): cause-byte not.toHaveProperty caught-live; helper units/refusal->owners; mutation-free concentration; mocks 11->5. REC spell-attack test-utils dedupe (logged #767)
+run2#772: encounter/MonsterCardModal.spellcasting-ancient-red -> maintained (4->4 stronger, mocks 11->5): real spells.json serves 11d6 from one authored byte; sibling-mirror cut; DC arith removed. REC archpriest cross-check cut (applied #773)
+run2#773: encounter/MonsterCardModal.spellcasting-archpriest -> maintained (5->3): REC #772 APPLIED sibling cross-check cut; real-DB 4d6+5d6 proven twice from one byte; 6 mocks bisected. REC azer-pyromancer :165-171 reverse mirror (applied #774)
+run2#774: encounter/MonsterCardModal.spellcasting-azer-pyromancer -> maintained (5->3, 213->186): REC #773 APPLIED reverse cross-check cut; real-DB Fireball 8d6; Elementalism 2024-fallback adjudicated live; owners 39/39
+run2#775: encounter/MonsterCardModal.spellcasting-bandit-deceiver -> maintained (7->4): FABRICATED Gust-of-Wind fixture test REMOVED (invented bytes -> spellcasting:195 advisory); MA-0049 hold_person_refused sole-owner kept; folder 375/1839
+run2#776: encounter/MonsterCardModal.spellcasting-barlgura -> maintained (9->6, 309->~230): cited upcast-parse owner PRESERVED byte-identical (shift :185-187->:146-148 reported); MA-0049 refusal strengthened byte-exact; 6 mocks purged
+run2#777: encounter/MonsterCardModal.spellcasting SUPER-OWNER -> maintained (32->22, 672->613): ALL canonical faces byte-intact ZERO weakening; full old->new cite map in bugs ledger; disk pins folded table-driven vs real ability scores; folder 375/1823
+run2#778: encounter/MonsterCardModal.staged-roar -> maintained (5->2/4 cases): inline-vs-picker split adjudicated (ma1502 owns picker); full 45-key ctx per stage + 31-rider INERT block; refusal full-entry lock; 7 mocks purged
+run2#779: encounter/MonsterCardModal.terrifying-presence-dracolich -> maintained (4->3, 191->153): FP header cite bytes PRESERVED (:144-146->:120-122 map); math/exhausted->canonical; damageUtils narrowed importActual. REC pounce-dracolich:104-105 header bytes droppable; save-full/helpers half-math dedupe
+run2#780: encounter/MonsterCardModal.test-utils (meta) -> maintained (16->14/58 cases): makeProps full toEqual + nested-mutation freshness proof; it.each contract tables; :147 cite byte-identical; honest Boolean() contract
+run2#781: encounter/MonsterCardModal.test BASE lane -> maintained (46->29 exec): vacuous traits queryByText tests replaced honest bytes (#710 lesson); :205 exact-byte tightening ACCEPTED (#769 rec); full canonical new-line map; folder 375/1807
+run2#782: encounter/MonsterCardModal.thunderclap-sphere -> maintained (4->4 stronger, mocks 10->4): PICKER_KEYS 29-key arm live riders + inert-null block; exhausted cited face PRESERVED :183->:197; cylinder guard determinism fix (any-chip ambiguity killed). REC legendary-uses:256-263 droppable subset
+
+## Batch #170 GREEN — run2#768-#782 (15 files)
+## Batch #170 — PROGRESS: completed 1918 / remaining 766 (total 2684)
+- Suite: lint clean; 2752 files, 33,629 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (player-save clean 2nd consecutive; evidence /tmp/batch170.log). 33,679->33,629 (-50) from batch trims incl. base lane 46->29 and super-owner 32->22.
+run2#783: encounter/MonsterCardModal.two-handed -> maintained (12->9, 112+/135-): offer-shape/inert->Helpers owner; chip-press it.each exact 5-key offer; setTimeout->waitFor; disk bytes replace shadow copy
+run2#784: encounter/MonsterCardModal.unrollable-damage -> maintained (3->1): render+seam faces cut->owners (MonsterAction census, flat-hit 'once'); sole chip-press refusal full exact-byte entry
+run2#785: encounter/MonsterCardModal.whirlwind-zone -> maintained (9->5): zoneTe exact incl derived damage:null; NEW registry pin getEffectDefinition('whirlwind') zero-hits suite-wide; cited :50->:51; zero-mock
+run2#786: encounter/SaveVariantChooserModal -> maintained (4 blocks->6 cases): real disk-row payloads exact toHaveBeenCalledWith exactly-one-fork; both inert branches; zero-mock leaf
+run2#787: encounter/ShapeShiftModal -> maintained (4 blocks->11 cases): 4-row exact payload forwarding (True Form pass-through newly pinned); malformed guards it.each; comment drift adjudicated honestly
+run2#788: factions/Factions.duplicate-name -> maintained (4->2): tautological disabled-clicks removed; live-validation arc one flow exact bytes; fresh fixtures. REC Factions.test.jsx 3 tautologies + waitFor
+run2#789: factions/Factions.test -> maintained (25->12): 3 carried recs APPLIED (tautologies->disabled-byte guards + cite #788; setTimeout->waitFor); POST payload bytes + confirm invocation + pending byte pinned; folder green
+run2#790: hex-map/EventDialog -> maintained (31->16): reroll-state fixtures folded; icons/types 7-row it.each; container-mock scan sole-internal-owner. SOURCE BUG 🔴 EventDialog.jsx:60 encounter.monsters.map unguarded -> crash
+run2#791: hex-map/HexGridLayer -> maintained (9->2): hollow hexToSVGPath mock DELETED (real converter wiring); counts->owner cite; converter-oracle bytes float-safe + stale-memo mutant catch; folder 558
+run2#792: hex-map/HexMap.additional -> maintained (19 decl->9/19 cases): three-way split header; travel-log asserts exact toEqual non-default fixtures; btn-reroll-weather NEW click coverage; generateWeather not-called assert
+run2#793: hex-map/HexMap.test BASE -> maintained (15->14 +4 new faces): toolbar zoom/paint/pointer routing new; Subscriber<-handleSSEEvent wiring byte + config oracle no hand-geometry; drop validation exact payloads; dead guard mock killed
+run2#794: hex-map/HexMap.travel -> maintained (15 units->2 it.each tables, -30% bytes): :212/:259 anchors guard-full exact payloads; hollow mocks/noise purged; camp/weather cut->#792 owners
+run2#795: hex-map/HexMapToolbar -> maintained (17->9+3 it.each/21): exact button order contract new; latent TOOL_ROAD ReferenceError FIXED; displayName precedence + rounding edge + erase->paint
+run2#796: hex-map/hooks/useEncounterGeneration -> maintained (14->9): golden-pipeline exact bytes + pass-through identity; seed-luck brittleness removed, spawn-ring invariant; memo-identity cut
+run2#797: hex-map/hooks/useHexHover -> maintained (16->6): memo-identity x2 cut (#796 lesson); identity-transform weak test subsumed; clear-transition proven from active hover; zero-mock act-clean
+
+## Batch #171 GREEN — run2#783-#797 (15 files)
+## Batch #171 — PROGRESS: completed 1933 / remaining 751 (total 2684)
+- Suite: lint clean; 2752 files, 33,562 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 3rd consecutive; evidence /tmp/batch171.log). 33,629->33,562 (-67) from hex-map/factions/modal trims incl. EventDialog 31->16, Factions 25->12, hover 16->6.
+run2#798: hex-map/hooks/useHexMapSSESync -> maintained (21->9 blocks): vacuous-negative filter gap fixed w/ positive control; retarget test replaces memo identity; unguarded travelState echo asymmetry pinned; no EventSource/no POST confirmed
+run2#799: hex-map/hooks/useMapLoader.api -> maintained EARLIER-PASS (16->3 + unmount canary): marker gate no re-edit. SOURCE BUGS VERIFIED+LOGGED: 🔴 :161 never-resets guard + Map.jsx:351 no key (stale map on outdoor switch); ⚠ :210 stale ref saves-stop; ⚠ :178 silent catch
+run2#800: hex-map/hooks/useMapLoader.createNew -> maintained (7->4): real-config derivation (DEFAULT_GRID_SIZE 30); transport-fake-only; race-tolerant save discipline surfaced NEW 🔴 :188-210 mount-save scheduling race (logged)
+run2#801: hex-map/hooks/useMapLoader.init -> maintained (5->2): recs x2 APPLIED (tautological config-mock defaults cut; ref-seed anchor :83-90 unshifted); pending-guard half pinned :189
+run2#802: hex-map/hooks/useMapLoader.loadExisting -> maintained (30->9 cases): full exact applied-state toEqual replaces 8 faces; anti-self-satisfaction clone (hook mutates in place); config un-mocked
+run2#803: hex-map/hooks/useMapLoader.travelState -> maintained (17->10): REC #802 adjudicated fold honest; old fake fast=6 lied -> real budgets pinned 2/4/5; surviving-zero guard kept
+run2#804: hex-map/hooks/usePoiManagement -> maintained (29->20): real A* unmocked optimal paths + unreachable branch; exact full-array mutations + id-format bytes; fixed own stale-prev unlink bug
+run2#805: hex-map/hooks/useTerrainPainting -> maintained (16->13): cumulative drag state strengthened; undefined-key weak erase test removed; guards it.each
+run2#806: hex-map/hooks/useTravelToolSync -> maintained (34->12 honest branch table vs 28-line source): SOURCE ⚠ :21 dead ternary + 📌 :20-24 fragility (logged)
+run2#807: hex-map/hooks/useZoomPan -> maintained (26->7): float literals->config oracles; batching defect caught (same-tick wheel stale zoomValueRef, :134 latent honest note); non-identity rect fixture
+run2#808: hex-map/MarchingOrderPanel -> maintained (14->7): controlled harness exact payloads every mutation; swap/add/remove membership flows + disabled bytes; folder 401
+run2#809: hex-map/PartyMarkerLayer -> maintained (12 dec->7): fake-path mock removed vacuity fixed; oracle byte-exact; svgRef transport-fake justified; TDZ note inspected
+run2#810: hex-map/POIContextMenu -> maintained (28->25 cases): full ordered option-set toEqual; Rename-no-close design pinned; picker insert position; unreachable defensive cut
+run2#811: hex-map/POILayer -> maintained (28->16): fake-grid mock deleted, real converter oracle exact; :174 rec APPLIED; GM/player visibility exact-remaining + opacity bytes
+run2#812: hex-map/POIPanel -> maintained (7->3): ordered names toEqual replaces self-satisfying loop; drag-contract exact setData/setDragImage; defensive unreachable branches cut
+
+## Batch #172 GREEN — run2#798-#812 (15 files)
+## Batch #172 — PROGRESS: completed 1948 / remaining 736 (total 2684)
+- Suite: lint clean; 2752 files, 33,404 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 4th consecutive; evidence /tmp/batch172.log). 33,562->33,404 (-158) from full hex-map domain trims (hook family + layers/panels).
+run2#813: hex-map/RiverLayer -> maintained (15->10): oracle verbatim d bytes chain/order/args in one assertion; zero module mocks (invalid-descriptor over-mock cut); fill cx/cy exact String(hexToPixel) bytes. REC RoadLayer same discipline (applied #814)
+run2#814: hex-map/RoadLayer -> maintained (13->6): REC #813 FULL APPLIED wholesale mock deleted, descriptor-null unreachable cut, memo call-counts cut; toBeTruthy vacuity -> oracle bytes; paint-order matrix
+run2#815: hex-map/TerrainLayer -> maintained (12->4): wholesale stub-mock deleted ('verified nothing real'); real getAllHexes+converter oracles; golden byte once rgb(186,206,157) + amplitude band; memo tests cut
+run2#816: hex-map/TravelPanel -> maintained (27->17): state-variants it.each 6 rows clamp/exhausted/forced-march bytes; circular format-recompute assertion replaced with literal display bytes; disabled-byte guards
+run2#817: hex-map/TravelPathLayer -> maintained (18->13): FATAL GAP fixed points/positions never verified -> oracle verbatim split at pathIndex; halo moves 4 indices; destination marker oracle-centered
+run2#818: hex-map/WeatherOverlay -> maintained (22->11): PRESENT_CONTRACT it.each 8 conditions exact className+particle counts (300 drops/5 flashes); coverage gaps fixed storm/mist/absence; random positions not pinned
+run2#819: initiative/AiDirectorPanel -> maintained (8->5): gate matrix +dead-NPC branch; POST bytes+notice exact; AI-500 honesty path; bare setTimeout(50)->deterministic; real applyDirectorIntent runs unmocked
+run2#820: initiative/ConditionEffectBadges.auras -> maintained (24->5, 94+/159-): registry golden-once; array-target + localhost-gating NEW faces (per-builder removable UNOBSERVABLE jsx:633 discovery). 🔴 SOURCE BUG jsx:142 lazy ctx.te crash protection_from_poison click (click-pin withheld pending fix)
+run2#821: initiative/CER.banished-demiplane -> maintained (3->2): registry bytes + authored remove-filter payload (banished_demiplane filters, banishment survives); storage.js dead mock cut
+run2#822: initiative/CER.common -> maintained: vacuous dedupe test removed; REAL label collision Save Disadv first-wins via tooltips NEW; mixed-kind exact order ['Adv','Disadv Fire/Radiant','Hasted','Silenced']; unknown-effect honesty
+run2#823: initiative/CER.control-spells (CITED OWNER) -> maintained (21->19): ALL cited faces byte-intact full old->new map (:59-65/:67-73/:75-109/:139-154); 2 vacuous imprisonment || fallback tests -> real passthrough golden; maze no-dc ||20 NEW
+run2#824: initiative/CER.disadvantage-next-attack -> maintained (3->2): two real authored sources converge exactly-one badge; storage.js REC applied; generic twins cut->owners
+run2#825: initiative/CER.effect-removal (CITED OWNER) -> maintained (8->6): pfeag triple-write survivors added (anti-vacuous); Warding Bond exact literal payload; describe.each fold; REC target-effect-removal trim 14->4 reps
+run2#826: initiative/CER.ma1012-frozen-grip (CITED OWNER) -> maintained: :47-63 collision face PRESERVED verbatim ->:57-73 map; live te.value ledger -15 ghost-free; honest ticket-vs-registry byte split. ⚠ CreatureBadge.jsx:8 inline-styles convention violation logged
+run2#827: initiative/CER.no-oa-speedy -> maintained (13->9): remarkableAthleteNoOA removal NEW sole-owner; determinism fix (clearAllMocks does NOT reset mockReturnValue — order-luck bug); storage.js REC applied
+
+## Batch #173 GREEN — run2#813-#827 (15 files)
+## Batch #173 — PROGRESS: completed 1963 / remaining 721 (total 2684)
+- Suite: lint clean; 2752 files, 33,326 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 5th consecutive; evidence /tmp/batch173.log). 33,404->33,326 (-78) from hex-map layers + badges family trims (auras 24->5, WeatherOverlay 22->11, TravelPanel 27->17).
+run2#828: initiative/CER.pass-without-trace -> maintained (2->1): registry golden-once + same-render decoy; click cut->generic owner; empty->base owner; factory mock determinism. REC target-effect-removal add pass_without_trace (applied #831)
+run2#829: initiative/CER.save-ability -> maintained (9->3/9): ruleset-gate NEW (Dodge 5e-only vs 2024); vow accept+reject; #822 :100 dup adjudicated-merged. 🔴 jsx:100-101 double-paren tooltip logged (old regex masked)
+run2#830: initiative/CER.spell-effects -> maintained (15->6/7): 9-badge coexistence golden exact tooltips; vacuous Hasted/Barkskin fixed (real applyActiveBuffs runs); storage mock cleared. REC target-effect-removal storage+trim (applied #831)
+run2#831: initiative/CER.target-effect-removal CANON -> maintained (14->5, 140->113): 3 recs APPLIED (path-reps sanctuary/banishment/forcecage-findResolved/pass_without_trace ADDED/slasher-override; survivors anti-vacuous; pfeg excluded crash-note)
+run2#832: initiative/CER.test BASE -> maintained (12->10 renders): recs #822/#827/#830 APPLIED; empty-state button->testid span-blindness fixed; determinism renderBadges helper; CLA-353 exact-byte attribution
+run2#833: initiative/concentration-2 -> maintained (1->2): sole handleBreakConcentration owner; SP-114 unmocked-strip proof; uncovered guard branch. REC base mega-test flatten + twins collapse (#833)
+run2#834: initiative/concentration.te-disadvantage -> maintained (2 str): exact attribution payloads + counts; wrong-target counter-arm addEntry-absence; summonedCreature over-mock deleted
+run2#835: initiative/concentration BASE -> maintained (8->8 str): mega-flatten it.each (rec#833); twins collapsed (#833/#834); precedence row NEW; leak fixed; full old->new map
+run2#836: initiative/creatureHandlers.sp069 -> maintained (4->1 it.each/4 branches): hypno-break sole ticket owner; player distinct oldHp source + zero-write guard bytes
+run2#837: initiative/creatureHandlers BASE -> maintained (13->10/23): mount-heavy->factory seam + kept sole wiring smoke; BROKEN overlay fake fixed (jsdom '' artifact); 3 untested branches; network-boundary mocks ADDED. REC initiative.test.jsx unmocked-fetch battery
+run2#838: initiative/effectAdder.falling -> maintained (3->2): exact 5-field delegate + full zero-side-effect battery; near-vacuous negatives -> exact append literal; guard->base cite
+run2#839: initiative/effectAdder BASE -> maintained (15->11/18): guard battery byte-intact + header cite-map; 2 NEW branches (saveAbility default, CLA-019 suppressed); array exact literals
+run2#840: initiative/npcClick.early-return -> maintained (1->2): bisect-FAILING guard test rewritten falsifiable; allowNonLocalhost:true obey-half NEW app-wide pin
+run2#841: initiative/npcClick.fallback -> maintained (2 str): passable-for-wrong-reason fixed (getMonsterData reached); popup payload object-identity; zero-network guard
+
+## Batch #174 GREEN — run2#828-#841 (14 files this window)
+## Batch #174 — PROGRESS: completed 1977 / remaining 707 (total 2684)
+- Suite: lint clean; 2752 files, 33,313 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 6th consecutive; evidence /tmp/batch174.log). 33,326->33,313 (-13) from badges/concentration/npcClick lane trims.
+run2#842: initiative/npcClick.monster-path -> maintained (3->2): runMonster split-bytes fixture override-vs-retain falsifiable; MA-0757 ability stamp NEW; fallback-not-reached attribution
+run2#843: initiative/npcClick.npc-path -> maintained (5->3): verbatim identity popup + early-return-before-chain attribution; clicked-casing falsifiable; collective miss bytes ['Goblin','Goblin','Goblin',null]. ⚠ :22 spurious undefined===undefined match logged
+run2#844: initiative/npcClick.polymorph -> maintained (12->4): rec #843 :273 folded; every override split falsifiable (type 'beast' byte); retain-side one-click pin; seam by loadMonsters counts
+run2#845: initiative/npcClick.shapechange -> maintained (3->4 honest rewrite): type='Dragon' verbatim vs polymorph 'beast'; unfalsifiable bytes fixed; exit seams attributable
+run2#846: initiative/npcClick.wildshape -> maintained (14->7): FAMILY COMPLETE 7 lanes; runtime lane-keys count-2; startsWith(' ') suffix sole pin; size/speed non-copy bytes
+run2#847: initiative/rollConditionSaveHandler -> maintained (31->16): case site :267 sole; live-vs-clone store identity; 2 misleading titles fixed; popup advantage+floor one-fixture
+run2#848: initiative/CreatureCard.badgeRemoval -> maintained (13->6): 3 vacuous not-dispatch -> positive revert dispatches; HM caster-move guard NEW; shared 4-effect store per-click survivor payloads; de-facto CreatureBadge owner declared
+run2#849: initiative/CreatureCard.badges -> maintained (14->3): full 17-lane census exact label->class toEqual map (old covered 5); gate-decoy zero-badge falsifiable; NPC gating bytes NEW; leak fixed
+run2#850: initiative/CreatureCard.conditions (CITED OWNER) -> maintained (8->8 +1): canonical :126/:153 PRESERVED ->:121/:149; concentration-inert-nonlocalhost NEW; regex->exact
+run2#851: initiative/CreatureCard.interactions -> maintained (13->8/17): Enter-commit + avatar-inert-gate + summoned-allow NEW never-tested seams; :175 honest coexistence w/ #840
+run2#852: initiative/CreatureCard.prompts -> maintained (18->7): exact-byte census 3 titles+counters; per-prompt service routing; underscore-normalized key regression NEW; no-prompt falsifiable
+run2#853: initiative/CreatureCard.rendering -> maintained (23->9): state-class truth table hp boundary; target-select full census secondTurn NEW; statless gate legs isolated; TempHp gate
+run2#854: initiative/CreatureHp -> maintained (22->17): aria-label queries; Enter-commits-once NEW; max-input aid branch NEW. ⚠ jsx:45-49 prop mutation logged
+run2#855: initiative/EffectAdder.concentration UI -> maintained (7->5): sanitizer retains-valid anti-vacuity; exact dispatch payload; disabled state-machine; tautological click-block cut #788
+run2#856: initiative/EffectAdder.conditions UI -> maintained (10->4): 15-label census BY NAME no circular import; single-select exactly-one NEW; full-flow sanitizer+payload one pass
+run2#857: initiative/EffectAdder.creatures -> maintained (6->2): adversarial single-fixture census (sort/dedupe/nameless/special-chars value+textContent exact); default preselection '' falsifiable. REC effects-config :47-55 superseded
+
+## Batch #175 GREEN — run2#843-#857 (15 files)
+## Batch #175 — PROGRESS: completed 1993 / remaining 691 (total 2684)
+- Suite: lint clean; 2752 files, 33,217 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 7th consecutive; evidence /tmp/batch175.log). 33,313->33,217 (-96) from CreatureCard family census consolidation + EffectAdder UI tabs + npcClick family trims.
+run2#858: initiative/EffectAdder.edge-cases -> maintained (3->2): vacuous-exists -> default-routing + no-fallback honesty pins (unowned); effects-tab dup cut byte-owners; tab-recovery transition NEW
+run2#859: initiative/EffectAdder.effects-browsing (CITED :22-35) -> maintained (15->8): census omitted authored Lair group FIXED; full title-byte census; filter matrix key-alone/desc-alone NEW; exact empty-pane byte
+run2#860: initiative/EffectAdder.effects-config -> maintained (20->13): recs #859/#856/#857 ALL applied; ability-payload branch NEW; 'Other' empty->source undefined; golden-once registry defaults
+run2#861: initiative/EffectAdder.rendering CANON chrome -> maintained (5->4): tabs exact-order toEqual; :40 overlay both-halves git-verified authored; tab-switch seam NEW; family 8 lanes complete
+run2#862: initiative/HpBar -> maintained (2 tables->1 oracle 9 rows): width+color pinned together; band boundaries both sides; fractional 37.5 no-rounding; consumer mock disclaims confirmed
+run2#863: initiative/initiative-callbacks -> maintained (4->5/7): sole owner inline concentration-result+death-save-result; expect.any(Object)->exact bytes; prefix near-miss guard NEW; delta-count lesson
+run2#864: initiative/initiative-init-rolled -> maintained (9->4): drifted mirror key-list REMOVED (~24 keys silently omitted); WM-008 campaign-latch NEW; preservation byte-pinned. ⚠ :154 redundant write logged
+run2#865: initiative CONTAINER -> maintained (4->3): REC #837 APPLIED (4 real fetch services boundary-mocked); T2 combat-summary-updated adoption NEW; roster+subscriber(1) census. REC overlays shrink; keydown unowned->callbacks rec
+run2#866: initiative/nav.active-stamp -> maintained (7->5): objectContaining->exact persist payloads; fixture coherence 2->1 observable; MA-1966 verbatim-except stamp; cross-lane dup cut seam-table
+run2#867: initiative/nav.mn013-parry -> maintained (2 str): armed-by-real-trigger byte; persistence widened zero-any-creature-writes; seam table vs #864/#866/#868
+run2#868: initiative/nav BASE (CITED :158/:163/:203/:235) -> maintained (14->11): cited->:158/:163/:191/:211 map; rewind-majesty quirk pinned; floor-guard full no-op. ⚠ :338 rewind round-1 no-op logged; KEYDOWN ruling documented
+run2#869: initiative/nav.wm008-vex -> maintained (2->3): byte-filter zero-stray-writes; rewind-boundary zero-latch NEW; seam distinctness vs #864 adjudicated
+run2#870: initiative/NpcAvatar -> maintained (FATAL over-mock fixed: tested own AvatarImage mock->real DOM bytes): imagePath||imageUrl precedence; size 150 box; click 2-branch table. REC AvatarImage stale marker
+run2#871: initiative/saveResultHandlers -> maintained (18->11): mid-save counter bytes BOTH branches NEW (failures untested app-wide); exact banishment literal. 🔴 :298 violet filter over-removal logged
+run2#872: initiative/sseHandlers-main -> maintained (29->15): unmocked real dice/damage chain FIXED (MN-003 stubbed skipSync); cache adoption NEW; self-compare guard dead-code. 🔴 :78-80 logged
+
+## Batch #176 GREEN — run2#858-#872 (15 files)
+## Batch #176 — PROGRESS: completed 2008 / remaining 676 (total 2684)
+- Suite: lint clean; 2752 files, 33,172 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 8th consecutive; evidence /tmp/batch176.log). 33,217->33,172 (-45) from sse-main 29->15, saveResult 18->11, nav-base 14->11, container+lane trims. Over-mock fixes: NpcAvatar own-mock, sse-main real-dice-chain.
+run2#873: log/sseHandlers-overlay -> maintained EARLIER-PASS accepted (16->7 marker-gate #799 precedent): positive-control guard, toBe identity pins, prev-bailout, 8-guard battery
+run2#874: initiative/TurnEconomyStrip -> maintained (5->3/14): oracle badge-census exact-order; Bonus-used gap fixed; speed-forwarding+overspend bytes; live-refresh NEW; gate incl unknown-mode
+run2#875: initiative/useLootHandlers -> maintained (12->7/8): XP accumulation seeded-store pins; failure-retry state preserved; bloated runtime mock bisected to 2-fn. ⚠ :25 unguarded deref
+run2#876: log/LogCondition -> maintained (7->4/6): full applied/broken bytes+cross-leg suppression; 'removed' producer byte polarity NEW. 🔴 :226 'kept'->'Condition Broken' mislabel
+run2#877: log/LogDeathSave -> maintained (20->14): regex->exact all; finalityMatrix stable/dead/revive NEW; advantage arrays. 🔴 removed->Failure mislabel + ghost-die + stable-red 3 bugs
+run2#878: log/LogEncounter -> maintained (13 exact): nbsp/comma separators pinned; crossLegSuppression NEW double-setup accident fixed. 🔴 'joined'->Completed mislabel
+run2#879: log CONTAINER CANON -> maintained (6->5): routing 1->ALL 23 keys batch ordered; unknown->blank exact; placeholders exact; note-retained flagged migration
+run2#880: log/LogHpChange -> maintained (9->4/10): breakdown matrix RELOCATED in-lane; NPC threshold bytes; zero-delta survivor. ⚠ :22-23 damage swallows sourceName/note
+run2#881: log/LogHpHealing -> maintained: RECs APPLIED (:12-30 damage deleted, gap-claimed heal legs+rollInfo); resurrection consolidated; zero-delta honest
+run2#882: log/LogLoot -> maintained (8->4/9): locale+nbsp exact XP; 6-row suppression; 🔴 xpPerChar=0 short-circuit stray-'0' leak pinned
+run2#883: log/LogMetamagicPool -> maintained (18->10): exhausted-Remaining:0 NEW; alias twin cut honest same-component adjudication; dead mock cleared
+run2#884: log/LogMiscEntries -> maintained (29->14): per-type content sweep consolidated; 7-guard falsy matrix w/ root anchors; fail-result polarity classes
+run2#885: log/LogNotes -> maintained (8->5): REC#884 ABSORBED note-content canonical census; ctrl+Enter seam; exact payloads. REC #879 drop retained
+run2#886: log/LogRoll -> maintained (~80->29): 4 NEW gaps header/HIT-AC/save-vs-attacker/subtract-rider; icons 21->9; vanilla absence sweep. ⚠ MISS trailing space
+run2#887: log/LogSpell -> maintained (8->2): cast-event exact incl HTML-injected desc proven; AND-gate both dirs; 'Level 0' honest; spell-vs-spellEffect split documented. REC #886 stale roll-handoff delete
+
+## Batch #177 GREEN — run2#873-#887 (15 files)
+## Batch #177 — PROGRESS: completed 2023 / remaining 661 (total 2684)
+- Suite: lint clean; 2752 files, 33,072 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 9th consecutive; evidence /tmp/batch177.log). 33,172->33,072 (-100) from log-family sweep (LogRoll ~80->29, Misc 29->14, Meta 18->10, Spell 8->2, DeathSave 20->14) + container routing 1->23 keys.
+run2#888: log/LogToolbar -> maintained (2 str): combobox ordered census + default byte; falsy-survivor add-UI integrity; brittle empty-name query fixed
+run2#889: log/LogTravel -> maintained (20->15): 12-action label/icon matrix exact textContent incl fallback; 0-coord leg; render-vs-service split (no math in entry)
+run2#890: map/AltarSVG FIRST map lane -> maintained (19->4): template born: census+inert-click snapshot; 3 golden d-bytes once (fixed 3 vacuous toHaveAttribute); lying test-name '4 asserted 8' corrected; oracle pairs. Family REC spread
+run2#891: map/ArrowSlitWallSVG -> maintained (6->4): template applied static; golden ordered point-tuples NEW (byte-drift catchable)
+run2#892: map/BarrelSVG -> maintained (11->4): 6 golden paths; rim ellipse ordered array; grain split()-parse retired
+run2#893: map/BedSVG -> maintained (12->4): rotation adjudicated->PlacedItems; 13 rect anchors verbatim
+run2#894: map/BookshelfSVG -> maintained (12->3): 48-rect golden verbatim; banned range-loop/unbounded spies replaced
+run2#895: map/BoulderSVG -> maintained (8->3): 7-signature golden DOM order; honest census self-correction (5 paths caught) proves guard
+run2#896: map/BushSVG -> maintained (10->3): 14 signatures golden; fill-tier honest counts
+run2#897: map/ChairSVG -> maintained (16->3): banned-range cushion math -> exact golden box; 18 signatures verbatim
+run2#898: map/ChestSVG -> maintained (16->3): rect/line/circle golden shape (no paths); census 12/4/9
+run2#899: map/DoorSVG -> maintained (4->3): static adjudicated; open/closed defer->PlacedItems lane
+run2#900: map/FirePitSVG -> maintained (8->4): banned r>=14 + bare-opacity spies removed; 16 flame path bytes once; misleading comment fixed
+run2#901: map/FogOverlay -> maintained (6->6 str): full rect verbatim role table; live re-render NEW; falsy widened empty-Set. REC Map:410-421 collapse
+run2#902: map/FountainSVG -> maintained (13->3): 21-element census; evenodd ring + 13 circle tuples golden once
+
+## Batch #178 GREEN — run2#888-#902 (15 files)
+## Batch #178 — PROGRESS: completed 2038 / remaining 646 (total 2684)
+- Suite: lint clean; 2752 files, 32,962 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 10th consecutive; evidence /tmp/batch178.log). 33,072->32,962 (-110) from SVG decor template sweep (13 lanes, e.g. Chair 16->3, Chest 16->3, Altar 19->4) + log travel/toolbar.

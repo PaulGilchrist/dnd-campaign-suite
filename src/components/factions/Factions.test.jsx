@@ -1,8 +1,18 @@
+// @maintained-by-ai
+// Base CRUD / modal / search lane for Factions: header + mount-load, loading
+// and empty states, modal open/close lifecycle, save-disabled-by-name guard
+// (the disabled byte IS the guard — clicking a disabled button is a no-op,
+// so we assert the byte, never a post-guard click), create/edit save payload
+// bytes, server-error surfacing, delete confirm/cancel/pending/error, search,
+// and influence badges.
+// The live duplicate-name arc (error WHILE typing, case-insensitive dup,
+// self-exempt retype) is owned by Factions.duplicate-name.test.jsx —
+// do not duplicate it here.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Factions from './Factions.jsx';
 
-let factionsState = { factions: [], loading: false, loadFactionsList: vi.fn(), saveFactionsList: vi.fn(), deleteFactionAction: vi.fn() };
+let factionsState = {};
 
 vi.mock('../../hooks/useEntityManagement.js', () => ({
   useEntityManagement: () => ({
@@ -28,353 +38,232 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
   ),
 }));
 
+const DUPLICATE_ERROR = 'A faction with that name already exists';
+
+// Fresh fixtures per test (no in-place mutation across tests).
+const faction = (overrides = {}) => ({
+  id: 'f1',
+  name: 'Faction',
+  description: '',
+  goals: '',
+  influence: 5,
+  notes: '',
+  ...overrides,
+});
+
 describe('Factions', () => {
-  const defaultProps = { campaignName: 'test-campaign', onBack: vi.fn() };
+  let defaultProps;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    factionsState.factions = [];
-    factionsState.loading = false;
-    factionsState.loadFactionsList = vi.fn();
-    factionsState.saveFactionsList = vi.fn();
-    factionsState.deleteFactionAction = vi.fn();
+    defaultProps = { campaignName: 'test-campaign', onBack: vi.fn() };
+    factionsState = {
+      factions: [],
+      loading: false,
+      loadFactionsList: vi.fn(),
+      saveFactionsList: vi.fn(),
+      deleteFactionAction: vi.fn(),
+    };
     window.confirm = vi.fn(() => true);
   });
 
-  describe('rendering', () => {
-    it('renders header with back button, title, new faction button, and search input', () => {
+  const nameInput = () => screen.getByRole('textbox', { name: 'Faction Name *' });
+  const saveButton = () => screen.getByRole('button', { name: 'Save' });
+
+  describe('list states', () => {
+    it('loads on mount and renders header, back button, and empty state; Back invokes onBack', () => {
       render(<Factions {...defaultProps} />);
-      expect(screen.getByText(/Back/)).toBeInTheDocument();
-      expect(screen.getByText(/Factions/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /New Faction/ })).toBeInTheDocument();
+      expect(factionsState.loadFactionsList).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('heading', { name: /Factions/ })).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/Search factions/)).toBeInTheDocument();
-    });
-
-    it('shows empty state when no factions', () => {
-      render(<Factions {...defaultProps} />);
+      expect(screen.getByRole('button', { name: /New Faction/ })).toBeInTheDocument();
       expect(screen.getByText(/No factions yet/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+      expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
     });
 
-    it('shows loading state', async () => {
+    it('shows the loading state instead of the list', () => {
       factionsState.loading = true;
       render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText(/Loading factions/)).toBeInTheDocument());
+      expect(screen.getByText(/Loading factions/)).toBeInTheDocument();
+      expect(screen.queryByText(/No factions/)).not.toBeInTheDocument();
+    });
+
+    it('renders influence badges with level-dependent colors and omits the badge when unset', () => {
+      factionsState.factions = [
+        faction({ id: 'f1', name: 'Weak', influence: 2 }),
+        faction({ id: 'f2', name: 'Strong', influence: 10 }),
+        faction({ id: 'f3', name: 'Mysterious', influence: undefined }),
+      ];
+      render(<Factions {...defaultProps} />);
+      const weak = screen.getByTitle('Influence: 2');
+      const strong = screen.getByTitle('Influence: 10');
+      expect(weak).toHaveTextContent('2');
+      expect(strong).toHaveTextContent('10');
+      // level colors must differ (without pinning exact hex values)
+      expect(weak.style.backgroundColor).not.toBe(strong.style.backgroundColor);
+      // exactly two badges in the list; f3 has no influence, so no badge
+      expect(screen.queryAllByTitle(/Influence:/)).toHaveLength(2);
     });
   });
 
-  describe('modal interactions', () => {
-    it('opens modal when New Faction clicked, closes on Cancel', () => {
+  describe('modal lifecycle', () => {
+    it('opens on New Faction with Save disabled until a real name is typed, no Delete button, closes via X and Cancel', () => {
       render(<Factions {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
       expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
+      // Guard contract: disabled byte is the empty-name guard (this replaces
+      // any "click Save while disabled, assert no save" tautology).
+      expect(saveButton()).toBeDisabled();
+      fireEvent.change(nameInput(), { target: { value: '   ' } });
+      expect(saveButton()).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText('Close'));
+      expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
+      fireEvent.change(nameInput(), { target: { value: 'Test' } });
+      expect(saveButton()).not.toBeDisabled();
       fireEvent.click(screen.getByText('Cancel'));
       expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
     });
 
-    it('closes modal when X button clicked', () => {
+    it('opens a prefilled Edit modal via keyboard with Save enabled and Delete present', () => {
+      factionsState.factions = [
+        faction({ id: 'f1', name: 'Test Faction', description: 'Some desc', goals: 'Goals here', influence: 7, notes: 'Extra notes' }),
+      ];
       render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.click(screen.getByLabelText('Close'));
-      expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
-    });
-
-    it('does not close modal when modal content clicked', () => {
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      const modal = document.querySelector('.ct-modal');
-      fireEvent.click(modal);
-      expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
-    });
-
-    it('disables save button when name is empty or whitespace-only, enables when filled', () => {
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: '   ' } });
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'Test' } });
-      expect(screen.getByRole('button', { name: 'Save' })).not.toBeDisabled();
-    });
-
-    it('shows Edit Faction heading when editing existing faction', () => {
-      factionsState.factions = [{ id: 'f1', name: 'Old Name', description: 'A faction', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByText('Old Name'));
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Edit faction: Test Faction' }), { key: 'Enter' });
       expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
-    });
-
-    it('pre-fills modal fields when editing existing faction', () => {
-      factionsState.factions = [{ id: 'f1', name: 'Test Faction', description: 'Some desc', goals: 'Goals here', influence: 7, notes: 'Extra notes' }];
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByText('Test Faction'));
-      expect(screen.getByRole('textbox', { name: 'Faction Name *' })).toHaveValue('Test Faction');
+      expect(nameInput()).toHaveValue('Test Faction');
       expect(screen.getByTestId('faction-field-faction-description')).toHaveValue('Some desc');
       expect(screen.getByTestId('faction-field-faction-goals')).toHaveValue('Goals here');
       expect(screen.getByTestId('faction-field-faction-notes')).toHaveValue('Extra notes');
+      expect(saveButton()).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     });
   });
 
-  describe('save and edit', () => {
-    it('saves a new faction when save clicked with name', async () => {
+  describe('save', () => {
+    it('creates a new faction with exact payload bytes and closes the modal', async () => {
       render(<Factions {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'The Silver Hand' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalled());
-    });
-
-    it('does not save when name is empty', async () => {
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(factionsState.saveFactionsList).not.toHaveBeenCalled());
-    });
-
-    it('edits existing faction and saves changes', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'Old Name', description: 'A faction', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Old Name')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('Old Name'));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'New Name' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalled());
-    });
-
-    it('closes modal after successful save', async () => {
-      render(<Factions {...defaultProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'The Silver Hand' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalled());
+      fireEvent.change(nameInput(), { target: { value: 'The Silver Hand' } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalledTimes(1));
+      expect(factionsState.saveFactionsList).toHaveBeenCalledWith([
+        { id: expect.any(String), name: 'The Silver Hand', description: '', goals: '', influence: 1, notes: '' },
+      ]);
       expect(screen.queryByRole('heading', { name: 'New Faction' })).not.toBeInTheDocument();
     });
-  });
 
-  describe('duplicate-name guard', () => {
-    it('shows an inline error and does not save when a new faction name collides case-insensitively', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'The Iron Consortium', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'the iron CONSORTIUM' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
-      await new Promise((r) => setTimeout(r, 0));
-      expect(factionsState.saveFactionsList).not.toHaveBeenCalled();
-    });
-
-    it('shows an inline error when renaming onto another existing faction name', async () => {
+    it('saves an edited faction in place (self-name exempt from the duplicate guard) with exact payload bytes', async () => {
       factionsState.factions = [
-        { id: 'f1', name: 'The Iron Consortium', description: '', goals: '', influence: 5, notes: '' },
-        { id: 'f2', name: 'QA Parity Faction', description: '', goals: '', influence: 5, notes: '' },
+        faction({ id: 'f1', name: 'The Iron Consortium', description: 'old' }),
+        faction({ id: 'f2', name: 'Other Faction' }),
       ];
       render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('QA Parity Faction')).toBeInTheDocument());
+      fireEvent.click(screen.getByLabelText('Edit faction: The Iron Consortium'));
+      // Enabled-arm contract: own name must not trip the duplicate guard.
+      expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
+      expect(saveButton()).not.toBeDisabled();
+      fireEvent.change(screen.getByTestId('faction-field-faction-description'), { target: { value: 'updated' } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalledTimes(1));
+      expect(factionsState.saveFactionsList).toHaveBeenCalledWith([
+        { id: 'f1', name: 'The Iron Consortium', description: 'updated', goals: '', influence: 5, notes: '' },
+        { id: 'f2', name: 'Other Faction', description: '', goals: '', influence: 5, notes: '' },
+      ]);
+      expect(screen.queryByRole('heading', { name: 'Edit Faction' })).not.toBeInTheDocument();
+    });
 
-      fireEvent.click(screen.getByText('QA Parity Faction'));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'THE IRON CONSORTIUM' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
-      await new Promise((r) => setTimeout(r, 0));
+    it('blocks renaming onto another faction: initially enabled, error + disabled Save while the colliding name is typed, zero writes', () => {
+      // Rename-collision face (id-exclusion of the guard). The while-typing
+      // duplicate arc for NEW factions is owned by Factions.duplicate-name.test.jsx.
+      factionsState.factions = [
+        faction({ id: 'f1', name: 'The Iron Consortium' }),
+        faction({ id: 'f2', name: 'QA Parity Faction' }),
+      ];
+      render(<Factions {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Edit faction: QA Parity Faction'));
+      expect(saveButton()).not.toBeDisabled();
+      fireEvent.change(nameInput(), { target: { value: 'THE IRON CONSORTIUM' } });
+      expect(screen.getByText(DUPLICATE_ERROR)).toBeInTheDocument();
+      expect(saveButton()).toBeDisabled();
       expect(factionsState.saveFactionsList).not.toHaveBeenCalled();
     });
 
-    it('saves normally when editing without renaming (self-match excluded)', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'The Iron Consortium', description: 'old', goals: '', influence: 5, notes: '' }];
+    it('surfaces the server rejection message exactly once, keeps the modal open, and logs the error', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const refusal = 'Server rejected the faction save';
+      factionsState.saveFactionsList = vi.fn().mockRejectedValue(new Error(refusal));
       render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('The Iron Consortium')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('The Iron Consortium'));
-      fireEvent.change(screen.getByTestId('faction-field-faction-description'), { target: { value: 'updated' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      await waitFor(() => expect(factionsState.saveFactionsList).toHaveBeenCalled());
-      expect(screen.queryByText('A faction with that name already exists')).not.toBeInTheDocument();
-      expect(factionsState.saveFactionsList.mock.calls[0][0][0].description).toBe('updated');
-    });
-
-    it('surfaces the server error message when a save is rejected', async () => {
-      factionsState.saveFactionsList = vi.fn().mockRejectedValue(new Error('A faction with that name already exists'));
-      render(<Factions {...defaultProps} />);
-
       fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'Some Faction' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-      await waitFor(() => expect(screen.getByText('A faction with that name already exists')).toBeInTheDocument());
+      fireEvent.change(nameInput(), { target: { value: 'Some Faction' } });
+      fireEvent.click(saveButton());
+      await waitFor(() => expect(screen.getByText(refusal)).toBeInTheDocument());
+      expect(screen.queryByText(DUPLICATE_ERROR)).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'New Faction' })).toBeInTheDocument();
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to save faction:', expect.any(Error));
+      consoleSpy.mockRestore();
     });
   });
 
   describe('delete', () => {
-    it('deletes when confirmed', async () => {
-      factionsState.deleteFactionAction = vi.fn().mockResolvedValue(undefined);
-      factionsState.factions = [{ id: 'f1', name: 'ToDelete', description: '', goals: '', influence: 5, notes: '' }];
+    it('asks for confirmation once per click, shows a disabled Deleting… state, and closes on success', async () => {
+      let resolveDelete;
+      factionsState.factions = [faction({ id: 'f1', name: 'ToDelete' })];
+      factionsState.deleteFactionAction = vi.fn(() => new Promise((resolve) => { resolveDelete = resolve; }));
+      window.confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
       render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('ToDelete')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('ToDelete'));
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
-      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
-      await waitFor(() => expect(factionsState.deleteFactionAction).toHaveBeenCalledWith('f1'));
-    });
+      fireEvent.click(screen.getByLabelText('Edit faction: ToDelete'));
+      const deleteButton = screen.getByRole('button', { name: 'Delete' });
 
-    it('does not delete when user cancels', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'Keep', description: '', goals: '', influence: 5, notes: '' }];
-      window.confirm = vi.fn(() => false);
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Keep')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('Keep'));
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
-      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
+      fireEvent.click(deleteButton); // cancelled
+      expect(window.confirm).toHaveBeenCalledWith('Delete this faction?');
       expect(factionsState.deleteFactionAction).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' })); // confirmed
+      expect(factionsState.deleteFactionAction).toHaveBeenCalledWith('f1');
+      expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
+
+      resolveDelete();
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Faction' })).not.toBeInTheDocument());
+      expect(factionsState.deleteFactionAction).toHaveBeenCalledTimes(1);
     });
 
-    it('shows delete button only in edit mode', () => {
+    it('logs and stays in the modal when the delete fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      factionsState.factions = [faction({ id: 'f1', name: 'ToDelete' })];
+      factionsState.deleteFactionAction = vi.fn().mockRejectedValue(new Error('Delete failed'));
       render(<Factions {...defaultProps} />);
-      expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /New Faction/ }));
-      expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument();
-    });
-
-    it('disables delete button while deleting', async () => {
-      factionsState.deleteFactionAction = vi.fn().mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
-      factionsState.factions = [{ id: 'f1', name: 'ToDelete', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('ToDelete')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('ToDelete'));
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
-      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
-      expect(deleteButtons[deleteButtons.length - 1]).toBeDisabled();
-      expect(deleteButtons[deleteButtons.length - 1]).toHaveTextContent(/Deleting/);
+      fireEvent.click(screen.getByLabelText('Edit faction: ToDelete'));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to delete faction:', expect.any(Error)));
+      expect(screen.getByRole('heading', { name: 'Edit Faction' })).toBeInTheDocument();
+      consoleSpy.mockRestore();
     });
   });
 
-  describe('search and filtering', () => {
-    it('filters factions by search query matching name case-insensitively', async () => {
+  describe('search', () => {
+    it('filters by name case-insensitively, ignores description text, shows a no-results message, and restores on clear', () => {
       factionsState.factions = [
-        { id: 'f1', name: 'The Silver Hand', description: '', goals: '', influence: 5, notes: '' },
-        { id: 'f2', name: 'Black Lotus', description: '', goals: '', influence: 3, notes: '' },
+        faction({ id: 'f1', name: 'The Silver Hand', description: 'a shadowy guild of artisans' }),
+        faction({ id: 'f2', name: 'Black Lotus' }),
       ];
       render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('The Silver Hand')).toBeInTheDocument());
       fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'silver' } });
       expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
       expect(screen.queryByText('Black Lotus')).not.toBeInTheDocument();
       fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'SILVER' } });
       expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
-      expect(screen.queryByText('Black Lotus')).not.toBeInTheDocument();
-    });
-
-    it('filters factions by name field only', async () => {
-      factionsState.factions = [
-        { id: 'f1', name: 'Order of Guardians', description: 'Protectors of the realm', goals: '', influence: 5, notes: '' },
-        { id: 'f2', name: 'Dark Brotherhood', description: 'Assassins from the shadows', goals: '', influence: 3, notes: '' },
-      ];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Order of Guardians')).toBeInTheDocument());
-      fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'dark' } });
-      expect(screen.queryByText('Order of Guardians')).not.toBeInTheDocument();
-      expect(screen.getByText('Dark Brotherhood')).toBeInTheDocument();
-    });
-
-    it('shows no results message when search matches nothing', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'The Silver Hand', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('The Silver Hand')).toBeInTheDocument());
-      fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'dragons' } });
+      // name-field only: 'shadowy' lives in the hidden description, not any name
+      fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'shadowy' } });
+      expect(screen.queryByText('The Silver Hand')).not.toBeInTheDocument();
       expect(screen.getByText(/No factions found matching/)).toBeInTheDocument();
-    });
-
-    it('shows all factions again when search is cleared', async () => {
-      factionsState.factions = [
-        { id: 'f1', name: 'Silver Hand', description: '', goals: '', influence: 5, notes: '' },
-        { id: 'f2', name: 'Black Lotus', description: '', goals: '', influence: 3, notes: '' },
-      ];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Silver Hand')).toBeInTheDocument());
-      fireEvent.change(screen.getByPlaceholderText(/Search factions/), { target: { value: 'silver' } });
-      expect(screen.queryByText('Black Lotus')).not.toBeInTheDocument();
       fireEvent.click(screen.getByLabelText('Clear search'));
-      expect(screen.getByText('Silver Hand')).toBeInTheDocument();
+      expect(screen.getByText('The Silver Hand')).toBeInTheDocument();
       expect(screen.getByText('Black Lotus')).toBeInTheDocument();
-    });
-  });
-
-  describe('list rendering', () => {
-    it('renders multiple factions', async () => {
-      factionsState.factions = [
-        { id: 'f1', name: 'Silver Hand', description: '', goals: '', influence: 5, notes: '' },
-        { id: 'f2', name: 'Black Lotus', description: '', goals: '', influence: 8, notes: '' },
-      ];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Silver Hand')).toBeInTheDocument());
-      expect(screen.getByText('Black Lotus')).toBeInTheDocument();
-    });
-
-    it('shows influence badge when set', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'Test', description: '', goals: '', influence: 7, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByTitle('Influence: 7')).toBeInTheDocument());
-    });
-
-    it('handles faction without influence gracefully', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'Mysterious', description: '', goals: '', notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Mysterious')).toBeInTheDocument());
-      expect(screen.queryByTitle(/Influence:/)).not.toBeInTheDocument();
-    });
-
-    it('applies correct influence color based on level', () => {
-      factionsState.factions = [
-        { id: 'f1', name: 'Weak', description: '', goals: '', influence: 2, notes: '' },
-        { id: 'f2', name: 'Strong', description: '', goals: '', influence: 10, notes: '' },
-      ];
-      render(<Factions {...defaultProps} />);
-      expect(screen.getByTitle('Influence: 2')).toBeInTheDocument();
-      expect(screen.getByTitle('Influence: 10')).toBeInTheDocument();
-    });
-  });
-
-  describe('keyboard accessibility', () => {
-    it('opens edit modal with keyboard keys', async () => {
-      factionsState.factions = [{ id: 'f1', name: 'Test', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Test')).toBeInTheDocument());
-      const editButton = screen.getByRole('button', { name: /Edit faction: Test/ });
-      fireEvent.keyDown(editButton, { key: 'Enter' });
-      expect(screen.getByText('Edit Faction')).toBeInTheDocument();
-    });
-  });
-
-  describe('error handling', () => {
-    it('handles save error gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error');
-      factionsState.saveFactionsList = vi.fn().mockRejectedValue(new Error('Network error'));
-      factionsState.factions = [{ id: 'f1', name: 'Test', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('Test')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('Test'));
-      fireEvent.change(screen.getByRole('textbox', { name: 'Faction Name *' }), { target: { value: 'Updated' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to save faction:', expect.any(Error)));
-      consoleSpy.mockRestore();
-    });
-
-    it('handles delete error gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error');
-      factionsState.deleteFactionAction = vi.fn().mockRejectedValue(new Error('Delete failed'));
-      factionsState.factions = [{ id: 'f1', name: 'ToDelete', description: '', goals: '', influence: 5, notes: '' }];
-      render(<Factions {...defaultProps} />);
-      await waitFor(() => expect(screen.getByText('ToDelete')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('ToDelete'));
-      const deleteButtons = screen.getAllByRole('button', { name: /Delete/ });
-      fireEvent.click(deleteButtons[deleteButtons.length - 1]);
-      await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to delete faction:', expect.any(Error)));
-      consoleSpy.mockRestore();
     });
   });
 });

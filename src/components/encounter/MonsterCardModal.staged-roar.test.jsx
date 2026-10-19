@@ -1,45 +1,38 @@
-// MA-0268 regression: Androsphinx Roar staged click path in MonsterCardModal.
-// Click N arms ONLY stage N's canonical save legs (pre-fix every click was
-// the conflated union: 8d10 thunder + Deafened/Frightened/Prone on all three
-// roars, dc_success half on the damage-free roars, inert usage gate):
-//   stage 1 (0 spent): WIS DC 18, zero damage, frightened, MA-0048
-//     repeat_save armed, label "Roar 1 of 3";
-//   stage 2 (1 spent): WIS, zero damage, deafened AND frightened, repeat_save;
-//   stage 3 (2 spent): CON, 8d10 Thunder half-on-success, prone, no repeat;
-//   4th click (3 spent): maxUses gate refuses — zero save prompts +
-//     roar_refused log + Uses Exhausted popup.
+// @maintained-by-ai
+// MA-0268 regression: Androsphinx Roar INLINE click lane in MonsterCardModal.
+// The disk row (live bytes via roarRow()) is staged_roar:true, maxUses:3,
+// WIS DC 18, shapeless (no area field) — click N arms ONLY stage N's canonical
+// legs straight through rollSavingThrow (pre-fix every click was the conflated
+// union: 8d10 thunder + Deafened/Frightened/Prone on all three roars,
+// dc_success half on the damage-free roars, inert usage gate). Stage legs are
+// hardcoded ROAR_STAGES bytes (this row carries NO roar_stages key).
+// Owned elsewhere, not re-pinned here: stage leg table bytes + exhausted→null
+// (roarService.test.js:107-191); picker-lane threading for row-authored
+// roar_stages rows (MonsterCardModal.ma1502-staged-roar.test.jsx); refusal
+// popup builder bytes (monsterAbilityUses.js:48, pinned in its own suite);
+// inline spend-at-confirm (saveProcessing MA-0020 lane — the inline save never
+// spends inside the modal, so per-stage fixtures seed the persisted counter).
+// Unique here: the full 45-key save ctx locked exact per stage — only the
+// stage's own legs arm live; every unrelated rider rides an honest null.
+// Note the dc_success canary: stage 3's 'half' is stage-table-armed (the
+// disk row itself authors NO dc_success key); stages 1-2 print honest
+// "none" (zero-damage legs). The chip face is row-level (always "DC 18
+// Wisdom"); only the (N left) counter moves with the spend.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-function roarRow() {
-  return monstersData.find(m => m.index === 'androsphinx').actions.find(a => a.name === 'Roar');
-}
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 44, rolls: [5, 5, 5, 5, 5, 5, 5, 9], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 88, rolls: [5, 5, 5, 5, 5, 5, 5, 9], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
-}));
-
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const _setPopupHtml = vi.fn();
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
+    popupHtml: null,
     setPopupHtml: _setPopupHtml,
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
@@ -51,32 +44,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ cannotAct: false, speedZero: false })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -105,14 +72,51 @@ const CREATURES = [
   { name: 'TestPC', type: 'player', currentHp: 41, maxHp: 41, conditions: [] },
 ];
 
-function renderAndrosphinx(uses) {
-  if (uses !== undefined) runtime.store['Androsphinx 1.monsterSpellUses'] = uses;
-  const m = makeMonster({ name: 'Androsphinx', type: 'monstrosity', actions: [roarRow()] });
-  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Androsphinx 1', creatures: CREATURES })} />);
-}
+// Every rider the roar row must NOT arm — one shared honest-null block so
+// each stage's ctx locks exact-key-set: a new live rider here is a loud,
+// single-place diff.
+const INERT_RIDERS = {
+  spellName: null,
+  autoDamageSecondaryFormula: null,
+  autoDamageSecondaryName: null,
+  autoDamageSecondaryDamageType: null,
+  saveVariant: null,
+  _characters: [],
+  isSpellDamage: false,
+  consumeMemoriesClause: false,
+  conditionDurationNote: null,
+  successImmunity: null,
+  stagedPetrify: null,
+  concentrationDisadvantage: null,
+  speedHalf: null,
+  subtractDebuff: null,
+  demiplaneTransport: null,
+  dreamPlaneBanishment: null,
+  acPenaltyClause: null,
+  speedZeroClause: null,
+  slowedClauses: null,
+  tempHpGrant: null,
+  exhaustionLevel: null,
+  animalSpiritVariant: null,
+  animalSpiritFortifyHp: null,
+  hpThresholdKill: null,
+  infernalWound: null,
+  saveMargin: null,
+  saveHpMaxReduce: null,
+  saveAttackerRecover: null,
+  saveTargetEffect: null,
+  saveRiderAttackDamage: null,
+  eyeRay: null,
+};
 
-function roarLink() {
-  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable')).find(el => el.closest('div')?.textContent.includes('Roar')) || null;
+function renderAndrosphinx(spent) {
+  if (spent) runtime.store['Androsphinx 1.monsterSpellUses'] = { Roar: spent };
+  const roar = monstersData.find(m => m.index === 'androsphinx').actions.find(a => a.name === 'Roar');
+  const m = makeMonster({ name: 'Androsphinx', type: 'monstrosity', actions: [roar] });
+  render(<MonsterCardModal {...makeProps(m, { creatureName: 'Androsphinx 1', creatures: CREATURES })} />);
+  const chips = Array.from(document.querySelectorAll('.mc-dice-link-save-clickable'));
+  expect(chips.length).toBe(1); // single-action monster — the Roar chip is the only save affordance
+  return chips[0];
 }
 
 beforeEach(() => {
@@ -120,68 +124,54 @@ beforeEach(() => {
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
 });
 
-describe('MA-0268 staged roar click path', () => {
-  it('chip renders the 3/Day counter once maxUses arms the gate', () => {
-    renderAndrosphinx();
-    expect(roarLink().textContent).toMatch(/\(3\/Day · 3 left\)/);
-  });
-
-  it('click 1 arms stage 1: WIS, zero damage, frightened, repeat-save armed, honest label', () => {
-    renderAndrosphinx();
-    fireEvent.click(roarLink());
+describe('MA-0268 staged roar inline click lane', () => {
+  it.each([
+    { spent: 0, abbr: 'WIS', saveType: 'Wisdom', dcSuccess: 'none', formula: null, damageType: null, saveConditions: ['frightened'], repeatSave: { condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 } },
+    { spent: 1, abbr: 'WIS', saveType: 'Wisdom', dcSuccess: 'none', formula: null, damageType: null, saveConditions: ['deafened', 'frightened'], repeatSave: { condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 } },
+    { spent: 2, abbr: 'CON', saveType: 'Constitution', dcSuccess: 'half', formula: '8d10', damageType: 'Thunder', saveConditions: ['prone'], repeatSave: null },
+  ])('click with $spent spent arms ONLY stage $spent: $abbr DC 18, damage $formula, $saveConditions, repeatSave $repeatSave — ctx exact-key-set', ({ spent, abbr, saveType, dcSuccess, formula, damageType, saveConditions, repeatSave }) => {
+    const chip = renderAndrosphinx(spent);
+    expect(chip.textContent).toContain(`(3/Day · ${3 - spent} left)`);
+    fireEvent.click(chip);
     expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    expect(rollSavingThrow.mock.calls[0][0]).toBe('WIS');
-    const ctx = rollSavingThrow.mock.calls[0][2];
-    expect(ctx.saveDc).toBe(18);
-    expect(ctx.saveType).toBe('Wisdom');
-    expect(ctx.dcSuccess).toBe('none');
-    expect(ctx.autoDamageFormula).toBeNull();
-    expect(ctx.saveConditions).toEqual(['frightened']);
-    expect(ctx.repeatSave).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
-    expect(ctx.actionName).toBe('Roar 1 of 3');
-    expect(ctx.monsterAbilityUse).toEqual({ useKey: 'Roar', maxUses: 3, actionName: 'Roar 1 of 3' });
+    const [saveAbbr, saveMod, ctx] = rollSavingThrow.mock.calls[0];
+    const label = `Roar ${spent + 1} of 3`;
+    expect(saveAbbr).toBe(abbr);
+    expect(saveMod).toBe(0); // TestPC carries no computedStats — honest zero modifier
+    expect(ctx).toEqual({
+      attackerName: 'Androsphinx 1',
+      targetName: 'TestPC',
+      actionName: label,
+      saveDc: 18,
+      saveType,
+      dcSuccess,
+      autoDamageFormula: formula,
+      autoDamageDamageType: damageType,
+      autoDamageName: label,
+      saveConditions,
+      monsterAbilityUse: { useKey: 'Roar', maxUses: 3, actionName: label },
+      repeatSave,
+      ...INERT_RIDERS,
+    });
   });
 
-  it('click 2 (1 spent) arms stage 2: WIS, zero damage, deafened AND frightened', () => {
-    renderAndrosphinx({ Roar: 1 });
-    fireEvent.click(roarLink());
-    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    const ctx = rollSavingThrow.mock.calls[0][2];
-    expect(ctx.saveType).toBe('Wisdom');
-    expect(ctx.dcSuccess).toBe('none');
-    expect(ctx.autoDamageFormula).toBeNull();
-    expect([...ctx.saveConditions].sort()).toEqual(['deafened', 'frightened']);
-    expect(ctx.repeatSave.save_type).toBe('Wisdom');
-    expect(ctx.actionName).toBe('Roar 2 of 3');
-  });
-
-  it('click 3 (2 spent) arms stage 3: CON, 8d10 Thunder half-on-success, prone, no repeat save', () => {
-    renderAndrosphinx({ Roar: 2 });
-    fireEvent.click(roarLink());
-    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    expect(rollSavingThrow.mock.calls[0][0]).toBe('CON');
-    const ctx = rollSavingThrow.mock.calls[0][2];
-    expect(ctx.saveType).toBe('Constitution');
-    expect(ctx.dcSuccess).toBe('half');
-    expect(ctx.autoDamageFormula).toBe('8d10');
-    expect(ctx.autoDamageDamageType).toMatch(/Thunder/i);
-    expect(ctx.saveConditions).toEqual(['prone']);
-    expect(ctx.repeatSave).toBeNull();
-    expect(ctx.actionName).toBe('Roar 3 of 3');
-    expect(ctx.monsterAbilityUse.actionName).toBe('Roar 3 of 3');
-  });
-
-  it('click 4 (3 spent): gate refuses — zero save prompts, Uses Exhausted popup, roar_refused log', async () => {
-    renderAndrosphinx({ Roar: 3 });
-    const link = roarLink();
-    expect(link.textContent).toMatch(/\(3\/Day · 0 left\)/);
-    fireEvent.click(link);
+  it('4th click (3 spent): gate refuses — zero prompts, Uses Exhausted popup, exact roar_refused log', async () => {
+    const chip = renderAndrosphinx(3);
+    expect(chip.textContent).toContain('(3/Day · 0 left)');
+    fireEvent.click(chip);
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Uses Exhausted');
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('<h3>Uses Exhausted</h3>');
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Androsphinx 1 has already used Roar today (3/Day). No save rolled, nothing spent.');
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'roar_refused');
-    expect(refusal).toBeTruthy();
-    expect(refusal.characterName).toBe('Androsphinx 1');
-    expect(refusal.description).toMatch(/already used Roar today \(3\/Day\)/);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'automation',
+      automationType: 'roar_refused',
+      characterName: 'Androsphinx 1',
+      abilityName: 'Roar',
+      description: 'Androsphinx 1 has already used Roar today (3/Day) — Roar refused. Uses reset at dawn; GM-enforced for monsters.',
+      timestamp: expect.any(Number),
+    });
   });
 });

@@ -1,115 +1,95 @@
-import { screen } from '@testing-library/react';
+// @maintained-by-ai
+// TRAVEL ENTRY content lane — owns the rendered bytes of TravelEntry (LogTravelEntry.jsx).
+// Render-vs-service split (cite-owner convention):
+//   routing travel→TravelEntry .log-travel .... owned by #879 container dispatch (LogEntryRendering.test.jsx) — cut here
+//   travel math getHexTravelTime/formatTravelTime  owned by travelService lanes (cited #816/#818 hex-map) — TravelEntry
+//                                                    renders NO distance/time bytes, so none are pinned here
+//   weather generation / enum roll-up .............. owned by weatherService.test.js — we pin weather text/icon AS AUTHORED
+//                                                    on the fixture only (#761/#818 cite pattern)
+//   encounter entries ................................ owned by #878 (LogEncounter.test.jsx)
+//
+// Owned here: action→label+icon config matrix incl. unknown-action fallback to advance;
+// exact hex coord bytes (q, r) with 0-coord short-circuit watch (#882); terrain/weather/event
+// optional-section presence + omission; weatherIcon default-sun vs custom legs; eventType gates
+// on eventTitle only; timestamp bytes by family /\d{2}:\d{2}:\d{2}/ convention (#876 fixed-ts
+// fixture). Exact bytes over regex (#829); falsy survivors exact (#842).
+// old->new map: 11 per-action its + fallback its + 10 section its → it.each matrix (fallback
+// row folded in) + full-entry byte pin + as-authored variant pin + minimal omission pin.
+
 import { beforeEach } from 'vitest';
 import { travel, q, setup, beforeEachSetup } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
 
-describe('Log', () => {
+describe('TravelEntry (Log)', () => {
   beforeEach(() => {
     beforeEachSetup();
   });
 
-  // ── TRAVEL ENTRY - action types ───────────────
-  describe('TravelEntry - action types', () => {
-    it.each([
-      ['advance', 'Advanced to', 'fa-person-walking'],
-      ['advance_with_event', 'Event triggered at', 'fa-bolt'],
-      ['arrived', 'Arrived at', 'fa-flag-checkered'],
-      ['camp', 'Camped at', 'fa-campground'],
-      ['forced_march', 'Forced march at', 'fa-person-running'],
-      ['event_accept', 'Accepted event at', 'fa-check'],
-      ['event_skip', 'Skipped event at', 'fa-xmark'],
-      ['event_reroll', 'Re-rolled event at', 'fa-dice'],
-      ['extreme_weather', 'Weather halted travel at', 'fa-triangle-exclamation'],
-      ['day_exhausted', 'Budget exhausted at', 'fa-tent'],
-      ['cancel', 'Travel cancelled at', 'fa-ban'],
-    ])('action %s -> label "%s" with icon .%s', (action, label, icon) => {
-      setup(Log, [travel({ action })]);
-      expect(screen.getByText(new RegExp(label, 'i'))).toBeInTheDocument();
-      expect(q(`.log-travel i.${icon}`)).toBeInTheDocument();
-    });
-
-    it('unknown action falls back to advance config', () => {
-      setup(Log, [travel({ action: 'bad' })]);
-      expect(screen.getByText(/Advanced to/i)).toBeInTheDocument();
-    });
+  // Authored matrix: TRAVEL_ACTION_CONFIG action → exact label byte + icon class.
+  // Last row is the fallback leg: unknown action renders advance config.
+  it.each([
+    ['advance', 'Advanced to', 'fa-person-walking'],
+    ['advance_with_event', 'Event triggered at', 'fa-bolt'],
+    ['arrived', 'Arrived at', 'fa-flag-checkered'],
+    ['camp', 'Camped at', 'fa-campground'],
+    ['forced_march', 'Forced march at', 'fa-person-running'],
+    ['event_accept', 'Accepted event at', 'fa-check'],
+    ['event_skip', 'Skipped event at', 'fa-xmark'],
+    ['event_reroll', 'Re-rolled event at', 'fa-dice'],
+    ['extreme_weather', 'Weather halted travel at', 'fa-triangle-exclamation'],
+    ['day_exhausted', 'Budget exhausted at', 'fa-tent'],
+    ['cancel', 'Travel cancelled at', 'fa-ban'],
+    ['not_a_real_action', 'Advanced to', 'fa-person-walking'],
+  ])('action %s renders exact label "%s" with icon .%s', (action, label, icon) => {
+    setup(Log, [travel({ action })]);
+    expect(q('.log-travel-action').textContent).toBe(label);
+    expect(q(`.log-travel i.${icon}`)).toBeInTheDocument();
   });
 
-  // ── TRAVEL ENTRY - hex coordinates ───────────────
-  describe('TravelEntry - hex coordinates', () => {
-    it('renders hex coords when present', () => {
-      setup(Log, [travel({ hex: { q: 5, r: -3 } })]);
-      expect(screen.getByText(/\(5, -3\)/)).toBeInTheDocument();
-    });
-
-    it('does not render coords when hex is missing', () => {
-      setup(Log, [travel({ hex: null })]);
-      expect(screen.queryByText(/\(\d+, -?\d+\)/)).not.toBeInTheDocument();
-    });
+  it('renders every optional section with exact bytes when all authored', () => {
+    setup(Log, [travel({
+      timestamp: 1700000000000,
+      hex: { q: 5, r: -3 },
+      terrain: 'Mountain',
+      weather: 'Sunny',
+      eventTitle: 'Ambush!',
+      eventType: 'Enemy',
+    })]);
+    expect(q('.log-travel-coords').textContent).toBe('(5, -3)');
+    expect(q('.log-travel-terrain')).toBeInTheDocument();
+    expect(q('.log-travel-terrain')).toHaveTextContent('Mountain');
+    expect(q('.log-travel-terrain i.fa-mountain')).toBeInTheDocument();
+    expect(q('.log-travel-weather')).toHaveTextContent('Sunny');
+    expect(q('.log-travel-weather i.fa-sun')).toBeInTheDocument(); // default icon, no weatherIcon authored
+    expect(q('.log-travel-event-type').textContent).toBe('Enemy');
+    expect(q('.log-travel-event-title').textContent).toBe('Ambush!');
+    expect(q('.log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/); // format owned by log-utils
   });
 
-  // ── TRAVEL ENTRY - terrain ───────────────
-  describe('TravelEntry - terrain', () => {
-    it('renders terrain with mountain icon when present', () => {
-      setup(Log, [travel({ terrain: 'Mountain' })]);
-      expect(screen.getByText(/Mountain/i)).toBeInTheDocument();
-      expect(q('.log-travel-terrain i.fa-mountain')).toBeInTheDocument();
-    });
-
-    it('does not render terrain when missing', () => {
-      setup(Log, [travel({ terrain: '' })]);
-      expect(q('.log-travel-terrain')).not.toBeInTheDocument();
-    });
+  it('renders as-authored variants: 0-coords, custom weather icon, title-only event, omitted falsy terrain', () => {
+    setup(Log, [travel({
+      hex: { q: 0, r: -1 }, // 0 q is truthy inside hex object — must render "(0, -1)" (#882 short-circuit watch)
+      terrain: '',
+      weather: 'Storms',
+      weatherIcon: 'cloud-showers-heavy',
+      eventTitle: 'Discovery', // eventType omitted → gate is on title only
+    })]);
+    expect(q('.log-travel-coords').textContent).toBe('(0, -1)');
+    expect(q('.log-travel-terrain')).not.toBeInTheDocument();
+    expect(q('.log-travel-weather')).toHaveTextContent('Storms');
+    expect(q('.log-travel-weather i.fa-cloud-showers-heavy')).toBeInTheDocument();
+    expect(q('.log-travel-event-title').textContent).toBe('Discovery');
+    expect(q('.log-travel-event-type').textContent).toBe('');
   });
 
-  // ── TRAVEL ENTRY - weather ───────────────
-  describe('TravelEntry - weather', () => {
-    it('renders weather with default sun icon when no weatherIcon provided', () => {
-      setup(Log, [travel({ weather: 'Sunny' })]);
-      expect(screen.getByText(/Sunny/i)).toBeInTheDocument();
-      expect(q('.log-travel-weather i.fa-sun')).toBeInTheDocument();
-    });
-
-    it('renders weather with custom icon when weatherIcon provided', () => {
-      setup(Log, [travel({ weather: 'Storms', weatherIcon: 'cloud-showers-heavy' })]);
-      expect(q('.log-travel-weather i.fa-cloud-showers-heavy')).toBeInTheDocument();
-    });
-
-    it('does not render weather when missing', () => {
-      setup(Log, [travel({ weather: '' })]);
-      expect(q('.log-travel-weather')).not.toBeInTheDocument();
-    });
-  });
-
-  // ── TRAVEL ENTRY - event ───────────────
-  describe('TravelEntry - event', () => {
-    it('renders event type and title when both present', () => {
-      setup(Log, [travel({ eventTitle: 'Ambush!', eventType: 'Enemy' })]);
-      expect(screen.getByText(/Ambush!/i)).toBeInTheDocument();
-      expect(screen.getByText(/Enemy/i)).toBeInTheDocument();
-    });
-
-    it('does not render event section when eventTitle is missing', () => {
-      setup(Log, [travel({ eventTitle: '' })]);
-      expect(q('.log-travel-event')).not.toBeInTheDocument();
-    });
-  });
-
-  // ── TRAVEL ENTRY - timestamp ───────────────
-  describe('TravelEntry - timestamp', () => {
-    it('renders formatted timestamp', () => {
-      const ts = new Date('2024-01-15T14:30:45').getTime();
-      setup(Log, [travel({ timestamp: ts })]);
-      expect(q('.log-time')).toBeInTheDocument();
-    });
-  });
-
-  // ── TRAVEL ENTRY - minimal entry ───────────────
-  describe('TravelEntry - minimal entry', () => {
-    it('renders with only action field', () => {
-      setup(Log, [travel({})]);
-      expect(screen.getByText(/Advanced to/i)).toBeInTheDocument();
-      expect(q('.log-travel')).toBeInTheDocument();
-    });
+  it('omits every optional section on a minimal entry (null hex, falsy strings)', () => {
+    setup(Log, [travel({ hex: null, terrain: '', weather: '', eventTitle: '' })]);
+    expect(q('.log-travel')).toBeInTheDocument();
+    expect(q('.log-travel-action').textContent).toBe('Advanced to');
+    expect(q('.log-travel-coords')).not.toBeInTheDocument();
+    expect(q('.log-travel-terrain')).not.toBeInTheDocument();
+    expect(q('.log-travel-weather')).not.toBeInTheDocument();
+    expect(q('.log-travel-event')).not.toBeInTheDocument();
   });
 });

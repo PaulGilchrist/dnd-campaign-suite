@@ -1,323 +1,168 @@
-// Cleanup applied (redundant / brittle / low-value removal):
-//
-//   Consolidated 6 positive/negative modifier pairs → 4 parameterized tests:
-//     "uses getAbilitySaveModifier from playerChar.abilities when available"
-//     "handles negative modifiers from abilities array"
-//       → merged into it.each({ abilities, expectedMod })
-//     "uses creature.saving_throws when player has no abilities array"
-//     "handles negative modifiers from saving_throws"
-//       → merged into it.each({ saving_throws, expectedMod })
-//     "uses creature.ability_score_modifiers when saving_throws is also missing"
-//     "handles negative modifiers from ability_score_modifiers"
-//       → merged into it.each({ ability_score_modifiers, expectedMod })
-//     "uses target.saving_throws for non-player targets"
-//     "handles negative modifiers from non-player saving_throws"
-//       → merged into it.each({ saving_throws, expectedMod })
-//
-//   Consolidated 2 "no modifier source" tests → 1 test:
-//     "defaults to 0 when no save modifier source is found" (player)
-//     "defaults to 0 when non-player target has no save data" (non-player)
-//       → merged into single test since the fallback-to-0 behavior is
-//         identical regardless of target type (getSaveModifierForSaveType
-//         returns 0 through the same code path in both branches).
-//
-//   Removed 1 redundant "no target" rolling test:
-//     "rolls save with modifier 0 when no target is set"
-//       → covered by "defaults to 0 when no save modifier source is found"
-//         which asserts the identical rollSavingThrow('DEX', 0, ...) call.
-//         Kept only the rendering test ("renders clickable save DC even
-//         without a target") as it asserts unique UI behavior.
-//
-//   Consolidated 2 save type abbreviation tests → 1 parameterized test:
-//     "converts save_type to uppercase abbreviation for rollSavingThrow" (WIS)
-//     "converts different save types to correct abbreviations" (CON)
-//       → merged into it.each({ saveType, abbr }) since both assert the
-//         same abbreviation conversion via rollSavingThrow first argument.
+// @maintained-by-ai
+// MonsterCardModal save-chip click lane (ownership cited: interaction.test.jsx:10 "action
+// save_dc chip → save-modifier.test.jsx"). Pins the modifier-resolution producer seam once,
+// click → roll: executeBlockSaveRoll (MonsterCardModal.jsx:445-446) resolves the save bonus via
+// getSaveModifierForSaveType (MonsterCardHelpers.js:644-657) and threads it into
+// rollSavingThrow(abbr, mod, ctx). Every resolution branch earns a distinct byte here:
+// player abilities beat creature saving_throws (real unmocked abilityLookup save ?? bonus),
+// saving_throws beats ability_score_modifiers, an honest 0 in saving_throws does NOT fall
+// through (!= null semantics at Helpers:635), negatives ride the asm fallback, the non-player
+// branch (Helpers:656), no-source → 0, and the MA-0049 no-target refusal (zero-roll canary).
+// Cited owners, not re-tested here: roll consumption (useLoggedDiceRoll/saveProcessing), full
+// save-context shape (MonsterCardModal.secondary-save-transport.test.js, ma1563:44),
+// abbreviation map (MonsterCardModal.test-utils.test.js saveAbilityAbbr), and no-target
+// popup/log bytes (MonsterCardHelpers.usage.test.js). No DC arithmetic is restated — the
+// authored save_dc is pinned verbatim as it reaches the roll.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [1, 2], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [1, 2], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
+// ── Mocks (each bisected: only what the save-chip click lane needs) ─────
+// useLoggedDiceRoll — the spy under test; popupHtml static (no popup consumer here).
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const _rollSavingThrow = vi.fn();
-
-  const mockHook = vi.fn((_monsterName, _campaignName, _opts) => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
-
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: _rollSavingThrow,
+      rollSkillCheck: vi.fn(),
+      rollInitiative: vi.fn(),
+      quickRollPlayerSave: vi.fn(),
+    })),
     _rollSavingThrow,
-    _setPopupHtml,
-    __setPopupHtml(val) { _popupHtml = val; },
   };
 });
 
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
-  let _computeReturn = null;
-  const _computeConditionEffects = vi.fn((_conditions) => {
-    return _computeReturn ?? { ...defaultConditionEffects };
-  });
-
-  return {
-    computeConditionEffects: _computeConditionEffects,
-    combineAttackModes: vi.fn(() => 'normal'),
-    CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-    __setComputeReturn(val) { _computeReturn = val; },
-  };
-});
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => {
-  let _findCreatureReturn = null;
-
-  return {
-    extractDamageTypes: vi.fn(() => []),
-    formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-    getTargetFromAttacker: vi.fn(() => null),
-    getResistanceNotice: vi.fn(() => null),
-    findCreatureByName: vi.fn((_ctx, _name) => {
-      return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
-    }),
-    getCombatContext: vi.fn().mockResolvedValue(null),
-    __setFindCreatureReturn(val) { _findCreatureReturn = val; },
-  };
-});
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((range) => {
-    if (typeof range === 'number') return range;
-    if (range === 'touch') return 8;
-    if (!range) return null;
-    const m = range.match(/^(\d+)/);
-    return m ? parseInt(m[1], 10) : 30;
-  }),
+// damageUtils — arms the Goblin→target attacker link (getTarget, Modal:2298) and
+// silences the render-time getCombatContext fetch (Modal:2125).
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
+  extractDamageTypes: vi.fn(() => []),
+  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
+  getTargetFromAttacker: vi.fn(() => null),
+  getResistanceNotice: vi.fn(() => null),
+  findCreatureByName: vi.fn(() => null),
+  getCombatContext: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
+// Zero-network guarantee: refusals/logs never hit the live API from this lane.
+vi.mock('../../services/ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn((_abilities, _abilityKey) => 0),
+vi.mock('../../services/encounters/combatData.js', () => ({
+  getCombatSummary: vi.fn(() => null),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-  const mockUseRuntimeValue = vi.fn((_characterKey, _propertyName, _campaignName) => null);
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  useRuntimeValue: vi.fn(() => null),
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
+}));
 
-  return {
-    useRuntimeValue: mockUseRuntimeValue,
-    getRuntimeValue: vi.fn(() => null),
-    setRuntimeValue: vi.fn(),
-  };
-});
+// Render-time condition reducer (Modal:1445/2362) — inert defaults; condition
+// math belongs to its own owners, not this modifier lane.
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
+  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
+  combineAttackModes: vi.fn(() => 'normal'),
+  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
+}));
 
-// ── Re-import for test helpers ─────────────────────────────────────────────
+// abilityLookup intentionally UNMOCKED — the real getAbilitySaveModifier (save ?? bonus)
+// runs through the seam and is pinned by the abilities-priority case below.
 
-import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import * as abilityLookup from '../../services/shared/abilityLookup.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-
-const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
+import * as logService from '../../services/ui/logService.js';
+import { _rollSavingThrow as rollSavingThrow } from '../../hooks/combat/useLoggedDiceRoll.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Find a save dice link by its visible text (e.g. "DC 13 Dexterity"). */
-function findSaveLinkByText(text) {
-  const links = document.querySelectorAll('.mc-dice-link-save-clickable');
-  return Array.from(links).find(el => el.textContent.includes(text)) || null;
+/** Render a Goblin with a single Web block-save row and arm the given target. */
+function renderSaveRow({ saveType, saveDc, targetEntry, characters = [] }) {
+  damageUtils.findCreatureByName.mockReturnValue({
+    name: 'Goblin',
+    conditions: [],
+    ...(targetEntry ? { targetName: targetEntry.name } : {}),
+  });
+  const creatures = [{ name: 'Goblin', conditions: [] }, ...(targetEntry ? [targetEntry] : [])];
+  const monster = makeMonster({
+    actions: [{ name: 'Web', description: `${saveType} Saving Throw: DC ${saveDc}`, save_dc: saveDc, save_type: saveType }],
+  });
+  render(<MonsterCardModal {...makeProps(monster, { creatures, characters })} />);
+  return Array.from(document.querySelectorAll('.mc-dice-link-save-clickable'))
+    .find(el => el.textContent.includes(`DC ${saveDc}`)) || null;
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('MonsterCardModal - save modifier resolution via handleSaveRoll', () => {
+describe('MonsterCardModal — save chip click resolves target save modifier (executeBlockSaveRoll → getSaveModifierForSaveType)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    damageUtils.__setFindCreatureReturn(null);
-    abilityLookup.getAbilitySaveModifier.mockReturnValue(0);
   });
 
-  describe('player target — abilities array (highest priority)', () => {
-    it.each([
-      { abilities: [{ name: 'Dexterity', bonus: 3 }], expectedMod: 3, saveType: 'Dexterity', saveDc: 13, desc: 'uses getAbilitySaveModifier from playerChar.abilities when available' },
-      { abilities: [{ name: 'Dexterity', bonus: -2 }], expectedMod: -2, saveType: 'Dexterity', saveDc: 15, desc: 'handles negative modifiers from abilities array' },
-    ])('$desc', ({ abilities, expectedMod, saveType, saveDc }) => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
+  it.each([
+    {
+      desc: 'player abilities win over creature saving_throws (save over bonus via real abilityLookup)',
+      saveType: 'Dexterity', saveDc: 13, abbr: 'DEX', expectedMod: 5,
+      targetEntry: { name: 'Player A', type: 'player', saving_throws: { dex: { modifier: 9 } }, ability_score_modifiers: { dex: 8 } },
+      characters: [{ name: 'Player A', abilities: [{ name: 'Dexterity', save: 5, bonus: 3 }] }],
+    },
+    {
+      desc: 'player without abilities reads creature saving_throws, beating ability_score_modifiers',
+      saveType: 'Wisdom', saveDc: 12, abbr: 'WIS', expectedMod: 2,
+      targetEntry: { name: 'Player A', type: 'player', saving_throws: { wis: { modifier: 2 } }, ability_score_modifiers: { wis: 7 } },
+      characters: [],
+    },
+    {
+      desc: 'saving_throws modifier of 0 is an honest zero, not a fall-through to ability_score_modifiers',
+      saveType: 'Dexterity', saveDc: 15, abbr: 'DEX', expectedMod: 0,
+      targetEntry: { name: 'Player A', type: 'player', saving_throws: { dex: { modifier: 0 } }, ability_score_modifiers: { dex: 4 } },
+      characters: [],
+    },
+    {
+      desc: 'player falls through to ability_score_modifiers with the negative sign preserved',
+      saveType: 'Strength', saveDc: 12, abbr: 'STR', expectedMod: -2,
+      targetEntry: { name: 'Player A', type: 'player', saving_throws: {}, ability_score_modifiers: { str: -2 } },
+      characters: [],
+    },
+    {
+      desc: 'non-player target resolves its own saving_throws',
+      saveType: 'Constitution', saveDc: 14, abbr: 'CON', expectedMod: 4,
+      targetEntry: { name: 'Ogre', saving_throws: { con: { modifier: 4 } } },
+      characters: [],
+    },
+    {
+      desc: 'no modifier source anywhere resolves to 0',
+      saveType: 'Charisma', saveDc: 13, abbr: 'CHA', expectedMod: 0,
+      targetEntry: { name: 'Player A', type: 'player' },
+      characters: [],
+    },
+  ])('$desc', ({ saveType, saveDc, abbr, expectedMod, targetEntry, characters }) => {
+    const saveLink = renderSaveRow({ saveType, saveDc, targetEntry, characters });
+    expect(saveLink).toBeInTheDocument();
 
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: `${saveType} Saving Throw: DC ${saveDc}`, save_dc: saveDc, save_type: saveType }],
-      });
+    fireEvent.click(saveLink);
 
-      const playerChar = {
-        name: 'Player A',
-        abilities,
-      };
-
-      abilityLookup.getAbilitySaveModifier.mockReturnValue(expectedMod);
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [playerChar] })} />);
-
-      const saveLink = findSaveLinkByText(`DC ${saveDc}`);
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(abilityLookup.getAbilitySaveModifier).toHaveBeenCalledWith(playerChar.abilities, 'dex');
-      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', expectedMod, expect.objectContaining({ saveDc, saveType }));
-    });
+    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
+    expect(rollSavingThrow).toHaveBeenCalledWith(abbr, expectedMod, expect.objectContaining({
+      saveDc,
+      saveType,
+      targetName: targetEntry.name,
+    }));
   });
 
-  describe('player target — saving_throws fallback', () => {
-    it.each([
-      { saving_throws: { dex: { modifier: 2 } }, expectedMod: 2, saveType: 'Dexterity', saveDc: 13, desc: 'uses creature.saving_throws when player has no abilities array' },
-      { saving_throws: { con: { modifier: -3 } }, expectedMod: -3, saveType: 'Constitution', saveDc: 14, desc: 'handles negative modifiers from saving_throws' },
-    ])('$desc', ({ saving_throws, expectedMod, saveType, saveDc }) => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
+  it('renders the DC chip with no armed target but refuses the click — zero rolls, refusal logged (MA-0049)', () => {
+    const saveLink = renderSaveRow({ saveType: 'Dexterity', saveDc: 13, targetEntry: null });
+    expect(saveLink).toBeInTheDocument();
 
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: `${saveType} Saving Throw: DC ${saveDc}`, save_dc: saveDc, save_type: saveType }],
-      });
+    fireEvent.click(saveLink);
 
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player', saving_throws }], characters: [] })} />);
-
-      const saveLink = findSaveLinkByText(`DC ${saveDc}`);
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith(saveType === 'Dexterity' ? 'DEX' : 'CON', expectedMod, expect.objectContaining({ saveDc, saveType }));
-    });
-  });
-
-  describe('player target — ability_score_modifiers fallback', () => {
-    it.each([
-      { ability_score_modifiers: { dex: 4 }, expectedMod: 4, saveType: 'Dexterity', saveDc: 13, desc: 'uses creature.ability_score_modifiers when saving_throws is also missing' },
-      { ability_score_modifiers: { str: -5 }, expectedMod: -5, saveType: 'Strength', saveDc: 12, desc: 'handles negative modifiers from ability_score_modifiers' },
-    ])('$desc', ({ ability_score_modifiers, expectedMod, saveType, saveDc }) => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: `${saveType} Saving Throw: DC ${saveDc}`, save_dc: saveDc, save_type: saveType }],
-      });
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player', ability_score_modifiers }], characters: [] })} />);
-
-      const saveLink = findSaveLinkByText(`DC ${saveDc}`);
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith(saveType === 'Dexterity' ? 'DEX' : 'STR', expectedMod, expect.objectContaining({ saveDc, saveType }));
-    });
-  });
-
-  describe('player target — no modifier source', () => {
-    it('defaults to 0 when no save modifier source is found', () => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
-      });
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }], characters: [] })} />);
-
-      const saveLink = findSaveLinkByText('DC 13');
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 0, expect.objectContaining({ saveDc: 13, saveType: 'Dexterity' }));
-    });
-
-    it('defaults to 0 for non-player target with no save data', () => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Ogre',
-      });
-
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: 'Constitution Saving Throw: DC 13', save_dc: 13, save_type: 'Constitution' }],
-      });
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Ogre' }, { name: 'Ogre' }] })} />);
-
-      const saveLink = findSaveLinkByText('DC 13');
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith('CON', 0, expect.objectContaining({ saveDc: 13, saveType: 'Constitution' }));
-    });
-  });
-
-  describe('no target', () => {
-    it('renders clickable save DC even without a target (modifier defaults to 0)', () => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-      });
-
-      const m = makeMonster({
-        actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
-      });
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin' }] })} />);
-
-      const saveLink = findSaveLinkByText('DC 13');
-      expect(saveLink).toBeInTheDocument();
-    });
-  });
-
-  describe('save type abbreviation', () => {
-    it.each([
-      { saveType: 'Wisdom', abbr: 'WIS', saveDc: 12, desc: 'converts save_type to uppercase abbreviation for rollSavingThrow' },
-      { saveType: 'Constitution', abbr: 'CON', saveDc: 14, desc: 'converts different save types to correct abbreviations' },
-    ])('$desc', ({ saveType, abbr, saveDc }) => {
-      damageUtils.__setFindCreatureReturn({
-        name: 'Goblin',
-        conditions: [],
-        targetName: 'Player A',
-      });
-
-      const m = makeMonster({
-        actions: [{ name: 'Charm', description: `${saveType} Saving Throw: DC ${saveDc}`, save_dc: saveDc, save_type: saveType }],
-      });
-
-      render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Goblin', targetName: 'Player A' }, { name: 'Player A', type: 'player' }] })} />);
-
-      const saveLink = findSaveLinkByText(`DC ${saveDc}`);
-      expect(saveLink).toBeInTheDocument();
-      fireEvent.click(saveLink);
-      expect(rollSavingThrow).toHaveBeenCalledWith(abbr, 0, expect.objectContaining({ saveType }));
-    });
+    expect(rollSavingThrow).not.toHaveBeenCalled();
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringContaining('refused') }));
   });
 });

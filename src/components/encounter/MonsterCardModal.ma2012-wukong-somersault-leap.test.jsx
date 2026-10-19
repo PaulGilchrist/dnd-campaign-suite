@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-2012 regression: Sun Wukong "Somersault Leap" (legendary_actions[2])
 // shipped {name, description} only — the generic MA-0021 "Expend Legendary"
 // chip (MonsterAction.jsx:220) SPENT one use unconditionally (resolveLegendaryRow
@@ -12,16 +13,27 @@
 // "somersault_leap"` + `advisory_message` carrying the RAW clause ("flies up to
 // his full fly Speed (300 ft.) without provoking Opportunity Attacks"). Movement
 // distance + no-OA suppression are structurally unexpressible (§398/§70 — no
-// moveToken/setTokenPos consumers; opportunity consumers are PC-side only).
-// Advisory PREEMPTS the numeric/delegate legs (resolveLegendaryRowMechanic
-// :755-761, after the gate spend) → honest record-only spend. delegates_to is
-// NOT co-authored (MA-1975 exclusivity — the delegate lane :895-905 replaces
-// mechanicAction before the advisory branch could inspect the child).
+// moveToken/setTokenPos consumers; opportunity consumers are PC-side only) —
+// advisory pins the honest GM-enforced advisory seam, never a fabricated
+// movement consumer. Advisory PREEMPTS the numeric/delegate legs
+// (resolveLegendaryRowMechanic :755-761, after the gate spend) → honest
+// record-only spend. delegates_to is NOT co-authored (MA-1975 exclusivity —
+// the delegate lane :895-905 replaces mechanicAction before the advisory branch
+// could inspect the child).
 //
-// Live seam pinned below: press spends 1 of 3 then lands the advisory popup +
-// advisory ability_use record carrying the RAW bytes — zero rollAttack/
-// rollDamage/rollSavingThrow, NO console MA-0510; same-boundary refire refuses
-// (turn latch) and exhausted pool refuses honest.
+// Trim fold (#751 carried rec): this file pins ONLY the Somersault-Leap-unique
+// faces — the flat-advisory row fingerprint (exact keys BY NAME + RAW clause +
+// MA-1883 name-cost parse folded = 1, plain press) plus the Wukong-only header/
+// sibling economy (no sibling Wukong file owns it) and the honest press (chip
+// render folded into press: spend 1, advisory popup + record-only ability_use,
+// zero rolls, NO console MA-0510). Shared refusal gates are owned elsewhere and
+// are NOT re-pinned here: same-boundary turn latch →
+// MonsterCardModal.legendary-uses.test.jsx :309-316 (per #735/#744/#751/#753);
+// exhausted pool → same file :195-212; cost-shortfall →
+// MonsterCardModal.ma1883-demogorgon-legendary-cast-spell.test.jsx :216-224
+// (+ service twin monsterLegendaryUses.ma1883-demogorgon-cast-a-spell.test.js
+// :238-242); own-turn refusal → MonsterCardModal.pounce-shadow-dragon.test.jsx
+// :300-305.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -107,12 +119,11 @@ const CREATURES = [
 
 const wukong = () => monsters.find(m => m.index === 'sun-wukong');
 const legendaryRows = () => wukong().legendary_actions;
-const headerRow = () => legendaryRows()[0];
 const leapRow = () => legendaryRows().find(a => a.name === 'Somersault Leap');
 
-// ---- disk fingerprint ----
+// ---- disk fingerprint (folded: row + economy + cost parse, one lock) ----
 describe('MA-2012 disk fingerprint: Sun Wukong Somersault Leap flat advisory (MA-1944 option-A / MA-1936 King Kong byte-twin shape)', () => {
-  it('row keys exactly [name, advisory, advisory_message, description] — advisory "somersault_leap", RAW clause carried, description byte-unchanged', () => {
+  it('leap row keys exactly [name, advisory, advisory_message, description] — advisory "somersault_leap", RAW clause carried, description byte-unchanged, MA-1883 name-cost 1 (exact keys prove no delegates_to/numeric/economy co-authorship — MA-1975 exclusivity: the delegate lane :895-905 replaces mechanicAction before the advisory branch :755 can inspect the child) — header economy and siblings byte-intact (uses:3 gate behind the press below, Club delegate child, Locking Word cost-2 save child)', () => {
     const row = leapRow();
     expect(Object.keys(row)).toEqual(['name', 'advisory', 'advisory_message', 'description']);
     expect(row.name).toBe('Somersault Leap');
@@ -123,35 +134,20 @@ describe('MA-2012 disk fingerprint: Sun Wukong Somersault Leap flat advisory (MA
     expect(row.advisory_message).toMatch(/advisory record/);
     expect(row.advisory_message).toMatch(/GM-enforced/);
     expect(row.description).toBe('Sun Wukong flies up to his full fly Speed without provoking Opportunity Attacks.');
-  });
-
-  it('NO delegates_to co-authorship (MA-1975 exclusivity — delegate lane replaces mechanicAction before the advisory branch can inspect the child) and no numeric/economy fields', () => {
-    const row = leapRow();
-    expect(row.delegates_to).toBeUndefined();
-    expect(row.attack_bonus).toBeUndefined();
-    expect(row.save_dc).toBeUndefined();
-    expect(row.damage_dice_primary).toBeUndefined();
-    expect(row.self_heal).toBeUndefined();
-    expect(row.uses).toBeUndefined();
-    expect(row.recharge).toBeUndefined();
-  });
-
-  it('header economy and siblings byte-intact (header uses:3, Club delegate child, Locking Word save child)', () => {
-    const h = headerRow();
+    // Plain press — the spend the fix makes honest (behaviorally re-pinned below).
+    expect(legendaryActionCost(row)).toBe(1);
+    // Wukong-only economy: no sibling Wukong test file owns this, and the
+    // press describe's {max: 3} is otherwise a bare mock with no disk anchor.
+    const h = legendaryRows()[0];
     expect(h.name).toBe('Legendary Action Uses: 3');
     expect(h.uses).toBe(3);
     expect(legendaryHeaderAction(wukong())).toBe(h);
     expect(legendaryRows()[1].name).toBe('Club');
     expect(legendaryRows()[1].delegates_to).toBe('Ruyi Jingu Bang');
-    const locking = legendaryRows()[3];
-    expect(locking.name).toBe('Locking Word (Costs 2 Actions)');
-    expect(locking.save_dc).toBe(24);
-    expect(locking.save_type).toBe('Wisdom');
+    expect(legendaryRows()[3].name).toBe('Locking Word (Costs 2 Actions)');
+    expect(legendaryRows()[3].save_dc).toBe(24);
+    expect(legendaryRows()[3].save_type).toBe('Wisdom');
     expect(legendaryRows().length).toBe(4);
-  });
-
-  it('MA-1883 name-cost parse is 1 (plain press — the spend the fix makes honest)', () => {
-    expect(legendaryActionCost(leapRow())).toBe(1);
   });
 });
 
@@ -181,16 +177,19 @@ describe('MA-2012 MonsterCardModal press: Somersault Leap spends 1 then lands th
     return Array.from(document.querySelectorAll('.mc-action')).find(r => (r.querySelector('strong')?.textContent || '').startsWith(name));
   }
 
-  it('Somersault Leap keeps the gated Expend chip', () => {
+  // Refusal faces deliberately NOT re-pinned (fold rec #751, precedents
+  // #735/#744/#753): same-boundary turn latch → legendary-uses.test.jsx
+  // :309-316; exhausted pool → same file :195-212; cost-shortfall →
+  // ma1883-demogorgon modal :216-224 (+ service twin :238-242);
+  // own-turn → pounce-shadow-dragon :300-305.
+  it('gated Expend chip renders, press spends 1 and lands advisory popup + advisory ability_use record with the RAW clause — zero rolls, NO console MA-0510', async () => {
     renderWukong({ max: 3, used: 0 });
     const chip = laRow('Somersault Leap').querySelector('.mc-dice-link-legendary');
     expect(chip).not.toBe(null);
     expect(chip.textContent).toContain('Expend Legendary');
-  });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
 
-  it('press spends 1 and lands advisory popup + advisory ability_use record with the RAW clause — zero rolls, NO console MA-0510', async () => {
-    renderWukong({ max: 3, used: 0 });
-    fireEvent.click(laRow('Somersault Leap').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(chip);
     await waitFor(() => expect(runtime.store['Sun Wukong 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const popups = setPopupHtml.mock.calls.map(c => String(c[0]));
@@ -204,34 +203,11 @@ describe('MA-2012 MonsterCardModal press: Somersault Leap spends 1 then lands th
     expect(advisory.description).toContain('flies up to his full fly Speed');
     expect(advisory.description).toContain('300 ft.');
     expect(advisory.description).toMatch(/GM-enforced/);
-    // advisory is record-only: no roll, no damage, no save transport.
+    // advisory is record-only: no roll, no damage, no save, no movement transport.
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     // MA-0510 dead-end is DEAD: no console error on the resolved press.
-    expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('same-boundary refire refuses (turn latch) — zero extra spend, record stayed one advisory', async () => {
-    renderWukong({ max: 3, used: 0 });
-    fireEvent.click(laRow('Somersault Leap').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store['Sun Wukong 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    setPopupHtml.mockClear();
-    fireEvent.click(laRow('Somersault Leap').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Sun Wukong 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('exhausted pool refuses honest (MA-0021): 0 remaining — popup names exhaustion, zero spend', async () => {
-    renderWukong({ max: 3, used: 3 });
-    fireEvent.click(laRow('Somersault Leap').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('no legendary uses');
-    expect(runtime.store['Sun Wukong 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(consoleSpy).not.toHaveBeenCalled();
   });
 });

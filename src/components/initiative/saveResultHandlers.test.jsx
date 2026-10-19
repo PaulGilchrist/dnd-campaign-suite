@@ -1,3 +1,30 @@
+// @maintained-by-ai
+/**
+ * Lane #864 — saveResultHandlers.js: the per-effect save-result handlers that
+ * Initiative.jsx registers as listeners. This lane owns what a handler WRITES,
+ * LOGS, and ADVANCES when a save result event arrives: counter bytes, terminal
+ * outcomes (petrified / banished / spell-ends), targetEffects filtering with
+ * exact resulting arrays, prompt clearing, and exact save_result description
+ * bytes. No wall-clock timers exist here — prompts wait indefinitely (turn-based
+ * mandate, app rule).
+ *
+ * Trigger → owner table:
+ *   sendResult() service impls (fleshToStoneService, savePromptService)  → their own tests
+ *   Save Success/Fail button dispatch in the UI                          → CreatureCard.prompts.test.jsx (#852, defers here at its line 7)
+ *   dice roll flows (rollConditionSaveHandler)                           → rollConditionSaveHandler.test.jsx (#847)
+ *   concentration roll/maintain/break flows                              → #833–#835 lane
+ *   'save-result' event detail production / listener registration        → Initiative.jsx
+ *   handler bodies: counter advance, terminal condition+te writes,
+ *   prompt clear, exact log payloads                                     → THIS file
+ *
+ * old→new map (18 → 11 tests):
+ *   11 early-return scenarios across 3 handlers → 3 zero-write guard batteries (5 scenarios each)
+ *   flesh 3rd-success / 3rd-failure + indigo 3rd-success / 3rd-failure → shared CON-tracker terminal tests ×2 handlers
+ *   flesh name-sanitization → folded into mid-save counter test (sanitized keys everywhere)
+ *   indigo/violet non-matching-targetEffects tests → folded into exact-array assertions on every targetEffects write
+ *   (new) mid-save counter bytes (failures branch, indigo), setCombatSummary clone on every processed path,
+ *   flesh prompt NOT cleared mid-progress, full save_result descriptions — none existed before.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     createFleshToStoneHandler,
@@ -15,476 +42,305 @@ vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
     clearFleshToStonePrompt: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-    const store = new Map();
-    return {
-        getRuntimeValue: vi.fn((key, prop, campaign) => {
-            const k = `${key}::${prop}::${campaign ?? ''}`;
-            return store.get(k) ?? null;
-        }),
-        setRuntimeValue: vi.fn((key, prop, value, campaign) => {
-            const k = `${key}::${prop}::${campaign ?? ''}`;
-            store.set(k, value);
-        }),
-        clearStore: vi.fn(() => store.clear()),
-    };
-});
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-describe('saveResultHandlers — flesh-to-stone', () => {
-    let combatSummary;
-    let setCombatSummary;
-    let campaignName;
-    let saveData;
-    let conditions;
-    let targetEffects;
+const CAMPAIGN = 'test-campaign';
+const NAME = 'Alice the Brave'; // multi-word name exercises key sanitization everywhere
+const CASTER = 'Goblin';
+
+const event = (targetName, result, campaignName = CAMPAIGN) => ({
+    detail: { campaignName, targetName, result },
+});
+
+/** Zero-write honesty: no store writes, no logs, no prompt clears, no summary refresh. */
+function expectNothingHappened() {
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
+    expect(clearFleshToStonePrompt).not.toHaveBeenCalled();
+    expect(setCombatSummary).not.toHaveBeenCalled();
+}
+
+let setCombatSummary;
+
+/** Configure the runtime-store mock for a 3-save CON tracker (restrained → petrified). */
+function setupTracker(tracker, saveDataOverride) {
+    setCombatSummary = vi.fn();
+    let saveData = { casterName: CASTER, dc: 15, successes: 0, failures: 0, ...saveDataOverride };
+    // Counter writes round-trip so consecutive saves see prior progress.
+    setRuntimeValue.mockImplementation((key, prop, value) => {
+        if (key === 'campaign' && prop === tracker.trackingKey && value) {
+            saveData = { ...saveData, ...value };
+        }
+    });
+    getRuntimeValue.mockImplementation((key, prop) => {
+        if (key === 'campaign' && prop === tracker.trackingKey) return saveData;
+        if (key === NAME && prop === 'activeConditions') return ['restrained'];
+        if (key === 'campaign' && prop === 'targetEffects') return [
+            { target: NAME, effect: tracker.teEffect, source: CASTER },
+            { target: 'Bob', effect: tracker.teEffect, source: CASTER },
+        ];
+        return null;
+    });
+    return saveData;
+}
+
+// Two structurally identical 3-save CON trackers; only keys, roll types, log bytes,
+// and flesh's prompt clearing differ.
+const CON_TRACKERS = [
+    {
+        label: 'flesh-to-stone',
+        create: createFleshToStoneHandler,
+        trackingKey: `_fleshToStone_${NAME.replace(/\s+/g, '_')}`,
+        rollType: 'save-flesh-to-stone',
+        teEffect: 'flesh_to_stone',
+        clearsPrompt: true,
+        midFailDesc: (n) => `${NAME} failed CON save against Flesh to Stone (${n}/3 failures needed).`,
+        midSuccessDesc: (n) => `${NAME} succeeded on CON save against Flesh to Stone (${n}/3 successes needed).`,
+        doneSuccessDesc: `${NAME} collected 3 successful saves against Flesh to Stone. The spell ends.`,
+        doneFailDesc: `${NAME} failed 3 CON saves against Flesh to Stone and is turned to stone (Petrified).`,
+    },
+    {
+        label: 'prismatic-spray-indigo',
+        create: createPrismaticSprayIndigoHandler,
+        trackingKey: `_prismaticSprayIndigo_${NAME.replace(/\s+/g, '_')}`,
+        rollType: 'save-prismatic-spray-indigo',
+        teEffect: 'prismatic_spray_indigo',
+        clearsPrompt: false,
+        midFailDesc: (n) => `${NAME} failed CON save against Prismatic Spray Indigo ray (${n}/3 failures needed).`,
+        midSuccessDesc: (n) => `${NAME} succeeded on CON save against Prismatic Spray Indigo ray (${n}/3 successes needed).`,
+        doneSuccessDesc: `${NAME} collected 3 successful CON saves against Prismatic Spray (Indigo ray). Restrained ends.`,
+        doneFailDesc: `${NAME} failed 3 CON saves against Prismatic Spray (Indigo ray) and is turned to stone (Petrified).`,
+    },
+];
+
+describe.each(CON_TRACKERS)('$label save-result handler', (tracker) => {
+    const combatSummary = { round: 1, creatures: [{ name: NAME, type: 'player' }] };
 
     beforeEach(() => {
         vi.clearAllMocks();
-        campaignName = 'test-campaign';
-        setCombatSummary = vi.fn();
-        combatSummary = {
-            round: 1,
-            creatures: [{ name: 'Alice', type: 'player' }],
-        };
-        saveData = { casterName: 'Goblin', dc: 15, successes: 0, failures: 0 };
-        conditions = ['restrained'];
-        targetEffects = [{ target: 'Alice', effect: 'flesh_to_stone', source: 'Goblin' }];
-
-        getRuntimeValue.mockImplementation((key, prop, _campaign) => {
-            if (key === 'campaign' && prop === '_fleshToStone_Alice') return saveData;
-            if (key === 'Alice' && prop === 'activeConditions') return conditions;
-            if (key === 'campaign' && prop === 'targetEffects') return targetEffects;
-            return null;
-        });
+        setupTracker(tracker);
     });
 
-    function makeHandler() {
-        return createFleshToStoneHandler(campaignName, combatSummary, setCombatSummary);
-    }
-
-    describe('early returns', () => {
-        const scenarios = [
-            { name: 'campaign mismatch', testCampaign: 'other-campaign' },
-            { name: 'null combatSummary', nullCombatSummary: true },
-            { name: 'missing result', result: null },
-            { name: 'creature not found', targetName: 'Bob' },
-            { name: 'missing save data', missingSaveData: true },
-        ];
-
-        it.each(scenarios)('should return early when $name', async ({ nullCombatSummary, result, targetName, missingSaveData, testCampaign }) => {
-            if (missingSaveData) {
-                getRuntimeValue.mockImplementation((key, prop) => {
-                    if (key === 'campaign' && prop === '_fleshToStone_Alice') return null;
-                    return null;
-                });
-            }
-            const cs = nullCombatSummary ? null : combatSummary;
-            const handler = createFleshToStoneHandler(campaignName, cs, setCombatSummary);
-            const detail = { campaignName: testCampaign || campaignName, targetName: targetName || 'Alice' };
-            if (result === undefined) detail.result = { success: true };
-            else detail.result = result;
-            await handler({ detail });
-            expect(logService.addEntry).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
+    it('writes nothing for invalid events (wrong campaign, no summary, no result, unknown creature, no tracking data)', async () => {
+        const handler = tracker.create(CAMPAIGN, combatSummary, setCombatSummary);
+        await handler(event(NAME, { success: true }, 'other-campaign'));
+        await tracker.create(CAMPAIGN, null, setCombatSummary)(event(NAME, { success: true }));
+        await handler(event(NAME, undefined));
+        await handler(event('Bob', { success: true }));
+        getRuntimeValue.mockImplementation(() => null);
+        await handler(event(NAME, { success: true }));
+        expectNothingHappened();
     });
 
-    describe('success path — 3rd success (spell ends)', () => {
-        it('should remove restrained condition, clean targetEffects, clear tracking, and call clearFleshToStonePrompt', async () => {
-            saveData = { casterName: 'Goblin', dc: 15, successes: 2, failures: 0 };
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: true } },
-            });
+    it('advances the counter only on non-terminal saves, under the sanitized key', async () => {
+        const handler = tracker.create(CAMPAIGN, combatSummary, setCombatSummary);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', [], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.not.arrayContaining([
-                    expect.objectContaining({ target: 'Alice', effect: 'flesh_to_stone', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_fleshToStone_Alice', null, campaignName);
-            expect(clearFleshToStonePrompt).toHaveBeenCalledWith(campaignName, 'Alice');
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'save_result',
-                rollType: 'save-flesh-to-stone',
-                targetName: 'Alice',
-                success: true,
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'Restrained',
-            }));
-        });
+        await handler(event(NAME, { success: false }));
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign', tracker.trackingKey,
+            { casterName: CASTER, dc: 15, successes: 0, failures: 1 }, CAMPAIGN);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            characterName: CASTER,
+            rollType: tracker.rollType,
+            targetName: NAME,
+            saveDc: 15,
+            saveType: 'CON',
+            success: false,
+            description: tracker.midFailDesc(1),
+        }));
+
+        await handler(event(NAME, { success: true }));
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign', tracker.trackingKey,
+            { casterName: CASTER, dc: 15, successes: 1, failures: 1 }, CAMPAIGN);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            success: true,
+            description: tracker.midSuccessDesc(1),
+        }));
+
+        // Non-terminal saves touch ONLY the counter: no conditions, no targetEffects, no prompt clear.
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(clearFleshToStonePrompt).not.toHaveBeenCalled();
+        expect(setCombatSummary).toHaveBeenCalledTimes(2);
+        expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
     });
 
-    describe('failure path — 3rd failure (petrified)', () => {
-        it('should remove restrained, apply petrified, clean targetEffects, clear tracking, and call clearFleshToStonePrompt', async () => {
-            saveData = { casterName: 'Goblin', dc: 15, successes: 0, failures: 2 };
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: false } },
-            });
+    it('ends the spell on the 3rd success: conditions cleared, tracking nulled, other targets preserved', async () => {
+        setupTracker(tracker, { successes: 2 });
+        const handler = tracker.create(CAMPAIGN, combatSummary, setCombatSummary);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', ['petrified'], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.not.arrayContaining([
-                    expect.objectContaining({ target: 'Alice', effect: 'flesh_to_stone', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_fleshToStone_Alice', null, campaignName);
-            expect(clearFleshToStonePrompt).toHaveBeenCalledWith(campaignName, 'Alice');
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'applied',
-                condition: 'Petrified',
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'Restrained',
-            }));
-        });
+        await handler(event(NAME, { success: true }));
+
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, NAME, 'activeConditions', [], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects',
+            [{ target: 'Bob', effect: tracker.teEffect, source: CASTER }], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(3, 'campaign', tracker.trackingKey, null, CAMPAIGN);
+        if (tracker.clearsPrompt) {
+            expect(clearFleshToStonePrompt).toHaveBeenCalledWith(CAMPAIGN, NAME);
+        } else {
+            expect(clearFleshToStonePrompt).not.toHaveBeenCalled();
+        }
+        expect(logService.addEntry).toHaveBeenCalledTimes(2);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            rollType: tracker.rollType,
+            targetName: NAME,
+            saveType: 'CON',
+            success: true,
+            description: tracker.doneSuccessDesc,
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'removed',
+            characterName: NAME,
+            condition: 'Restrained',
+        }));
+        expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
     });
 
-    describe('name sanitization in tracking key', () => {
-        it('should handle creature names with spaces in tracking key', async () => {
-            const creatureSummary = {
-                round: 1,
-                creatures: [{ name: 'Alice the Brave', type: 'player' }],
-            };
-            const handler = createFleshToStoneHandler(campaignName, creatureSummary, setCombatSummary);
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign' && prop === '_fleshToStone_Alice_the_Brave') return { casterName: 'Goblin', dc: 15, successes: 0, failures: 0 };
-                if (key === 'Alice the Brave' && prop === 'activeConditions') return ['restrained'];
-                if (key === 'campaign' && prop === 'targetEffects') return [];
-                return null;
-            });
+    it('petrifies on the 3rd failure: restrained removed, petrified applied, tracking nulled', async () => {
+        setupTracker(tracker, { failures: 2 });
+        const handler = tracker.create(CAMPAIGN, combatSummary, setCombatSummary);
 
-            await handler({
-                detail: { campaignName, targetName: 'Alice the Brave', result: { success: true } },
-            });
+        await handler(event(NAME, { success: false }));
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                '_fleshToStone_Alice_the_Brave',
-                expect.objectContaining({ successes: 1 }),
-                campaignName,
-            );
-        });
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, NAME, 'activeConditions', ['petrified'], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects',
+            [{ target: 'Bob', effect: tracker.teEffect, source: CASTER }], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(3, 'campaign', tracker.trackingKey, null, CAMPAIGN);
+        expect(logService.addEntry).toHaveBeenCalledTimes(3);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            rollType: tracker.rollType,
+            targetName: NAME,
+            saveType: 'CON',
+            success: false,
+            description: tracker.doneFailDesc,
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'removed',
+            characterName: NAME,
+            condition: 'Restrained',
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: NAME,
+            condition: 'Petrified',
+        }));
+        expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
     });
 });
 
-describe('saveResultHandlers — prismatic-spray-indigo', () => {
-    let combatSummary;
-    let setCombatSummary;
-    let campaignName;
-    let saveData;
-    let conditions;
-    let targetEffects;
+describe('prismatic-spray-violet save-result handler', () => {
+    const combatSummary = { round: 1, creatures: [{ name: NAME, type: 'player' }] };
+    const trackingKey = `_prismaticSprayViolet_${NAME.replace(/\s+/g, '_')}`;
+    const BANISHMENT = {
+        effect: 'banishment',
+        target: NAME,
+        source: CASTER,
+        duration: 'Concentration, up to 1 minute',
+        permanent: false,
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
-        campaignName = 'test-campaign';
         setCombatSummary = vi.fn();
-        combatSummary = {
-            round: 1,
-            creatures: [{ name: 'Alice', type: 'player' }],
-        };
-        saveData = { casterName: 'Goblin', dc: 15, successes: 0, failures: 0 };
-        conditions = ['restrained'];
-        targetEffects = [{ target: 'Alice', effect: 'prismatic_spray_indigo', source: 'Goblin' }];
-
         getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'campaign' && prop === '_prismaticSprayIndigo_Alice') return saveData;
-            if (key === 'Alice' && prop === 'activeConditions') return conditions;
-            if (key === 'campaign' && prop === 'targetEffects') return targetEffects;
-            return null;
-        });
-    });
-
-    function makeHandler() {
-        return createPrismaticSprayIndigoHandler(campaignName, combatSummary, setCombatSummary);
-    }
-
-    describe('early returns', () => {
-        const scenarios = [
-            { name: 'campaign mismatch', testCampaign: 'other-campaign' },
-            { name: 'creature not found', targetName: 'Bob' },
-            { name: 'missing save data', missingSaveData: true },
-        ];
-
-        it.each(scenarios)('should return early when $name', async ({ targetName, missingSaveData, testCampaign }) => {
-            if (missingSaveData) {
-                getRuntimeValue.mockImplementation((key, prop) => {
-                    if (key === 'campaign' && prop === '_prismaticSprayIndigo_Alice') return null;
-                    return null;
-                });
-            }
-            const handler = createPrismaticSprayIndigoHandler(campaignName, combatSummary, setCombatSummary);
-            await handler({
-                detail: { campaignName: testCampaign || campaignName, targetName: targetName || 'Alice', result: { success: true } },
-            });
-            expect(logService.addEntry).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('success path — 3rd success (restrained ends)', () => {
-        it('should remove restrained, clean targetEffects, clear tracking, and log both events', async () => {
-            saveData = { casterName: 'Goblin', dc: 15, successes: 2, failures: 0 };
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: true } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', [], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.not.arrayContaining([
-                    expect.objectContaining({ target: 'Alice', effect: 'prismatic_spray_indigo', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayIndigo_Alice', null, campaignName);
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'save_result',
-                rollType: 'save-prismatic-spray-indigo',
-                targetName: 'Alice',
-                success: true,
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'Restrained',
-            }));
-        });
-
-        it('should handle non-matching targetEffects (different target)', async () => {
-            saveData = { casterName: 'Goblin', dc: 15, successes: 2, failures: 0 };
-            targetEffects = [{ target: 'Bob', effect: 'prismatic_spray_indigo', source: 'Goblin' }];
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: true } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayIndigo_Alice', null, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ target: 'Bob', effect: 'prismatic_spray_indigo' }),
-                ]),
-                campaignName,
-            );
-        });
-    });
-
-    describe('failure path — 3rd failure (petrified)', () => {
-        it('should remove restrained, apply petrified, clean targetEffects, clear tracking, and log events', async () => {
-            saveData = { casterName: 'Goblin', dc: 15, successes: 0, failures: 2 };
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: false } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', ['petrified'], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.not.arrayContaining([
-                    expect.objectContaining({ target: 'Alice', effect: 'prismatic_spray_indigo', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayIndigo_Alice', null, campaignName);
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'applied',
-                condition: 'Petrified',
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'Restrained',
-            }));
-        });
-    });
-});
-
-describe('saveResultHandlers — prismatic-spray-violet', () => {
-    let combatSummary;
-    let setCombatSummary;
-    let campaignName;
-    let saveData;
-    let conditions;
-    let targetEffects;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        campaignName = 'test-campaign';
-        setCombatSummary = vi.fn();
-        combatSummary = {
-            round: 1,
-            creatures: [{ name: 'Alice', type: 'player' }],
-        };
-        saveData = { casterName: 'Goblin', dc: 15 };
-        conditions = ['blinded'];
-        targetEffects = [{ target: 'Alice', effect: 'prismatic_spray_violet', source: 'Goblin' }];
-
-        getRuntimeValue.mockImplementation((key, prop, _campaign) => {
-            if (key === 'campaign' && prop === '_prismaticSprayViolet_Alice') return saveData;
-            if (key === 'Alice' && prop === 'activeConditions') return conditions;
-            if (key === 'campaign' && prop === 'targetEffects') return targetEffects;
-            return null;
-        });
-    });
-
-    function makeHandler() {
-        return createPrismaticSprayVioletHandler(campaignName, combatSummary, setCombatSummary);
-    }
-
-    describe('early returns', () => {
-        const scenarios = [
-            { name: 'campaign mismatch', testCampaign: 'other-campaign' },
-            { name: 'creature not found', targetName: 'Bob' },
-            { name: 'missing save data', missingSaveData: true },
-        ];
-
-        it.each(scenarios)('should return early when $name', async ({ targetName, missingSaveData, testCampaign }) => {
-            if (missingSaveData) {
-                getRuntimeValue.mockImplementation((key, prop) => {
-                    if (key === 'campaign' && prop === '_prismaticSprayViolet_Alice') return null;
-                    return null;
-                });
-            }
-            const handler = createPrismaticSprayVioletHandler(campaignName, combatSummary, setCombatSummary);
-            await handler({
-                detail: { campaignName: testCampaign || campaignName, targetName: targetName || 'Alice', result: { success: true } },
-            });
-            expect(logService.addEntry).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('success path (blinded removed)', () => {
-        it('should remove blinded, clean targetEffects, clear tracking, and log both events', async () => {
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: true } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', [], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.not.arrayContaining([
-                    expect.objectContaining({ target: 'Alice', effect: 'prismatic_spray_violet', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayViolet_Alice', null, campaignName);
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'save_result',
-                rollType: 'save-prismatic-spray-violet',
-                targetName: 'Alice',
-                saveType: 'WIS',
-                success: true,
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'removed',
-                condition: 'Blinded',
-            }));
-        });
-
-        it('should handle non-matching targetEffects (different target)', async () => {
-            targetEffects = [{ target: 'Bob', effect: 'prismatic_spray_violet', source: 'Goblin' }];
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: true } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayViolet_Alice', null, campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ target: 'Bob', effect: 'prismatic_spray_violet' }),
-                ]),
-                campaignName,
-            );
-        });
-    });
-
-    describe('failure path (banishment — incapacitated applied)', () => {
-        it('should remove blinded, apply incapacitated, add banishment targetEffect, clear tracking, and log events', async () => {
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: false } },
-            });
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'activeConditions', ['incapacitated'], campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ effect: 'banishment', target: 'Alice', source: 'Goblin' }),
-                ]),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_prismaticSprayViolet_Alice', null, campaignName);
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'save_result',
-                rollType: 'save-prismatic-spray-violet',
-                targetName: 'Alice',
-                saveType: 'WIS',
-                success: false,
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'condition',
-                action: 'applied',
-                condition: 'Incapacitated',
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Goblin',
-                abilityName: 'Prismatic Spray (Violet ray)',
-            }));
-        });
-
-        it('should preserve non-banishment targetEffects when adding banishment and remove existing banishment', async () => {
-            targetEffects = [
-                { target: 'Bob', effect: 'prismatic_spray_violet', source: 'Goblin' },
-                { effect: 'banishment', target: 'Bob', source: 'OtherCaster' },
+            if (key === 'campaign' && prop === trackingKey) return { casterName: CASTER, dc: 15 };
+            if (key === NAME && prop === 'activeConditions') return ['blinded'];
+            if (key === 'campaign' && prop === 'targetEffects') return [
+                { target: NAME, effect: 'prismatic_spray_violet', source: CASTER },
+                { target: 'Bob', effect: 'prismatic_spray_violet', source: CASTER },
             ];
-            const handler = makeHandler();
-            await handler({
-                detail: { campaignName, targetName: 'Alice', result: { success: false } },
-            });
-
-            const targetEffectsCall = setRuntimeValue.mock.calls.find(
-                (call) => call[0] === 'campaign' && call[1] === 'targetEffects',
-            );
-            expect(targetEffectsCall).toBeDefined();
-            const effects = targetEffectsCall[2];
-            expect(effects).toHaveLength(2);
-            expect(effects).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({ target: 'Bob', effect: 'prismatic_spray_violet' }),
-                    expect.objectContaining({ effect: 'banishment', target: 'Alice', source: 'Goblin' }),
-                ]),
-            );
+            return null;
         });
+    });
+
+    it('writes nothing for invalid events (wrong campaign, no summary, no result, unknown creature, no tracking data)', async () => {
+        const handler = createPrismaticSprayVioletHandler(CAMPAIGN, combatSummary, setCombatSummary);
+        await handler(event(NAME, { success: true }, 'other-campaign'));
+        await createPrismaticSprayVioletHandler(CAMPAIGN, null, setCombatSummary)(event(NAME, { success: true }));
+        await handler(event(NAME, undefined));
+        await handler(event('Bob', { success: true }));
+        getRuntimeValue.mockImplementation(() => null);
+        await handler(event(NAME, { success: true }));
+        expectNothingHappened();
+    });
+
+    it('ends blindness on a WIS save success: blinded removed, other targets preserved, no banishment', async () => {
+        const handler = createPrismaticSprayVioletHandler(CAMPAIGN, combatSummary, setCombatSummary);
+
+        await handler(event(NAME, { success: true }));
+
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, NAME, 'activeConditions', [], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects',
+            [{ target: 'Bob', effect: 'prismatic_spray_violet', source: CASTER }], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(3, 'campaign', trackingKey, null, CAMPAIGN);
+        expect(clearFleshToStonePrompt).not.toHaveBeenCalled();
+        expect(logService.addEntry).toHaveBeenCalledTimes(2);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            rollType: 'save-prismatic-spray-violet',
+            targetName: NAME,
+            saveDc: 15,
+            saveType: 'WIS',
+            success: true,
+            description: `${NAME} succeeded on WIS save against Prismatic Spray (Violet ray). Blindness ends.`,
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'removed',
+            characterName: NAME,
+            condition: 'Blinded',
+        }));
+        expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
+    });
+
+    it('banishes on a WIS save failure: incapacitated applied, exact banishment effect replaces the ray entry, other targets preserved', async () => {
+        const handler = createPrismaticSprayVioletHandler(CAMPAIGN, combatSummary, setCombatSummary);
+
+        await handler(event(NAME, { success: false }));
+
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, NAME, 'activeConditions', ['incapacitated'], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects',
+            [{ target: 'Bob', effect: 'prismatic_spray_violet', source: CASTER }, BANISHMENT], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(3, 'campaign', trackingKey, null, CAMPAIGN);
+        expect(logService.addEntry).toHaveBeenCalledTimes(4);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'save_result',
+            rollType: 'save-prismatic-spray-violet',
+            targetName: NAME,
+            saveDc: 15,
+            saveType: 'WIS',
+            success: false,
+            description: `${NAME} failed WIS save against Prismatic Spray (Violet ray) and is banished to another plane of existence.`,
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'removed',
+            characterName: NAME,
+            condition: 'Blinded',
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'condition',
+            action: 'applied',
+            characterName: NAME,
+            condition: 'Incapacitated',
+        }));
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            type: 'ability_use',
+            characterName: CASTER,
+            abilityName: 'Prismatic Spray (Violet ray)',
+        }));
+        expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
     });
 });

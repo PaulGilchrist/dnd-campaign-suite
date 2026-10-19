@@ -1,24 +1,45 @@
+// @maintained-by-ai
 // MA-0084: Adult Bronze Dragon "Thunderclap" (legendary, DC 17 CON, 3d6
-// Thunder, Deafened on fail, dc_success none) authors a "20-foot-radius
-// Sphere … within 90 feet" area. breathAoeShape now recognizes the RADIUS
-// token and routes the click through the SAME SaveAttackAoeModal area picker
-// as the MA-0031 cones / MA-0042 zones — labelled "20-ft Radius", point
-// placement GM-advisory (rangeGateFt null, MA-0042 shape), never the
-// single-target block-save degrade. MA-0081 uses gating stays in front of
-// the picker (spend at click, refusal at 0 uses). Cylinder rows (radius +
-// height clause) stay byte-identical single-target.
+// Thunder, dc_success 'none' authored byte) authors a "20-foot-radius
+// Sphere … within 90 feet" point-placed area. breathAoeShape (
+// MonsterCardModal.jsx:55-59 sphereRadiusFeet) parses the RADIUS token —
+// never the 90-ft point-placement text — and routes the press through the
+// SAME SaveAttackAoeModal picker as the MA-0031 cones / MA-0042 zones,
+// labelled "20-ft Radius", rangeGateFt null (GM positions the point; MA-0042
+// advisory shape), NEVER the single-target block-save degrade. Legendary
+// economy: spend at picker-open via resolveLegendaryRow → expendLegendaryUse
+// (MonsterCardModal.jsx:920, MA-0021 latch); exhausted presses refuse
+// upstream — zero spend, picker never arms. Cylinder rows (radius + height
+// clause) stay byte-identical single-target — the disk Storm Giant Lightning
+// Storm canary guards the sphere-token reroute regression (pure-shape
+// guard: whirlwind-zone.test.jsx:50).
+// Picker-arm lock is the exact-shape one-shot BY NAME (#770 sleep-breath
+// template): LIVE riders saveConditions ['deafened'] + conditionDurationNote
+// + radius/rangeGateFt/damage dice/type pinned live; every inert rider in
+// the honest-null block fails the arm if wrongly armed. dc_success authored
+// byte 'none' overrides the app-wide 'half' default
+// (resolveBlockSaveDcSuccess; save-full math → applyDamage.save-full
+// .test.js:18-25; half-math dedupe → #779 rec). The exhausted face at the
+// test flagged below is CITED canon (terrifying-presence-dracolich.test.jsx
+// :18 cites thunderclap-sphere.test.jsx:183) — byte-locked, re-pin there.
+// Save-leg transport → secondary-save-transport.test.js :139-151/:297-313;
+// failed-save landings → saveProcessing.failed-save-conditions :103-146;
+// exhausted legendary gate canonical → legendary-uses.test.jsx:196-211
+// (verify map shift before citing); save-number data subset also lives at
+// legendary-uses.test.jsx:256 (subsumed by the full-row lock below).
+// No diceRoller mock: this lane rolls nothing in the modal. No wall-clock
+// timers — deafened duration is rounds at GM seams, never a setTimeout.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
+const aoeProps = vi.hoisted(() => ({ current: null }));
 
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     aoeProps.current = props;
-    aoeProps.onClose = props.onClose;
     return (
       <div className="sp-overlay sphere-picker-stub">
         <div className="sp-body">{props.titleOverride}</div>
@@ -27,20 +48,8 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
@@ -60,34 +69,6 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   }));
   return { default: mockHook, _rollSavingThrow, _setPopupHtml };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-const ctx = vi.hoisted(() => ({ value: { round: 1, activeCreatureName: 'Thug 1', creatures: [] } }));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
-  getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -110,21 +91,21 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 
+const THUNDERCLAP_ROW = monstersData.find(m => m.name === 'Adult Bronze Dragon').legendary_actions.find(a => a.name === 'Thunderclap');
+const LIGHTNING_STORM_ROW = monstersData.find(m => m.name === 'Storm Giant').actions.find(a => a.name === 'Lightning Storm');
+
 const CREATURES = [
   { name: 'Adult Bronze Dragon 1', type: 'npc', monsterType: 'dragon', targetName: 'ElderPaladin', currentHp: 200, maxHp: 200, ac: 19, conditions: [] },
   { name: 'ElderPaladin', type: 'player', currentHp: 90, maxHp: 90, conditions: [] },
   { name: 'Thug 1', type: 'npc', currentHp: 32, maxHp: 32, conditions: [] },
 ];
 
-const bronze = () => monstersData.find(m => m.name === 'Adult Bronze Dragon');
-const bronzeActions = () => [{ name: 'Rend', attack_bonus: 12, damage_dice_primary: '2d8 + 7', damage_type_primary: 'Slashing', reach: '10 ft.' }];
-
 function renderBronze(uses) {
   if (uses !== undefined) runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses'] = uses;
   const m = makeMonster({
     name: 'Adult Bronze Dragon',
-    actions: bronzeActions(),
-    legendary_actions: bronze().legendary_actions,
+    actions: [{ name: 'Rend', attack_bonus: 12, damage_dice_primary: '2d8 + 7', damage_type_primary: 'Slashing', reach: '10 ft.' }],
+    legendary_actions: monstersData.find(m => m.name === 'Adult Bronze Dragon').legendary_actions,
   });
   return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Adult Bronze Dragon 1', creatures: CREATURES })} />);
 }
@@ -134,50 +115,83 @@ function thunderclapRowLink() {
   return row ? row.querySelector('.mc-dice-link-legendary') || row.querySelector('.mc-dice-link') : null;
 }
 
-describe('MA-0084 monsters.json data: adult bronze Thunderclap sphere row ground truth', () => {
-  it('authors DC 17 CON, 3d6 Thunder, dc_success none, Deafened, 20-foot-radius Sphere', () => {
-    const row = bronze().legendary_actions.find(a => a.name === 'Thunderclap');
-    expect(row.save_dc).toBe(17);
-    expect(row.save_type).toBe('Constitution');
-    expect(row.dc_success).toBe('none');
-    expect(row.damage_dice_primary).toBe('3d6');
-    expect(row.damage_type_primary).toBe('Thunder');
-    expect(row.save_effect).toMatch(/Deafened condition until the end of its next turn/i);
-    expect(row.description).toMatch(/20-foot-radius\s*<strong>Sphere<\/strong>/i);
-    expect(row.description).not.toMatch(/\bcone\b|\bline\b|\bcylinder\b/i);
-  });
+function logEntries(pred) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e && pred(e));
+}
+
+// Exact-shape picker arm (#770 template): every semantic prop the sphere row
+// hands SaveAttackAoeModal. LIVE riders: range 20 (radius token, never the
+// 90-ft point text), rangeGateFt null (point-placed, MA-0042 advisory),
+// dc_success 'none' authored byte, deafened fail leg + until-next-turn note.
+// Every other rider is inert on this row — honest nulls catch a wrong arm.
+const PICKER_KEYS = ['action', 'playerStats', 'range', 'damage', 'damageType', 'secondaryDamage', 'secondaryDamageType', 'saveType', 'saveDc', 'dcSuccess', 'titleOverride', 'excludeNames', 'rangeGateFt', 'zoneTe', 'zoneOnly', 'saveConditions', 'sleepStaging', 'stagedParalysis', 'stagedPetrify', 'pushFeet', 'slowedClauses', 'weakeningBreath', 'acPenaltyClause', 'speedZeroClause', 'speedReduceClause', 'bothOutcomesClause', 'saveVariant', 'conditionDurationNote', 'storeLastAttack'];
+const pickerArm = (props) => Object.fromEntries(PICKER_KEYS.map(k => [k, props[k]]));
+
+const THUNDERCLAP_ARMED = {
+  action: THUNDERCLAP_ROW,
+  playerStats: { name: 'Adult Bronze Dragon 1' },
+  range: 20,
+  damage: '3d6',
+  damageType: 'Thunder',
+  secondaryDamage: null,
+  secondaryDamageType: null,
+  saveType: 'Constitution',
+  saveDc: 17,
+  dcSuccess: 'none',
+  titleOverride: '20-ft Radius (GM positions tokens; selection advisory)',
+  excludeNames: ['Adult Bronze Dragon 1'],
+  rangeGateFt: null,
+  saveConditions: ['deafened'],
+  conditionDurationNote: 'until the end of its next turn (GM-enforced)',
+  zoneTe: null,
+  zoneOnly: false,
+  sleepStaging: null,
+  stagedParalysis: null,
+  stagedPetrify: null,
+  pushFeet: null,
+  slowedClauses: null,
+  weakeningBreath: null,
+  acPenaltyClause: null,
+  speedZeroClause: null,
+  speedReduceClause: null,
+  bothOutcomesClause: null,
+  saveVariant: null,
+  storeLastAttack: false,
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  aoeProps.current = null;
 });
 
-describe('MA-0084 Thunderclap routes the Sphere row to the area picker', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    aoeProps.current = null;
-    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
+describe('MA-0084 Thunderclap sphere lane', () => {
+  it('disk row locked by full key set: DC 17 CON, 3d6 Thunder, dc_success none authored byte, Deafened until-next-turn save_effect, 20-foot-radius Sphere prose — no recharge/zone keys, no cone/line/cylinder token', () => {
+    expect(THUNDERCLAP_ROW).toEqual({
+      name: 'Thunderclap',
+      description: 'Constitution Saving Throw: DC 17, each creature in a 20-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet (sphere selection advisory — GM positions the point; no range-gate consumer). <strong>Failure:</strong> 10 (3d6) Thunder damage, and the target has the <strong>Deafened</strong> condition until the end of its next turn.',
+      save_dc: 17,
+      save_type: 'Constitution',
+      dc_success: 'none',
+      damage_dice_primary: '3d6',
+      damage_type_primary: 'Thunder',
+      save_effect: '10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.',
+    });
+    expect(THUNDERCLAP_ROW.description).not.toMatch(/\bcone\b|\bline\b|\bcylinder\b/i);
   });
 
-  it('click spends 1 legendary use and opens the 20-ft Radius picker, never the single-target save', async () => {
+  it('press spends 1 legendary use and arms the exact 20-ft Radius picker contract — CON DC 17 3d6 Thunder deafened, rangeGateFt null, all inert riders honest null, zero inline save', async () => {
     renderBronze({ max: 3, used: 0 });
     fireEvent.click(thunderclapRowLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    const props = aoeProps.current;
-    expect(props.titleOverride).toMatch(/^20-ft Radius/);
-    expect(props.range).toBe(20);
-    // GM positions the point — MA-0042 zone shape: no attacker-origin gate.
-    expect(props.rangeGateFt).toBeNull();
-    expect(props.saveDc).toBe(17);
-    expect(props.saveType).toBe('Constitution');
-    expect(props.dcSuccess).toBe('none');
-    expect(props.damage).toBe('3d6');
-    expect(props.damageType).toBe('Thunder');
-    expect(props.saveConditions).toEqual(['deafened']);
-    expect(props.conditionDurationNote).toMatch(/^until the end of its next turn \(GM-enforced\)$/);
-    expect(props.excludeNames).toEqual(['Adult Bronze Dragon 1']);
-    expect(props.storeLastAttack).toBe(false);
+    await waitFor(() => expect(document.querySelector('.sphere-picker-stub')).toBeTruthy());
+    // the picker IS target selection — never the single-target block save
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    await waitFor(() => expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 }));
-    const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Thunderclap/.test(String(e.description)));
-    expect(spend.description).toMatch(/expends a legendary use for Thunderclap/);
+    expect(pickerArm(aoeProps.current)).toEqual(THUNDERCLAP_ARMED);
+    // spend stamped at picker-open (MA-0021 latch) and logged, exactly once
+    expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 1 });
+    const spends = logEntries(e => e.type === 'ability_use');
+    expect(spends).toHaveLength(1);
+    expect(spends[0].description).toMatch(/expends a legendary use for Thunderclap/);
   });
 
   it('exhausted (3/3): click refuses with popup + legendary_use_refused, zero spend, NO picker', async () => {
@@ -188,23 +202,17 @@ describe('MA-0084 Thunderclap routes the Sphere row to the area picker', () => {
     expect(rollSavingThrow).not.toHaveBeenCalled();
     expect(runtime.store['Adult Bronze Dragon 1.monsterLegendaryUses']).toEqual({ max: 3, used: 3 });
   });
-});
 
-describe('MA-0084 shape detection guards', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-    aoeProps.current = null;
-    ctx.value = { round: 1, activeCreatureName: 'Thug 1', creatures: CREATURES };
-  });
-
-  it('cylinder row (Storm Giant Lightning Storm, radius + height clause) stays byte-identical single-target', async () => {
-    const giant = monstersData.find(m => m.name === 'Storm Giant');
-    const actions = (giant.actions || []).filter(a => a.name === 'Lightning Storm');
-    expect(actions[0].description).toMatch(/10-foot-radius.*Cylinder/i);
-    const m = makeMonster({ name: 'Storm Giant', actions });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Storm Giant 1', creatures: [{ name: 'Storm Giant 1', type: 'npc', targetName: 'ElderPaladin', currentHp: 230, maxHp: 230, ac: 17, conditions: [] }, ...CREATURES.slice(1)] })} />);
-    fireEvent.click(document.querySelector('.mc-dice-link-save-clickable') || Array.from(document.querySelectorAll('.mc-dice-link')).find(el => el.closest('.mc-action')?.textContent.includes('Lightning Storm')));
+  it('cylinder guard on disk data: Storm Giant Lightning Storm (10-foot-radius, 40-foot-high Cylinder prose) press stays byte-identical single-target — block save fires, picker never opens', async () => {
+    // Why this canary: sphereRadiusFeet's cylinder exclusion is the only
+    // thing keeping this disk row off the new RADIUS picker (MA-0084
+    // boundary; pure-shape arm owned by whirlwind-zone.test.jsx:50).
+    expect(LIGHTNING_STORM_ROW.range).toBe('10-foot-radius, 40-foot-high Cylinder');
+    const creatures = [{ name: 'Storm Giant 1', type: 'npc', targetName: 'ElderPaladin', currentHp: 230, maxHp: 230, ac: 17, conditions: [] }, ...CREATURES.slice(1)];
+    const m = makeMonster({ name: 'Storm Giant', actions: [LIGHTNING_STORM_ROW] });
+    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Storm Giant 1', creatures })} />);
+    const row = Array.from(document.querySelectorAll('.mc-action')).find(r => r.textContent.includes('Lightning Storm'));
+    fireEvent.click(row.querySelector('.mc-dice-link'));
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
     expect(aoeProps.current).toBeNull();
   });

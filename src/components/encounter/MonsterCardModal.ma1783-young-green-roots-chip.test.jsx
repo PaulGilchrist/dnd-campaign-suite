@@ -1,16 +1,16 @@
-// MA-1783: Young Green Dragon lair_actions[0] was a BARE STRING (inert
-// static span, zero affordance — MonsterCardBody.jsx:357 first disjunct).
-// DATA fix promotes it to the adult-green MA-0117 byte-twin named SAVE row
-// → row renders <strong>Grasping Roots.</strong> + ONE .mc-dice-link-lair
-// chip "DC 15 Strength"; click routes through handleSaveRoll → the existing
-// save seam at the authored DC/type, dcSuccess "none" (damageless RAW),
-// autoDamageFormula null, saveConditions ['restrained'].
-// MA-1784 census widening: [1] nameless roots dict promoted to the distinct-
-// named "Erupting Roots" save row ("DC 15 Strength"). MA-1785 census widening:
-// thorn-wall [2] nameless dict promoted to the adult-green[1] byte-twin named
-// "Wall of Thorns" save row → chip census now EXACTLY THREE chips ("Grasping
-// Roots." + "Erupting Roots.", both "DC 15 Strength"; "Wall of Thorns.",
-// "DC 15 Dexterity" with 4d8 Piercing half-on-success save legs).
+// @maintained-by-ai
+// MA-1783/84/85 modal-seam lane: young-green-dragon lair_actions [0] was a
+// BARE STRING, [1] a nameless dict, [2] a nameless thorn-wall dict (all inert
+// static spans — MonsterCardBody.jsx:385 first disjunct). DATA fixes promote
+// them to three named SAVE rows: "Grasping Roots" + "Erupting Roots" (both
+// DC 15 Strength, dcSuccess none, restrained) and "Wall of Thorns"
+// (DC 15 Dexterity, 4d8 Piercing half-on-success). This file pins ONLY the
+// modal seam: the rendered chip census and each press arming SaveAttackAoeModal
+// at the authored DC/type through handleLairRow → handleSaveRoll.
+// Cited owners, NOT re-pinned here: disk data locks (monsterLairActions.test.js
+// :2881-2895, :2974-2978), chip-vs-static render branches + inert gate
+// (MonsterCardModal.lair-actions.test.jsx:114/:153/:176), breathAoeShape
+// Line-parse of the thorn row (MonsterCardModal.save-variant-shape.test.jsx:50-55).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -22,14 +22,14 @@ const pickerProps = vi.hoisted(() => ({ current: null }));
 vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   default: (props) => {
     pickerProps.current = props;
-    return <div className="sp-overlay young-green-roots-picker-stub"><div className="sp-body">{props.title}</div></div>;
+    return <div className="sp-overlay young-green-roots-picker-stub"><div className="sp-body">{props.titleOverride}</div></div>;
   },
 }));
 
 vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
   ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
+  rollExpression: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
+  rollExpressionDoubled: vi.fn(() => ({ total: 0, rolls: [], modifier: 0 })),
 }));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
@@ -98,81 +98,70 @@ function lairChips() {
   return Array.from(document.querySelectorAll('.mc-dice-link-lair'));
 }
 
+// Per-chip picker contract: [0]/[1] are the STR DC 15 restrained save twins
+// (20-ft Radius picker from prose radius, rangeGateFt null); [2] is the DEX
+// half-damage thorn leg (prose Line, coverage 120 — parse owned by
+// save-variant-shape.test.jsx:50-55). Nulling pickerProps.current first
+// proves THIS click (not a stale render) opened/updated the picker.
+const PICKER_CASES = [
+  { i: 0, saveType: 'Strength', dcSuccess: 'none', saveConditions: ['restrained'], range: 20, rangeGateFt: null, titleOverride: '20-ft Radius (GM positions tokens; selection advisory)' },
+  { i: 1, saveType: 'Strength', dcSuccess: 'none', saveConditions: ['restrained'], range: 20, rangeGateFt: null, titleOverride: '20-ft Radius (GM positions tokens; selection advisory)' },
+  { i: 2, saveType: 'Dexterity', dcSuccess: 'half', saveConditions: [], range: 120, rangeGateFt: 120, titleOverride: '120-ft Line (GM positions tokens; selection advisory)' },
+];
+
+async function clickChip({ i, saveType, dcSuccess, saveConditions, range, rangeGateFt, titleOverride }) {
+  pickerProps.current = null;
+  fireEvent.click(lairChips()[i]);
+  await waitFor(() => expect(pickerProps.current, `chip ${i} did not open the picker`).toBeTruthy());
+  const p = pickerProps.current;
+  expect(p.saveDc, `chip ${i} saveDc`).toBe(15);
+  expect(p.saveType, `chip ${i} saveType`).toBe(saveType);
+  expect(p.dcSuccess, `chip ${i} dcSuccess`).toBe(dcSuccess);
+  expect(p.saveConditions, `chip ${i} saveConditions`).toEqual(saveConditions);
+  expect(p.range, `chip ${i} range`).toBe(range);
+  expect(p.titleOverride, `chip ${i} titleOverride`).toBe(titleOverride);
+  expect(p.rangeGateFt, `chip ${i} rangeGateFt`).toBe(rangeGateFt);
+  expect(p.zoneOnly, `chip ${i} zoneOnly`).toBe(false);
+  expect(p.zoneTe ?? null, `chip ${i} zoneTe`).toBeNull();
+  expect(p.pushFeet ?? null, `chip ${i} pushFeet`).toBeNull();
+  expect(p.excludeNames, `chip ${i} excludeNames`).toEqual(['Young Green Dragon 1']);
+  expect(p.storeLastAttack, `chip ${i} storeLastAttack`).toBe(false);
+  expect(ROLLERS.rollSavingThrow, `chip ${i} rolled a save before the picker resolved`).not.toHaveBeenCalled();
+  return p;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  pickerProps.current = null;
 });
 
-describe('MA-1783 young-green-dragon grasping-roots lair chip lock', () => {
-  it('lair block renders EXACTLY THREE chips — "Grasping Roots." + "Erupting Roots." ("DC 15 Strength") + "Wall of Thorns." ("DC 15 Dexterity") (MA-1784/MA-1785 widening)', () => {
+describe('MA-1783/84/85 young-green-dragon roots + thorn-wall lair chip lock', () => {
+  it('lair block renders EXACTLY THREE clickable chips — "Grasping Roots." + "Erupting Roots." ("DC 15 Strength") + "Wall of Thorns." ("DC 15 Dexterity")', () => {
     renderDragon();
     const chips = lairChips();
     expect(chips).toHaveLength(3);
     expect(chips.map(c => c.textContent.trim())).toEqual(['DC 15 Strength', 'DC 15 Strength', 'DC 15 Dexterity']);
-    expect(chips[0].getAttribute('title')).toMatch(/Lair action — DC 15 Strength/);
-    expect(chips[2].getAttribute('title')).toMatch(/Lair action — DC 15 Dexterity/);
-    const rows = chips.map(c => c.closest('.mc-action').querySelector('strong')?.textContent);
-    expect(rows).toEqual(['Grasping Roots.', 'Erupting Roots.', 'Wall of Thorns.']);
+    expect(chips.map(c => c.getAttribute('title'))).toEqual([
+      'Lair action — DC 15 Strength. Chosen on initiative 20, GM-enforced.',
+      'Lair action — DC 15 Strength. Chosen on initiative 20, GM-enforced.',
+      'Lair action — DC 15 Dexterity. Chosen on initiative 20, GM-enforced.',
+    ]);
+    expect(chips.map(c => c.closest('.mc-action').querySelector('strong')?.textContent)).toEqual(['Grasping Roots.', 'Erupting Roots.', 'Wall of Thorns.']);
   });
 
-  it('MA-1785 inverted: thorn-wall sibling [2] renders a clickable chip (was static prose); every lair row clickable', () => {
+  it('all three chip presses arm the picker at the authored save legs — STR DC 15 restrained twins (20-ft Radius, no damage) + DEX 4d8 Piercing half (120-ft Line), zero save rolled at press', async () => {
     renderDragon();
-    const staticRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => !el.querySelector('.mc-dice-link-lair'));
-    expect(staticRows.some(el => el.textContent.includes('tangled brush bristling with thorns'))).toBe(false);
-    const thornRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => el.textContent.includes('tangled brush bristling with thorns'));
-    expect(thornRows).toHaveLength(1);
-    expect(thornRows[0].querySelector('.mc-dice-link-lair')).toBeTruthy();
-    const eruptRows = Array.from(document.querySelectorAll('.mc-action')).filter(el => el.textContent.includes('Grasping roots and vines erupt'));
-    expect(eruptRows).toHaveLength(2);
-    expect(eruptRows.every(el => el.querySelector('.mc-dice-link-lair'))).toBe(true);
-  });
-
-  it('MA-1785: thorn-wall chip [2] arms the picker at DC 15 Dexterity with 4d8 Piercing half-on-success, zero conditions', async () => {
-    renderDragon();
-    fireEvent.click(lairChips()[2]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.saveType).toBe('Dexterity');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('half');
-    expect(p.damage).toBe('4d8');
-    expect(p.damageType).toBe('Piercing');
-    expect(p.saveConditions).toEqual([]);
-    expect(p.zoneOnly ?? false).toBe(false);
-    expect(p.range).toBe(120);
-    expect(p.titleOverride).toMatch(/120-ft Line/);
-    expect(p.excludeNames).toContain('Young Green Dragon 1');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('chip click arms the 20-ft Radius picker at DC 15 Strength, dcSuccess none, no damage (disk twin wins, picker route)', async () => {
-    renderDragon();
-    fireEvent.click(lairChips()[0]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.range).toBe(20);
-    expect(p.titleOverride).toMatch(/20-ft Radius/);
-    expect(p.saveType).toBe('Strength');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('none');
-    expect(p.damage ?? null).toBeFalsy();
-    expect(p.damageType ?? null).toBeFalsy();
-    expect(p.saveConditions).toEqual(['restrained']);
-    expect(p.zoneOnly ?? false).toBe(false);
-    expect(p.excludeNames).toContain('Young Green Dragon 1');
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('MA-1784: the NEW [1] "Erupting Roots." chip arms the same DC 15 Strength picker, dcSuccess none, restrained (was inert nameless)', async () => {
-    renderDragon();
-    fireEvent.click(lairChips()[1]);
-    await waitFor(() => expect(pickerProps.current).toBeTruthy());
-    const p = pickerProps.current;
-    expect(p.saveType).toBe('Strength');
-    expect(p.saveDc).toBe(15);
-    expect(p.dcSuccess).toBe('none');
-    expect(p.damage ?? null).toBeFalsy();
-    expect(p.saveConditions).toEqual(['restrained']);
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    for (const c of PICKER_CASES) {
+      const p = await clickChip(c);
+      const damage = p.damage ?? null;
+      if (c.i === 2) {
+        expect(damage, 'thorn chip damage').toBe('4d8');
+        expect(p.damageType, 'thorn chip damageType').toBe('Piercing');
+      } else {
+        expect(damage, `roots chip ${c.i} damage (damageless RAW)`).toBeNull();
+        expect(p.damageType || null, `roots chip ${c.i} damageType`).toBeNull();
+      }
+    }
   });
 });

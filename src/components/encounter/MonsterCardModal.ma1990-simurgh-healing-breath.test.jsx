@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1990 regression: Simurgh "Healing Breath (Costs 2 Actions)"
 // (legendary_actions[2]) shipped {name, description} only — the bare MA-0021
 // generic Expend chip SPENT TWO legendary uses (MA-1883 name-cost parse live)
@@ -17,17 +18,25 @@
 // replace mechanicAction before the advisory branch could inspect the child;
 // a delegating press would force an unconditional Talon attack, MA-1847 axis).
 //
-// Live seam pinned below: press spends 2 of 3 (cost parsed from the ROW NAME)
-// then lands the advisory popup + advisory ability_use record carrying
-// "22 (4d10)" and "5 Hit Points" — zero rollAttack/rollDamage/rollSavingThrow
-// (no monster-heal transport exists in the legendary lane; self_heal heals
-// the monster only — GM-enforced), NO console MA-0510 dead-end.
+// Trim fold (#751 rec): this file pins ONLY the Healing-Breath-unique faces —
+// the fixed row fingerprint (advisory shape + RAW numerics + MA-1883 cost-2)
+// and the honest press (spend 2 from the ROW NAME, advisory popup + record-only
+// ability_use, zero rolls, NO console MA-0510). Shared refusal gates are owned
+// elsewhere and are NOT re-pinned here: turn latch →
+// MonsterCardModal.legendary-uses.test.jsx :309-316 (per #735/#744/#751);
+// exhausted pool → same file :190-212; cost-2 insufficient-shortfall →
+// MonsterCardModal.ma1883-demogorgon-legendary-cast-spell.test.jsx :216-224
+// (+ service twin monsterLegendaryUses.ma1883-demogorgon-cast-a-spell.test.js
+// :238-242); own-turn refusal → MonsterCardModal.pounce-shadow-dragon.test.jsx
+// :300-305. Simurgh header economy (uses:3) + Talon-delegate + Soothing-Cry
+// sibling fingerprints → MonsterCardModal.ma1991-simurgh-soothing-cry.test.jsx
+// :138-148 — not re-pinned here.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-import { legendaryHeaderAction, legendaryActionCost } from '../../services/encounters/monsterLegendaryUses.js';
+import { legendaryActionCost } from '../../services/encounters/monsterLegendaryUses.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 
@@ -106,13 +115,11 @@ const CREATURES = [
 ];
 
 const simurgh = () => monsters.find(m => m.index === 'simurgh');
-const legendaryRows = () => simurgh().legendary_actions;
-const headerRow = () => legendaryRows()[0];
-const healingRow = () => legendaryRows().find(a => a.name === 'Healing Breath (Costs 2 Actions)');
+const healingRow = () => simurgh().legendary_actions.find(a => a.name === 'Healing Breath (Costs 2 Actions)');
 
 // ---- disk fingerprint ----
 describe('MA-1990 disk fingerprint: Simurgh Healing Breath flat advisory (MA-1944 option-A shape)', () => {
-  it('row keys exactly [name, advisory, advisory_message, description] — advisory "healing_breath", RAW numerics carried, description byte-unchanged', () => {
+  it('row keys exactly [name, advisory, advisory_message, description] — advisory "healing_breath", RAW numerics carried, description byte-unchanged, MA-1883 name-cost 2 (exact keys prove no delegates_to/numeric/economy co-authorship — MA-1975 exclusivity: the delegate lane :895-905 would replace mechanicAction before the advisory branch :755 can inspect the child)', () => {
     const row = healingRow();
     expect(Object.keys(row)).toEqual(['name', 'advisory', 'advisory_message', 'description']);
     expect(row.name).toBe('Healing Breath (Costs 2 Actions)');
@@ -121,35 +128,8 @@ describe('MA-1990 disk fingerprint: Simurgh Healing Breath flat advisory (MA-194
     expect(row.advisory_message).toContain('Simurgh regains 5 Hit Points');
     expect(row.advisory_message).toMatch(/GM-enforced/);
     expect(row.description).toBe('The Simurgh exhales warm wind over one creature within 30 ft. The target regains 22 (4d10) Hit Points and the Simurgh regains 5 Hit Points.');
-  });
-
-  it('NO delegates_to co-authorship (MA-1975 exclusivity — delegate lane replaces mechanicAction before the advisory branch can inspect the child) and no numeric/economy fields', () => {
-    const row = healingRow();
-    expect(row.delegates_to).toBeUndefined();
-    expect(row.attack_bonus).toBeUndefined();
-    expect(row.save_dc).toBeUndefined();
-    expect(row.damage_dice_primary).toBeUndefined();
-    expect(row.self_heal).toBeUndefined();
-    expect(row.uses).toBeUndefined();
-    expect(row.recharge).toBeUndefined();
-  });
-
-  it('header economy and siblings byte-intact (header uses:3, Talon delegate child, Soothing Cry carries the MA-1991 advisory)', () => {
-    const h = headerRow();
-    expect(h.name).toBe('Legendary Action Uses: 3');
-    expect(h.uses).toBe(3);
-    expect(legendaryHeaderAction(simurgh())).toBe(h);
-    expect(legendaryRows()[1].name).toBe('Talon');
-    expect(legendaryRows()[1].delegates_to).toBe('Talon');
-    const soothe = legendaryRows().find(a => a.name === 'Soothing Cry (Costs 2 Actions)');
-    // MA-1991 twin fix landed: Soothing Cry is no longer advisory-free —
-    // stale pre-MA-1991 undefined-pin inverted same pass (§384).
-    expect(soothe.advisory).toBe('soothing_cry');
-    expect(legendaryRows().length).toBe(4);
-  });
-
-  it('MA-1883 name-cost parse stays 2 (the spend the fix makes honest)', () => {
-    expect(legendaryActionCost(healingRow())).toBe(2);
+    // The spend the fix makes honest (behaviorally re-pinned by the press below).
+    expect(legendaryActionCost(row)).toBe(2);
   });
 });
 
@@ -179,16 +159,19 @@ describe('MA-1990 MonsterCardModal press: Healing Breath spends 2 then lands the
     return Array.from(document.querySelectorAll('.mc-action')).find(r => (r.querySelector('strong')?.textContent || '').startsWith(name));
   }
 
-  it('Healing Breath keeps the gated Expend chip', () => {
+  // Refusal faces deliberately NOT re-pinned (fold rec #751, precedents
+  // #735/#744): same-boundary turn latch → legendary-uses.test.jsx :309-316;
+  // exhausted pool → same file :190-212; cost-2 shortfall →
+  // ma1883-demogorgon modal :216-224 (+ service twin :238-242);
+  // own-turn → pounce-shadow-dragon :300-305.
+  it('gated Expend chip renders, press spends 2 (3->1 left) and lands advisory popup + advisory ability_use record with the RAW numerics — zero rolls, NO console MA-0510', async () => {
     renderSimurgh({ max: 3, used: 0 });
     const chip = laRow('Healing Breath').querySelector('.mc-dice-link-legendary');
     expect(chip).not.toBe(null);
     expect(chip.textContent).toContain('Expend Legendary');
-  });
+    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(3 left)');
 
-  it('press spends 2 and lands advisory popup + advisory ability_use record with the RAW numerics — zero rolls, NO console MA-0510', async () => {
-    renderSimurgh({ max: 3, used: 0 });
-    fireEvent.click(laRow('Healing Breath').querySelector('.mc-dice-link-legendary'));
+    fireEvent.click(chip);
     await waitFor(() => expect(runtime.store['Simurgh 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const popups = setPopupHtml.mock.calls.map(c => String(c[0]));
@@ -208,26 +191,5 @@ describe('MA-1990 MonsterCardModal press: Healing Breath spends 2 then lands the
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
     // MA-0510 dead-end is DEAD: no console error on the resolved press.
     expect(consoleSpy).not.toHaveBeenCalled();
-  });
-
-  it('same-boundary refire refuses (turn latch) — zero extra spend, record stayed one advisory', async () => {
-    renderSimurgh({ max: 3, used: 0 });
-    fireEvent.click(laRow('Healing Breath').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(runtime.store['Simurgh 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 }));
-    setPopupHtml.mockClear();
-    fireEvent.click(laRow('Healing Breath').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Simurgh 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-  });
-
-  it('insufficient-cost refire honest (MA-1883): 1 remaining < cost 2 — popup names the shortfall, zero spend', async () => {
-    renderSimurgh({ max: 3, used: 2 });
-    fireEvent.click(laRow('Healing Breath').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('costs 2 legendary uses');
-    expect(runtime.store['Simurgh 1.monsterLegendaryUses']).toEqual({ max: 3, used: 2 });
   });
 });

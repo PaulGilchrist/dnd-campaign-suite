@@ -1,229 +1,190 @@
+// @maintained-by-ai
+// Spell-effect badge lane for ConditionEffectBadges: the te-driven spell
+// badges this file owns (taunting_step, compelled_duel, sanctuary, silenced,
+// bane_penalty, ray_of_enfeeble_debuff, resistance_damage_reduction,
+// bless_bonus, beacon_of_hope) render their exact label + tooltip bytes in
+// one golden coexistence render with an exact count (#744), the bane
+// self/other polarity flip, displayLabel passthrough, and the find+guard
+// suppression. Buff-driven faces (haste/barkskin) are proven to flow through
+// the component-internal applyActiveBuffs mapping (compute guards stay falsy).
+// Owned elsewhere, not repeated here: control-spell faces, click→escape-save
+// callback shape, and the generic wrong-target exclusion — control-spells
+// #823; first-wins dedupe / mixed-kind order — common #822; generic ×
+// removal dispatch and Taunted/haste/barkskin removal payloads —
+// target-effect-removal / effect-removal #825; isLocalhost remove-gating —
+// auras #820; per-ability save faces — save-ability #829; empty state —
+// base test.jsx. Dead storage.js mock deleted here (carried REC #823 — the
+// component never imports storage.js); mocks trimmed to the two functions
+// the component imports (#828 pattern).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
 
+// Trimmed to the two functions the component imports (#828); no storage.js
+// mock (dead, REC #823).
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getStore: vi.fn(() => new Map()),
-    useSyncedState: vi.fn(() => [null, vi.fn()]),
-    listeners: new Map(),
-    getRuntimeValue: vi.fn((_name, _key, _campaign) => null),
+    getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/ui/storage.js', () => ({
-    default: {
-        set: vi.fn(),
-    },
-}));
-
-const defaultEffects = {
-    cannotAct: false,
-    speedZero: false,
-    speedReduction: 0,
-    pushEffect: false,
-    pushDistance: null,
-    proneEffect: false,
-    autoCritWithin5ft: false,
-    concentrationBroken: false,
-    autoFailSaves: [],
-    resistantToAll: false,
-    attackDisadvantageCount: 0,
-    attackDisadvantageReasons: [],
-    abilityCheckDisadvantage: false,
-    strCheckDisadvantage: false,
-    rayOfEnfeebleDamageReduction: false,
-    resistanceDamageReduction: false,
-    targetAdvantageCount: 0,
-    targetDisadvantageCount: 0,
-    targetAttackDisadvantageCount: 0,
-    riderSaveDisadvantage: false,
-    riderAttackBonus: 0,
-    riderCannotOpportunityAttack: false,
-    riderNoReactions: false,
-    noAdvantageAgainst: false,
-    attackAdvantageCount: 0,
-    attackAdvantageReasons: [],
-    saveAdvantageCount: 0,
-    saveAdvantageReasons: [],
-    saveAdvantageAbilities: null,
-    saveDisadvantageCount: 0,
-    dexSaveAdvantageCount: 0,
-    abilityCheckDisadvantageAbilities: null,
-    abilityCheckAdvantageAbilities: null,
-    abilityCheckAdvantage: false,
-    abilityCheckAdvantageReasons: [],
-    saveDisadvantage: [],
-    blessBonus: false,
-    beaconOfHope: false,
-    hasteActive: false,
-    barkskinActive: false,
-    banePenalty: false,
-};
-
-function makeEffects(overrides = {}) {
-    return { ...defaultEffects, ...overrides };
-}
-
+// Neutral base for this lane, built in the factory (hoisting-safe): every
+// guard falsy, so each badge appears only when a test opts its own guard in.
+// Counters are unnecessary — no accumulator spec fires with these fixtures.
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-    computeConditionEffects: vi.fn(() => makeEffects({})),
+    computeConditionEffects: vi.fn(() => ({
+        banePenalty: false,
+        rayOfEnfeebleDamageReduction: false,
+        resistanceDamageReduction: false,
+        blessBonus: false,
+        beaconOfHope: false,
+        hasteActive: false,
+        barkskinActive: false,
+    })),
 }));
 
 const CREATURE_NAME = 'Alice';
 const CAMPAIGN_NAME = 'test-campaign';
 
-function renderWithTargetEffect(targetEffect, effectsOverrides = {}) {
-    getRuntimeValue.mockImplementation((name, key) => {
-        if (name === CREATURE_NAME && key === 'activeBuffs') return [];
-        return null;
-    });
-    computeConditionEffects.mockReturnValue(makeEffects(effectsOverrides));
-    return render(
-        <ConditionEffectBadges
-            conditions={[]}
-            targetEffects={targetEffect ? [targetEffect] : []}
-            creatureName={CREATURE_NAME}
-            campaignName={CAMPAIGN_NAME}
-            isLocalhost={true}
-        />
-    );
+function laneGuardOverrides(guards) {
+    return {
+        banePenalty: false,
+        rayOfEnfeebleDamageReduction: false,
+        resistanceDamageReduction: false,
+        blessBonus: false,
+        beaconOfHope: false,
+        hasteActive: false,
+        barkskinActive: false,
+        ...guards,
+    };
 }
 
-function renderWithBuffs(buffs, effectsOverrides = {}) {
-    getRuntimeValue.mockImplementation((name, key) => {
-        if (name === CREATURE_NAME && key === 'activeBuffs') return buffs;
-        return null;
-    });
-    computeConditionEffects.mockReturnValue(makeEffects(effectsOverrides));
+// Determinism (#827): defaults re-armed before every test so no prior
+// mockImplementation leaks across cases.
+beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockImplementation(
+        (name, key) => (name === CREATURE_NAME && key === 'activeBuffs' ? [] : null)
+    );
+    computeConditionEffects.mockImplementation(() => laneGuardOverrides({}));
+});
+
+function renderBadges({ targetEffects = [], buffs = [], guards = {}, ...props } = {}) {
+    getRuntimeValue.mockImplementation(
+        (name, key) => (name === CREATURE_NAME && key === 'activeBuffs' ? buffs : null)
+    );
+    computeConditionEffects.mockReturnValue(laneGuardOverrides(guards));
     return render(
         <ConditionEffectBadges
             conditions={[]}
-            targetEffects={[]}
+            targetEffects={targetEffects}
             creatureName={CREATURE_NAME}
             campaignName={CAMPAIGN_NAME}
             isLocalhost={true}
+            {...props}
         />
     );
 }
 
 describe('ConditionEffectBadges - Spell Effect Badges', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+    it('renders the full spell-effect te lane in one coexistence render: exact count, labels, and tooltip bytes', () => {
+        renderBadges({
+            targetEffects: [
+                { target: CREATURE_NAME, effect: 'taunting_step', source: 'Rogue' },
+                { target: CREATURE_NAME, effect: 'compelled_duel', source: 'Paladin' },
+                { target: CREATURE_NAME, effect: 'sanctuary', source: 'Cleric' },
+                { target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric' },
+                { target: CREATURE_NAME, effect: 'ray_of_enfeeble_debuff', source: 'Wizard', dc: 17 },
+                { target: CREATURE_NAME, effect: 'resistance_damage_reduction', source: 'Druid', chosenType: 'Fire' },
+                { target: CREATURE_NAME, effect: 'bless_bonus', source: 'Cleric' },
+                { target: CREATURE_NAME, effect: 'beacon_of_hope', source: 'Cleric' },
+                { target: CREATURE_NAME, effect: 'silenced', source: 'Bard' },
+            ],
+            guards: {
+                banePenalty: true,
+                rayOfEnfeebleDamageReduction: true,
+                resistanceDamageReduction: true,
+                blessBonus: true,
+                beaconOfHope: true,
+            },
+        });
+
+        // Exact count (#744): one badge per te, no dedupe collisions in-lane.
+        expect(screen.getAllByTestId('creature-badge')).toHaveLength(9);
+
+        // Distinct tooltip payload bytes per spec (#829 lesson: exact bytes,
+        // never regex).
+        expect(screen.getByTitle('Disadvantage on attack rolls vs creatures other than Rogue')).toBeInTheDocument();
+        expect(screen.getByTitle('Disadvantage on attack rolls vs creatures other than Paladin (Concentration, up to 1 minute)')).toBeInTheDocument();
+        expect(screen.getByTitle('Sanctuary from Cleric: Creatures targeting this creature with attack rolls or damaging spells must succeed on a WIS save or lose the attack/spell. Does not protect from areas of effect. Spell ends if the warded creature attacks, casts a spell, or deals damage.')).toBeInTheDocument();
+        expect(screen.getByTitle('Bane from Cleric: -1d4 on attack rolls and saving throws')).toBeInTheDocument();
+        expect(screen.getByTitle('Ray of Enfeeblement from Wizard: -1d8 to damage rolls, Disadvantage on STR checks. Click to reroll the CON save (DC 17); a success ends the spell.')).toBeInTheDocument();
+        expect(screen.getByTitle('Resistance from Druid: reduces Fire damage by 1d4 (once per turn)')).toBeInTheDocument();
+        expect(screen.getByTitle('Bless from Cleric: +1d4 on attack rolls and saving throws')).toBeInTheDocument();
+        expect(screen.getByTitle('Beacon of Hope from Cleric: Advantage on WIS saves, death saves, and maximized healing')).toBeInTheDocument();
+        expect(screen.getByTitle('Silenced by Bard — Deafened, cannot cast spells with Verbal components')).toBeInTheDocument();
     });
 
-    describe('Taunted badge', () => {
-        it('should render Taunted badge when taunting_step targetEffect is present for this creature', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'taunting_step', source: 'Rogue' });
-            expect(screen.getByText('Taunted')).toBeInTheDocument();
+    // find+guard suppression is pinned once here via bane; enfeeble/resistance/
+    // bless/beacon share the identical guard shape (jsx:346-379).
+    it('suppresses guarded spell badges when the compute guard is falsy despite the targetEffect', () => {
+        renderBadges({
+            targetEffects: [
+                { target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric' },
+                { target: CREATURE_NAME, effect: 'bless_bonus', source: 'Cleric' },
+            ],
         });
+        expect(screen.queryByText('Bane')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bless')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('creature-badge')).not.toBeInTheDocument();
     });
 
-    describe('Compelled Duel badge', () => {
-        it('should render Compelled Duel badge when compelled_duel targetEffect is present for this creature', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'compelled_duel', source: 'Paladin' });
-            expect(screen.getByText('Compelled Duel')).toBeInTheDocument();
+    it.each([
+        { source: CREATURE_NAME, cls: 'effect-buff' },
+        { source: 'Cleric', cls: 'effect-debuff' },
+    ])('renders Bane as $cls when the caster is $source', ({ source, cls }) => {
+        renderBadges({
+            targetEffects: [{ target: CREATURE_NAME, effect: 'bane_penalty', source }],
+            guards: { banePenalty: true },
         });
+        expect(screen.getByTitle(`Bane from ${source}: -1d4 on attack rolls and saving throws`)).toHaveClass(cls);
     });
 
-    describe('Sanctuary badge', () => {
-        it('should render Sanctuary badge when sanctuary targetEffect is present for this creature', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'sanctuary', source: 'Cleric' });
-            expect(screen.getByText('Sanctuary')).toBeInTheDocument();
+    it('passes a custom displayLabel through to the Bane badge label and tooltip', () => {
+        renderBadges({
+            targetEffects: [{ target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric', displayLabel: 'My Bane' }],
+            guards: { banePenalty: true },
         });
+        expect(screen.getByText('My Bane')).toBeInTheDocument();
+        expect(screen.getByTitle('My Bane from Cleric: -1d4 on attack rolls and saving throws')).toBeInTheDocument();
     });
 
-    describe('Bane badge', () => {
-        it('should render Bane badge when banePenalty effect is active', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric', displayLabel: 'Bane' }, { banePenalty: true });
-            expect(screen.getByText('Bane')).toBeInTheDocument();
+    it('rolls the CON repeat save with the te dc when the Enfeeblement badge is clicked', () => {
+        const onRollConditionSave = vi.fn();
+        renderBadges({
+            targetEffects: [{ target: CREATURE_NAME, effect: 'ray_of_enfeeble_debuff', source: 'Wizard', dc: 17 }],
+            guards: { rayOfEnfeebleDamageReduction: true },
+            onRollConditionSave,
         });
-
-        it('should render custom displayLabel for Bane badge', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric', displayLabel: 'My Bane' }, { banePenalty: true });
-            expect(screen.getByText('My Bane')).toBeInTheDocument();
-        });
-
-        it('should render Bane as buff when caster is self', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'bane_penalty', source: CREATURE_NAME, displayLabel: 'Bane' }, { banePenalty: true });
-            const badge = screen.getByText('Bane');
-            expect(badge.closest('[class*="effect-buff"]')).toBeInTheDocument();
-        });
-
-        it('should render Bane as debuff when caster is not self', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'bane_penalty', source: 'Cleric', displayLabel: 'Bane' }, { banePenalty: true });
-            const badge = screen.getByText('Bane');
-            expect(badge.closest('[class*="effect-debuff"]')).toBeInTheDocument();
-        });
+        fireEvent.click(screen.getByText('Enfeeblement'));
+        expect(onRollConditionSave).toHaveBeenCalledTimes(1);
+        expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'ray_of_enfeeble_debuff', label: 'Enfeeblement', dc: 17, ability: 'con' });
     });
 
-    describe('Ray of Enfeeblement badge', () => {
-        it('should render Enfeeblement badge when rayOfEnfeebleDamageReduction is active', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'ray_of_enfeeble_debuff', source: 'Wizard' }, { rayOfEnfeebleDamageReduction: true });
-            expect(screen.getByText('Enfeeblement')).toBeInTheDocument();
+    // Buff-driven faces: guards stay falsy so the badges can only arrive via
+    // the component's BUFF_EFFECT_HANDLERS mapping of activeBuffs.
+    it('maps haste and barkskin activeBuffs to their badges through applyActiveBuffs', () => {
+        renderBadges({
+            buffs: [
+                { name: 'Haste', effect: 'haste' },
+                { name: 'Barkskin', effect: 'barkskin' },
+            ],
         });
-
-        it('should trigger CON repeat save with te dc when the badge is clicked', () => {
-            const onRollConditionSave = vi.fn();
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (name === CREATURE_NAME && key === 'activeBuffs') return [];
-                return null;
-            });
-            computeConditionEffects.mockReturnValue(makeEffects({ rayOfEnfeebleDamageReduction: true }));
-            render(
-                <ConditionEffectBadges
-                    conditions={[]}
-                    targetEffects={[{ target: CREATURE_NAME, effect: 'ray_of_enfeeble_debuff', source: 'Wizard', dc: 17 }]}
-                    creatureName={CREATURE_NAME}
-                    campaignName={CAMPAIGN_NAME}
-                    isLocalhost={true}
-                    onRollConditionSave={onRollConditionSave}
-                />
-            );
-            fireEvent.click(screen.getByText('Enfeeblement'));
-            expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'ray_of_enfeeble_debuff', label: 'Enfeeblement', dc: 17, ability: 'con' });
-        });
-    });
-
-    describe('Resistance badge', () => {
-        it('should render Resistance badge when resistanceDamageReduction is active', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'resistance_damage_reduction', source: 'Druid', chosenType: 'Fire' }, { resistanceDamageReduction: true });
-            expect(screen.getByText('Resistance')).toBeInTheDocument();
-        });
-    });
-
-    describe('Bless badge', () => {
-        it('should render Bless badge when blessBonus is active', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'bless_bonus', source: 'Cleric' }, { blessBonus: true });
-            expect(screen.getByText('Bless')).toBeInTheDocument();
-        });
-    });
-
-    describe('Beacon of Hope badge', () => {
-        it('should render Beacon of Hope badge when beaconOfHope is active', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'beacon_of_hope', source: 'Cleric' }, { beaconOfHope: true });
-            expect(screen.getByText('Beacon of Hope')).toBeInTheDocument();
-        });
-    });
-
-    describe('Hasted badge', () => {
-        it('should render Hasted badge when haste buff is active', () => {
-            renderWithBuffs([{ name: 'Haste', effect: 'haste' }], { hasteActive: true });
-            expect(screen.getByText('Hasted')).toBeInTheDocument();
-        });
-    });
-
-    describe('Barkskin badge', () => {
-        it('should render Barkskin badge when barkskin buff is active', () => {
-            renderWithBuffs([{ name: 'Barkskin', effect: 'barkskin' }], { barkskinActive: true });
-            expect(screen.getByText('Barkskin')).toBeInTheDocument();
-        });
-    });
-
-    describe('Silenced badge', () => {
-        it('should render Silenced badge when silenced targetEffect is present for this creature', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'silenced', source: 'Wizard' });
-            expect(screen.getByText('Silenced')).toBeInTheDocument();
-        });
+        expect(screen.getAllByTestId('creature-badge')).toHaveLength(2);
+        expect(screen.getByText('Hasted')).toBeInTheDocument();
+        expect(screen.getByText('Barkskin')).toBeInTheDocument();
+        expect(screen.getByTitle('Haste: Speed doubled, +2 AC, Advantage on DEX saves, Extra action (Attack, Dash, Disengage, Hide, Use Object)')).toBeInTheDocument();
+        expect(screen.getByTitle('Barkskin: AC set to 17')).toBeInTheDocument();
     });
 });

@@ -1,8 +1,27 @@
+// @maintained-by-ai
+// CreatureCard base render contract — card-hosted display bytes only.
+// Owned here (render lane):
+//   card skeleton section census + exact name byte (jsx:625-665)
+//   state-class truth table: type / active / creature-unconscious (jsx:610, 626)
+//   initiative display byte incl. unrolled fallback (jsx:150-168)
+//   target-select option population: self-excluded, secondTurn-excluded,
+//     no-target default, overlay optgroup + overlayLabel bytes (jsx:174-202)
+//   NPC match badge gate on CardName's showBadge computation (jsx:129)
+//   polymorphObject form-name + icon avatar (jsx:89-97, 122-123)
+//   statless default hint gate + exact hint byte (jsx:630-634)
+//   TempHpDisplay gate + byte (jsx:138-148) — card-hosted, not CreatureHp
+// NOT owned here (do not duplicate):
+//   all badge render faces → CreatureCard.badges.test.jsx (#849)
+//   badge removal dispatch → CreatureCard.badgeRemoval.test.jsx (#848)
+//   condition/concentration dispatch + add-button → CreatureCard.conditions.test.jsx (#850)
+//   save prompt census → CreatureCard.prompts.test.jsx (#852)
+//   click/change dispatch, disabled matrix, selected-value display →
+//     CreatureCard.interactions.test.jsx (#851)
+//   HP input internals → CreatureHp.test.jsx (forward-cited sibling)
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
-import * as buffToggle from '../../services/automation/common/buffToggle.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath }) => {
@@ -24,18 +43,13 @@ vi.mock('./NpcAvatar.jsx', () => ({
 }));
 
 vi.mock('./CreatureHp.jsx', () => ({
-    default: vi.fn(({ creature, isLocalhost, onChange }) => {
-        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><input data-testid={`hp-input-${creature.name}`} type="number" defaultValue={creature.currentHp ?? 0} onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)} disabled={!isLocalhost && creature.type === 'player'} /><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
+    default: vi.fn(({ creature }) => {
+        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
     }),
 }));
 
 vi.mock('./ConditionEffectBadges.jsx', () => ({
-    default: vi.fn(({ conditions, targetEffects, creatureName }) => {
-        const children = [];
-        (conditions || []).forEach(c => children.push(<span key={c.id} data-testid={`effect-condition-${c.id}`}>{c.label}</span>));
-        (targetEffects || []).forEach(te => children.push(<span key={te.id} data-testid={`effect-target-${te.id}`}>{te.effect}</span>));
-        return <div data-testid={`condition-effects-${creatureName}`}>{children}</div>;
-    }),
+    default: vi.fn(({ creatureName }) => <div data-testid={`condition-effects-${creatureName}`} />),
 }));
 
 vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
@@ -49,11 +63,8 @@ vi.mock('../../services/automation/common/buffToggle.js', () => ({
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => new Map()),
     useSyncedState: vi.fn(() => [null, vi.fn()]),
-    useRuntimeValue: vi.fn((_campaignName, key) => {
-        if (key === 'targetEffects') return [];
-        return null;
-    }),
-    getRuntimeValue: vi.fn(),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
     listeners: new Map(),
 }));
@@ -112,9 +123,8 @@ describe('CreatureCard - rendering', () => {
     };
 
     beforeEach(() => {
-        runtimeState.getRuntimeValue.mockClear();
-        runtimeState.useRuntimeValue.mockClear();
-        runtimeState.useRuntimeValue.mockReturnValue(null);
+        runtimeState.useRuntimeValue.mockReset().mockReturnValue(null);
+        runtimeState.getRuntimeValue.mockReset().mockReturnValue(null);
         props = {
             creature: defaultPlayerCreature,
             isActive: false,
@@ -135,136 +145,88 @@ describe('CreatureCard - rendering', () => {
             onRollConcentrationSave: vi.fn(),
             onBreakConcentration: vi.fn(),
         };
-        buffToggle.isBuffActive.mockReturnValue(false);
     });
 
-    describe('creature-card class styling', () => {
-        it('should apply creature-unconscious class when currentHp is 0', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, currentHp: 0 }} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('creature-unconscious');
-        });
-
-        it('should not apply creature-unconscious class when currentHp is positive', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, currentHp: 1 }} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).not.toHaveClass('creature-unconscious');
-        });
-
-        it('should apply active class when isActive is true', () => {
-            render(<CreatureCard {...props} isActive={true} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('active');
-        });
-
-        it('should not apply active class when isActive is false', () => {
-            render(<CreatureCard {...props} isActive={false} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).not.toHaveClass('active');
-        });
-
-        it.each([
-            [defaultPlayerCreature, 'player'],
-            [defaultNpcCreature, 'npc'],
-        ])('should apply the creature type class (%s)', (_creature, expectedClass) => {
-            render(<CreatureCard {...props} creature={_creature} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass(expectedClass);
-        });
+    it('renders the card skeleton once: avatar, exact name byte, HP, initiative, target select, conditions section', () => {
+        const { container } = render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, imagePath: '/img/alice.png' }} />);
+        expect(container.querySelectorAll('.creature-card')).toHaveLength(1);
+        expect(container.querySelectorAll('.creature-name span')).toHaveLength(1);
+        expect(container.querySelector('.creature-name span').textContent).toBe('Alice');
+        expect(screen.getByTestId('avatar-Alice')).toBeInTheDocument();
+        expect(screen.getByTestId('avatar-Alice').querySelector('img')).toHaveAttribute('src', '/img/alice.png');
+        expect(screen.getByTestId('creature-hp-Alice')).toBeInTheDocument();
+        expect(screen.getByTestId('initiative-input')).toBeInTheDocument();
+        expect(screen.getByTestId('target-select')).toBeInTheDocument();
+        expect(container.querySelector('.creature-conditions')).toBeInTheDocument();
     });
 
-    describe('initiative rendering', () => {
-        it('should render initiative input with the creature\'s initiative value', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            const initiativeInput = screen.getByTestId('initiative-input');
-            expect(initiativeInput).toHaveValue(14);
-        });
+    it('tracks card state classes: type, active, creature-unconscious', () => {
+        const alive = render(<CreatureCard {...props} />).container.querySelector('.creature-card');
+        expect(alive).toHaveClass('creature-card', 'player');
+        expect(alive).not.toHaveClass('npc', 'active', 'creature-unconscious');
 
-        it.each([
-            [null, 'null'],
-            [undefined, 'undefined'],
-        ])('should render initiative input with null value when initiative is %s', (initValue) => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, initiative: initValue }} />);
-            const initiativeInput = screen.getByTestId('initiative-input');
-            expect(initiativeInput).toHaveValue(null);
-        });
+        const dead = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 1 }} isActive={false} />).container.querySelector('.creature-card');
+        expect(dead).toHaveClass('npc');
+        expect(dead).not.toHaveClass('creature-unconscious', 'active');
+
+        const fallen = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, currentHp: 0 }} isActive={true} />).container.querySelector('.creature-card');
+        expect(fallen).toHaveClass('creature-card', 'npc', 'active', 'creature-unconscious');
     });
 
-    describe('target select rendering', () => {
-        it('should populate target select options from allCreatures excluding self', () => {
-            const allCreatures = [
-                defaultPlayerCreature,
-                { name: 'Bob', type: 'player' },
-                { name: 'Charlie', type: 'player' },
-            ];
-            render(<CreatureCard {...props} allCreatures={allCreatures} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect.querySelector('option[value="Bob"]')).toBeInTheDocument();
-            expect(targetSelect.querySelector('option[value="Charlie"]')).toBeInTheDocument();
-            expect(targetSelect.querySelector('option[value="Alice"]')).not.toBeInTheDocument();
-        });
+    it('shows the rolled initiative number and an empty Init placeholder when unrolled', () => {
+        render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
+        expect(screen.getByTestId('initiative-input')).toHaveValue(14);
 
-        it('should include overlay options in target select when overlays exist', () => {
-            const overlays = [
-                { id: 'overlay1', shape: 'sphere', radiusFt: 15, label: 'Fireball' },
-            ];
-            render(<CreatureCard {...props} overlays={overlays} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect.querySelector('option[value="overlay-overlay1"]')).toBeInTheDocument();
-        });
+        render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: 'Bob', initiative: null }} />);
+        const unrolled = screen.getAllByTestId('initiative-input')[1];
+        expect(unrolled).toHaveValue(null);
+        expect(unrolled).toHaveAttribute('placeholder', 'Init');
 
-        it('should render a default empty option in target select', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            const targetSelect = screen.getByTestId('target-select');
-            expect(targetSelect.querySelector('option[value=""]')).toBeInTheDocument();
-        });
-
-        it('should not render overlay options when overlays array is empty', () => {
-            render(<CreatureCard {...props} overlays={[]} />);
-            const targetSelect = document.querySelector('.creature-target select');
-            expect(targetSelect.querySelector('option[value="overlay-"]')).not.toBeInTheDocument();
-        });
+        render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: 'Cara', initiative: undefined }} />);
+        expect(screen.getAllByTestId('initiative-input')[2]).toHaveValue(null);
     });
 
-    describe('NPC rendering', () => {
-        it('should show NPC match badge when NPC name matches campaign npc (case-insensitive)', () => {
-            const creature = { ...defaultNpcCreature, name: 'Goblin' };
-            const campaignNpcs = [{ name: 'Goblin' }];
-            render(<CreatureCard {...props} creature={creature} campaignNpcs={campaignNpcs} />);
-            expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
-        });
+    it('populates target options: self-excluded, secondTurn-excluded, no-target default, overlay optgroup only when overlays exist', () => {
+        const allCreatures = [
+            defaultPlayerCreature,
+            { name: 'Bob', type: 'player' },
+            { name: 'Shadow', type: 'npc', secondTurn: true },
+        ];
+        const overlays = [
+            { id: 'ov1', shape: 'sphere', radiusFt: 15, label: 'Fireball' },
+            { id: 'ov2', shape: 'cone', radiusFt: 30 },
+        ];
+        const { container } = render(<CreatureCard {...props} allCreatures={allCreatures} overlays={overlays} />);
+        const select = screen.getByTestId('target-select');
+        const values = [...select.querySelectorAll('option')].map(o => o.value);
+        expect(values).toEqual(['', 'Bob', 'overlay-ov1', 'overlay-ov2']);
+        expect(select.querySelector('option[value=""]').textContent).toBe('— No Target —');
+        expect(select.querySelector('option[value="overlay-ov1"]').textContent).toBe('Fireball');
+        expect(select.querySelector('option[value="overlay-ov2"]').textContent).toBe('Cone (30ft)');
+        expect(container.querySelector('optgroup[label="─── Overlays ───"]')).toBeInTheDocument();
 
-        it('should show NPC match badge for case-insensitive match', () => {
-            const creature = { ...defaultNpcCreature, name: 'Goblin' };
-            const campaignNpcs = [{ name: 'goblin' }];
-            render(<CreatureCard {...props} creature={creature} campaignNpcs={campaignNpcs} />);
-            expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
-        });
-
-        it('should not show NPC match badge when no match exists', () => {
-            const creature = { ...defaultNpcCreature, name: 'Goblin' };
-            const campaignNpcs = [{ name: 'Orc' }];
-            render(<CreatureCard {...props} creature={creature} campaignNpcs={campaignNpcs} />);
-            expect(screen.queryByTestId('npc-match-badge')).not.toBeInTheDocument();
-        });
+        const quiet = render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: 'Bob' }} allCreatures={[defaultPlayerCreature]} overlays={[]} />);
+        expect(quiet.container.querySelector('optgroup')).not.toBeInTheDocument();
+        expect([...quiet.container.querySelectorAll('option')].every(o => !o.value.startsWith('overlay-'))).toBe(true);
     });
 
-    describe('polymorphObject rendering', () => {
-        it.each([
-            [{ type: 'giant_toad', icon: 'fa-toad' }, 'Giant Toad'],
-            [{ type: 'black_dragon', icon: 'fa-dragon' }, 'Black Dragon'],
-            [{ type: 'spider', icon: 'fa-spider' }, 'Spider'],
-        ])('should display polymorphObject type as formatted name (%s)', (_obj, expectedText) => {
-            const creature = {
-                ...defaultNpcCreature,
-                polymorphObject: _obj,
-            };
-            render(<CreatureCard {...props} creature={creature} />);
-            expect(screen.getByText(expectedText)).toBeInTheDocument();
-        });
+    it('shows the NPC match badge only when a campaign NPC name matches case-insensitively', () => {
+        render(<CreatureCard {...props} creature={defaultNpcCreature} campaignNpcs={[{ name: 'goblin' }]} />);
+        expect(screen.getByTestId('npc-match-badge')).toBeInTheDocument();
+
+        render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, name: 'Owlbear' }} campaignNpcs={[{ name: 'Goblin' }]} />);
+        expect(screen.getAllByTestId('npc-match-badge')).toHaveLength(1);
     });
 
-    describe('statless default NPC hint', () => {
+    it('renders a polymorphObject as its formatted form name with an icon avatar, bypassing NpcAvatar', () => {
+        const creature = { ...defaultNpcCreature, polymorphObject: { type: 'giant_toad', icon: 'fa-toad' } };
+        const { container } = render(<CreatureCard {...props} creature={creature} />);
+        expect(screen.getByText('Giant Toad')).toBeInTheDocument();
+        expect(container.querySelector('.creature-avatar i')).toHaveClass('fa-solid', 'fa-toad');
+        expect(screen.queryByTestId('npc-avatar-Goblin')).not.toBeInTheDocument();
+    });
+
+    it('shows the statless default hint only on auto-named 10/10 HP NPC cards', () => {
         const statlessNpc = {
             name: 'NPC 1',
             type: 'npc',
@@ -276,43 +238,42 @@ describe('CreatureCard - rendering', () => {
             conditions: [],
             concentration: null,
         };
+        const { container } = render(<CreatureCard {...props} creature={statlessNpc} allCreatures={[statlessNpc]} />);
+        expect(container.querySelectorAll('.npc-statless-hint')).toHaveLength(1);
+        expect(container.querySelector('.npc-statless-hint').textContent).toContain('Statless default · 10 HP (AC 10)');
 
-        it('shows a statless default hint with 10 HP on auto-named NPCs', () => {
-            render(<CreatureCard {...props} creature={statlessNpc} allCreatures={[statlessNpc]} />);
-            const hint = document.querySelector('.npc-statless-hint');
-            expect(hint).toBeInTheDocument();
-            expect(hint.textContent).toMatch(/Statless/i);
-            expect(hint.textContent).toContain('10 HP');
-        });
-
-        it('hides the hint once the NPC HP is no longer the default', () => {
-            render(<CreatureCard {...props} creature={{ ...statlessNpc, currentHp: 7 }} allCreatures={[statlessNpc]} />);
-            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
-        });
-
-        it('does not show the hint for renamed (monster-backed) NPCs', () => {
-            const goblin = { ...defaultNpcCreature, currentHp: 7, maxHp: 7 };
-            render(<CreatureCard {...props} creature={goblin} allCreatures={[goblin]} />);
-            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
-        });
-
-        it('does not show the hint for player cards', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: 'NPC 1' }} allCreatures={[defaultPlayerCreature]} />);
-            expect(document.querySelector('.npc-statless-hint')).not.toBeInTheDocument();
+        const negatives = [
+            { ...statlessNpc, currentHp: 7 },               // hp moved off default
+            { ...statlessNpc, name: 'Goblin' },             // renamed = monster-backed
+            { ...statlessNpc, type: 'player' },             // never on player cards
+        ];
+        negatives.forEach((creature) => {
+            const neg = render(<CreatureCard {...props} creature={creature} allCreatures={[creature]} />);
+            expect(neg.container.querySelectorAll('.npc-statless-hint')).toHaveLength(0);
+            expect(neg.container.querySelector(`.creature-card.${creature.type}`)).toBeInTheDocument();
         });
     });
 
-    describe('edge cases - creature data', () => {
-        it('should render the creature card when allCreatures is empty', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={[]} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toBeInTheDocument();
-        });
+    it('shows card-hosted temp HP only for form-linked creatures with positive temp HP', () => {
+        runtimeState.getRuntimeValue.mockImplementation((_name, key) => (key === 'tempHp' ? 5 : null));
 
-        it('should render the creature card when name is an empty string', () => {
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: '' }} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toBeInTheDocument();
-        });
+        const npc = render(<CreatureCard {...props} creature={defaultNpcCreature} />);
+        expect(npc.container.querySelectorAll('.temp-hp-display')).toHaveLength(1);
+        expect(npc.container.querySelector('.temp-hp-display').textContent).toContain('Temp HP: 5');
+
+        const native = render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
+        expect(native.container.querySelectorAll('.temp-hp-display')).toHaveLength(0);
+
+        runtimeState.getRuntimeValue.mockImplementation((_name, key) => (key === 'tempHp' ? 0 : null));
+        const zero = render(<CreatureCard {...props} creature={{ ...defaultNpcCreature, name: 'Orc' }} />);
+        expect(zero.container.querySelectorAll('.temp-hp-display')).toHaveLength(0);
+    });
+
+    it('survives an empty-name card with a targetless select', () => {
+        const { container } = render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, name: '', targetName: '' }} allCreatures={[]} />);
+        expect(container.querySelectorAll('.creature-card')).toHaveLength(1);
+        const options = screen.getByTestId('target-select').querySelectorAll('option');
+        expect(options).toHaveLength(1);
+        expect(options[0].value).toBe('');
     });
 });

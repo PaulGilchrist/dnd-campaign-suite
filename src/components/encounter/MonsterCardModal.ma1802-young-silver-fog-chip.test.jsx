@@ -1,18 +1,21 @@
-// MA-1802: Young Silver Dragon lair_actions[0] was a BARE STRING (inert
-// static span, zero affordance — MonsterCardBody.jsx:358 first disjunct
-// typeof==='string', MA-1747/1753/1760/1766 bare-string young-dragon
-// streak). DATA fix promotes it to the byte-proven adult-silver MA-0140
-// ADVISORY dict {name:"Fog Cloud", advisory:"fog_cloud", description} —
-// SILVER fog carries NO zone block (bronze MA-1766 zone lane does NOT
-// apply): chip renders named "Fog Cloud" (.mc-dice-link-lair) and clicks
-// route to the CLA-325 advisory record — ability_use "casts fog cloud" +
-// initiative-20 GM-enforced popup — NO picker, NO save, NO damage, NO
-// zone te. Sibling [1] (MA-1803) was the nameless description-only dict
-// (FALSE-pin) — MA-1803 promotes it to {name:"Rolling Fog",
-// advisory:"fog_cloud", description}: census widens 1→2 named chips, both
-// advisory lane (duplicate advisory key OK — consumer keys by action.name,
-// MA-1779), click logs ability_use "Rolling Fog", still NO picker/save/
-// damage/zone.
+// @maintained-by-ai
+// MA-1802/MA-1803: Young Silver Dragon lair lane — ADVISORY twins at the modal seam.
+// [0] was a BARE STRING, [1] a nameless dict (both inert static spans, zero
+// affordance — MonsterCardBody.jsx:385 string short-circuit / isLairRowClickable).
+// DATA fix promotes BOTH to the byte-proven adult-silver MA-0140 ADVISORY dicts
+// {name, advisory:"fog_cloud", description} — two named chips, both clicking
+// through the CLA-325 advisory record: ability_use "casts fog cloud" log +
+// initiative-20 GM-enforced popup — NO picker, NO save, NO damage, NO zone te.
+// Silver fog carries NO zone block: bronze MA-1766's zoneOnly picker lane is NOT
+// a lane twin here (different affordance branch in resolveLairRow) — the two
+// chips duplicate advisory key "fog_cloud" (OK: consumer keys by action.name,
+// MA-1779) and press as TWO distinct abilityName records.
+// OWNERS cited-skipped: disk byte-locks → monsterLairActions.test.js:6545
+// (MA-1802) / :6625 (MA-1803) incl. scope guard :6607; generic lair chip
+// render + title format + advisory press machine + cannot-act gate →
+// lair-actions.test.jsx:114/:140/:176; popup/log builder bytes →
+// monsterLairActions.test.js (buildLairAdvisory*). This file pins only the
+// SILVER modal seam: named-chip census and the per-chip click contract.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -103,66 +106,71 @@ function lairChips() {
   return Array.from(document.querySelectorAll('.mc-dice-link-lair'));
 }
 
+function lairRows() {
+  const title = Array.from(document.querySelectorAll('h5.mc-section-title')).find(h => h.textContent.includes('Lair Actions'));
+  return Array.from(title.nextElementSibling.querySelectorAll('.mc-action'));
+}
+
+// Per-chip byte table: both rows share advisory "fog_cloud" and byte-identical
+// disk prose — only the NAME differs. Each press must land exactly ONE
+// ability_use record + ONE advisory popup naming THIS chip, never a picker,
+// save roll, or runtime-store write (advisory lane touches no state).
+const FOG_CHIPS = [
+  { i: 0, name: 'Fog Cloud' },
+  { i: 1, name: 'Rolling Fog' },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   aoeProps.current = null;
 });
 
-describe('MA-1802 young-silver-dragon fog cloud lair chip lock', () => {
-  it('lair block renders two named advisory chips "Fog Cloud" + "Rolling Fog" (MA-1803 widened census 1→2)', () => {
+describe('MA-1802/MA-1803 young-silver-dragon fog advisory lair lane lock', () => {
+  it('lair block renders TWO named advisory rows/chips "Fog Cloud" + "Rolling Fog" — exact chrome titles, zero static prose rows, zero DC text', () => {
     renderDragon();
     const chips = lairChips();
     expect(chips.map(c => c.textContent.trim())).toEqual(['Fog Cloud', 'Rolling Fog']);
-    chips.forEach((chip, i) => {
+    expect(chips.map(c => c.getAttribute('title'))).toEqual([
+      'Lair action — Fog Cloud. Chosen on initiative 20, GM-enforced.',
+      'Lair action — Rolling Fog. Chosen on initiative 20, GM-enforced.',
+    ]);
+    chips.forEach(chip => {
       expect(chip.getAttribute('role')).toBe('button');
       expect(chip.getAttribute('tabindex')).toBe('0');
-      expect(chip.getAttribute('title')).toMatch(new RegExp(`Lair action — ${i === 0 ? 'Fog Cloud' : 'Rolling Fog'}`));
       expect(chip.textContent).not.toMatch(/DC/);
     });
-  });
-
-  it('sibling [1] MA-1803 pin INVERTED: row renders own "Rolling Fog" advisory chip, click logs ability_use', async () => {
-    renderDragon();
-    const title = Array.from(document.querySelectorAll('h5.mc-section-title')).find(h => h.textContent.includes('Lair Actions'));
-    const rows = Array.from(title.nextElementSibling.querySelectorAll('.mc-action'));
+    const rows = lairRows();
     expect(rows).toHaveLength(2);
-    const sib = rows[1];
-    const sibChips = sib.querySelectorAll('.mc-dice-link-lair');
-    expect(sibChips).toHaveLength(1);
-    expect(sibChips[0].textContent.trim()).toBe('Rolling Fog');
-    expect(sib.querySelector('strong')?.textContent).toMatch(/Rolling Fog/);
-    fireEvent.click(sibChips[0]);
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const entry = addEntry.mock.calls[0][1];
-    expect(entry.type).toBe('ability_use');
-    expect(entry.characterName).toBe('Young Silver Dragon 1');
-    expect(entry.abilityName).toBe('Rolling Fog');
-    expect(entry.description).toMatch(/Rolling Fog/);
-    expect(entry.description).toMatch(/casts fog cloud/i);
-    expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
-    expect(entry.description).not.toMatch(/save DC/i);
-    expect(aoeProps.current).toBeNull();
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    expect(rows.map(r => r.querySelector('strong')?.textContent)).toEqual(['Fog Cloud.', 'Rolling Fog.']);
+    expect(rows.map(r => r.querySelectorAll('.mc-dice-link-lair').length)).toEqual([1, 1]);
+    expect(rows.filter(r => !r.querySelector('.mc-dice-link-lair'))).toHaveLength(0);
   });
 
-  it('chip click routes advisory record: ability_use fog log + GM-enforced popup, NO picker/save/damage', async () => {
+  it('BOTH chips press as CLA-325 advisory records: one ability_use "casts fog cloud" log + GM-enforced popup per press, NO picker/save/damage/store write', async () => {
     renderDragon();
-    fireEvent.click(lairChips()[0]);
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const entry = addEntry.mock.calls[0][1];
-    expect(entry.type).toBe('ability_use');
-    expect(entry.characterName).toBe('Young Silver Dragon 1');
-    expect(entry.abilityName).toBe('Fog Cloud');
-    expect(entry.description).toMatch(/casts fog cloud/i);
-    expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
-    expect(entry.description).not.toMatch(/save DC/i);
-    expect(ROLLERS.setPopupHtml).toHaveBeenCalled();
-    const html = ROLLERS.setPopupHtml.mock.calls[ROLLERS.setPopupHtml.mock.calls.length - 1][0];
-    expect(html).toMatch(/Lair Action — Fog Cloud/);
-    expect(html).toMatch(/casts fog cloud/i);
-    expect(html).toMatch(/initiative 20/i);
-    expect(aoeProps.current).toBeNull();
-    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    for (const { i, name } of FOG_CHIPS) {
+      aoeProps.current = null;
+      const logsBefore = addEntry.mock.calls.length;
+      const popupsBefore = ROLLERS.setPopupHtml.mock.calls.length;
+      fireEvent.click(lairChips()[i]);
+      await waitFor(() => expect(addEntry.mock.calls.length, `chip ${i} logged nothing`).toBe(logsBefore + 1));
+      const entry = addEntry.mock.calls[logsBefore][1];
+      expect(entry.type).toBe('ability_use');
+      expect(entry.characterName).toBe('Young Silver Dragon 1');
+      expect(entry.abilityName, `chip ${i} abilityName`).toBe(name);
+      expect(entry.description).toMatch(new RegExp(`lair action ${name}`));
+      expect(entry.description).toMatch(/casts fog cloud/i);
+      expect(entry.description).toMatch(/initiative 20 \(GM-enforced/i);
+      expect(entry.description).not.toMatch(/save DC/i);
+      expect(ROLLERS.setPopupHtml.mock.calls.length, `chip ${i} popup`).toBe(popupsBefore + 1);
+      const html = String(ROLLERS.setPopupHtml.mock.calls[popupsBefore][0]);
+      expect(html).toMatch(new RegExp(`Lair Action — ${name}`));
+      expect(html).toMatch(/casts fog cloud/i);
+      expect(html).toMatch(/initiative 20/i);
+      expect(aoeProps.current, `chip ${i} opened a picker`).toBeNull();
+      expect(runtime.store, `chip ${i} wrote runtime state`).toEqual({});
+    }
+    expect(ROLLERS.rollSavingThrow).toHaveBeenCalledTimes(0);
   });
 });

@@ -1,8 +1,16 @@
+// @maintained-by-ai
+// Lane: CreatureCard save-tracking prompt rendering + response dispatch (prompts).
+// Owned here: prompts appear only under live save-request state (exact text bytes),
+// localhost-only gate, no-request absence (falsifiable), underscore-normalised store
+// keys, and Success/Failure dispatch of exact payloads to the correct savePromptService fn.
+// Owned elsewhere: save roll at handler seam (#847 createRollConditionSaveHandler.test.jsx),
+// save-result processing (saveResultHandlers.test.jsx), break dispatches (#850
+// CreatureCard.conditions.test.jsx :121/:149), badge census (#849), badge removal (#848),
+// avatar/Enter interaction gates (#851 CreatureCard.interactions.test.jsx).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
-import * as buffToggle from '../../services/automation/common/buffToggle.js';
 import * as savePromptService from '../../services/combat/conditions/savePromptService.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
@@ -47,38 +55,22 @@ vi.mock('../../services/automation/common/buffToggle.js', () => ({
     isBuffActive: vi.fn(() => false),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => {
-    const useRuntimeValue = vi.fn();
-    const getRuntimeValue = vi.fn((target, key, _campaignName) => {
-        if (key === 'naturesSanctuaryActive') return sanctuaryMocks.naturesSanctuaryActive?.[target];
-        if (key === 'naturesSanctuaryCreatures') return sanctuaryMocks.naturesSanctuaryCreatures?.[target];
-        if (key === 'naturesSanctuaryResistance') return sanctuaryMocks.naturesSanctuaryResistance?.[target];
-        if (key === 'wrathOfTheSeaActive') return wrathOfTheSeaMocks[target];
-        if (key === 'concentration') return { spell: "Hunter's Mark" };
-        if (key === 'targetEffects') return runtimeTargetEffects;
-        if (key === 'activeBuffs') return runtimeActiveBuffs?.[target];
-        return undefined;
-    });
-    return {
-        getStore: vi.fn(() => new Map()),
-        useSyncedState: vi.fn(() => [null, vi.fn()]),
-        useRuntimeValue,
-        getRuntimeValue,
-        setRuntimeValue: vi.fn(),
-        listeners: new Map(),
-    };
-});
+// Card reads all auxiliary runtime state with `|| fallback` guards, so an
+// undefined-returning getRuntimeValue keeps unrelated lanes inert and hermetic.
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+    getStore: vi.fn(() => new Map()),
+    useSyncedState: vi.fn(() => [null, vi.fn()]),
+    useRuntimeValue: vi.fn(() => null),
+    getRuntimeValue: vi.fn(() => undefined),
+    setRuntimeValue: vi.fn(),
+    listeners: new Map(),
+}));
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
     sendFleshToStoneResult: vi.fn(),
     sendPrismaticSprayIndigoResult: vi.fn(),
     sendPrismaticSprayVioletResult: vi.fn(),
 }));
-
-let sanctuaryMocks = {};
-let wrathOfTheSeaMocks = {};
-let runtimeTargetEffects = [];
-let runtimeActiveBuffs = {};
 
 const PROMPT_TYPES = [
     { key: '_fleshToStone_Alice', label: 'Flesh to Stone', service: savePromptService.sendFleshToStoneResult },
@@ -87,9 +79,7 @@ const PROMPT_TYPES = [
 ];
 
 describe('CreatureCard - save prompts', () => {
-    let props;
-
-    const defaultPlayerCreature = {
+    const alice = {
         name: 'Alice',
         type: 'player',
         currentHp: 20,
@@ -100,14 +90,18 @@ describe('CreatureCard - save prompts', () => {
         concentration: null,
     };
 
+    let props;
+
     beforeEach(() => {
+        vi.clearAllMocks();
+        runtimeState.useRuntimeValue.mockReturnValue(null);
         props = {
-            creature: defaultPlayerCreature,
+            creature: alice,
             isActive: false,
             isLocalhost: true,
             campaignNpcs: [],
             overlays: [],
-            allCreatures: [defaultPlayerCreature],
+            allCreatures: [alice],
             campaignName: 'test-campaign',
             onRemoveNpc: vi.fn(),
             onNpcClick: vi.fn(),
@@ -121,83 +115,70 @@ describe('CreatureCard - save prompts', () => {
             onRollConcentrationSave: vi.fn(),
             onBreakConcentration: vi.fn(),
         };
-        wrathOfTheSeaMocks = {};
-        sanctuaryMocks = {};
-        runtimeTargetEffects = [];
-        runtimeActiveBuffs = {};
-        buffToggle.isBuffActive.mockReturnValue(false);
-        savePromptService.sendFleshToStoneResult.mockClear();
-        savePromptService.sendPrismaticSprayIndigoResult.mockClear();
-        savePromptService.sendPrismaticSprayVioletResult.mockClear();
-        runtimeState.useRuntimeValue.mockReset();
-        runtimeState.useRuntimeValue.mockReturnValue(null);
-        runtimeState.getRuntimeValue.mockReset();
     });
 
-    function createPromptMock(promptKey, promptData) {
-        runtimeState.useRuntimeValue.mockImplementation((_campaignName, key) => {
-            if (key === 'targetEffects') return [];
-            if (key === promptKey) return promptData;
-            return null;
-        });
+    function setPrompts(promptDataByKey) {
+        runtimeState.useRuntimeValue.mockImplementation((_scope, key) => promptDataByKey[key] ?? null);
     }
 
-    describe('Prompt rendering and interaction', () => {
-        for (const { key, label, service } of PROMPT_TYPES) {
-            describe(label, () => {
-                it('should render prompt with data for localhost', () => {
-                    createPromptMock(key, { successes: 1, failures: 1 });
-                    render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={true} />);
-                    expect(screen.getByText(label)).toBeInTheDocument();
-                });
-
-                it('should not render prompt for non-localhost', () => {
-                    createPromptMock(key, { successes: 1, failures: 1 });
-                    render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={false} />);
-                    expect(screen.queryByText(label)).not.toBeInTheDocument();
-                });
-
-                it('should call the correct service on success button click', () => {
-                    createPromptMock(key, { successes: 0, failures: 0 });
-                    render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={true} />);
-                    fireEvent.click(screen.getByRole('button', { name: 'Success' }));
-                    expect(service).toHaveBeenCalledWith('test-campaign', 'Alice', { success: true });
-                });
-
-                it('should call the correct service on failure button click', () => {
-                    createPromptMock(key, { successes: 0, failures: 0 });
-                    render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={true} />);
-                    fireEvent.click(screen.getByRole('button', { name: 'Failure' }));
-                    expect(service).toHaveBeenCalledWith('test-campaign', 'Alice', { success: false });
-                });
-            });
-        }
+    it('shows all three save prompts with exact counter text for localhost GMs', () => {
+        setPrompts({
+            '_fleshToStone_Alice': { successes: 1, failures: 2 },
+            '_prismaticSprayIndigo_Alice': { successes: 0, failures: 3 },
+            '_prismaticSprayViolet_Alice': { successes: 0, failures: 0 },
+        });
+        render(<CreatureCard {...props} />);
+        expect(screen.getByText('Flesh to Stone')).toBeInTheDocument();
+        expect(screen.getByText('Saves: 1/3 | Failures: 2/3')).toBeInTheDocument();
+        expect(screen.getByText('Prismatic Spray (Indigo)')).toBeInTheDocument();
+        expect(screen.getByText('CON Saves: 0/3 | Failures: 3/3')).toBeInTheDocument();
+        expect(screen.getByText('Prismatic Spray (Violet)')).toBeInTheDocument();
+        expect(screen.getByText("WIS Save (caster's next turn)")).toBeInTheDocument();
     });
 
-    describe('Display format', () => {
-        const fleshToStoneKey = '_fleshToStone_Alice';
-        const indigoKey = '_prismaticSprayIndigo_Alice';
-
-        const testCases = [
-            { successes: 0, failures: 0, expected: /Saves:\s+0\/3\s+\|\s+Failures:\s+0\/3/ },
-            { successes: 0, failures: 3, expected: /Saves:\s+0\/3\s+\|\s+Failures:\s+3\/3/ },
-            { successes: 1, failures: 2, expected: /Saves:\s+1\/3\s+\|\s+Failures:\s+2\/3/ },
-        ];
-
-        for (const { successes, failures, expected } of testCases) {
-            it(`Flesh to Stone - displays saves/failures correctly (${successes}/${failures})`, () => {
-                createPromptMock(fleshToStoneKey, { successes, failures });
-                render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={true} />);
-                expect(screen.getByText('Flesh to Stone')).toBeInTheDocument();
-                expect(screen.getByText(expected)).toBeInTheDocument();
-            });
-
-            it(`Prismatic Spray (Indigo) - displays saves/failures correctly (${successes}/${failures})`, () => {
-                createPromptMock(indigoKey, { successes, failures });
-                render(<CreatureCard {...props} creature={defaultPlayerCreature} campaignName="test-campaign" isLocalhost={true} />);
-                expect(screen.getByText('Prismatic Spray (Indigo)')).toBeInTheDocument();
-                expect(screen.getByText(new RegExp(`CON Saves:\\s+${successes}\\/3\\s+\\|\\s+Failures:\\s+${failures}\\/3`))).toBeInTheDocument();
-            });
-        }
+    it('reads prompt state from underscore-normalised keys for multi-word creature names', () => {
+        const brave = { ...alice, name: 'Alice the Brave' };
+        setPrompts({ '_fleshToStone_Alice_the_Brave': { successes: 2, failures: 1 } });
+        render(<CreatureCard {...props} creature={brave} allCreatures={[brave]} />);
+        expect(screen.getByText('Flesh to Stone')).toBeInTheDocument();
+        expect(screen.getByText('Saves: 2/3 | Failures: 1/3')).toBeInTheDocument();
     });
+
+    it('renders no save prompts when no request is pending', () => {
+        render(<CreatureCard {...props} />);
+        expect(screen.queryByText('Flesh to Stone')).not.toBeInTheDocument();
+        expect(screen.queryByText('Prismatic Spray (Indigo)')).not.toBeInTheDocument();
+        expect(screen.queryByText('Prismatic Spray (Violet)')).not.toBeInTheDocument();
+        expect(screen.queryAllByRole('button', { name: 'Success' })).toHaveLength(0);
+        expect(screen.queryAllByRole('button', { name: 'Failure' })).toHaveLength(0);
+    });
+
+    it('hides save prompts from non-localhost clients even when a request is live', () => {
+        setPrompts({
+            '_fleshToStone_Alice': { successes: 1, failures: 2 },
+            '_prismaticSprayIndigo_Alice': { successes: 0, failures: 3 },
+            '_prismaticSprayViolet_Alice': { successes: 0, failures: 0 },
+        });
+        render(<CreatureCard {...props} isLocalhost={false} />);
+        expect(screen.queryByText('Flesh to Stone')).not.toBeInTheDocument();
+        expect(screen.queryByText('Prismatic Spray (Indigo)')).not.toBeInTheDocument();
+        expect(screen.queryByText('Prismatic Spray (Violet)')).not.toBeInTheDocument();
+        expect(screen.queryAllByRole('button', { name: 'Success' })).toHaveLength(0);
+        expect(screen.queryAllByRole('button', { name: 'Failure' })).toHaveLength(0);
+    });
+
+    for (const { key, label, service } of PROMPT_TYPES) {
+        it(`${label}: Success/Failure dispatch exact payload to its service only`, () => {
+            setPrompts({ [key]: { successes: 1, failures: 1 } });
+            render(<CreatureCard {...props} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Success' }));
+            expect(service).toHaveBeenCalledWith('test-campaign', 'Alice', { success: true });
+            fireEvent.click(screen.getByRole('button', { name: 'Failure' }));
+            expect(service).toHaveBeenCalledWith('test-campaign', 'Alice', { success: false });
+            expect(service).toHaveBeenCalledTimes(2);
+            for (const other of PROMPT_TYPES) {
+                if (other.service !== service) expect(other.service).not.toHaveBeenCalled();
+            }
+        });
+    }
 });

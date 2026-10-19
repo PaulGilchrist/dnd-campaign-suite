@@ -1,29 +1,47 @@
-// MA-1676: Warhorse Hooves — one-field DATA fix: conditional_damage
-// {dice:"2d4", damage_type:"Bludgeoning"} authored on monsters.json actions[0]
-// (MA-0007 charge-bonus seam, MA-0885 goat Ram byte-shape with MA-0809/MA-0805
-// giant-goat/giant-elk "2d4" twins) so the HIT popup offers the
-// "20+ ft Charge: +2d4 Bludgeoning?" rider instead of base-only damage.
-// Prone half: charge-gated Prone has zero transport app-wide (no movement-distance
-// subsystem, MA-0903/MA-1127 precedent) — hit_conditions deliberately NOT authored
-// (would over-grant Prone on EVERY hit, wrong RAW per MA-1610) — advisory residual.
-// Locks: disk data lock + placement, offer builds formula "2d4" (modifier-less),
-// grant rolls 2d4 as its own damage leg + logs conditional_damage_granted,
-// decline logs conditional_damage_declined base-only, hit clause stays null.
-// RAW anchor: description "extra 5 (2d4) Bludgeoning damage and has the Prone condition".
+// @maintained-by-ai
+// MA-1676 (Warhorse Hooves) + MA-1699 (Wereboar Tusk): one-field DATA fixes —
+// conditional_damage {dice:"2d4"|"2d6"} authored on monsters.json rows
+// (MA-0007 charge-bonus seam, MA-0885 goat Ram byte-shape placement: dict after
+// damage_type_primary, last key) so the HIT popup offers the
+// "20+ ft Charge: +2d4 Bludgeoning?" / "+2d6 Piercing?" rider instead of
+// base-only damage. Prone halves: movement-gated Prone has zero transport
+// app-wide (no movement-distance subsystem, MA-0903/MA-1610 precedent) —
+// hit_conditions deliberately NOT authored (would over-grant Prone on EVERY
+// hit, wrong RAW) — GM adjudicates at the popup; advisory residual.
+//
+// Trim pass (2026-10-18), two seams, one press per row — mirrors the maintained
+// ma1610 triceratops template (run #716 / ma1175 #683 / ma1174 #682 / ma1160 #680):
+//   1. Disk-row bytes (it.each over both rows): full conditional_damage toEqual
+//      identity (exact key set — modifier ABSENT, subsuming the old goat
+//      key-parity scan and the GOAT import; both rows are MA-0885 goat Ram
+//      shape twins modulo dice/type bytes — distinct pins are 2d4 Bludgeoning
+//      vs 2d6 Piercing, base 2d4+4/+6 vs 2d6+3/+5, and the row-distinct
+//      Large/Medium-or-smaller + Prone prose) + MA-0885 key placement +
+//      recharge/hit_conditions/two-handed absence pins + RAW prose regex.
+//   2. ONE click→rollAttack ctx press per row: full 7-key offer toEqual —
+//      owns the modifier-absent → formula=dice fold (Helpers.js:687-703) AND
+//      the feet-token label head "20+ ft Charge:" ("20+ feet" prose IS
+//      chargeClauseFeet-live on both rows) + hitClause toBeNull +
+//      twoHandedVariantOffer toBeNull (versatile bytes unauthored).
+// Cut (owner cites, not re-asserted here):
+//   - MonsterCardModal.charge-bonus.test.jsx owns resolveChargeBonus: grant
+//     hit/crit roller fold + logs + resolved-write (:210-233) and decline
+//     (:235-250) — these rows' 2d4/2d6 grant/decline bytes are shape twins.
+//   - Offer render on the popup: common/AttackResultPopup.ma1363:105-120.
+//   - monsterRecharge.test.js owns the recharge machine (:59-60, :152-165).
+//   - attackRowMissingToHit census: MonsterAction.ma0286:89-113.
+//   - MA-0689 Hooves prone-target PREREQUISITE gate (elk lane, different ticket
+//     family): MonsterCardModal.ma0689-hooves-prerequisite.test.jsx.
+// Dead-mock purge per-lane (ma1610/ma1175 baseline): diceRoller mock gone
+// (rollAttack mocked, popup never renders, no roller fires), AttackResultPopup
+// stub + grant/decline buttons gone (popupHtml stays null), rollD20 +
+// never-fired hook members gone. No timers — the ctx press lands synchronously.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  // dice-gated faithful mocks (§401): dice-bearing formulas roll, flat
-  // constants resolve null (MA-0322 codex).
-  rollExpression: vi.fn((formula) => (/\d+d\d+/.test(formula) ? { total: 7, rolls: [3, 4], modifier: 0, formula } : null)),
-  rollExpressionDoubled: vi.fn((formula) => (/\d+d\d+/.test(formula) ? { total: 14, rolls: [3, 4, 3, 4], modifier: 0, formula } : null)),
-  rollD20: vi.fn(() => 16),
-}));
+import { buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -36,23 +54,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -92,71 +102,58 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled, canRollExpression } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, buildHitConditionClause } from './MonsterCardHelpers.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const WARHORSE = monsters.find((m) => m.index === 'warhorse');
-const HOOVES = WARHORSE.actions.find((a) => a.name === 'Hooves');
-const GOAT = monsters.find((m) => m.index === 'goat');
-const GOAT_CD = GOAT.actions.find((a) => a.name === 'Ram').conditional_damage;
+
+const CHARGE = 'moved 20+ feet straight toward the target immediately before the hit';
+
+// One row table per seam — both rows are MA-0885 goat Ram shape twins; only the
+// distinct bytes differ (dice/type/base/chip/prose size-clause and creature noun).
+const ROWS = [
+  {
+    ticket: 'MA-1676 Warhorse Hooves',
+    index: 'warhorse',
+    monster: 'Warhorse',
+    actionName: 'Hooves',
+    chip: '+6',
+    attackBonus: 6,
+    base: '2d4 + 4',
+    type: 'Bludgeoning',
+    cd: { dice: '2d4', damage_type: 'Bludgeoning', condition: CHARGE },
+    // RAW anchor incl. the untransported Prone half (GM-adjudicated at popup).
+    prose: /if the target is a large or smaller creature and the horse moved 20\+ feet straight toward it immediately before the hit, the target takes an extra 5 \(2d4\) bludgeoning damage and has the prone condition/i,
+    offer: { dice: '2d4', modifier: 0, damageType: 'Bludgeoning', condition: CHARGE, formula: '2d4', label: '20+ ft Charge: +2d4 Bludgeoning?', attackName: 'Hooves' },
+  },
+  {
+    ticket: 'MA-1699 Wereboar Tusk',
+    index: 'wereboar',
+    monster: 'Wereboar',
+    actionName: 'Tusk',
+    chip: '+5',
+    attackBonus: 5,
+    base: '2d6 + 3',
+    type: 'Piercing',
+    cd: { dice: '2d6', damage_type: 'Piercing', condition: CHARGE },
+    prose: /if the target is a medium or smaller creature and the wereboar moved 20\+ feet straight toward it immediately before the hit, the target takes an extra 7 \(2d6\) piercing damage and has the prone condition/i,
+    offer: { dice: '2d6', modifier: 0, damageType: 'Piercing', condition: CHARGE, formula: '2d6', label: '20+ ft Charge: +2d6 Piercing?', attackName: 'Tusk' },
+  },
+];
 
 const CREATURES = [
-  { name: 'Warhorse 1', targetName: 'Bandit 1' },
+  { name: 'Attacker 1', targetName: 'Bandit 1' },
   { name: 'Bandit 1', type: 'player', size: 'Medium' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(HOOVES, 'Hooves');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Hooves',
-    rolls: [16],
-    bonus: 6,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Hooves', formula: '2d4 + 4', damageType: 'Bludgeoning', source: 'Warhorse 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderHooves(popupHtml = null) {
-  _setPopupHtml(popupHtml);
-  const m = makeMonster({ name: 'Warhorse', actions: WARHORSE.actions });
-  damageUtils.__setFindCreatureReturn({ name: 'Warhorse 1', targetName: 'Bandit 1', conditions: [] });
-  return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Warhorse 1' })} />);
-}
-
-function clickHoovesLink() {
-  const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Hooves/.test(a.textContent.trim()));
-  const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
-  expect(chip, 'Expected Hooves +6 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
+function renderRow(row) {
+  _setPopupHtml(null);
+  const src = monsters.find((m) => m.index === row.index);
+  const m = makeMonster({ name: row.monster, actions: src.actions });
+  damageUtils.__setFindCreatureReturn({ name: 'Attacker 1', targetName: 'Bandit 1', conditions: [] });
+  return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Attacker 1' })} />);
 }
 
 beforeEach(() => {
@@ -164,199 +161,39 @@ beforeEach(() => {
   _setPopupHtml(null);
 });
 
-describe('MA-1676 monsters.json data lock: Warhorse Hooves conditional charge damage', () => {
-  it('authors conditional_damage after damage_type_primary, last key (MA-0885 goat placement)', () => {
-    expect(HOOVES.attack_bonus).toBe(6);
-    expect(HOOVES.damage_dice_primary).toBe('2d4 + 4');
-    expect(HOOVES.damage_type_primary).toBe('Bludgeoning');
-    const keys = Object.keys(HOOVES);
+describe.each(ROWS)('$ticket monsters.json data lock: charge rider row', ({ index, actionName, attackBonus, base, type, cd, prose }) => {
+  it('conditional_damage identity modifier-absent after damage_type_primary last key + recharge/hit_conditions/two-handed absent + untransported Prone prose', () => {
+    const action = monsters.find((m) => m.index === index).actions.find((a) => a.name === actionName);
+    expect(action.attack_bonus).toBe(attackBonus);
+    expect(action.damage_dice_primary).toBe(base);
+    expect(action.damage_type_primary).toBe(type);
+    const keys = Object.keys(action);
     expect(keys.indexOf('conditional_damage')).toBeGreaterThan(keys.indexOf('damage_type_primary'));
     expect(keys.indexOf('conditional_damage')).toBe(keys.length - 1);
-    expect(HOOVES.description).toMatch(/extra 5 \(2d4\) Bludgeoning damage/i);
-    expect(canRollExpression(HOOVES.damage_dice_primary)).toBe(true);
-  });
-
-  it('conditional_damage is the goat twin byte-shape (2d4, modifier-less, same key order)', () => {
-    const cd = HOOVES.conditional_damage;
-    expect(cd).toBeTruthy();
-    expect(cd.dice).toBe('2d4');
-    expect(cd.damage_type).toBe('Bludgeoning');
-    expect(cd.condition).toBe('moved 20+ feet straight toward the target immediately before the hit');
-    expect(cd).not.toHaveProperty('modifier');
-    expect(Object.keys(cd)).toEqual(Object.keys(GOAT_CD));
-  });
-
-  it('prone stays advisory: hit_conditions NOT authored (charge gate has no transport — MA-0903/MA-1610)', () => {
-    expect('hit_conditions' in HOOVES).toBe(false);
-    expect(buildHitConditionClause(HOOVES)).toBeNull();
-  });
-
-  it('buildChargeBonusOffer arms on the row: formula "2d4" (modifier 0), charge label', () => {
-    const offer = buildChargeBonusOffer(HOOVES, 'Hooves');
-    expect(offer).toMatchObject({ dice: '2d4', modifier: 0, damageType: 'Bludgeoning', formula: '2d4', attackName: 'Hooves' });
-    expect(offer.label).toBe('20+ ft Charge: +2d4 Bludgeoning?');
+    // Full identity pins the exact key set (goat Ram MA-0885 shape; modifier
+    // key ABSENT → offer folds formula to bare dice).
+    expect(action.conditional_damage).toEqual(cd);
+    // Prone half advisory: hit_conditions NOT authored (auto-grant would fire
+    // on every hit, MA-0903/MA-1610 WRONG-RAW caveat).
+    expect(action.description).toMatch(prose);
+    expect(action.recharge).toBeUndefined();
+    expect(action.hit_conditions).toBeUndefined();
+    expect(action.damage_dice_two_handed).toBeUndefined();
+    expect(buildTwoHandedVariantOffer(action, actionName)).toBeNull();
   });
 });
 
-describe('MA-1676 Hooves HIT popup offer + grant/decline', () => {
-  it('forwards the charge offer to the attack roll context, no prone clause', () => {
-    renderHooves();
-    clickHoovesLink();
+describe.each(ROWS)('$ticket click→ctx forward (single press)', ({ index, monster, actionName, chip, offer }) => {
+  it(`clicking the ${chip} chip forwards the full disk offer (formula=dice fold, "20+ ft Charge:" label) + null hitClause + null two-handed variant`, () => {
+    renderRow({ index, monster });
+    const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => new RegExp(`^${actionName}`).test(a.textContent.trim()));
+    const diceChip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === chip);
+    expect(diceChip, `Expected ${actionName} ${chip} dice link`).toBeTruthy();
+    fireEvent.click(diceChip);
     expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d4', modifier: 0, damageType: 'Bludgeoning', formula: '2d4' });
-    expect(rollAttack.mock.calls[0][2].hitClause).toBeNull();
-  });
-
-  it('grants: rolls 2d4 as its own extra damage leg, logs conditional_damage_granted', async () => {
-    renderHooves(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d4');
-    expect(call.name).toBe('Hooves — Charge Bonus');
-    expect(call.context.damageType).toBe('Bludgeoning');
-    expect(rollExpression).toHaveBeenCalledWith('2d4');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('+7 Bludgeoning (2d4)');
-  });
-
-  it('declines: logs conditional_damage_declined with zero charge roll', async () => {
-    renderHooves(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      const decline = findLogEntry('conditional_damage_declined');
-      expect(decline).toBeTruthy();
-      expect(decline.description).toContain('base damage only');
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-  });
-});
-
-// MA-1699: Wereboar Tusk — one-field DATA fix: conditional_damage
-// {dice:"2d6", damage_type:"Piercing"} authored on monsters.json actions[3]
-// (MA-0007 charge-bonus seam, MA-0885 goat Ram / MA-1676 warhorse Hooves
-// byte-shape twins) so the HIT popup offers "20+ ft Charge: +2d6 Piercing?"
-// (chargeOfferLabel, feet=20 parsed from the clause) + decline instead of
-// base-only damage. Prone half: movement-gated Prone stays advisory —
-// hit_conditions deliberately NOT authored (ungated every-hit grant wrong
-// RAW, MA-1676/MA-1610/MA-0903 precedent).
-const WEREBOAR = monsters.find((m) => m.index === 'wereboar');
-const TUSK = WEREBOAR.actions[3];
-
-const TUSK_CREATURES = [
-  { name: 'Wereboar 1', targetName: 'Bandit 1' },
-  { name: 'Bandit 1', type: 'player', size: 'Medium' },
-];
-
-function tuskHitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(TUSK, 'Tusk');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Tusk',
-    rolls: [14],
-    bonus: 5,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Tusk', formula: '2d6 + 3', damageType: 'Piercing', source: 'Wereboar 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderTusk(popupHtml = null) {
-  _setPopupHtml(popupHtml);
-  const m = makeMonster({ name: 'Wereboar', actions: WEREBOAR.actions });
-  damageUtils.__setFindCreatureReturn({ name: 'Wereboar 1', targetName: 'Bandit 1', conditions: [] });
-  return render(<MonsterCardModal {...makeProps(m, { creatures: TUSK_CREATURES, creatureName: 'Wereboar 1' })} />);
-}
-
-function clickTuskLink() {
-  const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Tusk/.test(a.textContent.trim()));
-  const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+5');
-  expect(chip, 'Expected Tusk +5 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-describe('MA-1699 monsters.json data lock: Wereboar Tusk conditional charge damage', () => {
-  it('authors conditional_damage after damage_type_primary, last key (MA-0885/MA-1676 placement)', () => {
-    expect(TUSK.name).toBe('Tusk');
-    expect(TUSK.attack_bonus).toBe(5);
-    expect(TUSK.damage_dice_primary).toBe('2d6 + 3');
-    expect(TUSK.damage_type_primary).toBe('Piercing');
-    const keys = Object.keys(TUSK);
-    expect(keys.indexOf('conditional_damage')).toBeGreaterThan(keys.indexOf('damage_type_primary'));
-    expect(keys.indexOf('conditional_damage')).toBe(keys.length - 1);
-    expect(TUSK.description).toMatch(/extra 7 \(2d6\) Piercing damage/i);
-    expect(canRollExpression(TUSK.damage_dice_primary)).toBe(true);
-  });
-
-  it('conditional_damage is the goat/warhorse twin byte-shape (2d6 Piercing, modifier-less, same key order)', () => {
-    const cd = TUSK.conditional_damage;
-    expect(cd).toBeTruthy();
-    expect(cd.dice).toBe('2d6');
-    expect(cd.damage_type).toBe('Piercing');
-    expect(cd.condition).toBe('moved 20+ feet straight toward the target immediately before the hit');
-    expect(cd).not.toHaveProperty('modifier');
-    expect(Object.keys(cd)).toEqual(Object.keys(GOAT_CD));
-    expect(Object.keys(cd)).toEqual(Object.keys(HOOVES.conditional_damage));
-  });
-
-  it('prone stays advisory: hit_conditions NOT authored (movement-gated rider — MA-1676/MA-1610/MA-0903)', () => {
-    expect('hit_conditions' in TUSK).toBe(false);
-    expect(buildHitConditionClause(TUSK)).toBeNull();
-  });
-
-  it('buildChargeBonusOffer arms on the row: formula "2d6" (modifier 0), charge label', () => {
-    const offer = buildChargeBonusOffer(TUSK, 'Tusk');
-    expect(offer).toMatchObject({ dice: '2d6', modifier: 0, damageType: 'Piercing', formula: '2d6', attackName: 'Tusk' });
-    expect(offer.label).toBe('20+ ft Charge: +2d6 Piercing?');
-  });
-});
-
-describe('MA-1699 Tusk HIT popup offer + grant/decline', () => {
-  it('forwards the charge offer to the attack roll context, no prone clause', () => {
-    renderTusk();
-    clickTuskLink();
-    expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d6', modifier: 0, damageType: 'Piercing', formula: '2d6' });
-    expect(rollAttack.mock.calls[0][2].hitClause).toBeNull();
-  });
-
-  it('grants: rolls 2d6 as its own extra damage leg, logs conditional_damage_granted', async () => {
-    renderTusk(tuskHitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d6');
-    expect(call.name).toBe('Tusk — Charge Bonus');
-    expect(call.context.damageType).toBe('Piercing');
-    expect(rollExpression).toHaveBeenCalledWith('2d6');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('+7 Piercing (2d6)');
-  });
-
-  it('declines: logs conditional_damage_declined with zero charge roll', async () => {
-    renderTusk(tuskHitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      const decline = findLogEntry('conditional_damage_declined');
-      expect(decline).toBeTruthy();
-      expect(decline.description).toContain('base damage only');
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.chargeBonusOffer).toEqual(offer);
+    expect(ctx.hitClause).toBeNull();
+    expect(ctx.twoHandedVariantOffer).toBeNull();
   });
 });

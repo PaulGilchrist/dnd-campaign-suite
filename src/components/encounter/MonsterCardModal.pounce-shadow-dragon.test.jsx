@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1456 regression: Shadow Dragon legendary rows[0] "Pounce" carried `uses:1`
 // with no header row above it — legendaryHeaderAction() swallowed Pounce as the
 // economy header (name+counter render, zero affordance; MA-0510/§99 header-swallow)
@@ -17,6 +18,18 @@
 // advisory branch §678 PRECEDES the damage else and would silently suppress the roll).
 // Stealth stays §70 GM-enforced, folded into `description` (MA-1456 Pounce precedent);
 // once-per-turn cooldown engine-enforced by the MA-0073 legendary cooldown latch.
+//
+// Refusal legs cite-owned (monster-independent gates in monsterLegendaryUses.js):
+// exhausted pool MonsterCardModal.legendary-uses.test.jsx:195-212 (its canonical
+// trimmed leg absorbs zero-spend + zero-roll incl. numeric-chip refusal-before-roll
+// :204; max:2 here is pinned by the data lock and the '(2 left)' counter render);
+// turn latch same-boundary same file :309-316 ('Only one legendary action' popup text
+// owners: ma1881-demogorgon :162, blinking-gaze-solar :244, legendary-uses-unicorn
+// :187). OWN-TURN full-popup bytes below are CANONICAL — cited by pounce-ancient-
+// gold and terrifying-presence-dracolich; do not trim.
+// Mock hygiene: diceRoller/rangeValidation/mapsService unmocked per the gold run-
+// unmocked-clean precedent (real parseable rolls feed totals into the mocked
+// useLoggedDiceRoll hook; nothing roll-dependent is asserted).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
@@ -24,11 +37,6 @@ import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 import { legendaryHeaderAction, legendaryDelegateAction, legendaryDelegateAttackName } from '../../services/encounters/monsterLegendaryUses.js';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -66,13 +74,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   findCreatureByName: vi.fn((cs, name) => (cs?.creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn(() => Promise.resolve(ctx.value)),
 }));
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 80),
-}));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn().mockResolvedValue(null) }));
 
 const runtime = vi.hoisted(() => {
   const store = {};
@@ -106,60 +107,45 @@ const pounceRow = () => legendaryRows().find(a => a.name === 'Pounce');
 const veilRow = () => legendaryRows().find(a => a.name === 'Veil of Shadow');
 const rendRow = () => shadowDragon().actions.find(a => a.name === 'Rend');
 
-// MA-1456 data lock: header-swallow fixed — rows[0] is the canonical header
-// (numeric uses, no mechanic of its own); children carry no per-child `uses`
-// nor `recharge` (§168 Colossus/Death Knight verified templates).
+// MA-1456 data lock: header-swallow fixed — header+children SAME pass
+// (§168 Colossus/Death Knight verified templates).
 describe('MA-1456 monsters.json data: shadow-dragon legendary block header + children', () => {
-  it('rows[0] is the canonical header "Legendary Action Uses: 2" with numeric uses', () => {
+  it('rows[0] is the canonical full-row header "Legendary Action Uses: 2"; children own no economy fields (§168)', () => {
     const h = headerRow();
+    expect(Object.keys(h)).toEqual(['name', 'uses', 'description']);
     expect(h.name).toBe('Legendary Action Uses: 2');
     expect(h.uses).toBe(2);
     expect(h.description).toContain('regains expended legendary uses at the start of its turn');
-    expect(h.delegates_to).toBeUndefined();
     expect(legendaryHeaderAction(shadowDragon())).toBe(h);
-  });
-
-  it('children carry no per-child uses (header owns the economy, §168)', () => {
     for (const child of legendaryRows().slice(1)) {
       expect(child.uses).toBeUndefined();
       expect(child.recharge).toBeUndefined();
     }
   });
 
-  it('Pounce child delegates_to Rend, no numeric fields of its own', () => {
+  it('Pounce child is the full-row {name, delegates_to, description} shape; own Rend +10 / 2d6 + 5 Slashing + 1d6 Necrotic resolves through the delegate seam labelled "(Rend save)" (§640(a) DC0 decoy, attack seam)', () => {
     const row = pounceRow();
-    expect(row.delegates_to).toBe('Rend');
+    expect(Object.keys(row)).toEqual(['name', 'delegates_to', 'description']);
     expect(row.description).toBe('The dragon moves up to half its Speed (movement advisory — GM moves the token; no movement-distance consumer), and it makes one Rend attack.');
-    expect(row.attack_bonus).toBeUndefined();
-    expect(row.save_dc).toBeUndefined();
-    expect(row.advisory).toBeUndefined();
-  });
-
-  it('delegates to the shadow-dragon own Rend row: +10 / 2d6 + 5 Slashing + 1d6 Necrotic', () => {
     const rend = rendRow();
     expect(rend.attack_bonus).toBe(10);
     expect(rend.damage_dice_primary).toBe('2d6 + 5');
     expect(rend.damage_type_primary).toBe('Slashing');
     expect(rend.damage_dice_secondary).toBe('1d6');
     expect(rend.damage_type_secondary).toBe('Necrotic');
-    const delegate = legendaryDelegateAction(shadowDragon(), pounceRow());
-    expect(delegate).toBe(rend);
-    // §640(a): Rend carries the household save_dc:0 decoy → label reads
-    // "(Rend save)" while the row RIDES THE ATTACK SEAM (cosmetic pin).
-    expect(legendaryDelegateAttackName(pounceRow(), rend)).toBe('Pounce (Rend save)');
+    expect(rend.save_dc).toBe(0);
+    expect(legendaryDelegateAction(shadowDragon(), row)).toBe(rend);
+    // DISTINCT from gold's "(Rend attack)" — household DC0 decoy cosmetic pin.
+    expect(legendaryDelegateAttackName(row, rend)).toBe('Pounce (Rend save)');
   });
 
   // MA-1457: the interim MA-0957 advisory stopgap is superseded — the row now
   // carries numeric damage fields so its gated click rolls (advisory branch §678
   // precedes the damage else §698 and would suppress it). Stealth advisory folded
   // into `description` per the MA-1456 Pounce precedent; cooldown clause survives.
-  it('Veil of Shadow rides the damage seam — 3d6 Necrotic numeric fields, advisory stripped', () => {
+  it('Veil of Shadow rides the damage seam — full-row numeric 3d6 Necrotic fields, advisory stripped', () => {
     const row = veilRow();
-    expect(row.advisory).toBeUndefined();
-    expect(row.advisory_message).toBeUndefined();
-    expect(row.attack_bonus).toBeUndefined();
-    expect(row.save_dc).toBeUndefined();
-    expect(row.delegates_to).toBeUndefined();
+    expect(Object.keys(row)).toEqual(['name', 'description', 'damage_dice_primary', 'damage_type_primary']);
     expect(row.damage_dice_primary).toBe('3d6');
     expect(row.damage_type_primary).toBe('Necrotic');
     expect(row.description).toContain('takes 10 (3d6) Necrotic damage');
@@ -168,14 +154,14 @@ describe('MA-1456 monsters.json data: shadow-dragon legendary block header + chi
   });
 });
 
-// MA-1456 live seam: header renders "Legendary Action Uses: 2 (2 left)" — NOT a
-// swallowed Pounce header. Pounce (no numeric affordance) keeps the gated
-// "Expend Legendary" chip; Pounce click spends then rolls the delegated +10 Rend
-// attack (armed Bandit, 2d6 + 5 Slashing + 1d6 Necrotic via MA-0022 seam, save
-// lane never armed at DC0). MA-1457: Veil of Shadow now carries numeric 3d6 so its
-// gated affordance is a plain ".mc-dice-link" damage chip (LegendarySpendLink
-// self-suppresses on numeric rows) — click spends then rolls 3d6 Necrotic vs the
-// armed Bandit. Boundary refire + exhausted + own-turn refusals honest, zero spend.
+// MA-1456 live seam: header renders the canonical counter — NOT a swallowed
+// Pounce header — and chip faces split by affordance: the prose Pounce child
+// keeps the gated "Expend Legendary" chip while numeric Veil self-suppresses
+// LegendarySpendLink (:193) and affords a plain damage chip. Pounce click spends
+// then rolls the delegated +10 Rend attack (armed Bandit, MA-0022 seam, save
+// lane never armed at DC0); Veil click spends then rolls 3d6 Necrotic (§698)
+// and stamps the MA-0073 cooldown latch. Own-turn refusal is the CANONICAL
+// full-popup byte (cited by pounce-ancient-gold / terrifying-presence-dracolich).
 describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -196,25 +182,20 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     return Array.from(document.querySelectorAll('.mc-action')).find(r => (r.querySelector('strong')?.textContent || '').startsWith(name));
   }
 
-  it('header renders "Legendary Action Uses: 2" — NOT a swallowed Pounce header', () => {
+  it('header + chip faces: "Legendary Action Uses: 2 (2 left)" NOT a swallowed Pounce; exactly ONE spend chip (Pounce); Veil self-suppresses and affords numeric 3d6', () => {
     renderShadowDragon({ max: 2, used: 0 });
     const header = document.querySelector('.mc-legendary-header-row');
     expect(header).not.toBe(null);
     expect(header.textContent).toContain('Legendary Action Uses: 2');
     expect(header.textContent).not.toContain('Pounce');
     expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(2 left)');
-  });
-
-  it('Pounce keeps gated Expend Legendary chip; Veil now renders numeric 3d6 damage chip (MA-1457)', () => {
-    renderShadowDragon({ max: 2, used: 0 });
-    // Only the non-numeric child (Pounce) keeps the spend-only chip; a numeric
-    // legendary child self-suppresses LegendarySpendLink (:193) and affords damage.
-    expect(document.querySelectorAll('.mc-dice-link-legendary').length).toBe(1);
-    expect(laRow('Pounce').querySelector('.mc-dice-link-legendary')).not.toBe(null);
-    const veilDmg = laRow('Veil of Shadow').querySelector('.mc-dice-link');
-    expect(laRow('Veil of Shadow').querySelector('.mc-dice-link-legendary')).toBe(null);
-    expect(veilDmg).not.toBe(null);
-    expect(veilDmg.textContent).toContain('3d6');
+    const chips = document.querySelectorAll('.mc-dice-link-legendary');
+    expect(chips.length).toBe(1);
+    expect(chips[0].textContent).toContain('Expend Legendary');
+    expect(chips[0]).toBe(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
+    const veil = laRow('Veil of Shadow');
+    expect(veil.querySelector('.mc-dice-link-legendary')).toBe(null);
+    expect(veil.querySelector('.mc-dice-link').textContent).toContain('3d6');
   });
 
   it('Pounce chip spends 2->1 after another creature turn and rolls the delegated +10 Rend attack — no save leg, no console error', async () => {
@@ -233,6 +214,7 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     expect(options.damageType).toBe('Slashing');
     expect(options.autoDamageSecondaryFormula).toBe('1d6');
     expect(options.autoDamageSecondaryDamageType).toBe('Necrotic');
+    expect(options.isSpellDamage).toBe(false);
     expect(options.targetName).toBe('Bandit 1');
     expect(options.saveDc).toBeNull();
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Pounce/.test(e.description));
@@ -242,25 +224,10 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     errSpy.mockRestore();
   });
 
-  it('same-boundary refire refuses (turn latch) — shared gate rides BOTH children', async () => {
-    renderShadowDragon({ max: 2, used: 0 });
-    fireEvent.click(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(ROLLERS.rollAttack).toHaveBeenCalled());
-    fireEvent.click(laRow('Veil of Shadow').querySelector('.mc-dice-link'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Only one legendary action');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Shadow Dragon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 1 });
-    expect(ROLLERS.rollAttack).toHaveBeenCalledTimes(1);
-    // Refused before the mechanic resolves — the numeric damage roll never fires.
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
-  // MA-1457: the interim advisory record is superseded — the gated numeric chip
-  // spends honestly then ROLLS 3d6 Necrotic vs the armed Bandit through the damage
-  // else (§698). Stealth stays §70 GM-enforced (folded into description). Cooldown
-  // latch still stamps. Attack/save legs stay dead; zero console silent-burn.
-  it('MA-1457 Veil chip spends honestly and rolls 3d6 Necrotic vs the armed target', async () => {
+  // MA-1457: the gated numeric chip spends honestly then ROLLS 3d6 Necrotic vs
+  // the armed Bandit through the damage else (§698). Stealth stays §70
+  // GM-enforced (folded into description). Cooldown latch still stamps.
+  it('MA-1457 Veil chip spends honestly and rolls 3d6 Necrotic vs the armed target; MA-0073 cooldown stamps', async () => {
     renderShadowDragon({ max: 2, used: 0 });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const chip = laRow('Veil of Shadow').querySelector('.mc-dice-link');
@@ -275,7 +242,6 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     expect(dmg.context.targetName).toBe('Bandit 1');
     expect(dmg.context.attackerName).toBe('Shadow Dragon 1');
     const spend = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'ability_use' && /Veil of Shadow/.test(e.description));
-    expect(spend).toBeTruthy();
     expect(spend.description).toMatch(/expends a legendary use for Veil of Shadow/);
     // MA-0073: the row's own once-per-turn clause stamps the cooldown latch.
     expect(runtime.store['Shadow Dragon 1.monsterLegendaryActionCooldowns']?.veil_of_shadow).toBeTruthy();
@@ -285,25 +251,18 @@ describe('MA-1456 MonsterCardModal shadow-dragon legendary gated rows', () => {
     errSpy.mockRestore();
   });
 
-  it('exhausted (2/2 spent): Pounce chip click refuses with popup + legendary_use_refused, zero spend, zero roll', async () => {
-    renderShadowDragon({ max: 2, used: 2 });
-    expect(document.querySelector('.mc-legendary-counter').textContent).toBe('(0 left)');
-    fireEvent.click(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
-    await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Legendary Action Refused');
-    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
-    expect(runtime.store['Shadow Dragon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 2 });
-    expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
-    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
-  });
-
+  // CANONICAL own-turn refusal (cited by pounce-ancient-gold /
+  // terrifying-presence-dracolich): full-popup byte, zero spend, zero roll.
   it('own-turn click refuses honestly (after ANOTHER creature\'s turn, not its own)', async () => {
     ctx.value = { round: 1, activeCreatureName: 'Shadow Dragon 1', creatures: CREATURES };
     renderShadowDragon({ max: 2, used: 0 });
     fireEvent.click(laRow('Pounce').querySelector('.mc-dice-link-legendary'));
     await waitFor(() => expect(setPopupHtml).toHaveBeenCalled());
     expect(String(setPopupHtml.mock.calls[0][0])).toContain("after ANOTHER creature's turn, not its own");
+    await waitFor(() => expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'legendary_use_refused')).toBe(true));
     expect(runtime.store['Shadow Dragon 1.monsterLegendaryUses']).toEqual({ max: 2, used: 0 });
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
+    expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
+    expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
   });
 });

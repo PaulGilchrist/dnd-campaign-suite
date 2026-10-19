@@ -1,183 +1,129 @@
+// @maintained-by-ai
+// SVG asset lane — static decorative token, zero mocks, golden-once (template #890).
+// Old 16 attr-spie tests -> 3: (1) props/ref forwarding contract,
+// (2) element census + inert-click static-art guard, (3) golden geometry
+// verbatim in DOM order once. ChestSVG authors no <path> elements, so the
+// family's "pin path bytes" shape is replaced by rect/line/circle pins.
+// No authored interactive variants (no handlers/state in ChestSVG.jsx),
+// so no state->bytes it.each lane (#877) applies here.
+// Family map: map/*SVG.test.jsx siblings (Barrel #890, Altar #890);
+// PlacedItems-fog.test.jsx pins only <use href="#chest"> wiring, not internals.
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import ChestSVG from './ChestSVG';
 
 describe('ChestSVG', () => {
-  describe('root group element', () => {
-    it('renders a <g> element with id, className, rest props, and ref', () => {
-      const ref = { current: null };
-      const { container } = render(
-        <ChestSVG id="chest-1" className="custom-chest" data-test="chest-test" ref={ref} />
-      );
-      const g = container.querySelector('g');
-      expect(g).toBeInTheDocument();
-      expect(g).toHaveAttribute('id', 'chest-1');
-      expect(g).toHaveClass('custom-chest');
-      expect(g).toHaveAttribute('data-test', 'chest-test');
-      expect(ref.current).toBe(g);
-    });
+  it('forwards id, className, rest props, and ref to the root <g>', () => {
+    const ref = React.createRef();
+    const { container } = render(
+      <ChestSVG id="chest-1" className="custom-chest" data-test="chest-test" ref={ref} />
+    );
+    const g = container.querySelector('g');
+    expect(g).toBeInTheDocument();
+    expect(g).toHaveAttribute('id', 'chest-1');
+    expect(g).toHaveClass('custom-chest');
+    expect(g).toHaveAttribute('data-test', 'chest-test');
+    expect(ref.current).toBe(g);
   });
 
-  describe('floor shadow', () => {
-    it('renders the shadow rect with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const shadow = container.querySelector('rect[fill="#6B3E1F"][opacity="0.25"]');
-      expect(shadow).toBeInTheDocument();
-      expect(shadow).toHaveAttribute('rx', '1');
-      expect(shadow).toHaveAttribute('x', '7');
-      expect(shadow).toHaveAttribute('y', '10');
-      expect(shadow).toHaveAttribute('width', '24');
-      expect(shadow).toHaveAttribute('height', '18');
-    });
+  it('renders the authored element census and stays inert when clicked', () => {
+    const { container } = render(<ChestSVG />);
+
+    const counts = {
+      g: 1,
+      rect: 12, // shadow + lid edge + body + 2 bands + 2 band highlights + keyhole + 2 hinges + 2 edge shadows
+      line: 4, // wood grain lines
+      circle: 9, // 8 nail heads + lock
+      'rect[fill="#6B3E1F"]': 4, // floor shadow, lid edge, right + bottom edge shadows
+      'rect[fill="#A0703C"]': 1, // body
+      'rect[fill="#555"]': 2, // metal bands
+      'rect[fill="#777"]': 2, // band top highlights
+      'rect[fill="#333"]': 1, // keyhole
+      'rect[fill="#666"]': 2, // hinges
+      'line[stroke="#7A4E20"]': 4, // grain lines (stroke-only)
+      'circle[fill="#888"]': 8, // nail heads
+      'circle[fill="#D4A017"]': 1, // lock
+    };
+    for (const [selector, count] of Object.entries(counts)) {
+      expect(container.querySelectorAll(selector), selector).toHaveLength(count);
+    }
+
+    // Static art: clicking changes nothing.
+    const before = container.innerHTML;
+    fireEvent.click(container.querySelector('g'));
+    expect(container.innerHTML).toBe(before);
   });
 
-  describe('lid edge', () => {
-    it('renders the lid edge rect with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const lidEdge = container.querySelector('rect[x="5"][y="8"][width="26"][height="20"]');
-      expect(lidEdge).toBeInTheDocument();
-      expect(lidEdge).toHaveAttribute('rx', '1');
-      expect(lidEdge).toHaveAttribute('fill', '#6B3E1F');
-    });
-  });
+  it('pins rect, line, and circle geometry verbatim in DOM order', () => {
+    const { container } = render(<ChestSVG />);
 
-  describe('main chest body', () => {
-    it('renders the body rect with correct shape and colors', () => {
-      const { container } = render(<ChestSVG />);
-      const body = container.querySelector('rect[fill="#A0703C"]');
-      expect(body).toBeInTheDocument();
-      expect(body).toHaveAttribute('stroke', '#8B5E3C');
-      expect(body).toHaveAttribute('stroke-width', '0.6');
-      expect(body).toHaveAttribute('rx', '0.8');
-      expect(body).toHaveAttribute('x', '6');
-      expect(body).toHaveAttribute('y', '9');
-      expect(body).toHaveAttribute('width', '24');
-      expect(body).toHaveAttribute('height', '18');
-    });
-  });
+    // All 12 rects, DOM order: shadow, lid edge, body, band/highlight pairs,
+    // keyhole, hinges, right + bottom edge shadows.
+    const box = (r) =>
+      `${r.getAttribute('x')},${r.getAttribute('y')},${r.getAttribute('width')},${r.getAttribute('height')},${r.getAttribute('fill')}`;
+    expect(Array.from(container.querySelectorAll('rect')).map(box)).toEqual([
+      '7,10,24,18,#6B3E1F', // floor shadow
+      '5,8,26,20,#6B3E1F', // lid edge
+      '6,9,24,18,#A0703C', // body
+      '6,11,24,1.5,#555', // top band
+      '6,11,24,0.4,#777', // top band highlight
+      '6,24,24,1.5,#555', // bottom band
+      '6,24,24,0.4,#777', // bottom band highlight
+      '17.5,21.5,1,2.5,#333', // keyhole
+      '8,8,3,1.2,#666', // hinge left
+      '25,8,3,1.2,#666', // hinge right
+      '28,9,2,18,#6B3E1F', // right edge shadow
+      '6,25,24,2,#6B3E1F', // bottom edge shadow
+    ]);
 
-  describe('wood grain lines', () => {
-    it('renders 4 grain lines with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const grainLines = container.querySelectorAll('line[stroke="#7A4E20"]');
-      expect(grainLines.length).toBe(4);
-      grainLines.forEach((line) => {
-        expect(line).toHaveAttribute('stroke-width', '0.3');
-        expect(line).toHaveAttribute('opacity', '0.25');
-      });
+    // Silhouette and accent styling rides with the pinned boxes.
+    const rects = Array.from(container.querySelectorAll('rect'));
+    expect(rects[0]).toHaveAttribute('rx', '1');
+    expect(rects[0]).toHaveAttribute('opacity', '0.25');
+    expect(rects[1]).toHaveAttribute('rx', '1');
+    expect(rects[2]).toHaveAttribute('rx', '0.8');
+    expect(rects[2]).toHaveAttribute('stroke', '#8B5E3C');
+    expect(rects[2]).toHaveAttribute('stroke-width', '0.6');
+    expect(rects[7]).toHaveAttribute('rx', '0.2');
+    rects.slice(8, 10).forEach((hinge) => {
+      expect(hinge).toHaveAttribute('stroke', '#555');
+      expect(hinge).toHaveAttribute('stroke-width', '0.3');
+      expect(hinge).toHaveAttribute('rx', '0.3');
     });
-
-    it('renders grain lines at correct x positions', () => {
-      const { container } = render(<ChestSVG />);
-      const grainLines = Array.from(container.querySelectorAll('line[stroke="#7A4E20"]'));
-      const startPositions = grainLines.map((l) => l.getAttribute('x1'));
-      expect(startPositions).toContain('8');
-      expect(startPositions).toContain('7');
-    });
-  });
-
-  describe('metal bands', () => {
-    it('renders 2 dark band rects with correct positions', () => {
-      const { container } = render(<ChestSVG />);
-      const darkBands = container.querySelectorAll('rect[fill="#555"]');
-      expect(darkBands.length).toBe(2);
-      expect(darkBands[0]).toHaveAttribute('x', '6');
-      expect(darkBands[0]).toHaveAttribute('y', '11');
-      expect(darkBands[0]).toHaveAttribute('width', '24');
-      expect(darkBands[0]).toHaveAttribute('height', '1.5');
-      expect(darkBands[1]).toHaveAttribute('y', '24');
+    rects.slice(10).forEach((shadow) => {
+      expect(shadow).toHaveAttribute('opacity', '0.15');
     });
 
-    it('renders 2 highlight band rects with correct positions', () => {
-      const { container } = render(<ChestSVG />);
-      const highlights = container.querySelectorAll('rect[fill="#777"]');
-      expect(highlights.length).toBe(2);
-      expect(highlights[0]).toHaveAttribute('y', '11');
-      expect(highlights[0]).toHaveAttribute('height', '0.4');
-      expect(highlights[1]).toHaveAttribute('y', '24');
-    });
-  });
-
-  describe('nail heads', () => {
-    it('renders 8 nail head circles with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const nails = container.querySelectorAll('circle[fill="#888"]');
-      expect(nails.length).toBe(8);
-      nails.forEach((nail) => {
-        expect(nail).toHaveAttribute('r', '0.7');
-      });
+    // Grain lines, DOM order.
+    const grain = (l) =>
+      `${l.getAttribute('x1')},${l.getAttribute('y1')},${l.getAttribute('x2')},${l.getAttribute('y2')}`;
+    expect(Array.from(container.querySelectorAll('line')).map(grain)).toEqual([
+      '8,12,28,12',
+      '7,16,29,16',
+      '8,20,28,20',
+      '7,24,29,24',
+    ]);
+    Array.from(container.querySelectorAll('line')).forEach((l) => {
+      expect(l).toHaveAttribute('stroke-width', '0.3');
+      expect(l).toHaveAttribute('opacity', '0.25');
     });
 
-    it('renders nail heads at correct y positions for top and bottom bands', () => {
-      const { container } = render(<ChestSVG />);
-      const topNails = container.querySelectorAll('circle[cy="11.8"]');
-      const bottomNails = container.querySelectorAll('circle[cy="24.8"]');
-      expect(topNails.length).toBe(4);
-      expect(bottomNails.length).toBe(4);
-    });
-  });
-
-  describe('lock and keyhole', () => {
-    it('renders the lock circle with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const lock = container.querySelector('circle[cx="18"][cy="21"]');
-      expect(lock).toBeInTheDocument();
-      expect(lock).toHaveAttribute('r', '2.5');
-      expect(lock).toHaveAttribute('fill', '#D4A017');
-      expect(lock).toHaveAttribute('stroke', '#B8860B');
-      expect(lock).toHaveAttribute('stroke-width', '0.4');
-    });
-
-    it('renders the keyhole rect inside the lock', () => {
-      const { container } = render(<ChestSVG />);
-      const keyhole = container.querySelector('rect[fill="#333"]');
-      expect(keyhole).toBeInTheDocument();
-      expect(keyhole).toHaveAttribute('rx', '0.2');
-      expect(keyhole).toHaveAttribute('x', '17.5');
-      expect(keyhole).toHaveAttribute('y', '21.5');
-      expect(keyhole).toHaveAttribute('width', '1');
-      expect(keyhole).toHaveAttribute('height', '2.5');
-    });
-  });
-
-  describe('hinges', () => {
-    it('renders 2 hinge rects with correct attributes', () => {
-      const { container } = render(<ChestSVG />);
-      const hinges = container.querySelectorAll('rect[fill="#666"][stroke="#555"]');
-      expect(hinges.length).toBe(2);
-      hinges.forEach((hinge) => {
-        expect(hinge).toHaveAttribute('height', '1.2');
-        expect(hinge).toHaveAttribute('stroke-width', '0.3');
-        expect(hinge).toHaveAttribute('rx', '0.3');
-      });
-    });
-
-    it('renders hinges at correct x positions', () => {
-      const { container } = render(<ChestSVG />);
-      const hinges = Array.from(container.querySelectorAll('rect[fill="#666"][stroke="#555"]'));
-      const xPositions = hinges.map((h) => h.getAttribute('x'));
-      expect(xPositions).toContain('8');
-      expect(xPositions).toContain('25');
-    });
-  });
-
-  describe('edge shadows', () => {
-    it('renders the right edge shadow rect', () => {
-      const { container } = render(<ChestSVG />);
-      const rightShadow = container.querySelector('rect[x="28"][y="9"][width="2"][height="18"]');
-      expect(rightShadow).toBeInTheDocument();
-      expect(rightShadow).toHaveAttribute('fill', '#6B3E1F');
-      expect(rightShadow).toHaveAttribute('opacity', '0.15');
-    });
-
-    it('renders the bottom edge shadow rect', () => {
-      const { container } = render(<ChestSVG />);
-      const bottomShadow = container.querySelector('rect[x="6"][y="25"][width="24"][height="2"]');
-      expect(bottomShadow).toBeInTheDocument();
-      expect(bottomShadow).toHaveAttribute('fill', '#6B3E1F');
-      expect(bottomShadow).toHaveAttribute('opacity', '0.15');
-    });
+    // Circles, DOM order: 8 nails (top band then bottom band), then lock.
+    const center = (c) => `${c.getAttribute('cx')},${c.getAttribute('cy')},${c.getAttribute('r')}`;
+    expect(Array.from(container.querySelectorAll('circle')).map(center)).toEqual([
+      '8,11.8,0.7',
+      '28,11.8,0.7',
+      '13,11.8,0.7',
+      '23,11.8,0.7',
+      '8,24.8,0.7',
+      '28,24.8,0.7',
+      '13,24.8,0.7',
+      '23,24.8,0.7',
+      '18,21,2.5', // lock
+    ]);
+    const lock = container.querySelector('circle[fill="#D4A017"]');
+    expect(lock).toHaveAttribute('stroke', '#B8860B');
+    expect(lock).toHaveAttribute('stroke-width', '0.4');
   });
 });
-

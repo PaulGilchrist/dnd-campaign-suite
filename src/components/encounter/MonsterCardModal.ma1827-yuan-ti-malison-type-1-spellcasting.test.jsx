@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1827 data lock: Yuan-ti Malison (Type 1) Spellcasting rode the MA-0421 /
 // MA-1742 / MA-1814 / MA-1818 markup-gap family — plain-text spell names (zero
 // affordances, row inert) while the save_dc 13 + save_type Wisdom pair sat
@@ -5,12 +6,27 @@
 // the MA-1742 YOCHLOL / MA-1814 ABOMINATION / MA-1818 INFILTRATOR INLINE
 // byte-shape: <strong> tier headers + <em> per spell name, "; " tier delimiters
 // preserved, NO <br> (original prose was inline — adding <br> breaks stripTags
-// byte-equality, §MA-1742 pitfall).
-// "At Will:"/"2/Day:" headers end ":" → fake-chip guard skips them
-// (MonsterCardHelpers.js:399); "2/Day:" matches the uses-header regex (:440)
-// binding Suggestion maxUses 2. 2/Day refusal = monsterSpellUses key +
-// "automation blocked" (§57); At Will ungated by design. "(snakes only)"
+// byte-equality, §MA-1742 pitfall). The byte-exact fixed-description lock
+// below subsumes the markup-contains, no-<br> and pre-fix strip-tags twins
+// (any prose drift fails toBe). "At Will:"/"2/Day:" headers end ":" →
+// fake-chip guard skips them (MonsterCardHelpers.js:399); "2/Day:" matches the
+// uses-header regex (:440) binding Suggestion maxUses 2. "(snakes only)"
 // advisory paren stays OUTSIDE markup (§158 unresolvable-name guard).
+// TWIN IDENTITY (MA-1814 #727 / MA-1818 #728): the spell pair here is the
+// byte-twin of the Abomination's and Infiltrator's (Animal Friendship +
+// Suggestion) — spell-DB shape (WIS dc / dc_success none / damage-free /
+// concentration split) is pinned at ma1814-...abomination-spellcasting.test.jsx:178-190
+// and is NOT duplicated here. The fixed row prose is a byte-twin of the
+// Infiltrator's ma1818 :45 except this type carries DC 13 (infiltrator: DC 12);
+// type-1-distinct bytes pinned here: DC 13 + creature-name log bytes.
+// TRIPLE-TWIN NOTE: ma1830 (type-2) and ma1834 (type-3) Spellcasting rows are
+// byte-identical to this one (same DC 13 pair) — describe.each fold candidate
+// across the three malison files, recorded for those passes.
+// Generic lanes are OWNED by spellcasting.test.jsx and not re-asserted: counter
+// badge render :275, exhausted spend + spell-named refusal shape :288-302,
+// multi-key independence :522-548, At Will null store :327/:561. DC arithmetic
+// restatement removed (row dc bytes pinned once). diceRoller mock purged — the
+// save seam rolls only through the fully mocked useLoggedDiceRoll hook.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,23 +41,17 @@ const realSpells = (names) => allSpells.filter(s => names.includes(s.name));
 
 const YT_SPELLS = ['Animal Friendship', 'Suggestion'];
 
-// Pre-fix description fingerprint (git HEAD, monsters.json) — the markup-only
-// diff proof: strip every tag from the FIXED row and it must equal the
-// original prose byte-for-byte.
-const YTM1_PLAIN_ORIGINAL = 'The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13): At Will: Animal Friendship (snakes only); 2/Day: Suggestion';
-const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
+// Exact byte-lock: two <strong> headers + two <em> names, "(snakes only)"
+// OUTSIDE the <em>, "; " tier delimiter byte-kept, inline (no <br>/\n).
+// Type-1-distinct vs the #728 infiltrator twin: "spell save DC 13". The
+// extractor exact-map below proves no fake chips (§161/§648).
+const YTM1_FIXED_BYTES = 'The yuan-ti casts one of the following spells, requiring no Material components and using Wisdom as the spellcasting ability (spell save DC 13): <strong>At Will:</strong> <em>Animal Friendship</em> (snakes only); <strong>2/Day:</strong> <em>Suggestion</em>';
 
 const yuanTi = monsters.find(m => m.index === 'yuan-ti-malison-type-1');
 const row = yuanTi.actions.find(a => a.name === 'Spellcasting');
 const MONSTER_NAME = 'Yuan-ti Malison (Type 1) 1';
 
 // ── Mocks (mirror MonsterCardModal.ma1818-yuan-ti-infiltrator-spellcasting.test.jsx) ───
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 21, rolls: [4, 5, 6, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 42, rolls: [4, 5, 6, 6, 4, 5, 6, 6], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -78,10 +88,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
   return {
     default: mockHook,
-    _rollAttack,
-    _rollDamage,
     _rollSavingThrow,
-    _setPopupHtml,
   };
 });
 
@@ -96,7 +103,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
   getTargetFromAttacker: vi.fn(() => null),
   getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
+  findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
 }));
 
@@ -132,8 +139,8 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: runtime.getRuntimeValue,
 }));
 
-import { addEntry } from '../../services/ui/logService.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 
@@ -149,12 +156,12 @@ function abilityUseEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'ability_use' && e.abilityName === name);
 }
 
-function refusals() {
-  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked');
+function refusals(name) {
+  return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked' && (name == null || e.abilityName === name));
 }
 
 function renderYuanTi() {
-  const m = makeMonster({ name: yuanTi.name, actions: [row] });
+  const m = makeMonster({ name: yuanTi.name, index: 'yuan-ti-malison-type-1', type: 'monstrosity', actions: [row] });
   const creatures = [
     { name: MONSTER_NAME, type: 'npc', monsterType: 'monstrosity', targetName: 'Bandit 1', currentHp: yuanTi.hit_points, maxHp: yuanTi.hit_points, conditions: [] },
     { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11, conditions: [], computedStats: {} },
@@ -165,47 +172,18 @@ function renderYuanTi() {
 // ── Data lock ────────────────────────────────────────────────────────────────
 
 describe('MA-1827 monsters.json data lock: Yuan-ti Malison (Type 1) Spellcasting row', () => {
-  it('carries <em> markup on each spell name and <strong> tier headers (INLINE yochlol/abomination/infiltrator shape)', () => {
-    for (const name of YT_SPELLS) {
-      expect(row.description).toContain(`<em>${name}</em>`);
-    }
-    expect(row.description).toContain('<strong>At Will:</strong>');
-    expect(row.description).toContain('<strong>2/Day:</strong>');
-    expect(row.description).toContain('<em>Animal Friendship</em> (snakes only)');
+  it('description is byte-exact INLINE house style + numeric save_dc 13 / save_type Wisdom pair kept byte-untouched (§89)', () => {
+    expect(row.description).toBe(YTM1_FIXED_BYTES);
+    expect(row.save_dc).toBe(13);
+    expect(row.save_type).toBe('Wisdom');
   });
 
-  it('keeps the inline shape: no <br> and no newlines (original prose was inline)', () => {
-    expect(row.description).not.toContain('<br>');
-    expect(row.description).not.toContain('\n');
-    expect(row.description).toContain('; ');
-  });
-
-  it('extractSpellNamesFromSpellcasting returns both spell names (was [] zero chips)', () => {
+  it('extractor harvests exactly both names and gates Suggestion only — headers and "(snakes only)" never enter the harvest (§57/§144, no fake chips §161/§648)', () => {
     expect(extractSpellNamesFromSpellcasting(row.description)).toEqual(YT_SPELLS);
-  });
-
-  it('extractSpellcastingSpellUses binds the 2/Day gate to Suggestion only', () => {
     expect(extractSpellcastingSpellUses(row.description)).toEqual({ Suggestion: 2 });
   });
 
-  it('carries save_dc 13 + save_type Wisdom (8 + WIS + PB) — numeric pair was already byte-present', () => {
-    expect(row.save_dc).toBe(13);
-    expect(row.save_type).toBe('Wisdom');
-    expect(8 + yuanTi.ability_score_modifiers.wis + yuanTi.proficiency_bonus).toBe(13);
-  });
-
-  it('both spells resolve in 5e and 2024 spell data (no fake chips)', () => {
-    for (const name of YT_SPELLS) {
-      expect(allSpells.some(s => s.name === name)).toBe(true);
-      expect(spells2024.some(s => s.name === name)).toBe(true);
-    }
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte', () => {
-    expect(stripTags(row.description)).toBe(YTM1_PLAIN_ORIGINAL);
-  });
-
-  it('siblings untouched: four actions, plain-text only outside the Spellcasting row', () => {
+  it('fix scoped to the Spellcasting row only: three sibling actions byte-plain', () => {
     expect(yuanTi.actions.map(a => a.name)).toEqual(['Multiattack', 'Bite', 'Poison Ray', 'Spellcasting']);
     for (const a of yuanTi.actions.filter(x => x.name !== 'Spellcasting')) {
       expect(a.description).not.toContain('<strong>');
@@ -222,32 +200,32 @@ describe('MA-1827 MonsterCardModal Yuan-ti Malison (Type 1) Spellcasting chips',
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('renders two clickable spell chips (was zero affordances)', () => {
+  it('renders two chips in authored order — counter on Suggestion only, At Will chip bare (the zero-chip inert row is gone)', () => {
     renderYuanTi();
-    expect(stripTags(row.description)).toBe(YTM1_PLAIN_ORIGINAL);
-    const names = spellLinks().map(el => el.textContent.split('(')[0].trim());
-    expect(names.sort()).toEqual([...YT_SPELLS].sort());
-  });
-
-  it('Suggestion carries the 2/Day counter, the At Will chip does not', () => {
-    renderYuanTi();
+    expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(YT_SPELLS);
     expect(linkByText('Suggestion').textContent).toMatch(/\(2\/Day · 2 left\)/);
     expect(linkByText('Animal Friendship').textContent).not.toMatch(/\/Day/);
   });
 
-  it('At Will Animal Friendship routes its WIS DC 13 save without any uses spend or refusal', async () => {
+  it('At Will Animal Friendship repeats ungated — each cast LIVE-routes the enforced WIS DC 13 save (dc_success none, snakes-only paren never blocks resolution), zero refusals', async () => {
     renderYuanTi();
-    await act(async () => { fireEvent.click(linkByText('Animal Friendship')); });
+    // ability_use lands only after the save resolves (mock never resolves);
+    // this lane's affordance proof is the save seam itself.
+    for (let i = 0; i < 2; i++) {
+      await act(async () => { fireEvent.click(linkByText('Animal Friendship')); });
+      await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(i + 1));
+    }
 
-    const saveCalls = rollSavingThrow.mock.calls.filter(c => String(c[2]?.spellName) === 'Animal Friendship');
-    expect(saveCalls.length).toBe(1);
-    expect(saveCalls[0][2].saveDc).toBe(13);
-    expect(saveCalls[0][2].saveType).toBe('WIS');
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
-    expect(refusals().length).toBe(0);
+    const context = rollSavingThrow.mock.calls[0][2];
+    expect(context.spellName).toBe('Animal Friendship');
+    expect(context.saveDc).toBe(13);
+    expect(context.saveType).toBe('WIS');
+    expect(context.dcSuccess).toBe('none');
+    expect(refusals()).toHaveLength(0);
+    // null monsterSpellUses store is owned by spellcasting.test.jsx:327/:561.
   });
 
-  it('Suggestion spends 2→0 over two casts (ability_use rides each), refuses the 3rd zero-spend', async () => {
+  it('Suggestion spends 2→0 over two casts (each logs a 2/Day remaining-today record carrying name + DC 13 WIS), refuses the 3rd zero-spend', async () => {
     renderYuanTi();
     for (let i = 0; i < 2; i++) {
       await act(async () => { fireEvent.click(linkByText('Suggestion')); });
@@ -257,12 +235,19 @@ describe('MA-1827 MonsterCardModal Yuan-ti Malison (Type 1) Spellcasting chips',
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Suggestion: 2 });
     expect(abilityUseEntries('Suggestion')[0].description).toMatch(/Yuan-ti Malison \(Type 1\) 1 casts Suggestion via Spellcasting/);
     expect(abilityUseEntries('Suggestion')[0].description).toMatch(/spell save DC 13, WIS/);
+    // dc_success "none" gate lane logs the record (DC bytes ride the log) —
+    // no auto-roll seam; save routing on this row is owned by the AF test.
+    expect(rollSavingThrow).toHaveBeenCalledTimes(0);
+    const spends = abilityUseEntries('Suggestion').map(e => e.description).join('\n');
+    expect(spends).toMatch(/2\/Day use spent — 1 remaining today/);
+    expect(spends).toMatch(/2\/Day use spent — 0 remaining today/);
 
+    // Exhausted-refuse shape owned by spellcasting.test.jsx:288-302; this
+    // pins only the 2/Day-specific refusal bytes + gate holding the record.
     await act(async () => { fireEvent.click(linkByText('Suggestion')); });
+    await waitFor(() => expect(refusals('Suggestion').length).toBe(1));
+    expect(refusals('Suggestion')[0].description).toMatch(/already cast Suggestion today \(2\/Day\)/);
     expect(abilityUseEntries('Suggestion').length).toBe(2);
-    const refusal = refusals().find(e => e.abilityName === 'Suggestion');
-    expect(refusal).toBeTruthy();
-    expect(refusal.description).toMatch(/already cast Suggestion today \(2\/Day\)/);
     expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ Suggestion: 2 });
   });
 });

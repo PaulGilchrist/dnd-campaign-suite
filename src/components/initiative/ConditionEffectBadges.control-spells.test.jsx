@@ -1,8 +1,8 @@
+// @maintained-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getStore: vi.fn(() => new Map()),
@@ -12,80 +12,36 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/ui/storage.js', () => ({
-    default: {
-        set: vi.fn(),
-    },
-}));
-
-const defaultEffects = {
-    cannotAct: false,
-    speedZero: false,
-    speedReduction: 0,
-    pushEffect: false,
-    pushDistance: null,
-    proneEffect: false,
-    autoCritWithin5ft: false,
-    concentrationBroken: false,
-    autoFailSaves: [],
-    resistantToAll: false,
-    attackDisadvantageCount: 0,
-    attackDisadvantageReasons: [],
-    abilityCheckDisadvantage: false,
-    strCheckDisadvantage: false,
-    rayOfEnfeebleDamageReduction: false,
-    resistanceDamageReduction: false,
-    targetAdvantageCount: 0,
-    targetDisadvantageCount: 0,
-    riderSaveDisadvantage: false,
-    riderAttackBonus: 0,
-    riderCannotOpportunityAttack: false,
-    riderNoReactions: false,
-    noAdvantageAgainst: false,
-    attackAdvantageCount: 0,
-    attackAdvantageReasons: [],
-    saveAdvantageCount: 0,
-    saveAdvantageReasons: [],
-    saveAdvantageAbilities: null,
-    saveDisadvantageCount: 0,
-    dexSaveAdvantageCount: 0,
-    abilityCheckDisadvantageAbilities: null,
-    abilityCheckAdvantageAbilities: null,
-    abilityCheckAdvantage: false,
-    abilityCheckAdvantageReasons: [],
-    saveDisadvantage: [],
-    blessBonus: false,
-    beaconOfHope: false,
-    hasteActive: false,
-    barkskinActive: false,
-    banePenalty: false,
-};
-
-function makeEffects(overrides = {}) {
-    return { ...defaultEffects, ...overrides };
-}
-
+// Neutral computeConditionEffects result: every accumulator guard stays falsy so
+// only the find-based control-spell specs can produce badges in these tests.
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-    computeConditionEffects: vi.fn(() => makeEffects({})),
+    computeConditionEffects: vi.fn(() => ({
+        attackAdvantageReasons: [],
+        targetAdvantageReasons: [],
+        saveAdvantageReasons: [],
+        saveDisadvantage: [],
+    })),
 }));
 
 const CREATURE_NAME = 'Alice';
 const CAMPAIGN_NAME = 'test-campaign';
 
-function renderWithTargetEffect(targetEffect, overrides = {}) {
+// targetEffect may be a single te or an array (for coexistence renders);
+// extra props pass straight through to the component.
+function renderWithTargetEffect(targetEffect, props = {}) {
     getRuntimeValue.mockImplementation((name, key) => {
         if (name === CREATURE_NAME && key === 'activeBuffs') return [];
         return null;
     });
-    computeConditionEffects.mockReturnValue(makeEffects(overrides));
+    const targetEffects = Array.isArray(targetEffect) ? targetEffect : targetEffect ? [targetEffect] : [];
     return render(
         <ConditionEffectBadges
             conditions={[]}
-            targetEffects={targetEffect ? [targetEffect] : []}
+            targetEffects={targetEffects}
             creatureName={CREATURE_NAME}
             campaignName={CAMPAIGN_NAME}
             isLocalhost={true}
-            {...overrides}
+            {...props}
         />
     );
 }
@@ -155,25 +111,32 @@ describe('ConditionEffectBadges - Control Spell Badges', () => {
                 expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, expectedSave);
             }
         );
+
+        it('should fall back to the authored escape DC 20 when the maze te carries no dc', () => {
+            const onRollConditionSave = vi.fn();
+            renderWithTargetEffect(
+                { target: CREATURE_NAME, effect: 'maze', source: 'Wizard' },
+                { onRollConditionSave }
+            );
+            fireEvent.click(screen.getByText('Mazed'));
+            expect(onRollConditionSave).toHaveBeenCalledTimes(1);
+            expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'incapacitated', label: 'Incapacitated', dc: 20, ability: 'int' });
+        });
     });
 
-    describe('Control spell tooltip caster + DC', () => {
-        it("should include caster name and DC in Tasha's Hideous Laughter tooltip", () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'tashas_hideous_laughter', source: 'Wizard', dc: 12 });
-            expect(screen.getByTitle(/Tasha's Hideous Laughter from Wizard/)).toBeInTheDocument();
-            expect(screen.getByTitle(/DC 12/)).toBeInTheDocument();
-        });
-
-        it('should include caster name and DC in Maze tooltip', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'maze', source: 'Wizard', dc: 18 });
-            expect(screen.getByTitle(/Mazed by Wizard/)).toBeInTheDocument();
-            expect(screen.getByTitle(/DC 18/)).toBeInTheDocument();
-        });
-
-        it('should include caster name and DC in Confusion tooltip', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'confusion', source: 'Bard', dc: 16 });
-            expect(screen.getByTitle(/Confused by Bard/)).toBeInTheDocument();
-            expect(screen.getByTitle(/DC 16/)).toBeInTheDocument();
+    describe('Control spell tooltips', () => {
+        it('should render all three clickable control badges together with caster name and DC in each tooltip', () => {
+            renderWithTargetEffect([
+                { target: CREATURE_NAME, effect: 'tashas_hideous_laughter', source: 'Wizard', dc: 12 },
+                { target: CREATURE_NAME, effect: 'maze', source: 'Wizard', dc: 18 },
+                { target: CREATURE_NAME, effect: 'confusion', source: 'Bard', dc: 16 },
+            ]);
+            expect(screen.getByText("Tasha's Hideous Laughter")).toBeInTheDocument();
+            expect(screen.getByText('Mazed')).toBeInTheDocument();
+            expect(screen.getByText('Confused')).toBeInTheDocument();
+            expect(screen.getByTitle(/Tasha's Hideous Laughter from Wizard: .*DC 12/)).toBeInTheDocument();
+            expect(screen.getByTitle(/Mazed by Wizard: .*DC 18/)).toBeInTheDocument();
+            expect(screen.getByTitle(/Confused by Bard: .*DC 16/)).toBeInTheDocument();
         });
     });
 
@@ -196,14 +159,10 @@ describe('ConditionEffectBadges - Control Spell Badges', () => {
     });
 
     describe('Imprisonment badge', () => {
-        it('should include prisonType in tooltip', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'imprisonment', source: 'Wizard', prisonType: 'Slumber' });
-            expect(screen.getByTitle(/Slumber/)).toBeInTheDocument();
-        });
-
-        it('should include duration in tooltip when present', () => {
-            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'imprisonment', source: 'Wizard', prisonType: 'Buried', duration: 'Until dispelled' });
-            expect(screen.getByTitle(/Until dispelled/)).toBeInTheDocument();
+        it('should render Imprisoned and pass the authored prisonType and duration through to the tooltip', () => {
+            renderWithTargetEffect({ target: CREATURE_NAME, effect: 'imprisonment', source: 'Wizard', prisonType: 'Minimization', duration: '1 hour' });
+            expect(screen.getByText('Imprisoned')).toBeInTheDocument();
+            expect(screen.getByTitle('Imprisoned by Wizard: Minimization. 1 hour')).toBeInTheDocument();
         });
     });
 });

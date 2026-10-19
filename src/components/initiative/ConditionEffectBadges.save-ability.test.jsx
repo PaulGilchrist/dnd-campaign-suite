@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Save-ability badge lane for ConditionEffectBadges: exact label/title bytes
+// for the derived save/advantage counters and the ability-list suffix join
+// ('Adv Save', 'Save Disadv (dex, con)', 'Check Disadv (str, dex)',
+// 'Adv Check'), the component-internal ruleset gate on the Dodge→'Adv DEX
+// Save' face (BA-001), and cross-creature Vow-of-Enmity→'Adv' resolution
+// (accept + reject, plus the reasons-append tooltip).
+// Ownership cites — generic first-wins label dedupe and mixed-kind ordering:
+// ConditionEffectBadges.common.test.jsx (#822, incl. the 'Save Disadv'⇄
+// 'Save Disadv (STR)' te collision at :90-92); rider-save 'Save Disadv',
+// 'Disadv vs', 'No Adv vs' and base counter faces: ConditionEffectBadges
+// .test.jsx; click→store removal: effect-removal / target-effect-removal
+// (#825/#827); no-OA/speedy faces: no-oa-speedy (#827); empty state: base.
+// Ability abbreviation map owner: MonsterCardModal.test-utils.test.js:147.
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
@@ -12,80 +26,60 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/ui/storage.js', () => ({
-    default: {
-        set: vi.fn(),
-    },
-}));
-
-const defaultEffects = {
-    cannotAct: false,
-    speedZero: false,
-    speedReduction: 0,
-    pushEffect: false,
-    pushDistance: null,
-    proneEffect: false,
-    autoCritWithin5ft: false,
-    concentrationBroken: false,
-    autoFailSaves: [],
-    resistantToAll: false,
-    attackDisadvantageCount: 0,
-    attackDisadvantageReasons: [],
-    abilityCheckDisadvantage: false,
-    strCheckDisadvantage: false,
-    rayOfEnfeebleDamageReduction: false,
-    resistanceDamageReduction: false,
-    targetAdvantageCount: 0,
-    targetDisadvantageCount: 0,
-    targetAttackDisadvantageCount: 0,
-    riderSaveDisadvantage: false,
-    riderAttackBonus: 0,
-    riderCannotOpportunityAttack: false,
-    riderNoReactions: false,
-    noAdvantageAgainst: false,
-    attackAdvantageCount: 0,
-    attackAdvantageReasons: [],
-    saveAdvantageCount: 0,
-    saveAdvantageReasons: [],
-    saveAdvantageAbilities: null,
-    saveDisadvantageCount: 0,
-    dexSaveAdvantageCount: 0,
-    abilityCheckDisadvantageAbilities: null,
-    abilityCheckAdvantageAbilities: null,
-    abilityCheckAdvantage: false,
-    abilityCheckAdvantageReasons: [],
-    saveDisadvantage: [],
-    blessBonus: false,
-    beaconOfHope: false,
-    hasteActive: false,
-    barkskinActive: false,
-    banePenalty: false,
-};
-
-function makeEffects(overrides = {}) {
-    return { ...defaultEffects, ...overrides };
-}
-
+// NOTE: the legacy mock of services/ui/storage.js was deleted here
+// (carried REC #823) — the component never imports storage.js.
 vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-    computeConditionEffects: vi.fn(() => makeEffects({})),
+    computeConditionEffects: vi.fn(),
 }));
 
 const CREATURE_NAME = 'Alice';
 const CAMPAIGN_NAME = 'test-campaign';
 
+// Minimal house shape: only the accumulator fields the BADGE_SPECS guards
+// read from ctx.effects (trimmed-to-factory pattern proven in #828).
+// computeConditionEffects is mocked, so conditions keys are inert here.
+function baselineEffects() {
+    return {
+        speedReduction: 0,
+        noAdvantageAgainst: false,
+        attackAdvantageCount: 0,
+        attackAdvantageReasons: [],
+        targetAdvantageCount: 0,
+        targetAdvantageReasons: [],
+        targetDisadvantageCount: 0,
+        targetAttackDisadvantageCount: 0,
+        saveAdvantageCount: 0,
+        saveAdvantageReasons: [],
+        dexSaveAdvantageCount: 0,
+        saveDisadvantageCount: 0,
+        saveDisadvantage: [],
+        riderSaveDisadvantage: false,
+        riderAttackBonus: 0,
+        riderCannotOpportunityAttack: false,
+        abilityCheckDisadvantageAbilities: null,
+        abilityCheckAdvantageAbilities: null,
+        abilityCheckAdvantage: false,
+        abilityCheckAdvantageReasons: [],
+        hasteActive: false,
+        barkskinActive: false,
+    };
+}
+
 function renderWithEffects(effectsOverrides = {}, props = {}) {
-    getRuntimeValue.mockImplementation((name, key) => {
+    getRuntimeValue.mockImplementation((name, key, campaign) => {
         if (name === CREATURE_NAME && key === 'activeBuffs') return props.buffs || [];
+        if (key === 'vowOfEnmityTarget') return campaign ? props.vowTarget ?? null : null;
         return null;
     });
-    computeConditionEffects.mockReturnValue(makeEffects(effectsOverrides));
+    computeConditionEffects.mockReturnValue({ ...baselineEffects(), ...effectsOverrides });
     return render(
         <ConditionEffectBadges
-            conditions={props.conditions || []}
-            targetEffects={props.targetEffects || []}
+            conditions={[]}
+            targetEffects={[]}
             creatureName={CREATURE_NAME}
             campaignName={CAMPAIGN_NAME}
             allCreatures={props.allCreatures}
+            playerStats={props.playerStats}
             isLocalhost={props.isLocalhost ?? true}
         />
     );
@@ -96,108 +90,77 @@ describe('ConditionEffectBadges - Save & Ability Check Badges', () => {
         vi.clearAllMocks();
     });
 
-    describe('Adv badge', () => {
-        it('should render Adv badge with tooltip when attackAdvantageCount > 0', () => {
-            renderWithEffects(
-                { attackAdvantageCount: 1, attackAdvantageReasons: ['Invisible'] },
-                { conditions: [{ key: 'invisible' }] }
-            );
-            expect(screen.getByText('Adv')).toBeInTheDocument();
-            expect(screen.getByTitle(/Advantage on attack rolls.*Invisible/)).toBeInTheDocument();
-        });
+    // Each case pins one distinct observable face byte-for-byte: label plus
+    // resolved title (builder tooltip, or the label itself where the spec
+    // sets no tooltip and EFFECT_DESCRIPTIONS has no entry).
+    it.each([
+        {
+            name: 'Adv Save carries its reason in the tooltip',
+            effects: { saveAdvantageCount: 1, saveAdvantageReasons: ['Foresight'] },
+            label: 'Adv Save',
+            title: 'Advantage on saving throws (Foresight)',
+        },
+        {
+            name: 'Adv vs carries its reason in the tooltip',
+            effects: { targetAdvantageCount: 1, targetAdvantageReasons: ['Reckless Attack'] },
+            label: 'Adv vs',
+            title: 'Attackers have advantage on attack rolls against this creature (Reckless Attack)',
+        },
+        {
+            name: 'ability-scoped Adv Check lowercases three-letter ability suffix',
+            effects: { abilityCheckAdvantageAbilities: ['STR'] },
+            label: 'Adv Check (str)',
+            title: 'Adv Check (str)',
+        },
+        {
+            name: 'all-checks Adv Check falls back from missing ability list',
+            effects: { abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight'] },
+            label: 'Adv Check',
+            // Pinned as-rendered: the builder double-wraps the reason text
+            // (jsx:100-101 embeds parens in reasonText, then wraps again) —
+            // reported as a cosmetic source bug, not smoothed over here.
+            title: 'Advantage on all ability checks ( (Foresight))',
+        },
+        {
+            name: 'hex save disadvantage joins the ability list in order',
+            effects: { saveDisadvantageCount: 1, saveDisadvantage: ['dex', 'con'] },
+            label: 'Save Disadv (dex, con)',
+            title: 'Save Disadv (dex, con)',
+        },
+        {
+            name: 'hex ability-check disadvantage lowercases and joins abilities',
+            effects: { abilityCheckDisadvantageAbilities: ['STR', 'DEX'] },
+            label: 'Check Disadv (str, dex)',
+            title: 'Check Disadv (str, dex)',
+        },
+    ])('renders $name', ({ effects, label, title }) => {
+        renderWithEffects(effects);
+        expect(screen.getByText(label)).toBeInTheDocument();
+        expect(screen.getByTitle(title)).toBeInTheDocument();
     });
 
-    describe('Adv badge from Vow of Enmity', () => {
-        it('should render Adv badge when allCreatures has Vow of Enmity targeting this creature', () => {
-            getRuntimeValue.mockImplementation((name, key, campaign) => {
-                if (name === CREATURE_NAME && key === 'activeBuffs') return [];
-                if (key === 'vowOfEnmityTarget' && campaign) {
-                    return CREATURE_NAME;
-                }
-                return null;
-            });
-            computeConditionEffects.mockReturnValue(makeEffects({}));
-            render(
-                <ConditionEffectBadges
-                    conditions={[]}
-                    targetEffects={[]}
-                    creatureName={CREATURE_NAME}
-                    campaignName={CAMPAIGN_NAME}
-                    allCreatures={[{ name: 'Paladin' }]}
-                    isLocalhost={true}
-                />
-            );
-            expect(screen.getByText('Adv')).toBeInTheDocument();
-        });
-    });
-
-    describe('Adv vs badge', () => {
-        it('should render Adv vs badge with tooltip when targetAdvantageCount > 0', () => {
-            renderWithEffects(
-                { targetAdvantageCount: 1, targetAdvantageReasons: ['Reckless Attack'] },
-                { conditions: [{ key: 'blinded' }] }
-            );
-            expect(screen.getByText('Adv vs')).toBeInTheDocument();
-            expect(screen.getByTitle(/Attackers have advantage.*Reckless Attack/)).toBeInTheDocument();
-        });
-    });
-
-    describe('Adv Save badge', () => {
-        it('should render Adv Save badge with tooltip when saveAdvantageCount > 0', () => {
-            renderWithEffects(
-                { saveAdvantageCount: 1, saveAdvantageReasons: ['Foresight'] },
-                { conditions: [{ key: 'blinded' }] }
-            );
-            expect(screen.getByText('Adv Save')).toBeInTheDocument();
-            expect(screen.getByTitle(/Advantage on saving throws.*Foresight/)).toBeInTheDocument();
-        });
-    });
-
-    describe('Adv DEX Save badge', () => {
-        it('should render Adv DEX Save badge with tooltip when dexSaveAdvantageCount > 0', () => {
-            renderWithEffects(
-                { dexSaveAdvantageCount: 1 },
-                { buffs: [{ name: 'Dodge', effect: 'dodge' }] }
-            );
+    // BA-001 runs inside this component: applyActiveBuffs + resolveBadgeRuleset
+    // gate the Dodge→dex-save clause on the resolved ruleset.
+    it.each([
+        { rules: '5e', present: true },
+        { rules: '2024', present: false },
+    ])('Dodge buff under $rules ruleset renders Adv DEX Save: $present', ({ rules, present }) => {
+        renderWithEffects({}, { buffs: [{ name: 'Dodge', effect: 'dodge' }], playerStats: { rules } });
+        if (present) {
             expect(screen.getByText('Adv DEX Save')).toBeInTheDocument();
-            expect(screen.getByTitle(/Advantage on Dexterity saving throws/)).toBeInTheDocument();
-        });
+            expect(screen.getByTitle('Advantage on Dexterity saving throws')).toBeInTheDocument();
+        } else {
+            expect(screen.queryByText('Adv DEX Save')).not.toBeInTheDocument();
+        }
     });
 
-    describe('Save Disadv badge', () => {
-        it('should render Save Disadv badge with specific save type when saveDisadvantage contains a type', () => {
-            renderWithEffects({ saveDisadvantageCount: 1, saveDisadvantage: ['dex'] });
-            expect(screen.getByText(/Save Disadv \(dex\)/)).toBeInTheDocument();
-        });
-
-        it('should render Save Disadv badge with multiple save types', () => {
-            renderWithEffects({ saveDisadvantageCount: 2, saveDisadvantage: ['dex', 'con'] });
-            expect(screen.getByText(/Save Disadv \(dex, con\)/)).toBeInTheDocument();
-        });
-    });
-
-    describe('Check Disadv badge', () => {
-        it('should render Check Disadv badge with ability names when abilityCheckDisadvantageAbilities is set', () => {
-            renderWithEffects({ abilityCheckDisadvantageAbilities: ['STR', 'DEX'] });
-            expect(screen.getByText(/Check Disadv \(str, dex\)/)).toBeInTheDocument();
-        });
-
-        it('should render Check Disadv badge with a single ability', () => {
-            renderWithEffects({ abilityCheckDisadvantageAbilities: ['STR'] });
-            expect(screen.getByText(/Check Disadv \(str\)/)).toBeInTheDocument();
-        });
-    });
-
-    describe('Adv Check badge', () => {
-        it('should render Adv Check badge with ability names when abilityCheckAdvantageAbilities is set', () => {
-            renderWithEffects({ abilityCheckAdvantageAbilities: ['STR'] });
-            expect(screen.getByText(/Adv Check \(str\)/)).toBeInTheDocument();
-        });
-
-        it('should render Adv Check badge when abilityCheckAdvantage is true without specific abilities', () => {
-            renderWithEffects({ abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight'] });
-            expect(screen.getByText('Adv Check')).toBeInTheDocument();
-            expect(screen.getByTitle(/Advantage on all ability checks.*Foresight/)).toBeInTheDocument();
-        });
+    it('renders Adv from another creature Vow of Enmity only while it targets this creature', () => {
+        const allCreatures = [{ name: 'Paladin' }];
+        const { unmount } = renderWithEffects({}, { allCreatures, vowTarget: CREATURE_NAME });
+        expect(screen.getByText('Adv')).toBeInTheDocument();
+        expect(screen.getByTitle('Advantage on attack rolls (Vow of Enmity)')).toBeInTheDocument();
+        unmount();
+        renderWithEffects({}, { allCreatures, vowTarget: 'Bob' });
+        expect(screen.queryByText('Adv')).not.toBeInTheDocument();
     });
 });

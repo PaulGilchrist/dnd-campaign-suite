@@ -1,7 +1,19 @@
+// @maintained-by-ai
+// CreatureCard interactions lane — card-owned click/commit dispatches only.
+// Cut, with owners: badge removal dispatches → CreatureCard.badgeRemoval.test.jsx (#848);
+// badge render census → CreatureCard.badges.test.jsx (#849); condition/concentration breaks
+// + Add-effect button → CreatureCard.conditions.test.jsx (#850); onNpcClick handler obey-half
+// of allowNonLocalhost → createNpcClickHandler-* (#840); target option population and
+// initiative value display → CreatureCard.rendering.test.jsx.
+// Old→new map: NPC-remove 4→2 (render+click folded into dispatch test; negatives table);
+// initiative blur 2→1 (type-agnostic path) + Enter-commit NEW; target select 3→2
+// (dispatch kept; gating+value table adds player-flip and summoned-allow rows);
+// avatar click 1→3 (kept: flag-PASSED wiring seam, distinct from #840 obey-half)
+// + non-localhost-inert gate NEW + player-summoned allow NEW; name change 2→2 kept;
+// HP blur 2→1 (identical onChange wiring path).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
-import * as buffToggle from '../../services/automation/common/buffToggle.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath }) => {
@@ -23,26 +35,15 @@ vi.mock('./NpcAvatar.jsx', () => ({
 }));
 
 vi.mock('./CreatureHp.jsx', () => ({
-    default: vi.fn(({ creature, isLocalhost, onChange }) => {
-        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><input data-testid={`hp-input-${creature.name}`} type="number" defaultValue={creature.currentHp ?? 0} onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)} disabled={!isLocalhost && creature.type === 'player'} /><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
+    default: vi.fn(({ creature, onChange }) => {
+        return <div data-testid={`creature-hp-${creature.name}`} className="creature-hp"><input data-testid={`hp-input-${creature.name}`} type="number" defaultValue={creature.currentHp ?? 0} onBlur={(e) => onChange(creature.name, parseInt(e.target.value) || 0)} /><span>{creature.currentHp ?? 0}/{creature.maxHp ?? 1}</span></div>;
     }),
 }));
 
 vi.mock('./ConditionEffectBadges.jsx', () => ({
-    default: vi.fn(({ conditions, targetEffects, creatureName }) => {
-        const children = [];
-        (conditions || []).forEach(c => children.push(<span key={c.id} data-testid={`effect-condition-${c.id}`}>{c.label}</span>));
-        (targetEffects || []).forEach(te => children.push(<span key={te.id} data-testid={`effect-target-${te.id}`}>{te.effect}</span>));
-        return <div data-testid={`condition-effects-${creatureName}`}>{children}</div>;
+    default: vi.fn(({ creatureName }) => {
+        return <div data-testid={`condition-effects-${creatureName}`}></div>;
     }),
-}));
-
-vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
-    getAbilityLabel: (ability) => ability?.toUpperCase() || '',
-}));
-
-vi.mock('../../services/automation/common/buffToggle.js', () => ({
-    isBuffActive: vi.fn(() => false),
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -101,108 +102,134 @@ describe('CreatureCard', () => {
             onRollConcentrationSave: vi.fn(),
             onBreakConcentration: vi.fn(),
         };
-        buffToggle.isBuffActive.mockReturnValue(false);
     });
 
     describe('NPC remove button', () => {
-        it('should render remove button for NPC when isLocalhost is true', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            expect(screen.getByTitle('Remove NPC')).toBeInTheDocument();
-        });
-
-        it('should call onRemoveNpc when remove button is clicked', () => {
+        it('offers remove for localhost NPCs and dispatches onRemoveNpc with the exact name exactly once', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
             fireEvent.click(screen.getByTitle('Remove NPC'));
+            expect(props.onRemoveNpc).toHaveBeenCalledTimes(1);
             expect(props.onRemoveNpc).toHaveBeenCalledWith('Goblin');
         });
 
-        it('should not render remove button for non-localhost', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
-            expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
-        });
-
-        it('should not render remove button for player creatures', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={true} />);
+        it.each([
+            ['non-localhost NPC', defaultNpcCreature, false],
+            ['player (even on localhost)', defaultPlayerCreature, true],
+        ])('is absent for %s', (_label, creature, isLocalhost) => {
+            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} />);
             expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
         });
     });
 
-    describe('initiative input', () => {
-        it('should call onInitiativeChange when initiative input blurs for both player and NPC', () => {
+    describe('initiative commit', () => {
+        it('dispatches onInitiativeChange(name, raw input string) on blur', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            const initiativeInput = screen.getByTestId('initiative-input');
-            fireEvent.blur(initiativeInput, { target: { value: '20' } });
+            fireEvent.blur(screen.getByTestId('initiative-input'), { target: { value: '20' } });
             expect(props.onInitiativeChange).toHaveBeenCalledWith('Alice', '20');
         });
 
-        it('should call onInitiativeChange when initiative input blurs for NPC', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const initiativeInput = screen.getByTestId('initiative-input');
-            fireEvent.blur(initiativeInput, { target: { value: '15' } });
-            expect(props.onInitiativeChange).toHaveBeenCalledWith('Goblin', '15');
+        it('commits on Enter without requiring blur', () => {
+            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
+            const input = screen.getByTestId('initiative-input');
+            input.focus(); // native focus so blur()/focusout can fire
+            fireEvent.change(input, { target: { value: '18' } });
+            fireEvent.keyDown(input, { key: 'Enter' });
+            expect(props.onInitiativeChange).toHaveBeenCalledWith('Alice', '18');
         });
     });
 
     describe('target select', () => {
-        it('should call onTargetChange when target select changes for player', () => {
+        it('dispatches onTargetChange(creature.name, new value) on change', () => {
             const allCreatures = [defaultPlayerCreature, { name: 'Bob', type: 'player' }];
             render(<CreatureCard {...props} creature={defaultPlayerCreature} allCreatures={allCreatures} />);
-            const targetSelect = screen.getByTestId('target-select');
-            fireEvent.change(targetSelect, { target: { value: 'Bob' } });
+            fireEvent.change(screen.getByTestId('target-select'), { target: { value: 'Bob' } });
             expect(props.onTargetChange).toHaveBeenCalledWith('Alice', 'Bob');
         });
 
-        it('should disable target select for non-localhost NPC creatures', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
+        it.each([
+            {
+                label: 'player on localhost stays enabled',
+                creature: { ...defaultPlayerCreature, targetName: 'Bob' },
+                isLocalhost: true,
+                expectDisabled: false,
+            },
+            {
+                label: 'player on non-localhost stays enabled',
+                creature: { ...defaultPlayerCreature, targetName: 'Bob' },
+                isLocalhost: false,
+                expectDisabled: false,
+            },
+            {
+                label: 'NPC on localhost stays enabled',
+                creature: { ...defaultNpcCreature, targetName: 'Bob' },
+                isLocalhost: true,
+                expectDisabled: false,
+            },
+            {
+                label: 'NPC on non-localhost is disabled',
+                creature: { ...defaultNpcCreature, targetName: 'Bob' },
+                isLocalhost: false,
+                expectDisabled: true,
+            },
+            {
+                label: 'player-summoned creature on non-localhost is re-enabled',
+                creature: { ...defaultNpcCreature, targetName: 'Bob', wildShapeSource: 'Alice' },
+                isLocalhost: false,
+                expectDisabled: false,
+            },
+        ])('target select: $label and shows creature.targetName', ({ creature, isLocalhost, expectDisabled }) => {
+            const allCreatures = [defaultPlayerCreature, { name: 'Bob', type: 'player' }];
+            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} allCreatures={allCreatures} />);
             const targetSelect = screen.getByTestId('target-select');
-            expect(targetSelect).toBeDisabled();
-        });
-
-        it('should set selected value to creature.targetName', () => {
-            const creature = { ...defaultPlayerCreature, targetName: 'Bob' };
-            const allCreatures = [creature, { name: 'Bob', type: 'player' }];
-            render(<CreatureCard {...props} creature={creature} allCreatures={allCreatures} />);
-            const targetSelect = screen.getByTestId('target-select');
+            if (expectDisabled) {
+                expect(targetSelect).toBeDisabled();
+            } else {
+                expect(targetSelect).toBeEnabled();
+            }
             expect(targetSelect).toHaveValue('Bob');
         });
     });
 
     describe('NPC avatar click', () => {
-        it('should call onNpcClick when NPC avatar is clicked', () => {
+        it('dispatches onNpcClick(creature, { allowNonLocalhost: true }) — card wiring seam (handler obey-half owned by createNpcClickHandler tests, #840)', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const npcAvatar = screen.getByTestId('npc-avatar-Goblin');
-            fireEvent.click(npcAvatar);
+            fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
+            expect(props.onNpcClick).toHaveBeenCalledTimes(1);
             expect(props.onNpcClick).toHaveBeenCalledWith(defaultNpcCreature, { allowNonLocalhost: true });
+        });
+
+        it('is inert on non-localhost for non-summoned creatures', () => {
+            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
+            fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
+            expect(props.onNpcClick).not.toHaveBeenCalled();
+        });
+
+        it('is allowed on non-localhost when player-summoned', () => {
+            const summoned = { ...defaultNpcCreature, wildShapeSource: 'Alice' };
+            render(<CreatureCard {...props} creature={summoned} isLocalhost={false} allCreatures={[defaultPlayerCreature, summoned]} />);
+            fireEvent.click(screen.getByTestId('npc-avatar-Goblin'));
+            expect(props.onNpcClick).toHaveBeenCalledWith(summoned, { allowNonLocalhost: true });
         });
     });
 
     describe('name change', () => {
-        it('should call onNameChange with old name and new value for NPC', () => {
+        it('dispatches onNameChange(oldName, newName) for NPC autocomplete edits', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const input = screen.getByTestId('monster-name-input');
-            fireEvent.change(input, { target: { value: 'Kobold' } });
+            fireEvent.change(screen.getByTestId('monster-name-input'), { target: { value: 'Kobold' } });
             expect(props.onNameChange).toHaveBeenCalledWith('Goblin', 'Kobold');
         });
 
-        it('should not render a name input for player creatures (rendered as span)', () => {
+        it('renders player names as static text (no editable input)', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
             expect(screen.queryByTestId('monster-name-input')).not.toBeInTheDocument();
         });
     });
 
     describe('HP change', () => {
-        it('should call onHpChange when HP input blurs for both player and NPC', () => {
+        it('wires CreatureHp onChange to onHpChange(name, hp) on blur', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            const hpInput = screen.getByTestId('hp-input-Alice');
-            fireEvent.blur(hpInput, { target: { value: '15' } });
+            fireEvent.blur(screen.getByTestId('hp-input-Alice'), { target: { value: '15' } });
             expect(props.onHpChange).toHaveBeenCalledWith('Alice', 15);
-        });
-
-        it('should call onHpChange when HP input blurs for NPC', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const hpInput = screen.getByTestId('hp-input-Goblin');
-            fireEvent.blur(hpInput, { target: { value: '3' } });
-            expect(props.onHpChange).toHaveBeenCalledWith('Goblin', 3);
         });
     });
 });

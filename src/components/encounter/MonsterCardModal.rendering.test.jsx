@@ -1,147 +1,73 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { render, screen, cleanup } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import { getStore } from '../../hooks/runtime/useRuntimeState.js';
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
+// ── Scope ────────────────────────────────────────────────────────────────────
 //
-// This file only covers rendering behavior that is NOT already tested in the
-// other MonsterCardModal test files (MonsterCardModal.test.jsx,
-// MonsterCardModal.senses-and-fallback.test.jsx, etc.). Interaction, dice-roll,
-// and overlay/close behavior all live in those files.
+// Pins for the base render contract that NO maintained sibling covers:
+//   - terminal 'Monster' name fallback (MonsterCardModal.jsx:2113).
+//     MonsterCardModal.test.jsx pins monster.name and creatureName override
+//     only; senses-and-fallback covers senses/AC fallbacks.
+//   - Speed line join for multi-mode string speeds (test.jsx pins the
+//     single numeric 'walk 30' form only).
+//   - Temp HP stat row fed from the runtime store (getRuntimeValue
+//     'tempHp', MonsterCardModal.jsx:2114 → MonsterCardBody.jsx:163).
+//     Other tempHp pins (emperyean, ma0875-cube-shape) assert store values
+//     and picker props, not this stat row.
+//   - languages ARRAY join (formatLanguages, MonsterCardBody.jsx:340 —
+//     test.jsx uses a string languages value).
+//   - legendary_resistance: 0 renders '0/day' (test.jsx pins 3/day and
+//     null/undefined hidden; the falsy-zero arm is unpinned elsewhere).
 //
-// Cleanup applied (redundant test removal):
-//   - Removed "prefers creatureName when monster.name is empty" — fully covered
-//     by MonsterCardModal.test.jsx:146-152 which tests the same creatureName ||
-//     monster.name || 'Monster' fallback chain (default + override cases).
+// Everything else in the card (close button, overlay, section census,
+// header bytes, 0/day siblings) is owned by MonsterCardModal.test.jsx and
+// the dedicated feature-lane siblings — see coverage map in that file.
+// No vi.mock: default props (creatures: [], mapName: null) short-circuit
+// the mount fetch effects, and no interactions fire, so real modules are
+// inert here (verified by bisect — see lane notes).
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [1, 2], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [1, 2], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({
-  sanitizeHtml: vi.fn((html) => String(html || '')),
-}));
-
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  })),
-}));
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({})),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
-
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(() => ({ name: 'Goblin', conditions: [] })),
-  getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn(() => 30),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-// ── Tests ───────────────────────────────────────────────────────────────────
-
-describe('MonsterCardModal rendering', () => {
+describe('MonsterCardModal base render contract', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    cleanup();
     getStore('Goblin').clear();
   });
 
-  // ════════════════════════════════════════════
-  // Monster name resolution
-  // ════════════════════════════════════════════
-
-  describe('monster name resolution', () => {
-    it('falls back to "Monster" when neither creatureName nor monster.name is present', () => {
-      render(<MonsterCardModal {...makeProps(makeMonster({ name: undefined }), { creatureName: '' })} />);
-      expect(screen.getByText('Monster')).toBeInTheDocument();
-    });
+  it('falls back to "Monster" when neither creatureName nor monster.name is present', () => {
+    render(<MonsterCardModal {...makeProps(makeMonster({ name: undefined }), { creatureName: '' })} />);
+    expect(screen.getByText('Monster')).toBeInTheDocument();
   });
 
-  // ════════════════════════════════════════════
-  // Speed line
-  // ════════════════════════════════════════════
+  it('renders the Speed line: joins multiple modes, empty value when speed is missing', () => {
+    render(<MonsterCardModal {...makeProps(makeMonster({ speed: { walk: '30 ft.', fly: '20 ft.' } }))} />);
+    expect(screen.getByText('walk 30 ft., fly 20 ft.')).toBeInTheDocument();
 
-  describe('speed line', () => {
-    it('joins multiple speed modes into a single comma-separated value', () => {
-      const m = makeMonster({ speed: { walk: '30 ft.', fly: '20 ft.' } });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      expect(screen.getByText(/walk 30 ft\., fly 20 ft\./)).toBeInTheDocument();
-    });
-
-    it('renders the Speed label with an empty value when speed is missing', () => {
-      render(<MonsterCardModal {...makeProps(makeMonster({ speed: {} }))} />);
-      expect(screen.getByText('Speed')).toBeInTheDocument();
-      expect(document.querySelector('.mc-stat-speed .mc-stat-value').textContent).toBe('');
-    });
+    cleanup();
+    render(<MonsterCardModal {...makeProps(makeMonster({ speed: {} }))} />);
+    expect(screen.getByText('Speed')).toBeInTheDocument();
+    expect(screen.getByText('Speed').nextElementSibling.textContent).toBe('');
   });
 
-  // ════════════════════════════════════════════
-  // Temporary hit points
-  // ════════════════════════════════════════════
+  it('shows a Temp HP stat from the runtime store and hides it when the store has none', () => {
+    render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    expect(screen.queryByText('Temp HP')).not.toBeInTheDocument();
 
-  describe('temporary hit points', () => {
-    it('renders a Temp HP stat when the creature has temp HP in the runtime store', () => {
-      getStore('Goblin').set('tempHp', 5);
-      render(<MonsterCardModal {...makeProps(makeMonster())} />);
-      expect(screen.getByText('Temp HP')).toBeInTheDocument();
-      expect(document.querySelector('.mc-stat-temp-hp').textContent).toContain('5');
-    });
-
-    it('does not render a Temp HP stat when the creature has no temp HP', () => {
-      render(<MonsterCardModal {...makeProps(makeMonster())} />);
-      expect(screen.queryByText('Temp HP')).not.toBeInTheDocument();
-    });
+    cleanup();
+    getStore('Goblin').set('tempHp', 5);
+    render(<MonsterCardModal {...makeProps(makeMonster())} />);
+    expect(screen.getByText('Temp HP')).toBeInTheDocument();
+    expect(screen.getByText('Temp HP').nextElementSibling.textContent).toBe(' 5');
   });
 
-  // ════════════════════════════════════════════
-  // Languages
-  // ════════════════════════════════════════════
-
-  describe('languages', () => {
-    it('joins array-format languages with commas', () => {
-      const m = makeMonster({ languages: ['Common', 'Goblin', 'Draconic'] });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      expect(screen.getByText('Common, Goblin, Draconic')).toBeInTheDocument();
-    });
+  it('joins array-format languages with commas', () => {
+    render(<MonsterCardModal {...makeProps(makeMonster({ languages: ['Common', 'Goblin', 'Draconic'] }))} />);
+    expect(screen.getByText('Common, Goblin, Draconic')).toBeInTheDocument();
   });
 
-  // ════════════════════════════════════════════
-  // Legendary resistance
-  // ════════════════════════════════════════════
-
-  describe('legendary resistance', () => {
-    it('renders "0/day" when legendary_resistance is 0 (a valid count, not "none")', () => {
-      const m = makeMonster({ legendary_resistance: 0 });
-      render(<MonsterCardModal {...makeProps(m)} />);
-      expect(screen.getByText('0/day')).toBeInTheDocument();
-    });
+  it('renders "0/day" when legendary_resistance is 0 (a valid count, not "none")', () => {
+    render(<MonsterCardModal {...makeProps(makeMonster({ legendary_resistance: 0 }))} />);
+    expect(screen.getByText('0/day')).toBeInTheDocument();
   });
 });

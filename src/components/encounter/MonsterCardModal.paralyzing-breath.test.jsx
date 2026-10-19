@@ -1,16 +1,28 @@
-// MA-0248: Ancient Silver Dragon Paralyzing Breath click-path enforcement —
-// data lock (dc_success 'none', staged_paralysis 1 minute), NO recharge,
-// cone picker armed with stagedParalysis (paralyzed_minutes×10 rounds,
-// CLA-334), no half-damage dcSuccess, zero damage. Re-usable row: every
-// fresh click arms the picker (MA-0068 sleepStaging shape minus the gate).
-// MA-1469 mirrors every pin onto the Silver Dragon Wyrmling byte-twin
-// (actions[3], DC 13, 15-ft Cone): the same two fields arm the same
-// stagedParalysisForAction → SaveAttackAoeModal → paralyzingBreathService
-// seam, retiring the flat first-fail Incapacitated+Paralyzed over-grant.
+// @maintained-by-ai
+// MA-0248 / MA-1469: Paralyzing Breath click-path enforcement for the Ancient
+// Silver Dragon (DC 24, prose-derived 90-ft Cone) and its byte-twin Silver
+// Dragon Wyrmling (actions[3], DC 13, authored 15-ft Cone range).
+// Covered here: row data lock (Object.keys exact, incl. absences), press
+// arms the SaveAttackAoeModal picker with the exact stagedParalysis contract
+// (stagedParalysisForAction ×10 rounds, CLA-334, MonsterCardModal.jsx:305)
+// and dc_success 'none' authored byte (its absence = 'half' default at
+// resolveBlockSaveDcSuccess, MonsterCardModal.jsx:286 — the half-damage
+// leak this row must never inherit), ungated re-arm (no recharge authored),
+// zero inline save roll at press.
+// Cite-skips (covered elsewhere, never re-anchored here):
+// • failed-save ladder grant leg + picker copy (paralyzingBreathService
+//   routing, DC-13 twin transport): SaveAttackAoeModal.staged-paralysis.test.jsx
+// • extractConditionsFromSaveEffect truth tables (MonsterCardHelpers.js:383):
+//   sibling extractor suites — here the flat ['incapacitated','paralyzed']
+//   spray rides the props byte and is pinned only as the armed payload shape;
+//   with stagedParalysis non-null the picker routes the fail leg to the
+//   staged service, so the flat spray never governs the grant.
+// • recharge arm/spend/refusal machinery: monsterRecharge.test.js (:41-57
+//   arm-only) — this row authors NO recharge, so only the absence is pinned.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
-import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const aoeProps = vi.hoisted(() => ({ current: null, onClose: null }));
@@ -27,29 +39,11 @@ vi.mock('../char-sheet/modals/shared/SaveAttackAoeModal.jsx', () => ({
   },
 }));
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
-
-vi.mock('../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../services/ui/dataLoader.js', () => ({
-  loadSpells: vi.fn(() => Promise.resolve([])),
-}));
-
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
     rollAbilityCheck: vi.fn(),
@@ -58,14 +52,8 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
     rollInitiative: vi.fn(),
     quickRollPlayerSave: vi.fn(),
   }));
-  return { default: mockHook, _rollSavingThrow, _setPopupHtml };
+  return { default: mockHook, _rollSavingThrow };
 });
-
-vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
-  computeConditionEffects: vi.fn(() => ({ ...defaultConditionEffects })),
-  combineAttackModes: vi.fn(() => 'normal'),
-  CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-}));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   extractDamageTypes: vi.fn(() => []),
@@ -74,17 +62,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 30)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -112,141 +89,171 @@ const CREATURES = [
   { name: 'ElderPaladin', type: 'player', currentHp: 224, maxHp: 224, conditions: [] },
 ];
 
-function silverActions() {
-  const dragon = monstersData.find(m => m.index === 'ancient-silver-dragon');
-  return dragon.actions;
+const WYRMLING_CREATURES = [
+  { name: 'Silver Dragon Wyrmling 1', type: 'npc', monsterType: 'dragon', targetName: 'Bandit 1', currentHp: 45, maxHp: 45, ac: 17, conditions: [] },
+  { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11, ac: 12, conditions: [] },
+];
+
+function monsterRow(index) {
+  return monstersData.find(m => m.index === index);
 }
 
-function paralyzingBreathAction() {
-  return silverActions().find(a => a.name === 'Paralyzing Breath');
+function paralyzingBreathAction(index) {
+  return monsterRow(index).actions.find(a => a.name === 'Paralyzing Breath');
 }
 
-function renderSilver() {
-  const m = makeMonster({ name: 'Ancient Silver Dragon', actions: silverActions() });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Ancient Silver Dragon 1', creatures: CREATURES })} />);
+function renderDragon(index, creatureName, creatures) {
+  const m = makeMonster({ name: monsterRow(index).name, actions: monsterRow(index).actions });
+  return render(<MonsterCardModal {...makeProps(m, { creatureName, creatures })} />);
 }
 
 function paralyzingBreathLink() {
   return Array.from(document.querySelectorAll('.mc-dice-link')).find(el => el.closest('div')?.textContent.includes('Paralyzing Breath')) || null;
 }
 
-function wyrmlingActions() {
-  const dragon = monstersData.find(m => m.index === 'silver-dragon-wyrmling');
-  return dragon.actions;
-}
-
-const WYRMLING_CREATURES = [
-  { name: 'Silver Dragon Wyrmling 1', type: 'npc', monsterType: 'dragon', targetName: 'Bandit 1', currentHp: 45, maxHp: 45, ac: 17, conditions: [] },
-  { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11, ac: 12, conditions: [] },
+// Every picker prop the staged-paralysis lane adjudicates, locked in one
+// shot BY NAME — riders that must stay inert on this row appear as their
+// inert bytes, so a wrongly-armed new rider on these rows fails here.
+const PICKER_KEYS = [
+  'action', 'playerStats', 'saveDc', 'saveType', 'dcSuccess', 'damage', 'damageType',
+  'secondaryDamage', 'secondaryDamageType', 'range', 'rangeGateFt', 'titleOverride',
+  'excludeNames', 'saveConditions', 'sleepStaging', 'stagedParalysis', 'stagedPetrify',
+  'pushFeet', 'slowedClauses', 'weakeningBreath', 'acPenaltyClause', 'speedZeroClause',
+  'speedReduceClause', 'bothOutcomesClause', 'zoneTe', 'zoneOnly', 'storeLastAttack',
 ];
 
-function renderWyrmling() {
-  const m = makeMonster({ name: 'Silver Dragon Wyrmling', actions: wyrmlingActions() });
-  return render(<MonsterCardModal {...makeProps(m, { creatureName: 'Silver Dragon Wyrmling 1', creatures: WYRMLING_CREATURES })} />);
+function pickedPickerProps() {
+  return Object.fromEntries(PICKER_KEYS.map(k => [k, aoeProps.current[k]]));
 }
+
+const LADDER_PROSE = [
+  'First Failure: The target has the Incapacitated condition',
+  'Second Failure: The target has the Paralyzed condition',
+  'After 1 minute, it succeeds automatically',
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   aoeProps.current = null;
+  aoeProps.onClose = null;
 });
 
-describe('MA-0248 Ancient Silver Dragon Paralyzing Breath data lock', () => {
-  it('row authors dc_success none + staged_paralysis 1 minute on DC 24 CON, no damage dice, no recharge', () => {
-    const action = paralyzingBreathAction();
-    expect(action).toBeTruthy();
+const ARMED_RIDERS_INERT = {
+  damage: null,
+  damageType: '',
+  secondaryDamage: null,
+  secondaryDamageType: null,
+  saveConditions: ['incapacitated', 'paralyzed'],
+  sleepStaging: null,
+  stagedPetrify: null,
+  pushFeet: null,
+  slowedClauses: null,
+  weakeningBreath: null,
+  acPenaltyClause: null,
+  speedZeroClause: null,
+  speedReduceClause: null,
+  bothOutcomesClause: null,
+  zoneTe: null,
+  zoneOnly: false,
+  storeLastAttack: false,
+};
+
+const ANCIENT_ARMED = {
+  action: paralyzingBreathAction('ancient-silver-dragon'),
+  playerStats: { name: 'Ancient Silver Dragon 1' },
+  saveDc: 24,
+  saveType: 'Constitution',
+  dcSuccess: 'none',
+  range: 90,
+  rangeGateFt: 90,
+  titleOverride: '90-ft Cone (GM positions tokens; selection advisory)',
+  excludeNames: ['Ancient Silver Dragon 1'],
+  stagedParalysis: { paralyzedRounds: 10 },
+  ...ARMED_RIDERS_INERT,
+};
+
+const WYRMLING_ARMED = {
+  action: paralyzingBreathAction('silver-dragon-wyrmling'),
+  playerStats: { name: 'Silver Dragon Wyrmling 1' },
+  saveDc: 13,
+  saveType: 'Constitution',
+  dcSuccess: 'none',
+  range: 15,
+  rangeGateFt: 15,
+  titleOverride: '15-ft Cone (GM positions tokens; selection advisory)',
+  excludeNames: ['Silver Dragon Wyrmling 1'],
+  stagedParalysis: { paralyzedRounds: 10 },
+  ...ARMED_RIDERS_INERT,
+};
+
+describe('MA-0248 Ancient Silver Dragon Paralyzing Breath', () => {
+  it('full-row data lock: Object.keys exact by name (no recharge, no damage, no range keys), dc_success none byte, staged_paralysis 1 minute on DC 24 CON, ladder prose', () => {
+    const action = paralyzingBreathAction('ancient-silver-dragon');
+    expect(Object.keys(action).sort()).toEqual([
+      'dc_success', 'description', 'name', 'save_dc', 'save_effect', 'save_type', 'staged_paralysis',
+    ]);
     expect(action.save_dc).toBe(24);
     expect(action.save_type).toBe('Constitution');
+    // Authored byte — unauthored rows default dc_success to 'half' at
+    // resolveBlockSaveDcSuccess (MonsterCardModal.jsx:286); this row must
+    // never pay half-damage on a save it has no damage for.
     expect(action.dc_success).toBe('none');
     expect(action.staged_paralysis).toEqual({ paralyzed_minutes: 1 });
-    expect(action.recharge == null).toBe(true);
-    expect(action.damage_dice_primary == null).toBe(true);
+    for (const clause of LADDER_PROSE) {
+      expect(action.save_effect).toContain(clause);
+    }
   });
 
-  it('save_effect keeps canonical two-stage ladder prose', () => {
-    const action = paralyzingBreathAction();
-    expect(action.save_effect).toContain('First Failure: The target has the Incapacitated condition');
-    expect(action.save_effect).toContain('Second Failure: The target has the Paralyzed condition');
-    expect(action.save_effect).toContain('After 1 minute, it succeeds automatically');
-  });
-});
-
-describe('MA-0248 Paralyzing Breath staged cone picker', () => {
-  it('fresh click arms the cone picker with stagedParalysis (10 rounds), dc_success none, no damage, no sleepStaging', async () => {
-    renderSilver();
+  it('press arms the exact picker contract without rolling inline; close + refire re-arms ungated with zero recharge writes', async () => {
+    renderDragon('ancient-silver-dragon', 'Ancient Silver Dragon 1', CREATURES);
     const link = paralyzingBreathLink();
     expect(link).toBeTruthy();
     fireEvent.click(link);
     expect(rollSavingThrow).not.toHaveBeenCalled();
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.saveDc).toBe(24);
-    expect(aoeProps.current.saveType).toBe('Constitution');
-    expect(aoeProps.current.damage).toBe(null);
-    expect(aoeProps.current.dcSuccess).toBe('none');
-    expect(aoeProps.current.stagedParalysis).toEqual({ paralyzedRounds: 10 });
-    expect(aoeProps.current.sleepStaging == null).toBe(true);
-    expect(aoeProps.current.coneFt ?? aoeProps.current.range).toBe(90);
-    expect(aoeProps.current.excludeNames).toEqual(['Ancient Silver Dragon 1']);
-    expect(aoeProps.current.storeLastAttack).toBe(false);
-  });
+    expect(pickedPickerProps()).toEqual(ANCIENT_ARMED);
 
-  it('ungated row re-arms: close + click opens the picker again with stagedParalysis (no recharge authored)', async () => {
-    renderSilver();
-    fireEvent.click(paralyzingBreathLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    const firstProps = aoeProps.current;
-    expect(firstProps.stagedParalysis).toEqual({ paralyzedRounds: 10 });
     aoeProps.onClose();
     await waitFor(() => expect(document.querySelector('.cone-picker-stub')).toBeNull());
+
     fireEvent.click(paralyzingBreathLink());
-    await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.stagedParalysis).toEqual({ paralyzedRounds: 10 });
+    await waitFor(() => expect(document.querySelectorAll('.cone-picker-stub').length).toBe(1));
+    expect(pickedPickerProps()).toEqual(ANCIENT_ARMED);
+    // ungated row: nothing ever arms or spends a recharge for it
     expect(runtime.store['Ancient Silver Dragon 1.monsterRecharge'] == null).toBe(true);
+    expect(rollSavingThrow).not.toHaveBeenCalled();
   });
 });
 
-describe('MA-1469 Silver Dragon Wyrmling Paralyzing Breath data lock (MA-0248 byte-twin)', () => {
-  it('actions[3] authors dc_success none + staged_paralysis 1 minute on DC 13 CON, cone range, no damage dice, no recharge', () => {
-    const action = wyrmlingActions()[3];
-    expect(action.name).toBe('Paralyzing Breath');
+describe('MA-1469 Silver Dragon Wyrmling Paralyzing Breath (byte-twin)', () => {
+  it('actions[3] full-row data lock: Object.keys exact by name incl. authored 15-foot Cone range, dc_success none byte, staged_paralysis 1 minute on DC 13 CON, ladder prose', () => {
+    const action = paralyzingBreathAction('silver-dragon-wyrmling');
+    expect(Object.keys(action).sort()).toEqual([
+      'dc_success', 'description', 'name', 'range', 'save_dc', 'save_effect', 'save_type', 'staged_paralysis',
+    ]);
     expect(action.save_dc).toBe(13);
     expect(action.save_type).toBe('Constitution');
     expect(action.dc_success).toBe('none');
     expect(action.staged_paralysis).toEqual({ paralyzed_minutes: 1 });
     expect(action.range).toBe('15-foot Cone');
-    expect(action.recharge == null).toBe(true);
-    expect(action.damage_dice_primary == null).toBe(true);
+    for (const clause of LADDER_PROSE) {
+      expect(action.save_effect).toContain(clause);
+    }
   });
 
-  it('save_effect keeps canonical two-stage ladder prose', () => {
-    const action = wyrmlingActions()[3];
-    expect(action.save_effect).toContain('First Failure: The target has the Incapacitated condition');
-    expect(action.save_effect).toContain('Second Failure: The target has the Paralyzed condition');
-    expect(action.save_effect).toContain('After 1 minute, it succeeds automatically');
-  });
-});
-
-describe('MA-1469 Silver Dragon Wyrmling staged cone picker routing', () => {
-  it('click arms the cone picker with stagedParalysis (10 rounds) + dcSuccess none — staged service supersedes the flat extractor spray', async () => {
-    renderWyrmling();
+  it('press arms the same staged contract at DC 13 / 15 ft — staged service supersedes the flat extractor spray', async () => {
+    renderDragon('silver-dragon-wyrmling', 'Silver Dragon Wyrmling 1', WYRMLING_CREATURES);
     const link = paralyzingBreathLink();
     expect(link).toBeTruthy();
     fireEvent.click(link);
     expect(rollSavingThrow).not.toHaveBeenCalled();
     await waitFor(() => expect(aoeProps.current).toBeTruthy());
-    expect(aoeProps.current.saveDc).toBe(13);
-    expect(aoeProps.current.saveType).toBe('Constitution');
-    expect(aoeProps.current.damage).toBe(null);
-    expect(aoeProps.current.dcSuccess).toBe('none');
-    expect(aoeProps.current.stagedParalysis).toEqual({ paralyzedRounds: 10 });
-    expect(aoeProps.current.sleepStaging == null).toBe(true);
-    expect(aoeProps.current.coneFt ?? aoeProps.current.range).toBe(15);
-    expect(aoeProps.current.excludeNames).toEqual(['Silver Dragon Wyrmling 1']);
-    expect(aoeProps.current.storeLastAttack).toBe(false);
-    // The word-list scan still yields both ladder words; with stagedParalysis
-    // armed the picker routes the fail leg to paralyzingBreathService (pinned
-    // in SaveAttackAoeModal.staged-paralysis.test.jsx) — the flat spray never
+    expect(pickedPickerProps()).toEqual(WYRMLING_ARMED);
+    // The word-list scan still yields both ladder words inside saveConditions;
+    // with stagedParalysis armed the picker routes the fail leg to
+    // paralyzingBreathService — pinned in
+    // SaveAttackAoeModal.staged-paralysis.test.jsx — so the flat spray never
     // governs the grant.
-    expect(aoeProps.current.saveConditions).toEqual(['incapacitated', 'paralyzed']);
   });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1959 data lock + chip+shell fork lock: Orcus "Wand Spellcasting" rode a
 // HALF-live fingerprint — the generic ActionSaveRoll shell was LIVE ("DC 18
 // Wisdom" adjudicated on both faces) while the five spell names were plain
@@ -9,12 +10,27 @@
 // dc_success:"none" — the row is damageless, half-default copy is MV-20
 // misleading) PLUS the sanctioned chip+shell code fork: the canonical
 // spell-selection idiom "casts one of the following spells" lets
-// SpellOrSaveLinks render SpellCastLinks ALONGSIDE the untouched ActionSaveRoll
+// SpellCastLinks render SpellCastLinks ALONGSIDE the untouched ActionSaveRoll
 // shell. Charge economy stays §70 ADVISORY text (no charge-pool producer/
 // consumer exists; "At Will (no charge)"/"1 Charge:"/"2 Charges:" miss the
 // N/Day pattern → chips ungated fire-by-design, At-Will precedent).
-// Whole-DB census pins the fork byte-inert: Wand Spellcasting is the ONLY
-// non-"Spellcasting"-named row carrying idiom + marked names + save_dc>0.
+// N/Day grammar parse owned by spellcasting canonical extractor tests
+// (spellcasting.test.jsx:333/:340; legendary-uses twin ma1883) — this file
+// binds THIS row's bytes only. Spellcasting-row chip names owned by
+// ma1958-orcus-spellcasting.test.jsx:202; generic counter badge / spend /
+// refusal / At-Will null-store bytes owned by spellcasting.test.jsx
+// :275/:281-302/:317/:522-548/:561; Spellcasting-row no-save-shell :192.
+// Trimmed #750: 14 tests → 7. Full-description exact byte-pin absorbs the
+// emphasis census, header/name forEach, <br> guard and prose regex; extractor
+// binding + whole-DB fork census + spell-lane census stand; render tests fold
+// (/Day-absence + sibling co-render inertness), save-route presses fold
+// (Blight twice = ungated charge advisory, Circle = own-half non-leak).
+// Mock hygiene (#739-#749): diceRoller/rangeValidation/mapsService/
+// abilityLookup purged (bisect-green — no consumer in this lane; same modal
+// tree as ma1958 purge justifications); useLoggedDiceRoll popup-capture and
+// unconsumed roll exports purged. Kept: logService (assertion target),
+// sanitize (body render), dataLoader §177 ruleset-branch, conditionEffects +
+// damageUtils (getCombatContext fires), runtime store.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -33,22 +49,17 @@ const multiattackRow = orcus.actions.find(a => a.name === 'Multiattack');
 const wandAttackRow = orcus.actions.find(a => a.name === 'Wand of Orcus');
 
 const CHIP_NAMES = ['Animate Dead', 'Blight', 'Speak with Dead', 'Circle of Death', 'Power Word Kill'];
-const HEADERS = ['At Will (no charge):', '1 Charge:', '2 Charges:'];
 const ADVISORY_CHIPS = ['Animate Dead', 'Speak with Dead', 'Power Word Kill'];
+const USES_KEY = 'monsterSpellUses';
 
-// Pre-fix description bytes (git HEAD f3e493eeb, monsters.json) — strip-tag
-// byte-equality pins the markup-only diff (house style: INLINE, no <br>,
-// original prose was single-space separated — MA-1958 append §619/§251).
+// Post-fix authored bytes pinned ONCE (house style: INLINE, no <br>) — this
+// single exact pin absorbs the markup-only-diff proof against the pre-fix
+// plain baseline (machine-read charge-tier suffixes exact-pinned #747/#748).
+const DESCRIPTION = 'While holding the Wand of Orcus, Orcus casts one of the following spells (spell save DC 18). The wand has 7 charges: <strong>At Will (no charge):</strong> <em>Animate Dead</em>, <em>Blight</em>, <em>Speak with Dead</em>. <strong>1 Charge:</strong> <em>Circle of Death</em>. <strong>2 Charges:</strong> <em>Power Word Kill</em>. It regains 1d4 + 3 charges daily at dawn.';
 const PRE_FIX_DESCRIPTION = 'While holding the Wand of Orcus, Orcus casts one of the following spells (spell save DC 18). The wand has 7 charges: At Will (no charge): Animate Dead, Blight, Speak with Dead. 1 Charge: Circle of Death. 2 Charges: Power Word Kill. It regains 1d4 + 3 charges daily at dawn.';
 const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const MONSTER_NAME = 'Orcus 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 30, rolls: [7, 8, 9, 6], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 60, rolls: [7, 8, 9, 6, 7, 8, 9, 6], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -65,35 +76,23 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSpells: vi.fn((ruleset) => Promise.resolve(ruleset === '2024' ? SPELLS_2024 : SPELLS_5E)),
 }));
 
+// Only rollSavingThrow is asserted — popup-capture and the other roll
+// entries are inert-shape-only (#739-#749 purge).
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
-  const _rollAttack = vi.fn();
-  const _rollDamage = vi.fn();
-  const _rollAbilityCheck = vi.fn();
-  const _rollSavingThrow = vi.fn();
-  const _rollSkillCheck = vi.fn();
-  const _rollInitiative = vi.fn();
-  const _quickRollPlayerSave = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
-
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: _rollAbilityCheck,
-    rollSavingThrow: _rollSavingThrow,
-    rollSkillCheck: _rollSkillCheck,
-    rollInitiative: _rollInitiative,
-    quickRollPlayerSave: _quickRollPlayerSave,
-  }));
-
+  const rollSavingThrow = vi.fn();
   return {
-    default: mockHook,
-    _rollAttack,
-    _rollDamage,
-    _rollSavingThrow,
-    _setPopupHtml,
+    default: vi.fn(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow,
+      rollSkillCheck: vi.fn(),
+      rollInitiative: vi.fn(),
+      quickRollPlayerSave: vi.fn(),
+    })),
+    _rollSavingThrow: rollSavingThrow,
   };
 });
 
@@ -110,21 +109,6 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getResistanceNotice: vi.fn(() => null),
   findCreatureByName: vi.fn(({ creatures } = {}, name) => (creatures || []).find(c => c.name === name) || null),
   getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/shared/abilityLookup.js', () => ({
-  getAbilitySaveModifier: vi.fn(() => 0),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -169,6 +153,10 @@ function refusalEntries(name) {
   return addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'automation blocked' && e.abilityName === name);
 }
 
+async function pressChip(name) {
+  await act(async () => { fireEvent.click(wandChipByText(name)); });
+}
+
 function renderOrcus() {
   const m = makeMonster({
     name: 'Orcus',
@@ -186,65 +174,20 @@ function renderOrcus() {
 // ── Data lock: Orcus Wand Spellcasting row ─────────────────────────────────
 
 describe('MA-1959 monsters.json data lock: Orcus Wand Spellcasting row', () => {
-  it('extracts all five spell names as chips — tier headers ending ":" skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(wandRow.description);
-    expect(names).toEqual(CHIP_NAMES);
-    HEADERS.forEach(h => expect(names).not.toContain(h.replace(/:$/, '')));
-  });
-
-  it('charge tiers do NOT match the N/Day uses pattern — chips ungated fire-by-design, charge economy stays §70 advisory text', () => {
-    expect(extractSpellcastingSpellUses(wandRow.description)).toEqual({});
-  });
-
-  it('dc_success "none" authored — damageless row, half-default copy is MV-20 misleading; save_dc 18 + save_type "Wisdom" pair byte-untouched', () => {
+  it('row bytes locked once: description exact INLINE markup (charge-tier suffixes machine-read, no <br>, no hit/failure copy), stripped text byte-equals the pre-fix plain baseline (markup-only diff §619), dc_success "none" + save_dc 18 + save_type "Wisdom" fields pinned (damageless row — half-default copy is MV-20 misleading)', () => {
+    expect(wandRow.description).toBe(DESCRIPTION);
+    expect(stripTags(wandRow.description)).toBe(PRE_FIX_DESCRIPTION);
     expect(wandRow.dc_success).toBe('none');
     expect(wandRow.save_dc).toBe(18);
     expect(wandRow.save_type).toBe('Wisdom');
-    expect(wandRow.description).toMatch(/spell save DC 18/);
-    expect(wandRow.description).not.toMatch(/Hit:|Failure:|Success:/);
   });
 
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte (INLINE twin, no <br> — original prose single-line, §619)', () => {
-    expect(stripTags(wandRow.description)).toBe(PRE_FIX_DESCRIPTION);
-    expect(wandRow.description).not.toMatch(/<br>/);
+  it('extractors bind THIS row: five names BY NAME in authored order (colon headers skipped); charge tiers miss the N/Day grammar → uses {} — chips ungated fire-by-design, charge economy stays §70 advisory text (grammar owned by canonical parser tests, cited)', () => {
+    expect(extractSpellNamesFromSpellcasting(wandRow.description)).toEqual(CHIP_NAMES);
+    expect(extractSpellcastingSpellUses(wandRow.description)).toEqual({});
   });
 
-  it('house style MA-0421/MA-1958: three tier headers <strong>-wrapped ending ":", five spell names <em>-wrapped', () => {
-    HEADERS.forEach(h => expect(wandRow.description).toContain(`<strong>${h}</strong>`));
-    CHIP_NAMES.forEach(n => expect(wandRow.description).toContain(`<em>${n}</em>`));
-  });
-
-  it('emphasis census: ONLY the three tier headers + five spell names carry markup — no §161 fake-chip decoys', () => {
-    const tokens = (wandRow.description.match(/<(?:strong|em)>[^<]*<\/(?:strong|em)>/g) || []);
-    expect(tokens).toEqual([
-      '<strong>At Will (no charge):</strong>',
-      '<em>Animate Dead</em>',
-      '<em>Blight</em>',
-      '<em>Speak with Dead</em>',
-      '<strong>1 Charge:</strong>',
-      '<em>Circle of Death</em>',
-      '<strong>2 Charges:</strong>',
-      '<em>Power Word Kill</em>',
-    ]);
-  });
-
-  it('all five spells resolve in BOTH 5e and 2024 indexes; Blight/Circle of Death carry CON-half saves, the other three carry no dc → save-route vs advisory lanes', () => {
-    CHIP_NAMES.forEach(n => {
-      expect(spells5e.some(s => s.name === n)).toBe(true);
-      expect(spells2024.some(s => s.name === n)).toBe(true);
-    });
-    const blight = spells5e.find(s => s.name === 'Blight');
-    const circle = spells5e.find(s => s.name === 'Circle of Death');
-    expect(blight.dc).toEqual({ dc_type: 'CON', dc_success: 'half' });
-    expect(blight.damage.damage_at_slot_level['4']).toBe('8d8');
-    expect(circle.dc).toEqual({ dc_type: 'CON', dc_success: 'half' });
-    expect(circle.damage.damage_at_slot_level['6']).toBe('8d6');
-    ['Animate Dead', 'Speak with Dead', 'Power Word Kill'].forEach(n => {
-      expect(spells5e.find(s => s.name === n).dc == null).toBe(true);
-    });
-  });
-
-  it('whole-DB byte-inertness census of the chip+shell fork: Wand Spellcasting is the ONLY non-"Spellcasting" row with the idiom + marked names + numeric save_dc', () => {
+  it('census: the fork is byte-inert app-wide and the five spells split cleanly across lanes — Wand Spellcasting is the ONLY non-"Spellcasting" row with idiom + marked names + numeric save_dc in the whole DB; all five resolve in BOTH spell indexes (§158 trap INACTIVE); Blight/Circle of Death carry CON-half 8d8/8d6 (save-route), the other three carry no dc (advisory)', () => {
     const idiom = /one of the following spells/i;
     const lists = ['actions', 'bonus_actions', 'reactions', 'legendary_actions', 'lair_actions'];
     const hits = [];
@@ -261,14 +204,20 @@ describe('MA-1959 monsters.json data lock: Orcus Wand Spellcasting row', () => {
       });
     });
     expect(hits).toEqual(['Orcus/Wand Spellcasting']);
-  });
 
-  it('no 2024 monsters.json twin exists — single-file fix scope (§3)', () => {
-    expect(() => readFileSync('public/data/2024/monsters.json', 'utf8')).toThrow();
+    CHIP_NAMES.forEach(n => {
+      expect(spells5e.some(s => s.name === n)).toBe(true);
+      expect(spells2024.some(s => s.name === n)).toBe(true);
+    });
+    expect(spells5e.find(s => s.name === 'Blight').dc).toEqual({ dc_type: 'CON', dc_success: 'half' });
+    expect(spells5e.find(s => s.name === 'Circle of Death').dc).toEqual({ dc_type: 'CON', dc_success: 'half' });
+    ['Animate Dead', 'Speak with Dead', 'Power Word Kill'].forEach(n => {
+      expect(spells5e.find(s => s.name === n).dc == null).toBe(true);
+    });
   });
 });
 
-// ── Modal: five chips + live shell coexist ─────────────────────────────────
+// ── Modal: chip+shell fork live on the full card ───────────────────────────
 
 describe('MA-1959 MonsterCardModal Wand Spellcasting chip+shell fork', () => {
   beforeEach(() => {
@@ -276,72 +225,76 @@ describe('MA-1959 MonsterCardModal Wand Spellcasting chip+shell fork', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('Wand row renders five spell chips AND the DC 18 Wisdom shell — chip+shell coexist (was 0 chips + shell-only)', () => {
+  it('fork renders: five spell chips in authored order WITHOUT any /Day counter (charge advisory) alongside the ONE untouched DC 18 Wisdom shell (was 0 chips + shell-only) — and sibling rows stay inert when co-rendered: Multiattack chipless, Wand of Orcus attack-chip-only (+19), Spellcasting row keeps its no-save-shell XOR (names owned by ma1958:202)', () => {
     renderOrcus();
     const row = wandRowEl();
     const wandSpellChips = Array.from(row.querySelectorAll('.mc-dice-link-spell'));
-    expect(wandSpellChips.length).toBe(5);
     expect(wandSpellChips.map(el => el.textContent.split('(')[0].trim())).toEqual(CHIP_NAMES);
+    wandSpellChips.forEach(el => expect(el.textContent).not.toMatch(/\/Day/));
     const shells = Array.from(row.querySelectorAll('.mc-dice-link-save-clickable'));
     expect(shells.length).toBe(1);
     expect(shells[0].textContent.trim()).toBe('DC 18 Wisdom');
+
+    expect(rowByLeadingName('Multiattack').querySelectorAll('.mc-dice-link').length).toBe(0);
+    const wandAttack = rowByLeadingName('Wand of Orcus');
+    expect(wandAttack.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
+    expect(wandAttack.querySelectorAll('.mc-dice-link').length).toBe(1);
+    expect(wandAttack.querySelector('.mc-dice-link').textContent).toContain('+19');
+    const sc = rowByLeadingName('Spellcasting');
+    expect(sc.querySelectorAll('.mc-dice-link-spell').length).toBe(3);
+    expect(sc.querySelectorAll('.mc-dice-link-save-clickable').length).toBe(0);
   });
 
-  it('ungated by design: NO Wand chip carries an N/Day counter; no monsterSpellUses spend on repeated casts (§70 charge advisory)', async () => {
+  it('save-route chips adjudicate each spell\'s OWN save bytes at row DC 18 and fire UNGATED — Blight CON half 8d8 Necrotic (MA-1879 cast lane §204), second Blight press adjudicates again with zero monsterSpellUses stored and zero refusals (§70 charges advisory), Circle of Death keeps its OWN half 8d6 (row dc_success "none" never leaks onto save-route casts)', async () => {
     renderOrcus();
-    Array.from(wandRowEl().querySelectorAll('.mc-dice-link-spell')).forEach(el => expect(el.textContent).not.toMatch(/\/Day/));
-    await act(async () => { fireEvent.click(wandChipByText('Blight')); });
+    await pressChip('Blight');
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
-    await act(async () => { fireEvent.click(wandChipByText('Blight')); });
+    expect(rollSavingThrow.mock.calls[0][2]).toMatchObject({
+      spellName: 'Blight',
+      actionName: 'Blight',
+      saveDc: 18,
+      saveType: 'CON',
+      dcSuccess: 'half',
+      autoDamageFormula: '8d8',
+      autoDamageDamageType: 'Necrotic',
+      isSpellDamage: true,
+    });
+
+    await pressChip('Blight');
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(2));
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
+
+    await pressChip('Circle of Death');
+    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(3));
+    expect(rollSavingThrow.mock.calls[2][2]).toMatchObject({
+      spellName: 'Circle of Death',
+      saveDc: 18,
+      saveType: 'CON',
+      dcSuccess: 'half',
+      autoDamageFormula: '8d6',
+      isSpellDamage: true,
+    });
+
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`] ?? null).toBeNull();
     expect(refusalEntries('Blight').length).toBe(0);
+    expect(refusalEntries('Circle of Death').length).toBe(0);
   });
 
-  it('Blight chip press adjudicates DC 18 CON half 8d8 Necrotic via the MA-1879 cast lane (§204)', async () => {
-    renderOrcus();
-    await act(async () => { fireEvent.click(wandChipByText('Blight')); });
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const context = rollSavingThrow.mock.calls[0][2];
-    expect(context.spellName).toBe('Blight');
-    expect(context.actionName).toBe('Blight');
-    expect(context.saveDc).toBe(18);
-    expect(context.saveType).toBe('CON');
-    expect(context.dcSuccess).toBe('half');
-    expect(context.autoDamageFormula).toBe('8d8');
-    expect(context.autoDamageDamageType).toBe('Necrotic');
-    expect(context.isSpellDamage).toBe(true);
-  });
-
-  it('Circle of Death chip press adjudicates DC 18 CON half 8d6 Necrotic (spell keeps its OWN half — row dc_success:none never leaks onto save-route casts)', async () => {
-    renderOrcus();
-    await act(async () => { fireEvent.click(wandChipByText('Circle of Death')); });
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
-    const context = rollSavingThrow.mock.calls[0][2];
-    expect(context.spellName).toBe('Circle of Death');
-    expect(context.saveDc).toBe(18);
-    expect(context.saveType).toBe('CON');
-    expect(context.dcSuccess).toBe('half');
-    expect(context.autoDamageFormula).toBe('8d6');
-    expect(context.isSpellDamage).toBe(true);
-  });
-
-  it('Animate Dead / Speak with Dead / Power Word Kill cast as honest advisory records carrying row DC 18 — no save prompt, no spend (§680 lane)', async () => {
+  it('no-dc chips cast as honest advisory records carrying the row DC 18, Wisdom — no save roll fires at all, no spend, no refusal (§680 lane, zero-roll canary)', async () => {
     renderOrcus();
     for (const n of ADVISORY_CHIPS) {
-      await act(async () => { fireEvent.click(wandChipByText(n)); });
+      await pressChip(n);
     }
-    await waitFor(() => expect(abilityUseEntries('Animate Dead').length).toBe(1));
+    await waitFor(() => expect(ADVISORY_CHIPS.every(n => abilityUseEntries(n).length === 1)).toBe(true));
     expect(abilityUseEntries('Animate Dead')[0].description).toMatch(/Orcus 1 casts Animate Dead via Spellcasting \(spell save DC 18, Wisdom\)/);
     expect(abilityUseEntries('Animate Dead')[0].description).toMatch(/GM-enforced for monsters/);
     expect(abilityUseEntries('Speak with Dead')[0].description).toMatch(/spell save DC 18/);
     expect(abilityUseEntries('Power Word Kill')[0].description).toMatch(/spell save DC 18/);
     expect(rollSavingThrow).not.toHaveBeenCalled();
+    expect(runtime.store[`${MONSTER_NAME}.${USES_KEY}`] ?? null).toBeNull();
     expect(refusalEntries('Animate Dead').length).toBe(0);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`] ?? null).toBeNull();
   });
 
-  it('shell press STILL adjudicates the generic DC 18 Wisdom save byte-identically — dc_success "none" kills the half-copy leak, no damage arms (MV-20)', async () => {
+  it('shell press STILL adjudicates the generic DC 18 Wisdom save — dc_success "none" kills the half-copy leak, no damage arms (MV-20 honest-dc_success canary)', async () => {
     renderOrcus();
     await act(async () => { fireEvent.click(wandRowEl().querySelector('.mc-dice-link-save-clickable')); });
     await waitFor(() => expect(rollSavingThrow).toHaveBeenCalled());
@@ -353,17 +306,5 @@ describe('MA-1959 MonsterCardModal Wand Spellcasting chip+shell fork', () => {
     expect(context.dcSuccess).toBe('none');
     expect(context.isSpellDamage).toBe(false);
     expect(context.autoDamageFormula == null).toBe(true);
-  });
-
-  it('sibling rows byte-inert: Multiattack stays chipless, Wand of Orcus keeps ONE attack chip, Spellcasting row keeps its XOR (three chips, no save shell)', () => {
-    renderOrcus();
-    expect(rowByLeadingName('Multiattack').querySelectorAll('.mc-dice-link').length).toBe(0);
-    const wandAttack = rowByLeadingName('Wand of Orcus');
-    expect(wandAttack.querySelectorAll('.mc-dice-link-spell').length).toBe(0);
-    expect(wandAttack.querySelectorAll('.mc-dice-link').length).toBe(1);
-    expect(wandAttack.querySelector('.mc-dice-link').textContent).toContain('+19');
-    const sc = rowByLeadingName('Spellcasting');
-    expect(Array.from(sc.querySelectorAll('.mc-dice-link-spell')).map(el => el.textContent.split('(')[0].trim())).toEqual(['Detect Magic', 'Dispel Magic', 'Time Stop']);
-    expect(sc.querySelectorAll('.mc-dice-link-save-clickable').length).toBe(0);
   });
 });

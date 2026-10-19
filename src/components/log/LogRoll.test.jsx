@@ -1,490 +1,264 @@
+// @maintained-by-ai
+// Lane: LogRollEntry bytes for generic type:'roll' entries (dice values, totals,
+// adv/dis legs, attack outcomes, modifiers, save-damage/aoe/damage lanes).
+// CUT (owner cited): container type-dispatch → LogEntryRendering.test.jsx (#879);
+// death-save selected/discarded bytes (type:'death_save') → LogDeathSave.test.jsx (#877);
+// condition-entry DC/ability legs (type:'condition') → LogCondition.test.jsx (#876);
+// save_result entry → its own lane (#883); spell roll entry bytes → LogSpell.test.jsx (queued).
+// Old→new map: cover(3)+rangeReason-hide+notice-hides+bane/bless/ray/gwf-hides+secondary-hide
+// → vanillaRoll/cover + per-lane count pins; condition-save(4)→conditionSave; save-info(3)→saveInfo;
+// save-result(7)→saveOutcome; aoe(3)→aoe; damageType-each(4)→damageTypeGate; resistance(2)→resistanceDetails;
+// final-damage(2)→finalDamage; attack(6)→hitMiss+crit; nat badges(2)→natBadges; target(3)→targetVariants;
+// bane/bless(4)+ray(2)→modifiers; gwf(3)→gwf; bonus(4)→totalBytes; showBothDice(3)→bothDice;
+// secondary(2)→secondary; damage-dice(1)→damageDice; icon-each(21 rows)→iconMatrix (9 distinct icons + default).
+// Family-standard setup (useLog fake, zero network) from log-test-utils.jsx; fixed timestamps.
 import { screen } from '@testing-library/react';
 import { beforeEach } from 'vitest';
 import { roll, q, setup, beforeEachSetup } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
 
-describe('Log', () => {
+const TS = 1750000000000; // fixed timestamp — never assert against Date.now() output
+
+// Entries render newest-first (Log.jsx reverses); expect byte arrays in that order.
+const textsOf = (sel) => [...document.querySelectorAll(sel)].map((n) => n.textContent.trim());
+
+describe('Log > RollEntry', () => {
   beforeEach(() => {
     beforeEachSetup();
   });
 
-  // ── ROLL ENTRY - cover and rangeReason ───────────────
-  describe('RollEntry - cover and rangeReason', () => {
-    it('shows 1/2 cover with AC bonus', () => {
-      setup(Log, [roll({ coverAcBonus: 2 })]);
-      expect(screen.getByText(/1\/2 Cover \(.*AC\)/i)).toBeInTheDocument();
-    });
-
-    it('shows 3/4 cover with AC bonus', () => {
-      setup(Log, [roll({ coverAcBonus: 3, coverLevel: 'threeQuarter' })]);
-      expect(screen.getByText(/3\/4 Cover \(.*AC\)/i)).toBeInTheDocument();
-    });
-
-    it('hides cover when bonus is zero', () => {
-      setup(Log, [roll()]);
-      expect(screen.queryByText(/Cover/i)).not.toBeInTheDocument();
-    });
-
-    it('shows rangeReason when set', () => {
-      setup(Log, [roll({ rangeReason: 'Long range' })]);
-      expect(screen.getByText(/Long range/i)).toBeInTheDocument();
-    });
-
-    it('hides rangeReason when empty', () => {
-      setup(Log, [roll({ rangeReason: '' })]);
-      expect(screen.queryByText(/Long range/i)).not.toBeInTheDocument();
-    });
+  it('renders header: actor, roll name, and locale-formatted fixed timestamp', () => {
+    setup(Log, [roll({ timestamp: TS })]);
+    expect(q('.log-entry.log-roll')).toBeInTheDocument();
+    expect(q('.log-character').textContent).toBe('Frodo');
+    expect(q('.log-name').textContent).toBe('LS Attack');
+    expect(q('.log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
   });
 
-  // ── ROLL ENTRY - condition save ───────────────
-  describe('RollEntry - condition save', () => {
-    it('shows condition save with success class and text', () => {
-      setup(Log, [roll({ condition: 'charmed', dc: 15, success: true })]);
-      expect(screen.getByText(/vs charmed.*SUCCESS/i)).toBeInTheDocument();
-      expect(q('.log-condition-save.log-condition-success')).toBeInTheDocument();
-    });
-
-    it('shows condition save with failure class and text', () => {
-      setup(Log, [roll({ condition: 'paralyzed', dc: 12, success: false })]);
-      expect(screen.getByText(/FAILURE/i)).toBeInTheDocument();
-      expect(q('.log-condition-save.log-condition-failure')).toBeInTheDocument();
-    });
-
-    it('shows advantage with advantageSources', () => {
-      setup(Log, [roll({
-        condition: 'charmed',
-        dc: 15,
-        success: true,
-        mode: 'advantage',
-        advantageSources: ['Bard', 'Paladin'],
-      })]);
-      expect(screen.getByText(/ADVANTAGE \(Bard, Paladin\)/i)).toBeInTheDocument();
-    });
-
-    it('shows disadvantage badge on condition save', () => {
-      setup(Log, [roll({ condition: 'frightened', dc: 10, success: false, mode: 'disadvantage' })]);
-      expect(screen.getByText(/DISADVANTAGE/i)).toBeInTheDocument();
-    });
+  it('formats totals: signed bonus, bonus detail, and plain total bytes', () => {
+    setup(Log, [
+      roll({ id: 't1', total: 20, bonus: 5 }),
+      roll({ id: 't2', total: 13, bonus: -2 }),
+      roll({ id: 't3', total: 8, bonus: 3, bonusDetail: 'from bless' }),
+      roll({ id: 't4', total: 15, bonus: null }),
+    ]);
+    expect(textsOf('.log-total')).toEqual(['15', '8+3 from bless', '13-2', '20+5']);
   });
 
-  // ── ROLL ENTRY - resistance notice ───────────────
-  describe('RollEntry - resistance notice', () => {
-    it('shows resistanceNotice text', () => {
-      setup(Log, [roll({ resistanceNotice: 'Half dmg' })]);
-      expect(screen.getByText(/Half dmg/i)).toBeInTheDocument();
-    });
-
-    it('hides resistanceNotice when empty', () => {
-      setup(Log, [roll({ resistanceNotice: '' })]);
-      expect(q('.log-resistance-notice')).not.toBeInTheDocument();
-    });
+  it('renders a vanilla roll with every optional segment absent', () => {
+    setup(Log, [roll()]);
+    expect(screen.queryByText(/Cover/i)).not.toBeInTheDocument();
+    ['.log-range-reason', '.log-mode-badge', '.log-damage-type', '.log-save-info',
+      '.log-save-result', '.log-final-damage', '.log-secondary-damage',
+      '.log-resistance-details', '.log-aoe-affect', '.log-condition-save',
+      '.log-resistance-notice', '.log-hunter-lore-notice', '.log-bane-penalty',
+      '.log-bless-bonus', '.log-gwf', '.log-ray-enfeeblement', '.log-resistance',
+      '.log-dice-formula', '.log-dice-values-inline', '.log-nat20', '.log-nat1',
+    ].forEach((sel) => expect(q(sel)).not.toBeInTheDocument());
+    // core still renders
+    expect(screen.getByText('HIT (AC 15)')).toBeInTheDocument();
+    expect(q('.log-total').textContent).toBe('20+5');
   });
 
-  // ── ROLL ENTRY - save-damage: save info ───────────────
-  describe('RollEntry - save-damage save info', () => {
-    it('shows save type and DC', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveType: 'dex', saveDc: 15 })]);
-      expect(q('.log-save-info')).toBeInTheDocument();
-    });
-
-    it('hides save info when saveType or saveDc is missing', () => {
-      setup(Log, [roll({ rollType: 'save-damage' })]);
-      expect(q('.log-save-info')).not.toBeInTheDocument();
-    });
-
-    it('shows disadvantage badge in save info', () => {
-      setup(Log, [roll({ rollType: 'save-damage', mode: 'disadvantage', saveDc: 13, saveType: 'wis' })]);
-      expect(screen.getByText(/DISADVANTAGE/i)).toBeInTheDocument();
-    });
+  it('marks selected/discarded dice for advantage, disadvantage, and plain fallback', () => {
+    setup(Log, [
+      roll({ id: 'adv', rolls: [17, 9], mode: 'advantage', total: 22 }),
+      roll({ id: 'dis', rolls: [3, 15], mode: 'disadvantage', total: 3, bonus: null }),
+      roll({ id: 'norm', rolls: [17, 9], mode: 'normal', total: 26 }),
+    ]);
+    expect(textsOf('.log-die')).toEqual([
+      '(26)',
+      '(3 selected)', '(15 discarded)',
+      '(17 selected)', '(9 discarded)',
+    ]);
+    expect(textsOf('.log-mode-badge')).toEqual(['DISADVANTAGE', 'ADVANTAGE']);
   });
 
-  // ── ROLL ENTRY - save-damage: save result ───────────────
-  describe('RollEntry - save-damage save result', () => {
-    it('shows saveResult success with class', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveResult: 'success', targetName: 'Gob' })]);
-      expect(q('.log-save-result.log-condition-success')).toBeInTheDocument();
-    });
-
-    it('shows saveResult failure with class and text', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveResult: 'failure', targetName: 'Gob' })]);
-      expect(screen.getByText(/SAVE FAILURE/i)).toBeInTheDocument();
-      expect(q('.log-save-result.log-condition-failure')).toBeInTheDocument();
-    });
-
-    it('hides save result when saveResult is null and saveSuccess is not set', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveResult: null })]);
-      expect(q('.log-save-result')).not.toBeInTheDocument();
-    });
-
-    it('shows saveSuccess path (boolean=true) when saveResult is null', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveResult: null, saveSuccess: true })]);
-      expect(screen.getByText(/SAVE SUCCESS/i)).toBeInTheDocument();
-    });
-
-    it('shows saveSuccess path (boolean=false) when saveResult is null', () => {
-      setup(Log, [roll({ rollType: 'save-damage', saveResult: null, saveSuccess: false })]);
-      expect(screen.getByText(/SAVE FAILURE/i)).toBeInTheDocument();
-    });
-
-    it('shows saveRoll with bonus', () => {
-      setup(Log, [roll({
-        rollType: 'save-damage',
-        saveResult: 'success',
-        saveRoll: 14,
-        saveBonus: 3,
-      })]);
-      expect(screen.getByText(/d20 14\+3/i)).toBeInTheDocument();
-    });
-
-    it('shows saveRoll without bonus when bonus is null', () => {
-      setup(Log, [roll({
-        rollType: 'save-damage',
-        saveResult: 'failure',
-        saveRoll: 8,
-        saveBonus: null,
-      })]);
-      expect(screen.getByText(/d20 8\)/i)).toBeInTheDocument();
-    });
+  it('shows NAT 20 and FUMBLE badges with entry-level classes', () => {
+    setup(Log, [roll({ id: 'n20', isNatural20: true }), roll({ id: 'n1', isNatural1: true })]);
+    expect(q('.log-roll.log-nat20')).toHaveTextContent('NAT 20');
+    expect(q('.log-roll.log-nat1')).toHaveTextContent('FUMBLE');
   });
 
-  // ── ROLL ENTRY - aoe-damage ───────────────
-  describe('RollEntry - aoe-damage', () => {
-    it('shows formula, affected count, and damage type', () => {
-      setup(Log, [roll({ rollType: 'aoe-damage', formula: '8d6+0', affectedCount: 3 })]);
-      expect(screen.getByText(/8d6/)).toBeInTheDocument();
-      expect(screen.getByText(/3 creatures affected/i)).toBeInTheDocument();
-    });
-
-    it('hides affected count when zero', () => {
-      setup(Log, [roll({ rollType: 'aoe-damage', formula: '4d6', affectedCount: 0 })]);
-      expect(screen.queryByText(/affected/i)).not.toBeInTheDocument();
-    });
-
-    it('uses singular "creature" when count is 1', () => {
-      setup(Log, [roll({ rollType: 'aoe-damage', formula: '4d6', affectedCount: 1 })]);
-      expect(screen.getByText(/1 creature affected/i)).toBeInTheDocument();
-    });
+  it('renders HIT / MISS / AUTO-MISS bytes with AC suffix, and suppresses when hit undefined', () => {
+    setup(Log, [
+      roll({ id: 'hit', hit: true, targetAc: 16 }),
+      roll({ id: 'miss', hit: false, targetAc: null }),
+      roll({ id: 'auto', isAutoMiss: true }),
+      roll({ id: 'nohit', hit: undefined }),
+    ]);
+    expect(textsOf('.log-hit-miss')).toEqual(['AUTO-MISS (AC 15)', 'MISS', 'HIT (AC 16)']);
+    expect(q('.log-hit-miss.log-hit')).toBeInTheDocument();
+    expect(q('.log-hit-miss.log-miss')).toBeInTheDocument();
   });
 
-  // ── ROLL ENTRY - damage type display ───────────────
-  describe('RollEntry - damage type', () => {
-    it.each([
-      ['damage', 'slashing'],
-      ['save-damage', 'fire'],
-      ['overchannel-damage', 'fire'],
-      ['graze-damage', 'cold'],
-    ])('shows damage type "%s" for rollType "%s"', (rollType, damageType) => {
-      setup(Log, [roll({ rollType, damageType })]);
-      expect(screen.getByText(new RegExp(damageType, 'i'))).toBeInTheDocument();
-    });
+  it('renders Critical Hit, Critical Miss, and natural-1 suppresses crit', () => {
+    setup(Log, [
+      roll({ id: 'crit', isCrit: true }),
+      roll({ id: 'nat1', isCrit: false, isNatural1: true }),
+      roll({ id: 'both', isCrit: true, isNatural1: true }),
+    ]);
+    expect(textsOf('.log-critical-hit')).toEqual(['Critical Hit!']);
+    expect(textsOf('.log-critical-miss')).toEqual(['Critical Miss!', 'Critical Miss!']);
   });
 
-  // ── ROLL ENTRY - resistance details ───────────────
-  describe('RollEntry - resistance details', () => {
-    it('shows immune and resistant badges', () => {
-      setup(Log, [roll({
-        rollType: 'damage',
-        damageType: 'fire',
-        resistanceDetails: [
-          { damageType: 'fire', status: 'immune' },
-          { damageType: 'cold', status: 'resistant' },
-        ],
-      })]);
-      expect(screen.getByText(/Immune to fire/i)).toBeInTheDocument();
-      expect(screen.getByText(/Resistant to cold/i)).toBeInTheDocument();
-      expect(q('.log-immune')).toBeInTheDocument();
-      expect(q('.log-resistant')).toBeInTheDocument();
-    });
-
-    it('hides resistance details when array is empty', () => {
-      setup(Log, [roll({ rollType: 'damage', resistanceDetails: [] })]);
-      expect(q('.log-resistance-details')).not.toBeInTheDocument();
-    });
+  it('renders target variants: arrow, vs-target, save-vs-attacker, aoe suppressed', () => {
+    setup(Log, [
+      roll({ id: 'gen', targetName: 'Orc' }),
+      roll({ id: 'sd', rollType: 'save-damage', targetName: 'Gob' }),
+      roll({ id: 'sv', rollType: 'save', targetName: 'Wolf', attackerName: 'Goblin' }),
+      roll({ id: 'aoe', rollType: 'aoe-damage', targetName: 'Hobgoblin' }),
+    ]);
+    expect(screen.getByText('→ Orc')).toBeInTheDocument();
+    expect(screen.getByText('vs Gob')).toBeInTheDocument();
+    expect(screen.getByText('Wolf vs Goblin')).toBeInTheDocument();
+    expect(screen.queryByText(/Hobgoblin/i)).not.toBeInTheDocument();
   });
 
-  // ── ROLL ENTRY - final damage ───────────────
-  describe('RollEntry - final damage', () => {
-    it('shows final damage for save-damage with damageType', () => {
-      setup(Log, [roll({
-        rollType: 'save-damage',
-        finalDamage: 5,
-        damageType: 'fire',
-      })]);
-      expect(screen.getByText(/→ 5 fire damage/i)).toBeInTheDocument();
-    });
-
-    it('hides final damage when finalDamage is null', () => {
-      setup(Log, [roll({ rollType: 'save-damage', damageType: 'fire', finalDamage: null })]);
-      expect(q('.log-final-damage')).not.toBeInTheDocument();
-    });
+  it('renders modifier badges: bane, bless, enfeeblement, generic subtract rider', () => {
+    setup(Log, [roll({ baneRoll: 3, blessRoll: 2, rayOfEnfeebleRoll: 4, subtractDieRoll: 2 })]);
+    expect(q('.log-bane-penalty').textContent.trim()).toBe('-1d4 [Bane]: -3');
+    expect(q('.log-bless-bonus').textContent.trim()).toBe('+1d4 [Bless]: +2');
+    expect(q('.log-ray-enfeeblement').textContent.trim()).toBe('-1d8 [Enfeeblement]: -4');
+    // subtract rider reuses .log-bane-penalty — it renders as the second one
+    expect(document.querySelectorAll('.log-bane-penalty')[1].textContent.trim()).toBe('-1d6 [Subtract Rider]: -2');
   });
 
-  // ── ROLL ENTRY - hunter lore notice ───────────────
-  describe('RollEntry - hunter lore notice', () => {
-    it('shows hunter lore notice with eye icon', () => {
-      setup(Log, [roll({ hunterLoreNotice: 'Orc weakness detected' })]);
-      expect(screen.getByText(/Orc weakness detected/i)).toBeInTheDocument();
-      expect(q('.log-hunter-lore-notice i.fa-eye')).toBeInTheDocument();
-    });
-
-    it('hides hunter lore notice when empty', () => {
-      setup(Log, [roll({ hunterLoreNotice: '' })]);
-      expect(q('.log-hunter-lore-notice')).not.toBeInTheDocument();
-    });
+  it('shows GWF original → display dice with rolls fallback', () => {
+    setup(Log, [
+      roll({ id: 'g1', gwfApplied: true, gwfOriginalRolls: [12, 8], gwfDisplayRolls: [15, 10] }),
+      roll({ id: 'g2', gwfApplied: true, gwfOriginalRolls: [1, 3], rolls: [4, 6], gwfDisplayRolls: undefined }),
+    ]);
+    expect(textsOf('.log-gwf')).toEqual(['GWF: 1, 3 → 4, 6', 'GWF: 12, 8 → 15, 10']);
   });
 
-  // ── ROLL ENTRY - attack hit/miss/crit ───────────────
-  describe('RollEntry - attack hit/miss/crit', () => {
-    it('shows HIT with target AC', () => {
-      setup(Log, [roll({ rollType: 'attack', hit: true, targetAc: 16 })]);
-      expect(screen.getByText(/HIT \(AC 16\)/i)).toBeInTheDocument();
-    });
-
-    it('shows MISS without AC when targetAc is missing', () => {
-      setup(Log, [roll({ rollType: 'attack', hit: false, targetAc: null })]);
-      expect(screen.getByText(/MISS/i)).toBeInTheDocument();
-      expect(q('.log-hit-miss').textContent).not.toContain('AC');
-    });
-
-    it('shows AUTO-MISS', () => {
-      setup(Log, [roll({ rollType: 'attack', isAutoMiss: true })]);
-      expect(screen.getByText(/AUTO-MISS/i)).toBeInTheDocument();
-    });
-
-    it('shows Critical Hit on isCrit', () => {
-      setup(Log, [roll({ rollType: 'attack', isCrit: true })]);
-      expect(screen.getByText(/Critical Hit!/i)).toBeInTheDocument();
-    });
-
-    it('shows Critical Miss on natural 1', () => {
-      setup(Log, [roll({ rollType: 'attack', isNatural1: true })]);
-      expect(screen.getByText(/Critical Miss!/i)).toBeInTheDocument();
-    });
-
-    it('does not show Critical Hit when isNatural1 overrides', () => {
-      setup(Log, [roll({ rollType: 'attack', isCrit: true, isNatural1: true })]);
-      expect(screen.queryByText(/Critical Hit!/i)).not.toBeInTheDocument();
-    });
+  it('renders save info bytes and suppresses when saveType or saveDc missing', () => {
+    setup(Log, [
+      roll({ id: 'si', rollType: 'save-damage', saveType: 'dex', saveDc: 15, mode: 'disadvantage' }),
+      roll({ id: 'no', rollType: 'save-damage' }),
+    ]);
+    expect(document.querySelectorAll('.log-save-info')).toHaveLength(1);
+    expect(q('.log-save-info')).toHaveTextContent('DEX save DC 15');
+    expect(screen.getByText('DISADVANTAGE')).toBeInTheDocument();
   });
 
-  // ── ROLL ENTRY - natural 20 / fumble badges ───────────────
-  describe('RollEntry - natural 20 and fumble badges', () => {
-    it('shows NAT 20 badge and log-nat20 class', () => {
-      setup(Log, [roll({ isNatural20: true })]);
-      expect(screen.getByText(/NAT 20/i)).toBeInTheDocument();
-      expect(q('.log-nat20')).toBeInTheDocument();
-    });
-
-    it('shows FUMBLE badge and log-nat1 class', () => {
-      setup(Log, [roll({ isNatural1: true })]);
-      expect(screen.getByText(/FUMBLE/i)).toBeInTheDocument();
-      expect(q('.log-nat1')).toBeInTheDocument();
-    });
+  it('renders save outcome bytes: saveResult, legacy saveSuccess, dice, and null suppression', () => {
+    setup(Log, [
+      roll({ id: 'sr1', rollType: 'save-damage', saveResult: 'success', saveRoll: 14, saveBonus: 3 }),
+      roll({ id: 'sr2', rollType: 'save-damage', saveResult: 'failure' }),
+      roll({ id: 'sr3', rollType: 'save-damage', saveResult: null, saveSuccess: true }),
+      roll({ id: 'sr4', rollType: 'save-damage', saveResult: null, saveSuccess: false }),
+      roll({ id: 'sr5', rollType: 'save-damage', saveResult: null }),
+    ]);
+    expect(textsOf('.log-save-result')).toEqual([
+      'SAVE FAILURE',
+      'SAVE SUCCESS',
+      'SAVE FAILURE',
+      'SAVE SUCCESS (d20 14+3)',
+    ]);
+    expect(q('.log-save-result.log-condition-success')).toBeInTheDocument();
+    expect(q('.log-save-result.log-condition-failure')).toBeInTheDocument();
   });
 
-  // ── ROLL ENTRY - target display ───────────────
-  describe('RollEntry - target display', () => {
-    it('shows target with arrow for non-save-damage rolls', () => {
-      setup(Log, [roll({ targetName: 'Orc' })]);
-      expect(screen.getByText(/→ Orc/i)).toBeInTheDocument();
-    });
-
-    it('shows target without arrow for save-damage rolls', () => {
-      setup(Log, [roll({ rollType: 'save-damage', targetName: 'Gob' })]);
-      expect(screen.getByText(/vs Gob/i)).toBeInTheDocument();
-    });
-
-    it('hides target for aoe-damage rolls', () => {
-      setup(Log, [roll({ rollType: 'aoe-damage', targetName: 'Orc' })]);
-      expect(screen.queryByText(/→ Orc/i)).not.toBeInTheDocument();
-    });
+  it('renders final damage only when authored', () => {
+    setup(Log, [
+      roll({ id: 'fd1', rollType: 'save-damage', finalDamage: 5, damageType: 'fire' }),
+      roll({ id: 'fd2', rollType: 'save-damage', finalDamage: null, damageType: 'fire' }),
+    ]);
+    expect(textsOf('.log-final-damage')).toEqual(['→ 5 fire damage']);
   });
 
-  // ── ROLL ENTRY - bane and bless penalties ───────────────
-  describe('RollEntry - bane and bless', () => {
-    it('shows bane penalty when baneRoll is set', () => {
-      setup(Log, [roll({ baneRoll: 3 })]);
-      expect(screen.getByText(/-1d4 \[Bane\]: -3/i)).toBeInTheDocument();
-    });
-
-    it('shows bless bonus when blessRoll is set', () => {
-      setup(Log, [roll({ blessRoll: 2 })]);
-      expect(screen.getByText(/\+1d4 \[Bless\]: \+2/i)).toBeInTheDocument();
-    });
-
-    it('hides bane when baneRoll is null', () => {
-      setup(Log, [roll({ baneRoll: null })]);
-      expect(q('.log-bane-penalty')).not.toBeInTheDocument();
-    });
-
-    it('hides bless when blessRoll is null', () => {
-      setup(Log, [roll({ blessRoll: null })]);
-      expect(q('.log-bless-bonus')).not.toBeInTheDocument();
-    });
+  it('renders aoe formula and singular/plural affected counts, zero suppressed', () => {
+    setup(Log, [
+      roll({ id: 'ao3', rollType: 'aoe-damage', formula: '8d6+0', affectedCount: 3 }),
+      roll({ id: 'ao1', rollType: 'aoe-damage', formula: '4d6', affectedCount: 1 }),
+      roll({ id: 'ao0', rollType: 'aoe-damage', formula: '2d6', affectedCount: 0 }),
+    ]);
+    expect(textsOf('.log-dice-formula')).toEqual(['2d6', '4d6', '8d6+0']);
+    expect(textsOf('.log-aoe-affect')).toEqual(['1 creature affected', '3 creatures affected']);
   });
 
-  // ── ROLL ENTRY - ray of enfeeblement ───────────────
-  describe('RollEntry - ray of enfeeblement', () => {
-    it('shows enfeeblement penalty when set', () => {
-      setup(Log, [roll({ rayOfEnfeebleRoll: 4 })]);
-      expect(screen.getByText(/-1d8 \[Enfeeblement\]: -4/i)).toBeInTheDocument();
-    });
-
-    it('hides enfeeblement when null', () => {
-      setup(Log, [roll({ rayOfEnfeebleRoll: null })]);
-      expect(q('.log-ray-enfeeblement')).not.toBeInTheDocument();
-    });
+  it('shows damage-type badge only on damage roll types', () => {
+    setup(Log, [
+      roll({ id: 'd1', rollType: 'damage', damageType: 'slashing' }),
+      roll({ id: 'd2', rollType: 'save-damage', damageType: 'acid' }),
+      roll({ id: 'd3', rollType: 'overchannel-damage', damageType: 'fire' }),
+      roll({ id: 'd4', rollType: 'graze-damage', damageType: 'cold' }),
+      roll({ id: 'd5', rollType: 'attack', damageType: 'poison' }),
+    ]);
+    expect(textsOf('.log-damage-type')).toEqual(['cold', 'fire', 'acid', 'slashing']);
   });
 
-  // ── ROLL ENTRY - gwf (great weapon fighting) ───────────────
-  describe('RollEntry - great weapon fighting', () => {
-    it('shows GWF with original and display rolls', () => {
-      setup(Log, [roll({
-        gwfApplied: true,
-        gwfOriginalRolls: [12, 8],
-        gwfDisplayRolls: [15, 10],
-      })]);
-      expect(screen.getByText(/GWF: 12, 8 → 15, 10/i)).toBeInTheDocument();
-    });
-
-    it('falls back to rolls when gwfDisplayRolls is missing', () => {
-      setup(Log, [roll({
-        gwfApplied: true,
-        gwfOriginalRolls: [1, 3],
-        rolls: [4, 6],
-      })]);
-      expect(screen.getByText(/GWF: 1, 3 → 4, 6/i)).toBeInTheDocument();
-    });
-
-    it('hides GWF when not applied', () => {
-      setup(Log, [roll({ gwfApplied: false })]);
-      expect(q('.log-gwf')).not.toBeInTheDocument();
-    });
+  it('renders immune/resistant badges and suppresses empty details', () => {
+    setup(Log, [
+      roll({ id: 'r1', rollType: 'damage', damageType: 'fire', resistanceDetails: [
+        { damageType: 'fire', status: 'immune' },
+        { damageType: 'cold', status: 'resistant' },
+      ] }),
+      roll({ id: 'r2', rollType: 'damage', resistanceDetails: [] }),
+    ]);
+    expect(document.querySelectorAll('.log-resistance-details')).toHaveLength(1);
+    expect(textsOf('.log-immune')).toEqual(['Immune to fire']);
+    expect(textsOf('.log-resistant')).toEqual(['Resistant to cold']);
   });
 
-  // ── ROLL ENTRY - bonus display ───────────────
-  describe('RollEntry - bonus display', () => {
-    it('shows positive bonus with plus sign', () => {
-      setup(Log, [roll({ bonus: 5 })]);
-      expect(q('.log-total').textContent).toContain('+5');
-    });
-
-    it('shows negative bonus with minus sign', () => {
-      setup(Log, [roll({ bonus: -2 })]);
-      expect(q('.log-total').textContent).toContain('-2');
-    });
-
-    it('shows bonus detail after bonus value', () => {
-      setup(Log, [roll({ bonus: 3, bonusDetail: 'from bless' })]);
-      expect(q('.log-total').textContent).toContain('+3 from bless');
-    });
-
-    it('hides bonus when null', () => {
-      setup(Log, [roll({ bonus: null })]);
-      expect(q('.log-total').textContent).not.toMatch(/\+\d/);
-    });
+  it('renders resistance and hunter-lore notices with eye icon', () => {
+    setup(Log, [roll({ resistanceNotice: 'Half dmg', hunterLoreNotice: 'Orc weakness detected' })]);
+    expect(q('.log-resistance-notice').textContent).toBe('Half dmg');
+    expect(q('.log-hunter-lore-notice')).toHaveTextContent('Orc weakness detected');
+    expect(q('.log-hunter-lore-notice i.fa-eye')).toBeInTheDocument();
   });
 
-  // ── ROLL ENTRY - showBothDice modes ───────────────
-  describe('RollEntry - showBothDice modes', () => {
-    it('shows both dice with selected/discarded labels for advantage', () => {
-      setup(Log, [roll({ rolls: [17, 9], mode: 'advantage' })]);
-      expect(screen.getByText(/selected/i)).toBeInTheDocument();
-      expect(screen.getByText(/discarded/i)).toBeInTheDocument();
-    });
-
-    it('shows disadvantage both dice with selected when rolls[0] <= rolls[1]', () => {
-      setup(Log, [roll({ rolls: [3, 15], mode: 'disadvantage' })]);
-      expect(screen.getByText(/3 selected/i)).toBeInTheDocument();
-      expect(screen.getByText(/15 discarded/i)).toBeInTheDocument();
-    });
-
-    it('shows mode badge for non-damage/save-damage/aoe rolls with two dice', () => {
-      setup(Log, [roll({ rollType: 'attack', rolls: [17, 9], mode: 'advantage' })]);
-      expect(screen.getByText(/ADVANTAGE/i)).toBeInTheDocument();
-    });
+  it('renders secondary damage with optional save bytes', () => {
+    setup(Log, [
+      roll({ id: 's1', secondaryFormula: '2d6', secondaryTotal: 7, secondaryDamageType: 'cold',
+        secondarySaveResult: 'success', secondarySaveRoll: 14, secondarySaveBonus: 2 }),
+      roll({ id: 's2', secondaryFormula: '1d4', secondaryTotal: 3, secondaryDamageType: 'fire' }),
+    ]);
+    expect(textsOf('.log-secondary-damage')).toEqual([
+      'Secondary:1d43fire',
+      'Secondary:2d67coldSAVE SUCCESS (d20 14+2)',
+    ]);
+    expect(document.querySelectorAll('.log-secondary-damage .log-save-result')).toHaveLength(1);
   });
 
-  // ── ROLL ENTRY - secondary damage ───────────────
-  describe('RollEntry - secondary damage', () => {
-    it('shows all secondary damage fields', () => {
-      setup(Log, [roll({
-        secondaryFormula: '2d6',
-        secondaryTotal: 7,
-        secondaryDamageType: 'cold',
-        secondarySaveResult: 'success',
-        secondarySaveRoll: 14,
-        secondarySaveBonus: 2,
-      })]);
-      expect(screen.getByText(/Secondary:/i)).toBeInTheDocument();
-      expect(screen.getByText(/2d6/)).toBeInTheDocument();
-      expect(screen.getByText(/cold/i)).toBeInTheDocument();
-      expect(screen.getByText(/SAVE SUCCESS/i)).toBeInTheDocument();
-      expect(screen.getByText(/d20 14\+2/i)).toBeInTheDocument();
-    });
-
-    it('shows secondary damage without save info', () => {
-      setup(Log, [roll({
-        secondaryFormula: '1d4',
-        secondaryTotal: 3,
-        secondaryDamageType: 'fire',
-      })]);
-      expect(screen.getByText(/Secondary:/i)).toBeInTheDocument();
-      expect(q('.log-secondary-damage b').textContent).toBe('3');
-      expect(screen.getByText(/fire/i)).toBeInTheDocument();
-    });
+  it('shows formula, dice values, and bonus-free total for damage rolls', () => {
+    setup(Log, [roll({ rollType: 'damage', formula: '8d6', rolls: [5, 3, 6, 2, 4, 1, 6, 5], total: 32, bonus: 5 })]);
+    expect(q('.log-dice-formula').textContent).toBe('8d6');
+    expect(q('.log-dice-values-inline').textContent).toBe('(5, 3, 6, 2, 4, 1, 6, 5)');
+    expect(q('.log-total').textContent).toBe('32');
   });
 
-  // ── ROLL ENTRY - damage rolls dice display ───────────────
-  describe('RollEntry - damage rolls dice display', () => {
-    it('shows formula and inline dice values for damage rolls', () => {
-      setup(Log, [roll({ rollType: 'damage', formula: '8d6', rolls: [5, 3, 6, 2, 4, 1, 6, 5] })]);
-      expect(screen.getByText(/8d6/)).toBeInTheDocument();
-      expect(screen.getByText(/\(5, 3, 6, 2, 4, 1, 6, 5\)/i)).toBeInTheDocument();
-    });
+  it('renders condition save bytes with mode badges on roll entries', () => {
+    setup(Log, [
+      roll({ id: 'cs1', condition: 'charmed', dc: 15, success: true, mode: 'advantage', advantageSources: ['Bard', 'Paladin'] }),
+      roll({ id: 'cs2', condition: 'frightened', dc: 10, success: false, mode: 'disadvantage' }),
+    ]);
+    const badges = document.querySelectorAll('.log-condition-save');
+    expect(badges).toHaveLength(2);
+    expect(badges[1]).toHaveTextContent('vs charmed (DC 15): SUCCESS');
+    expect(badges[1]).toHaveClass('log-condition-success');
+    expect(screen.getByText('ADVANTAGE (Bard, Paladin)')).toBeInTheDocument();
+    expect(badges[0]).toHaveTextContent('vs frightened (DC 10): FAILURE');
+    expect(badges[0]).toHaveClass('log-condition-failure');
+    expect(screen.getByText('DISADVANTAGE')).toBeInTheDocument();
   });
 
-  // ── ICON CLASSES mapping ───────────────
-  describe('getRollIconType icon mapping', () => {
-    const saveShields = [
-      'save', 'condition-save', 'save-damage', 'save-ottos-dance',
-      'save-banishment', 'save-imprisonment', 'save-confusion',
-      'save-forcecage', 'save-forcecage-escape', 'save-maze', 'save-maze-escape',
-    ];
-
-    it.each(saveShields)('save type "%s" uses shield icon', (tp) => {
-      setup(Log, [roll({ rollType: tp })]);
-      expect(q('.log-roll i.fa-shield-halved')).toBeInTheDocument();
-    });
-
-    it.each([
-      ['save-polymorph', 'fa-paw'],
-      ['save-animal-shapes', 'fa-paw'],
-    ])('save type "%s" uses "%s" icon', (tp, cls) => {
-      setup(Log, [roll({ rollType: tp })]);
-      expect(q(`.log-roll i.${cls}`)).toBeInTheDocument();
-    });
-
-    it.each([
-      ['save-prismatic-spray', 'fa-wand-magic-sparkles'],
-      ['save-prismatic-spray-indigo', 'fa-eye'],
-      ['save-prismatic-spray-violet', 'fa-door-open'],
-    ])('prismatic spray variant "%s" uses "%s" icon', (tp, cls) => {
-      setup(Log, [roll({ rollType: tp })]);
-      expect(q(`.log-roll i.${cls}`)).toBeInTheDocument();
-    });
-
+  describe('icon mapping (one row per distinct icon + default)', () => {
     it.each([
       ['attack', 'fa-crosshairs'],
       ['spell_attack', 'fa-wand-magic-sparkles'],
+      ['save', 'fa-shield-halved'],
+      ['save-polymorph', 'fa-paw'],
+      ['save-prismatic-spray-indigo', 'fa-eye'],
+      ['save-prismatic-spray-violet', 'fa-door-open'],
       ['initiative', 'fa-bolt'],
       ['damage', 'fa-skull'],
-      ['aoe-damage', 'fa-wand-magic-sparkles'],
-      ['unknown_type', 'fa-dice-d20'],
-    ])('roll type "%s" uses "%s" icon', (tp, cls) => {
+      ['not_a_known_type', 'fa-dice-d20'],
+    ])('roll type "%s" uses "%s"', (tp, cls) => {
       setup(Log, [roll({ rollType: tp })]);
-      expect(q(`.log-roll i.${cls}`)).toBeInTheDocument();
+      expect(q('.log-icon i')).toHaveClass(cls);
     });
   });
 });

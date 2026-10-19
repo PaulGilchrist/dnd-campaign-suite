@@ -1,8 +1,25 @@
+// @maintained-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useState } from 'react';
 import useZoomPan from './useZoomPan.js';
-import { MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
+import { HEX_SIZE, MIN_ZOOM, MAX_ZOOM } from '../../../config/outdoorConfig.js';
+
+// Zoom contract (product constants, pinned here deliberately — they are the
+// behavior under test, not implementation details): toolbar buttons step the
+// zoom by x1.25 / x0.8; trackpad wheel zooms +/-5% each time the accumulated
+// deltaY crosses +/-20. MIN/MAX come from the real config, never fixtures.
+const ZOOM_IN_STEP = 1.25;
+const ZOOM_OUT_STEP = 0.8;
+const WHEEL_STEP = 1.05;
+const WHEEL_ZOOM_OUT_STEP = 0.95;
+
+// Golden values use toBeCloseTo(..., 3) tolerance to absorb float noise;
+// everything else is derived from HEX_SIZE / MIN_ZOOM / MAX_ZOOM or from the
+// hook's own exposed bounds/centerView/clampPan (cross-checks, not re-clamps).
+// Routing of DOM wheel/click events to these handlers is owned by the
+// container test (HexMap.test.jsx 'routes wheel, zoom, and reset clicks');
+// zoom-% display by HexMapToolbar.test.jsx. This file owns the math/state.
 
 const createSvgRef = (overrides = {}) => ({
     current: {
@@ -38,6 +55,14 @@ const setup = (overrides = {}) => {
     return { ...utils, svgRef, hostRef };
 };
 
+const renderGrid = (cols, rows) =>
+    renderHook(({ cols, rows }) => {
+        const [zoom, setZoom] = useState(2);
+        const [panX, setPanX] = useState(0);
+        const [panY, setPanY] = useState(0);
+        return useZoomPan({ svgRef: createSvgRef(), hexCols: cols, hexRows: rows, zoom, setZoom, panX, setPanX, panY, setPanY });
+    }, { initialProps: { cols, rows } });
+
 const wheelEvent = (deltaY) => ({
     metaKey: true,
     deltaY,
@@ -47,312 +72,216 @@ const wheelEvent = (deltaY) => ({
 });
 
 describe('useZoomPan', () => {
-    describe('gridPixelBounds / svgWidth / svgHeight', () => {
-        it('computes the pixel bounds of a 10x10 grid', () => {
-            const { result } = setup();
-            const bounds = result.current.gridPixelBounds;
-            expect(bounds.width).toBeCloseTo(753.4421, 3);
-            expect(bounds.height).toBeCloseTo(465, 3);
-            expect(bounds.offsetX).toBeCloseTo(-25.9808, 3);
-            expect(bounds.offsetY).toBeCloseTo(-30, 3);
-            expect(bounds.centerX).toBeCloseTo(350.7403, 3);
-            expect(bounds.centerY).toBeCloseTo(202.5, 3);
-            expect(result.current.svgWidth).toBeCloseTo(753.4421, 3);
-            expect(result.current.svgHeight).toBeCloseTo(465, 3);
-        });
+    it('sizes grid bounds from hex pitch: single hex, per-column and per-row growth, centering', () => {
+        const hexW = Math.sqrt(3) * HEX_SIZE;
+        const { result, rerender } = renderGrid(1, 1);
 
-        it('handles a single-hex grid', () => {
-            const { result } = setup({ hexCols: 1, hexRows: 1 });
-            expect(result.current.gridPixelBounds.width).toBeCloseTo(51.9615, 3);
-            expect(result.current.gridPixelBounds.height).toBeCloseTo(60, 3);
-        });
+        // A 1x1 grid bounds exactly one pointy-top hex centered on the origin.
+        let b = result.current.gridPixelBounds;
+        expect(b.width).toBeCloseTo(hexW, 6);
+        expect(b.height).toBeCloseTo(2 * HEX_SIZE, 6);
+        expect(b.offsetX).toBeCloseTo(-hexW / 2, 6);
+        expect(b.offsetY).toBeCloseTo(-HEX_SIZE, 6);
 
-        it('grows the bounds when the grid has more columns', () => {
-            const svgRef = createSvgRef();
-            const { result, rerender } = renderHook(({ cols, rows }) => {
-                const [zoom, setZoom] = useState(2);
-                const [panX, setPanX] = useState(0);
-                const [panY, setPanY] = useState(0);
-                return useZoomPan({ svgRef, hexCols: cols, hexRows: rows, zoom, setZoom, panX, setPanX, panY, setPanY });
-            }, { initialProps: { cols: 10, rows: 10 } });
-            expect(result.current.gridPixelBounds.width).toBeCloseTo(753.4421, 3);
-            rerender({ cols: 20, rows: 10 });
-            expect(result.current.gridPixelBounds.width).toBeCloseTo(1273.0573, 3);
-        });
+        rerender({ cols: 10, rows: 10 });
+        b = result.current.gridPixelBounds;
+        expect(result.current.svgWidth).toBe(b.width);
+        expect(result.current.svgHeight).toBe(b.height);
+        expect(b.centerX).toBeCloseTo(b.offsetX + b.width / 2, 6);
+        expect(b.centerY).toBeCloseTo(b.offsetY + b.height / 2, 6);
+        // 10 full column pitches + half-hex overhangs on each side;
+        // 9 row pitches (1.5 x radius) + one hex height (2 x radius).
+        expect(b.width).toBeCloseTo(14.5 * hexW, 6);
+        expect(b.height).toBeCloseTo((2 + 1.5 * 9) * HEX_SIZE, 6);
 
-        it('grows the bounds when the grid has more rows', () => {
-            const svgRef = createSvgRef();
-            const { result, rerender } = renderHook(({ cols, rows }) => {
-                const [zoom, setZoom] = useState(2);
-                const [panX, setPanX] = useState(0);
-                const [panY, setPanY] = useState(0);
-                return useZoomPan({ svgRef, hexCols: cols, hexRows: rows, zoom, setZoom, panX, setPanX, panY, setPanY });
-            }, { initialProps: { cols: 10, rows: 10 } });
-            expect(result.current.gridPixelBounds.height).toBeCloseTo(465, 3);
-            rerender({ cols: 10, rows: 20 });
-            expect(result.current.gridPixelBounds.height).toBeCloseTo(915, 3);
-        });
+        // One more column adds exactly one hex width, no height change.
+        rerender({ cols: 11, rows: 10 });
+        const colStep = result.current.gridPixelBounds;
+        expect(colStep.width).toBeCloseTo(b.width + hexW, 6);
+        expect(colStep.height).toBeCloseTo(b.height, 6);
+
+        // One more row adds one row pitch of height and half a column of stagger.
+        rerender({ cols: 11, rows: 11 });
+        expect(result.current.gridPixelBounds.height).toBeCloseTo(colStep.height + 1.5 * HEX_SIZE, 6);
+        expect(result.current.gridPixelBounds.width).toBeCloseTo(colStep.width + hexW / 2, 6);
     });
 
     describe('clampPan', () => {
-        it('returns in-bounds pan values unchanged', () => {
+        it('passes pans between the edges through untouched and saturates beyond them', () => {
             const { result } = setup({ initialZoom: 8 });
-            expect(result.current.clampPan(8, 300, 150)).toEqual({ x: 300, y: 150 });
-        });
-
-        it('clamps pan values above the upper bound', () => {
-            const { result } = setup({ initialZoom: 8 });
-            const clamped = result.current.clampPan(8, 99999, 99999);
-            expect(clamped.x).toBeCloseTo(399.4542, 3);
-            expect(clamped.y).toBeCloseTo(309.375, 3);
-        });
-
-        it('clamps pan values below the lower bound', () => {
-            const { result } = setup({ initialZoom: 8 });
-            const clamped = result.current.clampPan(8, -99999, -99999);
-            expect(clamped.x).toBeCloseTo(207.8461, 3);
-            expect(clamped.y).toBeCloseTo(37.5, 3);
+            const min = result.current.clampPan(8, -1e6, -1e6);
+            const max = result.current.clampPan(8, 1e6, 1e6);
+            expect(min.x).toBeLessThan(max.x);
+            expect(min.y).toBeLessThan(max.y);
+            // Golden: right edge of the 10x10 grid at zoom 8 minus the pan margin.
+            expect(max.x).toBeCloseTo(399.4542, 3);
+            // Saturating: pushing further out never moves further — edges are stable.
+            expect(result.current.clampPan(8, 1e6 + 1, 1e6 + 1)).toEqual(max);
+            expect(result.current.clampPan(8, -1e6 - 1, -1e6 - 1)).toEqual(min);
+            // Idempotent at the edges, exact passthrough between them.
+            expect(result.current.clampPan(8, max.x, max.y)).toEqual(max);
+            const mid = { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2 };
+            expect(result.current.clampPan(8, mid.x, mid.y)).toEqual(mid);
         });
     });
 
     describe('centerView', () => {
-        it('returns the pan that centers the grid at the given zoom', () => {
+        it('centers the grid in the viewport at the given zoom', () => {
             const { result } = setup();
-            const centered = result.current.centerView(4);
-            expect(centered.x).toBeCloseTo(256.56, 3);
-            expect(centered.y).toBeCloseTo(144.375, 3);
-        });
-
-        it('keeps the grid horizontally and vertically centered', () => {
-            const { result } = setup();
-            const bounds = result.current.gridPixelBounds;
-            const centered = result.current.centerView(4);
-            expect(centered.x + bounds.width / 4 / 2).toBeCloseTo(bounds.centerX, 3);
-            expect(centered.y + bounds.height / 4 / 2).toBeCloseTo(bounds.centerY, 3);
+            const b = result.current.gridPixelBounds;
+            const zoom = 4;
+            const c = result.current.centerView(zoom);
+            expect(c.x + b.width / zoom / 2).toBeCloseTo(b.centerX, 6);
+            expect(c.y + b.height / zoom / 2).toBeCloseTo(b.centerY, 6);
         });
     });
 
-    describe('zoomIn', () => {
-        it('zooms in by a factor of 1.25', () => {
-            const { result, hostRef } = setup();
-            act(() => { result.current.zoomIn(); });
-            expect(hostRef.zoom).toBeCloseTo(2.5, 10);
-        });
+    it('steps zoom, re-centers every transition, clamps at MAX/MIN, and resets to default', () => {
+        const { result, hostRef } = setup({ initialZoom: 4, initialPanX: 300, initialPanY: 150 });
 
-        it('re-centers the view at the new zoom', () => {
-            const { result, hostRef } = setup({ initialZoom: 4 });
-            act(() => { result.current.zoomIn(); });
-            expect(hostRef.zoom).toBeCloseTo(5, 10);
-            expect(hostRef.panX).toBeCloseTo(275.3961, 3);
-            expect(hostRef.panY).toBeCloseTo(156, 3);
-        });
+        act(() => { result.current.zoomIn(); });
+        expect(hostRef.zoom).toBeCloseTo(4 * ZOOM_IN_STEP, 10);
+        let c = result.current.centerView(hostRef.zoom);
+        expect(hostRef.panX).toBeCloseTo(c.x, 6);
+        expect(hostRef.panY).toBeCloseTo(c.y, 6);
 
-        it('clamps zoom at MAX_ZOOM', () => {
-            const { result, hostRef } = setup({ initialZoom: 7 });
-            act(() => { result.current.zoomIn(); });
-            expect(hostRef.zoom).toBe(MAX_ZOOM);
-        });
+        act(() => { result.current.zoomOut(); });
+        expect(hostRef.zoom).toBeCloseTo(5 * ZOOM_OUT_STEP, 10);
+        c = result.current.centerView(hostRef.zoom);
+        expect(hostRef.panX).toBeCloseTo(c.x, 6);
+        expect(hostRef.panY).toBeCloseTo(c.y, 6);
 
-        it('still re-centers the view when already at MAX_ZOOM', () => {
-            const { result, hostRef } = setup({ initialZoom: 8, initialPanX: 100, initialPanY: 100 });
-            act(() => { result.current.zoomIn(); });
-            expect(hostRef.zoom).toBe(MAX_ZOOM);
-            expect(hostRef.panX).toBeCloseTo(303.6502, 3);
-            expect(hostRef.panY).toBeCloseTo(173.4375, 3);
-        });
+        // Clamps at MAX_ZOOM (config) and still re-centers while held at the cap.
+        act(() => { for (let i = 0; i < 10; i++) result.current.zoomIn(); });
+        expect(hostRef.zoom).toBe(MAX_ZOOM);
+        c = result.current.centerView(MAX_ZOOM);
+        expect(hostRef.panX).toBeCloseTo(c.x, 6);
+        expect(hostRef.panY).toBeCloseTo(c.y, 6);
+
+        // Steps down from the cap and clamps at MIN_ZOOM (config).
+        act(() => { result.current.zoomOut(); });
+        expect(hostRef.zoom).toBeCloseTo(MAX_ZOOM * ZOOM_OUT_STEP, 10);
+        act(() => { for (let i = 0; i < 25; i++) result.current.zoomOut(); });
+        expect(hostRef.zoom).toBe(MIN_ZOOM);
+
+        // resetView returns to the default zoom, grid centered.
+        // Golden: clamped centered pan for a 10x10 grid at the default zoom —
+        // at MIN_ZOOM the horizontal center saturates at the right edge.
+        act(() => { result.current.resetView(); });
+        expect(hostRef.zoom).toBe(MIN_ZOOM);
+        expect(hostRef.panX).toBeCloseTo(116.9134, 3);
+        expect(hostRef.panY).toBeCloseTo(86.25, 3);
     });
 
-    describe('zoomOut', () => {
-        it('zooms out by a factor of 0.8', () => {
+    it('pans on left-drag with viewBox-scaled deltas, clamps, ends, and detaches safely', () => {
+        // viewBox differs from the client rect (x2 scale) so the
+        // client->SVG coordinate conversion is genuinely exercised.
+        const svgRef = createSvgRef({ viewBox: { baseVal: { x: 0, y: 0, width: 1200, height: 600 } } });
+        const { result, hostRef } = setup({ svgRef, initialZoom: 8, initialPanX: 300, initialPanY: 150 });
+
+        // Non-left buttons are ignored, event not swallowed.
+        const rightClick = { button: 2, clientX: 200, clientY: 100, preventDefault: vi.fn() };
+        act(() => { result.current.handlePanStart(rightClick); });
+        expect(result.current.panning).toBeNull();
+        expect(rightClick.preventDefault).not.toHaveBeenCalled();
+
+        // Left-press captures the click in SVG coords plus the current pan.
+        const start = { button: 0, clientX: 200, clientY: 100, preventDefault: vi.fn() };
+        act(() => { result.current.handlePanStart(start); });
+        expect(start.preventDefault).toHaveBeenCalled();
+        expect(result.current.panning).toEqual({ startX: 400, startY: 200, startPanX: 300, startPanY: 150 });
+
+        // Drag moves the map opposite the pointer by the SVG-scaled delta.
+        act(() => { result.current.handlePanMove({ clientX: 160, clientY: 80, preventDefault: vi.fn() }); });
+        expect(hostRef.panX).toBe(380);
+        expect(hostRef.panY).toBe(190);
+
+        // A massive drag saturates exactly where clampPan says it must.
+        const edge = result.current.clampPan(8, -1e6, -1e6);
+        act(() => { result.current.handlePanMove({ clientX: 2000, clientY: 2000, preventDefault: vi.fn() }); });
+        expect(hostRef.panX).toBeCloseTo(edge.x, 6);
+        expect(hostRef.panY).toBeCloseTo(edge.y, 6);
+        const pinned = { x: hostRef.panX, y: hostRef.panY };
+
+        // Release stops panning; a subsequent move is inert.
+        act(() => { result.current.handlePanEnd(); });
+        expect(result.current.panning).toBeNull();
+        act(() => { result.current.handlePanMove({ clientX: 10, clientY: 10, preventDefault: vi.fn() }); });
+        expect(hostRef.panX).toBe(pinned.x);
+        expect(hostRef.panY).toBe(pinned.y);
+
+        // With the svg detached, a fresh press cannot start a pan.
+        svgRef.current = null;
+        act(() => { result.current.handlePanStart({ button: 0, clientX: 10, clientY: 10, preventDefault: vi.fn() }); });
+        expect(result.current.panning).toBeNull();
+    });
+
+    describe('wheel zoom', () => {
+        it('requires metaKey, steps +/-5% only when the accumulator crosses +/-20, clamps at MIN_ZOOM', () => {
             const { result, hostRef } = setup({ initialZoom: 3 });
-            act(() => { result.current.zoomOut(); });
-            expect(hostRef.zoom).toBeCloseTo(2.4, 10);
-        });
 
-        it('re-centers the view at the new zoom', () => {
-            const { result, hostRef } = setup({ initialZoom: 4 });
-            act(() => { result.current.zoomOut(); });
-            expect(hostRef.zoom).toBeCloseTo(3.2, 10);
-            expect(hostRef.panX).toBeCloseTo(233.015, 3);
-            expect(hostRef.panY).toBeCloseTo(129.8438, 3);
-        });
-
-        it('clamps zoom at MIN_ZOOM', () => {
-            const { result, hostRef } = setup({ initialZoom: MIN_ZOOM });
-            act(() => { result.current.zoomOut(); });
-            expect(hostRef.zoom).toBe(MIN_ZOOM);
-        });
-    });
-
-    describe('resetView', () => {
-        it('resets zoom to the minimum and re-centers the grid', () => {
-            const { result, hostRef } = setup({ initialZoom: 5, initialPanX: 200, initialPanY: 100 });
-            act(() => { result.current.resetView(); });
-            expect(hostRef.zoom).toBe(MIN_ZOOM);
-            expect(hostRef.panX).toBeCloseTo(116.9134, 3);
-            expect(hostRef.panY).toBeCloseTo(86.25, 3);
-        });
-    });
-
-    describe('handlePanStart', () => {
-        it('starts panning at the click position converted to SVG coordinates', () => {
-            const { result } = setup({ initialPanX: 100, initialPanY: 50 });
-            const event = { button: 0, clientX: 150, clientY: 90, preventDefault: vi.fn() };
-            act(() => { result.current.handlePanStart(event); });
-            expect(event.preventDefault).toHaveBeenCalled();
-            expect(result.current.panning).toEqual({
-                startX: 150,
-                startY: 90,
-                startPanX: 100,
-                startPanY: 50,
-            });
-        });
-
-        it('ignores non-left mouse buttons', () => {
-            const { result } = setup();
-            const event = { button: 1, clientX: 150, clientY: 90, preventDefault: vi.fn() };
-            act(() => { result.current.handlePanStart(event); });
-            expect(result.current.panning).toBeNull();
-            expect(event.preventDefault).not.toHaveBeenCalled();
-        });
-
-        it('does nothing when the svg is not attached', () => {
-            const { result } = setup({ svgRef: { current: null } });
-            act(() => {
-                result.current.handlePanStart({ button: 0, clientX: 150, clientY: 90, preventDefault: vi.fn() });
-            });
-            expect(result.current.panning).toBeNull();
-        });
-    });
-
-    describe('handlePanMove', () => {
-        it('does nothing while not panning', () => {
-            const { result, hostRef } = setup();
-            act(() => { result.current.handlePanMove({ clientX: 120, clientY: 120, preventDefault: vi.fn() }); });
-            expect(hostRef.panX).toBe(0);
-            expect(hostRef.panY).toBe(0);
-        });
-
-        it('moves the pan by the drag delta', () => {
-            const { result, hostRef } = setup({ initialZoom: 8, initialPanX: 300, initialPanY: 150 });
-            act(() => {
-                result.current.handlePanStart({ button: 0, clientX: 200, clientY: 100, preventDefault: vi.fn() });
-            });
-            act(() => { result.current.handlePanMove({ clientX: 160, clientY: 80, preventDefault: vi.fn() }); });
-            expect(hostRef.panX).toBe(340);
-            expect(hostRef.panY).toBe(170);
-        });
-
-        it('clamps the pan so the grid cannot be dragged off-screen', () => {
-            const { result, hostRef } = setup({ initialZoom: 8, initialPanX: 300, initialPanY: 150 });
-            act(() => {
-                result.current.handlePanStart({ button: 0, clientX: 200, clientY: 100, preventDefault: vi.fn() });
-            });
-            act(() => { result.current.handlePanMove({ clientX: 2000, clientY: 2000, preventDefault: vi.fn() }); });
-            expect(hostRef.panX).toBeCloseTo(207.8461, 3);
-            expect(hostRef.panY).toBeCloseTo(37.5, 3);
-        });
-    });
-
-    describe('handlePanEnd', () => {
-        it('stops panning', () => {
-            const { result } = setup();
-            act(() => {
-                result.current.handlePanStart({ button: 0, clientX: 150, clientY: 90, preventDefault: vi.fn() });
-            });
-            expect(result.current.panning).not.toBeNull();
-            act(() => { result.current.handlePanEnd(); });
-            expect(result.current.panning).toBeNull();
-        });
-    });
-
-    describe('handleWheel', () => {
-        it('ignores wheel events without metaKey', () => {
-            const { result, hostRef } = setup();
-            act(() => {
-                result.current.handleWheel({ metaKey: false, deltaY: -100, clientX: 100, clientY: 100, preventDefault: vi.fn() });
-            });
-            expect(hostRef.zoom).toBe(2);
-            expect(hostRef.panX).toBe(0);
-            expect(hostRef.panY).toBe(0);
-        });
-
-        it('does nothing when the svg is not attached', () => {
-            const { result, hostRef } = setup({ svgRef: { current: null } });
-            act(() => { result.current.handleWheel(wheelEvent(-100)); });
-            expect(hostRef.zoom).toBe(2);
-        });
-
-        it('zooms in once the accumulated delta crosses the threshold', () => {
-            const { result, hostRef } = setup();
-            for (let i = 0; i < 3; i++) {
-                act(() => { result.current.handleWheel(wheelEvent(-10)); });
-            }
-            expect(hostRef.zoom).toBeCloseTo(2.1, 10);
-        });
-
-        it('zooms out once the accumulated delta crosses the threshold', () => {
-            const { result, hostRef } = setup({ initialZoom: 3 });
-            for (let i = 0; i < 3; i++) {
-                act(() => { result.current.handleWheel(wheelEvent(10)); });
-            }
-            expect(hostRef.zoom).toBeCloseTo(2.85, 10);
-        });
-
-        it('does not zoom while the accumulated delta is below the threshold', () => {
-            const { result, hostRef } = setup({ initialZoom: 3 });
-            act(() => { result.current.handleWheel(wheelEvent(19)); });
+            // No metaKey: fully ignored, browser keeps its native scroll.
+            const plain = { metaKey: false, deltaY: -500, clientX: 100, clientY: 100, preventDefault: vi.fn() };
+            act(() => { result.current.handleWheel(plain); });
+            expect(plain.preventDefault).not.toHaveBeenCalled();
             expect(hostRef.zoom).toBe(3);
-            act(() => { result.current.handleWheel(wheelEvent(2)); });
-            expect(hostRef.zoom).toBeCloseTo(2.85, 10);
-        });
+            expect(hostRef.panX).toBe(0);
+            expect(hostRef.panY).toBe(0);
 
-        it('compounds zoom across consecutive gestures', () => {
-            const { result, hostRef } = setup();
-            for (let i = 0; i < 3; i++) {
+            // Accumulating to exactly -20 does not fire; crossing it fires one +5% step.
+            act(() => {
+                result.current.handleWheel(wheelEvent(-10));
+                result.current.handleWheel(wheelEvent(-10));
+            });
+            expect(hostRef.zoom).toBe(3);
+            act(() => { result.current.handleWheel(wheelEvent(-1)); });
+            expect(hostRef.zoom).toBeCloseTo(3 * WHEEL_STEP, 10);
+
+            // Accumulator resets on firing, so further gestures compound steps.
+            // (Each firing gesture gets its own act() so the hook's zoom-ref
+            // sync effect commits the new zoom before the next gesture reads it.)
+            for (let i = 0; i < 2; i++) {
                 act(() => { result.current.handleWheel(wheelEvent(-21)); });
             }
-            expect(hostRef.zoom).toBeCloseTo(2 * 1.05 ** 3, 10);
-        });
+            expect(hostRef.zoom).toBeCloseTo(3 * WHEEL_STEP ** 3, 10);
 
-        it('clamps zoom at MIN_ZOOM when zooming out', () => {
-            const { result, hostRef } = setup({ initialZoom: 2.5 });
-            for (let i = 0; i < 5; i++) {
+            // Sign flips: positive deltas below threshold idle, crossing zooms out one step.
+            act(() => { result.current.handleWheel(wheelEvent(10)); });
+            expect(hostRef.zoom).toBeCloseTo(3 * WHEEL_STEP ** 3, 10);
+            act(() => { result.current.handleWheel(wheelEvent(15)); });
+            expect(hostRef.zoom).toBeCloseTo(3 * WHEEL_STEP ** 3 * WHEEL_ZOOM_OUT_STEP, 10);
+
+            // Repeated large out-gestures saturate at MIN_ZOOM (real config value).
+            for (let i = 0; i < 15; i++) {
                 act(() => { result.current.handleWheel(wheelEvent(500)); });
             }
             expect(hostRef.zoom).toBe(MIN_ZOOM);
         });
 
-        it('clamps zoom at MAX_ZOOM when zooming in', () => {
-            const { result, hostRef } = setup({ initialZoom: 7 });
-            for (let i = 0; i < 3; i++) {
-                act(() => { result.current.handleWheel(wheelEvent(-500)); });
-            }
-            expect(hostRef.zoom).toBe(MAX_ZOOM);
-        });
-
-        it('keeps the point under the cursor anchored while zooming', () => {
+        it('anchors the point under the cursor across gestures and clamps at MAX_ZOOM', () => {
             const { result, hostRef } = setup({ initialZoom: 4, initialPanX: 300, initialPanY: 150 });
             const svgX = 200;
             const svgY = 100;
-            act(() => {
-                result.current.handleWheel({
-                    metaKey: true, deltaY: -21, clientX: svgX, clientY: svgY, preventDefault: vi.fn(),
-                });
-            });
-            expect(hostRef.zoom).toBeCloseTo(4.2, 10);
+            const event = { metaKey: true, deltaY: -21, clientX: svgX, clientY: svgY, preventDefault: vi.fn() };
+
+            // After each gesture, the world point under the cursor is unmoved:
+            // (cursor - pan) * zoom stays constant across the zoom change.
+            act(() => { result.current.handleWheel(event); });
+            expect(hostRef.zoom).toBeCloseTo(4 * WHEEL_STEP, 10);
             expect((svgX - hostRef.panX) * hostRef.zoom).toBeCloseTo((svgX - 300) * 4, 5);
             expect((svgY - hostRef.panY) * hostRef.zoom).toBeCloseTo((svgY - 150) * 4, 5);
-        });
 
-        it('anchors subsequent gestures to the latest pan', () => {
-            const { result, hostRef } = setup({ initialZoom: 4, initialPanX: 300, initialPanY: 150 });
-            const event = { metaKey: true, deltaY: -21, clientX: 200, clientY: 100, preventDefault: vi.fn() };
+            // The next gesture anchors against the latest pan, not the original.
             act(() => { result.current.handleWheel(event); });
-            act(() => { result.current.handleWheel(event); });
-            expect(hostRef.zoom).toBeCloseTo(4.41, 10);
-            expect(hostRef.panX).toBeCloseTo(290.7029, 3);
-            expect(hostRef.panY).toBeCloseTo(145.3515, 3);
+            expect(hostRef.zoom).toBeCloseTo(4 * WHEEL_STEP ** 2, 10);
+            expect((svgX - hostRef.panX) * hostRef.zoom).toBeCloseTo((svgX - 300) * 4, 5);
+            expect((svgY - hostRef.panY) * hostRef.zoom).toBeCloseTo((svgY - 150) * 4, 5);
+
+            // Repeated large in-gestures saturate at MAX_ZOOM (real config value).
+            for (let i = 0; i < 20; i++) {
+                act(() => { result.current.handleWheel(wheelEvent(-500)); });
+            }
+            expect(hostRef.zoom).toBe(MAX_ZOOM);
         });
     });
 });
