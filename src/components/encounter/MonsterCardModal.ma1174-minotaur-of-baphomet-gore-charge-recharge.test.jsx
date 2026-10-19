@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1174: Minotaur of Baphomet Gore — two DATA defects on monsters.json actions[1]:
 // (1) charge clause ("moved 10+ feet straight toward") live-unarmed — no conditional_damage
 //     authored so buildChargeBonusOffer (MA-0007 seam, MA-1160 additive convention) never
@@ -9,18 +10,35 @@
 // (ADDITIVE: base Done still pays 4d6 + 4; grant rolls its own 3d6 leg; total RAW
 // 4d6 + 4 + 3d6). Prone-on-charge stays GM-adjudicated at the popup — hit_conditions
 // NOT authored (auto-grant would fire on every hit, RAW-wrong).
+//
+// Trim pass (2026-10-18), two seams, one press each — mirrors the maintained ma0805/ma1160
+// template, mirroring the family adjudications:
+//   1. Disk-row bytes: recharge:"" regression lock + full conditional_damage toEqual
+//      identity (modifier:0 explicit = additive delta, MA-1160 chrome; toEqual pins the
+//      exact key set so the old mimic key-parity scan is redundant) + RAW additive sum
+//      + no hit_conditions / no two-handed bytes + recharge-free name/description.
+//   2. ONE click→rollAttack ctx press (:1407): full 7-key offer identity via toEqual —
+//      owns the modifier-0 → formula=dice branch pin (Helpers.js:693, cited by ma1160
+//      header :23) AND the chargeClauseFeet-inert label ("moved 10 or more feet" prose
+//      never matches a feet-token → bare "Charge:" head, MA-1160 chrome) — + hitClause
+//      toBeNull (prone is a GM-adjudicated pre-condition, never an auto-grant rider)
+//      + twoHandedVariantOffer toBeNull (replaces the direct-helper byte re-reads).
+// Cut (owner cites, not re-asserted here):
+//   - monsterRecharge.test.js owns the recharge machine: ungated-row gate null (:59-60),
+//     ungated spend returns null with no stamp/log (:152-165), displayText derivation
+//     (:158-160) — the only monster-distinct byte is GORE.recharge === "" above.
+//   - MonsterCardModal.charge-bonus.test.jsx owns resolveChargeBonus: grant hit/crit
+//     roller fold + logs + resolved-write (:210-233) and decline (:235-250) — this
+//     row's 3d6/Piercing grant/decline bytes are shape twins there (#667-#672 family).
+// Dead-mock purge per-lane (ma0805/ma1160 baseline): diceRoller mock gone (rollAttack
+// mocked, no roller fires without the cut grant tests), AttackResultPopup stub gone
+// (popupHtml null → popup never renders), rollD20 + never-fired hook members gone.
+// No timers — the ctx press lands synchronously.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: 5, rolls: [5], modifier: 0, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 10, rolls: [5, 5], modifier: 0, formula })),
-  rollD20: vi.fn(() => 14),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -33,23 +51,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -89,70 +99,38 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
-import { monsterRechargeGate, rechargeDisplayText, rechargeUsageOf, spendMonsterRecharge, MONSTER_RECHARGE_KEY } from '../../services/encounters/monsterRecharge.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const MINOTAUR = monsters.find((m) => m.index === 'minotaur-of-baphomet');
 const GORE = MINOTAUR.actions[1];
+
+// Exact buildChargeBonusOffer(GORE, 'Gore') output FROM the disk row — full identity.
+// modifier:0 folds formula to bare dice; the "10 or more feet" prose is chargeClauseFeet
+// -inert, so the label head is bare "Charge:" (no feet prefix, unlike the ram twins).
+const GORE_OFFER = {
+  dice: '3d6',
+  modifier: 0,
+  damageType: 'Piercing',
+  condition: 'the minotaur moved 10 or more feet straight toward the target immediately before the hit',
+  formula: '3d6',
+  label: 'Charge: +3d6 Piercing?',
+  attackName: 'Gore',
+};
 
 const CREATURES = [
   { name: 'Minotaur of Baphomet 1', targetName: 'Bandit 1' },
   { name: 'Bandit 1', type: 'player' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(GORE, 'Gore');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Gore',
-    rolls: [14],
-    bonus: 6,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Gore', formula: '4d6 + 4', damageType: 'Piercing', source: 'Minotaur of Baphomet 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderGore(popupHtml = null) {
-  _setPopupHtml(popupHtml);
+function renderGore() {
+  _setPopupHtml(null);
   const m = makeMonster({ name: 'Minotaur of Baphomet', actions: MINOTAUR.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Minotaur of Baphomet 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Minotaur of Baphomet 1' })} />);
-}
-
-function clickGoreLink() {
-  const goreRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Gore/.test(a.textContent.trim()));
-  const chip = Array.from(goreRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
-  expect(chip, 'Expected Gore +6 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
 }
 
 beforeEach(() => {
@@ -160,107 +138,41 @@ beforeEach(() => {
   _setPopupHtml(null);
 });
 
-describe('MA-1174 monsters.json data lock: Gore recharge:"" + conditional_damage delta', () => {
-  it('recharge emptied — no phantom recharge economy (gate null, no display text)', () => {
-    expect(GORE.recharge).toBe('');
-    expect(rechargeUsageOf(GORE).threshold).toBeNull();
-    expect(monsterRechargeGate(GORE, null)).toBeNull();
-    expect(monsterRechargeGate(GORE, { Gore: { recharged: false, threshold: 5 } })).toBeNull();
-    // display lane: empty string never renders the old "(5-6)" chip text
-    expect(rechargeDisplayText(GORE)).toBe('');
-  });
-
-  it('phantom recharge regression: spent-map row still never refuses or spends', async () => {
-    const store = {};
-    const deps = {
-      store,
-      addEntry: vi.fn(() => Promise.resolve()),
-      rollExpression: vi.fn(() => ({ total: 6, rolls: [6], modifier: 0 })),
-      getRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
-      setRuntimeValue: vi.fn((k, p, v) => { store[`${k}.${p}`] = v; return Promise.resolve(); }),
-    };
-    const spent = await spendMonsterRecharge({ monsterName: 'Minotaur of Baphomet 1', action: GORE, campaignName: 'test-campaign', ...deps });
-    expect(spent).toBeFalsy();
-    expect(deps.addEntry).not.toHaveBeenCalled();
-    expect(store[MONSTER_RECHARGE_KEY]).toBeUndefined();
-  });
-
-  it('conditional_damage mirrors the MA-1160 additive delta byte-shape (3d6 modifier 0 Piercing)', () => {
+describe('MA-1174 monsters.json data lock: Gore recharge:"" + additive 3d6 charge delta', () => {
+  it('recharge emptied (phantom economy dead — ungated-row derivation owned by monsterRecharge.test.js:59-60) + full conditional_damage identity mirroring the MA-1160 modifier-less delta', () => {
     expect(GORE.attack_bonus).toBe(6);
     expect(GORE.damage_dice_primary).toBe('4d6 + 4');
     expect(GORE.damage_type_primary).toBe('Piercing');
-    const cd = GORE.conditional_damage;
-    expect(cd).toBeTruthy();
-    expect(cd.dice).toBe('3d6');
-    expect(cd.modifier).toBe(0);
-    expect(cd.damage_type).toBe('Piercing');
-    expect(cd.condition).toMatch(/the minotaur moved 10 or more feet straight toward the target immediately before the hit/i);
-    const mimic = monsters.find((m) => m.index === 'mimic').actions[0].conditional_damage;
-    expect(Object.keys(cd).sort()).toEqual(Object.keys(mimic).sort());
-  });
-
-  it('ADDITIVE convention: base + delta = RAW 4d6 + 4 + 3d6; no hit_conditions auto-grant (prone GM-adjudicated)', () => {
-    const cd = GORE.conditional_damage;
-    expect(`${GORE.damage_dice_primary} + ${cd.dice}`).toBe('4d6 + 4 + 3d6');
+    expect(GORE.recharge).toBe('');
+    expect(GORE.conditional_damage).toEqual({
+      dice: '3d6',
+      modifier: 0,
+      damage_type: 'Piercing',
+      condition: 'the minotaur moved 10 or more feet straight toward the target immediately before the hit',
+    });
+    // ADDITIVE convention: base + delta = RAW 4d6 + 4 + 3d6 (grant rolls its own leg)
+    expect(`${GORE.damage_dice_primary} + ${GORE.conditional_damage.dice}`).toBe('4d6 + 4 + 3d6');
+    // Prone-on-charge stays GM-adjudicated at the popup — auto-grant would fire on
+    // every hit (RAW-wrong); versatile 2-handed bytes unauthored too.
     expect(GORE.hit_conditions).toBeUndefined();
     expect(GORE.damage_dice_two_handed).toBeUndefined();
-    expect(buildTwoHandedVariantOffer(GORE, 'Gore')).toBeNull();
-    // recharge-free canonical prose: no Recharge token in name/description
+    // recharge-free canonical 2024 prose: no Recharge token in name/description
     expect(/recharge/i.test(GORE.name)).toBe(false);
     expect(/recharge/i.test(GORE.description)).toBe(false);
   });
 });
 
-describe('MA-1174 Gore HIT popup charge offer', () => {
-  it('buildChargeBonusOffer arms the 3d6 clause ("10 or more feet" prose is chargeClauseFeet-inert → "Charge:" label, MA-1160 chrome)', () => {
-    const offer = buildChargeBonusOffer(GORE, 'Gore');
-    expect(offer).toMatchObject({ dice: '3d6', modifier: 0, damageType: 'Piercing', formula: '3d6', attackName: 'Gore' });
-    expect(offer.condition).toMatch(/moved 10 or more feet straight/i);
-    expect(offer.label).toBe('Charge: +3d6 Piercing?');
-  });
-
-  it('forwards the charge offer to the attack roll context (seam armed by the fix)', () => {
+describe('MA-1174 Gore click→ctx forward (#583 single press)', () => {
+  it('clicking the +6 chip forwards the full disk offer (formula=dice, bare "Charge:" label) + null hitClause + null two-handed variant', () => {
     renderGore();
-    clickGoreLink();
+    const goreRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Gore/.test(a.textContent.trim()));
+    const chip = Array.from(goreRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
+    expect(chip, 'Expected Gore +6 dice link').toBeTruthy();
+    fireEvent.click(chip);
     expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '3d6', modifier: 0, damageType: 'Piercing' });
-  });
-
-  it('grants: rolls 3d6 as its own leg, logs the clause; base 4d6 + 4 stays intact', async () => {
-    renderGore(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('3d6');
-    expect(rollExpression).toHaveBeenCalledWith('3d6');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const popup = useLoggedDiceRoll.__getPopupHtml();
-    expect(popup.autoDamage.formula).toBe('4d6 + 4');
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toMatch(/moved 10 or more feet straight/i);
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('granted');
-    });
-  });
-
-  it('declines: no clause roll, base-only log, zero bonus damage', async () => {
-    renderGore(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      expect(addEntry).toHaveBeenCalled();
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-    const decline = findLogEntry('conditional_damage_declined');
-    expect(decline).toBeTruthy();
-    expect(decline.description).toContain('base damage only');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('declined');
-    });
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.chargeBonusOffer).toEqual(GORE_OFFER);
+    expect(ctx.hitClause).toBeNull();
+    expect(ctx.twoHandedVariantOffer).toBeNull();
   });
 });

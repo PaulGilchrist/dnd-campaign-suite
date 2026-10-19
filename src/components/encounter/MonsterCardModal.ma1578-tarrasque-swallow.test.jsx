@@ -1,189 +1,136 @@
-// MA-1578: Tarrasque "Swallow" (save, DC 20 Constitution) — FAIL: the fail face paid
-// NOTHING (no 8d6+6 Bludgeoning), the popup showed "DC Unknown", and no conditions landed.
-// The dice lived ONLY in save_effect prose and every structured key was absent, so
-// saveChipPlan.formula was null → the raw d20 save popup rendered DiceRollResult.jsx
-// showDcUnknown ("DC Unknown — no success or failure"), applySaveOutcome's damage gate
-// (context.autoDamageFormula && saveDc != null) never fired → applySaveDamage skipped,
-// and extractConditionsFromSaveEffect harvested [] (applyDamagelessSaveConditions early-
-// returned) → zero swallowed-state delta.
+// @maintained-by-ai
+// MA-1578: Tarrasque "Swallow" (save, DC 20 Constitution) — pre-fix the fail face paid
+// NOTHING: dice lived only in save_effect prose, every structured key was absent, so
+// saveChipPlan.formula was null → raw d20 popup ("DC Unknown"), applySaveDamage's damage
+// gate never fired, and extractConditionsFromSaveEffect harvested []. FIX was pure data on
+// the MA-1563 save-damage seam (parseSaveDamageFields → resolveSaveLegDamageFields,
+// MonsterCardModal.jsx:1720-1733): save_damage_dice "8d6 + 6" + save_damage_type
+// "Bludgeoning" arm a rollable save chip rolled verbatim on a fail; save_effect's canonical
+// Blinded/Prone/Restrained words harvest all three on the fail face (ungated harvest is
+// RAW-correct §1105: every failed save = swallowed = all three).
 //
-// DATA fix rides the LIVE MA-1563 save-damage seam (parseSaveDamageFields + saveChipPlan +
-// resolveSaveLegDamageFields in MonsterCardModal) — the exact swarm-of-poisonous-snakes
-// key layout (save_dc → save_damage_dice → save_damage_type → save_type → save_effect):
-//   save_damage_dice:"8d6 + 6" + save_damage_type:"Bludgeoning" arm a rollable save chip
-//     (canRollExpression handles the "+ N" modifier exactly like every base formula "1d8 + 4")
-//     → resolveSaveLegDamageFields overrides autoDamageFormula/autoDamageDamageType on the
-//     SAVE transport → saveProcessing.applySaveDamage rolls 8d6+6 verbatim on a fail,
-//     re-setting the popup via buildSaveDamagePopupData(saveDc:20) → "DC Unknown" gone.
-//   save_effect gains canonical words Blinded/Prone/Restrained → extractConditionsFromSaveEffect
-//     harvests [blinded,prone,restrained] → applyFailedSaveConditions grants all three + the
-//     condition-applied log (MA-1546 charmed-floor precedent). Ungated harvest (playbook §1105)
-//     is RAW-CORRECT HERE: every failed save = swallowed = blinded + restrained + prone.
+// This file owns: the Swallow disk-row byte-lock (full-row toEqual — exhaustiveness also
+// locks the ABSENCE of fake swallow-state fields: acid tick, regurgitation gate, grapple
+// prerequisite stay GM-enforced advisory prose, zero consumers app-wide), the swarm Bites
+// MA-1563 twin save-byte-lock (delegated HERE by MonsterCardModal.ma1563-swarm-save-damage
+// .test.js :11-12), the saveChipPlan shape, and the DC 20 CON ctx transport discriminator.
+// Cited owners (not re-asserted here):
+// - parseSaveDamageFields truth table incl. delete-keys → null:
+//   MonsterCardHelpers.ma1563-swarm-save-damage.test.js :27-40
+// - generic dc/type/secondary transport + predicate forks:
+//   MonsterCardModal.secondary-save-transport.test.js; full/zero/half save math:
+//   applyDamage computeDamageAfterSave (MA-0218 owner lane)
+// - FP full row + repeat-save lane: MonsterCardModal.ma1577-tarrasque-frightful-presence
+//   .test.js :100-119 (#711) — presence-guard only below; Bite grapple twin + Swallow
+//   clause-less guard: MonsterCardModal.ma1573-tarrasque-bite-grapple.test.js :159-166
+// - condition landing machinery (applyFailedSaveConditions/meta stamps): handlePlainDamage
+//   .hitClause owner lane — transport pins here stop at the ctx.
+// - typo residual "within 10 feet ofthe tarrasque" byte: owned by ma1577 :118.
 //
-// ADVISORY RESIDUAL — FULL RAW STATE MACHINE IS NOT IN SCOPE (zero consumers, prose-only):
-//   • 16d6 acid EOT tick while swallowed — no swallowed-state turn-end tick consumer (§87/§70).
-//   • 60-damage regurgitation gate + "fall prone within 10 feet" — no regurgitate consumer.
-//   • grapple prerequisite / bite-hit gate / "can't bite another target" — §59 grapple machine
-//     absent; the Swallow row has NO target_prerequisite/hit_conditions authored BY DESIGN.
-//   This ticket arms ONLY the fail-face damage + swallowed-conditions harvest lanes; the
-//   state-machine clauses above remain GM-enforced advisory. data-lock asserts the row gains
-//   NO fake swallow-state fields (no swallowed te, no acid_tick, no regurgitate key).
+// HONEST CANARY (SOURCE, reported not fixed): the row authors NO dc_success, so the
+// app-wide MV-20 default 'half' (resolveBlockSaveDcSuccess :286 → computeDamageAfterSave
+// :93) pays ~14 damage on a SUCCESSFUL save despite the "Failure:" only wording — RAW
+// wants dc_success:'none' authored (MA-0030 Chilling Gaze precedent). Pins below assert
+// the shipped 'half' honestly and flip red the day the data is fixed.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import monstersData from '../../../public/data/monsters.json';
 import { extractConditionsFromSaveEffect, parseSaveDamageFields } from './MonsterCardHelpers.js';
 import { saveChipPlan, buildSaveOptions, buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
 
-const RAW = readFileSync('public/data/monsters.json', 'utf8');
 const TARRASQUE = monstersData.find((m) => m.index === 'tarrasque');
 const SWALLOW = TARRASQUE.actions.find((a) => a.name === 'Swallow');
 const FP = TARRASQUE.actions.find((a) => a.name === 'Frightful Presence');
-const BITE = TARRASQUE.actions.find((a) => a.name === 'Bite');
-const SWARM = monstersData.find((m) => m.index === 'swarm-of-poisonous-snakes');
-const SWARM_BITES = SWARM.actions.find((a) => a.name === 'Bites');
+const SWARM_BITES = monstersData.find((m) => m.index === 'swarm-of-poisonous-snakes').actions.find((a) => a.name === 'Bites');
 
-function rawCount(haystack, needle) {
-  return haystack.split(needle).length - 1;
-}
+// Exact disk row, byte-for-byte — one toEqual locks the full MA-1563-key-layout arm
+// (save_dc → save_damage_dice → save_damage_type → save_type → save_effect) AND, by
+// exhaustiveness, the absence of every fake swallow-state field (swallowed/acid_tick/
+// regurgitate/escape_dc/hit_conditions/target_prerequisite/dc_success...).
+const FULL_ROW = {
+  name: 'Swallow',
+  description: 'The tarrasque makes one bite attack against a Large or smaller creature it is grappling. If the attack hits, the target takes the bite\'s damage, the target is swallowed, and the grapple ends. While swallowed, the creature is blinded and restrained, it has total cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) acid damage at the start of each of the tarrasque\'s turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, which fall prone in a space within 10 feet ofthe tarrasque. If the tarrasque dies, a swallowed creature is no longer restrained by it and can escape from the corpse by using 30 feet of movement, exiting prone.',
+  save_dc: 20,
+  save_damage_dice: '8d6 + 6',
+  save_damage_type: 'Bludgeoning',
+  save_type: 'Constitution',
+  save_effect: 'Failure: 28 (8d6 + 6) Bludgeoning damage. If the target is a creature, it is swallowed — Blinded, Prone, and Restrained until it is regurgitated.',
+};
 
-describe('MA-1578 monsters.json data lock: Tarrasque Swallow save_damage fields + harvested save_effect', () => {
-  it('save_damage fields toEqual pin — rides the MA-1563 structured seam', () => {
-    expect(SWALLOW.save_dc).toBe(20);
-    expect(SWALLOW.save_damage_dice).toBe('8d6 + 6');
-    expect(SWALLOW.save_damage_type).toBe('Bludgeoning');
-    expect(SWALLOW.save_type).toBe('Constitution');
+const countCarriers = (dice) => monstersData.reduce(
+  (n, m) => n + (m.actions || []).filter((a) => a.save_damage_dice === dice).length, 0);
+
+describe('MA-1578 disk data lock: Swallow row arms the fail face, advisory state machine stays prose-only', () => {
+  it('full-row byte-lock + key order + parseSaveDamageFields + harvest yields EXACTLY [blinded, prone, restrained]; Swallow is the sole 8d6 + 6 carrier file-wide', () => {
+    expect(SWALLOW).toEqual(FULL_ROW);
+    expect(Object.keys(SWALLOW)).toEqual(['name', 'description', 'save_dc', 'save_damage_dice', 'save_damage_type', 'save_type', 'save_effect']);
     expect(parseSaveDamageFields(SWALLOW)).toEqual({ dice: '8d6 + 6', damageType: 'Bludgeoning' });
-  });
-
-  it('key layout mirrors swarm-of-poisonous-snakes MA-1563 twin (save_dc → save_damage_dice → save_damage_type → save_type)', () => {
-    // anchor on tarrasque-Swallow-unique bytes (the 8d6+6 pool appears once file-wide)
-    const diceIdx = RAW.indexOf('"save_damage_dice": "8d6 + 6"');
-    expect(diceIdx).toBeGreaterThan(-1);
-    const rawSlice = RAW.slice(RAW.lastIndexOf('"save_dc": 20', diceIdx), RAW.indexOf('"save_effect"', diceIdx));
-    expect(rawSlice.indexOf('"save_dc"')).toBeLessThan(rawSlice.indexOf('"save_damage_dice"'));
-    expect(rawSlice.indexOf('"save_damage_dice"')).toBeLessThan(rawSlice.indexOf('"save_damage_type"'));
-    expect(rawSlice.indexOf('"save_damage_type"')).toBeLessThan(rawSlice.indexOf('"save_type"'));
-  });
-
-  it('save_effect extended honestly + harvest yields EXACTLY [blinded, prone, restrained] via the actual extractor', () => {
-    expect(SWALLOW.save_effect).toBe('Failure: 28 (8d6 + 6) Bludgeoning damage. If the target is a creature, it is swallowed — Blinded, Prone, and Restrained until it is regurgitated.');
     expect(extractConditionsFromSaveEffect(SWALLOW.save_effect)).toEqual(['blinded', 'prone', 'restrained']);
-    // ungated harvest is RAW-correct (§1105): every failed save = swallowed = all three.
-    // no foreign canonical condition word leaks into the wording.
-    expect(extractConditionsFromSaveEffect(SWALLOW.save_effect)).not.toContain('grappled');
-    expect(extractConditionsFromSaveEffect(SWALLOW.save_effect)).not.toContain('paralyzed');
-  });
-
-  it('tarrasque-Swallow-unique fixed bytes appear exactly once file-wide', () => {
-    expect(rawCount(RAW, '"save_damage_dice": "8d6 + 6"')).toBe(1);
-    expect(rawCount(RAW, '"save_damage_type": "Bludgeoning"')).toBe(1);
-    expect(rawCount(RAW, 'it is swallowed — Blinded, Prone, and Restrained until it is regurgitated.')).toBe(1);
-    expect(RAW).toContain('within 10 feet ofthe tarrasque'); // MA-1577 cosmetic residual stays put
-  });
-
-  it('NO fake swallow-state machinery authored (advisory state machine stays prose-only)', () => {
-    expect(SWALLOW.swallowed).toBeUndefined();
-    expect(SWALLOW.acid_tick).toBeUndefined();
-    expect(SWALLOW.regurgitate).toBeUndefined();
-    expect(SWALLOW.save_damage_secondary).toBeUndefined();
-    expect(SWALLOW.damage_dice_primary).toBeUndefined();
-    expect(SWALLOW.attack_bonus).toBeUndefined();
-    expect(SWALLOW.hit_conditions).toBeUndefined();
-    expect(SWALLOW.escape_dc).toBeUndefined();
-    expect(SWALLOW.target_prerequisite).toBeUndefined();
+    expect(countCarriers('8d6 + 6')).toBe(1);
   });
 });
 
-describe('MA-1578 save chip plan: rollable + clickable, not a condition rider', () => {
-  it('saveChipPlan(formula:"8d6 + 6") rollable && clickable (pure save row, no attack_bonus)', () => {
-    const plan = saveChipPlan(SWALLOW, false);
-    expect(plan.formula).toBe('8d6 + 6');
-    expect(plan.rollable).toBe(true);
-    expect(plan.clickable).toBe(true);
-    expect(plan.riderOnly).toBe(false);
-  });
-
-  it('attackerCannotAct disarms the chip (byte-inert gate honored)', () => {
-    const plan = saveChipPlan(SWALLOW, true);
-    expect(plan.clickable).toBe(false);
-    expect(plan.rollable).toBe(true);
-  });
-
-  it('legacy row without the keys stays byte-inert (formula null → not rollable)', () => {
-    const legacy = { ...SWALLOW };
-    delete legacy.save_damage_dice;
-    delete legacy.save_damage_type;
-    const plan = saveChipPlan(legacy, false);
-    expect(plan.formula).toBe(null);
-    expect(plan.rollable).toBe(false);
-    expect(parseSaveDamageFields(legacy)).toBe(null);
+describe('MA-1578 saveChipPlan: authored pool owns the chip, gates honored, byte-inert stripped', () => {
+  it('exact plan shape rollable+clickable (pure-save row, no attack_bonus); attackerCannotAct disarms; stripped row falls back to null → pre-fix raw-save popup face', () => {
+    expect(saveChipPlan(SWALLOW, false)).toEqual({ riderOnly: false, formula: '8d6 + 6', rollable: true, clickable: true });
+    const disarmed = saveChipPlan(SWALLOW, true);
+    expect(disarmed.clickable).toBe(false);
+    expect(disarmed.rollable).toBe(true); // formula stays — only the press is gated
+    const stripped = { ...SWALLOW };
+    delete stripped.save_damage_dice;
+    delete stripped.save_damage_type;
+    const legacyPlan = saveChipPlan(stripped, false);
+    expect(legacyPlan.formula).toBe(null); // no fabricated pool from prose
+    expect(legacyPlan.rollable).toBe(false); // parseSaveDamageFields → null owned by Helpers.ma1563 :32
   });
 });
 
 describe('MA-1578 DC 20 Constitution threading + save transport', () => {
-  it('buildSaveOptions threads DC 20 + con + harvested conditions', () => {
+  it('buildSaveOptions arms DC 20 con + triple conditions (dc_success canary: MV-20 half-on-success default ships); ctx overrides the pre-fix null handoff with authored 8d6 + 6 Bludgeoning, single leg', () => {
     const opts = buildSaveOptions(SWALLOW);
     expect(opts.saveDc).toBe(20);
     expect(opts.saveType).toBe('con');
     expect(opts.saveConditions).toEqual(['blinded', 'prone', 'restrained']);
-  });
-
-  it('buildAbilitySaveRollContext rolls 8d6+6 Bludgeoning at DC 20 — the fail-face damage leg', () => {
+    // CANARY: row authors no dc_success → 'half' ships to the prompt (see header SOURCE note).
+    expect(opts.dcSuccess).toBe('half');
     const ctx = buildAbilitySaveRollContext({
       monsterName: 'Tarrasque 1',
       target: { name: 'Bandit 1', type: 'monster' },
       spellName: null,
       action: SWALLOW,
-      saveType: 'CON',
-      dcSuccess: 'none',
-      saveDamageFormula: '8d6 + 6',
-      saveConditions: extractConditionsFromSaveEffect(SWALLOW.save_effect),
+      saveType: SWALLOW.save_type, // press passes action.save_type verbatim (:425)
+      dcSuccess: opts.dcSuccess,
+      // Discriminator: the PRE-fix chip handoff (plan.formula was null → "DC Unknown").
+      // If the MA-1563 row-override branch (:1727) were removed, autoDamageFormula
+      // falls through to this null and the fail face pays nothing again — the exact bug.
+      saveDamageFormula: null,
+      saveConditions: opts.saveConditions,
       usesGate: null,
       prerequisite: null,
-      getDamageTypesForAction: () => ['Bludgeoning'],
+      getDamageTypesForAction: () => [], // proves 'Bludgeoning' rides from the ROW, not the getter
     });
     expect(ctx.saveDc).toBe(20);
-    expect(ctx.saveType).toBe('CON');
+    expect(ctx.saveType).toBe('Constitution');
+    expect(ctx.dcSuccess).toBe('half');
     expect(ctx.autoDamageFormula).toBe('8d6 + 6');
     expect(ctx.autoDamageDamageType).toBe('Bludgeoning');
+    // fail face rolls the save pool exactly once — no fabricated second leg
+    expect(ctx.autoDamageSecondaryFormula).toBe(null);
+    expect(ctx.autoDamageSecondaryDamageType).toBe(null);
     expect(ctx.saveConditions).toEqual(['blinded', 'prone', 'restrained']);
-    // save_effect carries no "half on success" wording → row honest zero on success face.
-    expect(SWALLOW.dc_success).toBeUndefined();
   });
 });
 
-describe('MA-1578 sibling byte-locks (MA-1563 swarm + MA-1577 FP + Bite grapple twin intact)', () => {
-  it('swarm-of-poisonous-snakes Bites MA-1563 row byte-intact', () => {
+describe('MA-1578 sibling guards (full bytes owned elsewhere)', () => {
+  it('swarm Bites MA-1563 twin save-byte-lock + sole 4d6 carrier (bytes delegated HERE by ma1563 :11-12); FP MA-1577 structured keys PRESENT (full row + repeat-save lane owned by ma1577 :100-119)', () => {
     expect(SWARM_BITES.save_dc).toBe(10);
     expect(SWARM_BITES.save_damage_dice).toBe('4d6');
     expect(SWARM_BITES.save_damage_type).toBe('Poison');
-    expect(SWARM_BITES.damage_dice_primary).toBe('2d6');
-    expect(SWARM_BITES.damage_type_primary).toBe('piercing');
     expect(SWARM_BITES.save_type).toBe('Constitution');
     expect(SWARM_BITES.save_effect).toBe('14 (4d6) Poison damage. Success: Half damage.');
-    expect(rawCount(RAW, '"save_damage_dice": "4d6"')).toBe(1);
-  });
-
-  it('tarrasque Frightful Presence MA-1577 row byte-intact (DC 17 Wisdom + FP structured keys)', () => {
+    expect(countCarriers('4d6')).toBe(1);
     expect(FP.save_dc).toBe(17);
     expect(FP.save_type).toBe('Wisdom');
-    expect(FP.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
-    expect(FP.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
-    expect(extractConditionsFromSaveEffect(FP.save_effect)).toEqual(['frightened']);
-  });
-
-  it('tarrasque Bite grapple twin MA-1573 stays clause-shaped + Swallow gains no attack_bonus', () => {
-    expect(BITE.attack_bonus).toBe(19);
-    expect(BITE.hit_conditions).toEqual(['grappled', 'restrained']);
-    expect(BITE.escape_dc).toBe(20);
-    expect(SWALLOW.attack_bonus).toBeUndefined();
-  });
-
-  it('whole-diff scope: file parses and Swallow is the only row carrying the 8d6+6 save pool', () => {
-    const parsed = JSON.parse(RAW);
-    const row = parsed.find((m) => m.index === 'tarrasque').actions.find((a) => a.name === 'Swallow');
-    expect(row).toEqual(SWALLOW);
-    const carriers = parsed.reduce((n, m) => n + (m.actions || []).filter((a) => a.save_damage_dice === '8d6 + 6').length, 0);
-    expect(carriers).toBe(1);
+    expect(FP.success_immunity).toBeDefined();
+    expect(FP.repeat_save).toBeDefined();
   });
 });

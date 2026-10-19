@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1570: Swarm of Venomous Snakes "Bites" — inert prose Bloodied variant
 // fixed on monsters.json swarm-of-venomous-snakes actions[0] via
 // conditional_damage riding the live MA-0007 GM-adjudication seam
@@ -8,23 +9,46 @@
 // secondary precedent, on the MA-1552/MA-1562 swarm-family bloodied lane.
 // Byte-shape mirrors the modifier-bearing MA-0485/MA-1555/MA-1562/MA-1569
 // twins (separate numeric modifier key, NEVER embedded "+" in dice — §MA-1555).
-// Placement: conditional_damage AFTER the damage_dice_secondary/damage_type_
-// secondary pair (giant-elk Ram / mimic Bite multi-key ordering precedent).
 // Seam is ADDITIVE (MA-1160/§MA-1555): accept pays bonus leg + base primary
 // + poison rider intact; RAW full-variant replacement caveat is the accepted
 // family residual (§70).
+// Trim pass (2026-10-18), two tests mirroring the maintained ma1562 template:
+//   1. Disk-row bytes: full cd-object toEqual identity as this monster's LONE
+//      lock — cd {1d4, modifier 4, Piercing, Bloodied} genuinely differs by
+//      VALUE from every swarm twin (piranhas {1d4,3}, stirges {1d10,3}, claws
+//      {2d8,2}, bats modifier-less) — plus inline key order, full row-key
+//      census locking cd placement AFTER the live secondary pair (giant-elk
+//      Ram / mimic Bite multi-key ordering precedent, owned ma0805/ma1160),
+//      base legs + live poison rider bytes, RAW em-dash prose regex with
+//      fix-scope anchor count==1, single-action parent census, and lone
+//      CR0 venomous-snake same-name Bite inert (blast-radius guard).
+//   2. ONE click→rollAttack ctx press: full 7-key offer identity incl. this
+//      monster's distinct label chrome ("Bloodied: +1d4+4 Piercing?") +
+//      hitClause toBeNull (Bloodied-only row) + dual-pool transport — variant
+//      is primary-only while the live 3d6 Poison secondary rides the ctx
+//      (this monster's genuinely distinct behavior vs the rider-less twins).
+// Cut (owner MonsterCardModal.charge-bonus.test.jsx owns the machine :210-250):
+// grant, crit accept, decline — generic mechanics twins of the owner's lane;
+// popup offer-render — popup chrome owned by common/AttackResultPopup.ma1363
+// :105-120; direct buildChargeBonusOffer label test — subsumed by the ctx offer
+// toEqual; attackRowMissingToHit — truth table owned by helper census
+// (MonsterAction.ma0286 :89-113; a suppressed row would fail the +6-chip click
+// in test 2 anyway). Foreign-row cross-pins cut with owners: piranhas cd/key-
+// order/label→ma1562, stirges→ma1569, bats→ma1552, claws→ma1555,
+// centipedes→ma1554, mimic Bite cd→ma1160, giant-elk Ram→ma0805. Fix scope
+// stays guarded without them via the monster-exclusive RAW prose anchor
+// count==1. NOTE for orchestrator: the MA-0647 drow-mage Staff precedent bytes
+// cut here (cd absence + 1d6 poison secondary) have no other test owner —
+// they belong to a future ma0647 owner file, not to this swarm's lock.
+// Dead-mock purge per ma1552/ma1558/ma1561 baseline: diceRoller stub (rollAttack
+// mocked, no roller fires without the cut grant tests), AttackResultPopup stub
+// (popup never renders — popupHtml null), never-fired hook members (minimal
+// shape renders).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: 8, rolls: [4], modifier: 4, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 12, rolls: [4, 4], modifier: 4, formula })),
-  rollD20: vi.fn(() => 18),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -37,23 +61,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -93,83 +109,41 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const RAW = readFileSync('public/data/monsters.json', 'utf8');
 const monsters = JSON.parse(RAW);
-const SNAKES = monsters.find((m) => m.index === 'swarm-of-venomous-snakes');
-const BITES = SNAKES.actions.find((a) => a.name === 'Bites');
-const STIRGES = monsters.find((m) => m.index === 'swarm-of-stirges').actions.find((a) => a.name === 'Swarm of Proboscises');
-const PIRANHAS_BITES = monsters.find((m) => m.index === 'swarm-of-piranhas').actions.find((a) => a.name === 'Bites');
-const BAT_BITES = monsters.find((m) => m.index === 'swarm-of-bats').actions.find((a) => a.name === 'Bites');
-const CLAWS = monsters.find((m) => m.index === 'swarm-of-crawling-claws').actions.find((a) => a.name === 'Swarm of Grasping Hands');
-const CENTIPEDES_BITES = monsters.find((m) => m.index === 'swarm-of-centipedes').actions.find((a) => a.name === 'Bites');
-const MIMIC_BITE = monsters.find((m) => m.index === 'mimic').actions.find((a) => a.name === 'Bite');
-const ELK_RAM = monsters.find((m) => m.index === 'giant-elk').actions.find((a) => a.name === 'Ram');
-const STAFF = monsters.find((m) => m.index === 'drow-mage').actions.find((a) => a.name === 'Staff');
+const SWARM = monsters.find((m) => m.index === 'swarm-of-venomous-snakes');
+const BITES = SWARM.actions.find((a) => a.name === 'Bites');
+const LONE_SNAKE = monsters.find((m) => m.index === 'venomous-snake');
+
+// Exact buildChargeBonusOffer(BITES, 'Bites') output FROM the disk row — full
+// identity, incl. the modifier-bearing formula ('1d4 + 4', MA-0485 shape) and
+// the condition-text label chrome ("Bloodied: +1d4+4 Piercing?", no feet-token
+// head, MA-1363 label generalization with the +4 modifier token).
+const SNAKES_OFFER = {
+  dice: '1d4',
+  modifier: 4,
+  damageType: 'Piercing',
+  condition: 'Bloodied',
+  formula: '1d4 + 4',
+  label: 'Bloodied: +1d4+4 Piercing?',
+  attackName: 'Bites',
+};
 
 const CREATURES = [
   { name: 'Swarm of Venomous Snakes 1', targetName: 'Bandit 1' },
   { name: 'Bandit 1', type: 'player', size: 'Medium or Small' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(BITES, 'Bites');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Bites',
-    rolls: [18],
-    bonus: 6,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Bites', formula: '1d8 + 4', damageType: 'Piercing', source: 'Swarm of Venomous Snakes 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderSnakes(popupHtml = null) {
-  _setPopupHtml(popupHtml);
-  const m = makeMonster({ name: 'Swarm of Venomous Snakes', size: 'Medium', type: 'swarm', actions: SNAKES.actions });
+function renderSnakes() {
+  _setPopupHtml(null);
+  const m = makeMonster({ name: 'Swarm of Venomous Snakes', size: 'Medium', type: 'swarm', actions: SWARM.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Swarm of Venomous Snakes 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Swarm of Venomous Snakes 1' })} />);
-}
-
-function clickBitesLink() {
-  const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Bites/.test(a.textContent.trim()));
-  const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
-  expect(chip, 'Expected Bites +6 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
-}
-
-function clickButton(text) {
-  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === text);
-  fireEvent.click(btn);
 }
 
 beforeEach(() => {
@@ -178,145 +152,75 @@ beforeEach(() => {
 });
 
 describe('MA-1570 monsters.json data lock: Swarm of Venomous Snakes Bites Bloodied fix', () => {
-  it('row identity + core legs byte-unchanged: +6, 5 ft., 1d8 + 4 Piercing, 3d6 Poison', () => {
-    expect(SNAKES.actions.length).toBe(1);
+  it('authors the modifier-bearing Bloodied cd over the live 3d6 poison rider, with key placement and RAW prose anchor', () => {
     expect(BITES.attack_bonus).toBe(6);
     expect(BITES.reach).toBe('5 ft.');
     expect(BITES.damage_dice_primary).toBe('1d8 + 4');
     expect(BITES.damage_type_primary).toBe('Piercing');
-    expect(BITES.description).toBe(
-      'Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage.'
-    );
-  });
-
-  it('authors Bloodied conditional_damage in the modifier-bearing MA-0485/MA-1555 byte-shape (separate modifier key, no "+" in dice)', () => {
-    const cd = BITES.conditional_damage;
-    expect(cd).toEqual({ dice: '1d4', modifier: 4, damage_type: 'Piercing', condition: 'Bloodied' });
-    expect(cd.dice).not.toMatch(/\+/);
-    expect(Object.keys(cd)).toEqual(Object.keys(STIRGES.conditional_damage));
-    expect(Object.keys(cd)).toEqual(Object.keys(PIRANHAS_BITES.conditional_damage));
-  });
-
-  it('key placement: conditional_damage AFTER the live secondary pair, last key (giant-elk Ram / mimic Bite multi-key ordering precedent)', () => {
-    const keys = Object.keys(BITES);
-    expect(keys.indexOf('conditional_damage')).toBe(keys.indexOf('damage_type_secondary') + 1);
-    expect(keys[keys.length - 1]).toBe('conditional_damage');
-    expect(keys.indexOf('damage_type_secondary')).toBe(keys.indexOf('damage_dice_secondary') + 1);
-  });
-
-  it('poison rider byte-locked UNTOUCHED: 3d6 Poison rides unchanged (MA-0427/§516 dual-pool, MA-0647 twin)', () => {
+    // Full cd identity — the modifier-bearing MA-0485 byte-shape (separate numeric
+    // modifier key, dice string never carries '+'), key order pinned inline.
+    // {1d4, modifier 4} is THIS monster's lone lock: piranhas {1d4,3}, stirges
+    // {1d10,3}, claws {2d8,2} differ by dice/modifier value, bats is modifier-less.
+    expect(BITES.conditional_damage).toEqual({
+      dice: '1d4',
+      modifier: 4,
+      damage_type: 'Piercing',
+      condition: 'Bloodied',
+    });
+    expect(Object.keys(BITES.conditional_damage)).toEqual(['dice', 'modifier', 'damage_type', 'condition']);
+    expect(BITES.conditional_damage.dice).not.toMatch(/\+/);
+    // Dual-pool (MA-0427/§516): the live poison rider is untouched, the Bloodied
+    // variant applies to PRIMARY only (MA-0647 drow-mage Staff precedent shape).
     expect(BITES.damage_dice_secondary).toBe('3d6');
     expect(BITES.damage_type_secondary).toBe('Poison');
     expect(BITES.flat_damage_secondary).toBeUndefined();
     expect(BITES.secondary_condition).toBeUndefined();
-  });
-
-  it('no escape clock, no hit_target_effect, no hit_conditions, no hit_choice, no two-handed chooser authored', () => {
-    expect(BITES.escape_dc).toBeUndefined();
-    expect(BITES.hit_target_effect).toBeUndefined();
-    expect(BITES.hit_conditions).toBeUndefined();
-    expect(BITES.hit_choice).toBeUndefined();
-    expect(BITES.damage_dice_two_handed).toBeUndefined();
-  });
-
-  it('fix touches ONLY this row: unique byte anchor count==1, siblings byte-locked', () => {
-    const anchor = '"description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage.",';
+    // Full row-key census: cd sits AFTER the live secondary pair as the last key
+    // (multi-key ordering precedent giant-elk Ram ma0805 / mimic Bite ma1160) and
+    // no escape_dc/hit_conditions/hit_choice/two-handed chooser is authored.
+    expect(Object.keys(BITES)).toEqual([
+      'name',
+      'description',
+      'attack_bonus',
+      'reach',
+      'damage_dice_primary',
+      'damage_type_primary',
+      'damage_dice_secondary',
+      'damage_type_secondary',
+      'conditional_damage',
+    ]);
+    // RAW prose anchor for the fixed Bloodied variant — monster-exclusive seam
+    // (the em-dash "or 6 (1d4 + 4)" clause never appears on any other row).
+    expect(BITES.description).toMatch(/Hit: 8 \(1d8 \+ 4\) Piercing damage\u2014or 6 \(1d4 \+ 4\) Piercing damage if the swarm is Bloodied\u2014plus 10 \(3d6\) Poison damage\./);
+    const anchor = 'or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied';
     expect(RAW.split(anchor).length - 1).toBe(1);
-    expect(STIRGES.conditional_damage).toEqual({ dice: '1d10', modifier: 3, damage_type: 'Piercing', condition: 'Bloodied' });
-    expect(PIRANHAS_BITES.conditional_damage).toEqual({ dice: '1d4', modifier: 3, damage_type: 'Piercing', condition: 'Bloodied' });
-    expect(BAT_BITES.conditional_damage).toEqual({ dice: '1d4', damage_type: 'Piercing', condition: 'Bloodied' });
-    expect(CLAWS.conditional_damage).toEqual({ dice: '2d8', modifier: 2, damage_type: 'Necrotic', condition: 'Bloodied' });
-    expect(CENTIPEDES_BITES.conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: 'half HP or fewer' });
-    expect(MIMIC_BITE.conditional_damage).toEqual({ dice: '1d8', modifier: 0, damage_type: 'Piercing', condition: 'the target is Grappled by the mimic' });
-    expect(ELK_RAM.conditional_damage).toEqual({ dice: '2d4', damage_type: 'Bludgeoning', condition: 'moved 20+ feet straight toward target immediately before the hit' });
-    expect(STAFF.conditional_damage).toBeUndefined();
-    expect(STAFF.damage_dice_secondary).toBe('1d6');
-    expect(STAFF.damage_type_secondary).toBe('poison');
+    // Single-action parent census: Bites is the swarm's only action.
+    expect(SWARM.actions.map((a) => a.name)).toEqual(['Bites']);
+    // Fix-scope guard: the lone CR0 venomous-snake's same-name Bite stays inert
+    // (fixed-form 1d4 + 2 Piercing, no cd) — only the swarm carries the variant.
+    const loneBite = LONE_SNAKE.actions.find((a) => a.name === 'Bite');
+    expect(loneBite.conditional_damage).toBeUndefined();
+    expect(loneBite.damage_dice_primary).toBe('1d4 + 2');
   });
 });
 
-describe('MA-1570 buildChargeBonusOffer label', () => {
-  it('builds the Bloodied variant offer with formula "1d4 + 4" and a condition-text label', () => {
-    const offer = buildChargeBonusOffer(BITES, 'Bites');
-    expect(offer).toMatchObject({ dice: '1d4', modifier: 4, damageType: 'Piercing', condition: 'Bloodied', formula: '1d4 + 4', attackName: 'Bites' });
-    expect(offer.label).toBe('Bloodied: +1d4+4 Piercing?');
-    expect(offer.label).not.toMatch(/Charge/i);
-  });
-
-  it('keeps every swarm-family twin label byte-identical (MA-1552/MA-1555/MA-1562/MA-1569 pins)', () => {
-    expect(buildChargeBonusOffer(BAT_BITES, 'Bites').label).toBe('Bloodied: +1d4 Piercing?');
-    expect(buildChargeBonusOffer(PIRANHAS_BITES, 'Bites').label).toBe('Bloodied: +1d4+3 Piercing?');
-    expect(buildChargeBonusOffer(CLAWS, 'Swarm of Grasping Hands').label).toBe('Bloodied: +2d8+2 Necrotic?');
-    expect(buildChargeBonusOffer(STIRGES, 'Swarm of Proboscises').label).toBe('Bloodied: +1d10+3 Piercing?');
-  });
-});
-
-describe('MA-1570 Swarm of Venomous Snakes Bites HIT popup offer + grant/decline', () => {
-  it('forwards the Bloodied offer AND the live poison rider to the attack roll context (variant = primary-only, secondary rides)', () => {
+describe('MA-1570 Swarm of Venomous Snakes Bites click→ctx forward (dual-pool: variant primary-only, poison rides)', () => {
+  it('clicking the +6 chip forwards the full disk offer with Bloodied label chrome, null hitClause, and the live 3d6 poison secondary intact', () => {
     renderSnakes();
-    clickBitesLink();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Bites/.test(a.textContent.trim()));
+    const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
+    expect(chip, 'Expected Bites +6 dice link').toBeTruthy();
+    fireEvent.click(chip);
     expect(rollAttack).toHaveBeenCalled();
     const ctx = rollAttack.mock.calls[0][2];
-    expect(ctx.chargeBonusOffer).toMatchObject({ dice: '1d4', modifier: 4, formula: '1d4 + 4', damageType: 'Piercing', condition: 'Bloodied' });
+    expect(ctx.chargeBonusOffer).toEqual(SNAKES_OFFER);
+    // toBeNull like the Bloodied-only swarm twins (contrast ma1555's prone twin).
+    expect(ctx.hitClause).toBeNull();
+    // Dual-pool transport: base primary AND the live poison rider ride alongside
+    // the bonus offer — the Bloodied variant never consumes the secondary.
     expect(ctx.autoDamageFormula).toBe('1d8 + 4');
     expect(ctx.damageType).toBe('Piercing');
     expect(ctx.autoDamageSecondaryFormula).toBe('3d6');
     expect(ctx.autoDamageSecondaryDamageType).toBe('Poison');
-    expect(attackRowMissingToHit(BITES)).toBe(false);
-  });
-
-  it('renders the Bloodied offer button in the HIT popup', () => {
-    renderSnakes(hitPopupHtml());
-    const popup = document.querySelector('[data-testid="popup-stub"]');
-    expect(popup.textContent).toContain('Bloodied: +1d4+4 Piercing?');
-  });
-
-  it('accept: rolls 1d4 + 4, applies its own bonus leg, logs the grant (additive seam, poison rides on base Done)', async () => {
-    renderSnakes(hitPopupHtml());
-    clickButton('charge-grant');
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('1d4 + 4');
-    expect(call.context.damageType).toBe('Piercing');
-    expect(rollExpression).toHaveBeenCalledWith('1d4 + 4');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('(Bloodied)');
-    expect(grant.description).toContain('+8 Piercing (1d4 + 4)');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('granted');
-    });
-  });
-
-  it('crit accept doubles the clause formula ("1d4 + 4*2")', async () => {
-    renderSnakes(hitPopupHtml({ isCrit: true }));
-    clickButton('charge-grant');
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    expect(rollExpressionDoubled).toHaveBeenCalledWith('1d4 + 4');
-    expect(rollExpression).not.toHaveBeenCalled();
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('1d4 + 4');
-    expect(call.total).toBe(12);
-  });
-
-  it('decline: logs the refusal with zero bonus roll (base + poison rider only)', async () => {
-    renderSnakes(hitPopupHtml());
-    clickButton('charge-decline');
-    await vi.waitFor(() => {
-      const decline = findLogEntry('conditional_damage_declined');
-      expect(decline).toBeTruthy();
-      expect(decline.description).toContain('base damage only');
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-    expect(findLogEntry('conditional_damage_granted')).toBeFalsy();
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('declined');
-    });
   });
 });

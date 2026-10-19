@@ -1471,3 +1471,42 @@ ORCH NOTE: boundaries #163-#167 MISSED (spec drift after #162 anchor slip; per-f
 - ACTIVE REC (escalated): player-save flake root-cause — 3rd sighting under parallel load; likely default findBy timeout vs slow async chain in lane; suggest explicit {timeout} pin or serial-retry on that file at next lane audit
 - Test count 34,934->34,182 (-752): expected from mass template trims (#611 276->32 etc.)
 run2#678: encounter/MonsterCardModal.ma1016-fog-cloud-spellcast -> maintained (3 kept 177->152, mocks 11->4): modal-distinct numeric-gate refusal + MA-0020 re-arm kept (#677 precedent honestly inapplicable); neighbors 46/46
+run2#679: encounter/MonsterCardModal.ma1150-merfolk-wavebender-spellcasting -> maintained (7->4): row toEqual + armed/disarmed guard pair kept; barlgura/spellcasting-owner/ma0611 cites; no bugs
+run2#680: encounter/MonsterCardModal.ma1160-mimic-bite-conditional-damage -> maintained (6->2, ~250->160): full-identity row lock + offer toEqual w/ null-hitClause neg; grant/decline->charge-bonus owner; REC: ma1363 grant/decline/forward faces cut
+run2#681: encounter/MonsterCardModal.ma1163-extract-brain-prerequisite -> maintained (8->3, -96/+37): provenance-omission popup pin + source-agnostic admit leg; gate units cite MA-1275/MA-1652; 5 dead mocks bisected
+run2#682: encounter/MonsterCardModal.ma1174-minotaur-of-baphomet-gore-charge-recharge -> maintained (8->2, 266->176): toEqual row lock, recharge-free + modifier-0 pins; phantom-recharge->monsterRecharge owner; grant/decline->charge-bonus owner
+run2#683: encounter/MonsterCardModal.ma1175-minotaur-skeleton-gore-charge -> maintained (6->2): twin template; NEW not.toEqual distinctness vs Baphomet row (2d8/20ft vs 3d6/10ft verified on disk)
+run2#684: encounter/MonsterCardModal.ma1212-rapport-spores-zone-picker -> maintained (5->1 describe.each x3 myconid twins): literal payload pins replaced self-referential assert; DOM-scrape->chip owner; registry cite targetEffectDefinitions:124
+run2#685: encounter/MonsterCardModal.ma1223-nalfeshnee-teleport-advisory -> maintained (3->2): census->shared render helper; press exact counts + zero-store-writes seam; diceRoller purged; REC: ma1224 same template
+run2#686: encounter/MonsterCardModal.ma1224-nalfeshnee-pursuit-advisory -> maintained (2 kept + census fold): REC #685 applied; byte-distinct Pursuit prose kept (/no move-end producer app-wide/); false feather_fall twin claim fixed; diceRoller purged
+run2#687: encounter/MonsterCardModal.ma1275-tentacle-slam-prerequisite -> maintained (11->6 OWNER): by_attacker:true gate truth table + provenance + refusal shape kept; key-order brittle cut; parse cites MA-1890, truth table MA-1652; 4 dead mocks purged
+run2#688: encounter/MonsterCardModal.ma1329-poisonous-snake-bite -> maintained (5->3): clickable-unrollable composite guard sole-owned; saveChipPlan full toEqual; buildSaveOptions->secondary-save-transport owner
+run2#689: encounter/MonsterCardModal.ma1363-quaggoth-claw-bloodied -> maintained (8->2): REC #680 applied (grant/crit/decline->charge-bonus owner); bloodied chrome offer toEqual sole-owned. REC: 14 swarm siblings (ma1552/53/54/55/57/58/59/61/62/64/65/66/68/71) re-pin foreign quaggoth claw label -> cut at their turns
+run2#690: encounter/MonsterCardModal.ma1427-salamander-constrict -> maintained (8->3): full disk identity + save-leg branch-discriminator (Modal.jsx:1740-1748); computeDamageAfterSave->applyDamage.save-full owner. REC: giant-snake-save-leg:34-35 predicate slice dup secondary-save-transport:111-128
+run2#691: encounter/MonsterCardModal.ma1433-satyr-mockery -> maintained (8->3): disk pin + classification/chip-plan + render+click; 5 cut w/ owner cites; owners re-verified
+run2#692: encounter/MonsterCardModal.ma1502-staged-roar -> maintained (5->2): it.each stage-bytes picker-threading sole payload; refusal lane-correct honest-counter; 8 dead mocks bisected. DATA SMELL: valor roar_stages[1] prose repeat-save vs repeat_save:null (Androsphinx stage2 authors it)
+
+## Batch #164 GREEN — run2#679-#693 (15 files)
+## Batch #164 — PROGRESS: completed 1829 / remaining 855 (total 2684)
+- Suite: lint clean; 2752 files, 34,127 passed, 2 canon FIXME fails (steps-config languageWarnings + Players dragging — exact known canon pair, bug-ledger:77-79) + 3 expected = GREEN canon. ElementalAttunementModal.player-save flake did NOT recur (evidence /tmp/batch164.log)
+- Test count 34,182->34,127 (-55): expected from this window's template trims
+- run2#693: encounter/MonsterCardModal.ma1552-swarm-of-bats-bites-bloodied -> maintained (8->2): swarm template established (disk toEqual + full offer toEqual w/ uppercase-Bloodied distinct byte); foreign-label loop cut per REC #689; twins ma1553+ mapped for same 2-test trim
+run2#694: encounter/MonsterCardModal.ma1553-swarm-of-beetles-bites-half-hp -> maintained (8->2, 274->178): half-HP lowercase distinct byte pinned vs Bloodied twins; foreign/grant/render->owners
+run2#695: encounter/MonsterCardModal.ma1554-swarm-of-centipedes-bites-half-hp -> maintained (8->2, 280->~180): HONEST byte-twin of beetles cd — centipede-exclusive KO sentence sole seam; REC foreign-centipede consts in ma1564/68/71
+run2#696: encounter/MonsterCardModal.ma1555-swarm-of-grasping-hands-bloodied-prone -> maintained (10->2): family's ONLY hit_conditions:['prone'] row — hitClause toEqual kept (not null); modifier:2 MA-0485 shape; prone e2e->handlePlainDamage.ma1555 owner
+run2#697: encounter/MonsterCardModal.ma1557-swarm-of-dretches-rend-bloodied -> maintained (7->2): dretches-distinct 3d4+2 Slashing sole lock; non-twin documented; REC dretches cross-pins in ma1558/59/61/62 cut
+run2#698: encounter/MonsterCardModal.ma1558-swarm-of-insects-bites-bloodied -> maintained (11->2, 288->~185): census monster-exclusive cd; full offer toEqual 1d4+1 Poison; REC foreign INSECTS consts in ma1559/61/62 cut
+run2#699: encounter/MonsterCardModal.ma1559-swarm-of-larvae-bites-bloodied -> maintained (10->2, 291->178): 2d4+2 Necrotic census-exclusive; foreign cross-pins->8 owners; REC ma1561/62 larvae pins cut
+run2#700: encounter/MonsterCardModal.ma1561-swarm-of-lemures-vile-slime-bloodied -> maintained (8->2, 298->~190): only Poison+Bloodied cd census lock + CR0 lemure guard; REC ma1562 LEMURES_SLIME consts cut
+run2#701: encounter/MonsterCardModal.ma1562-swarm-of-piranhas-bites-bloodied -> maintained (8->2): cd {1d4,3,Piercing,Bloodied} census-unique + CR0 lone-piranha guard; 12 foreign pin-families cut; REC ma1570 piranhas pins cut
+run2#702: encounter/MonsterCardModal.ma1563-swarm-save-damage -> maintained (5->4): exact saveChipPlan toEqual + ctx override discriminator + null negatives; legacy tests merged; transport->secondary-save-transport, disk->ma1578 cites
+run2#703: encounter/MonsterCardModal.ma1564-swarm-of-quippers-bites-half-hp -> maintained (8->2): ONLY 2d6 half-HP row (census vs 2d4 quadruple-twins); REC #695 centipedes const cut done
+run2#704: encounter/MonsterCardModal.ma1565-swarm-of-rats-bites-bloodied -> maintained (8->2): rats cd byte-twin of bats — +2 attack bonus + prose head sole distinct bytes; lone-rat guard; REC #697 :206 bats cd cut done
+run2#705: encounter/MonsterCardModal.ma1566-swarm-of-ravens-beaks-bloodied -> maintained (10->2): ravens-distinct +4/1d6+2 + modifier-less cd + lone-raven guard; reciprocal rats pin cut per #697
+run2#706: encounter/MonsterCardModal.ma1568-swarm-of-spiders-bites-half-hp -> maintained (6->2): FULLY byte-twin of beetles (prose incl.) documented honestly; lone-spider guard sole new value; all foreign consts purged
+run2#707: encounter/MonsterCardModal.ma1569-swarm-of-stirges-proboscises -> maintained (16->2): family's ONLY triple-payload row (cd 1d10+3 + grappled/escape_dc 13 + attached te) full-row toEqual; registry lane-link; landing->handlePlainDamage.hitClause owner. RECS: ma1570:246-250 + ma1573:195-197 cross-pins cut
+
+## Batch #165 GREEN — run2#693-#707 (15 files, swarm family)
+## Batch #165 — PROGRESS: completed 1843 / remaining 841 (total 2684)
+- Suite: lint clean; 2752 files, 33,981 passed, 2 canon FIXME fails (steps-config languageWarnings + Players dragging — exact canon pair) + 3 expected = GREEN canon. player-save flake absent (evidence /tmp/batch165.log)
+- Test count 34,127->33,981 (-146): swarm family template trims (1552:8->2 ... 1569:16->2)

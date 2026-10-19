@@ -1,22 +1,27 @@
+// @maintained-by-ai
 // MA-1224 modal press seam: Nalfeshnee "Pursuit" REACTION-row advisory chip
 // → resolveMonsterActionAdvisoryRow (DATA-only fix, zero code — reactions[]
 // already route through the MonsterCardBody generic section carrying
-// handleAdvisoryRow). Locks: press lands popup + exactly ONE ability_use
-// advisory log per press with the honest move-end trigger note, refire stays
-// record-only (At Will sentinel), ZERO rollAttack/rollDamage/rollSavingThrow
-// calls and ZERO runtime store writes (hence zero lastAttack pollution), and
-// the feather_fall te-channel twin in the same card stays on its gated chip.
+// handleAdvisoryRow). OWNERSHIP: Pursuit disk row shape, detector, popup/log
+// builders and the record-only resolver contract (incl. service-level refire)
+// are owned by services/encounters/monsterActionAdvisory.ma1224-nalfeshnee-
+// pursuit.test.js; the AdvisoryLink chip internals (label, honest title,
+// single-affordance fork, "(At Will)" sentinel, press payload routing) are
+// owned by MonsterAction.ma1224-nalfeshnee-pursuit-advisory-chip.test.jsx.
+// This file locks ONLY the full-card modal seam: the advisory chip survives
+// the merged modal render of the REACTIONS section (red if disk data or the
+// reactions[] wiring regresses), press lands popup + exactly ONE ability_use
+// log per press with the byte-distinct Pursuit prose (/has no move-end
+// producer app-wide/, /GM-enforced gridless \(CLA-320\)/), zero roll calls,
+// ZERO runtime-store writes (zero lastAttack pollution), console clean, and
+// refire stays record-only (At Will sentinel). Byte-distinct from the
+// ma1223 Teleport twin. The advisory lane never rolls — no diceRoller mock.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -84,9 +89,17 @@ const CREATURES = [
 
 const nalfeshnee = () => monstersData.find((m) => m.index === 'nalfeshnee');
 
-const renderNalfeshnee = () => {
+const renderPursuitRow = () => {
   render(<MonsterCardModal {...makeProps(makeMonster({ name: 'Nalfeshnee', actions: nalfeshnee().actions, reactions: nalfeshnee().reactions }), { creatureName: 'Nalfeshnee 1', creatures: CREATURES })} />);
-  return Array.from(document.querySelectorAll('.mc-action')).find((r) => r.textContent.startsWith('Pursuit'));
+  const row = Array.from(document.querySelectorAll('.mc-action')).find((r) => r.textContent.startsWith('Pursuit'));
+  const chip = row.querySelector('.mc-dice-link-advisory');
+  // Disk-data regression pins: the advisory chip survives the merged modal
+  // render of the REACTIONS section (was zero affordance) and it is the
+  // row's ONLY affordance — the junk "+0" chip must stay dead.
+  expect(chip).not.toBe(null);
+  expect(Array.from(row.querySelectorAll('.mc-dice-link')).filter((c) => c !== chip)).toHaveLength(0);
+  expect(row.textContent).not.toContain('+0');
+  return { row, chip };
 };
 
 describe('MA-1224 MonsterCardModal reaction advisory press seam', () => {
@@ -96,36 +109,28 @@ describe('MA-1224 MonsterCardModal reaction advisory press seam', () => {
     ctx.value = { round: 1, activeCreatureName: 'Bandit', creatures: CREATURES };
   });
 
-  it('card census: Pursuit reaction row has the advisory chip (was zero affordance)', () => {
-    const row = renderNalfeshnee();
-    expect(row).toBeTruthy();
-    expect(row.querySelector('.mc-dice-link-advisory')).not.toBe(null);
-    expect(Array.from(row.querySelectorAll('.mc-dice-link')).every((c) => !/\+0/.test(c.textContent))).toBe(true);
-  });
-
-  it('press lands popup + exactly ONE ability_use advisory log, zero rolls, zero lastAttack writes', async () => {
+  it('press lands popup + exactly ONE ability_use advisory log — zero rolls, zero runtime-store writes, console clean', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const row = renderNalfeshnee();
-    fireEvent.click(row.querySelector('.mc-dice-link-advisory'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect(setPopupHtml).toHaveBeenCalled();
-    const entry = addEntry.mock.calls.map((c) => c[1]).find((e) => e.type === 'ability_use' && e.abilityName === 'Pursuit');
-    expect(entry).toBeTruthy();
-    expect(entry.characterName).toBe('Nalfeshnee 1');
+    const { chip } = renderPursuitRow();
+    fireEvent.click(chip);
+    await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    const [entry] = addEntry.mock.calls.map((c) => c[1]);
+    expect(entry).toMatchObject({ type: 'ability_use', abilityName: 'Pursuit', characterName: 'Nalfeshnee 1' });
     expect(entry.description).toMatch(/has no move-end producer app-wide/);
     expect(entry.description).toMatch(/GM-enforced gridless \(CLA-320\)/);
     expect(String(setPopupHtml.mock.calls.map((c) => String(c[0])).find((h) => /Pursuit/.test(h)))).toMatch(/Action — Pursuit/);
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
-    expect(runtime.store['campaign.lastAttack']).toBeUndefined();
+    // zero lastAttack/spend pollution: the press writes NOTHING to the store
+    expect(Object.keys(runtime.store)).toHaveLength(0);
     expect(errSpy.mock.calls.flat().some((a) => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
   });
 
-  it('refire press stays record-only (At Will sentinel): two logs, still zero rolls, no spends written', async () => {
-    const row = renderNalfeshnee();
-    const chip = row.querySelector('.mc-dice-link-advisory');
+  it('refire press stays record-only (At Will sentinel): two presses → two ability_use logs, still zero rolls, no spends written', async () => {
+    const { chip } = renderPursuitRow();
     fireEvent.click(chip);
     await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
     fireEvent.click(chip);

@@ -1,11 +1,17 @@
-# test-maintain state (updated 2026-10-18, session stopped by owner — resume from disk)
-- Cursor: run2#678 DONE (marker-verified). NEXT dispatch: run2#679 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory.
-- Batch: #163 flushed GREEN canon (lint clean; 34,182 pass; 2 canon FIXME + 3 expected + player-save FLAKE 3x = GREEN canon w/ flake; evidence /tmp/batch163.log).
-- Batch discipline: flush every 15 dispatches — last window anchor run2#678; NEXT flush after run2#692 (Batch #164). (History: #163-#167 were missed after #162 anchor slip; catch-up done; do not repeat.)
-- Counters at batch #163: completed 1822 / remaining 872 / total 2694 (queue regenerated from marker truth, both copies synced).
-- ACTIVE REC: ElementalAttunementModal.player-save flake (3x: #158/#161/#163; isolated 21/21) — carry to that lane's audit turn.
-- Lane families CLOSED through run2#678: legendary-uses fleet (#619-#639 template super-owner cite-map in ledger), spellcasting template (#645-#670), prerequisite (#662/#663), ram-charge (#667/#668/#669/#672), secondary/transport (#673/#674/#675), utility spellcast (#677/#678).
-- Standing recs to carry: two-handed owner cites :25-61; charge-bonus grant/decline owner; usage #571 :16-38; template exhausted-canonical :190/latch :304/cooldown :399 (#639 cite-map in ledger); triceratops Gore 1570/1610/1656 fold candidates; per-monster computeDamageAfterSave pins -> applyDamage.save-full owner; shared modal mock factories (spellcast + runtime) orchestration-level proposals pending owner.
-- Queue: .opencode/plans/test-maintain-queue.txt (872) — consume sequentially from head; regenerate only at batch boundaries.
+# test-maintain state (updated 2026-10-18, run2 batch #165 flush)
+- Cursor: run2#707 DONE (marker-verified). NEXT dispatch: run2#708 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory. (Queue head at flush: ma1570-swarm-of-venomous-snakes)
+- Batch: #165 flushed (run2#693-#707, 15 files, all maintained — swarm family ~done bar ma1570/71). Batch check lint+test:run RUNNING at flush (evidence /tmp/batch165.log) — record GREEN/RED + `## Batch #165` header in ledger when it completes.
+- Batch discipline: flush every 15 dispatches — last window anchor run2#707; NEXT flush after run2#722 (Batch #166).
+- Counters at batch #165: completed 1843 / remaining 841 / total 2684 (queue regenerated from marker truth, both copies synced; strict drop 855->841 confirmed).
+- ACTIVE REC: ElementalAttunementModal.player-save flake (3x historically; absent in #164) — carry to that lane's audit turn.
+- Lane families CLOSED through run2#707: swarm twin family ma1552-1569 (2-test template, census byte-map in ledger); next: ma1570/1571 swarm tail, then whatever queue head follows.
+- PENDING CROSS-FILE RECS (apply at owning files' own turns):
+  - ma1570: cut foreign piranhas pins (:122/:197/:226/:248) + label loop (:246-250) — owners ma1562/ma1569 etc. (#701/#707)
+  - ma1571 wasps: 6->2 template + foreign-centipedes const cut (#695/#706)
+  - ma1573-tarrasque:195-197: cut stirges-row cross-pin (owner ma1569) (#707)
+  - giant-snake-save-leg.test.js:34-35 predicate slice dup secondary-save-transport:111-128 — cut at its turn (#690)
+  - valor roar_stages[1] repeat_save prose/field data smell recorded in bug ledger (#692)
+- Standing recs to carry: two-handed owner cites :25-61; charge-bonus grant/decline owner :210-250 (confirmed stable #164/#165); usage #571 :16-38; template exhausted-canonical :190/latch :304/cooldown :399 (#639 cite-map in ledger); triceratops Gore 1570/1610/1656 fold candidates; per-monster computeDamageAfterSave pins -> applyDamage.save-full owner :22-25; shared modal mock factories proposals pending owner.
+- Queue: .opencode/plans/test-maintain-queue.txt (841) — consume sequentially from head; regenerate only at batch boundaries.
 - Spec: ~/.config/opencode/commands/test-maintain.md (PREFLIGHT :126 + SCOPED-GIT :107 ACTIVE in every dispatch prompt).
-- Anomaly log: transparent-retry preflight hits #560/#599 (verify-only, fine); #620 malformed subagent output -> verified untouched -> clean re-dispatch pattern works.
+- Anomaly log: transparent-retry preflight hits #560/#599 (verify-only, fine); #620 malformed -> clean re-dispatch works; #691 terse final message -> marker gate held; #699 guessed filename wrong -> subagent self-corrected via ls (future prompts: use queue path verbatim, no guessing).

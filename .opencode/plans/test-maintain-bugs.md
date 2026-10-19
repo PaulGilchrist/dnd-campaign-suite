@@ -488,3 +488,23 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 rec: ma0857:58 + ma0861:60 plain-null delete (owner :66); ma0857:121-128 + ma0861:112-119 no-falling byte-copies delete; ma0861:63-66/:85-96 twin-fold to ma0853 sequential shape. (pass #520)
 ## Pass run2#523 (MonsterCardHelpers.ma0871-gnoll-spear.test.js)
 - 🗑 rec: ma0989/ma0965/ma1267 identical offer-shape+select-log presses shrink to disk-lock+derived wiring (twins of two-handed.test.js:46-53). (pass #523)
+
+## Batch #164 flush (run2#679-#692, 2026-10-18)
+- 📌 DATA public/data/monsters.json sphinx-of-valor roar_stages[1]: prose says Paralyzed repeats save at end of each turn but repeat_save:null (Androsphinx stage2 authors repeat_save) — prose/field inconsistency (#692)
+- 📌 REC cross-file: 14 swarm lane siblings (ma1552/1553/1554/1555/1557/1558/1559/1561/1562/1564/1565/1566/1568/1571) re-pin foreign quaggoth-claw label 'Bloodied: +2d6 Slashing?' — cut at each swarm file's own turn (#689)
+- 📌 REC cross-file: MonsterCardModal.giant-snake-save-leg.test.js:34-35 predicate-slice dup of secondary-save-transport.test.js:111-128 owner — trim at its turn (#690)
+- 📌 REC cross-file: AttackResultPopup.ma1363 twin disk-lock accepted, no action (#689)
+- ✅ CONFIRMED owners stable this window: charge-bonus :210-250, applyDamage.save-full :22-25, monsterRecharge :59-60/:152-165, MA-1890 parse, targetEffectDefinitions :124 — all re-run green as cite-targets
+- ACTIVE REC carried: ElementalAttunementModal.player-save flake (3x under parallel load) — root-cause at that lane's audit turn
+
+## Batch #165 flush (run2#693-#707, 2026-10-18)
+- 📌 REC cross-file: ma1570 (venomous-snakes) — cut foreign piranhas pins (:122 const, :197 key-order, :226 cd, :248 label) (#701) + foreign label loop cross-pins bats/piranhas/claws/stirges (:246-250) (#707) — apply at ma1570's turn
+- 📌 REC cross-file: ma1573-tarrasque-bite-grapple:195-197 cross-pins stirges row hit_conditions/escape_dc/hit_target_effect — owned by maintained ma1569; cut at ma1573's turn (#707)
+- 📌 REC cross-file: ma1571 (wasps) 6→2 template + foreign-centipedes const cut (#695/#706) — pending, its turn upcoming
+- ✅ Family census locked (no action): swarm cd twins documented — spiders⊂beetles FULL byte-twin (#706), rats cd≡bats (#704), centipedes cd≡beetles (#695); distinct-byte owners: quippers only-2d6 half-HP (#703), ravens +4/1d6+2 (#705), insects/larves/lemures/piranhas/dretches census-unique (#697-#701)
+- ✅ CONFIRMED stable cite-targets this window: charge-bonus :210-250 + :51, AttackResultPopup.ma1363 :105-120, MonsterAction.ma0286 :89-113, secondary-save-transport, applyDamage.save-full :22-25, handlePlainDamage.ma1555/:841→854, ma1578 disk lane :150-165 — all re-run green as owners
+
+## Batch #166 window (run2#708-, 2026-10-18)
+- ⚠ DATA public/data/monsters.json tarrasque Swallow: no dc_success authored -> MV-20 default 'half' (MonsterCardModal.jsx:286 -> applyDamage.js:93): successful DC 20 save pays ~(8d6+6)/2 damage despite "Failure:" wording; RAW success = no damage/not swallowed. Needs dc_success:'none' (MA-0030 precedent). Canary pinned honestly in maintained ma1578 (#712) — flips red when fixed.
+- 📌 REC cross-file: frightfulPresenceService.test.js :144-221 MA-0147/0163 row-mirror arms collapse to data-shape asserts (dracolich canonical :70-142 covers legs) (#711)
+- 📌 REC future: MA-0647 drow-mage Staff precedent (cd absence + 1d6 poison secondary) has no owner file — propose owner if that lane is ever touched (#708)

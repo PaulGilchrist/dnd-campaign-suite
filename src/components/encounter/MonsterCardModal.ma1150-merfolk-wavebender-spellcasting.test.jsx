@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1150 regression: Merfolk Wavebender Spellcasting.
 // Defect 1 — the advisory cast log stamped the spell-side 5e dc_type ("DEX")
 // over the row's authored save_type ("Wisdom"). Root cause was spurious DATA:
@@ -17,11 +18,19 @@
 // (refuseUnarmedMonsterSaveCast), mirroring the MA-0033 attack-lane
 // validate-before-spend precedent; refusals now spend NOTHING and the MA-0049
 // popup/log text is honest.
+// Cite-skip owners (NOT repeated here): spell-side dc_type precedence on the
+// advisory log → spellcasting-barlgura.test.jsx:261 (Entangle STR beats the
+// row's authored Wisdom — same buildMonsterSpellCastLog short-circuit, a
+// superset of the empty-save_type fallback); Elementalism 2024-only advisory
+// lookup → spellcasting.test.jsx:212; 1/Day spend wording + exhausted-refire
+// "already cast today (1/Day)" refusal → spellcasting.test.jsx:281;
+// no-target refusal popup/log byte shape → MonsterCardHelpers.usage.test.js:48.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
+import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const SPELLS_5E = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
@@ -120,7 +129,6 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 import { addEntry } from '../../services/ui/logService.js';
-import { loadSpells } from '../../services/ui/dataLoader.js';
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
@@ -146,20 +154,19 @@ beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   useLoggedDiceRoll._resetPopupHtml();
-  loadSpells.mockImplementation((version) => Promise.resolve(version === '2024' ? SPELLS_2024 : SPELLS_5E));
 });
 
 // ── Defect 1: DATA lane — Light carries no never-firing save dc ──────────
 
-describe('MA-1150 Light spell data (defect 1 fix)', () => {
-  it('5e spells.json Light dc is null, byte-aligned with the 2024 twin — no {dc_type:DEX,dc_success:none} noise', () => {
-    const light5e = SPELLS_5E.find(s => s.name === 'Light');
-    const light2024 = SPELLS_2024.find(s => s.name === 'Light');
-    expect(light5e.dc ?? null).toBeNull();
-    expect(light2024.dc ?? null).toBeNull();
+describe('MA-1150 disk data locks (defect 1 fix)', () => {
+  it('spells.json Light dc is null in both rulesets — no {dc_type:DEX,dc_success:none} noise reappearing', () => {
+    expect(SPELLS_5E.find(s => s.name === 'Light').dc ?? null).toBeNull();
+    expect(SPELLS_2024.find(s => s.name === 'Light').dc ?? null).toBeNull();
   });
 
-  it('wavebender row disk truth: save_dc 15 + save_type Wisdom + 4 marked spells', () => {
+  it('wavebender row disk truth: exact chip extraction, 1/Day gate map, save_dc 15 + save_type Wisdom pair (8 + WIS + PB)', () => {
+    expect(extractSpellNamesFromSpellcasting(WAVEBENDER_ROW.description)).toEqual(['Elementalism', 'Light', 'Control Water', 'Create or Destroy Water']);
+    expect(extractSpellcastingSpellUses(WAVEBENDER_ROW.description)).toEqual({ 'Control Water': 1, 'Create or Destroy Water': 1 });
     expect(WAVEBENDER_ROW.save_dc).toBe(15);
     expect(WAVEBENDER_ROW.save_type).toBe('Wisdom');
     expect(8 + WAVEBENDER.ability_score_modifiers.wis + WAVEBENDER.proficiency_bonus).toBe(15);
@@ -169,7 +176,7 @@ describe('MA-1150 Light spell data (defect 1 fix)', () => {
 // ── Defect 1: advisory log stamps the ROW-authored Wisdom for Light ──────
 
 describe('MA-1150 advisory cast log ability stamp (defect 1)', () => {
-  it('Light cast via Spellcasting logs "spell save DC 15, Wisdom" — never DEX', async () => {
+  it('Light (dc:null) cast via Spellcasting logs "spell save DC 15, Wisdom" — never DEX', async () => {
     renderWavebender();
     await act(async () => { fireEvent.click(linkByText('Light')); });
 
@@ -182,36 +189,11 @@ describe('MA-1150 advisory cast log ability stamp (defect 1)', () => {
     expect(entry.description).toMatch(/Spell effect is recorded; GM-enforced for monsters\./);
     expect(rollSavingThrow).not.toHaveBeenCalled();
   });
-
-  it('Elementalism (2024-only, dc:null) keeps logging row Wisdom — fallback lane unchanged', async () => {
-    renderWavebender();
-    await act(async () => { fireEvent.click(linkByText('Elementalism')); });
-
-    await waitFor(() => expect(entriesOf('Elementalism').length).toBe(1));
-    expect(entriesOf('Elementalism')[0].description).toMatch(/\(spell save DC 15, Wisdom\)/);
-    expect(loadSpells).toHaveBeenCalledWith('2024');
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-  });
-
-  it('rows WITHOUT an authored save_type still fall back to spell-side dc_type (MA-0012 lane intact)', async () => {
-    const row = {
-      name: 'Spellcasting',
-      description: 'The caster casts one of the following spells:<br><strong>At Will:</strong> <strong>Command</strong>',
-      save_dc: 12,
-      save_type: '',
-    };
-    const m = makeMonster({ name: 'Fanatic Stand-in', actions: [row] });
-    render(<MonsterCardModal {...makeProps(m, { creatureName: 'Fanatic Stand-in 1', creatures: [] })} />);
-    await act(async () => { fireEvent.click(linkByText('Command')); });
-
-    await waitFor(() => expect(entriesOf('Command').length).toBe(1));
-    expect(entriesOf('Command')[0].description).toMatch(/\(spell save DC 12, WIS\)/);
-  });
 });
 
-// ── Defect 2: no-target refusal spends NOTHING ─────────────────────────────
+// ── Defect 2: check-before-spend guard — refusal vs spend pair ────────────
 
-describe('MA-1150 Control Water no-target refusal (defect 2)', () => {
+describe('MA-1150 Control Water no-target guard (defect 2)', () => {
   it('unarmed press refuses via MA-0049 popup+log BEFORE any spend — uses, ledger and text all honest', async () => {
     renderWavebender({ armed: false });
     await act(async () => { fireEvent.click(linkByText('Control Water')); });
@@ -233,7 +215,7 @@ describe('MA-1150 Control Water no-target refusal (defect 2)', () => {
     expect(linkByText('Control Water').textContent).toMatch(/\(1\/Day · 1 left\)/);
   });
 
-  it('armed press DOES spend the 1/Day use and routes the spell-attributed STR/half save', async () => {
+  it('armed press passes the guard: spends the 1/Day use and routes the STR/half save at row DC 15', async () => {
     renderWavebender({ armed: true });
     await act(async () => { fireEvent.click(linkByText('Control Water')); });
 
@@ -242,6 +224,7 @@ describe('MA-1150 Control Water no-target refusal (defect 2)', () => {
     const spend = entriesOf('Control Water').find(e => e.type === 'ability_use');
     expect(spend).toBeTruthy();
     expect(spend.description).toMatch(/1\/Day use spent — 0 remaining today/);
+    // save attrs: spell-side STR/half (Control Water disk dc) at the ROW's DC 15
     const context = rollSavingThrow.mock.calls[0][2];
     expect(context.spellName).toBe('Control Water');
     expect(context.saveDc).toBe(15);
@@ -249,18 +232,5 @@ describe('MA-1150 Control Water no-target refusal (defect 2)', () => {
     expect(context.dcSuccess).toBe('half');
     expect(context.isSpellDamage).toBe(true);
     expect(entriesOf('Control Water').some(e => e.type === 'automation')).toBe(false);
-  });
-
-  it('post-spend exhausted refire still refuses with automation blocked and no extra spend', async () => {
-    renderWavebender({ armed: true });
-    await act(async () => { fireEvent.click(linkByText('Control Water')); });
-    await waitFor(() => expect(rollSavingThrow).toHaveBeenCalledTimes(1));
-
-    await act(async () => { fireEvent.click(linkByText('Control Water')); });
-    const blocked = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'automation blocked');
-    expect(blocked).toBeTruthy();
-    expect(blocked.description).toMatch(/already cast Control Water today \(1\/Day\)/);
-    expect(rollSavingThrow).toHaveBeenCalledTimes(1);
-    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Control Water': 1 });
   });
 });

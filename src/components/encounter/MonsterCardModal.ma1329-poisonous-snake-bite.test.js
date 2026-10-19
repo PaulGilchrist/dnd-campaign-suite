@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1329: Poisonous Snake "Bite" (attack+save composite) — the row shipped
 // damage_dice_primary "2d4" (the SAVE-leg poison pool) with no authored flat
 // primary, so extractDamageDiceFromDescription short-circuited and the attack
@@ -8,15 +9,23 @@
 // damage_dice_secondary "2d4" Poison save leg (byte rides save_effect
 // failure clause "5 (2d4)"), so buildAttackChipSaveOptions pays fixed flat 1
 // with save keys nulled and the DC chip adjudicates 2d4 full/half.
-// CODE guard: saveChipPlan must keep the DC chip CLICKABLE on a composite row
-// whose flat "1" primary is not rollExpression-parseable — the clickable
-// secondary save leg is the save adjudication affordance (MA-0551 fork).
+// CODE guard (unique here): saveChipPlan must keep the DC chip CLICKABLE on a
+// composite row whose flat "1" primary is not rollExpression-parseable — the
+// clickable secondary save leg is the save adjudication affordance (MA-0551
+// fork; giant-snake twins are byte-inert via their rollable primaries).
+//
+// Cite-skips (covered byte-exact elsewhere, never re-anchored here):
+// predicate truth tables (isCompositeAttackSaveRow / saveLegCarriesSecondaryDamage
+// / saveLegIsConditionRider) + buildSaveOptions save-key + secondary transport:
+// MonsterCardModal.secondary-save-transport.test.js :111-128/:155-160/:186-202;
+// giant-snake disk-bytes + save-chip ctx twin:
+// MonsterCardModal.giant-snake-save-leg.test.js; rider-only clickable plan face:
+// MonsterCardModal.ma1000-homunculus-bite-save-rider.test.js.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   buildAutoDamageOptions,
-  buildSaveOptions,
   buildAbilitySaveRollContext,
   isCompositeAttackSaveRow,
   saveLegCarriesSecondaryDamage,
@@ -29,8 +38,8 @@ const getDamageTypesForAction = (action) => [action?.damage_type_primary || 'Pie
 const snakeRow = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'))
   .find((m) => m.index === 'poisonous-snake').actions[0];
 
-describe('MA-1329 poisonous-snake Bite — attack+save composite data shape', () => {
-  it('disk row authors flat "1" Piercing primary + "2d4" Poison secondary', () => {
+describe('MA-1329 poisonous-snake Bite — flat primary + save-leg secondary composite', () => {
+  it('disk row BY-name bytes: flat "1" Piercing primary + "2d4" Poison save leg inside save_effect', () => {
     expect(snakeRow.name).toBe('Bite');
     expect(snakeRow.attack_bonus).toBe(5);
     expect(snakeRow.save_dc).toBe(10);
@@ -39,30 +48,23 @@ describe('MA-1329 poisonous-snake Bite — attack+save composite data shape', ()
     expect(snakeRow.damage_type_primary).toBe('Piercing');
     expect(snakeRow.damage_dice_secondary).toBe('2d4');
     expect(snakeRow.damage_type_secondary).toBe('Poison');
-  });
-
-  it('saveLegCarriesSecondaryDamage: true — "2d4" byte lives inside save_effect', () => {
-    expect(isCompositeAttackSaveRow(snakeRow)).toBe(true);
     expect(snakeRow.save_effect.includes('2d4')).toBe(true);
+    // discriminators arming the MA-0551 fork on THIS disk row
+    // (predicate truth tables owned by secondary-save-transport.test.js)
+    expect(isCompositeAttackSaveRow(snakeRow)).toBe(true);
     expect(saveLegCarriesSecondaryDamage(snakeRow)).toBe(true);
     expect(saveLegIsConditionRider(snakeRow)).toBe(false);
   });
 
-  it('attack-chip producer carries flat "1" primary; save keys ride buildSaveOptions and are stripped by the MA-0551 attack-chip fork upstream', () => {
+  it('attack chip pays flat "1" — the MA-1329 regression (was the save-gated 2d4 pool)', () => {
     const opts = buildAutoDamageOptions(snakeRow, 'Bite');
     expect(opts.autoDamageFormula).toBe('1');
-    const saveOpts = buildSaveOptions(snakeRow);
-    expect(saveOpts.saveDc).toBe(10);
-    expect(saveOpts.dcSuccess).toBe('half');
-    expect(saveOpts.autoDamageSecondaryFormula).toBe('2d4');
-    expect(saveOpts.autoDamageSecondaryDamageType).toBe('Poison');
-    // saveLegCarriesSecondaryDamage true => the composite fork (verified in
-    // MonsterCardModal.secondary-save-transport / giant-snake-save-leg twins)
-    // nulls saveDc/saveType/dcSuccess + secondary on the ATTACK chip.
-    expect(saveLegCarriesSecondaryDamage(snakeRow)).toBe(true);
+    expect(opts.autoDamageName).toBe('Bite');
   });
 
-  it('save chip adjudicates 2d4 Poison full/half, never the flat attack primary', () => {
+  it('save chip seam: unrollable flat "1" plan stays clickable, ctx adjudicates 2d4 Poison full/half', () => {
+    const plan = saveChipPlan(snakeRow, false);
+    expect(plan).toEqual({ riderOnly: false, formula: '1', rollable: false, clickable: true });
     const ctx = buildAbilitySaveRollContext({
       monsterName: 'Poisonous Snake 1',
       target: { name: 'Bandit 1', type: 'monster' },
@@ -70,22 +72,17 @@ describe('MA-1329 poisonous-snake Bite — attack+save composite data shape', ()
       action: snakeRow,
       saveType: 'CON',
       dcSuccess: 'half',
-      saveDamageFormula: '1',
+      saveDamageFormula: plan.formula, // ActionSaveRoll hands off the chip plan
       saveConditions: [],
       usesGate: null,
       prerequisite: null,
       getDamageTypesForAction,
     });
+    // save leg rides the secondary dice, NOT the flat attack primary
     expect(ctx.autoDamageFormula).toBe('2d4');
     expect(ctx.autoDamageDamageType).toBe('Poison');
     expect(ctx.autoDamageSecondaryFormula).toBeNull();
+    expect(ctx.autoDamageSecondaryDamageType).toBeNull();
     expect(ctx.dcSuccess).toBe('half');
-  });
-
-  it('saveChipPlan keeps the DC chip clickable despite unrollable flat "1" formula', () => {
-    const plan = saveChipPlan(snakeRow, false);
-    expect(plan.formula).toBe('1');
-    expect(plan.rollable).toBe(false);
-    expect(plan.clickable).toBe(true);
   });
 });

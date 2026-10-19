@@ -1,20 +1,23 @@
+// @maintained-by-ai
 // MA-1223 modal press seam: Nalfeshnee "Teleport" advisory chip →
-// resolveMonsterActionAdvisoryRow. Locks: press lands popup + exactly ONE
-// ability_use advisory log per press (refire stays record-only), ZERO
-// rollAttack/rollDamage/rollSavingThrow calls, therefore ZERO lastAttack
-// pollution (live bug: junk "+0" press → roll/attack bonus:0 vs armed Bandit
-// AC 12 + lastAttack attackName:"Teleport" weaponType:"ranged" fabricated).
+// resolveMonsterActionAdvisoryRow (wired at MonsterCardModal.jsx:2840).
+// OWNERSHIP: disk row shape + resolver record-only contract are owned by
+// services/encounters/monsterActionAdvisory.test.js; the MonsterAction
+// AdvisoryLink chip lane (labels, press payload, inert lanes, legendaryGate
+// suppression, no junk "+0" sibling) is owned by
+// MonsterAction.ma1223-nalfeshnee-teleport-advisory-chip.test.jsx. This
+// file locks ONLY the full-card modal press seam: advisory chip survives the
+// merged modal render (red if disk data regresses), press lands popup +
+// exactly ONE ability_use log with zero rolls and ZERO runtime-store writes
+// (live bug: junk "+0" press → roll/attack bonus:0 vs armed Bandit AC 12 +
+// lastAttack attackName:"Teleport" weaponType:"ranged" fabricated), and
+// refire stays record-only. Byte-distinct from the ma1224 Pursuit twin.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
 import monstersData from '../../../public/data/monsters.json';
 
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [3, 3, 4], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 20, rolls: [3, 3, 4], modifier: 0 })),
-}));
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 vi.mock('../../services/ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve()) }));
 vi.mock('../../services/ui/dataLoader.js', () => ({ loadSpells: vi.fn(() => Promise.resolve([])) }));
@@ -82,9 +85,18 @@ const CREATURES = [
 
 const nalfeshnee = () => monstersData.find((m) => m.index === 'nalfeshnee');
 
-const renderNalfeshnee = () => {
+const renderTeleportRow = () => {
   render(<MonsterCardModal {...makeProps(makeMonster({ name: 'Nalfeshnee', actions: nalfeshnee().actions }), { creatureName: 'Nalfeshnee 1', creatures: CREATURES })} />);
-  return Array.from(document.querySelectorAll('.mc-action')).find((r) => r.textContent.startsWith('Teleport'));
+  const row = Array.from(document.querySelectorAll('.mc-action')).find((r) => r.textContent.startsWith('Teleport'));
+  const chip = row.querySelector('.mc-dice-link-advisory');
+  // Disk-data regression pins: advisory chip survives the merged modal render
+  // and it is the row's ONLY affordance — the junk "+0" chip (and any
+  // save/damage sibling) must stay dead, and the press must not console the
+  // legendary-delegate dead-end.
+  expect(chip).not.toBe(null);
+  expect(Array.from(row.querySelectorAll('.mc-dice-link')).filter((c) => c !== chip)).toHaveLength(0);
+  expect(row.textContent).not.toContain('+0');
+  return { row, chip };
 };
 
 describe('MA-1223 MonsterCardModal advisory press seam', () => {
@@ -94,33 +106,28 @@ describe('MA-1223 MonsterCardModal advisory press seam', () => {
     ctx.value = { round: 1, activeCreatureName: 'Bandit', creatures: CREATURES };
   });
 
-  it('card census: Teleport row has the advisory chip and NO "+0" attack chip', () => {
-    const row = renderNalfeshnee();
-    expect(row.querySelector('.mc-dice-link-advisory')).not.toBe(null);
-    expect(Array.from(row.querySelectorAll('.mc-dice-link')).every((c) => !/\+0/.test(c.textContent))).toBe(true);
-  });
-
-  it('press lands popup + exactly ONE ability_use advisory log, zero rolls, zero console dead-end', async () => {
+  it('press lands popup + exactly ONE ability_use advisory log — zero rolls, zero runtime-store writes, console clean', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const row = renderNalfeshnee();
-    fireEvent.click(row.querySelector('.mc-dice-link-advisory'));
-    await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    expect(setPopupHtml).toHaveBeenCalled();
-    const entry = addEntry.mock.calls.map((c) => c[1]).find((e) => e.type === 'ability_use' && e.abilityName === 'Teleport');
-    expect(entry).toBeTruthy();
-    expect(entry.characterName).toBe('Nalfeshnee 1');
-    expect(entry.description).toMatch(/advisory record|GM-enforced/);
+    const { chip } = renderTeleportRow();
+    fireEvent.click(chip);
+    await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    const [entry] = addEntry.mock.calls.map((c) => c[1]);
+    expect(entry).toMatchObject({ type: 'ability_use', abilityName: 'Teleport', characterName: 'Nalfeshnee 1' });
+    expect(entry.description).toMatch(/advisory record/);
+    expect(entry.description).toMatch(/GM-enforced/);
     expect(String(setPopupHtml.mock.calls.map((c) => String(c[0])).find((h) => /Teleport/.test(h)))).toMatch(/Action — Teleport/);
     expect(ROLLERS.rollAttack).not.toHaveBeenCalled();
     expect(ROLLERS.rollDamage).not.toHaveBeenCalled();
     expect(ROLLERS.rollSavingThrow).not.toHaveBeenCalled();
+    // zero lastAttack/spend pollution: the press writes NOTHING to the store
+    expect(Object.keys(runtime.store)).toHaveLength(0);
     expect(errSpy.mock.calls.flat().some((a) => /no resolvable mechanic/.test(String(a)))).toBe(false);
     errSpy.mockRestore();
   });
 
-  it('refire press stays record-only: two logs, still zero rolls, no spends written', async () => {
-    const row = renderNalfeshnee();
-    const chip = row.querySelector('.mc-dice-link-advisory');
+  it('refire press stays record-only: two presses → two ability_use logs, still zero rolls, no spends written', async () => {
+    const { chip } = renderTeleportRow();
     fireEvent.click(chip);
     await waitFor(() => expect(addEntry).toHaveBeenCalledTimes(1));
     fireEvent.click(chip);

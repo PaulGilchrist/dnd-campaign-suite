@@ -1,24 +1,42 @@
-// MA-1559: Swarm of Larvae "Bites" — inert prose Bloodied variant
-// fixed on monsters.json actions[0] via conditional_damage riding the live
-// MA-0007 GM-adjudication seam (buildChargeBonusOffer arms on cd?.dice).
-// Byte-shape mirrors the modifier-bearing MA-0485 Chimera / MA-1555 /
-// MA-1557 / MA-1558 twins (separate numeric modifier key; NEVER embedded in
-// the dice string) — dice/modifier split per §MA-1555 pitfall. Seam is
-// ADDITIVE (MA-1160): base Done still pays 2d6 + 2; accept rolls its own
-// 2d4 + 2 bonus leg — RAW full-variant replacement caveat accepted exactly
-// like swarm-family twins MA-1552/MA-1553/MA-1554/MA-1555/MA-1557.
+// @maintained-by-ai
+// MA-1559: Swarm of Larvae "Bites" (single-action swarm) — inert prose Bloodied
+// variant fixed on monsters.json via conditional_damage riding the live MA-0007
+// GM-adjudication seam (buildChargeBonusOffer arms on cd?.dice, Helpers:687).
+// Modifier-bearing MA-0485 byte-shape (separate numeric modifier key; NEVER embedded
+// in the dice string) — dice/modifier split per §MA-1555 pitfall. Monster-exclusive
+// disk row: no other action carries cd {2d4 + 2, Necrotic, Bloodied} (verified census
+// — no byte-twin, unlike the half-HP family peers). Seam is ADDITIVE (MA-1160):
+// base Done still pays 2d6 + 2; grant rolls its own 2d4 + 2 bonus leg — RAW
+// full-variant replacement caveat accepted exactly like swarm-family twins
+// MA-1552/MA-1553/MA-1554/MA-1555/MA-1557/MA-1558.
+// Trim pass (2026-10-18), two tests mirroring the maintained ma1552/ma1555/ma1557/
+// ma1558 template:
+//   1. Disk-row bytes: full cd-object toEqual identity (modifier-bearing shape, key
+//      order pinned inline — no foreign-row chimera comparison) + base legs + key
+//      placement + no-rider absence + RAW prose regex for the Bloodied variant
+//      sentence + single-action parent census.
+//   2. ONE click→rollAttack ctx press: full 7-key offer identity incl. this monster's
+//      distinct label chrome ("Bloodied: +2d4+2 Necrotic?") + hitClause toBeNull
+//      (Bloodied-only row, unlike ma1555's prone twin).
+// Cut (owner MonsterCardModal.charge-bonus.test.jsx owns the machine :210-250):
+// grant, crit accept, decline — generic mechanics twins of owner Talons bytes;
+// popup offer-render — popup chrome owned by common/AttackResultPopup.ma1363 :105-120;
+// direct buildChargeBonusOffer label test — subsumed by the ctx offer toEqual.
+// Charge-row label loop cut: every foreign row byte-pinned by its own owner (talons
+// charge-bonus :51, goat ma0885 :124, quaggoth ma1363 :158, bats ma1552, claws
+// ma1555, dretches ma1557, insects ma1558). Sibling swarm cross-pins cut: spiders
+// owned by ma1568, centipedes by ma1554 (foreign-row cross-pins cut per the ma1557
+// carried rec). attackRowMissingToHit truth table owned by ma0286 helper owner
+// (full-monster census :89-113 covers this row; a suppressed row would fail the
+// +4-chip click in test 2 anyway).
+// Dead-mock purge per ma1552/ma1558 baseline: diceRoller stub (rollAttack mocked, no
+// roller fires without the cut grant tests), AttackResultPopup stub (popup never
+// renders — popupHtml null), never-fired hook members (minimal shape renders).
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: 6, rolls: [1, 4], modifier: 2, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 11, rolls: [1, 4, 1, 4], modifier: 2, formula })),
-  rollD20: vi.fn(() => 18),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -31,23 +49,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -87,80 +97,40 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, attackRowMissingToHit } from './MonsterCardHelpers.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const SWARM = monsters.find((m) => m.index === 'swarm-of-larvae');
 const BITES = SWARM.actions.find((a) => a.name === 'Bites');
-const CHIMERA_BITE = monsters.find((m) => m.index === 'chimera').actions.find((a) => a.name === 'Bite');
-const QUAGGOTH_CLAW = monsters.find((m) => m.index === 'quaggoth').actions.find((a) => a.name === 'Claw');
-const BAT_BITES = monsters.find((m) => m.index === 'swarm-of-bats').actions.find((a) => a.name === 'Bites');
-const CLAWS = monsters.find((m) => m.index === 'swarm-of-crawling-claws').actions.find((a) => a.name === 'Swarm of Grasping Hands');
-const DRETCHES_REND = monsters.find((m) => m.index === 'swarm-of-dretches').actions.find((a) => a.name === 'Rend');
-const INSECTS_BITES = monsters.find((m) => m.index === 'swarm-of-insects').actions.find((a) => a.name === 'Bites');
+
+// Exact buildChargeBonusOffer(BITES, 'Bites') output FROM the disk row — full identity,
+// incl. the modifier-bearing formula ('2d4 + 2', MA-0485 shape) and the condition-text
+// label chrome ("Bloodied: +2d4+2 Necrotic?", no feet-token head, MA-1363 label
+// generalization with the +2 modifier token — larvae-distinct in the swarm family
+// Necrotic twin set: claws pay 2d8+2 at ma1555).
+const LARVAE_OFFER = {
+  dice: '2d4',
+  modifier: 2,
+  damageType: 'Necrotic',
+  condition: 'Bloodied',
+  formula: '2d4 + 2',
+  label: 'Bloodied: +2d4+2 Necrotic?',
+  attackName: 'Bites',
+};
 
 const CREATURES = [
   { name: 'Swarm of Larvae 1', targetName: 'Bandit 1' },
   { name: 'Bandit 1', type: 'player', size: 'Medium or Small' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(BITES, 'Bites');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Bites',
-    rolls: [18],
-    bonus: 4,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Bites', formula: '2d6 + 2', damageType: 'Necrotic', source: 'Swarm of Larvae 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderLarvae(popupHtml = null) {
-  _setPopupHtml(popupHtml);
+function renderLarvae() {
+  _setPopupHtml(null);
   const m = makeMonster({ name: 'Swarm of Larvae', size: 'Large', type: 'swarm', actions: SWARM.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Swarm of Larvae 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Swarm of Larvae 1' })} />);
-}
-
-function clickBitesLink() {
-  const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Bites/.test(a.textContent.trim()));
-  const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+4');
-  expect(chip, 'Expected Bites +4 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
-}
-
-function clickButton(text) {
-  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === text);
-  fireEvent.click(btn);
 }
 
 beforeEach(() => {
@@ -169,123 +139,48 @@ beforeEach(() => {
 });
 
 describe('MA-1559 monsters.json data lock: Swarm of Larvae Bites Bloodied fix', () => {
-  it('row identity + core legs byte-unchanged: +4, 5 ft., 2d6 + 2 Necrotic', () => {
+  it('authors the modifier-bearing Bloodied cd with RAW prose anchor, key placement, and no hit-clause riders', () => {
     expect(BITES.attack_bonus).toBe(4);
     expect(BITES.reach).toBe('5 ft.');
     expect(BITES.damage_dice_primary).toBe('2d6 + 2');
     expect(BITES.damage_type_primary).toBe('Necrotic');
-    expect(BITES.description).toBe(
-      'Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d6 + 2) Necrotic damage, or 7 (2d4 + 2) Necrotic damage if the swarm is Bloodied.'
-    );
-  });
-
-  it('authors Bloodied conditional_damage in the modifier-bearing MA-0485 byte-shape (separate modifier key)', () => {
-    const cd = BITES.conditional_damage;
-    expect(cd).toEqual({ dice: '2d4', modifier: 2, damage_type: 'Necrotic', condition: 'Bloodied' });
-    expect(cd.dice).not.toMatch(/\+/);
-    expect(Object.keys(cd)).toEqual(Object.keys(CHIMERA_BITE.conditional_damage));
-  });
-
-  it('key placement: conditional_damage after damage_type_primary, last key (family byte-shape)', () => {
+    // Full cd identity — the modifier-bearing MA-0485 byte-shape (separate numeric
+    // modifier key, dice string never carries '+'), key order pinned inline.
+    expect(BITES.conditional_damage).toEqual({
+      dice: '2d4',
+      modifier: 2,
+      damage_type: 'Necrotic',
+      condition: 'Bloodied',
+    });
+    expect(Object.keys(BITES.conditional_damage)).toEqual(['dice', 'modifier', 'damage_type', 'condition']);
+    // Key placement: cd immediately after damage_type_primary, last key on the row.
     const keys = Object.keys(BITES);
     expect(keys.indexOf('conditional_damage')).toBe(keys.indexOf('damage_type_primary') + 1);
     expect(keys[keys.length - 1]).toBe('conditional_damage');
-  });
-
-  it('no escape clock, no hit_target_effect, no hit_conditions, no hit_choice chooser authored', () => {
-    expect(BITES.escape_dc).toBeUndefined();
-    expect(BITES.hit_target_effect).toBeUndefined();
+    // Bloodied-only row: no hit-clause riders authored (unlike the ma1555 twin).
     expect(BITES.hit_conditions).toBeUndefined();
+    expect(BITES.hit_target_effect).toBeUndefined();
     expect(BITES.hit_choice).toBeUndefined();
-  });
-
-  it('untouched siblings stay untouched: swarm-of-larvae is single-action, swarm-of-spiders unchanged, twin pins hold', () => {
-    expect(SWARM.actions.length).toBe(1);
-    const spiders = monsters.find((m) => m.index === 'swarm-of-spiders');
-    expect(spiders.actions.find((a) => a.name === 'Bites').conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: 'half HP or fewer' });
-    const centipedes = monsters.find((m) => m.index === 'swarm-of-centipedes');
-    expect(centipedes.actions[0].conditional_damage).toEqual({ dice: '2d4', damage_type: 'piercing', condition: expect.any(String) });
-    expect(DRETCHES_REND.conditional_damage).toEqual({ dice: '3d4', modifier: 2, damage_type: 'Slashing', condition: 'Bloodied' });
-    expect(INSECTS_BITES.conditional_damage).toEqual({ dice: '1d4', modifier: 1, damage_type: 'Poison', condition: 'Bloodied' });
+    expect(BITES.escape_dc).toBeUndefined();
+    // RAW prose anchor for the fixed Bloodied variant.
+    expect(BITES.description).toMatch(/Hit: 9 \(2d6 \+ 2\) Necrotic damage, or 7 \(2d4 \+ 2\) Necrotic damage if the swarm is Bloodied\./);
+    // Single-action parent census: Bites is the swarm's only action.
+    expect(SWARM.actions).toHaveLength(1);
+    expect(SWARM.actions[0].name).toBe('Bites');
   });
 });
 
-describe('MA-1559 buildChargeBonusOffer label', () => {
-  it('builds the Bloodied variant offer with formula "2d4 + 2" and a condition-text label', () => {
-    const offer = buildChargeBonusOffer(BITES, 'Bites');
-    expect(offer).toMatchObject({ dice: '2d4', modifier: 2, damageType: 'Necrotic', condition: 'Bloodied', formula: '2d4 + 2', attackName: 'Bites' });
-    expect(offer.label).toBe('Bloodied: +2d4+2 Necrotic?');
-    expect(offer.label).not.toMatch(/Charge/i);
-  });
-
-  it('keeps every existing charge-row label byte-identical (MA-0007/MA-0885/MA-1363/MA-1552/MA-1555/MA-1557/MA-1558 pins)', () => {
-    const talons = monsters.find((m) => m.name === 'Aarakocra Skirmisher').actions[0];
-    expect(buildChargeBonusOffer(talons, 'Talons').label).toBe('30+ ft Charge: +3d4+2 Slashing?');
-    const goatRam = monsters.find((m) => m.index === 'goat').actions.find((a) => a.name === 'Ram');
-    expect(buildChargeBonusOffer(goatRam, 'Ram').label).toBe('20+ ft Charge: +1d4 Bludgeoning?');
-    expect(buildChargeBonusOffer(QUAGGOTH_CLAW, 'Claw').label).toBe('Bloodied: +2d6 Slashing?');
-    expect(buildChargeBonusOffer(BAT_BITES, 'Bites').label).toBe('Bloodied: +1d4 Piercing?');
-    expect(buildChargeBonusOffer(CLAWS, 'Swarm of Grasping Hands').label).toBe('Bloodied: +2d8+2 Necrotic?');
-    expect(buildChargeBonusOffer(DRETCHES_REND, 'Rend').label).toBe('Bloodied: +3d4+2 Slashing?');
-    expect(buildChargeBonusOffer(INSECTS_BITES, 'Bites').label).toBe('Bloodied: +1d4+1 Poison?');
-  });
-});
-
-describe('MA-1559 Swarm of Larvae Bites HIT popup offer + grant/decline', () => {
-  it('forwards the Bloodied offer to the attack roll context', () => {
+describe('MA-1559 Swarm of Larvae Bites click→ctx forward (MonsterCardModal.jsx:1407)', () => {
+  it('clicking the +4 chip forwards the full disk offer with Bloodied label chrome and a null hitClause', () => {
     renderLarvae();
-    clickBitesLink();
+    const row = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Bites/.test(a.textContent.trim()));
+    const chip = Array.from(row.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+4');
+    expect(chip, 'Expected Bites +4 dice link').toBeTruthy();
+    fireEvent.click(chip);
     expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d4', modifier: 2, damageType: 'Necrotic', condition: 'Bloodied' });
-    expect(attackRowMissingToHit(BITES)).toBe(false);
-  });
-
-  it('renders the Bloodied offer button in the HIT popup', () => {
-    renderLarvae(hitPopupHtml());
-    const popup = document.querySelector('[data-testid="popup-stub"]');
-    expect(popup.textContent).toContain('Bloodied: +2d4+2 Necrotic?');
-  });
-
-  it('accept: rolls 2d4 + 2, applies its own bonus leg, logs the grant (additive seam)', async () => {
-    renderLarvae(hitPopupHtml());
-    clickButton('charge-grant');
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d4 + 2');
-    expect(call.context.damageType).toBe('Necrotic');
-    expect(rollExpression).toHaveBeenCalledWith('2d4 + 2');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toContain('(Bloodied)');
-    expect(grant.description).toContain('+6 Necrotic (2d4 + 2)');
-  });
-
-  it('crit accept doubles the clause formula ("2d4 + 2*2")', async () => {
-    renderLarvae(hitPopupHtml({ isCrit: true }));
-    clickButton('charge-grant');
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    expect(rollExpressionDoubled).toHaveBeenCalledWith('2d4 + 2');
-    expect(rollExpression).not.toHaveBeenCalled();
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d4 + 2');
-    expect(call.total).toBe(11);
-  });
-
-  it('decline: logs the refusal with zero bonus roll (base only)', async () => {
-    renderLarvae(hitPopupHtml());
-    clickButton('charge-decline');
-    await vi.waitFor(() => {
-      const decline = findLogEntry('conditional_damage_declined');
-      expect(decline).toBeTruthy();
-      expect(decline.description).toContain('base damage only');
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-    expect(findLogEntry('conditional_damage_granted')).toBeFalsy();
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.chargeBonusOffer).toEqual(LARVAE_OFFER);
+    // toBeNull like the Bloodied-only swarm twins (contrast ma1555's prone twin).
+    expect(ctx.hitClause).toBeNull();
   });
 });

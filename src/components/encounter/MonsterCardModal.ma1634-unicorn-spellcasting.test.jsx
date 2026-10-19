@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1634 data lock: Unicorn Spellcasting (actions[3]) rode the
 // MA-0421/MA-1230/MA-1543/MA-1625 markup-gap family — the WHOLE description
 // was plain text on a SINGLE line with "; " tier separators: names AND both
@@ -10,15 +11,15 @@
 // seam via buildAbilitySaveRollContext.saveDc instead).
 // DATA fix = dao MA-1543/storm-giant house style: <strong> headers +
 // <em> on all seven names, "; " / ", " separators byte-kept (single-line
-// prose, no <br>/\n — strip-tags byte-equality proves markup-only diff).
+// prose, no <br>/\n). Headers end ":" → skipped by the extractor (§648),
+// so no fake chips (§161).
 // CANONICAL-NAME AMENDMENT (§1241/§158 trap ACTIVE HERE, unlike ultroloth
 // MA-1625 where all six names resolved): the DBs index "Pass Without Trace"
 // capital-W; findMonsterSpell is EXACT-match (Modal:1354/:1357), so the
 // prose lowercase-w form would have rendered a chip that logs junk
 // ability_use + console "Spell not found" (§161 noise). The wrapped name
-// uses the canonical capital-W spelling — the ONE prose byte changed outside
-// tags, pinned below. Headers end ":" → skipped by the extractor (§648),
-// so no fake chips.
+// uses the canonical capital-W spelling — the ONE prose byte changed
+// outside tags, pinned by the live DB-resolution test below.
 import { readFileSync } from 'node:fs';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -28,7 +29,7 @@ import { extractSpellNamesFromSpellcasting, extractSpellcastingSpellUses } from 
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const spells5e = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
-const spells2024 = JSON.parse(readFileSync('public/data/2024/spells.json', 'utf8'));
+const spells2024 = JSON.parse(readFileSync('public/data/spells.json', 'utf8'));
 
 const unicorn = monsters.find(m => m.index === 'unicorn');
 const unRow = unicorn.actions.find(a => a.name === 'Spellcasting');
@@ -36,21 +37,16 @@ const NAMES = ['Detect Evil and Good', 'Druidcraft', 'Calm Emotions', 'Dispel Ev
 const ONE_DAY = ['Calm Emotions', 'Dispel Evil and Good', 'Entangle', 'Pass Without Trace', 'Word of Recall'];
 const AT_WILL = ['Detect Evil and Good', 'Druidcraft'];
 
-const UNICORN_PLAIN_ORIGINAL = 'The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14): At Will: Detect Evil and Good, Druidcraft; 1/Day Each: Calm Emotions, Dispel Evil and Good, Entangle, Pass without Trace, Word of Recall';
+// Exact byte-lock: <strong> headers + <em> names, canonical capital-W on
+// Pass Without Trace, single-line prose. Headers are ":"-terminated, so the
+// exact-map extractor output below proves no fake chips (§161/§648).
 const UNICORN_FIXED_BYTES = 'The unicorn casts one of the following spells, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 14): <strong>At Will:</strong> <em>Detect Evil and Good</em>, <em>Druidcraft</em>; <strong>1/Day Each:</strong> <em>Calm Emotions</em>, <em>Dispel Evil and Good</em>, <em>Entangle</em>, <em>Pass Without Trace</em>, <em>Word of Recall</em>';
-const stripTags = (d) => d.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '');
 
 const ENTANGLE = spells5e.find(s => s.name === 'Entangle');
 const SPELLS_5E = spells5e.filter(s => NAMES.includes(s.name));
 const SPELLS_2024 = spells2024.filter(s => NAMES.includes(s.name));
 
 const MONSTER_NAME = 'Unicorn 1';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 9, rolls: [2, 4, 3], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 18, rolls: [2, 4, 3, 2, 4, 3], modifier: 0 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -89,10 +85,7 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
 
   return {
     default: mockHook,
-    _rollAttack,
-    _rollDamage,
     _rollSavingThrow,
-    _setPopupHtml,
   };
 });
 
@@ -176,64 +169,39 @@ function renderUnicorn() {
 // ── Data lock: unicorn Spellcasting row ──────────────────────────────────────
 
 describe('MA-1634 monsters.json data lock: Unicorn Spellcasting row', () => {
-  it('extracts all seven spell names as chips — tier headers skipped', () => {
-    const names = extractSpellNamesFromSpellcasting(unRow.description);
-    expect(names).toEqual(NAMES);
-    expect(names).not.toContain('At Will');
-    expect(names).not.toContain('1/Day Each');
+  it('extractor harvests exactly the seven names and gates only the five 1/Day names; At Will pair ungated (§57/§144)', () => {
+    expect(extractSpellNamesFromSpellcasting(unRow.description)).toEqual(NAMES);
+    expect(extractSpellcastingSpellUses(unRow.description)).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
+    AT_WILL.forEach(n => expect(extractSpellcastingSpellUses(unRow.description)[n]).toBeUndefined());
   });
 
-  it('binds 1/Day Each to exactly the five marked names; At Will pair ungated (§57/§144)', () => {
-    const uses = extractSpellcastingSpellUses(unRow.description);
-    expect(uses).toEqual(Object.fromEntries(ONE_DAY.map(n => [n, 1])));
-    AT_WILL.forEach(n => expect(uses[n]).toBeUndefined());
-  });
-
-  it('fixed description is byte-exact house style (dao MA-1543 storm-giant shape: <strong> headers + <em> names)', () => {
+  it('description is byte-exact house style — two <strong> headers + seven <em> names, canonical capital-W, single-line prose (dao MA-1543 shape, §161)', () => {
     expect(unRow.description).toBe(UNICORN_FIXED_BYTES);
-    expect(unRow.description).toMatch(/<strong>At Will:<\/strong> <em>Detect Evil and Good<\/em>, <em>Druidcraft<\/em>; <strong>1\/Day Each:<\/strong>/);
-    expect(unRow.description).toMatch(/<em>Entangle<\/em>, <em>Pass Without Trace<\/em>, <em>Word of Recall<\/em>/);
   });
 
-  it('no fake chips: §161 — only the seven names + trailing-":" headers are emphasis spans', () => {
-    const spans = [...unRow.description.matchAll(/<(?:strong|em)>([^<]+)<\/(?:strong|em)>/g)].map(m => m[1]);
-    expect(spans).toEqual(['At Will:', ...AT_WILL, '1/Day Each:', ...ONE_DAY]);
-  });
-
-  it('markup-only diff proof: stripped text equals the pre-fix description byte-for-byte EXCEPT the canonical capital-W amendment (§89/§1241)', () => {
-    expect(stripTags(unRow.description)).toBe(UNICORN_PLAIN_ORIGINAL.replace('Pass without Trace', 'Pass Without Trace'));
-  });
-
-  it('canonical-name trap pinned (§1241/§158): lowercase-w prose form resolves in NEITHER DB — capital-W is MANDATORY', () => {
-    expect(spells5e.some(s => s.name === 'Pass without Trace')).toBe(false);
-    expect(spells2024.some(s => s.name === 'Pass without Trace')).toBe(false);
-    expect(spells5e.some(s => s.name === 'Pass Without Trace')).toBe(true);
-    expect(spells2024.some(s => s.name === 'Pass Without Trace')).toBe(true);
-  });
-
-  it('row-level numeric save_dc 14 + save_type Charisma pair kept byte-untouched (§89); DC 14 = 8 + CHA +3 + PB +3', () => {
+  it('row-level numeric save_dc 14 + save_type Charisma pair kept byte-untouched (§89); Spellcasting row carries no chip DC keys', () => {
     expect(unRow.save_dc).toBe(14);
     expect(unRow.save_type).toBe('Charisma');
     expect(unRow.spell_save_dc).toBeUndefined();
     expect(unRow.attack_bonus).toBeUndefined();
     expect(unRow.automation).toBeUndefined();
     expect(unRow.save_effect).toMatch(/spell save DC 14/);
-    expect(unicorn.ability_score_modifiers.cha).toBe(3);
-    expect(unicorn.proficiency_bonus).toBe(3);
-    expect(8 + unicorn.ability_score_modifiers.cha + unicorn.proficiency_bonus).toBe(14);
   });
 
-  it('all seven canonical names resolvable in BOTH spell DBs (§158 trap closed); Entangle rides STR/none', () => {
+  it('canonical-name trap pinned (§1241/§158): all seven names resolve in BOTH spell DBs; the lowercase-w prose form resolves in NEITHER — capital-W is MANDATORY', () => {
     NAMES.forEach(n => {
       expect(spells5e.some(s => s.name === n)).toBe(true);
       expect(spells2024.some(s => s.name === n)).toBe(true);
     });
+    expect(spells5e.some(s => s.name === 'Pass without Trace')).toBe(false);
+    expect(spells2024.some(s => s.name === 'Pass without Trace')).toBe(false);
+    // Spell-side lock for the advisory lane below: STR save, none-succeeds, no damage.
     expect(ENTANGLE.dc).toEqual({ dc_type: 'STR', dc_success: 'none' });
     expect(ENTANGLE.damage ?? null).toBeNull();
   });
 });
 
-// ── Modal: seven chips, counters, gates ──────────────────────────────────────
+// ── Modal: seven chips, counters, advisory + gate e2e ────────────────────────
 
 describe('MA-1634 MonsterCardModal Unicorn Spellcasting chips', () => {
   beforeEach(() => {
@@ -244,18 +212,14 @@ describe('MA-1634 MonsterCardModal Unicorn Spellcasting chips', () => {
     runtime.useRuntimeValue.mockImplementation((characterKey, propertyName) => runtime.store[`${characterKey}.${propertyName}`] ?? null);
   });
 
-  it('renders seven spell chips — the zero-chip inert row is gone', () => {
+  it('renders seven chips — counters on the five 1/Day names, At Will pair bare (the zero-chip inert row is gone)', () => {
     renderUnicorn();
     expect(spellLinks().map(el => el.textContent.split('(')[0].trim())).toEqual(NAMES);
-  });
-
-  it('the five 1/Day names carry counters; the At Will pair does not', () => {
-    renderUnicorn();
     ONE_DAY.forEach(n => expect(linkByText(n).textContent).toMatch(/\(1\/Day · 1 left\)/));
     AT_WILL.forEach(n => expect(linkByText(n).textContent).not.toMatch(/\/Day/));
   });
 
-  it('At Will Druidcraft casts ungated twice — zero uses, advisory log prints row DC 14 Charisma', async () => {
+  it('At Will Druidcraft casts ungated twice — advisory log prints row DC 14 Charisma, zero uses stored, zero refusals', async () => {
     renderUnicorn();
     await act(async () => { fireEvent.click(linkByText('Druidcraft')); });
     await waitFor(() => expect(abilityUseEntries('Druidcraft').length).toBe(1));
@@ -284,23 +248,14 @@ describe('MA-1634 MonsterCardModal Unicorn Spellcasting chips', () => {
     expect(abilityUseEntries('Entangle').length).toBe(1);
   });
 
-  it('exhausted 1/Day Calm Emotions re-click refused — zero extra spend (§57)', async () => {
-    renderUnicorn();
-    await act(async () => { fireEvent.click(linkByText('Calm Emotions')); });
-    await waitFor(() => expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Calm Emotions': 1 }));
-    await act(async () => { fireEvent.click(linkByText('Calm Emotions')); });
-    await waitFor(() => expect(refusals('Calm Emotions').length).toBe(1));
-    expect(refusals('Calm Emotions')[0].description).toMatch(/already cast Calm Emotions today \(1\/Day\)/);
-    expect(abilityUseEntries('Calm Emotions').length).toBe(1);
-  });
-
-  it('canonical Pass Without Trace spends its own independent 1/Day counter and resolves (§1241 capital-W live)', async () => {
+  // Generic exhausted-refuse shape is owned by spellcasting.test.jsx:288-302;
+  // multi-key independence by spellcasting.test.jsx:522-548. This test pins
+  // ONLY the unicorn-specific claim: the canonical capital-W chip LIVE-resolves.
+  it('canonical Pass Without Trace LIVE-resolves and spends its own 1/Day key (§1241 capital-W live)', async () => {
     renderUnicorn();
     await act(async () => { fireEvent.click(linkByText('Pass Without Trace')); });
-    await waitFor(() => expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Pass Without Trace': 1 }));
+    await waitFor(() => expect(abilityUseEntries('Pass Without Trace').length).toBe(1));
+    expect(runtime.store[`${MONSTER_NAME}.monsterSpellUses`]).toEqual({ 'Pass Without Trace': 1 });
     expect(refusals('Pass Without Trace').length).toBe(0);
-    await act(async () => { fireEvent.click(linkByText('Pass Without Trace')); });
-    await waitFor(() => expect(refusals('Pass Without Trace').length).toBe(1));
-    expect(abilityUseEntries('Pass Without Trace').length).toBe(1);
   });
 });

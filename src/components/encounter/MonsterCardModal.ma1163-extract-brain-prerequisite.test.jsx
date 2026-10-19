@@ -1,28 +1,21 @@
-// MA-1163 regression: Mind Flayer Extract Brain grappled-target prerequisite.
-// The save row now authors target_prerequisite {conditions:["grappled"]} (MA-0019
-// byte-shape minus by_attacker — Tentacles provenance unestablished, source-agnostic
-// per the MA-0687 twin) and handleSaveRoll's evaluateTargetPrerequisiteGate refuses
-// an ungrappled armed target with the MA-0019 refusal popup + extract_brain_refused
-// log, zero save roll, nothing spent; a grappled target resolves the save exactly as
-// before (DC 15 CON, 10d10 Piercing, half on success). Tentacles sibling untouched.
+// @maintained-by-ai
+// MA-1163 regression: Mind Flayer Extract Brain grappled-target prerequisite on the
+// SAVE chip. The save row authors target_prerequisite {conditions:["grappled"]} —
+// MA-0019 byte-shape MINUS by_attacker (Tentacles provenance unestablished, source-
+// agnostic per the MA-0687 twin). handleSaveRoll's evaluateTargetPrerequisiteGate
+// refuses an ungrappled armed target with the provenance-OMITTED popup ("must be
+// Grappled." — the fix's byAttacker-conditional clause) + extract_brain_refused log,
+// zero save roll, nothing spent; a grappled target from ANY source resolves the save
+// exactly as before (DC 15 CON, 10d10 Piercing, half on success).
+// Cite-skip: gate truth table, by_attacker provenance, refusal-log builder —
+// MA-1275 owner (MonsterCardModal.ma1275-tentacle-slam-prerequisite.test.jsx) +
+// MA-1652 helpers (by_attacker-absent satisfaction); Tentacles attack-chip lane —
+// MonsterAction.ma1162-mind-flayer-tentacles-hit-conditions.test.jsx.
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import { parseTargetPrerequisite, evaluateTargetPrerequisiteGate, buildTargetPrerequisiteRefusalLog } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
-
-const MIND_FLYER = monstersData.find(m => m.name === 'Mind Flayer');
-const EXTRACT_BRAIN = MIND_FLYER.actions.find(a => a.name === 'Extract Brain');
-const TENTACLES = MIND_FLYER.actions.find(a => a.name === 'Tentacles');
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 55, rolls: [6, 10, 6, 6, 1, 10, 6, 3, 4, 7], modifier: 0 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 110, rolls: [6, 10, 6, 6, 1, 10, 6, 3, 4, 7], modifier: 0 })),
-}));
-
-vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -33,11 +26,10 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 }));
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
-  let _popupHtml = null;
   const _rollSavingThrow = vi.fn();
-  const _setPopupHtml = vi.fn((val) => { _popupHtml = val; });
+  const _setPopupHtml = vi.fn();
   const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
+    popupHtml: null,
     setPopupHtml: _setPopupHtml,
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
@@ -56,20 +48,11 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
+// Network-guard: getCombatContext only fetches when `creatures` is absent — never on
+// this lane; other exports real.
+vi.mock('../../services/rules/combat/damageUtils.js', async (importActual) => ({
+  ...(await importActual()),
   getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 5)),
 }));
 
 vi.mock('../../services/maps/mapsService.js', () => ({
@@ -98,6 +81,11 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
+const MIND_FLYER_ACTIONS = monstersData.find(m => m.name === 'Mind Flayer').actions;
+const TENTACLES = MIND_FLYER_ACTIONS.find(a => a.name === 'Tentacles');
+const EXTRACT_BRAIN = MIND_FLYER_ACTIONS.find(a => a.name === 'Extract Brain');
+
+// Mind Flayer carries targetName so getTarget resolves Bandit 1 without a picker.
 const CREATURES = [
   { name: 'Mind Flayer 1', type: 'npc', monsterType: 'aberration', targetName: 'Bandit 1', currentHp: 999, maxHp: 999, ac: 15, conditions: [] },
   { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
@@ -113,88 +101,41 @@ function saveChip(actionName) {
     el.closest('.mc-action')?.querySelector('strong')?.textContent.trim().startsWith(actionName)) || null;
 }
 
-describe('MA-1163 monsters.json data: Extract Brain carries grappled target_prerequisite', () => {
-  it('authors target_prerequisite {conditions:["grappled"]} with exact save core', () => {
+describe('MA-1163 MonsterCardModal Extract Brain SAVE-chip prerequisite gate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  });
+
+  it('monsters.json Extract Brain row authors target_prerequisite {conditions:["grappled"]} (no by_attacker) with its save core; Tentacles sibling byte-inert', () => {
     expect(EXTRACT_BRAIN.target_prerequisite).toEqual({ conditions: ['grappled'] });
     expect(EXTRACT_BRAIN.target_prerequisite.by_attacker).toBeUndefined();
     expect(EXTRACT_BRAIN.save_dc).toBe(15);
     expect(EXTRACT_BRAIN.save_type).toBe('Constitution');
     expect(EXTRACT_BRAIN.damage_dice_primary).toBe('10d10');
     expect(EXTRACT_BRAIN.damage_type_primary).toBe('Piercing');
-  });
-
-  it('Tentacles sibling untouched (no target_prerequisite)', () => {
     expect(TENTACLES.target_prerequisite).toBeUndefined();
-    expect(parseTargetPrerequisite(TENTACLES)).toBeNull();
-  });
-});
-
-describe('MA-1163 parseTargetPrerequisite + gate on the save row (by_attacker absent)', () => {
-  it('parseTargetPrerequisite returns conditions ["grappled"], byAttacker false', () => {
-    const prereq = parseTargetPrerequisite(EXTRACT_BRAIN);
-    expect(prereq.conditions).toEqual(['grappled']);
-    expect(prereq.byAttacker).toBe(false);
-    expect(prereq.attackName).toBe('Extract Brain');
   });
 
-  it('ungrappled target refuses with extract_brain_refused refusal shape', () => {
-    const gate = evaluateTargetPrerequisiteGate({
-      action: EXTRACT_BRAIN,
-      target: { name: 'Bandit 1' },
-      monsterName: 'Mind Flayer 1',
-      campaignName: 'test-campaign',
-      getRuntimeValue: (k, p) => (p === 'activeConditions' ? [] : null),
-    });
-    expect(gate.satisfied).toBe(false);
-    expect(String(gate.popupHtml)).toContain('Prerequisite Not Met');
-    expect(String(gate.popupHtml)).toContain('must be Grappled.');
-    expect(gate.refusalLog.automationType).toBe('extract_brain_refused');
-    expect(gate.refusalLog.characterName).toBe('Mind Flayer 1');
-    expect(gate.refusalLog.targetName).toBe('Bandit 1');
-  });
-
-  it('grappled target (source-agnostic) is admitted', () => {
-    const gate = evaluateTargetPrerequisiteGate({
-      action: EXTRACT_BRAIN,
-      target: { name: 'Bandit 1' },
-      monsterName: 'Mind Flayer 1',
-      campaignName: 'test-campaign',
-      getRuntimeValue: (k, p) => (p === 'activeConditions' ? ['grappled'] : { grappled: { source: 'Bandit Captain 1' } }),
-    });
-    expect(gate.satisfied).toBe(true);
-    expect(gate.prerequisite.byAttacker).toBe(false);
-  });
-
-  it('refusal log slug is extract_brain_refused', () => {
-    const entry = buildTargetPrerequisiteRefusalLog({ monsterName: 'Mind Flayer 1', actionName: 'Extract Brain', targetName: 'Bandit 1', prerequisite: parseTargetPrerequisite(EXTRACT_BRAIN) });
-    expect(entry.automationType).toBe('extract_brain_refused');
-    expect(entry.type).toBe('automation');
-    expect(entry.targetName).toBe('Bandit 1');
-  });
-});
-
-describe('MA-1163 MonsterCardModal Extract Brain SAVE-chip gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  });
-
-  it('ungrappled target: popup + extract_brain_refused log, zero save roll, no prompt', async () => {
+  it('ungrappled target: popup omits provenance + extract_brain_refused log, zero save roll, nothing spent', async () => {
     renderMindFlayer();
     fireEvent.click(saveChip('Extract Brain'));
 
     expect(rollSavingThrow).not.toHaveBeenCalled();
+    // "must be Grappled." proves the byAttacker-conditional provenance clause is OMITTED here
     expect(String(setPopupHtml.mock.calls[0][0])).toContain('Prerequisite Not Met');
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('must be Grappled.');
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
     const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'extract_brain_refused');
     expect(refusal).toBeTruthy();
+    expect(refusal.type).toBe('automation');
     expect(refusal.characterName).toBe('Mind Flayer 1');
     expect(refusal.targetName).toBe('Bandit 1');
   });
 
-  it('grappled target (any source): resolves the save unchanged, DC 15 CON / 10d10 Piercing', async () => {
+  it('grappled from ANY source: resolves the save unchanged, DC 15 CON / 10d10 Piercing half on success', () => {
     runtime.store['Bandit 1.activeConditions'] = ['grappled'];
-    runtime.store['Bandit 1.activeConditionMeta'] = { grappled: { dc: 14, ability: 'str', source: 'Mind Flayer 1' } };
+    runtime.store['Bandit 1.activeConditionMeta'] = { grappled: { dc: 14, ability: 'str', source: 'Bandit Captain 1' } };
     renderMindFlayer();
     fireEvent.click(saveChip('Extract Brain'));
 

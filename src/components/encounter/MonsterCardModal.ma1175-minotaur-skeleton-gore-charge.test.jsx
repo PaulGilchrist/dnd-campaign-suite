@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1175: Minotaur Skeleton Gore — charge clause ("moved 20+ feet straight toward")
 // live-unarmed: disk authored no conditional_damage so buildChargeBonusOffer (MA-0007
 // seam, MA-1160/MA-1174 additive-delta convention) never armed a HIT-popup offer.
@@ -5,18 +6,39 @@
 // (ADDITIVE: base Done still pays 2d6 + 4; grant rolls its own 2d8 leg; total RAW
 // 2d6 + 4 + 2d8). Prone-on-charge stays GM-adjudicated at the popup — hit_conditions
 // NOT authored (auto-grant would fire on every hit, RAW-wrong).
+//
+// Trim pass (2026-10-18), two seams, one press each — mirrors the maintained ma1174
+// twin template (run2#682):
+//   1. Disk-row bytes: full conditional_damage toEqual identity (modifier:0 explicit =
+//      additive delta, MA-1160 chrome; toEqual pins the exact key set, so the old
+//      mimic key-parity scan is subsumed) + recharge:"" (gate null — recharge machine
+//      owned by monsterRecharge.test.js:59-60) + RAW additive sum + no hit_conditions /
+//      no two-handed bytes + the MONSTER-DISTINCT prose that keeps this file alive:
+//      the skeleton's 2d8 delta on "the skeleton moved 20 or more feet" is NOT the
+//      ma1174 Baphomet row's 3d6-on-10-feet twin bytes.
+//   2. ONE click→rollAttack ctx press (:1409): full 7-key offer identity via toEqual —
+//      owns the modifier-0 → formula=dice branch pin (Helpers.js:697) AND the
+//      chargeClauseFeet-inert label ("20 or more feet" prose never matches the
+//      digits+feet token → bare "Charge:" head, MA-1160 chrome) + hitClause toBeNull
+//      (prone is GM-adjudicated at the popup, never an auto-grant rider) +
+//      twoHandedVariantOffer toBeNull (replaces the direct-helper byte re-reads).
+// Cut (owner cites, not re-asserted here):
+//   - MonsterCardModal.charge-bonus.test.jsx owns resolveChargeBonus: grant hit/crit
+//     roller fold + logs + resolved-write (:210-233) and decline (:235-250) — this
+//     row's 2d8/Piercing grant/decline bytes are shape twins there.
+//   - monsterRecharge.test.js owns the recharge machine: ungated-row gate null
+//     (:59-60), ungated spend returns null with no stamp/log (:152-165) — the only
+//     monster-distinct byte is GORE.recharge === "" above.
+// Dead-mock purge per-lane (ma1174/ma1160 baseline): diceRoller mock gone (rollAttack
+// mocked, no roller fires without the cut grant tests), AttackResultPopup stub gone
+// (popupHtml null → popup never renders), rollD20 + never-fired hook members gone.
+// No timers — the ctx press lands synchronously.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps } from './MonsterCardModal.test-utils.js';
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn((formula) => ({ total: 5, rolls: [5], modifier: 0, formula })),
-  rollExpressionDoubled: vi.fn((formula) => ({ total: 10, rolls: [5, 5], modifier: 0, formula })),
-  rollD20: vi.fn(() => 14),
-}));
+import { buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -29,23 +51,15 @@ vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn().mockResolvedValue();
   const _setPopupHtml = vi.fn((val) => { _popupHtml = typeof val === 'function' ? val(_popupHtml) : val; });
-  const mockHook = vi.fn(() => ({
-    get popupHtml() { return _popupHtml; },
-    setPopupHtml: _setPopupHtml,
-    rollAttack: _rollAttack,
-    rollDamage: _rollDamage,
-    rollAbilityCheck: vi.fn(),
-    rollSavingThrow: vi.fn(),
-    rollSkillCheck: vi.fn(),
-    rollInitiative: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  }));
   return {
-    default: mockHook,
+    default: vi.fn(() => ({
+      get popupHtml() { return _popupHtml; },
+      setPopupHtml: _setPopupHtml,
+      rollAttack: _rollAttack,
+      rollDamage: _rollDamage,
+    })),
     _rollAttack,
-    _rollDamage,
     _setPopupHtml,
-    __getPopupHtml: () => _popupHtml,
   };
 });
 
@@ -85,70 +99,39 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../common/AttackResultPopup.jsx', () => ({
-  default: (props) => {
-    const offer = props.popupHtml?.chargeBonusOffer;
-    return (
-      <div data-testid="popup-stub">
-        {offer && <span>{offer.label}</span>}
-        <button onClick={() => props.onChargeBonus?.()}>charge-grant</button>
-        <button onClick={() => props.onChargeBonusDecline?.()}>charge-decline</button>
-      </div>
-    );
-  },
-}));
-
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { addEntry } from '../../services/ui/logService.js';
-import { buildChargeBonusOffer, buildTwoHandedVariantOffer } from './MonsterCardHelpers.js';
-import { monsterRechargeGate, rechargeUsageOf } from '../../services/encounters/monsterRecharge.js';
 
-const { _rollAttack: rollAttack, _rollDamage: rollDamage, _setPopupHtml } = useLoggedDiceRoll;
+const { _rollAttack: rollAttack, _setPopupHtml } = useLoggedDiceRoll;
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const SKELETON = monsters.find((m) => m.index === 'minotaur-skeleton');
 const GORE = SKELETON.actions[0];
+
+// Exact buildChargeBonusOffer(GORE, 'Gore') output FROM the disk row — full identity.
+// modifier:0 folds formula to bare dice; the "20 or more feet" prose is chargeClauseFeet
+// -inert (digits must glue to "feet"), so the label head is bare "Charge:" — and these
+// 2d8 bytes are DISTINCT from the ma1174 Baphomet twin's 3d6-on-10-feet row.
+const GORE_OFFER = {
+  dice: '2d8',
+  modifier: 0,
+  damageType: 'Piercing',
+  condition: 'the skeleton moved 20 or more feet straight toward the target immediately before the hit',
+  formula: '2d8',
+  label: 'Charge: +2d8 Piercing?',
+  attackName: 'Gore',
+};
 
 const CREATURES = [
   { name: 'Minotaur Skeleton 1', targetName: 'Bandit 1' },
   { name: 'Bandit 1', type: 'player' },
 ];
 
-function hitPopupHtml(overrides = {}) {
-  const offer = buildChargeBonusOffer(GORE, 'Gore');
-  return {
-    type: 'd20',
-    rollType: 'attack',
-    name: 'Gore',
-    rolls: [14],
-    bonus: 6,
-    targetName: 'Bandit 1',
-    targetAc: 12,
-    hit: true,
-    autoDamage: { name: 'Gore', formula: '2d6 + 4', damageType: 'Piercing', source: 'Minotaur Skeleton 1' },
-    chargeBonusOffer: offer,
-    ...overrides,
-  };
-}
-
-function renderGore(popupHtml = null) {
-  _setPopupHtml(popupHtml);
+function renderGore() {
+  _setPopupHtml(null);
   const m = makeMonster({ name: 'Minotaur Skeleton', actions: SKELETON.actions });
   damageUtils.__setFindCreatureReturn({ name: 'Minotaur Skeleton 1', targetName: 'Bandit 1', conditions: [] });
   return render(<MonsterCardModal {...makeProps(m, { creatures: CREATURES, creatureName: 'Minotaur Skeleton 1' })} />);
-}
-
-function clickGoreLink() {
-  const goreRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Gore/.test(a.textContent.trim()));
-  const chip = Array.from(goreRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
-  expect(chip, 'Expected Gore +6 dice link').toBeTruthy();
-  fireEvent.click(chip);
-}
-
-function findLogEntry(type) {
-  return addEntry.mock.calls.map((c) => c[1]).find((e) => e && e.automationType === type);
 }
 
 beforeEach(() => {
@@ -156,86 +139,42 @@ beforeEach(() => {
   _setPopupHtml(null);
 });
 
-describe('MA-1175 monsters.json data lock: Gore conditional_damage delta 2d8', () => {
-  it('base bytes exact: +6 attack, "2d6 + 4" Piercing, recharge stays empty (gate null)', () => {
+describe('MA-1175 monsters.json data lock: Gore additive 2d8 charge delta (skeleton-distinct)', () => {
+  it('charge unarmed is dead: full conditional_damage identity 2d8 modifier:0 on the skeleton 20-ft prose + recharge:"" + RAW additive sum + no auto-grant/versatile riders', () => {
     expect(GORE.attack_bonus).toBe(6);
     expect(GORE.damage_dice_primary).toBe('2d6 + 4');
     expect(GORE.damage_type_primary).toBe('Piercing');
     expect(GORE.recharge).toBe('');
-    expect(rechargeUsageOf(GORE).threshold).toBeNull();
-    expect(monsterRechargeGate(GORE, null)).toBeNull();
-  });
-
-  it('conditional_damage mirrors the MA-1160/MA-1174 additive delta byte-shape (2d8 modifier 0 Piercing)', () => {
-    const cd = GORE.conditional_damage;
-    expect(cd).toBeTruthy();
-    expect(cd.dice).toBe('2d8');
-    expect(cd.modifier).toBe(0);
-    expect(cd.damage_type).toBe('Piercing');
-    expect(cd.condition).toMatch(/the skeleton moved 20 or more feet straight toward the target immediately before the hit/i);
-    const mimic = monsters.find((m) => m.index === 'mimic').actions[0].conditional_damage;
-    expect(Object.keys(cd).sort()).toEqual(Object.keys(mimic).sort());
-  });
-
-  it('ADDITIVE convention: base + delta = RAW 2d6 + 4 + 2d8; no hit_conditions auto-grant (prone GM-adjudicated)', () => {
-    const cd = GORE.conditional_damage;
-    expect(`${GORE.damage_dice_primary} + ${cd.dice}`).toBe('2d6 + 4 + 2d8');
+    expect(GORE.conditional_damage).toEqual({
+      dice: '2d8',
+      modifier: 0,
+      damage_type: 'Piercing',
+      condition: 'the skeleton moved 20 or more feet straight toward the target immediately before the hit',
+    });
+    // ADDITIVE convention: base + delta = RAW 2d6 + 4 + 2d8 (grant rolls its own leg)
+    expect(`${GORE.damage_dice_primary} + ${GORE.conditional_damage.dice}`).toBe('2d6 + 4 + 2d8');
+    // Skeleton-vs-Baphomet distinctness (the point of this row existing separately
+    // from ma1174): 2d8-on-20-feet, NOT the Baphomet 3d6-on-10-feet twin bytes.
+    expect(GORE.conditional_damage).not.toEqual(monsters.find((m) => m.index === 'minotaur-of-baphomet').actions[1].conditional_damage);
+    // Prone-on-charge stays GM-adjudicated at the popup — auto-grant would fire on
+    // every hit (RAW-wrong); versatile 2-handed bytes unauthored too.
     expect(GORE.hit_conditions).toBeUndefined();
     expect(GORE.damage_dice_two_handed).toBeUndefined();
     expect(buildTwoHandedVariantOffer(GORE, 'Gore')).toBeNull();
   });
 });
 
-describe('MA-1175 Gore HIT popup charge offer', () => {
-  it('buildChargeBonusOffer arms the 2d8 clause ("20 or more feet" prose is chargeClauseFeet-inert → "Charge:" label, MA-1160 chrome)', () => {
-    const offer = buildChargeBonusOffer(GORE, 'Gore');
-    expect(offer).toMatchObject({ dice: '2d8', modifier: 0, damageType: 'Piercing', formula: '2d8', attackName: 'Gore' });
-    expect(offer.condition).toMatch(/moved 20 or more feet straight/i);
-    expect(offer.label).toBe('Charge: +2d8 Piercing?');
-  });
-
-  it('forwards the charge offer to the attack roll context (seam armed by the fix)', () => {
+describe('MA-1175 Gore click→ctx forward (#583 single press)', () => {
+  it('clicking the +6 chip forwards the full disk offer (formula=dice, bare "Charge:" label) + null hitClause + null two-handed variant', () => {
     renderGore();
-    clickGoreLink();
+    const goreRow = Array.from(document.querySelectorAll('.mc-action')).find((a) => /^Gore/.test(a.textContent.trim()));
+    const chip = Array.from(goreRow.querySelectorAll('.mc-dice-link')).find((el) => el.textContent.trim() === '+6');
+    expect(chip, 'Expected Gore +6 dice link').toBeTruthy();
+    fireEvent.click(chip);
     expect(rollAttack).toHaveBeenCalled();
-    expect(rollAttack.mock.calls[0][2].chargeBonusOffer).toMatchObject({ dice: '2d8', modifier: 0, damageType: 'Piercing' });
-  });
-
-  it('grants: rolls 2d8 as its own leg, logs the clause; base 2d6 + 4 stays intact', async () => {
-    renderGore(hitPopupHtml());
-    const grantBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-grant');
-    fireEvent.click(grantBtn);
-    await vi.waitFor(() => {
-      expect(rollDamage).toHaveBeenCalled();
-    });
-    const call = rollDamage.mock.calls[0][0];
-    expect(call.formula).toBe('2d8');
-    expect(rollExpression).toHaveBeenCalledWith('2d8');
-    expect(rollExpressionDoubled).not.toHaveBeenCalled();
-    const popup = useLoggedDiceRoll.__getPopupHtml();
-    expect(popup.autoDamage.formula).toBe('2d6 + 4');
-    const grant = findLogEntry('conditional_damage_granted');
-    expect(grant).toBeTruthy();
-    expect(grant.description).toMatch(/moved 20 or more feet straight/i);
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('granted');
-    });
-  });
-
-  it('declines: no clause roll, base-only log, zero bonus damage', async () => {
-    renderGore(hitPopupHtml());
-    const declineBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'charge-decline');
-    fireEvent.click(declineBtn);
-    await vi.waitFor(() => {
-      expect(addEntry).toHaveBeenCalled();
-    });
-    expect(rollDamage).not.toHaveBeenCalled();
-    expect(rollExpression).not.toHaveBeenCalled();
-    const decline = findLogEntry('conditional_damage_declined');
-    expect(decline).toBeTruthy();
-    expect(decline.description).toContain('base damage only');
-    await vi.waitFor(() => {
-      expect(useLoggedDiceRoll.__getPopupHtml().chargeBonusResolved).toBe('declined');
-    });
+    const ctx = rollAttack.mock.calls[0][2];
+    expect(ctx.chargeBonusOffer).toEqual(GORE_OFFER);
+    expect(ctx.hitClause).toBeNull();
+    expect(ctx.twoHandedVariantOffer).toBeNull();
   });
 });

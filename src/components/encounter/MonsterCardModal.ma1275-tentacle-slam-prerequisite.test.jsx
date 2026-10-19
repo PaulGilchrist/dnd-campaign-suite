@@ -1,29 +1,26 @@
+// @maintained-by-ai
 // MA-1275 regression: Otyugh Tentacle Slam grappled-by-the-otyugh prerequisite.
-// The save row now authors target_prerequisite {conditions:["grappled"],
-// by_attacker:true} (MA-0019 aboleth byte-shape) after save_effect; handleSaveRoll's
-// evaluateTargetPrerequisiteGate refuses an ungrappled armed target AND a victim
-// grappled by someone else (source ≠ attacker) with the MA-0019 refusal popup +
-// tentacle_slam_refused log, zero save roll, nothing spent; a victim grappled BY the
-// otyugh (provenance stamped live by the MA-1274 Tentacle hit_conditions seam)
-// resolves the save exactly as before (DC 14 CON, 3d8 + 3 Bludgeoning, half default).
-// Bite/Tentacle siblings untouched.
+// OWNER FILE for the MA-0019 by_attacker:true gate lane (ma0687, ma0689, ma1163
+// cite-skip their gates here): the direct evaluateTargetPrerequisiteGate truth
+// table (unmet refuse, source≠attacker refuse, source===attacker admit) + the
+// tentacle_slam_refused refusal-log shape live HERE, nowhere else.
+// The Otyugh save row authors target_prerequisite {conditions:["grappled"],
+// by_attacker:true} after save_effect; the SAVE chip refuses an ungrappled or
+// other-grappled target with the provenance-INCLUSIVE popup ("must be Grappled
+// by Otyugh 1." — the byAttacker clause, vs the omission on ma0687/ma1163),
+// zero save roll, nothing spent; a victim grappled BY the otyugh (provenance
+// stamped live by the MA-1274 Tentacle hit_conditions seam) resolves the save
+// exactly as before (DC 14 CON, 3d8 + 3 Bludgeoning, half default).
+// Cite-skip: by_attacker:true parse byte + refusal description prose — MA-1890;
+// satisfaction truth table by_attacker-absent + null-parse — MA-1652 helpers;
+// ungated siblings' own lanes — MA-1273/1274 (Bite/Tentacle appear here only as
+// byte-inert null-negatives on the same disk lock).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
-import { parseTargetPrerequisite, evaluateTargetPrerequisiteGate, buildTargetPrerequisiteRefusalLog } from './MonsterCardHelpers.js';
+import { evaluateTargetPrerequisiteGate } from './MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
-
-const OTYUGH = monstersData.find(m => m.name === 'Otyugh');
-const BITE = OTYUGH.actions.find(a => a.name === 'Bite');
-const TENTACLE = OTYUGH.actions.find(a => a.name === 'Tentacle');
-const TENTACLE_SLAM = OTYUGH.actions.find(a => a.name === 'Tentacle Slam');
-
-vi.mock('../../services/dice/diceRoller.js', async (importActual) => ({
-  ...(await importActual()),
-  rollExpression: vi.fn(() => ({ total: 16, rolls: [3, 6, 4], modifier: 3 })),
-  rollExpressionDoubled: vi.fn(() => ({ total: 29, rolls: [3, 6, 4], modifier: 3 })),
-}));
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
@@ -59,24 +56,11 @@ vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
 }));
 
-vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  extractDamageTypes: vi.fn(() => []),
-  formatDamageTypes: vi.fn((types) => (types || []).join(', ') || ''),
-  getTargetFromAttacker: vi.fn(() => null),
-  getResistanceNotice: vi.fn(() => null),
-  findCreatureByName: vi.fn(({ creatures }, name) => (creatures || []).find(c => c.name === name) || null),
+// Network-guard: getCombatContext only fetches when `creatures` is absent —
+// never on this lane; all other exports real.
+vi.mock('../../services/rules/combat/damageUtils.js', async (importActual) => ({
+  ...(await importActual()),
   getCombatContext: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal', reason: '' })),
-  getDistanceFeet: vi.fn(() => null),
-  getNearestPlacedItem: vi.fn(() => null),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 5)),
-}));
-
-vi.mock('../../services/maps/mapsService.js', () => ({
-  loadMapData: vi.fn().mockResolvedValue(null),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -101,6 +85,11 @@ import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
+const OTYUGH = monstersData.find(m => m.name === 'Otyugh');
+const BITE = OTYUGH.actions.find(a => a.name === 'Bite');
+const TENTACLE = OTYUGH.actions.find(a => a.name === 'Tentacle');
+const TENTACLE_SLAM = OTYUGH.actions.find(a => a.name === 'Tentacle Slam');
+
 const CREATURES = [
   { name: 'Otyugh 1', type: 'npc', monsterType: 'aberration', targetName: 'Bandit 1', currentHp: 999, maxHp: 999, ac: 13, conditions: [] },
   { name: 'Bandit 1', type: 'npc', currentHp: 999, maxHp: 999, ac: 12, conditions: [] },
@@ -116,81 +105,53 @@ function saveChip(actionName) {
     el.closest('.mc-action')?.querySelector('strong')?.textContent.trim().startsWith(actionName)) || null;
 }
 
-describe('MA-1275 monsters.json data: Tentacle Slam carries grappled-by-attacker target_prerequisite', () => {
-  it('authors target_prerequisite {conditions:["grappled"],by_attacker:true} with exact save core', () => {
+function gateWith(conditions, meta) {
+  return evaluateTargetPrerequisiteGate({
+    action: TENTACLE_SLAM,
+    target: { name: 'Bandit 1' },
+    monsterName: 'Otyugh 1',
+    campaignName: 'test-campaign',
+    getRuntimeValue: (k, p) => (p === 'activeConditions' ? conditions : meta ?? null),
+  });
+}
+
+describe('MA-1275 monsters.json: Tentacle Slam carries grappled-by-attacker target_prerequisite', () => {
+  it('authors {conditions:["grappled"],by_attacker:true} + exact save core; Bite/Tentacle siblings byte-inert', () => {
     expect(TENTACLE_SLAM.target_prerequisite).toEqual({ conditions: ['grappled'], by_attacker: true });
     expect(TENTACLE_SLAM.save_dc).toBe(14);
     expect(TENTACLE_SLAM.save_type).toBe('Constitution');
     expect(TENTACLE_SLAM.damage_dice_primary).toBe('3d8 + 3');
     expect(TENTACLE_SLAM.damage_type_primary).toBe('Bludgeoning');
     expect(TENTACLE_SLAM.dc_success).toBeUndefined();
-  });
-
-  it('target_prerequisite placed immediately after save_effect (MA-0019 byte-shape)', () => {
-    const keys = Object.keys(TENTACLE_SLAM);
-    expect(keys.indexOf('target_prerequisite')).toBe(keys.indexOf('save_effect') + 1);
-  });
-
-  it('Bite/Tentacle siblings untouched (MA-1273/1274 rows carry no target_prerequisite)', () => {
     expect(BITE.target_prerequisite).toBeUndefined();
     expect(TENTACLE.target_prerequisite).toBeUndefined();
-    expect(parseTargetPrerequisite(TENTACLE)).toBeNull();
   });
 });
 
-describe('MA-1275 parseTargetPrerequisite + gate on the save row (by_attacker true)', () => {
-  it('parseTargetPrerequisite returns conditions ["grappled"], byAttacker true', () => {
-    const prereq = parseTargetPrerequisite(TENTACLE_SLAM);
-    expect(prereq.conditions).toEqual(['grappled']);
-    expect(prereq.byAttacker).toBe(true);
-    expect(prereq.attackName).toBe('Tentacle Slam');
-  });
-
-  it('ungrappled target refuses with tentacle_slam_refused refusal shape', () => {
-    const gate = evaluateTargetPrerequisiteGate({
-      action: TENTACLE_SLAM,
-      target: { name: 'Bandit 1' },
-      monsterName: 'Otyugh 1',
-      campaignName: 'test-campaign',
-      getRuntimeValue: (k, p) => (p === 'activeConditions' ? [] : null),
-    });
+describe('MA-1275 OWNED gate truth table (by_attacker:true) + tentacle_slam_refused refusal shape', () => {
+  it('ungrappled target refuses: provenance-inclusive popup + refusal log, nothing spent', () => {
+    const gate = gateWith([], null);
     expect(gate.satisfied).toBe(false);
+    // "by Otyugh 1." proves the byAttacker:true provenance clause is INCLUDED here
     expect(String(gate.popupHtml)).toContain('Prerequisite Not Met');
     expect(String(gate.popupHtml)).toContain('must be Grappled by Otyugh 1.');
+    expect(gate.refusalLog.type).toBe('automation');
     expect(gate.refusalLog.automationType).toBe('tentacle_slam_refused');
     expect(gate.refusalLog.characterName).toBe('Otyugh 1');
     expect(gate.refusalLog.targetName).toBe('Bandit 1');
   });
 
-  it('grappled victim with source ≠ attacker refuses (by_attacker provenance check)', () => {
-    const gate = evaluateTargetPrerequisiteGate({
-      action: TENTACLE_SLAM,
-      target: { name: 'Bandit 1' },
-      monsterName: 'Otyugh 1',
-      campaignName: 'test-campaign',
-      getRuntimeValue: (k, p) => (p === 'activeConditions' ? ['grappled'] : { grappled: { source: 'Bandit Captain 1' } }),
-    });
+  it('grappled by someone else refuses (by_attacker provenance leg)', () => {
+    const gate = gateWith(['grappled'], { grappled: { source: 'Bandit Captain 1' } });
     expect(gate.satisfied).toBe(false);
+    expect(String(gate.popupHtml)).toContain('must be Grappled by Otyugh 1.');
     expect(gate.refusalLog.automationType).toBe('tentacle_slam_refused');
   });
 
-  it('grappled victim with source === attacker name is admitted', () => {
-    const gate = evaluateTargetPrerequisiteGate({
-      action: TENTACLE_SLAM,
-      target: { name: 'Bandit 1' },
-      monsterName: 'Otyugh 1',
-      campaignName: 'test-campaign',
-      getRuntimeValue: (k, p) => (p === 'activeConditions' ? ['grappled'] : { grappled: { dc: 13, ability: 'str', source: 'Otyugh 1' } }),
-    });
+  it('grappled BY the otyugh admits the save', () => {
+    const gate = gateWith(['grappled'], { grappled: { dc: 13, ability: 'str', source: 'Otyugh 1' } });
     expect(gate.satisfied).toBe(true);
     expect(gate.prerequisite.byAttacker).toBe(true);
-  });
-
-  it('refusal log slug is tentacle_slam_refused', () => {
-    const entry = buildTargetPrerequisiteRefusalLog({ monsterName: 'Otyugh 1', actionName: 'Tentacle Slam', targetName: 'Bandit 1', prerequisite: parseTargetPrerequisite(TENTACLE_SLAM) });
-    expect(entry.automationType).toBe('tentacle_slam_refused');
-    expect(entry.type).toBe('automation');
-    expect(entry.targetName).toBe('Bandit 1');
   });
 });
 
@@ -200,28 +161,17 @@ describe('MA-1275 MonsterCardModal Tentacle Slam SAVE-chip gate', () => {
     Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   });
 
-  it('ungrappled target: popup + tentacle_slam_refused log, zero save roll, no prompt', async () => {
+  it('ungrappled target: popup + tentacle_slam_refused log, zero save roll', async () => {
     renderOtyugh();
     fireEvent.click(saveChip('Tentacle Slam'));
 
     expect(rollSavingThrow).not.toHaveBeenCalled();
-    expect(String(setPopupHtml.mock.calls[0][0])).toContain('Prerequisite Not Met');
+    expect(String(setPopupHtml.mock.calls[0][0])).toContain('must be Grappled by Otyugh 1.');
     await waitFor(() => expect(addEntry).toHaveBeenCalled());
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'tentacle_slam_refused');
-    expect(refusal).toBeTruthy();
-    expect(refusal.characterName).toBe('Otyugh 1');
-    expect(refusal.targetName).toBe('Bandit 1');
-  });
-
-  it('grappled by another: still refuses, zero save roll', async () => {
-    runtime.store['Bandit 1.activeConditions'] = ['grappled'];
-    runtime.store['Bandit 1.activeConditionMeta'] = { grappled: { dc: 12, ability: 'str', source: 'Bandit Captain 1' } };
-    renderOtyugh();
-    fireEvent.click(saveChip('Tentacle Slam'));
-
-    expect(rollSavingThrow).not.toHaveBeenCalled();
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'tentacle_slam_refused');
-    expect(refusal).toBeTruthy();
+    const refusals = addEntry.mock.calls.map(c => c[1]).filter(e => e.automationType === 'tentacle_slam_refused');
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0].characterName).toBe('Otyugh 1');
+    expect(refusals[0].targetName).toBe('Bandit 1');
   });
 
   it('grappled by the otyugh: resolves the save unchanged, DC 14 CON / 3d8 + 3 Bludgeoning half-default', async () => {
@@ -238,7 +188,6 @@ describe('MA-1275 MonsterCardModal Tentacle Slam SAVE-chip gate', () => {
     expect(ctx.autoDamageFormula).toBe('3d8 + 3');
     expect(ctx.targetName).toBe('Bandit 1');
     expect(setPopupHtml).not.toHaveBeenCalled();
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'tentacle_slam_refused');
-    expect(refusal).toBeUndefined();
+    expect(addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'tentacle_slam_refused')).toBeUndefined();
   });
 });
