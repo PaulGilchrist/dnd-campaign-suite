@@ -1,230 +1,146 @@
+// @maintained-by-ai
+// Lane: usePlacedItems — the hook's own mutation semantics at the setter SEAM (setPlacedItems/
+//   setSelectedItem owned by the PlacedItems component; no persistence here — no network, no timers).
+//   Render/visibility split (not duplicated here): PlacedItems.test.jsx, PlacedItems-fog.test.jsx and
+//   the -localhost-rendering pair own exact rendering; ItemContextMenu.test.jsx owns click→handler
+//   wiring with mocked handlers.
+// old->new map (19->6): census kept as "interface" (full census, not exists);
+//   toggle 2+3+4 -> "toggles visibility"; delete 6+7+9 -> "deletes exact survivors";
+//   rotate 10+11+12+13 -> "rotates +90 wrapping"; door 15+16+19 -> "door open/close";
+//   toggle 5 + delete 8 + rotate 14 + door 17+18 -> "inert for unknown/non-door ids" (one sweep,
+//   pinning item reference identity and the delete/door unconditional selection-clear).
+//   Not pinned: toggling an item with missing `visible` flips it to true — `!undefined` JS-spec
+//   quirk, same precedent as the useMapDrops lane's removed quirk pins.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import usePlacedItems from './usePlacedItems.js';
 
 describe('usePlacedItems', () => {
-  let placedItemsState;
+  // Honest stateful harness (#906): the setter applies updaters to live state, so every
+  // assertion observes the exact resulting array literal — no mock-call archaeology.
+  // item4 intentionally has no rotation: pins the rotate default (0 -> 90).
+  let placedItems;
   let setPlacedItems;
   let setSelectedItem;
 
   beforeEach(() => {
-    placedItemsState = [
+    placedItems = [
       { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
       { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
       { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, gridX: 4, gridY: 4 },
     ];
-    vi.clearAllMocks();
-    setPlacedItems = vi.fn((fn) => {
-      placedItemsState = fn(placedItemsState);
-      return placedItemsState;
-    });
     setSelectedItem = vi.fn();
-  });
-
-  const getHook = () => {
-    const { result } = renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem));
-    return result;
-  };
-
-  describe('returned interface', () => {
-    it('returns an object with exactly 4 handler functions', () => {
-      const result = getHook();
-      expect(Object.keys(result.current)).toEqual([
-        'handleToggleItemVisibility',
-        'handleDeleteItem',
-        'handleToggleDoor',
-        'handleRotate',
-      ]);
+    setPlacedItems = vi.fn((fn) => {
+      placedItems = fn(placedItems);
+      return placedItems;
     });
   });
 
-  describe('handleToggleItemVisibility', () => {
-    it('toggles visible from true to false', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleItemVisibility('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1').visible).toBe(false);
-    });
+  const getHook = () => renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem)).result;
 
-    it('toggles visible from false to true', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleItemVisibility('item2');
-      });
-      expect(placedItemsState.find(i => i.id === 'item2').visible).toBe(true);
-    });
-
-    it('does not affect other items when toggling', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleItemVisibility('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item2').visible).toBe(false);
-      expect(placedItemsState.find(i => i.id === 'item3').visible).toBeUndefined();
-    });
-
-    it('does nothing when item id does not exist', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleItemVisibility('nonexistent');
-      });
-      expect(placedItemsState).toHaveLength(3);
-      expect(placedItemsState.find(i => i.id === 'item1').visible).toBe(true);
-    });
+  it('returns exactly the four mutation handlers', () => {
+    expect(Object.keys(getHook().current)).toEqual([
+      'handleToggleItemVisibility',
+      'handleDeleteItem',
+      'handleToggleDoor',
+      'handleRotate',
+    ]);
   });
 
-  describe('handleDeleteItem', () => {
-    it('removes the item and clears selected item', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleDeleteItem('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1')).toBeUndefined();
-      expect(setSelectedItem).toHaveBeenCalledWith(null);
-    });
-
-    it('leaves other items intact', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleDeleteItem('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item2')).toBeDefined();
-      expect(placedItemsState.find(i => i.id === 'item3')).toBeDefined();
-    });
-
-    it('does nothing when item id does not exist', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleDeleteItem('nonexistent');
-      });
-      expect(placedItemsState).toHaveLength(3);
-      expect(setSelectedItem).toHaveBeenCalledWith(null);
-    });
-
-    it('results in empty array when deleting the last item', () => {
-      const { result } = renderHook(() => usePlacedItems(
-        vi.fn((fn) => { placedItemsState = fn(placedItemsState); return placedItemsState; }),
-        vi.fn(),
-      ));
-      act(() => {
-        result.current.handleDeleteItem('item1');
-        result.current.handleDeleteItem('item2');
-        result.current.handleDeleteItem('item3');
-      });
-      expect(placedItemsState).toEqual([]);
-    });
+  it('toggles visibility both directions with one write per call and other items byte-identical', () => {
+    const result = getHook();
+    act(() => result.current.handleToggleItemVisibility('item1'));
+    expect(placedItems).toEqual([
+      { id: 'item1', visible: false, rotation: 0, gridX: 1, gridY: 1 },
+      { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+      { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, gridX: 4, gridY: 4 },
+    ]);
+    act(() => result.current.handleToggleItemVisibility('item2'));
+    expect(placedItems).toEqual([
+      { id: 'item1', visible: false, rotation: 0, gridX: 1, gridY: 1 },
+      { id: 'item2', visible: true, rotation: 90, gridX: 2, gridY: 2 },
+      { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, gridX: 4, gridY: 4 },
+    ]);
+    expect(setPlacedItems).toHaveBeenCalledTimes(2);
+    // Visibility toggle is selection-preserving (contrast with delete/door below).
+    expect(setSelectedItem).not.toHaveBeenCalled();
   });
 
-  describe('handleRotate', () => {
-    it('rotates item by 90 degrees', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleRotate('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1').rotation).toBe(90);
+  it('deletes exact survivors, always clears selection, and empties to an exact empty array', () => {
+    const result = getHook();
+    act(() => result.current.handleDeleteItem('item1'));
+    expect(placedItems).toEqual([
+      { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+      { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, gridX: 4, gridY: 4 },
+    ]);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
+    act(() => {
+      result.current.handleDeleteItem('item2');
+      result.current.handleDeleteItem('item3');
+      result.current.handleDeleteItem('item4');
     });
-
-    it('wraps from 270 to 0 after four rotations', () => {
-      const { result } = renderHook(() => usePlacedItems(
-        vi.fn((fn) => { placedItemsState = fn(placedItemsState); return placedItemsState; }),
-        vi.fn(),
-      ));
-      act(() => {
-        result.current.handleRotate('item1');
-        result.current.handleRotate('item1');
-        result.current.handleRotate('item1');
-        result.current.handleRotate('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1').rotation).toBe(0);
-    });
-
-    it('defaults rotation to 0 when property is missing', () => {
-      const { result } = renderHook(() => usePlacedItems(
-        vi.fn((fn) => {
-          placedItemsState = [
-            { id: 'item-no-rot', gridX: 1, gridY: 1 },
-          ];
-          placedItemsState = fn(placedItemsState);
-          return placedItemsState;
-        }),
-        vi.fn(),
-      ));
-      act(() => {
-        result.current.handleRotate('item-no-rot');
-      });
-      expect(placedItemsState[0].rotation).toBe(90);
-    });
-
-    it('does not affect other items when rotating', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleRotate('item1');
-      });
-      expect(placedItemsState.find(i => i.id === 'item2').rotation).toBe(90);
-      expect(placedItemsState.find(i => i.id === 'item3').rotation).toBe(0);
-    });
-
-    it('does nothing when item id does not exist', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleRotate('nonexistent');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1').rotation).toBe(0);
-    });
+    expect(placedItems).toEqual([]);
+    expect(setPlacedItems).toHaveBeenCalledTimes(4);
   });
 
-  describe('handleToggleDoor', () => {
-    it('toggles door open from false to true', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleDoor('item3');
-      });
-      expect(placedItemsState.find(i => i.id === 'item3').open).toBe(true);
-      expect(setSelectedItem).toHaveBeenCalledWith(null);
+  it('rotates +90, defaults missing rotation to 0, wraps 270 to 0, others untouched', () => {
+    const result = getHook();
+    act(() => {
+      result.current.handleRotate('item1');
+      result.current.handleRotate('item4'); // no rotation property -> 0 + 90
     });
+    expect(placedItems).toEqual([
+      { id: 'item1', visible: true, rotation: 90, gridX: 1, gridY: 1 },
+      { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+      { id: 'item3', type: 'door', open: false, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, rotation: 90, gridX: 4, gridY: 4 },
+    ]);
+    const spins = [0, 0, 0].map(() => {
+      act(() => result.current.handleRotate('item1'));
+      return placedItems[0].rotation;
+    });
+    expect(spins).toEqual([180, 270, 0]);
+    expect(setSelectedItem).not.toHaveBeenCalled();
+  });
 
-    it('toggles door open from true to false', () => {
-      const { result } = renderHook(() => usePlacedItems(
-        vi.fn((fn) => {
-          placedItemsState = [
-            { id: 'door1', type: 'door', open: true, rotation: 0, gridX: 1, gridY: 1 },
-          ];
-          placedItemsState = fn(placedItemsState);
-          return placedItemsState;
-        }),
-        vi.fn(),
-      ));
-      act(() => {
-        result.current.handleToggleDoor('door1');
-      });
-      expect(placedItemsState.find(i => i.id === 'door1').open).toBe(false);
-    });
+  it('flips a door open then closed, others byte-identical, clearing selection each time', () => {
+    const result = getHook();
+    act(() => result.current.handleToggleDoor('item3'));
+    expect(placedItems).toEqual([
+      { id: 'item1', visible: true, rotation: 0, gridX: 1, gridY: 1 },
+      { id: 'item2', visible: false, rotation: 90, gridX: 2, gridY: 2 },
+      { id: 'item3', type: 'door', open: true, rotation: 0, gridX: 3, gridY: 3 },
+      { id: 'item4', visible: true, gridX: 4, gridY: 4 },
+    ]);
+    act(() => result.current.handleToggleDoor('item3'));
+    expect(placedItems[2].open).toBe(false);
+    expect(setPlacedItems).toHaveBeenCalledTimes(2);
+    expect(setSelectedItem).toHaveBeenCalledTimes(2);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
+  });
 
-    it('does not toggle non-door items', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleDoor('item1');
-      });
-      expect(setSelectedItem).toHaveBeenCalledWith(null);
-      expect(placedItemsState.find(i => i.id === 'item1').open).toBeUndefined();
+  it('is inert for unknown ids and non-door ids but delete and door-toggle still clear selection', () => {
+    const result = getHook();
+    const refs = [...placedItems];
+    act(() => {
+      result.current.handleToggleItemVisibility('nonexistent');
+      result.current.handleRotate('nonexistent');
+      result.current.handleDeleteItem('nonexistent');
+      result.current.handleToggleDoor('nonexistent');
+      result.current.handleToggleDoor('item1'); // id matches but type is not door
     });
-
-    it('does nothing when item id does not exist', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleDoor('nonexistent');
-      });
-      expect(setSelectedItem).toHaveBeenCalledWith(null);
-    });
-
-    it('does not affect other items when toggling door', () => {
-      const result = getHook();
-      act(() => {
-        result.current.handleToggleDoor('item3');
-      });
-      expect(placedItemsState.find(i => i.id === 'item1').visible).toBe(true);
-      expect(placedItemsState.find(i => i.id === 'item2').visible).toBe(false);
-    });
+    // Every survivor keeps reference identity — nothing was rewritten, only re-mapped.
+    placedItems.forEach((item, i) => expect(item).toBe(refs[i]));
+    expect(placedItems[0].open).toBeUndefined();
+    // Honest behavior: the unconditional setSelectedItem(null) in delete/toggleDoor fires
+    // even when nothing was found or toggled — 3 calls total (delete + both door attempts),
+    // never from visibility/rotate.
+    expect(setSelectedItem).toHaveBeenCalledTimes(3);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
+    expect(setPlacedItems).toHaveBeenCalledTimes(5);
   });
 });

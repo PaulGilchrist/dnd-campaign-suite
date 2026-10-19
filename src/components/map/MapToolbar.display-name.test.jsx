@@ -1,6 +1,19 @@
+// @maintained-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MapToolbar from './MapToolbar.jsx';
+
+// Lane: regression pin for the map-editor title slug-capitalization fix —
+// the toolbar title must show the stored displayName verbatim, never a
+// re-derivation from the slug (which mangled 'QA Fog Map' → 'Qa Fog Map').
+// Pins only the three distinct title bytes of MapToolbar.jsx's
+// `displayName || formatMapName(mapName) || 'Map'` expression that
+// siblings do not cover. Split with MapToolbar.test.jsx:
+//   - undefined-displayName formatMapName path ('dungeon-map.json' → 'Dungeon Map') → MapToolbar.test.jsx "should render the map name formatted correctly" (skip here)
+//   - displayName precedence, acronym preservation, and negative slug byte → this file
+//   - empty-string displayName falsy byte → this file (sibling never passes '')
+//   - 'Map' final fallback when both props absent → this file (sibling always passes mapName)
+// Toolbar routing/lint lane: MapToolbar.test.jsx; Map container HexMap props → Map.test.jsx.
 
 const createMockSpellOverlayState = (overrides = {}) => ({
     spellMode: null,
@@ -37,30 +50,27 @@ const renderMapToolbar = (props = {}) => {
     return render(<MapToolbar {...defaultProps} />);
 };
 
+const getTitle = () => screen.getByRole('heading', { level: 4 });
+
 describe('MapToolbar title', () => {
-    it('renders the stored displayName instead of re-deriving from the slug', () => {
+    it('shows the stored displayName verbatim, not re-derived from the slug', () => {
         renderMapToolbar({ displayName: 'QA Fog Map' });
-        expect(screen.getByRole('heading', { level: 4 })).toHaveTextContent('QA Fog Map');
+        // Acronym capitalisation must survive; the mangled slug-derived
+        // title is the exact regression this lane exists to catch.
+        expect(getTitle().textContent).toBe('QA Fog Map');
         expect(screen.queryByText('Qa Fog Map')).not.toBeInTheDocument();
     });
 
-    it('preserves acronym capitalisation in displayName', () => {
-        renderMapToolbar({ mapName: 'qa-fog-map', displayName: 'QA Fog Map' });
-        expect(screen.getByText('QA Fog Map')).toBeInTheDocument();
-    });
-
-    it('falls back to formatMapName(slug) when displayName is absent', () => {
-        renderMapToolbar({ displayName: undefined });
-        expect(screen.getByText('Qa Fog Map')).toBeInTheDocument();
-    });
-
-    it('falls back to formatMapName(slug) when displayName is empty', () => {
+    it('falls back to formatMapName(slug) when displayName is an empty string', () => {
+        // Sibling covers displayName absent (undefined); the '' falsy
+        // byte is unique here — a stricter falsy that a !== undefined
+        // guard would let slip through as a blank title.
         renderMapToolbar({ displayName: '' });
-        expect(screen.getByText('Qa Fog Map')).toBeInTheDocument();
+        expect(getTitle().textContent).toBe('Qa Fog Map');
     });
 
     it('falls back to "Map" when neither displayName nor mapName is provided', () => {
         renderMapToolbar({ mapName: undefined, displayName: undefined });
-        expect(screen.getByText('Map')).toBeInTheDocument();
+        expect(getTitle().textContent).toBe('Map');
     });
 });

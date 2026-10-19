@@ -1,9 +1,41 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// ─── Lane: ItemContextMenu — GM context menu on placed map items ─────────────
+// OWNED here: menu open content (exact ordered label census by item state) and
+// action dispatch (each entry click → consumer callback, exact args, exactly once).
+//
+// Menu label census (exact render order; close glyph '✕' is always last):
+//   state                        labels
+//   token visible              → ['Hide','Delete','Rotate','✕']
+//   token hidden             → ['Show','Delete','Rotate','✕']
+//   npc, monster not found   → ['Hide','Delete','Rename','Rotate','✕']
+//   npc, monster found       → ['Hide','Delete','Rename','View Stats','Rotate','✕']
+//   door closed              → ['Hide','Delete','Open Door','Rotate','✕']
+//   door open                → ['Hide','Delete','Close Door','Rotate','✕']
+//   unknown type             → ['Hide','Delete','Rotate','✕']
+//   id not in placedItems    → ['Hide','Delete','Rotate','✕']
+//   no selection (null)      → renders nothing
+//
+// NOT OWNED — cited to owner lanes (dispatch args pinned here only):
+//   door open/closed pane swap + resulting placed state → PlacedItems lanes (#899/#909)
+//   toggle/delete/rotate state mutations                → hooks/usePlacedItems.test.js (#906/#909)
+//   door SVG pixels                                     → DoorSVG.test.jsx (#890-#902)
+//   wall/fog rendering                                  → GridAndWalls #903, fog #901/#904/#915
+//   end-to-end rename/modal flows                     → Map-context-menus.test.jsx
+//   player context menu                               → PlayerContextMenu.test.jsx
+//
+// Old→new: 20 one-label exists/click tests consolidated into
+//   null-render(1) + census table(8) + per-handler dispatch table(6) + rename(2) + click containment(1).
+//   Cut: rect x/y layout internals (menu anchor pinned behaviorally by the '✕' → onClose(30,30) byte);
+//   redundant Rotate/NPC-absence exists-checks (subsumed by ordered census rows).
+
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ItemContextMenu from './ItemContextMenu';
 
-const mockGridCenterX = (gx) => gx * 40 + 20;
-const mockGridCenterY = (gy) => gy * 40 + 20;
+const gridCenterX = (gx) => gx * 40 + 20;
+const gridCenterY = (gy) => gy * 40 + 20;
+
+const SELECTED = { id: 'item-1', gridX: 0, gridY: 0 };
 
 const createMocks = () => ({
     handleToggleItemVisibility: vi.fn(),
@@ -15,9 +47,7 @@ const createMocks = () => ({
     onClose: vi.fn(),
 });
 
-const defaultSelectedItem = { id: 'item-1', gridX: 0, gridY: 0 };
-
-const createPlacedItem = (overrides = {}) => ({
+const placedItem = (overrides = {}) => ({
     id: 'item-1',
     type: 'token',
     visible: true,
@@ -26,294 +56,131 @@ const createPlacedItem = (overrides = {}) => ({
     ...overrides,
 });
 
-// ── Null / undefined item renders nothing ───────────────────────
+const renderMenu = (mocks, props = {}) => render(
+    <ItemContextMenu
+        selectedItem={SELECTED}
+        placedItems={[placedItem()]}
+        gridCenterX={gridCenterX}
+        gridCenterY={gridCenterY}
+        monsterFound={false}
+        {...mocks}
+        {...props}
+    />
+);
 
-describe('null item', () => {
-    it('returns null when selectedItem is null or undefined', () => {
+// Exact ordered text census of the rendered menu, including the close glyph.
+const menuLabels = (container) =>
+    Array.from(container.querySelectorAll('text')).map(t => t.textContent);
+
+// Exact dispatch contract: one callback, once, with exact args; every other handler untouched.
+const expectOnlyCall = (mocks, key, args) => {
+    expect(mocks[key]).toHaveBeenCalledTimes(1);
+    expect(mocks[key]).toHaveBeenCalledWith(...args);
+    Object.entries(mocks)
+        .filter(([k]) => k !== key)
+        .forEach(([, spy]) => expect(spy).not.toHaveBeenCalled());
+};
+
+// ── Selection contract ─────────────────────────────────────────
+
+describe('no selection', () => {
+    it('renders nothing when selectedItem is null or undefined', () => {
         const mocks = createMocks();
-        const { container } = render(
-            <ItemContextMenu
-                selectedItem={undefined}
-                placedItems={[]}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
-        );
-        expect(container.innerHTML).toBe('');
+        const withNull = renderMenu(mocks, { selectedItem: null });
+        expect(withNull.container.innerHTML).toBe('');
+        withNull.unmount();
+
+        const withUndefined = renderMenu(mocks, { selectedItem: undefined });
+        expect(withUndefined.container.innerHTML).toBe('');
     });
 });
 
-// ── Basic token (non-NPC, non-door) ───────────────────────────
+// ── Menu content: exact ordered census per item state ──────────
 
-describe('basic token item', () => {
-    let mocks;
-
-    beforeEach(() => {
-        mocks = createMocks();
+describe('menu content census', () => {
+    it.each([
+        ['token visible', { type: 'token', visible: true }, false, ['Hide', 'Delete', 'Rotate', '✕']],
+        ['token hidden', { type: 'token', visible: false }, false, ['Show', 'Delete', 'Rotate', '✕']],
+        ['npc monster not found', { type: 'npc' }, false, ['Hide', 'Delete', 'Rename', 'Rotate', '✕']],
+        ['npc monster found', { type: 'npc' }, true, ['Hide', 'Delete', 'Rename', 'View Stats', 'Rotate', '✕']],
+        ['door closed, monster found', { type: 'door', open: false }, true, ['Hide', 'Delete', 'Open Door', 'Rotate', '✕']],
+        ['door open', { type: 'door', open: true }, false, ['Hide', 'Delete', 'Close Door', 'Rotate', '✕']],
+        ['unknown type', { type: 'chest' }, true, ['Hide', 'Delete', 'Rotate', '✕']],
+    ])('%s → exact labels', (_state, item, monsterFound, expected) => {
+        const mocks = createMocks();
+        const { container } = renderMenu(mocks, {
+            placedItems: [placedItem(item)],
+            monsterFound,
+        });
+        expect(menuLabels(container)).toEqual(expected);
     });
 
-    const renderBasicToken = (overrides = {}) => {
-        const placedItems = [createPlacedItem(overrides)];
-        render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
-        );
-    };
-
-    it('renders Hide when item is visible', () => {
-        renderBasicToken({ visible: true });
-        expect(screen.getByText('Hide')).toBeInTheDocument();
-    });
-
-    it('renders Show when item visibility is explicitly false', () => {
-        renderBasicToken({ visible: false });
-        expect(screen.getByText('Show')).toBeInTheDocument();
-    });
-
-    it('renders Delete option', () => {
-        renderBasicToken();
-        expect(screen.getByText('Delete')).toBeInTheDocument();
-    });
-
-    it('renders Rotate option', () => {
-        renderBasicToken();
-        expect(screen.getByText('Rotate')).toBeInTheDocument();
-    });
-
-    it('does NOT render door-specific options for non-door items', () => {
-        renderBasicToken({ type: 'token' });
-        expect(screen.queryByText('Open Door')).not.toBeInTheDocument();
-        expect(screen.queryByText('Close Door')).not.toBeInTheDocument();
-    });
-
-    it('does NOT render rename or view stats for non-NPC items', () => {
-        renderBasicToken({ type: 'token' });
-        expect(screen.queryByText('Rename')).not.toBeInTheDocument();
-        expect(screen.queryByText('View Stats')).not.toBeInTheDocument();
-    });
-
-    it('calls handleToggleItemVisibility when Hide or Show is clicked', () => {
-        renderBasicToken({ visible: true });
-        fireEvent.click(screen.getByText('Hide'));
-        expect(mocks.handleToggleItemVisibility).toHaveBeenCalledWith('item-1');
-    });
-
-    it('calls handleDeleteItem with item id when Delete is clicked', () => {
-        renderBasicToken();
-        fireEvent.click(screen.getByText('Delete'));
-        expect(mocks.handleDeleteItem).toHaveBeenCalledWith('item-1');
-    });
-
-    it('calls handleRotate with item id when Rotate is clicked', () => {
-        renderBasicToken();
-        fireEvent.click(screen.getByText('Rotate'));
-        expect(mocks.handleRotate).toHaveBeenCalledWith('item-1');
-    });
-
-    it('calls onClose with menuX and menuY when close button is clicked', () => {
-        renderBasicToken();
-        fireEvent.click(screen.getByText('✕'));
-        expect(mocks.onClose).toHaveBeenCalledWith(30, 30);
+    it('id not in placedItems → base menu, no crash', () => {
+        const mocks = createMocks();
+        const { container } = renderMenu(mocks, { placedItems: [] });
+        expect(menuLabels(container)).toEqual(['Hide', 'Delete', 'Rotate', '✕']);
     });
 });
 
-// ── NPC item ───────────────────────────────────────────────────
+// ── Dispatch: one row per handler, exact args, nothing else fires ──
 
-describe('NPC item', () => {
-    let mocks;
-
-    beforeEach(() => {
-        mocks = createMocks();
+describe('action dispatch', () => {
+    it.each([
+        ['Hide', 'handleToggleItemVisibility', ['item-1'], {}],
+        ['Delete', 'handleDeleteItem', ['item-1'], {}],
+        ['Rotate', 'handleRotate', ['item-1'], {}],
+        ['Open Door', 'handleToggleDoor', ['item-1'], { placedItems: [placedItem({ type: 'door', open: false })] }],
+        ['View Stats', 'handleViewStats', ['item-1'], { placedItems: [placedItem({ type: 'npc' })], monsterFound: true }],
+        // Anchor byte: grid (0,0) → center (20,20) + offset 10 → onClose(30, 30).
+        ['✕', 'onClose', [30, 30], {}],
+    ])('clicking %s calls %s with %j and nothing else', (label, spyKey, args, props) => {
+        const mocks = createMocks();
+        renderMenu(mocks, props);
+        fireEvent.click(screen.getByText(label));
+        expectOnlyCall(mocks, spyKey, args);
     });
+});
 
-    const renderNpc = (overrides = {}) => {
-        const placedItems = [createPlacedItem({ type: 'npc', ...overrides })];
-        render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                monsterFound={overrides.monsterFound ?? false}
-                {...mocks}
-            />
-        );
-    };
+// ── Rename payload (distinct signature: event, selectedItem, name) ──
 
-    it('shows Rename option for NPC items', () => {
-        renderNpc();
-        expect(screen.getByText('Rename')).toBeInTheDocument();
-    });
-
-    it('shows View Stats when monsterFound is true', () => {
-        renderNpc({ monsterFound: true });
-        expect(screen.getByText('View Stats')).toBeInTheDocument();
-    });
-
-    it('does NOT show View Stats when monsterFound is falsy', () => {
-        renderNpc({ monsterFound: false });
-        expect(screen.queryByText('View Stats')).not.toBeInTheDocument();
-    });
-
-    it('calls onRenameClicked with event, selectedItem, and name when Rename is clicked', () => {
-        renderNpc({ name: 'Goblin' });
+describe('rename dispatch', () => {
+    it.each([
+        ['named npc', 'Goblin', 'Goblin'],
+        ['nameless npc', null, 'NPC'],
+    ])('%s: Rename dispatches (event, selectedItem, %s)', (_label, name, expectedName) => {
+        const mocks = createMocks();
+        renderMenu(mocks, { placedItems: [placedItem({ type: 'npc', name })] });
         fireEvent.click(screen.getByText('Rename'));
-        expect(mocks.onRenameClicked).toHaveBeenCalledTimes(1);
-        const [event, selectedItem, name] = mocks.onRenameClicked.mock.calls[0];
-        expect(event).toBeTruthy();
-        expect(selectedItem).toBe(defaultSelectedItem);
-        expect(name).toBe('Goblin');
-    });
-
-    it('passes "NPC" as default name when item has no name', () => {
-        renderNpc({ name: null });
-        fireEvent.click(screen.getByText('Rename'));
-        expect(mocks.onRenameClicked.mock.calls[0][2]).toBe('NPC');
-    });
-
-    it('calls handleViewStats with item id when View Stats is clicked', () => {
-        renderNpc({ monsterFound: true });
-        fireEvent.click(screen.getByText('View Stats'));
-        expect(mocks.handleViewStats).toHaveBeenCalledWith('item-1');
-    });
-
-    it('renders Rotate option for NPC items', () => {
-        renderNpc();
-        expect(screen.getByText('Rotate')).toBeInTheDocument();
-    });
-
-    it('does NOT show Rename or View Stats for door items even when monsterFound is true', () => {
-        const placedItems = [createPlacedItem({ type: 'door' })];
-        render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                monsterFound={true}
-                {...mocks}
-            />
-        );
-        expect(screen.queryByText('Rename')).not.toBeInTheDocument();
-        expect(screen.queryByText('View Stats')).not.toBeInTheDocument();
+        expectOnlyCall(mocks, 'onRenameClicked', [expect.anything(), SELECTED, expectedName]);
     });
 });
 
-// ── Door item ──────────────────────────────────────────────────
+// ── Click containment ──────────────────────────────────────────
 
-describe('door item', () => {
-    let mocks;
-
-    beforeEach(() => {
-        mocks = createMocks();
-    });
-
-    const renderDoor = (overrides = {}) => {
-        const placedItems = [createPlacedItem({ type: 'door', ...overrides })];
-        render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
-        );
-    };
-
-    it('shows Open Door when door is closed', () => {
-        renderDoor({ open: false });
-        expect(screen.getByText('Open Door')).toBeInTheDocument();
-    });
-
-    it('shows Close Door when door is open', () => {
-        renderDoor({ open: true });
-        expect(screen.getByText('Close Door')).toBeInTheDocument();
-    });
-
-    it('calls handleToggleDoor when Open Door is clicked', () => {
-        renderDoor({ open: false });
-        fireEvent.click(screen.getByText('Open Door'));
-        expect(mocks.handleToggleDoor).toHaveBeenCalledWith('item-1');
-    });
-
-    it('calls handleToggleDoor when Close Door is clicked', () => {
-        renderDoor({ open: true });
-        fireEvent.click(screen.getByText('Close Door'));
-        expect(mocks.handleToggleDoor).toHaveBeenCalledWith('item-1');
-    });
-});
-
-// ── Menu layout / positioning ──────────────────────────────────
-
-describe('menu layout', () => {
-    let mocks;
-
-    beforeEach(() => {
-        mocks = createMocks();
-    });
-
-    it('positions menu at correct grid offset', () => {
-        const placedItems = [createPlacedItem()];
+describe('click containment', () => {
+    it('menu panel absorbs clicks so the canvas surface below never fires', () => {
+        const mocks = createMocks();
+        const onCanvasClick = vi.fn();
         const { container } = render(
-            <ItemContextMenu
-                selectedItem={{ id: 'item-1', gridX: 2, gridY: 3 }}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
+            <svg onClick={onCanvasClick}>
+                <rect className="canvas-surface" x="0" y="0" width="400" height="400" />
+                <ItemContextMenu
+                    selectedItem={SELECTED}
+                    placedItems={[placedItem()]}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    monsterFound={false}
+                    {...mocks}
+                />
+            </svg>
         );
-        const rect = container.querySelector('rect');
-        // menuX = gridCenterX(2) + 10 = 110, menuY = gridCenterY(3) + 10 = 150
-        expect(rect.getAttribute('x')).toBe('110');
-        expect(rect.getAttribute('y')).toBe('150');
-    });
 
-    it('stops propagation on the outer group click', () => {
-        const placedItems = [createPlacedItem()];
-        const { container } = render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={placedItems}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
-        );
-        const stopSpy = vi.spyOn(Event.prototype, 'stopPropagation');
-        const outerG = container.querySelector('.item-context-menu');
-        outerG.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        expect(stopSpy).toHaveBeenCalled();
-        stopSpy.mockRestore();
-    });
-});
+        fireEvent.click(container.querySelector('.item-context-menu rect'));
+        expect(onCanvasClick).not.toHaveBeenCalled();
+        expect(mocks.handleDeleteItem).not.toHaveBeenCalled();
 
-// ── Item lookup from placedItems ───────────────────────────────
-
-describe('item lookup from placedItems', () => {
-    let mocks;
-
-    beforeEach(() => {
-        mocks = createMocks();
-    });
-
-    it('does NOT show Rename when selectedItem id is not in placedItems', () => {
-        render(
-            <ItemContextMenu
-                selectedItem={defaultSelectedItem}
-                placedItems={[]}
-                gridCenterX={mockGridCenterX}
-                gridCenterY={mockGridCenterY}
-                {...mocks}
-            />
-        );
-        expect(screen.queryByText('Rename')).not.toBeInTheDocument();
+        // Sanity: containment is real, not a dead listener — sibling click bubbles.
+        fireEvent.click(container.querySelector('.canvas-surface'));
+        expect(onCanvasClick).toHaveBeenCalledTimes(1);
     });
 });

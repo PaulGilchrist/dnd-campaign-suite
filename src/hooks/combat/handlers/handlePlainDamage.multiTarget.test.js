@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// Lane: handlePlainDamage — MULTI-TARGET ITERATION owner (#789 exact-order precedent).
+// Module under test: src/hooks/combat/handlers/handlePlainDamage.js (reached via
+// createLogDamageAndShow, src/hooks/combat/useLoggedDiceRollDamage.js). NOT
+// services/automation/handlers/combat/multiTargetHandler.js — the #880 damage-swallow
+// note lives there, a different module.
+// Family map (from #940 header): .hitClause = generic MA-0010 grant owner (:304/:393/:403/:366/:381/:475);
+// .test.js = base damage resolution (currentHitPoints :1147, lastAttack :477); .ma1732 = ticket #940
+// closed (2 tests); .popupData owns the single-target apply payload bytes (:579) and twin/multi popup
+// rendering bytes (queued NEXT). Census here = ITERATION semantics only: fan-out order, exact per-target
+// apply payloads and write counts, one log + one popup write per target, dedupe of non-distinct
+// follow-ups, honest zero-write for missing targets and failed applies. Per-target internals (resistance,
+// interception, hp writes) belong to the base lane, not here.
+// Old -> new: 9 -> 3. Census folds old apply-arg-bytes + log-bytes + popup-bytes tests; skip table
+// (it.each, #936 fold precedent) collapses twin==primary, multi==primary, twin/multi-not-found, and the
+// two mixed dedupe rows; failed-apply continuation is new (partial-failure honesty, #934).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -43,9 +59,9 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
-    playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
+    playerIsImmuneToCondition: vi.fn(() => false),
+    hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
@@ -65,10 +81,10 @@ vi.mock('../../../services/rules/combat/aoeService.js', () => ({
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
     getGuardianProtectionAcBonus: vi.fn(() => 0),
-    readAoeContext: vi.fn(),
-    hasPotentCantrip: vi.fn(),
-    isMagicMissileImmune: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    readAoeContext: vi.fn(() => null),
+    hasPotentCantrip: vi.fn(() => false),
+    isMagicMissileImmune: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -84,17 +100,17 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-    hasBardicInspirationOffense: vi.fn(),
-    getBardicInspirationDieSize: vi.fn(),
-    getBardicInspirationDieSizeFromClass: vi.fn(),
+    hasBardicInspirationOffense: vi.fn(() => false),
+    getBardicInspirationDieSize: vi.fn(() => 0),
+    getBardicInspirationDieSizeFromClass: vi.fn(() => 0),
 }));
 
 vi.mock('../../rules/spells/empoweredSpellService.js', () => ({
-    hasEmpoweredSpell: vi.fn(),
+    hasEmpoweredSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../rules/spells/metamagicRules.js', () => ({
-    getChaModifier: vi.fn(),
+    getChaModifier: vi.fn(() => 0),
 }));
 
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
@@ -102,7 +118,14 @@ import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 
-describe('Plain damage multi/twin target', () => {
+describe('handlePlainDamage — multi-target fan-out iteration', () => {
+    const roster = {
+        creatures: [
+            { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
+            { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
+            { name: 'Skeleton', type: 'npc', ac: 13, currentHp: 12, maxHp: 12 },
+        ],
+    };
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
@@ -122,251 +145,67 @@ describe('Plain damage multi/twin target', () => {
     };
 
     beforeEach(() => {
-        getRuntimeValue.mockReset().mockReturnValue(null);
-        applyDamageToTarget.mockReset().mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-        });
+        getRuntimeValue.mockReset().mockImplementation((key) => (key === 'campaign' ? [] : null));
+        applyDamageToTarget.mockReset().mockReturnValue({ finalDamage: 7, newHp: 6, damageReduced: false });
+        loadCombatSummary.mockReset().mockResolvedValue(roster);
         deps.logEntry.mockClear();
         deps.setPopupHtml.mockClear();
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
+    const spell = (context) => ({ name: 'Magic Missile', formula: '4d4+2', total: 10, rolls: [3, 2, 3, 2], modifier: 2, context });
+    const applyTargetNames = () => applyDamageToTarget.mock.calls.map(([, targetName]) => targetName);
+    const logShapes = () => deps.logEntry.mock.calls.map(([entry]) => ({ name: entry.name, targetName: entry.targetName, note: entry.note }));
+    const finalPopup = () => deps.setPopupHtml.mock.calls.reduce((acc, [arg]) => (typeof arg === 'function' ? arg(acc) : arg), {});
 
-    describe('multi target plain damage', () => {
-        it('applies damage to both primary and multi targets with correct arguments', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 7, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                ],
-            });
+    it('fans full damage to primary → twin → multi: exact per-target apply payloads, one authored-order log and popup write each', async () => {
+        applyDamageToTarget
+            .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
+            .mockReturnValueOnce({ finalDamage: 5, newHp: 10, damageReduced: false })
+            .mockReturnValueOnce({ finalDamage: 6, newHp: 8, damageReduced: false });
 
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', } });
+        await createLogDamageAndShow(deps)(spell({ targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Skeleton' }));
 
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+        expect(applyDamageToTarget).toHaveBeenCalledTimes(3);
+        expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, roster, 'Goblin', 10, ['force'], { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
+        expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, roster, 'Orc', 10, ['force'], { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestFighter' });
+        expect(applyDamageToTarget).toHaveBeenNthCalledWith(3, roster, 'Skeleton', 10, ['force'], { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'TestFighter' });
 
-            // First call: primary target (Goblin) with adjusted total
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, expect.any(Object), 'Goblin', 7, ['force'], { campaignName: 'test-campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
+        expect(logShapes()).toEqual([
+            { name: 'Magic Missile', targetName: 'Goblin', note: 'combined_damage_roll' },
+            { name: 'Magic Missile (Twinned)', targetName: 'Orc', note: 'twin_damage_roll_before_apply' },
+            { name: 'Magic Missile (Words of Creation)', targetName: 'Skeleton', note: 'multi_damage_roll_before_apply' },
+        ]);
 
-            // Second call: multi target (Orc) with adjusted total
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, expect.any(Object), 'Orc', 7, ['force'], { campaignName: 'test-campaign', characters: null,  ignoreResistance: false, attackerName: 'TestFighter' });
-        });
-
-        it('logs damage entries for both primary and multi targets', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 7, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                ],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', } });
-
-            const logCalls = deps.logEntry.mock.calls.map((call) => call[0]);
-            expect(logCalls).toHaveLength(2);
-            expect(logCalls[0].targetName).toBe('Goblin');
-            expect(logCalls[1].targetName).toBe('Orc');
-            expect(logCalls[1].note).toBe('multi_damage_roll_before_apply');
-        });
-
-        it('includes multi target info in popup data', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 6, newHp: 9, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                ],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', multiTarget: 'Orc', } });
-
-            // setPopupHtml is called multiple times: first with popup object, then with updater function for multi-target
-            const popupCalls = deps.setPopupHtml.mock.calls;
-            // Find the call that contains multi-target info (the updater function)
-            const lastCallArgs = popupCalls[popupCalls.length - 1][0];
-            // The last call is an updater function; verify it was called with multi-target data
-            expect(lastCallArgs).toBeTypeOf('function');
-            // Simulate the updater to verify the multi-target fields
-            const basePopup = popupCalls[popupCalls.length - 2][0];
-            const result = lastCallArgs(basePopup);
-            expect(result.twinTargetName).toBe('Orc');
-            expect(result.twinFinalDamage).toBe(6);
-        });
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(3);
+        // Multi is processed after twin and overwrites the shared twin* popup fields — last write wins.
+        expect(finalPopup()).toMatchObject({ twinTargetName: 'Skeleton', twinFinalDamage: 6, twinTargetCurrentHp: 8 });
     });
 
-    describe('twin target with same name', () => {
-        it('applies damage only once when twin target equals primary target', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+    it('continues the fan-out when a follow-up apply fails — remaining target still takes damage and its popup fields land', async () => {
+        applyDamageToTarget.mockImplementation((_summary, targetName) => targetName === 'Orc' ? null : { finalDamage: 7, newHp: 6, damageReduced: false });
 
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '4d4+2', total: 10, rolls: [3, 2, 3, 2], modifier: 2, context: { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Goblin', } });
+        await createLogDamageAndShow(deps)(spell({ targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Skeleton' }));
 
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, expect.any(Object), 'Goblin', 10, ['force'], { campaignName: 'test-campaign', characters: expect.any(Array),  ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
-        });
+        expect(applyTargetNames()).toEqual(['Goblin', 'Orc', 'Skeleton']);
+        expect(logShapes().map((entry) => entry.targetName)).toEqual(['Goblin', 'Orc', 'Skeleton']);
+        expect(finalPopup()).toMatchObject({ twinTargetName: 'Skeleton', twinFinalDamage: 7 });
     });
 
-    describe('multi target with same name', () => {
-        it('applies damage only once when multi target equals primary target', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
+    // Follow-up handlers run AFTER the primary's log (:1244 log → :1273 follow-ups) and each
+    // logs exactly when it applies, so log target names must mirror the apply target names 1:1.
+    const followupContexts = [
+        { label: 'twin equals primary', context: { metamagicTwinTarget: 'Goblin' }, expected: ['Goblin'] },
+        { label: 'multi equals primary', context: { multiTarget: 'Goblin' }, expected: ['Goblin'] },
+        { label: 'twin is not in the roster', context: { metamagicTwinTarget: 'NonExistent' }, expected: ['Goblin'] },
+        { label: 'multi is not in the roster', context: { multiTarget: 'NonExistent' }, expected: ['Goblin'] },
+        { label: 'multi equals primary while twin is distinct', context: { metamagicTwinTarget: 'Orc', multiTarget: 'Goblin' }, expected: ['Goblin', 'Orc'] },
+        { label: 'twin equals primary while multi is distinct', context: { metamagicTwinTarget: 'Goblin', multiTarget: 'Orc' }, expected: ['Goblin', 'Orc'] },
+    ];
 
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', multiTarget: 'Goblin', } });
+    it.each(followupContexts)('applies and logs damage to $expected only when $label — skipped follow-ups get zero writes and zero logs', async ({ context, expected }) => {
+        await createLogDamageAndShow(deps)(spell({ targetName: 'Goblin', damageType: 'force', ...context }));
 
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('multi target not found in combat summary', () => {
-        it('applies damage only to primary when multi target is missing', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', multiTarget: 'NonExistent', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(deps.logEntry).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('twin target not found in combat summary', () => {
-        it('applies damage only to primary when twin target is missing', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '4d4+2', total: 10, rolls: [3, 2, 3, 2], modifier: 2, context: { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'NonExistent', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            expect(deps.logEntry).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('both twin and multi targets', () => {
-        it('applies damage to primary, twin, and multi targets independently', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 5, newHp: 10, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 6, newHp: 8, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                    { name: 'Skeleton', type: 'npc', ac: 13, currentHp: 12, maxHp: 12 },
-                ],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '4d4+2', total: 10, rolls: [3, 2, 3, 2], modifier: 2, context: { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Skeleton', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(3);
-
-            const logCalls = deps.logEntry.mock.calls.map((call) => call[0]);
-            expect(logCalls).toHaveLength(3);
-            expect(logCalls[0].targetName).toBe('Goblin');
-            expect(logCalls[1].targetName).toBe('Orc');
-            expect(logCalls[1].note).toBe('twin_damage_roll_before_apply');
-            expect(logCalls[2].targetName).toBe('Skeleton');
-            expect(logCalls[2].note).toBe('multi_damage_roll_before_apply');
-        });
-
-        it('applies only twin damage when multi target equals primary', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 5, newHp: 10, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                ],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Magic Missile', formula: '4d4+2', total: 10, rolls: [3, 2, 3, 2], modifier: 2, context: { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Goblin', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-        });
-
-        it('applies only multi damage when twin target equals primary', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget
-                .mockReturnValueOnce({ finalDamage: 8, newHp: 5, damageReduced: false })
-                .mockReturnValueOnce({ finalDamage: 6, newHp: 8, damageReduced: false });
-            loadCombatSummary.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
-                    { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
-                ],
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Words of Creation', formula: '2d6', total: 7, rolls: [3, 4], modifier: 0, context: { targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Goblin', multiTarget: 'Orc', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-        });
+        expect(applyTargetNames()).toEqual(expected);
+        expect(logShapes().map((entry) => entry.targetName)).toEqual(expected);
     });
 });

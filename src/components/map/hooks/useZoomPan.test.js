@@ -1,506 +1,257 @@
+// @maintained-by-ai
+// useZoomPan — square-map transform lane. Distinct from hex-map zoom lane (#807):
+// this hook mirrors zoomValueRef/panValueRefs via effects, so sequential wheel events
+// compound with no hex zoomRef staleness quirk — feed inputs, pin output bytes.
+// Old(30) -> new(13): vacuous NaN pan mock (matrixTransform closed over args never
+// passed) replaced with an honest affine fake; weak not.toBe(0) anchor checks -> exact
+// pan bytes; duplicate accumulate/compound, split preventDefault, and reset-again tests
+// consolidated. Consumer files (Map*.test.jsx) mock this hook wholesale — no overlap.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import useZoomPan from './useZoomPan.js';
 
+// Pinned literals — the exact contract of useZoomPan. Do not import from config.
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 
+// Honest SVG fake: a mutable point whose matrixTransform applies the real affine
+// formula, driven by whatever coordinates the hook assigns. Not order-dependent,
+// no canned return values. Default screen-CTM inverse is scale(2).
+const SCALE_2 = { a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 };
+const makeSvg = ({ ctm = { inverse: () => SCALE_2 } } = {}) => ({
+  createSVGPoint: vi.fn(() => {
+    const pt = { x: 0, y: 0 };
+    pt.matrixTransform = (m) => ({
+      x: m.a * pt.x + m.c * pt.y + m.e,
+      y: m.b * pt.x + m.d * pt.y + m.f,
+    });
+    return pt;
+  }),
+  getScreenCTM: vi.fn(() => ctm),
+  releasePointerCapture: vi.fn(),
+});
+
+const wheelEvent = (deltaY, overrides = {}) => ({
+  metaKey: true,
+  preventDefault: vi.fn(),
+  clientX: 100,
+  clientY: 100,
+  deltaY,
+  ...overrides,
+});
+
 describe('useZoomPan', () => {
-  describe('initial state', () => {
-    it('should initialize zoom to 1, pan to 0, and panning to null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.zoom).toBe(1);
-      expect(result.current.panX).toBe(0);
-      expect(result.current.panY).toBe(0);
-      expect(result.current.panning).toBeNull();
-    });
+  it('starts at zoom 1, pan 0,0, no active pan', () => {
+    const { result } = renderHook(() => useZoomPan({ current: null }));
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
+    expect(result.current.panning).toBeNull();
   });
 
-  describe('zoomIn', () => {
-    it('should increase zoom by 1.25x', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => { result.current.zoomIn(); });
-      expect(result.current.zoom).toBe(1.25);
+  it('zoomIn multiplies by 1.25 per click and clamps at MAX_ZOOM (4)', () => {
+    const { result } = renderHook(() => useZoomPan({ current: null }));
+    act(() => { result.current.zoomIn(); });
+    expect(result.current.zoom).toBe(1.25);
+    act(() => {
+      for (let i = 0; i < 10; i++) result.current.zoomIn();
     });
-
-    it('should cap zoom at MAX_ZOOM (4)', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        for (let i = 0; i < 10; i++) {
-          result.current.zoomIn();
-        }
-      });
-      expect(result.current.zoom).toBe(MAX_ZOOM);
-    });
+    expect(result.current.zoom).toBe(MAX_ZOOM);
+    act(() => { result.current.zoomIn(); });
+    expect(result.current.zoom).toBe(MAX_ZOOM);
   });
 
-  describe('zoomOut', () => {
-    it('should decrease zoom by 0.8x', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => { result.current.zoomOut(); });
-      expect(result.current.zoom).toBe(0.8);
+  it('zoomOut multiplies by 0.8 per click and clamps at MIN_ZOOM (0.25)', () => {
+    const { result } = renderHook(() => useZoomPan({ current: null }));
+    act(() => { result.current.zoomOut(); });
+    expect(result.current.zoom).toBe(0.8);
+    act(() => {
+      for (let i = 0; i < 10; i++) result.current.zoomOut();
     });
-
-    it('should cap zoom at MIN_ZOOM (0.25)', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        for (let i = 0; i < 10; i++) {
-          result.current.zoomOut();
-        }
-      });
-      expect(result.current.zoom).toBe(MIN_ZOOM);
-    });
-
-    it('should stay at MIN_ZOOM when already at minimum', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        for (let i = 0; i < 10; i++) {
-          result.current.zoomOut();
-        }
-      });
-      const before = result.current.zoom;
-      act(() => { result.current.zoomOut(); });
-      expect(result.current.zoom).toBe(before);
-    });
+    expect(result.current.zoom).toBe(MIN_ZOOM);
+    act(() => { result.current.zoomOut(); });
+    expect(result.current.zoom).toBe(MIN_ZOOM);
   });
 
-  describe('resetView', () => {
-    it('should reset zoom, panX, and panY to their initial values', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => { result.current.zoomIn(); });
-      expect(result.current.zoom).toBe(1.25);
-      act(() => { result.current.resetView(); });
-      expect(result.current.zoom).toBe(1);
-      expect(result.current.panX).toBe(0);
-      expect(result.current.panY).toBe(0);
+  it('resetView restores zoom 1 and pan 0,0 after zooming and panning', () => {
+    const svgRef = { current: makeSvg() };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    act(() => {
+      result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 0, 0);
     });
-
-    it('should reset pan values even without prior pan', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => { result.current.zoomIn(); });
-      act(() => { result.current.resetView(); });
-      expect(result.current.panX).toBe(0);
-      expect(result.current.panY).toBe(0);
+    act(() => {
+      result.current.handlePanMove({ clientX: 120, clientY: 140, preventDefault: vi.fn() });
     });
+    act(() => { result.current.zoomIn(); });
+    expect(result.current.panX).toBe(-40);
+    expect(result.current.panY).toBe(-80);
+    act(() => { result.current.resetView(); });
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
   });
 
-  describe('gridCenterX / gridCenterY', () => {
-    it('should return grid center coordinates for a given grid position', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.gridCenterX(0)).toBe(20);
-      expect(result.current.gridCenterX(1)).toBe(60);
-      expect(result.current.gridCenterY(0)).toBe(20);
-      expect(result.current.gridCenterY(1)).toBe(60);
-    });
-
-    it('should compute correct centers for negative grid positions', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.gridCenterX(-1)).toBe(-20);
-      expect(result.current.gridCenterY(-1)).toBe(-20);
-    });
-
-    it('should scale linearly with grid position', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.gridCenterX(5)).toBe(220);
-      expect(result.current.gridCenterY(5)).toBe(220);
-    });
+  it('gridCenter maps grid indices to cell centers (cell size 40) exactly, including negatives', () => {
+    const { result } = renderHook(() => useZoomPan({ current: null }));
+    expect(result.current.gridCenterX(0)).toBe(20);
+    expect(result.current.gridCenterX(1)).toBe(60);
+    expect(result.current.gridCenterX(-1)).toBe(-20);
+    expect(result.current.gridCenterX(5)).toBe(220);
+    expect(result.current.gridCenterY(0)).toBe(20);
+    expect(result.current.gridCenterY(1)).toBe(60);
+    expect(result.current.gridCenterY(-1)).toBe(-20);
+    expect(result.current.gridCenterY(5)).toBe(220);
   });
 
-  describe('clientToSVG', () => {
-    const createMockSvg = (overrides = {}) => ({
-      createSVGPoint: vi.fn(() => ({
-        matrixTransform: vi.fn(() => ({ x: 50, y: 75 })),
-      })),
-      getScreenCTM: vi.fn(() => ({
-        inverse: vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })),
-      })),
-      ...overrides,
-    });
+  it('clientToSVG converts client coords through the inverse screen CTM, and returns null without a point or CTM', () => {
+    const svgRef = { current: makeSvg() };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    expect(result.current.clientToSVG(100, 200)).toEqual({ x: 200, y: 400 });
 
-    it('should return SVG coordinates when svgRef is valid', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const pt = result.current.clientToSVG(100, 200);
-      expect(pt).toEqual({ x: 50, y: 75 });
-      expect(mockSvg.createSVGPoint).toHaveBeenCalledTimes(1);
-    });
+    const nullRef = renderHook(() => useZoomPan({ current: null }));
+    expect(nullRef.result.current.clientToSVG(100, 200)).toBeNull();
 
-    it('should return null when svgRef is null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.clientToSVG(100, 200)).toBeNull();
-    });
-
-    it('should return null when getScreenCTM returns null', () => {
-      const mockSvg = {
-        createSVGPoint: vi.fn(() => ({
-          matrixTransform: vi.fn(() => ({ x: 50, y: 75 })),
-        })),
-        getScreenCTM: vi.fn(() => null),
-      };
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      expect(result.current.clientToSVG(100, 200)).toBeNull();
-    });
+    const noCtmRef = { current: makeSvg({ ctm: null }) };
+    const noCtm = renderHook(() => useZoomPan(noCtmRef));
+    expect(noCtm.result.current.clientToSVG(100, 200)).toBeNull();
   });
 
-  describe('getGridFromEvent', () => {
-    const createMockSvg = () => ({
-      createSVGPoint: vi.fn(() => ({
-        matrixTransform: vi.fn(() => ({ x: 80, y: 120 })),
-      })),
-      getScreenCTM: vi.fn(() => ({
-        inverse: vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })),
-      })),
-    });
+  it('getGridFromEvent divides SVG coords by cell size without flooring, and returns null without an SVG', () => {
+    const svgRef = { current: makeSvg() };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    // client(55, 70) -> scale(2) -> SVG(110, 140) -> grid(2.75, 3.5): fractional stays fractional
+    expect(result.current.getGridFromEvent({ clientX: 55, clientY: 70 })).toEqual({ gridX: 2.75, gridY: 3.5 });
 
-    it('should return grid coordinates from event clientX/clientY', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const grid = result.current.getGridFromEvent({ clientX: 100, clientY: 200 });
-      expect(grid).toEqual({ gridX: 2, gridY: 3 });
-    });
-
-    it('should return null when clientToSVG returns null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const grid = result.current.getGridFromEvent({ clientX: 100, clientY: 200 });
-      expect(grid).toBeNull();
-    });
+    const nullRef = renderHook(() => useZoomPan({ current: null }));
+    expect(nullRef.result.current.getGridFromEvent({ clientX: 55, clientY: 70 })).toBeNull();
   });
 
-  describe('panning', () => {
-    const createMockSvg = () => ({
-      createSVGPoint: vi.fn((x, y) => ({
-        x,
-        y,
-        matrixTransform: vi.fn(() => ({ x: Number(x) + 10, y: Number(y) + 10 })),
-      })),
-      getScreenCTM: vi.fn(() => ({
-        inverse: vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })),
-      })),
-      releasePointerCapture: vi.fn(),
-    });
+  it('pan starts only for a left button on a live SVG; other buttons and a null SVG stay inert', () => {
+    const svg = makeSvg();
+    const svgRef = { current: svg };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    const left = { button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() };
+    act(() => { result.current.handlePanStart(left, 5, 7); });
+    expect(left.preventDefault).toHaveBeenCalledTimes(1);
+    expect(result.current.panning).toEqual({ startX: 200, startY: 200, startPanX: 5, startPanY: 7 });
 
-    it('should start panning on left mouse button click', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = { button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() };
-      act(() => { result.current.handlePanStart(mockEvent, 0, 0); });
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-      expect(result.current.panning).not.toBeNull();
-      expect(result.current.panning.startPanX).toBe(0);
-      expect(result.current.panning.startPanY).toBe(0);
-    });
+    const right = { button: 2, clientX: 100, clientY: 100, preventDefault: vi.fn() };
+    act(() => { result.current.handlePanStart(right, 5, 7); });
+    expect(right.preventDefault).not.toHaveBeenCalled();
+    expect(result.current.panning).toEqual({ startX: 200, startY: 200, startPanX: 5, startPanY: 7 });
 
-    it('should not start panning on non-left mouse button', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = { button: 2, clientX: 100, clientY: 100, preventDefault: vi.fn() };
-      act(() => { result.current.handlePanStart(mockEvent, 0, 0); });
-      expect(result.current.panning).toBeNull();
-    });
-
-    it('should not call preventDefault on non-left mouse button', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = { button: 2, clientX: 100, clientY: 100, preventDefault: vi.fn() };
-      act(() => { result.current.handlePanStart(mockEvent, 0, 0); });
-      expect(mockEvent.preventDefault).not.toHaveBeenCalled();
-    });
-
-    it('should not start panning when svgRef is null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = { button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() };
-      act(() => { result.current.handlePanStart(mockEvent, 0, 0); });
-      expect(result.current.panning).toBeNull();
-    });
-
-    it('should update pan position during pan move', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 0, 0);
-      });
-      act(() => {
-        result.current.handlePanMove({ clientX: 150, clientY: 150, preventDefault: vi.fn() });
-      });
-      expect(result.current.panX).not.toBe(0);
-      expect(result.current.panY).not.toBe(0);
-    });
-
-    it('should call preventDefault during pan move', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 0, 0);
-      });
-      const moveEvent = { clientX: 150, clientY: 150, preventDefault: vi.fn() };
-      act(() => { result.current.handlePanMove(moveEvent); });
-      expect(moveEvent.preventDefault).toHaveBeenCalled();
-    });
-
-    it('should not change pan when not panning', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        result.current.handlePanMove({ clientX: 150, clientY: 150, preventDefault: vi.fn() });
-      });
-      expect(result.current.panX).toBe(0);
-      expect(result.current.panY).toBe(0);
-    });
-
-    it('should end panning on handlePanEnd', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 0, 0);
-      });
-      expect(result.current.panning).not.toBeNull();
-      act(() => { result.current.handlePanEnd({ pointerId: 1 }); });
-      expect(result.current.panning).toBeNull();
-    });
-
-    it('should call releasePointerCapture on svg when ending pan', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => {
-        result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 0, 0);
-      });
-      act(() => { result.current.handlePanEnd({ pointerId: 1 }); });
-      expect(mockSvg.releasePointerCapture).toHaveBeenCalledWith(1);
-    });
-
-    it('should not call releasePointerCapture when svgRef is null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      act(() => { result.current.handlePanEnd({ pointerId: 1 }); });
-      // Should not throw even when svgRef is null
-    });
+    const nullRef = renderHook(() => useZoomPan({ current: null }));
+    const onNullSvg = { button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() };
+    act(() => { nullRef.result.current.handlePanStart(onNullSvg, 0, 0); });
+    // Button gate passes before the SVG guard, so default is still prevented...
+    expect(onNullSvg.preventDefault).toHaveBeenCalledTimes(1);
+    // ...but no pan session begins without an SVG to measure against.
+    expect(nullRef.result.current.panning).toBeNull();
   });
 
-  describe('handleWheel', () => {
-    const createMockSvg = () => ({
-      createSVGPoint: vi.fn(() => ({
-        matrixTransform: vi.fn(() => ({ x: 100, y: 100 })),
-      })),
-      getScreenCTM: vi.fn(() => ({
-        inverse: vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })),
-      })),
-    });
+  it('pan move offsets pan by the SVG-space drag delta exactly; pan end clears state and releases capture; later moves are inert', () => {
+    const svg = makeSvg();
+    const svgRef = { current: svg };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    act(() => { result.current.handlePanStart({ button: 0, clientX: 100, clientY: 100, preventDefault: vi.fn() }, 5, 7); });
+    const move = { clientX: 120, clientY: 140, preventDefault: vi.fn() };
+    act(() => { result.current.handlePanMove(move); });
+    // client(120,140) -> scale(2) -> SVG(240,280); start SVG(200,200) => d=(40,80)
+    expect(result.current.panX).toBe(-35);
+    expect(result.current.panY).toBe(-73);
+    expect(move.preventDefault).toHaveBeenCalledTimes(1);
 
-    it('should do nothing when metaKey is false', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = {
-        metaKey: false,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(mockEvent); });
-      expect(result.current.zoom).toBe(1);
-      expect(mockEvent.preventDefault).not.toHaveBeenCalled();
-    });
+    act(() => { result.current.handlePanEnd({ pointerId: 1 }); });
+    expect(result.current.panning).toBeNull();
+    expect(svg.releasePointerCapture).toHaveBeenCalledWith(1);
 
-    it('should do nothing when svgRef is null', () => {
-      const svgRef = { current: null };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(mockEvent); });
-      expect(result.current.zoom).toBe(1);
-    });
+    const afterEnd = { clientX: 999, clientY: 999, preventDefault: vi.fn() };
+    act(() => { result.current.handlePanMove(afterEnd); });
+    expect(afterEnd.preventDefault).not.toHaveBeenCalled();
+    expect(result.current.panX).toBe(-35);
+    expect(result.current.panY).toBe(-73);
+  });
 
-    it('should call preventDefault when metaKey is true', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(mockEvent); });
-      expect(mockEvent.preventDefault).toHaveBeenCalled();
-    });
+  it('wheel without metaKey is fully inert; wheel with metaKey but no SVG prevents default but does not zoom', () => {
+    const svgRef = { current: makeSvg() };
+    const { result } = renderHook(() => useZoomPan(svgRef));
+    const plain = wheelEvent(-30, { metaKey: false });
+    act(() => { result.current.handleWheel(plain); });
+    expect(plain.preventDefault).not.toHaveBeenCalled();
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
 
-    it('should zoom in when accumulated delta is below threshold', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(mockEvent); });
-      expect(result.current.zoom).toBe(1.05);
-    });
+    const nullRef = renderHook(() => useZoomPan({ current: null }));
+    const noSvg = wheelEvent(-30);
+    act(() => { nullRef.result.current.handleWheel(noSvg); });
+    expect(noSvg.preventDefault).toHaveBeenCalledTimes(1);
+    expect(nullRef.result.current.zoom).toBe(1);
+  });
 
-    it('should zoom out when accumulated delta exceeds threshold', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const mockEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: 30,
-      };
-      act(() => { result.current.handleWheel(mockEvent); });
-      expect(result.current.zoom).toBe(0.95);
-    });
+  it('trackpad wheel zooms to the cursor with exact zoom and pan bytes in each direction', () => {
+    const inRef = { current: makeSvg() };
+    const zoomInCase = renderHook(() => useZoomPan(inRef));
+    // client(100,100) -> scale(2) -> anchor SVG(200,200)
+    const inEvent = wheelEvent(-30);
+    act(() => { zoomInCase.result.current.handleWheel(inEvent); });
+    expect(inEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(zoomInCase.result.current.zoom).toBe(1.05);
+    expect(zoomInCase.result.current.panX).toBe(9.523809523809547);
+    expect(zoomInCase.result.current.panY).toBe(9.523809523809547);
 
-    it('should accumulate deltas across multiple wheel events to trigger zoom', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const smallEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -15,
-      };
-      act(() => { result.current.handleWheel(smallEvent); });
-      expect(result.current.zoom).toBe(1);
-      act(() => { result.current.handleWheel(smallEvent); });
-      expect(result.current.zoom).toBe(1.05);
-    });
+    const outCase = renderHook(() => useZoomPan({ current: makeSvg() }));
+    const outEvent = wheelEvent(30);
+    act(() => { outCase.result.current.handleWheel(outEvent); });
+    expect(outEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(outCase.result.current.zoom).toBe(0.95);
+    expect(outCase.result.current.panX).toBe(-10.52631578947367);
+    expect(outCase.result.current.panY).toBe(-10.52631578947367);
+  });
 
-    it('should not zoom when accumulated delta is below threshold', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const smallEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -10,
-      };
-      act(() => { result.current.handleWheel(smallEvent); });
-      expect(result.current.zoom).toBe(1);
-    });
+  it('wheel accumulates deltaY until it crosses the 20 threshold, fires once, then restarts accumulation', () => {
+    const { result } = renderHook(() => useZoomPan({ current: makeSvg() }));
+    const small = () => wheelEvent(-15);
 
-    it('should clamp zoom at MAX_ZOOM when zooming in', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const zoomInEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -500,
-      };
-      // Each event triggers 1.05x; need ~30 events to reach 4 from 1
-      for (let i = 0; i < 30; i++) {
-        act(() => { result.current.handleWheel(zoomInEvent); });
-      }
-      expect(result.current.zoom).toBe(MAX_ZOOM);
-    });
+    const e1 = small();
+    act(() => { result.current.handleWheel(e1); });
+    expect(result.current.zoom).toBe(1);
+    expect(result.current.panX).toBe(0);
+    expect(result.current.panY).toBe(0);
 
-    it('should clamp zoom at MIN_ZOOM when zooming out', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const zoomOutEvent = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: 500,
-      };
-      // Each event triggers 0.95x; need ~51 events to reach 0.25 from 1
-      for (let i = 0; i < 55; i++) {
-        act(() => { result.current.handleWheel(zoomOutEvent); });
-      }
-      expect(result.current.zoom).toBe(MIN_ZOOM);
-    });
+    const e2 = small();
+    act(() => { result.current.handleWheel(e2); });
+    expect(result.current.zoom).toBe(1.05);
+    expect(result.current.panX).toBe(9.523809523809547);
 
-    it('should compound zoom across consecutive gestures', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const event = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(event); });
-      expect(result.current.zoom).toBe(1.05);
-      act(() => { result.current.handleWheel(event); });
-      expect(result.current.zoom).toBeCloseTo(1.05 * 1.05, 10);
-    });
+    // Accumulator reset after firing: this alone (-15) must not fire again.
+    const e3 = small();
+    act(() => { result.current.handleWheel(e3); });
+    expect(result.current.zoom).toBe(1.05);
+  });
 
-    it('should reset accumulated delta after triggering zoom', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const event = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      // First event triggers zoom
-      act(() => { result.current.handleWheel(event); });
-      expect(result.current.zoom).toBe(1.05);
-      // Second event should start accumulating from zero again
-      act(() => { result.current.handleWheel(event); });
-      expect(result.current.zoom).toBeCloseTo(1.05 * 1.05, 10);
-    });
+  it('consecutive wheel gestures compound multiplicatively and clamp at MIN/MAX_ZOOM', () => {
+    const { result } = renderHook(() => useZoomPan({ current: makeSvg() }));
+    act(() => { result.current.handleWheel(wheelEvent(-30)); });
+    act(() => { result.current.handleWheel(wheelEvent(-30)); });
+    expect(result.current.zoom).toBe(1.1025);
 
-    it('should update panX and panY when zooming with cursor anchoring', () => {
-      const mockSvg = createMockSvg();
-      const svgRef = { current: mockSvg };
-      const { result } = renderHook(() => useZoomPan(svgRef));
-      const event = {
-        metaKey: true,
-        preventDefault: vi.fn(),
-        clientX: 100,
-        clientY: 100,
-        deltaY: -30,
-      };
-      act(() => { result.current.handleWheel(event); });
-      expect(result.current.zoom).toBe(1.05);
-      expect(result.current.panX).not.toBe(0);
-      expect(result.current.panY).not.toBe(0);
+    // Pinch-in at the ceiling: extra wheel events hold the exact max.
+    act(() => { result.current.resetView(); });
+    act(() => {
+      for (let i = 0; i < 7; i++) result.current.zoomIn();
     });
+    expect(result.current.zoom).toBe(MAX_ZOOM);
+    act(() => { result.current.handleWheel(wheelEvent(-300)); });
+    expect(result.current.zoom).toBe(MAX_ZOOM);
+
+    // Pinch-out at the floor: hold the exact min.
+    act(() => { result.current.resetView(); });
+    act(() => {
+      for (let i = 0; i < 7; i++) result.current.zoomOut();
+    });
+    expect(result.current.zoom).toBe(MIN_ZOOM);
+    act(() => { result.current.handleWheel(wheelEvent(300)); });
+    expect(result.current.zoom).toBe(MIN_ZOOM);
   });
 });

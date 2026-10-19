@@ -1,8 +1,26 @@
+// @maintained-by-ai
+// Lane: ItemsPanel palette contract. SVG decor leaves are wholesale-stubbed
+// HERE BY DESIGN (#890-#902 cite this file) — their pixels are golden-tested
+// beside each leaf; this file owns the PANEL only.
+//
+// Seam split:
+//   palette census + per-tile drag payload ........ this file
+//   panel open/close through the Map mount .......... Map-tool-handlers.test.jsx
+//   drop-side handling of the payload .............. hooks/useMapDrops.test.js
+//   right-click menu dispatch ........................ ItemContextMenu.test.jsx
+//
+// Old -> new test map:
+//   visibility x3 ........................... -> 'renders nothing when closed...'
+//   items rendering (outdoor only) ........ -> palette census x2 (exact ordered, both variants)
+//   drag and drop x4 (spot checks) ........ -> folded into palette census (every tile's payload)
+//   characters section x4 ................. -> Characters section x2
+//   character image x3 .................... -> 'resolves character avatars'
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ItemsPanel from './ItemsPanel';
 
-// Mock all SVG imports
+// Mock all SVG decor leaves — this lane never asserts into them (#870).
 vi.mock('./AltarSVG.jsx', () => ({ default: () => 'AltarSVG' }));
 vi.mock('./ArrowSlitWallSVG.jsx', () => ({ default: () => 'ArrowSlitWallSVG' }));
 vi.mock('./BarrelSVG.jsx', () => ({ default: () => 'BarrelSVG' }));
@@ -35,119 +53,125 @@ const createProps = (overrides = {}) => ({
     ...overrides,
 });
 
+// Ordered exactly as ItemsPanel renders them; type is the exact 'text/plain'
+// payload useMapDrops turns into the placed item's type — no drift allowed.
+const INDOOR_PALETTE = [
+    { label: 'Altar', type: 'altar' },
+    { label: 'Arrow Slit Wall', type: 'arrowSlitWall' },
+    { label: 'Barrel', type: 'barrel' },
+    { label: 'Bed', type: 'bed' },
+    { label: 'Bookshelf', type: 'bookshelf' },
+    { label: 'Chair', type: 'chair' },
+    { label: 'Treasure Chest', type: 'chest' },
+    { label: 'Crate', type: 'crate' },
+    { label: 'Door', type: 'door' },
+    { label: 'Fire Pit', type: 'firepit' },
+    { label: 'Fountain', type: 'fountain' },
+    { label: 'Pillar', type: 'pillar' },
+    { label: 'Secret Door', type: 'secretDoor' },
+    { label: 'Stairs', type: 'stairs' },
+    { label: 'Statue', type: 'statue' },
+    { label: 'Table', type: 'table' },
+    { label: 'Torch', type: 'torch' },
+    { label: 'Trap', type: 'trap' },
+    { label: 'Spider Web', type: 'web' },
+    { label: 'NPC', type: 'npc' },
+];
+
+const OUTDOOR_PALETTE = [
+    { label: 'Barrel', type: 'barrel' },
+    { label: 'Boulder', type: 'boulder' },
+    { label: 'Bush', type: 'bush' },
+    { label: 'Crate', type: 'crate' },
+    { label: 'Fire Pit', type: 'firepit' },
+    { label: 'Torch', type: 'torch' },
+    { label: 'Tree', type: 'tree' },
+    { label: 'NPC', type: 'npc' },
+];
+
+function assertPaletteAndPayloads(palette, props = {}) {
+    const { container } = render(<ItemsPanel {...createProps(props)} />);
+    const labels = [...container.querySelectorAll('.items-panel-content > .items-panel-item > span')]
+        .map(span => span.textContent);
+    expect(labels).toEqual(palette.map(({ label }) => label));
+
+    palette.forEach(({ label, type }) => {
+        const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn() };
+        fireEvent.dragStart(screen.getByText(label).closest('.items-panel-item'), { dataTransfer });
+        expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', type);
+    });
+}
+
 describe('ItemsPanel', () => {
-    describe('visibility', () => {
-        it('returns null when itemsPanelOpen is false', () => {
-            const { container } = render(<ItemsPanel {...createProps()} itemsPanelOpen={false} />);
-            expect(container.innerHTML).toBe('');
-        });
+    it('renders nothing when closed; when open its close button fires onClose once', () => {
+        const onClose = vi.fn();
+        const { container, unmount } = render(
+            <ItemsPanel {...createProps({ onClose })} itemsPanelOpen={false} />
+        );
+        expect(container.innerHTML).toBe('');
+        unmount();
 
-        it('renders close button when open', () => {
-            render(<ItemsPanel {...createProps()} />);
-            expect(screen.getByRole('button')).toBeInTheDocument();
-        });
-
-        it('calls onClose once when close button is clicked', () => {
-            const onClose = vi.fn();
-            render(<ItemsPanel {...createProps({ onClose })} />);
-            fireEvent.click(screen.getByRole('button'));
-            expect(onClose).toHaveBeenCalledOnce();
-        });
+        render(<ItemsPanel {...createProps({ onClose })} />);
+        fireEvent.click(screen.getByRole('button'));
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    describe('items rendering', () => {
-        it('renders outdoor items and excludes indoor-only items', () => {
-            render(<ItemsPanel {...createProps({ mapVariant: 'outdoor' })} />);
-            const outdoorLabels = ['Barrel', 'Boulder', 'Bush', 'Crate', 'Fire Pit', 'Torch', 'Tree'];
-            outdoorLabels.forEach(label => {
-                expect(screen.getByText(label)).toBeInTheDocument();
-            });
-            const indoorOnlyLabels = ['Altar', 'Arrow Slit Wall', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Door', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Trap', 'Spider Web'];
-            indoorOnlyLabels.forEach(label => {
-                expect(screen.queryByText(label)).not.toBeInTheDocument();
-            });
-        });
+    it('indoor map shows the exact ordered indoor palette, each tile dragging its exact type', () => {
+        assertPaletteAndPayloads(INDOOR_PALETTE, { mapVariant: 'indoor' });
     });
 
-    describe('characters section', () => {
-        it('renders characters section when characters exist and are not players', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin' }], players: [{ name: 'Player1' }] })} />);
-            expect(screen.getByText('Characters')).toBeInTheDocument();
-            expect(screen.getByText('Goblin')).toBeInTheDocument();
-        });
-
-        it('hides characters section when no characters exist', () => {
-            render(<ItemsPanel {...createProps({ characters: [], players: [] })} />);
-            expect(screen.queryByText('Characters')).not.toBeInTheDocument();
-        });
-
-        it('hides characters section when all characters are players', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Player1' }], players: [{ name: 'Player1' }] })} />);
-            expect(screen.queryByText('Characters')).not.toBeInTheDocument();
-        });
-
-        it('filters out characters that overlap with players', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Player1' }, { name: 'Goblin' }], players: [{ name: 'Player1' }] })} />);
-            expect(screen.getByText('Goblin')).toBeInTheDocument();
-            expect(screen.queryByText('Player1')).not.toBeInTheDocument();
-        });
-
-        it('renders character image when imagePath is provided', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin', imagePath: '/goblin.png' }], players: [] })} />);
-            const img = screen.getByRole('img');
-            expect(img).toHaveAttribute('src', '/goblin.png');
-        });
-
-        it('renders character initial when no imagePath is provided', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin' }], players: [] })} />);
-            expect(screen.getByText('G')).toBeInTheDocument();
-        });
-
-        it('prefixes relative imagePath with campaignName', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin', imagePath: 'portraits/goblin.png' }], players: [], campaignName: 'my-campaign' })} />);
-            const img = screen.getByRole('img');
-            expect(img).toHaveAttribute('src', 'campaigns/my-campaign/portraits/goblin.png');
-        });
-
-        it('does not prefix imagePath that starts with http', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin', imagePath: 'https://example.com/goblin.png' }], players: [], campaignName: 'my-campaign' })} />);
-            const img = screen.getByRole('img');
-            expect(img).toHaveAttribute('src', 'https://example.com/goblin.png');
-        });
-
+    it('outdoor map shows the exact ordered outdoor palette, each tile dragging its exact type', () => {
+        assertPaletteAndPayloads(OUTDOOR_PALETTE, { mapVariant: 'outdoor' });
     });
 
-    describe('drag and drop', () => {
-        it('sets drag data type for indoor items', () => {
-            render(<ItemsPanel {...createProps({ mapVariant: 'indoor' })} />);
-            const dt = { setData: vi.fn(), setDragImage: vi.fn() };
-            const barrel = screen.getByText('Barrel').closest('.items-panel-item');
-            fireEvent.dragStart(barrel, { dataTransfer: dt });
-            expect(dt.setData).toHaveBeenCalledWith('text/plain', 'barrel');
-        });
+    it('shows a Characters section of non-player characters only, draggable with character: prefix', () => {
+        render(<ItemsPanel {...createProps({
+            characters: [{ name: 'Player1' }, { name: 'Goblin' }],
+            players: [{ name: 'Player1' }],
+        })} />);
+        expect(screen.getByText('Characters')).toBeInTheDocument();
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.queryByText('Player1')).not.toBeInTheDocument();
 
-        it('sets drag data type for outdoor items', () => {
-            render(<ItemsPanel {...createProps({ mapVariant: 'outdoor' })} />);
-            const dt = { setData: vi.fn(), setDragImage: vi.fn() };
-            const tree = screen.getByText('Tree').closest('.items-panel-item');
-            fireEvent.dragStart(tree, { dataTransfer: dt });
-            expect(dt.setData).toHaveBeenCalledWith('text/plain', 'tree');
-        });
+        const dataTransfer = { setData: vi.fn(), setDragImage: vi.fn() };
+        fireEvent.dragStart(screen.getByText('Goblin').closest('.items-panel-item'), { dataTransfer });
+        expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', 'character:Goblin');
+    });
 
-        it('sets drag data type for NPC', () => {
-            render(<ItemsPanel {...createProps()} />);
-            const dt = { setData: vi.fn(), setDragImage: vi.fn() };
-            const npc = screen.getByText('NPC').closest('.items-panel-item');
-            fireEvent.dragStart(npc, { dataTransfer: dt });
-            expect(dt.setData).toHaveBeenCalledWith('text/plain', 'npc');
-        });
+    it('hides the Characters section when nothing is draggable there', () => {
+        const { unmount } = render(<ItemsPanel {...createProps({ characters: [], players: [] })} />);
+        expect(screen.queryByText('Characters')).not.toBeInTheDocument();
+        unmount();
 
-        it('sets drag data type for characters with character: prefix', () => {
-            render(<ItemsPanel {...createProps({ characters: [{ name: 'Goblin' }], players: [] })} />);
-            const dt = { setData: vi.fn(), setDragImage: vi.fn() };
-            const char = screen.getByText('Goblin').closest('.items-panel-item');
-            fireEvent.dragStart(char, { dataTransfer: dt });
-            expect(dt.setData).toHaveBeenCalledWith('text/plain', 'character:Goblin');
-        });
+        render(<ItemsPanel {...createProps({
+            characters: [{ name: 'Player1' }],
+            players: [{ name: 'Player1' }],
+        })} />);
+        expect(screen.queryByText('Characters')).not.toBeInTheDocument();
+    });
+
+    it('resolves character avatars: campaign-relative path, untouched URL, initial fallback', () => {
+        const { unmount } = render(<ItemsPanel {...createProps({
+            campaignName: 'my-campaign',
+            characters: [
+                { name: 'Goblin', imagePath: 'portraits/goblin.png' },
+                { name: 'Spider', imagePath: 'https://example.com/spider.png' },
+                { name: 'Therk' },
+            ],
+        })} />);
+        expect(screen.getByRole('img', { name: 'Goblin' }))
+            .toHaveAttribute('src', 'campaigns/my-campaign/portraits/goblin.png');
+        expect(screen.getByRole('img', { name: 'Spider' }))
+            .toHaveAttribute('src', 'https://example.com/spider.png');
+        expect(screen.queryByRole('img', { name: 'Therk' })).not.toBeInTheDocument();
+        expect(screen.getByText('T')).toBeInTheDocument();
+        unmount();
+
+        // without a campaignName the relative path is used verbatim
+        render(<ItemsPanel {...createProps({
+            characters: [{ name: 'Goblin', imagePath: 'portraits/goblin.png' }],
+        })} />);
+        expect(screen.getByRole('img', { name: 'Goblin' }))
+            .toHaveAttribute('src', 'portraits/goblin.png');
     });
 });

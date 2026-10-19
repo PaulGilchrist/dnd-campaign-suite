@@ -1,14 +1,32 @@
+// @maintained-by-ai
 // MA-1732 grant leg: Wyvern "Sting" poisoned rider. One-field DATA fix
 // hit_conditions:["poisoned"] (MA-1723 Winter Wolf / MA-1726 Wolf lane,
 // Ettercap byte-twin) arms buildHitConditionClause →
-// handlePlainDamage.maybeApplyHitClause → applyHitClauseConditions (:554):
+// handlePlainDamage.maybeApplyHitClause → applyHitClauseConditions (:642):
 // poisoned lands on the victim's activeConditions + meta.source + a
-// condition-applied log on every resolved hit. Consumer size gate is the
-// family-wide Large-or-smaller: the Medium Bandit victim passes
-// byte-identical to MA-1723; Huge is refused. No escape DC, no expiry clock
+// condition-applied log on every resolved hit. No escape DC, no expiry clock
 // on the pure hit_conditions lane (MA-1541/MA-1723 precedent) — the prose
 // "until the start of the wyvern's next turn" anchor is the recorded
 // advisory residual of this lane.
+//
+// handlers family map / cited owners (never duplicated here):
+// - handlePlainDamage.test.js + .multiTarget.test.js — base damage resolution
+//   and multi-target iteration own the resolved-hit plumbing.
+// - handlePlainDamage.hitClause.test.js — generic MA-0010 lane owner: grant
+//   payload + provenance meta + reason bytes (:304, poisoned DC-less rows
+//   :259/:264/:268), already-active dedupe (:393), Large-or-smaller size
+//   ladder incl. Huge refusal and 'Medium or Small' pass (:403), clause-
+//   absent zero-write (:366), unresolved-hit zero-write (:381), PFEG ward
+//   split (:475).
+// - MonsterAction.ma1732-wyvern-sting-hit-conditions.test.jsx — data owner:
+//   Sting row bytes + clause fingerprint.
+// Ticket residue held here: the real wyvern row's grant leg exact write/log
+// bytes, the no-DC / no-clock legs, and a faithful-store zero-write control.
+//
+// old→new: grant+meta+no-DC+log (old 1-3) → test 1 (exact bytes);
+// dedupe (old 4) → cited hitClause.test.js:393, removed;
+// clause-absent control (old 5) → test 2 (#934 state survives);
+// Huge-gate (old 6) → cited hitClause.test.js:403, removed.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -36,9 +54,9 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
-    playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
+    playerIsImmuneToCondition: vi.fn(() => false),
+    hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
@@ -59,9 +77,9 @@ vi.mock('../../../services/rules/combat/aoeService.js', () => ({
 vi.mock('../loggedDiceRollUtils.js', () => ({
     getGuardianProtectionAcBonus: vi.fn(() => 0),
     readAoeContext: vi.fn(),
-    hasPotentCantrip: vi.fn(),
-    isMagicMissileImmune: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    hasPotentCantrip: vi.fn(() => false),
+    isMagicMissileImmune: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -87,13 +105,13 @@ vi.mock('../../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-    hasBardicInspirationOffense: vi.fn(),
+    hasBardicInspirationOffense: vi.fn(() => false),
     getBardicInspirationDieSize: vi.fn(),
     getBardicInspirationDieSizeFromClass: vi.fn(),
 }));
 
 vi.mock('../../rules/spells/empoweredSpellService.js', () => ({
-    hasEmpoweredSpell: vi.fn(),
+    hasEmpoweredSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../rules/spells/metamagicRules.js', () => ({
@@ -103,6 +121,8 @@ vi.mock('../../rules/spells/metamagicRules.js', () => ({
 import { getRuntimeValue, setRuntimeValue } from '../../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { addExpiration } from '../../../services/rules/effects/expirationQueue.js';
+import { registerTargetEffect } from '../../../services/combat/conditions/targetEffectDefinitions.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 import { buildHitConditionClause } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
@@ -126,10 +146,19 @@ describe('MA-1732 Wyvern Sting poisoned grant leg', () => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
         applyDamageToTarget.mockReturnValue({ finalDamage: 11, newHp: 987, damageReduced: false });
+        // Medium-or-Small victim passes the family-wide Large gate (byte-
+        // identical to MA-1723); ladder itself owned by hitClause.test.js:403.
         loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 11, maxHp: 11 }],
+            creatures: [
+                { name: 'Bandit 1', type: 'player', size: 'Medium or Small', ac: 12, currentHp: 11, maxHp: 11 },
+                { name: 'Wyvern 1', type: 'npc', size: 'Large', ac: 13, currentHp: 110, maxHp: 110 },
+            ],
         });
     });
+
+    function stingRoll(context) {
+        return { name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context };
+    }
 
     function hitContext(extra = {}) {
         return {
@@ -141,75 +170,45 @@ describe('MA-1732 Wyvern Sting poisoned grant leg', () => {
         };
     }
 
-    it('grants Poisoned to the Large-or-smaller victim on a resolved hit', async () => {
+    it('resolved Sting hit grants Poisoned — exact write pair, wyvern-source meta with no escape DC, no expiry clock, one condition log byte', async () => {
         const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context: hitContext() });
+        await fn(stingRoll(hitContext()));
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Bandit 1',
-            'activeConditions',
-            expect.arrayContaining(['poisoned']),
-            'test-campaign'
-        );
-    });
+        const condWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+        expect(condWrites).toEqual([['Bandit 1', 'activeConditions', ['poisoned'], 'test-campaign']]);
 
-    it('stamps the wyvern into activeConditionMeta source with no escape DC', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context: hitContext() });
+        // Deep-equal payload: dc/ability keys must be ABSENT (pure hit_conditions lane).
+        const metaWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditionMeta');
+        expect(metaWrites).toEqual([['Bandit 1', 'activeConditionMeta', { poisoned: { source: 'Wyvern 1' } }, 'test-campaign']]);
 
-        const metaCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditionMeta');
-        expect(metaCall).toBeTruthy();
-        expect(metaCall[2].poisoned.source).toBe('Wyvern 1');
-        expect(metaCall[2].poisoned.dc).toBeUndefined();
-    });
+        expect(addExpiration).not.toHaveBeenCalled();
+        expect(registerTargetEffect).not.toHaveBeenCalled();
 
-    it('logs a condition-applied entry naming the action', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context: hitContext() });
-
-        expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-            type: 'condition',
+        const conditionLogs = deps.logEntry.mock.calls.map(c => c[0]).filter(e => e.type === 'condition');
+        expect(conditionLogs).toEqual([expect.objectContaining({
             action: 'applied',
             characterName: 'Bandit 1',
             condition: 'Poisoned',
             reason: 'Sting (escape DC —)',
-        }));
+            note: null,
+        })]);
     });
 
-    it('does not duplicate Poisoned already active on the target', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'Bandit 1' && prop === 'activeConditions') return ['poisoned'];
+    it('control: no hitClause armed (plain attack / miss leg) — zero clause writes and pre-existing Poisoned survives byte-identical', async () => {
+        getRuntimeValue.mockImplementation((name, prop) => {
+            if (name !== 'Bandit 1') return null;
+            if (prop === 'activeConditions') return ['poisoned'];
+            if (prop === 'activeConditionMeta') return { poisoned: { source: 'Wyvern 1' } };
             return null;
         });
         const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context: hitContext() });
+        await fn(stingRoll({ targetName: 'Bandit 1', damageType: 'Piercing', attackerName: 'Wyvern 1' }));
 
-        const condCall = setRuntimeValue.mock.calls.find(c => c[1] === 'activeConditions');
-        expect(condCall[2].filter(c => String(c).toLowerCase() === 'poisoned')).toHaveLength(1);
-    });
-
-    it('writes nothing when the clause is absent (plain attack / miss flow)', async () => {
-        const fn = createLogDamageAndShow(deps);
-        await fn({
-            name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4,
-            context: { targetName: 'Bandit 1', damageType: 'Piercing', attackerName: 'Wyvern 1' },
-        });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
-        expect(deps.logEntry).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'condition' }));
-    });
-
-    it('family gate (§1116): Huge victims are refused; Medium passes byte-identical to MA-1723', async () => {
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Bandit 1', type: 'player', size: 'Huge', ac: 12, currentHp: 11, maxHp: 11 }],
-        });
-        const fn = createLogDamageAndShow(deps);
-        await fn({ name: 'Sting', formula: '2d6 + 4', total: 11, rolls: [4, 5], modifier: 4, context: hitContext() });
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'Bandit 1', 'activeConditions', expect.anything(), 'test-campaign'
-        );
+        // Base-lane writes (currentHitPoints/hpEffects + campaign lastAttack lanes,
+        // owned by handlePlainDamage.test.js) may fire on any resolved hit; the
+        // clause lane keys must stay untouched so stored Poisoned survives.
+        expect(setRuntimeValue.mock.calls.filter(c =>
+            c[1] === 'activeConditions' || c[1] === 'activeConditionMeta')).toEqual([]);
+        expect(deps.logEntry.mock.calls.map(c => c[0]).filter(e => e.type === 'condition')).toHaveLength(0);
     });
 });

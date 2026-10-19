@@ -1,3 +1,27 @@
+// @maintained-by-ai
+// Lane: handlePlainDamage — popup PAYLOAD BYTES owner (#744 write count, #789/#825 byte-exact census).
+// Module under test: src/hooks/combat/handlers/handlePlainDamage.js (reached via createLogDamageAndShow,
+// src/hooks/combat/useLoggedDiceRollDamage.js). NOT services/automation/handlers/combat/multiTargetHandler.js
+// — the #880 note lives there, a different module (#941 module-identity).
+// Owned here: every byte the plain popup carries — roll detail (formula/rolls/total/adjustedTotal),
+// target + hp bytes, crit styling flag, dc/tavern/spell/bardic/empowered passthrough, piercer/savage
+// availability + weaponType, applyResult-derived bytes (finalDamage overwrite on intercept, holyAura),
+// twin/secondary popup bytes incl. the twinTarget* collision the multi handler reuses (:558-566) —
+// pinned AS-AUTHORED, no new bug invented.
+// Owned elsewhere (not re-driven): fan-out order, per-target apply payloads, write counts and log notes
+// (.multiTarget #941); MA-0010 grants (.hitClause); base hp/lastAttack resolution (.test.js — its :154
+// already pins the apply args, so the old args test here is cut); min-damage/zero-damage seams
+// (.ma1400/.ma1402); secondary-damage feature bytes (.secondaryDamage); weakening/ray/seeding te bytes
+// (.weakening-breath et al).
+// Old -> new: 20 -> 17. core+gwf+elementalAdept+tavernNull+spellNameEmpty -> one byte-exact census (#1);
+// elementalAdeptBonus was mis-titled ("exceeds total") but asserted 0 — honest now: the unmocked
+// min-damage seam keeps adjustedTotal == total, so the byte is 0 as-authored. isCrit/dc/tavern/spell/
+// bardic/empowered -> 5-row passthrough table; piercer(4)+savage(5)+weaponType(4) -> 5-row gate table
+// (true gates co-assert on one rapier attack; each false-conjunct stays falsifiable);
+// intercepted+holyAura -> applyResult-derived table (secondaryDamage:383 covers the same intercept byte
+// via secondary context — the FINAL-damage-overwrite + hp bytes here are primary-payload, kept);
+// twin/secondary popup bytes are NEW here — .multiTarget :9 cited them "queued NEXT"; its :181 fold
+// keeps order, the full bytes land now.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -43,9 +67,9 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
-    playerIsImmuneToCondition: vi.fn(),
-    hasGreatWeaponFighting: vi.fn(),
+    hasIgnoreResistance: vi.fn(() => false),
+    playerIsImmuneToCondition: vi.fn(() => false),
+    hasGreatWeaponFighting: vi.fn(() => false),
     applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
@@ -65,10 +89,10 @@ vi.mock('../../../services/rules/combat/aoeService.js', () => ({
 
 vi.mock('../loggedDiceRollUtils.js', () => ({
     getGuardianProtectionAcBonus: vi.fn(() => 0),
-    readAoeContext: vi.fn(),
+    readAoeContext: vi.fn(() => null),
     hasPotentCantrip: vi.fn(),
-    isMagicMissileImmune: vi.fn(),
-    hasSoulstitchProtection: vi.fn(),
+    isMagicMissileImmune: vi.fn(() => false),
+    hasSoulstitchProtection: vi.fn(() => false),
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
@@ -84,17 +108,17 @@ vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
 }));
 
 vi.mock('../../combat/auras/bardicInspirationState.js', () => ({
-    hasBardicInspirationOffense: vi.fn(),
-    getBardicInspirationDieSize: vi.fn(),
-    getBardicInspirationDieSizeFromClass: vi.fn(),
+    hasBardicInspirationOffense: vi.fn(() => false),
+    getBardicInspirationDieSize: vi.fn(() => 0),
+    getBardicInspirationDieSizeFromClass: vi.fn(() => 0),
 }));
 
 vi.mock('../../rules/spells/empoweredSpellService.js', () => ({
-    hasEmpoweredSpell: vi.fn(),
+    hasEmpoweredSpell: vi.fn(() => false),
 }));
 
 vi.mock('../../rules/spells/metamagicRules.js', () => ({
-    getChaModifier: vi.fn(),
+    getChaModifier: vi.fn(() => 0),
 }));
 
 import { getRuntimeValue } from '../../runtime/useRuntimeState.js';
@@ -102,7 +126,14 @@ import { loadCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from '../useLoggedDiceRollDamage.js';
 
-describe('Plain damage popup data', () => {
+describe('handlePlainDamage — popup payload bytes', () => {
+    const roster = {
+        creatures: [
+            { name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 },
+            { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
+            { name: 'Alistair', type: 'player', ac: 17, currentHp: 27, maxHp: 30 },
+        ],
+    };
     const deps = {
         characterName: 'TestFighter',
         campaignName: 'test-campaign',
@@ -122,478 +153,241 @@ describe('Plain damage popup data', () => {
     };
 
     beforeEach(() => {
-        getRuntimeValue.mockReset().mockReturnValue(null);
+        // Campaign-scoped reads answer empty; creature-scoped runtime values default null (#872 explicit
+        // consumer-exact defaults): no te reductions, feats unused, lastAttack absent.
+        getRuntimeValue.mockReset().mockImplementation((key) => (key === 'campaign' ? [] : null));
         applyDamageToTarget.mockReset().mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-        loadCombatSummary.mockResolvedValue({
-            creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }],
-        });
+        loadCombatSummary.mockReset().mockResolvedValue(roster);
         deps.logEntry.mockClear();
         deps.setPopupHtml.mockClear();
     });
 
-    function createFn() {
-        return createLogDamageAndShow(deps);
-    }
+    const longsword = (context = {}) => ({
+        name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3,
+        context: { targetName: 'Goblin', damageType: 'slashing', ...context },
+    });
 
-    describe('popup data structure', () => {
-        it('includes core popup fields in the first setPopupHtml call', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
+    // Fold updater-style writes onto the primary popup (#941 robust fold — no index digging).
+    const finalPopup = () => deps.setPopupHtml.mock.calls.reduce((acc, [arg]) => (typeof arg === 'function' ? arg(acc) : arg), {});
+    const run = async (roll) => {
+        await createLogDamageAndShow(deps)(roll);
+        return finalPopup();
+    };
 
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
+    // Census of every byte buildPlainPopupData + hp fallbacks + applyPopupApplyResult +
+    // attachPopupFeatureFlags leave on a plain hit (:428-471, :1127-1229, :334-375).
+    // Note the authored defaults: bonus 0, elementalAdeptBonus 0 (applyMinDamageAdjustment is the
+    // identity seam owned by .ma1400/.ma1402, so adjustedTotal stays == total), gwf untouched,
+    // ray/weakening/resistance te bytes 0/null (te lanes owned elsewhere), 'no feat' flag bytes
+    // false, spellName ''.
+    it('writes the FULL plain popup byte-exactly, once', async () => {
+        await run(longsword());
 
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.type).toBe('damage');
-            expect(call.name).toBe('Longsword');
-            expect(call.formula).toBe('1d8+3');
-            expect(call.damageType).toBe('slashing');
-            expect(call.targetName).toBe('Goblin');
-            expect(call.total).toBe(8);
-            expect(call.adjustedTotal).toBe(8);
-            expect(call.rolls).toEqual([5, 3]);
-            expect(call.modifier).toBe(3);
-            expect(call.damageApplied).toBe(true);
-            expect(call.finalDamage).toBe(8);
-            expect(call.damageReduced).toBe(false);
-            expect(call.targetCurrentHp).toBe(5);
-            expect(call.targetMaxHp).toBe(13);
-        });
-
-        it('sets isCrit based on context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', isAutoCrit: true, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.isCrit).toBe(true);
-        });
-
-        it('sets elementalAdeptBonus when adjustedTotal exceeds total', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.elementalAdeptBonus).toBe(0);
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(1);
+        expect(deps.setPopupHtml.mock.calls[0][0]).toEqual({
+            type: 'damage',
+            name: 'Longsword',
+            formula: '1d8+3',
+            rolls: [5, 3],
+            bonus: 0,
+            modifier: 3,
+            damageType: 'slashing',
+            targetName: 'Goblin',
+            total: 8,
+            adjustedTotal: 8,
+            elementalAdeptBonus: 0,
+            isCrit: false,
+            gwfApplied: false,
+            gwfOriginalRolls: null,
+            gwfDisplayRolls: [5, 3],
+            tavernBrawlerRerolls: null,
+            rayOfEnfeebleReduction: 0,
+            rayOfEnfeebleRoll: null,
+            weakeningBreathReduction: 0,
+            weakeningBreathRoll: null,
+            resistanceReduction: 0,
+            resistanceRoll: null,
+            targetCurrentHp: 5,
+            targetMaxHp: 13,
+            damageApplied: true,
+            finalDamage: 8,
+            damageReduced: false,
+            bardicInspirationOffense: false,
+            bardicInspirationOffenseDieSize: null,
+            empoweredSpell: false,
+            empoweredSpellChaMod: 0,
+            spellName: '',
+            piercerPuncture: false,
+            weaponType: 'melee',
+            savageAttacker: false,
         });
     });
 
-    describe('bardic inspiration and empowered spell passthrough', () => {
-        it('passes bardicInspirationOffense and die size through from context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
+    const passthroughBytes = [
+        {
+            label: 'auto-crit flag (formula bytes stay unmultiplied — crit display lives on the log lane)',
+            context: { isAutoCrit: true },
+            bytes: { isCrit: true },
+        },
+        {
+            label: 'save dc triple',
+            context: { dc: 15, dcType: 'strength', dcSuccess: false },
+            bytes: { dc: 15, dcType: 'strength', dcSuccess: false },
+        },
+        {
+            label: 'tavern brawler rerolls',
+            context: { tavernBrawlerRerolls: [1, 2] },
+            bytes: { tavernBrawlerRerolls: [1, 2] },
+        },
+        {
+            label: 'spellName',
+            context: { spellName: 'Fire Bolt' },
+            bytes: { spellName: 'Fire Bolt' },
+        },
+        {
+            label: 'bardic inspiration and empowered spell pairs',
+            context: { bardicInspirationOffense: true, bardicInspirationOffenseDieSize: 6, empoweredSpell: true, empoweredSpellChaMod: 2 },
+            bytes: { bardicInspirationOffense: true, bardicInspirationOffenseDieSize: 6, empoweredSpell: true, empoweredSpellChaMod: 2 },
+        },
+    ];
 
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', bardicInspirationOffense: true, bardicInspirationOffenseDieSize: 6, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.bardicInspirationOffense).toBe(true);
-            expect(call.bardicInspirationOffenseDieSize).toBe(6);
-        });
-
-        it('passes empoweredSpell and cha mod through from context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', empoweredSpell: true, empoweredSpellChaMod: 2, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.empoweredSpell).toBe(true);
-            expect(call.empoweredSpellChaMod).toBe(2);
-        });
+    it.each(passthroughBytes)('surfaces context passthrough bytes verbatim — $label', async ({ context, bytes }) => {
+        expect(await run(longsword(context))).toMatchObject(bytes);
     });
 
-    describe('piercer puncture availability', () => {
-        function makePiercerStats() {
-            return {
+    const featGateBytes = [
+        {
+            label: 'rapier with Piercer + Savage Attacker unused grants both flag bytes',
+            roll: { name: 'Rapier', damageType: 'piercing' },
+            playerStats: {
                 reactions: [{ automation: { type: 'piercer_puncture' } }],
-            };
-        }
+                automation: { passives: [{ type: 'passive_rule', effect: 'reroll_damage_once_per_turn' }] },
+            },
+            used: { piercer: false, savage: false },
+            bytes: { weaponType: 'melee', piercerPuncture: true, savageAttacker: true },
+        },
+        {
+            label: 'same attack with both feats already used zeroes both flag bytes',
+            roll: { name: 'Rapier', damageType: 'piercing' },
+            playerStats: {
+                reactions: [{ automation: { type: 'piercer_puncture' } }],
+                automation: { passives: [{ type: 'passive_rule', effect: 'reroll_damage_once_per_turn' }] },
+            },
+            used: { piercer: true, savage: true },
+            bytes: { weaponType: 'melee', piercerPuncture: false, savageAttacker: false },
+        },
+        {
+            label: 'ranged fire bolt zeroes piercer (type gate) and savage (range gate) even with both feats',
+            roll: { name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, damageType: 'fire', isMelee: false },
+            playerStats: {
+                reactions: [{ automation: { type: 'piercer_puncture' } }],
+                automation: { passives: [{ type: 'passive_rule', effect: 'reroll_damage_once_per_turn' }] },
+            },
+            used: { piercer: false, savage: false },
+            bytes: { weaponType: 'ranged', piercerPuncture: false, savageAttacker: false },
+        },
+        {
+            label: 'unarmed strike classifies unarmed and keeps savage eligible',
+            roll: { name: 'Unarmed Strike', formula: '1d4', total: 4, rolls: [4], modifier: 0, damageType: 'bludgeoning', isUnarmedStrike: true },
+            playerStats: {
+                automation: { passives: [{ type: 'passive_rule', effect: 'reroll_damage_once_per_turn' }] },
+            },
+            used: { piercer: false, savage: false },
+            bytes: { weaponType: 'unarmed', savageAttacker: true },
+        },
+        {
+            label: 'piercing without the Piercer feat zeroes piercerPuncture',
+            roll: { name: 'Rapier', damageType: 'piercing' },
+            playerStats: {},
+            used: { piercer: false, savage: false },
+            bytes: { weaponType: 'melee', piercerPuncture: false, savageAttacker: false },
+        },
+    ];
 
-        it('sets piercerPuncture true when piercing damage, feat present, and not used', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === 'piercerPunctureUsedThisTurn') return false;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'piercing', playerStats: makePiercerStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.piercerPuncture).toBe(true);
+    it.each(featGateBytes)('feature availability + weaponType bytes — $label', async ({ roll, playerStats, used, bytes }) => {
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign') return [];
+            if (prop === 'piercerPunctureUsedThisTurn') return used.piercer;
+            if (prop === '_Savage_Attacker_usedRound') return used.savage;
+            return null;
         });
-
-        it('sets piercerPuncture false when damage type is not piercing', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === 'piercerPunctureUsedThisTurn') return false;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', playerStats: makePiercerStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.piercerPuncture).toBe(false);
-        });
-
-        it('sets piercerPuncture false when already used this turn', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === 'piercerPunctureUsedThisTurn') return true;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'piercing', playerStats: makePiercerStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.piercerPuncture).toBe(false);
-        });
-
-        it('sets piercerPuncture false when feat is not present', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Rapier', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'piercing', playerStats: {}, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.piercerPuncture).toBe(false);
-        });
+        expect(await run(longsword({ ...roll, playerStats }))).toMatchObject(bytes);
     });
 
-    describe('savage attacker availability', () => {
-        function makeSavageStats() {
-            return {
-                automation: {
-                    passives: [{ type: 'passive_rule', effect: 'reroll_damage_once_per_turn' }],
-                },
-            };
-        }
+    const applyResultBytes = [
+        {
+            label: 'intercepted hit rewrites FINAL damage to damageDealt and names the feature (:465-467)',
+            applyResult: { finalDamage: 5, newHp: 8, damageReduced: false, intercepted: true, interceptedFeature: 'Shield Boy', damageDealt: 3, oldHp: 11 },
+            bytes: { interceptedFeature: 'Shield Boy', finalDamage: 3, targetCurrentHp: 8, damageApplied: true },
+        },
+        {
+            label: 'holy aura save result object lands whole from applyResult (:468-470)',
+            applyResult: { finalDamage: 8, newHp: 5, damageReduced: false, holyAuraSaveResult: { success: true, saveType: 'wisdom' } },
+            bytes: { holyAuraSaveResult: { success: true, saveType: 'wisdom' } },
+        },
+    ];
 
-        it('sets savageAttacker true for melee attacks when feat present and not used', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === '_Savage_Attacker_usedRound') return false;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: makeSavageStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.savageAttacker).toBe(true);
-        });
-
-        it('sets savageAttacker true for unarmed strikes when feat present', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === '_Savage_Attacker_usedRound') return false;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Unarmed Strike', formula: '1d4', total: 4, rolls: [4], modifier: 0, context: { targetName: 'Goblin', damageType: 'bludgeoning', isUnarmedStrike: true, playerStats: makeSavageStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.savageAttacker).toBe(true);
-        });
-
-        it('sets savageAttacker false for ranged attacks even with feat', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === '_Savage_Attacker_usedRound') return false;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', isMelee: false, playerStats: makeSavageStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.savageAttacker).toBe(false);
-        });
-
-        it('sets savageAttacker false when already used this round', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'campaign') return [];
-                if (key === 'TestFighter' && prop === '_Savage_Attacker_usedRound') return true;
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: makeSavageStats(), } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.savageAttacker).toBe(false);
-        });
-
-        it('sets savageAttacker false when feat is not present', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', isMelee: true, playerStats: {}, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.savageAttacker).toBe(false);
-        });
+    it.each(applyResultBytes)('applyResult-derived popup bytes — $label', async ({ applyResult, bytes }) => {
+        applyDamageToTarget.mockReturnValue(applyResult);
+        expect(await run(longsword())).toMatchObject(bytes);
     });
 
-    describe('weapon type classification', () => {
-        it('sets weaponType to unarmed for unarmed strikes', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
+    // As-authored (:523-531/:558-566): BOTH secondary handlers publish into the SAME twinTarget*
+    // namespace — the multi handler overwrites twin bytes when both are distinct. .multiTarget #941
+    // owns the fan-out ORDER and order-dependent overwrite fold (:181); here the payload bytes for
+    // each lane are pinned without re-driving order. The multi row asserts the field-name collision
+    // honestly as-authored — no new bug needed.
+    const secondaryPopupBytes = [
+        {
+            label: 'twin npc copies secondary apply bytes with maxHp from the roster',
+            rosterCreature: { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
+            context: { metamagicTwinTarget: 'Orc' },
+            secondary: { finalDamage: 5, newHp: 10, damageReduced: false },
+            runtime: {},
+            bytes: { twinTargetName: 'Orc', twinFinalDamage: 5, twinTargetCurrentHp: 10, twinTargetMaxHp: 15 },
+        },
+        {
+            label: 'twin player maxHp byte comes from runtime hitPoints, not the roster',
+            rosterCreature: { name: 'Alistair', type: 'player', ac: 17, currentHp: 27, maxHp: 30 },
+            context: { metamagicTwinTarget: 'Alistair' },
+            secondary: { finalDamage: 4, newHp: 26, damageReduced: false },
+            runtime: { hitPoints: 22 },
+            bytes: { twinTargetName: 'Alistair', twinFinalDamage: 4, twinTargetCurrentHp: 26, twinTargetMaxHp: 22 },
+        },
+        {
+            label: 'twin player with no runtime hitPoints collapses maxHp byte to 0 (:528-530 ?? 0)',
+            rosterCreature: { name: 'Alistair', type: 'player', ac: 17, currentHp: 27, maxHp: 30 },
+            context: { metamagicTwinTarget: 'Alistair' },
+            secondary: { finalDamage: 4, newHp: 26, damageReduced: false },
+            runtime: { hitPoints: null },
+            bytes: { twinTargetName: 'Alistair', twinTargetMaxHp: 0 },
+        },
+        {
+            label: 'quirk as-authored — multi target publishes into the twinTarget* namespace (:558-566)',
+            rosterCreature: { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
+            context: { multiTarget: 'Orc' },
+            secondary: { finalDamage: 6, newHp: 8, damageReduced: false },
+            runtime: {},
+            bytes: { twinTargetName: 'Orc', twinFinalDamage: 6, twinTargetCurrentHp: 8, twinTargetMaxHp: 15 },
+        },
+    ];
 
-            const fn = createFn();
-            await fn({ name: 'Unarmed Strike', formula: '1d4', total: 4, rolls: [4], modifier: 0, context: { targetName: 'Goblin', damageType: 'bludgeoning', isUnarmedStrike: true, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.weaponType).toBe('unarmed');
+    it.each(secondaryPopupBytes)('secondary (twin/multi) popup bytes — $label', async ({ rosterCreature, context, secondary, runtime, bytes }) => {
+        loadCombatSummary.mockResolvedValue({
+            creatures: [roster.creatures[0], rosterCreature],
+        });
+        applyDamageToTarget.mockImplementation((_summary, targetName) =>
+            targetName === 'Goblin'
+                ? { finalDamage: 8, newHp: 5, damageReduced: false }
+                : secondary);
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign') return [];
+            return prop in runtime ? runtime[prop] : null;
         });
 
-        it('sets weaponType to melee for melee attacks', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', isMelee: true, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.weaponType).toBe('melee');
-        });
-
-        it('sets weaponType to ranged for ranged attacks', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', isMelee: false, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.weaponType).toBe('ranged');
-        });
-
-        it('defaults weaponType to melee when isMelee is undefined', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.weaponType).toBe('melee');
-        });
-    });
-
-    describe('gwf (great weapon fighting) popup data', () => {
-        it('sets gwfApplied false and gwfDisplayRolls when no GWF changes', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.gwfApplied).toBe(false);
-            expect(call.gwfOriginalRolls).toBeNull();
-            expect(call.gwfDisplayRolls).toEqual([5, 3]);
-        });
-    });
-
-    describe('holy aura save result passthrough', () => {
-        it('includes holyAuraSaveResult in popup when present in applyResult', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({
-                finalDamage: 8,
-                newHp: 5,
-                damageReduced: false,
-                holyAuraSaveResult: { success: true, saveType: 'wisdom' },
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.holyAuraSaveResult).toEqual({ success: true, saveType: 'wisdom' });
-        });
-    });
-
-    describe('dc data passthrough', () => {
-        it('includes dc, dcType, dcSuccess from context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', dc: 15, dcType: 'strength', dcSuccess: false, } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.dc).toBe(15);
-            expect(call.dcType).toBe('strength');
-            expect(call.dcSuccess).toBe(false);
-        });
-    });
-
-    describe('tavern brawler rerolls passthrough', () => {
-        it('includes tavernBrawlerRerolls from context when present', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', tavernBrawlerRerolls: [1, 2], } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.tavernBrawlerRerolls).toEqual([1, 2]);
-        });
-
-        it('sets tavernBrawlerRerolls to null when not in context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.tavernBrawlerRerolls).toBeNull();
-        });
-    });
-
-    describe('spellName passthrough', () => {
-        it('includes spellName from context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Fire Bolt', formula: '1d10', total: 8, rolls: [8], modifier: 0, context: { targetName: 'Goblin', damageType: 'fire', spellName: 'Fire Bolt', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.spellName).toBe('Fire Bolt');
-        });
-
-        it('sets spellName to empty string when not in context', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.spellName).toBe('');
-        });
-    });
-
-    describe('intercepted damage popup data', () => {
-        it('includes interceptedFeature and adjusted hp values when damage is intercepted', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({
-                finalDamage: 5,
-                newHp: 8,
-                damageReduced: false,
-                intercepted: true,
-                interceptedFeature: 'Shield Boy',
-                damageDealt: 3,
-                oldHp: 11,
-            });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            const call = deps.setPopupHtml.mock.calls[0][0];
-            expect(call.interceptedFeature).toBe('Shield Boy');
-            expect(call.finalDamage).toBe(3);
-        });
-    });
-
-    describe('applyDamageToTarget call verification', () => {
-        it('calls applyDamageToTarget with correct arguments for plain damage', async () => {
-            getRuntimeValue.mockImplementation((key) => {
-                if (key === 'campaign') return [];
-                return null;
-            });
-            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-
-            const fn = createFn();
-            await fn({ name: 'Longsword', formula: '1d8+3', total: 8, rolls: [5, 3], modifier: 3, context: { targetName: 'Goblin', damageType: 'slashing', } });
-
-            expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-            const [, target, damage, damageTypes, options] =
-                applyDamageToTarget.mock.calls[0];
-            expect(target).toBe('Goblin');
-            expect(damage).toBe(8);
-            expect(damageTypes).toEqual(['slashing']);
-            expect(options.campaignName).toBe('test-campaign');
-            expect(options.attackerName).toBe('TestFighter');
-        });
+        const popup = await run(longsword(context));
+        expect(popup).toMatchObject(bytes);
+        expect(popup.targetName).toBe('Goblin');
+        expect(popup.finalDamage).toBe(8);
     });
 });

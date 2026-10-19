@@ -1,61 +1,45 @@
+// @maintained-by-ai
+// ─── Lane: Map container context-menu wiring ──────────────────────────────────
+// OWNED here — the container seam only: how Map.jsx reacts to right-clicks.
+//   - right-click item → ONE menu, anchored at the right-clicked item's exact
+//     bytes (menuX/Y = gridCenter + 10 via the {id, gridX, gridY} payload that
+//     crosses the PlacedItems→Map seam); re-right-click swaps, never stacks
+//   - right-click empty canvas → no context menu mounts (target specificity)
+//   - close paths → menu unmounts: ✕ and left-click canvas both hit
+//     handleCloseMenu (no Escape handler is authored; no tool-mode suppression
+//     is authored — hit areas answer right-click under every tool)
+//   - end-to-end rename flow and View Stats modal open/close (delegated here
+//     by ItemContextMenu.test.jsx's header)
 //
-// Context menu integration tests for the Map component.
-// These tests verify end-to-end flows that are difficult to unit-test in isolation:
-//   - NPC rename flow through MonsterNameAutocomplete
-//   - Monster card modal opening via View Stats
+// NOT OWNED — cited to owner lanes (do not re-pin here):
+//   menu label census + per-entry dispatch args       → ItemContextMenu.test.jsx (#918)
+//   setSelectedItem payload bytes (unit, per type)      → PlacedItems-event-handlers.test.jsx
+//   player menu content, Remove/✕ dispatch              → PlayerContextMenu.test.jsx
+//   player remove flow + View Stats negatives           → Map-handlers.test.jsx
+//   native contextmenu defaultPrevented bytes, drops,
+//   wheel/zoom                                           → Map-tool-handlers.test.jsx (#917)
+//   placed-item mutations (hide/delete/rotate)          → hooks/usePlacedItems (#909)
+//   fog                                                  → #901/#904
 //
-// Unit tests for context menu rendering and behavior are in:
-//   - ItemContextMenu.test.jsx (Rename, View Stats, Hide/Show, Delete, Rotate, door options)
-//   - PlayerContextMenu.test.jsx (Remove from Map, positioning)
-//
-// Removed redundant tests:
-//   - "View Stats" visibility by monster load state → ItemContextMenu.test.jsx covers monsterFound prop
-//   - "View Stats" visibility for non-NPC items → ItemContextMenu.test.jsx covers type filtering
-//   - "View Stats" visibility for unmatched NPC names → ItemContextMenu.test.jsx covers monsterFound=false
-//   - NPC rename empty name guard → ItemContextMenu.test.jsx covers onRenameClicked callback
-//   - NPC rename whitespace trimming → ItemContextMenu.test.jsx covers onRenameClicked callback
-//   - Monster card modal close button → trivial DOM interaction, covered by modal's own tests
-//   - Case-insensitive monster matching → ItemContextMenu.test.jsx covers monsterFound logic
-//   - Trailing number stripping → ItemContextMenu.test.jsx covers baseName logic
-//   - Error logging on monster load failure → tests console.error (internal detail, brittle)
-//
-// Removed brittle tests:
-//   - querySelector('.npc-group rect') / querySelector('.item-hit-area') → fragile CSS selectors
-//   - expect(mockState.placedItems[0].name) → asserts internal mock state
-//   - expect(mockState.npcImages) → asserts internal cache state
+// Old→new: 3 tests → 5. 'shows Rename option' re-anchored from menu content
+//   (#918 owns labels) to open/anchor/swap wiring; rename flow strengthened
+//   with not-renamed sibling + menu-closed byte; modal flow strengthened with
+//   close/unmount and synced-store clear. Added: empty-canvas no-menu,
+//   ✕/canvas-click close paths.
 
 import { render, fireEvent, act, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Map from './Map.jsx';
-import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
+import { clearRuntimeState, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 const mockLoadMonsters = vi.fn(() => Promise.resolve([]));
 
+// Stateful harness: the mocked hooks read these live, so Map re-renders see
+// what its callbacks wrote (setPlacedItems/setMapData mutate them in place).
 const mockState = {
     mapData: null,
     placedItems: [],
-    zoom: 1,
-    panX: 0,
-    panY: 0,
-    panning: false,
-    rulerMode: false,
-    spellDraft: null,
-    dragOverlay: null,
-    rotateOverlay: null,
-    overlays: [],
-    selectedWalls: new Set(),
-    selectedItems: new Set(),
-    selectionRect: null,
-    moveOffset: null,
-    selectStart: { current: null },
-    moveStartGrid: { current: null },
-    painting: false,
-    dragging: null,
-    itemDragging: null,
     npcImages: {},
-    rulerStart: null,
-    rulerEnd: null,
-    rulerPreview: null,
 };
 
 class MockEventSource {
@@ -90,30 +74,34 @@ vi.mock('./hooks/useMapLoader.js', () => ({
     default: vi.fn(() => ({
         mapData: mockState.mapData,
         setMapData: vi.fn((fn) => {
-            const result = typeof fn === 'function' ? fn(mockState.mapData) : fn;
-            mockState.mapData = result;
+            mockState.mapData = typeof fn === 'function' ? fn(mockState.mapData) : fn;
         }),
         placedItems: mockState.placedItems,
         setPlacedItems: vi.fn((fn) => {
-            const result = typeof fn === 'function' ? fn(mockState.placedItems) : fn;
-            mockState.placedItems = result;
+            mockState.placedItems = typeof fn === 'function' ? fn(mockState.placedItems) : fn;
         }),
         flushSave: vi.fn(),
     })),
 }));
 
+// Deterministic cell math: center of cell (gx, gy) = (gx*40+20, gy*40+20);
+// the menu anchors at center + 10, so right-clicking cell (5,5) must put the
+// menu panel rect at x=230 y=230 — the bytes that pin which item was chosen.
+const gridCenterX = (gx) => gx * 40 + 20;
+const gridCenterY = (gy) => gy * 40 + 20;
+
 vi.mock('./hooks/useZoomPan.js', () => ({
     default: vi.fn(() => ({
-        zoom: mockState.zoom,
-        panX: mockState.panX,
-        panY: mockState.panY,
+        zoom: 1,
+        panX: 0,
+        panY: 0,
         zoomIn: vi.fn(),
         zoomOut: vi.fn(),
         resetView: vi.fn(),
-        gridCenterX: (gx) => gx * 40 + 20,
-        gridCenterY: (gy) => gy * 40 + 20,
+        gridCenterX,
+        gridCenterY,
         getGridFromEvent: vi.fn(() => ({ gridX: 5, gridY: 5 })),
-        panning: mockState.panning,
+        panning: false,
         handlePanStart: vi.fn(),
         handlePanMove: vi.fn(),
         handlePanEnd: vi.fn(),
@@ -124,7 +112,7 @@ vi.mock('./hooks/useZoomPan.js', () => ({
 
 vi.mock('./hooks/useWallDrawing.js', () => ({
     default: vi.fn(() => ({
-        painting: mockState.painting,
+        painting: false,
         handleGridPointerDown: vi.fn(),
         handleGridPointerMove: vi.fn(),
         handleGridPointerUp: vi.fn(),
@@ -134,17 +122,14 @@ vi.mock('./hooks/useWallDrawing.js', () => ({
 
 vi.mock('./hooks/useSelectMove.js', () => ({
     default: vi.fn(() => ({
-        selectionRect: mockState.selectionRect,
-        selectedWalls: mockState.selectedWalls,
-        selectedItems: mockState.selectedItems,
-        moveOffset: mockState.moveOffset,
-        selectedWallsRef: { current: mockState.selectedWalls },
-        selectedItemsRef: { current: mockState.selectedItems },
-        selectStart: mockState.selectStart,
-        moveStartGrid: mockState.moveStartGrid,
-        moveOffsetRef: { current: null },
-        selectionRectRef: { current: null },
-        selectionBoundsRef: { current: null },
+        selectionRect: null,
+        selectedWalls: new Set(),
+        selectedItems: new Set(),
+        moveOffset: null,
+        selectedWallsRef: { current: new Set() },
+        selectedItemsRef: { current: new Set() },
+        selectStart: { current: null },
+        moveStartGrid: { current: null },
         placedItemsRef: { current: mockState.placedItems },
         mapDataRef: { current: mockState.mapData },
         handleSelectPointerDown: vi.fn(),
@@ -155,11 +140,11 @@ vi.mock('./hooks/useSelectMove.js', () => ({
 
 vi.mock('./hooks/useRuler.js', () => ({
     default: vi.fn(() => ({
-        rulerMode: mockState.rulerMode,
+        rulerMode: false,
         setRulerMode: vi.fn(),
-        rulerStart: mockState.rulerStart,
-        rulerEnd: mockState.rulerEnd,
-        rulerPreview: mockState.rulerPreview,
+        rulerStart: null,
+        rulerEnd: null,
+        rulerPreview: null,
         resetRuler: vi.fn(),
         handleRulerPointerDown: vi.fn(),
         handleRulerPointerMove: vi.fn(),
@@ -169,7 +154,7 @@ vi.mock('./hooks/useRuler.js', () => ({
 
 vi.mock('./hooks/useSpellOverlay.js', () => ({
     default: vi.fn(() => ({
-        overlays: mockState.overlays,
+        overlays: [],
         addOverlay: vi.fn(),
         updateOverlay: vi.fn(),
         updateOverlayImmediate: vi.fn(),
@@ -181,9 +166,9 @@ vi.mock('./hooks/useSpellOverlay.js', () => ({
 
 vi.mock('./hooks/useSpellHandlers.js', () => ({
     default: vi.fn(() => ({
-        spellDraft: mockState.spellDraft,
-        dragOverlay: mockState.dragOverlay,
-        rotateOverlay: mockState.rotateOverlay,
+        spellDraft: null,
+        dragOverlay: null,
+        rotateOverlay: null,
         spellDragActiveRef: { current: false },
         handleSpellPointerDown: vi.fn(),
         handleSpellPointerMove: vi.fn(),
@@ -195,7 +180,7 @@ vi.mock('./hooks/useSpellHandlers.js', () => ({
 
 vi.mock('./hooks/usePlayerDragging.js', () => ({
     default: vi.fn(() => ({
-        dragging: mockState.dragging,
+        dragging: null,
         handlePointerDown: vi.fn(),
         handlePointerMove: vi.fn(),
         handlePointerUp: vi.fn(),
@@ -204,7 +189,7 @@ vi.mock('./hooks/usePlayerDragging.js', () => ({
 
 vi.mock('./hooks/useItemDragging.js', () => ({
     default: vi.fn(() => ({
-        itemDragging: mockState.itemDragging,
+        itemDragging: null,
         handleItemPointerDown: vi.fn(),
         handleItemPointerMove: vi.fn(),
         handleItemPointerUp: vi.fn(),
@@ -216,8 +201,7 @@ vi.mock('./hooks/useNpcImageCache.js', () => ({
     default: vi.fn(() => ({
         npcImages: mockState.npcImages,
         setNpcImages: vi.fn((fn) => {
-            const result = typeof fn === 'function' ? fn(mockState.npcImages) : fn;
-            Object.assign(mockState.npcImages, result);
+            Object.assign(mockState.npcImages, typeof fn === 'function' ? fn(mockState.npcImages) : fn);
         }),
     })),
 }));
@@ -245,11 +229,7 @@ vi.mock('../encounter/MonsterCardModal.jsx', () => ({
     ),
 }));
 
-const createMockMapData = (overrides = {}) => ({
-    players: [],
-    walls: new Set(),
-    ...overrides,
-});
+const npc = (id, name, gridX, gridY) => ({ id, type: 'npc', name, gridX, gridY });
 
 const renderMap = (overrides = {}) => {
     const defaultProps = {
@@ -266,109 +246,110 @@ const renderMap = (overrides = {}) => {
 };
 
 const resetState = () => {
-    Object.assign(mockState, {
-        mapData: createMockMapData(),
-        placedItems: [],
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-        panning: false,
-        rulerMode: false,
-        spellDraft: null,
-        dragOverlay: null,
-        rotateOverlay: null,
-        overlays: [],
-        selectedWalls: new Set(),
-        selectedItems: new Set(),
-        selectionRect: null,
-        moveOffset: null,
-        painting: false,
-        dragging: null,
-        itemDragging: null,
-        npcImages: {},
-        rulerStart: null,
-        rulerEnd: null,
-        rulerPreview: null,
-    });
-    mockState.selectStart.current = null;
-    mockState.moveStartGrid.current = null;
+    mockState.mapData = { players: [], walls: new Set() };
+    mockState.placedItems = [];
+    mockState.npcImages = {};
     mockLoadMonsters.mockReset();
     mockLoadMonsters.mockImplementation(() => Promise.resolve([]));
 };
 
-describe('Map - NPC context menu rendering', () => {
+const npcHitAreas = (container) =>
+    container.querySelectorAll('g.npc-group rect[fill="transparent"]');
+
+const menus = (container) => container.querySelectorAll('.item-context-menu');
+
+const menuPanelRect = (container) => menus(container)[0]?.querySelector('rect');
+
+describe('Map container - context-menu wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         clearRuntimeState('test-campaign');
+        clearRuntimeState('campaign'); // viewingMonster lives on the 'campaign' store
         MockEventSource.instances.length = 0;
         resetState();
     });
 
-    it('shows Rename option when an NPC is right-clicked', async () => {
-        mockState.placedItems = [{ id: 'npc1', type: 'npc', name: 'Goblin', gridX: 5, gridY: 5 }];
+    it('right-click opens ONE item menu anchored to the clicked item and swaps on a new right-click', async () => {
+        mockState.placedItems = [npc('npcA', 'Goblin', 5, 5), npc('npcB', 'Bogey', 8, 3)];
         const { container } = await act(async () => renderMap());
-        const npcGroup = container.querySelector('g.npc-group');
-        expect(npcGroup).toBeTruthy();
-        const hitArea = npcGroup.querySelector('rect[fill="transparent"]');
-        await act(async () => {
-            fireEvent.contextMenu(hitArea);
-        });
-        expect(screen.getByText('Rename')).toBeInTheDocument();
-    });
-});
+        const hitAreas = npcHitAreas(container);
+        expect(hitAreas).toHaveLength(2);
 
-describe('Map - NPC rename flow', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        clearRuntimeState('test-campaign');
-        MockEventSource.instances.length = 0;
-        resetState();
+        await act(async () => { fireEvent.contextMenu(hitAreas[0]); });
+        expect(menus(container)).toHaveLength(1);
+        // Selection payload {id, gridX: 5, gridY: 5} → anchor bytes 220+10, 220+10
+        expect(menuPanelRect(container).getAttribute('x')).toBe('230');
+        expect(menuPanelRect(container).getAttribute('y')).toBe('230');
+
+        // Re-right-click swaps the selection: still one menu, anchored to cell (8,3)
+        await act(async () => { fireEvent.contextMenu(hitAreas[1]); });
+        expect(menus(container)).toHaveLength(1);
+        expect(menuPanelRect(container).getAttribute('x')).toBe('350');
+        expect(menuPanelRect(container).getAttribute('y')).toBe('150');
     });
 
-    it('renames an NPC through the autocomplete commit', async () => {
-        mockState.placedItems = [{ id: 'npc1', type: 'npc', name: 'Goblin', gridX: 5, gridY: 5 }];
+    it('right-clicking empty canvas opens no context menu', async () => {
+        mockState.mapData = { players: [npc('p1', 'Thorin', 1, 1)], walls: new Set() };
+        mockState.placedItems = [npc('npcA', 'Goblin', 5, 5)];
         const { container } = await act(async () => renderMap());
-        const npcGroup = container.querySelector('g.npc-group');
-        const hitArea = npcGroup.querySelector('rect[fill="transparent"]');
-        await act(async () => {
-            fireEvent.contextMenu(hitArea);
-        });
-        await act(async () => {
-            fireEvent.click(screen.getByText('Rename'));
-        });
+
+        await act(async () => { fireEvent.contextMenu(container.querySelector('svg')); });
+        expect(menus(container)).toHaveLength(0);
+        expect(screen.queryByText('Hide')).not.toBeInTheDocument();
+        expect(screen.queryByText('Remove from Map')).not.toBeInTheDocument();
+    });
+
+    it('item menu closes exactly on ✕ and on canvas left-click', async () => {
+        mockState.placedItems = [npc('npcA', 'Goblin', 5, 5)];
+        const { container } = await act(async () => renderMap());
+        const svg = container.querySelector('svg');
+        const hit = npcHitAreas(container)[0];
+
+        await act(async () => { fireEvent.contextMenu(hit); });
+        expect(menus(container)).toHaveLength(1);
+        await act(async () => { fireEvent.click(screen.getByText('✕')); });
+        expect(menus(container)).toHaveLength(0);
+
+        await act(async () => { fireEvent.contextMenu(hit); });
+        expect(menus(container)).toHaveLength(1);
+        await act(async () => { fireEvent.click(svg, { button: 0 }); });
+        expect(menus(container)).toHaveLength(0);
+    });
+
+    it('Rename flow: popover opens and the item menu closes; Enter commits the new name to that NPC only', async () => {
+        mockState.placedItems = [npc('npcA', 'Goblin', 5, 5), npc('npcB', 'Bogey', 2, 2)];
+        const { container } = await act(async () => renderMap());
+
+        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
+        await act(async () => { fireEvent.click(screen.getByText('Rename')); });
+
+        expect(menus(container)).toHaveLength(0);
         const input = container.querySelector('.monster-autocomplete-input');
         expect(input).toBeInTheDocument();
+
         await act(async () => {
             fireEvent.change(input, { target: { value: 'Orc' } });
             fireEvent.keyDown(input, { key: 'Enter' });
         });
-        expect(mockState.placedItems[0].name).toBe('Orc');
+
+        expect(mockState.placedItems.map(i => i.name)).toEqual(['Orc', 'Bogey']);
         expect(container.querySelector('.monster-autocomplete-input')).not.toBeInTheDocument();
     });
-});
 
-describe('Map - monster card modal flow', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        clearRuntimeState('test-campaign');
-        MockEventSource.instances.length = 0;
-        resetState();
-    });
-
-    it('opens the monster card modal via View Stats when the monster is loaded', async () => {
+    it('View Stats opens the monster card with the bestiary match and closes back through the synced store', async () => {
         mockLoadMonsters.mockImplementation(() => Promise.resolve([{ name: 'Goblin', index: 'goblin' }]));
-        mockState.placedItems = [{ id: 'npc1', type: 'npc', name: 'Goblin', gridX: 5, gridY: 5 }];
+        mockState.placedItems = [npc('npcA', 'Goblin', 5, 5)];
         const { container } = await act(async () => renderMap());
-        const npcGroup = container.querySelector('g.npc-group');
-        const hitArea = npcGroup.querySelector('rect[fill="transparent"]');
-        await act(async () => {
-            fireEvent.contextMenu(hitArea);
-        });
-        await act(async () => {
-            fireEvent.click(screen.getByText('View Stats'));
-        });
+
+        await act(async () => { fireEvent.contextMenu(npcHitAreas(container)[0]); });
+        await act(async () => { fireEvent.click(screen.getByText('View Stats')); });
+
         const modal = screen.getByTestId('monster-card-modal');
-        expect(modal).toBeInTheDocument();
         expect(within(modal).getByText('Goblin')).toBeInTheDocument();
+        expect(getRuntimeValue('campaign', 'map-viewingMonster')).toMatchObject({ name: 'Goblin' });
+
+        await act(async () => { fireEvent.click(within(modal).getByText('close')); });
+        expect(screen.queryByTestId('monster-card-modal')).not.toBeInTheDocument();
+        expect(getRuntimeValue('campaign', 'map-viewingMonster')).toBeNull();
     });
 });

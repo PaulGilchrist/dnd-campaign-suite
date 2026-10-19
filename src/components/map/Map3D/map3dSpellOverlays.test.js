@@ -1,7 +1,26 @@
+// @maintained-by-ai
+// Lane: overlay SHAPE -> exact 3D scene-graph bytes using REAL THREE (geometry,
+// material, outline, group transform of one createOverlayGroup call).
+// Distinct seams: useSpellHandlers #913 (2D draft + shapeParams bytes),
+// sseHandlers-overlay #873 (SSE payload bodies), useSpellOverlay #914 (persistence),
+// Map3D.test.jsx #925 (verbatim overlays-prop forwarding; THREE never loaded there).
+// Update/remove/dispose semantics live in the map3dScene rebuild lane, not here.
+// Goldens #815: expected bytes are literals hand-derived ONCE from the fixtures
+// (1 ft = 8 units; EFFECT_HEIGHT = 80 units = 10 ft), never re-run source formulas.
 import * as THREE from 'three';
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createOverlayGroup, parseOverlayColor, ftToUnits, EFFECT_HEIGHT } from './map3dSpellOverlays.js';
-import { OverlayShape, OVERLAY_FILL_ALPHA, OVERLAY_STROKE_ALPHA } from '../../../models/SpellOverlay.js';
+import { describe, it, expect, vi } from 'vitest';
+import { createOverlayGroup, parseOverlayColor } from './map3dSpellOverlays.js';
+import { OverlayShape } from '../../../models/SpellOverlay.js';
+
+// rgba(255,80,60,·) converted sRGB->linear: g = ((80/255+0.055)/1.055)^2.4,
+// b = ((60/255+0.055)/1.055)^2.4, r = 1 (hand-derived golden, #815).
+const GOLDEN_LINEAR_RGB = [1, 0.080220, 0.045186];
+
+const expectGoldenColor = (color) => {
+    expect(color.r).toBeCloseTo(GOLDEN_LINEAR_RGB[0], 5);
+    expect(color.g).toBeCloseTo(GOLDEN_LINEAR_RGB[1], 5);
+    expect(color.b).toBeCloseTo(GOLDEN_LINEAR_RGB[2], 5);
+};
 
 const makeOverlay = (overrides = {}) => ({
     id: 'o1',
@@ -18,158 +37,149 @@ const makeOverlay = (overrides = {}) => ({
     ...overrides,
 });
 
-const getMesh = (group) => group.children[0];
-const getOutline = (group) => group.children[1];
-const bbox = (geometry) => {
-    geometry.computeBoundingBox();
-    return geometry.boundingBox;
-};
-
-afterEach(() => {
-    vi.restoreAllMocks();
-});
-
-describe('ftToUnits / EFFECT_HEIGHT', () => {
-    it('converts feet to world units (1 ft = 8 units)', () => {
-        expect(ftToUnits(5)).toBe(40);
-        expect(ftToUnits(20)).toBe(160);
-        expect(ftToUnits(60)).toBe(480);
-    });
-
-    it('effect height is 10 feet (2 cells)', () => {
-        expect(EFFECT_HEIGHT).toBe(80);
-    });
-});
-
-const expectedColor = new THREE.Color().setRGB(1, 80 / 255, 60 / 255, THREE.SRGBColorSpace);
-
-describe('parseOverlayColor', () => {
-    it('parses rgba strings into an sRGB-converted color and alpha', () => {
-        const { color, alpha } = parseOverlayColor(THREE, 'rgba(255,80,60,0.35)');
-        expect(color).toEqual(expectedColor);
-        expect(alpha).toBeCloseTo(0.35);
-    });
-
-    it('falls back to the default overlay color and logs an error for bad input', () => {
-        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const { color, alpha } = parseOverlayColor(THREE, 'not-a-color');
-        expect(color).toEqual(expectedColor);
-        expect(alpha).toBeCloseTo(OVERLAY_FILL_ALPHA);
-        expect(spy).toHaveBeenCalled();
-    });
-});
+// Each row: fixture overrides + every byte the builder must emit in local space
+// (+X east, +Z south, +Y up; ft x 8 = units; cones: apex at origin, opens +X).
+const SHAPE_CASES = [
+    {
+        name: 'sphere (no outline, floor-centered)',
+        overlay: {},
+        x: 100, z: -50,
+        rotationY: 0,
+        meshType: 'SphereGeometry',
+        params: { radius: 160 }, // 20 ft
+        bboxMin: [-160, -160, -160],
+        bboxMax: [160, 160, 160],
+        outline: false,
+    },
+    {
+        name: 'cylinder (floor to EFFECT_HEIGHT, outlined)',
+        overlay: { shape: OverlayShape.CYLINDER },
+        x: 0, z: 0,
+        rotationY: 0,
+        meshType: 'CylinderGeometry',
+        params: { radiusTop: 160, radiusBottom: 160, height: 80 },
+        bboxMin: [-160, 0, -160],
+        bboxMax: [160, 80, 160],
+        outline: true,
+    },
+    {
+        name: 'cube (size^3 on floor, angle 90 -> rotation.y = -PI/2)',
+        overlay: { shape: OverlayShape.CUBE, sizeFt: 15, angle: 90 },
+        x: 0, z: 0,
+        rotationY: -1.5708,
+        meshType: 'BoxGeometry',
+        params: { width: 120, height: 120, depth: 120 }, // 15 ft
+        bboxMin: [-60, 0, -60],
+        bboxMax: [60, 120, 60],
+        outline: true,
+    },
+    {
+        name: 'cone 60deg (apex at origin)',
+        overlay: { shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 60 },
+        x: 0, z: 0,
+        rotationY: 0,
+        meshType: 'ConeGeometry',
+        params: { height: 480, radius: 277.12813 }, // 480 x tan(30deg)
+        bboxMin: [0, -277.128, -277.128],
+        bboxMax: [480, 277.128, 277.128],
+        outline: true,
+    },
+    {
+        name: 'cone 270deg (base radius capped at distance)',
+        overlay: { shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 270 },
+        x: 0, z: 0,
+        rotationY: 0,
+        meshType: 'ConeGeometry',
+        params: { height: 480, radius: 480 },
+        bboxMin: [0, -480, -480],
+        bboxMax: [480, 480, 480],
+        outline: true,
+    },
+    {
+        name: 'cone 360deg (full cylinder fallback)',
+        overlay: { shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 360 },
+        x: 0, z: 0,
+        rotationY: 0,
+        meshType: 'CylinderGeometry',
+        params: { radiusTop: 480, radiusBottom: 480, height: 80 },
+        bboxMin: [-480, 0, -480],
+        bboxMax: [480, 80, 480],
+        outline: true,
+    },
+    {
+        name: 'line (beam along +X)',
+        overlay: { shape: OverlayShape.LINE, distanceFt: 60, widthFt: 5 },
+        x: 0, z: 0,
+        rotationY: 0,
+        meshType: 'BoxGeometry',
+        params: { width: 480, height: 80, depth: 40 }, // 60 ft long, 5 ft wide
+        bboxMin: [0, 0, -20],
+        bboxMax: [480, 80, 20],
+        outline: true,
+    },
+];
 
 describe('createOverlayGroup', () => {
-    it('returns null for an unknown shape', () => {
-        expect(createOverlayGroup(THREE, makeOverlay({ shape: 'hexagon' }), 0, 0)).toBeNull();
-        expect(createOverlayGroup(THREE, null, 0, 0)).toBeNull();
-    });
+    it.each(SHAPE_CASES)(
+        'builds $name with exact geometry, material, outline, and group bytes',
+        ({ overlay, x, z, rotationY, meshType, params, bboxMin, bboxMax, outline }) => {
+            const group = createOverlayGroup(THREE, makeOverlay(overlay), x, z);
 
-    it('positions the group at the given cell origin on the floor', () => {
-        const group = createOverlayGroup(THREE, makeOverlay(), 100, -50);
-        expect(group.position.x).toBe(100);
-        expect(group.position.y).toBe(0);
-        expect(group.position.z).toBe(-50);
-    });
+            expect(group.position.toArray()).toEqual([x, 0, z]);
+            expect(group.rotation.y).toBeCloseTo(rotationY, 4);
 
-    it('applies the 2D clockwise angle as a negative Y rotation', () => {
-        const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CUBE, angle: 90, sizeFt: 15 }), 0, 0);
-        expect(group.rotation.y).toBeCloseTo(-Math.PI / 2);
-    });
+            const mesh = group.children[0];
+            expect(mesh).toBeInstanceOf(THREE.Mesh);
+            expect(mesh.geometry.type).toBe(meshType);
+            for (const [key, expected] of Object.entries(params)) {
+                expect(mesh.geometry.parameters[key]).toBeCloseTo(expected, 4);
+            }
+            mesh.geometry.computeBoundingBox();
+            const min = mesh.geometry.boundingBox.min.toArray();
+            const max = mesh.geometry.boundingBox.max.toArray();
+            bboxMin.forEach((v, i) => expect(min[i]).toBeCloseTo(v, 3));
+            bboxMax.forEach((v, i) => expect(max[i]).toBeCloseTo(v, 3));
 
-    describe('sphere', () => {
-        it('builds a sphere centered at floor level with the radius in feet and no outline', () => {
-            const group = createOverlayGroup(THREE, makeOverlay(), 0, 0);
-            expect(group.children).toHaveLength(1);
-            const mesh = getMesh(group);
-            expect(mesh.geometry.parameters.radius).toBe(160); // 20 ft
-            const box = bbox(mesh.geometry);
-            expect(box.min.y).toBeCloseTo(-160);
-            expect(box.max.y).toBeCloseTo(160);
-            expect(mesh.material).toBeInstanceOf(THREE.MeshBasicMaterial);
-            expect(mesh.material.transparent).toBe(true);
-            expect(mesh.material.opacity).toBeCloseTo(0.35);
-            expect(mesh.material.depthTest).toBe(false);
-            expect(mesh.material.depthWrite).toBe(false);
-            expect(mesh.material.side).toBe(THREE.DoubleSide);
+            const material = mesh.material;
+            expect(material).toBeInstanceOf(THREE.MeshBasicMaterial);
+            expectGoldenColor(material.color);
+            expect(material.transparent).toBe(true);
+            expect(material.opacity).toBeCloseTo(0.35);
+            expect(material.depthTest).toBe(false);
+            expect(material.depthWrite).toBe(false);
+            expect(material.side).toBe(THREE.DoubleSide);
             expect(mesh.renderOrder).toBe(1001);
-            expect(mesh.material.color).toEqual(expectedColor);
-        });
+
+            if (outline) {
+                expect(group.children).toHaveLength(2);
+                const line = group.children[1];
+                expect(line).toBeInstanceOf(THREE.LineSegments);
+                expect(line.geometry.type).toBe('EdgesGeometry');
+                expectGoldenColor(line.material.color);
+                expect(line.material.opacity).toBeCloseTo(0.2);
+                expect(line.renderOrder).toBe(1002);
+            } else {
+                expect(group.children).toHaveLength(1);
+            }
+        }
+    );
+
+    it('returns null for a missing overlay or unknown shape without throwing', () => {
+        expect(createOverlayGroup(THREE, null, 0, 0)).toBeNull();
+        expect(createOverlayGroup(THREE, makeOverlay({ shape: 'hexagon' }), 0, 0)).toBeNull();
     });
+});
 
-    describe('cylinder', () => {
-        it('builds a floor-to-ceiling cylinder with an outline', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CYLINDER }), 0, 0);
-            expect(group.children).toHaveLength(2);
-            const mesh = getMesh(group);
-            expect(mesh.geometry.parameters.radiusTop).toBe(160);
-            expect(mesh.geometry.parameters.radiusBottom).toBe(160);
-            expect(mesh.geometry.parameters.height).toBe(80);
-            const box = bbox(mesh.geometry);
-            expect(box.min.y).toBeCloseTo(0);
-            expect(box.max.y).toBeCloseTo(80);
-            const outline = getOutline(group);
-            expect(outline).toBeInstanceOf(THREE.LineSegments);
-            expect(outline.material.opacity).toBeCloseTo(OVERLAY_STROKE_ALPHA);
-            expect(outline.renderOrder).toBe(1002);
-        });
-    });
-
-    describe('cube', () => {
-        it('builds a size-cubed box sitting on the floor', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CUBE, sizeFt: 15 }), 0, 0);
-            const mesh = getMesh(group);
-            expect(mesh.geometry.parameters.width).toBe(120); // 15 ft
-            expect(mesh.geometry.parameters.height).toBe(120);
-            expect(mesh.geometry.parameters.depth).toBe(120);
-            const box = bbox(mesh.geometry);
-            expect(box.min.y).toBeCloseTo(0);
-            expect(box.max.y).toBeCloseTo(120);
-        });
-    });
-
-    describe('cone', () => {
-        it('builds a cone with apex at the origin opening along +X', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 60 }), 0, 0);
-            const mesh = getMesh(group);
-            const params = mesh.geometry.parameters;
-            expect(params.height).toBe(480); // 60 ft
-            expect(params.radius).toBeCloseTo(480 * Math.tan(Math.PI / 6), 1);
-            const box = bbox(mesh.geometry);
-            expect(box.min.x).toBeCloseTo(0);
-            expect(box.max.x).toBeCloseTo(480);
-            expect(box.min.y).toBeCloseTo(-480 * Math.tan(Math.PI / 6), 1);
-            expect(box.max.y).toBeCloseTo(480 * Math.tan(Math.PI / 6), 1);
-        });
-
-        it('caps the base radius at the hemisphere radius past 180 degrees', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 270 }), 0, 0);
-            const mesh = getMesh(group);
-            expect(mesh.geometry.parameters.radius).toBeCloseTo(480);
-        });
-
-        it('builds a full circle for a 360-degree cone', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.CONE, distanceFt: 60, coneAngle: 360 }), 0, 0);
-            const mesh = getMesh(group);
-            expect(mesh.geometry.parameters.radiusTop).toBe(480);
-            expect(mesh.geometry.parameters.radiusBottom).toBe(480);
-            expect(mesh.geometry.parameters.height).toBe(80);
-        });
-    });
-
-    describe('line', () => {
-        it('builds a beam extending from the origin along +X', () => {
-            const group = createOverlayGroup(THREE, makeOverlay({ shape: OverlayShape.LINE, distanceFt: 60, widthFt: 5 }), 0, 0);
-            const mesh = getMesh(group);
-            const params = mesh.geometry.parameters;
-            expect(params.width).toBe(480); // 60 ft
-            expect(params.height).toBe(80); // 10 ft
-            expect(params.depth).toBe(40); // 5 ft
-            const box = bbox(mesh.geometry);
-            expect(box.min.x).toBeCloseTo(0);
-            expect(box.max.x).toBeCloseTo(480);
-            expect(box.min.z).toBeCloseTo(-20);
-            expect(box.max.z).toBeCloseTo(20);
-        });
+describe('parseOverlayColor', () => {
+    it.each([
+        { label: 'parses valid rgba to the golden linear color and alpha', input: 'rgba(255,80,60,0.35)', alpha: 0.35, errors: false },
+        { label: 'falls back to default rgba(255,80,60,0.07) and logs for bad input', input: 'not-a-color', alpha: 0.07, errors: true },
+    ])('$label', ({ input, alpha, errors }) => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { color, alpha: parsedAlpha } = parseOverlayColor(THREE, input);
+        expectGoldenColor(color);
+        expect(parsedAlpha).toBeCloseTo(alpha);
+        expect(spy).toHaveBeenCalledTimes(errors ? 1 : 0);
+        spy.mockRestore();
     });
 });

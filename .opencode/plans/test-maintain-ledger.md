@@ -1757,3 +1757,58 @@ run2#902: map/FountainSVG -> maintained (13->3): 21-element census; evenodd ring
 ## Batch #178 GREEN — run2#888-#902 (15 files)
 ## Batch #178 — PROGRESS: completed 2038 / remaining 646 (total 2684)
 - Suite: lint clean; 2752 files, 32,962 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 10th consecutive; evidence /tmp/batch178.log). 33,072->32,962 (-110) from SVG decor template sweep (13 lanes, e.g. Chair 16->3, Chest 16->3, Altar 19->4) + log travel/toolbar.
+run2#903: map/GridAndWalls -> maintained (12->13 cases): verbatim oracles replace (g+1)*2 recompute; fog-undefined honesty NEW; live re-render
+run2#904: map/useFogOfWar CANON -> maintained (14->5/10): authored-literal fog censuses; memo-identity cut #796; wiring one-fixture; REC test-utils:711 vacuous-vs-mock
+run2#905: map/useItemDragging -> maintained (24->15): commit contract NEW (exact-once rerender seam); spy-leak hygiene. 🔴 capture-strand :28-38 logged
+run2#906: map/useMapDrops -> maintained (21->9): stateful-harness exemplar (retired mock archaeology + brittle resetAllMocks); snap matrix. ⚠ whitespace-furniture + NaN-cells logged
+run2#907: map/useMapLoader -> maintained (20->11): ALL 4 open bugs re-confirmed+pinned FIXME-style; cite refresh :37/:78-92/:60-62/:50-57; debounce boundary deterministic
+run2#908: map/useNpcImageCache -> maintained (7->4): Once-chain brittleness->deterministic fake; misnamed-cache full-refetch honest pin
+run2#909: map/usePlacedItems -> maintained (19->6): exact-literal CRUD; unconditional-setSelection quirk pinned; folder-red claim DISMISSED (orchestrator 4/4 green)
+run2#910: map/usePlayerDragging -> maintained (36->31): trigger-args keystone NEW; vacuous player-not-found replaced; 🔴 capture-leak class CONFIRMED systemic :124+:257
+run2#911: map/useRuler -> maintained (20->8): capture CLEAN here (guards-before-capture); reset-vs-disable distinction NEW
+run2#912: map/useSelectMove -> maintained (20->15): budget clamp B1/B2 NEW owned; vacuous titles fixed with real stamps
+run2#913: map/useSpellHandlers -> maintained (39->20): bounds-angle->exact ints; guard-honesty real gestures. ⚠ :51 right-click-empty-grid quirk
+run2#914: map/useSpellOverlay -> maintained (36->9): POST URL finally asserted; debounce 149/150 boundary; service-noise cleared. ⚠ :59 unmount-debounce leak
+run2#915: map/useSSESync -> maintained (16->15): revealed field NEW; toBe identity guard proof; asymmetry table. ⚠ :28 !==undefined vs || logged
+run2#916: map/useWallDrawing -> maintained (21->11): pixel-driven grid fake (order-dependent fixed); real-gesture trails both modes; tautological self-assert deleted
+run2#917: map/useZoomPan -> maintained (30->13): FATAL vacuous-NaN pan mock replaced honest affine; anchor bytes exact; 🔴 release-without-capture NotFoundError class logged
+
+## Batch #179 GREEN — run2#903-#917 (15 files)
+## Batch #179 — PROGRESS: completed 2053 / remaining 631 (total 2684)
+- Suite: lint clean; 2752 files, 32,767 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 11th consecutive; evidence /tmp/batch179.log). 32,962->32,767 (-195) from map/hooks sweep: zoomPan 30->13 (fatal vacuous-NaN mock fixed), spellHandlers 39->20, spellOverlay 36->9, playerDragging 36->31, wallDrawing 21->11, ruler 20->8, loader 20->11, fog 14->5.
+run2#918: map/ItemContextMenu (CITED Open/Close owner) -> maintained (20->18): ordered label census per item state; 6-row dispatch table exact args + ✕ anchor byte; brittle stopPropagation-spy -> observable containment w/ sibling sanity
+run2#919: map/ItemsPanel -> maintained (14->6): full 19-tile indoor census (was none); every drag payload vs useMapDrops verbatim; image 4-branch incl campaignName-absent
+run2#920: map/Map-context-menus -> maintained (3->5): re-anchored to real wiring (anchor bytes, no-stacking); viewedMonster store-sync pins NEW; honest unauthored gaps documented not faked. RECs Map-handlers :346 vacuous+:280/:294 dupes
+run2#921: map/Map-handlers -> maintained (4->2): DOUBLE-vacuous fixed (guard-skipped remove test w/ never-matching selector + never-opened close test) -> real open->close lifecycles exact bytes
+run2#922: map/Map-tool-handlers (CITED :419) -> maintained (16->15): TOOL->pointerdown matrix exact routing; flushSave autosave seam NEW app-wide; wheel routing NEW; :419 face preserved->:489
+run2#923: map/map.test-utils -> maintained (62->5, 723->110 lines): KEY FINDING helper imported ONLY by own meta-test — pure tested-own-mock purged; 4 carried recs applied; kept calc/override/Set-independence smokes
+run2#924: map CONTAINER (CITED availability owner) -> maintained (10->8): both recs applied; defs census strengthened exact ordered (surfaced nested-defs defect); T8 mergeNewlyRevealed persistence NEW app-wide idempotent; fake MockEventSource deleted
+run2#925: map/Map3D container -> maintained (9->7): deps-isolation flaw fixed (overlays rebuild now isolated by ref-hold); exact buildMap payload; WebGL failure needs console evidence
+run2#926: map/Map3D/map3dSpellOverlays -> maintained (14->10): #710 formula-oracle FIXED (hand-derived linear literals); cone 3-branch dispatch as data; unit-conv tautologies -> golden bytes
+run2#927: map/MapToolbar.display-name -> maintained (5->3): regression lane kept w/ negative byte-pin; sibling split table; rec forwarded for sibling dupe trim
+run2#928: map/MapToolbar (CITED routing owner) -> maintained (23->16): routing faces both directions preserved; rec #927 applied; 🔴 :42-48 null-overlayState destructure-crash + ⚠ :127 falsy-divergence logged
+run2#929: map/PlacedItems-event-handlers -> maintained (4->6): 3 hit-area sites parameterized — shared rectHitArea gap CLOSED (deletion broke nothing); defaultPrevented + identity payloads exact
+run2#930: map/PlacedItems-localhost-rendering -> maintained (11->6): title-lie fixed network leg was missing; it.each both legs exact bytes; avatar-source priority NEW. REC -2 lane :50 redundant
+run2#931: hooks/combat/cla120-potent-cantrip -> maintained (3->4): dedupe guard falsified via auto-miss roll path; exact log bytes logging-mandate satisfied; folded PASS control
+run2#932: hooks/combat/ma1170-shield-consume -> maintained (4->6): hit+miss both-consume falsifiable (hit-only gate kills); exact store+log bytes; oneShot guard removal now fails
+
+## Batch #180 GREEN (canon + 1 adjudicated flake) — run2#918-#932 (15 files)
+## Batch #180 — PROGRESS: completed 2068 / remaining 616 (total 2684)
+- Suite: lint clean; 2752 files, 32,656 passed, 2 canon FIXME fails (exact pair) + useNpcImageCache:96 flake (3rd occurrence parallel-load waitFor race; passes isolation 4/4, deterministic fake kept) + 3 expected = GREEN canon w/ adjudicated flake. Flake stabilization dispatched. Evidence /tmp/batch180.log. 32,767->32,656 (-111) from map-domain sweep close.
+run2#933: hooks/combat/nextAttackAdvantage -> maintained (5->4): stacked one-shots exact clear w/ vex-guard falsifiable; zero-write same-shape control fixed fuzzy-filter; stateful te fake (resurrect-fix)
+run2#934: hooks/combat/riposte -> maintained (5->6): !==false gate + 0-die guard legs folded; survives-proof faithful store; auto-miss redundancy cut (flag never read)
+run2#935: hooks/combat/battleMaster -> maintained (10->18 rows): grant-side seam adjudicated; getKnownManeuvers/getSuperiorityDice NEW first coverage; serial fallback bytes; fetch-noise removed
+run2#936: d20 feats-of-chaos -> maintained (8->9): 7 flat -> 8-row matrix hand-derived; advantage-beats-fold NEW row; skipSync write bytes pinned
+run2#937: d20 subtract-die -> maintained (5->8): 3 gap rows (zero-rider falsifier, bane-positive, bane+giggling stack per-te formulas); ticket seams mocked-zero
+run2#938: d20 BASE CANON -> maintained (10->19): selection-core matrix NEW (crit bounds, Lucky-leak falsifier, floor consumer); real modules behind null-store fixed; Lucky folded w/ queue-consumption
+run2#939: d20 weakening-breath -> maintained (rec #938 applied): marker-gate verified, file 10/10; terse-return adjudicated by orchestrator rerun
+run2#940: handlers/ma1732 wyvern-sting -> maintained (6->2): full grant bytes + dc/ability-absence proof + no-clock pins; clause-absent survives-control honest-scoped; dedupe/ladder cut cited
+run2#941: handlers/multiTarget -> maintained (9->8): fan-out census log-arrays + popup counts; failed-apply NEW; 🔴 :556 characters:null + twin/multi popup collision logged
+run2#942: handlers/popupData CANON -> maintained (20->17): full field census; secondary-popup 4-row NEW w/ #941 collision pinned as-authored; title-lie fixed honestly
+run2#943: saveProcessing.ma1665 vine-blight -> maintained (8->4): exact row-shape toEqual 5-in-1; DC tie-to-success + near-miss re-arm; no-op registry mock deleted
+run2#944: saveProcessing.secondary-save-damage -> maintained (4->4): per-leg roll order exact; raw-vs-adjudicated NEW; unparseable-formula branch NEW; byte-inert widened
+run2#945: useSpellCastExecutor.castAction -> maintained (20->8): 11 routing faces cut cited maintained siblings; LOS gate consumer NEW; exact full-options dispatch
+
+## Batch #181 GREEN — run2#933-#945 (15 files)
+## Batch #181 — PROGRESS: completed 2081 / remaining 603 (total 2684)
+- Suite: lint clean; 2752 files, 32,651 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 12th consecutive; useNpcImageCache stabilization confirmed under full load). Evidence /tmp/batch181.log. 32,656 byte-stable vs #180 minus castAction 20->8 routing fold etc.

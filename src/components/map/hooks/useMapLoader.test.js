@@ -1,547 +1,294 @@
+// @maintained-by-ai
+/**
+ * Lane: map loader — owns (campaign, map) → fetch exact-once (#786 transport bytes),
+ * loaded-state adoption, save-post payload exactness, 1s autosave debounce flush
+ * semantics (authored debounce timers = permitted save-debounce category; no
+ * wall-clock GAME advancement; vi.useFakeTimers flushed deterministically),
+ * error honesty (#819), and unmount/map-switch flush.
+ *
+ * Open source-bug pins (reported only, never fixed here — line refs are current
+ * useMapLoader.js; prior-pass refs :161/:188-210/:178/:210 map to these seams):
+ *   :37    loadedMapNameRef guard keyed on mapName only — campaignName/characters
+ *          changes never reload → stale outdoor map (#799) ... pinned below
+ *   :78-92 autosave effect re-saves a freshly loaded map with zero edits →
+ *          mount-save scheduling race (#800) ... pinned below
+ *   :60-62 silent catch — a failed GET falls through to overwriting the map
+ *          with an empty one ... pinned below
+ *   :50-57 reconciliation only ever runs at load time (stale-ref) ... pinned below
+ *
+ * Old→new: initialization(4)+empty-create→1; existing-data(6)→2+3;
+ * reconciliation(6)→4+5+7; error-handling(2)→6; re-render(4)→7+8;
+ * batched autosave(5)→2(pin)+8+9+10+11.
+ */
+import { useState } from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import useMapLoader from './useMapLoader.js';
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig.js';
 
+const CAMPAIGN = 'test-campaign';
+const MAP = 'dungeon-floor-1';
+const CHARACTERS = [
+  { name: 'Thorin', class: 'Fighter' },
+  { name: 'Elaria', class: 'Wizard' },
+];
+
 describe('useMapLoader', () => {
   let loadMapDataSpy;
   let saveMapDataSpy;
-  let setGridSizeMock;
-
-  const defaultCampaignName = 'test-campaign';
-  const defaultMapName = 'dungeon-floor-1';
-  const defaultCharacters = [
-    { name: 'Thorin', class: 'Fighter' },
-    { name: 'Elaria', class: 'Wizard' },
-  ];
+  let consoleErrorSpy;
 
   beforeEach(() => {
-    loadMapDataSpy = vi.spyOn(mapsService, 'loadMapData');
-    saveMapDataSpy = vi.spyOn(mapsService, 'saveMapData');
-    setGridSizeMock = vi.fn();
-
-    loadMapDataSpy.mockResolvedValue(null);
-    saveMapDataSpy.mockResolvedValue({});
+    vi.useFakeTimers();
+    loadMapDataSpy = vi.spyOn(mapsService, 'loadMapData').mockResolvedValue(null);
+    saveMapDataSpy = vi.spyOn(mapsService, 'saveMapData').mockResolvedValue({});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  const getHook = (options = {}) => {
-    const {
-      campaignName = defaultCampaignName,
-      characters = defaultCharacters,
-      mapName = defaultMapName,
-      gridSize = DEFAULT_GRID_SIZE,
-      setGridSize = setGridSizeMock,
-    } = options;
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
-    return renderHook(
-      () =>
-        useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize }),
+  // Stateful harness: gridSize is real state so the payload reflects what the
+  // hook actually told its owner, not a mock capture.
+  const renderLoader = ({
+    campaignName = CAMPAIGN,
+    characters = CHARACTERS,
+    mapName = MAP,
+  } = {}) =>
+    renderHook(
+      (props) => {
+        const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+        return {
+          ...useMapLoader({ ...props, gridSize, setGridSize }),
+          gridSize,
+        };
+      },
+      { initialProps: { campaignName, characters, mapName } },
     );
+
+  // Settle the mount load, flush its debounced mount re-save (see pin table),
+  // then clear so later assertions see only stroke-driven traffic.
+  const loadAndClearSaves = async ({ result }) => {
+    await act(async () => {});
+    act(() => result.current.flushSave());
+    saveMapDataSpy.mockClear();
   };
 
-  describe('initialization', () => {
-    it('should return mapData, setMapData, placedItems, setPlacedItems, and loadInProgressRef', () => {
-      const { result } = getHook();
+  it('loads (campaign, map) exactly once on mount, gating loadInProgressRef, and saves an exact empty-map payload when none exists', async () => {
+    let resolveLoad;
+    loadMapDataSpy.mockImplementation(() => new Promise((r) => { resolveLoad = r; }));
 
-      expect(result.current.mapData).toBeNull();
-      expect(typeof result.current.setMapData).toBe('function');
-      expect(result.current.placedItems).toEqual([]);
-      expect(typeof result.current.setPlacedItems).toBe('function');
-      expect(result.current.loadInProgressRef).toHaveProperty('current');
-    });
+    const { result } = renderLoader();
 
-    it('should call loadMapData on mount', async () => {
-      getHook();
-      await act(() => {});
-      expect(loadMapDataSpy).toHaveBeenCalledWith(defaultCampaignName, defaultMapName);
-    });
+    expect(result.current.loadInProgressRef.current).toBe(true);
+    expect(result.current.mapData).toBeNull();
+    expect(loadMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP);
 
-    it('should create and save empty map data when no existing data', async () => {
-      getHook();
-      await act(() => {});
+    await act(async () => { resolveLoad(null); });
 
-      expect(saveMapDataSpy).toHaveBeenCalledWith(
-        defaultCampaignName,
-        defaultMapName,
-        expect.objectContaining({
-          gridSize: DEFAULT_GRID_SIZE,
-          players: [],
-          walls: [],
-          placedItems: [],
-        }),
-      );
-    });
-
-    it('should set loadInProgressRef to true during load and false after', async () => {
-      let resolveLoad;
-      loadMapDataSpy.mockImplementation(
-        () => new Promise((resolve) => { resolveLoad = () => resolve(null); }),
-      );
-
-      const { result } = getHook();
-      expect(result.current.loadInProgressRef.current).toBe(true);
-
-      await act(() => { resolveLoad(); });
-      expect(result.current.loadInProgressRef.current).toBe(false);
+    expect(loadMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(result.current.loadInProgressRef.current).toBe(false);
+    expect(result.current.mapData).toEqual({ players: [], walls: new Set() });
+    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, {
+      players: [],
+      walls: [],
+      gridSize: DEFAULT_GRID_SIZE,
+      placedItems: [],
     });
   });
 
-  describe('existing map data', () => {
-    function buildExistingData(overrides = {}) {
-      return {
-        players: [],
-        walls: ['1,1-2,1', '2,1-2,2'],
-        placedItems: [{ id: 'item1', gridX: 3, gridY: 4 }],
-        gridSize: 40,
-        ...overrides,
-      };
+  it('adopts an existing map exactly and — FIXME(#800, useMapLoader.js:78-92) — re-saves it unchanged once the debounce elapses', async () => {
+    const existing = {
+      players: [{ name: 'Thorin' }],
+      walls: ['1,1', '2,2'],
+      placedItems: [{ id: 'a', gridX: 1, gridY: 2 }],
+      gridSize: 50,
+      revealed: ['3,3'],
+    };
+    loadMapDataSpy.mockResolvedValue(existing);
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    expect(result.current.mapData.walls).toBeInstanceOf(Set);
+    expect(Array.from(result.current.mapData.walls)).toEqual(['1,1', '2,2']);
+    expect(result.current.placedItems).toEqual(existing.placedItems);
+    expect(result.current.gridSize).toBe(50);
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+
+    // Pin: a fresh load with ZERO edits schedules a full round-trip write.
+    // Bug-pinned intentionally pending the #800 mount-save fix.
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, {
+      players: [{ name: 'Thorin' }],
+      walls: ['1,1', '2,2'],
+      placedItems: [{ id: 'a', gridX: 1, gridY: 2 }],
+      gridSize: 50,
+      revealed: ['3,3'],
+    });
+  });
+
+  it('defaults missing fields of an existing map (empty walls Set, revealed [], placedItems [], gridSize fallback)', async () => {
+    loadMapDataSpy.mockResolvedValue({});
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    expect(result.current.mapData.walls).toEqual(new Set());
+    expect(result.current.mapData.revealed).toEqual([]);
+    expect(result.current.mapData.players).toBeUndefined();
+    expect(result.current.placedItems).toEqual([]);
+    expect(result.current.gridSize).toBe(DEFAULT_GRID_SIZE);
+  });
+
+  it('reconciles loaded players against the characters list, keeping survivors in order', async () => {
+    loadMapDataSpy.mockResolvedValue({
+      players: [{ name: 'Thorin' }, { name: 'Grimjaw' }, { name: 'Elaria' }],
+      walls: [],
+      placedItems: [],
+      gridSize: 40,
+    });
+
+    const { result } = renderLoader();
+    await act(async () => {});
+
+    expect(result.current.mapData.players.map((p) => p.name)).toEqual(['Thorin', 'Elaria']);
+  });
+
+  it('does not reconcile players when characters is empty or absent, or after characters later change', async () => {
+    const existing = {
+      players: [{ name: 'Thorin' }, { name: 'Elaria' }],
+      walls: [],
+      placedItems: [],
+      gridSize: 40,
+    };
+    loadMapDataSpy.mockResolvedValue(existing);
+
+    // falsy-shortcut ([] / null) and truthy-empty are the guard's two shapes
+    for (const characters of [CHARACTERS.slice(0, 0), null]) {
+      const { result } = renderLoader({ characters });
+      await act(async () => {});
+      expect(result.current.mapData.players).toEqual(existing.players);
     }
 
-    it('should load existing map data and convert walls to a Set', async () => {
-      const existingData = buildExistingData();
-      loadMapDataSpy.mockResolvedValue(existingData);
+    // FIXME(#799, useMapLoader.js:37): a later characters/campaign change
+    // can never re-reconcile — the mapName-only guard returns before load.
+    const { result, rerender } = renderLoader();
+    await act(async () => {});
+    const loadsBefore = loadMapDataSpy.mock.calls.length;
+    rerender({ campaignName: 'other-campaign', characters: [{ name: 'Newbie' }], mapName: MAP });
+    await act(async () => {});
 
-      const { result } = getHook();
-      await act(() => {});
-
-      const loaded = result.current.mapData;
-      expect(loaded).toEqual({
-        ...existingData,
-        walls: new Set(existingData.walls),
-        revealed: [],
-      });
-      expect(loaded.walls).toBeInstanceOf(Set);
-      expect(Array.from(loaded.walls)).toEqual(existingData.walls);
-    });
-
-    it('should set placedItems from existing data', async () => {
-      const existingData = buildExistingData({
-        walls: [],
-        placedItems: [{ id: 'torch1', gridX: 5, gridY: 5 }],
-      });
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      const { result } = getHook();
-      await act(() => {});
-
-      expect(result.current.placedItems).toEqual(existingData.placedItems);
-    });
-
-    it('should call setGridSize with existing gridSize', async () => {
-      const existingData = buildExistingData({ walls: [], placedItems: [], gridSize: 50 });
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      getHook();
-      await act(() => {});
-
-      expect(setGridSizeMock).toHaveBeenCalledWith(50);
-    });
-
-    it('should default to DEFAULT_GRID_SIZE when existing data has no gridSize', async () => {
-      const existingData = buildExistingData({ walls: [], placedItems: [], gridSize: null });
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      getHook();
-      await act(() => {});
-
-      expect(setGridSizeMock).toHaveBeenCalledWith(DEFAULT_GRID_SIZE);
-    });
-
-    it('should set walls to empty Set when existing data has no walls field', async () => {
-      const existingData = buildExistingData({ walls: undefined });
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      const { result } = getHook();
-      await act(() => {});
-
-      expect(result.current.mapData.walls).toBeInstanceOf(Set);
-      expect(Array.from(result.current.mapData.walls)).toEqual([]);
-    });
-
-    it('should set placedItems to empty array when existing data has no placedItems field', async () => {
-      const existingData = buildExistingData({ walls: [], placedItems: undefined });
-      loadMapDataSpy.mockResolvedValue(existingData);
-
-      const { result } = getHook();
-      await act(() => {});
-
-      expect(result.current.placedItems).toEqual([]);
-    });
+    expect(loadMapDataSpy).toHaveBeenCalledTimes(loadsBefore);
+    expect(loadMapDataSpy).toHaveBeenLastCalledWith(CAMPAIGN, MAP);
+    expect(result.current.mapData.players).toEqual(existing.players);
   });
 
-  describe('character reconciliation', () => {
-    function buildExistingData(overrides = {}) {
-      return {
-        players: [{ name: 'Thorin' }, { name: 'Elaria' }, { name: 'Grimjaw' }],
-        walls: [],
-        placedItems: [],
-        gridSize: 30,
-        ...overrides,
-      };
-    }
+  it('falls through to an empty map and logs when load fails — FIXME(useMapLoader.js:60-62): silent catch overwrites on a transient GET failure', async () => {
+    loadMapDataSpy.mockRejectedValue(new Error('Network error'));
+    saveMapDataSpy.mockRejectedValue(new Error('Save failed'));
 
-    it('should filter out players no longer in the characters list', async () => {
-      loadMapDataSpy.mockResolvedValue(buildExistingData());
+    const { result } = renderLoader();
+    await act(async () => {});
 
-      const { result } = getHook();
-      await act(() => {});
-
-      const playerNames = result.current.mapData.players.map((p) => p.name);
-      expect(playerNames).toEqual(['Thorin', 'Elaria']);
+    expect(result.current.loadInProgressRef.current).toBe(false);
+    expect(result.current.mapData.players).toEqual([]);
+    expect(result.current.mapData.walls).toEqual(new Set());
+    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, {
+      players: [],
+      walls: [],
+      gridSize: DEFAULT_GRID_SIZE,
+      placedItems: [],
     });
-
-    it('should preserve all players when all characters still exist', async () => {
-      loadMapDataSpy.mockResolvedValue(
-        buildExistingData({
-          players: [{ name: 'Thorin' }, { name: 'Elaria' }],
-        }),
-      );
-
-      const { result } = getHook();
-      await act(() => {});
-
-      const playerNames = result.current.mapData.players.map((p) => p.name);
-      expect(playerNames).toEqual(['Thorin', 'Elaria']);
-    });
-
-    it('should not reconcile when characters is empty', async () => {
-      loadMapDataSpy.mockResolvedValue(
-        buildExistingData({
-          players: [{ name: 'Thorin' }, { name: 'Elaria' }],
-        }),
-      );
-
-      const { result } = getHook({ characters: [] });
-      await act(() => {});
-
-      const playerNames = result.current.mapData.players.map((p) => p.name);
-      expect(playerNames).toEqual(['Thorin', 'Elaria']);
-    });
-
-    it('should not reconcile when characters is null', async () => {
-      loadMapDataSpy.mockResolvedValue(
-        buildExistingData({
-          players: [{ name: 'Thorin' }, { name: 'Elaria' }],
-        }),
-      );
-
-      const { result } = getHook({ characters: null });
-      await act(() => {});
-
-      const playerNames = result.current.mapData.players.map((p) => p.name);
-      expect(playerNames).toEqual(['Thorin', 'Elaria']);
-    });
-
-    it('should not reconcile when characters is undefined', async () => {
-      loadMapDataSpy.mockResolvedValue(
-        buildExistingData({
-          players: [{ name: 'Thorin' }],
-        }),
-      );
-
-      const { result } = getHook({ characters: undefined });
-      await act(() => {});
-
-      const playerNames = result.current.mapData.players.map((p) => p.name);
-      expect(playerNames).toEqual(['Thorin']);
-    });
-
-    it('should handle existing data with no players field', async () => {
-      loadMapDataSpy.mockResolvedValue(
-        buildExistingData({ players: undefined }),
-      );
-
-      const { result } = getHook();
-      await act(() => {});
-
-      expect(result.current.mapData.players).toBeUndefined();
-    });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Failed to save initial map data:',
+      expect.any(Error),
+    );
   });
 
-  describe('error handling', () => {
-    it('should create empty map data and save it when loadMapData throws', async () => {
-      loadMapDataSpy.mockRejectedValue(new Error('Network error'));
+  it('ignores campaignName and characters changes while mapName is unchanged — FIXME(#799, useMapLoader.js:37): guard never resets, outdoor map stays stale', async () => {
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: ['1,1'], placedItems: [], gridSize: 40 });
 
-      const { result } = getHook();
-      await act(() => {});
+    const { result, rerender } = renderLoader();
+    await act(async () => {});
+    loadMapDataSpy.mockClear();
 
-      expect(result.current.mapData.players).toEqual([]);
-      expect(result.current.mapData.walls).toBeInstanceOf(Set);
-      expect(Array.from(result.current.mapData.walls)).toEqual([]);
+    rerender({ campaignName: 'other-campaign', characters: [{ name: 'Newbie' }], mapName: MAP });
+    await act(async () => {});
 
-      expect(saveMapDataSpy).toHaveBeenCalledWith(
-        defaultCampaignName,
-        defaultMapName,
-        expect.objectContaining({
-          players: [],
-          walls: [],
-        }),
-      );
-    });
-
-    it('should call console.error when save initial data fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      saveMapDataSpy.mockRejectedValue(new Error('Save failed'));
-
-      getHook();
-      await act(() => {});
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to save initial map data:',
-        expect.any(Error),
-      );
-      consoleErrorSpy.mockRestore();
-    });
+    expect(loadMapDataSpy).not.toHaveBeenCalled();
+    expect(result.current.mapData.walls).toEqual(new Set(['1,1']));
+    // pending mount-save is flushed under the PREVIOUS campaign, never the new one
+    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, expect.any(Object));
   });
 
-  describe('re-render behavior', () => {
-    it('should not reload when mapName is the same', async () => {
-      loadMapDataSpy.mockClear();
-      loadMapDataSpy.mockResolvedValue({
-        players: [],
-        walls: [],
-        placedItems: [],
-        gridSize: 30,
-      });
+  it('flushes pending edits under the previous map name and loads the new map exactly once when mapName switches', async () => {
+    const { result, rerender } = renderLoader();
+    await loadAndClearSaves({ result });
 
-      const { rerender } = renderHook(
-        ({ mapName }) =>
-          useMapLoader({
-            campaignName: defaultCampaignName,
-            characters: defaultCharacters,
-            mapName,
-            gridSize: DEFAULT_GRID_SIZE,
-            setGridSize: setGridSizeMock,
-          }),
-        { initialProps: { mapName: defaultMapName } },
-      );
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set(['9,9']) })));
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
 
-      await act(() => {});
-      const firstCallCount = loadMapDataSpy.mock.calls.length;
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: ['2,2'], placedItems: [], gridSize: 40 });
+    rerender({ campaignName: CAMPAIGN, characters: CHARACTERS, mapName: 'other-map' });
+    await act(async () => {});
 
-      rerender({ mapName: defaultMapName });
-      await act(() => {});
-
-      expect(loadMapDataSpy.mock.calls.length).toBe(firstCallCount);
-    });
-
-    it('should reload when mapName changes', async () => {
-      loadMapDataSpy.mockClear();
-      loadMapDataSpy.mockResolvedValue({
-        players: [],
-        walls: [],
-        placedItems: [],
-        gridSize: 30,
-      });
-
-      const { rerender } = renderHook(
-        ({ mapName }) =>
-          useMapLoader({
-            campaignName: defaultCampaignName,
-            characters: defaultCharacters,
-            mapName,
-            gridSize: DEFAULT_GRID_SIZE,
-            setGridSize: setGridSizeMock,
-          }),
-        { initialProps: { mapName: 'map-1' } },
-      );
-
-      await act(() => {});
-      expect(loadMapDataSpy).toHaveBeenCalledTimes(1);
-
-      rerender({ mapName: 'map-2' });
-      await act(() => {});
-
-      expect(loadMapDataSpy).toHaveBeenCalledTimes(2);
-    });
-
-    it('should not reconcile characters on re-render when only characters change', async () => {
-      loadMapDataSpy.mockResolvedValue({
-        players: [{ name: 'Thorin' }, { name: 'Elaria' }, { name: 'Grimjaw' }],
-        walls: [],
-        placedItems: [],
-        gridSize: 30,
-      });
-
-      const { result, rerender } = renderHook(
-        ({ characters }) =>
-          useMapLoader({
-            campaignName: defaultCampaignName,
-            characters,
-            mapName: defaultMapName,
-            gridSize: DEFAULT_GRID_SIZE,
-            setGridSize: setGridSizeMock,
-          }),
-        { initialProps: { characters: defaultCharacters } },
-      );
-
-      await act(() => {});
-
-      const initialPlayers = result.current.mapData.players.map((p) => p.name);
-      expect(initialPlayers).toEqual(['Thorin', 'Elaria']);
-
-      rerender({ characters: [{ name: 'Thorin' }] });
-      await act(() => {});
-
-      const players = result.current.mapData.players.map((p) => p.name);
-      expect(players).toEqual(['Thorin', 'Elaria']);
-    });
-
-    it('should not reload when only characters change but mapName is the same', async () => {
-      loadMapDataSpy.mockClear();
-      loadMapDataSpy.mockResolvedValue({
-        players: [],
-        walls: [],
-        placedItems: [],
-        gridSize: 30,
-      });
-
-      const { rerender } = renderHook(
-        ({ characters }) =>
-          useMapLoader({
-            campaignName: defaultCampaignName,
-            characters,
-            mapName: defaultMapName,
-            gridSize: DEFAULT_GRID_SIZE,
-            setGridSize: setGridSizeMock,
-          }),
-        { initialProps: { characters: defaultCharacters } },
-      );
-
-      await act(() => {});
-      const firstCallCount = loadMapDataSpy.mock.calls.length;
-
-      rerender({ characters: [{ name: 'NewChar', class: 'Rogue' }] });
-      await act(() => {});
-
-      expect(loadMapDataSpy.mock.calls.length).toBe(firstCallCount);
-    });
+    expect(saveMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, MAP, expect.objectContaining({ walls: ['9,9'] }));
+    expect(loadMapDataSpy).toHaveBeenCalledWith(CAMPAIGN, 'other-map');
+    expect(result.current.mapData.walls).toEqual(new Set(['2,2']));
   });
 
-  describe('batched autosave', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-      loadMapDataSpy.mockResolvedValue({
-        players: [], walls: [], placedItems: [], gridSize: 40,
-      });
-    });
-    afterEach(() => {
-      vi.useRealTimers();
-    });
+  it('coalesces painted and erased cells through a stroke into one exact save on manual flush', async () => {
+    loadMapDataSpy.mockResolvedValue({ players: [], walls: ['5,0', '5,1', '5,2'], placedItems: [], gridSize: 40 });
 
-    const loadAndClearSaves = async (hook) => {
-      await act(async () => {});
-      act(() => { hook.result.current.flushSave(); });
-      saveMapDataSpy.mockClear();
-    };
+    const { result } = renderLoader();
+    await loadAndClearSaves({ result });
 
-    const paintCells = (hook, keys) => {
-      keys.forEach((key, i) => {
-        act(() => hook.result.current.setMapData(prev => ({
-          ...prev, walls: new Set([...prev.walls, ...keys.slice(0, i + 1)]),
-        })));
-      });
-    };
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '7,0']) })));
+    act(() => result.current.setMapData((prev) => {
+      const walls = new Set(prev.walls);
+      walls.delete('5,1');
+      return { ...prev, walls };
+    }));
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
 
-    it('coalesces many mutations in one stroke into a single save on flush', async () => {
-      const { result } = getHook();
-      await loadAndClearSaves({ result });
+    act(() => result.current.flushSave());
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['5,0', '5,2', '7,0']);
 
-      const keys = Array.from({ length: 10 }, (_, y) => `5,${y}`);
-      paintCells({ result }, keys);
-      expect(saveMapDataSpy).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(1500); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1); // flush consumed the pending save
+  });
 
-      act(() => { result.current.flushSave(); });
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
-      expect(saveMapDataSpy.mock.calls[0][2].walls.sort()).toEqual([...keys].sort());
+  it('autosaves exactly once when the 1s debounce elapses, containing every edit since the last flush', async () => {
+    const { result } = renderLoader();
+    await loadAndClearSaves({ result });
 
-      await act(() => { vi.advanceTimersByTime(1500); });
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
-    });
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '5,0']) })));
+    await act(async () => { vi.advanceTimersByTime(500); });
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '5,1']) })));
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
 
-    it('debounces to one save when a long stroke pauses, and completes on flush', async () => {
-      const { result } = getHook();
-      await loadAndClearSaves({ result });
+    await act(async () => { vi.advanceTimersByTime(999); });
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['5,0', '5,1']);
+  });
 
-      for (let y = 0; y < 20; y++) {
-        act(() => result.current.setMapData(prev => ({
-          ...prev, walls: new Set([...prev.walls, `5,${y}`]),
-        })));
-        await act(() => { vi.advanceTimersByTime(50); });
-      }
-      expect(saveMapDataSpy).not.toHaveBeenCalled();
+  it('flushes pending edits on unmount so no stroke data is lost', async () => {
+    const { result, unmount } = renderLoader();
+    await loadAndClearSaves({ result });
 
-      await act(() => { vi.advanceTimersByTime(1000); });
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    act(() => result.current.setMapData((prev) => ({ ...prev, walls: new Set([...prev.walls, '7,3']) })));
+    expect(saveMapDataSpy).not.toHaveBeenCalled();
 
-      act(() => result.current.setMapData(prev => ({
-        ...prev, walls: new Set([...prev.walls, '5,20']),
-      })));
-      act(() => { result.current.flushSave(); });
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(2);
-      expect(saveMapDataSpy.mock.calls.at(-1)[2].walls).toHaveLength(21);
-    });
-
-    it('persists erased cells with the same batching', async () => {
-      loadMapDataSpy.mockResolvedValue({
-        players: [], walls: ['5,0', '5,1', '5,2'], placedItems: [], gridSize: 40,
-      });
-      const { result } = getHook();
-      await loadAndClearSaves({ result });
-
-      ['5,0', '5,1', '5,2'].forEach(key => {
-        act(() => result.current.setMapData(prev => {
-          const walls = new Set(prev.walls);
-          walls.delete(key);
-          return { ...prev, walls };
-        }));
-      });
-      expect(saveMapDataSpy).not.toHaveBeenCalled();
-
-      act(() => { result.current.flushSave(); });
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
-      expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual([]);
-    });
-
-    it('flushes pending stroke data on unmount', async () => {
-      const { result, unmount } = getHook();
-      await loadAndClearSaves({ result });
-
-      act(() => result.current.setMapData(prev => ({
-        ...prev, walls: new Set([...prev.walls, '7,3']),
-      })));
-      expect(saveMapDataSpy).not.toHaveBeenCalled();
-
-      unmount();
-      expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
-      expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['7,3']);
-    });
-
-    it('flushes pending data under the previous map name when map switches', async () => {
-      const { result, rerender } = renderHook(
-        ({ mapName }) => useMapLoader({
-          campaignName: defaultCampaignName,
-          characters: defaultCharacters,
-          mapName,
-          gridSize: DEFAULT_GRID_SIZE,
-          setGridSize: setGridSizeMock,
-        }),
-        { initialProps: { mapName: defaultMapName } },
-      );
-      await loadAndClearSaves({ result });
-
-      act(() => result.current.setMapData(prev => ({
-        ...prev, walls: new Set([...prev.walls, '9,9']),
-      })));
-      expect(saveMapDataSpy).not.toHaveBeenCalled();
-
-      rerender({ mapName: 'other-map' });
-      await act(async () => {});
-      expect(saveMapDataSpy).toHaveBeenCalledWith(
-        defaultCampaignName, defaultMapName,
-        expect.objectContaining({ walls: ['9,9'] }),
-      );
-    });
+    unmount();
+    expect(saveMapDataSpy).toHaveBeenCalledTimes(1);
+    expect(saveMapDataSpy.mock.calls[0][2].walls).toEqual(['7,3']);
   });
 });
