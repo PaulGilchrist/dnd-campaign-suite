@@ -1,185 +1,101 @@
+// @maintained-by-ai
+// remarkableAthlete lane — 2024 "Remarkable Athlete" crit-movement latch: a crit by a holder of the
+// auto_effect remarkable_athlete_movement rider (2024/classes.json verbatim) writes the
+// remarkableAthleteNoOA=true store byte; damage data passes through untouched.
+// Owner-split (cite, do NOT re-drive here):
+//  - attackRollPostDamage.js featureRiders owns condition dispatch and supplies ctx.isCrit bytes.
+//  - ConditionEffectBadges.no-oa-speedy.test.jsx owns the "No OA (Crit)" badge face READ of this byte;
+//    ConditionEffectBadges.jsx remarkable_no_oa owns the clear-to-false lane.
+//  - conditionEffectsInternal.test.js owns remarkable_athlete_athletics STR-check advantage rows.
+//  - feats/classes.json → automation.passives data routing: collector lanes, not re-driven here.
+// Silent-step honesty (by design, #1054 pattern): this handler logs nothing — the latch byte IS the
+// output consumed by the badge lane; setRuntimeValue call-count is the burn assertion (#1026).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks ────────────────────────────────────────────────────────
-
+// Mock set matches source imports exactly (dead-mock purge, #1049): useRuntimeState only.
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
-
-// ── Imports ──────────────────────────────────────────────────────
 
 import { remarkableAthlete } from './remarkableAthlete.js';
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-// ── Helpers ───────────────────────────────────────────────────────
+// Rider verbatim from public/data/2024/classes.json Remarkable Athlete automation (#993).
+const PASSIVE = { type: 'auto_effect', effect: 'remarkable_athlete_movement' };
 
 function makeCtx(overrides = {}) {
   return {
     campaignName: 'test-campaign',
-    playerStats: { name: 'Fighter1' },
+    playerStats: { name: 'Fighter1', automation: { passives: [PASSIVE] } },
     ...overrides,
   };
 }
 
-// ── Tests ────────────────────────────────────────────────────────
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
-describe('remarkableAthlete', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('remarkableAthlete — condition', () => {
+  it('fires only on a crit carrying the exact auto_effect/remarkable_athlete_movement rider byte', () => {
+    // Armed: crit + matching rider.
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true }))).toBe(true);
+    // Rider buried among decoys still arms.
+    expect(remarkableAthlete.condition(makeCtx({
+      isCrit: true,
+      playerStats: {
+        name: 'Fighter1',
+        automation: { passives: [{ type: 'auto_effect', effect: 'other' }, PASSIVE] },
+      },
+    }))).toBe(true);
+
+    // Refusals — every leg hits its own branch (#903 ladder).
+    const armed = { name: 'Fighter1', automation: { passives: [PASSIVE] } };
+    // non-crit short-circuits before any passive scan (exact false byte)
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: false, playerStats: armed }))).toBe(false);
+    // missing crit byte: && short-circuit returns undefined, not false (honest ===)
+    expect(remarkableAthlete.condition(makeCtx({ playerStats: armed }))).toBeFalsy();
+    // right effect, wrong rider type
+    expect(remarkableAthlete.condition(makeCtx({
+      isCrit: true,
+      playerStats: { name: 'Fighter1', automation: { passives: [{ type: 'passive_rule', effect: 'remarkable_athlete_movement' }] } },
+    }))).toBe(false);
+    // right type, wrong effect
+    expect(remarkableAthlete.condition(makeCtx({
+      isCrit: true,
+      playerStats: { name: 'Fighter1', automation: { passives: [{ type: 'auto_effect', effect: 'some_other_effect' }] } },
+    }))).toBe(false);
+    // empty passives
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true, playerStats: { name: 'Fighter1', automation: { passives: [] } } }))).toBe(false);
+    // structurally missing store branches (optional-chain legs)
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true, playerStats: { name: 'Fighter1', automation: {} } }))).toBe(false);
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true, playerStats: { name: 'Fighter1', automation: null } }))).toBe(false);
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true, playerStats: {} }))).toBe(false);
+    expect(remarkableAthlete.condition(makeCtx({ isCrit: true, playerStats: null }))).toBe(false);
+  });
+});
+
+describe('remarkableAthlete — handler', () => {
+  it('burns exactly one latch byte remarkableAthleteNoOA=true and passes prevData through by identity', async () => {
+    const prevData = { formula: '1d8+3', total: 11, rolls: [5, 3, 3] };
+
+    const res = await remarkableAthlete.handler(makeCtx({ isCrit: true }), prevData);
+
+    expect(res).toEqual({ data: prevData });
+    expect(res.data).toBe(prevData); // pipeline passthrough preserves object identity (#829)
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1); // one write, no extra burns
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'remarkableAthleteNoOA', true, 'test-campaign');
   });
 
-  describe('condition', () => {
-    it('returns true when isCrit is true and player has remarkable_athlete_movement passive', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: {
-          automation: {
-            passives: [
-              { type: 'auto_effect', effect: 'remarkable_athlete_movement' },
-            ],
-          },
-        },
-      });
+  it('keys the latch to the ctx character and campaign, not hardcoded bytes (#1050/#1052 falsifier)', async () => {
+    const prevData = {};
 
-      expect(remarkableAthlete.condition(ctx)).toBe(true);
-    });
+    const res = await remarkableAthlete.handler(
+      makeCtx({ campaignName: 'other-campaign', playerStats: { name: 'Barbarian42', automation: { passives: [PASSIVE] } } }),
+      prevData,
+    );
 
-    it('returns false when isCrit is false', () => {
-      const ctx = makeCtx({
-        isCrit: false,
-        playerStats: {
-          automation: {
-            passives: [
-              { type: 'auto_effect', effect: 'remarkable_athlete_movement' },
-            ],
-          },
-        },
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when player has no passives', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: {
-          automation: {
-            passives: [],
-          },
-        },
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when player has no automation object', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: {},
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when playerStats is null', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: null,
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when playerStats.automation is null', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: { automation: null },
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when player has a different passive effect', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: {
-          automation: {
-            passives: [
-              { type: 'auto_effect', effect: 'some_other_effect' },
-            ],
-          },
-        },
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(false);
-    });
-
-    it('returns true when player has multiple passives including remarkable_athlete_movement', () => {
-      const ctx = makeCtx({
-        isCrit: true,
-        playerStats: {
-          automation: {
-            passives: [
-              { type: 'auto_effect', effect: 'some_other_effect' },
-              { type: 'auto_effect', effect: 'remarkable_athlete_movement' },
-              { type: 'auto_effect', effect: 'another_effect' },
-            ],
-          },
-        },
-      });
-
-      expect(remarkableAthlete.condition(ctx)).toBe(true);
-    });
-  });
-
-  describe('handler', () => {
-    it('sets remarkableAthleteNoOA to true on the runtime store', async () => {
-      const ctx = makeCtx();
-      const prevData = { formula: '1d8+3', total: 11 };
-
-      await remarkableAthlete.handler(ctx, prevData);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter1',
-        'remarkableAthleteNoOA',
-        true,
-        'test-campaign',
-      );
-    });
-
-    it('returns { data: prevData }', async () => {
-      const ctx = makeCtx();
-      const prevData = { formula: '2d6+4', total: 14, rolls: [3, 5, 4] };
-
-      const result = await remarkableAthlete.handler(ctx, prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData unchanged', async () => {
-      const ctx = makeCtx();
-      const prevData = { formula: '1d10+5', total: 15, rolls: [10, 5] };
-
-      const { data } = await remarkableAthlete.handler(ctx, prevData);
-
-      expect(data).toBe(prevData);
-    });
-
-    it('works with minimal context', async () => {
-      const ctx = makeCtx({
-        playerStats: { name: 'Character99' },
-      });
-      const prevData = {};
-
-      const result = await remarkableAthlete.handler(ctx, prevData);
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Character99',
-        'remarkableAthleteNoOA',
-        true,
-        'test-campaign',
-      );
-      expect(result).toEqual({ data: prevData });
-    });
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Barbarian42', 'remarkableAthleteNoOA', true, 'other-campaign');
+    expect(res).toEqual({ data: prevData });
   });
 });

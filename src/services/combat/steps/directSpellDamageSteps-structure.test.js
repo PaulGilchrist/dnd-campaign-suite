@@ -1,128 +1,66 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Lane: composition contract of buildDirectSpellDamageSteps() ONLY — structural owner
+// of this pipeline (#1039 VERBATIM-template twin, attackRollDamageSteps.test.js).
+// Golden-shape census + wiring bytes. Zero mocks (#937): the factory is a pure
+// factory — it consults no callee and executes no step body (inert #744/#786) at
+// build time, so the module graph is imported bare and NO condition/handler runs here.
+//
+// directSpellDamageSteps family idx/ownership table (post #1042–#1047 CLOSED state):
+//   idx 0 spellHousekeeping      trivial passthrough literals; wiring + contract shape pinned
+//                                 here (no dedicated body lane exists — honest note, see below)
+//   idx 1 spellContext           cla120 #1042 (pre-baked [EE] dedupe guard),
+//                                 context #1043 (condition gate, EE/BS/EA fold arms),
+//                                 radiantSoul #1045 (CLA-279 [Radiant Soul] dedupe)
+//   idx 2 spellRollDamage        rolling #1047 (roll CANON bytes: normal/crit/maximize/
+//                                 null dispatch, no-extra-leak), radiantSoul #1045 (idx-2
+//                                 stamp/latch, latch reset owned there too)
+//   idx 3 spellFeatureRiders     riders #1046 (featureModules dispatch contract,
+//                                 seed bytes, modal abort)
+//   idx 4 spellOverchannel       overchannel #1044 (self-damage d12 roll + log bytes)
+//   idx 5 spellProceedToDamage   overchannel #1044 (proceedWithDamage handoff payload)
+//
+// old→new map:
+//   'returns an array of 6 steps' (:83-86) + 'has steps with correct names in order'
+//   (:88-98) + 'has correct subscribe/emit chain' (:100-113)
+//     → single golden wiring table (now :40-47) — count, identity, order, and event
+//     bytes in one exact toEqual; any insert/remove/rename/reorder fails. This is the
+//     ONLY lane where pinning order is legal; siblings cite it, never repeat it.
+//   'spellHousekeeping step' block (:116-127: 'always returns true' / 'returns
+//   { data: {} }') → REMOVED — executing step bodies is illegal in this lane
+//   (inert #744/#786). Honest record: no sibling owns the idx-0 body, but it is a
+//   `() => true` / `async () => ({ data: {} })` literal whose wiring and key shape
+//   are pinned by the two tests below; a body lane would test a no-op.
+//   5 vi.mock blocks (:4-67) + beforeEach re-arming (:74-80) → DELETED — nothing is
+//   consulted at build time (mocked-zero #937); no spies remain, so no
+//   afterEach(vi.restoreAllMocks) is needed (#1007).
+// The factory takes zero arguments — there is no degenerate-input surface to probe (#945).
+
+import { describe, it, expect } from 'vitest';
 import { buildDirectSpellDamageSteps } from './directSpellDamageSteps.js';
 
-vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = rolls.reduce((s, r) => s + r, 0) + modStr;
-      return { total, rolls, modifier: modStr };
-    }
-    return { total: 6, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionDoubled: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = (rolls.reduce((s, r) => s + r, 0) * 2) + modStr;
-      const doubledRolls = rolls.concat(rolls);
-      return { total, rolls, doubledRolls, modifier: modStr };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionMaximized: vi.fn((formula) => {
-    if (!formula) return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      return { total: count * sides + modStr, rolls: Array(count).fill(sides), modifier: modStr, maximized: true };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-}));
+// Exact ordered census: [name, subscribe, emit] for every step. Verbatim bytes pin
+// count, identity, order, and event wiring — any insert/remove/rename/reorder fails.
+const GOLDEN_STEPS = [
+  ['spellHousekeeping', 'spell:do', 'spell:context'],
+  ['spellContext', 'spell:context', 'spell:formulas'],
+  ['spellRollDamage', 'spell:formulas', 'spell:rolled'],
+  ['spellFeatureRiders', 'spell:rolled', 'spell:riders:applied'],
+  ['spellOverchannel', 'spell:riders:applied', 'spell:ready'],
+  ['spellProceedToDamage', 'spell:ready', 'spell:applied'],
+];
 
-vi.mock('../../rules/spells/postCastRiderService.js', () => ({
-  getEmpoweredEvocationFeatures: vi.fn(() => []),
-  getEmpoweredEvocationIntModifier: vi.fn(() => 0),
-}));
+describe('buildDirectSpellDamageSteps — composition contract', () => {
+  const steps = buildDirectSpellDamageSteps();
 
-vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve({})),
-}));
-
-vi.mock('../../../services/automation/common/choiceStorage.js', () => ({
-  getChosenRuntimeValue: vi.fn(() => undefined),
-}));
-
-const _featureModulesRef = { value: [] };
-vi.mock('./features/index.js', () => ({
-  get featureModules() { return _featureModulesRef.value; },
-}));
-
-const { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } = await import('../../rules/spells/postCastRiderService.js');
-
-describe('buildDirectSpellDamageSteps', () => {
-  let steps;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(getEmpoweredEvocationFeatures).mockReturnValue([]);
-    vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValue(0);
-    _featureModulesRef.value = [];
-    steps = buildDirectSpellDamageSteps();
+  it('composes exactly 6 steps with exact names, subscribe/emit bytes, in order (golden census)', () => {
+    expect(steps.map(({ name, subscribe, emit }) => [name, subscribe, emit])).toEqual(GOLDEN_STEPS);
   });
 
-  describe('structure', () => {
-    it('returns an array of 6 steps', () => {
-      expect(Array.isArray(steps)).toBe(true);
-      expect(steps).toHaveLength(6);
-    });
-
-    it('has steps with correct names in order', () => {
-      const names = steps.map((s) => s.name);
-      expect(names).toEqual([
-        'spellHousekeeping',
-        'spellContext',
-        'spellRollDamage',
-        'spellFeatureRiders',
-        'spellOverchannel',
-        'spellProceedToDamage',
-      ]);
-    });
-
-    it('has correct subscribe/emit chain', () => {
-      expect(steps[0].subscribe).toBe('spell:do');
-      expect(steps[0].emit).toBe('spell:context');
-      expect(steps[1].subscribe).toBe('spell:context');
-      expect(steps[1].emit).toBe('spell:formulas');
-      expect(steps[2].subscribe).toBe('spell:formulas');
-      expect(steps[2].emit).toBe('spell:rolled');
-      expect(steps[3].subscribe).toBe('spell:rolled');
-      expect(steps[3].emit).toBe('spell:riders:applied');
-      expect(steps[4].subscribe).toBe('spell:riders:applied');
-      expect(steps[4].emit).toBe('spell:ready');
-      expect(steps[5].subscribe).toBe('spell:ready');
-      expect(steps[5].emit).toBe('spell:applied');
-    });
-  });
-
-  describe('spellHousekeeping step', () => {
-    it('always returns true for condition', () => {
-      expect(steps[0].condition({})).toBe(true);
-      expect(steps[0].condition({ attack: null })).toBe(true);
-      expect(steps[0].condition({ playerStats: {} })).toBe(true);
-    });
-
-    it('returns { data: {} } from handler', async () => {
-      const result = await steps[0].handler({});
-      expect(result).toEqual({ data: {} });
-    });
+  it('every entry satisfies the pipeline step contract — assembled inertly, no bodies executed', () => {
+    for (const step of steps) {
+      expect(Object.keys(step).sort()).toEqual(['condition', 'emit', 'handler', 'name', 'subscribe']);
+      expect(typeof step.condition).toBe('function');
+      expect(typeof step.handler).toBe('function');
+    }
   });
 });

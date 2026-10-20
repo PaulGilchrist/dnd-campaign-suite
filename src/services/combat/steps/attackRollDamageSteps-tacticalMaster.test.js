@@ -1,67 +1,51 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Lane: tacticalMaster step ASSEMBLED via buildAttackRollDamageSteps() (attackRollDamageSteps.js:30, steps[21];
+// source buildTacticalMasterStep attackRollPostDamage.js:590).
+// Mechanics named from source (:570-627): post-hit mastery resolution — reads campaign lastAttack,
+// auto-applies non-modal masteries to the last target (skipping Graze/Topple/Nick, choice/replace
+// options, and masteries already latched on that exact target; Slow never writes its latch, :583),
+// then offers a replace/choice modal when modalOptions exist (:573 replace-precedence).
+// Consulted bytes census: getRuntimeValue('campaign','lastAttack'), getRuntimeValue('campaign',
+// '_<Mastery>_appliedTarget'); writes: setRuntimeValue('campaign','_<Mastery>_appliedTarget',
+// target, campaign), applyMasteryEffect(name, playerStats, campaign, target), setModalState(pending).
+// Family map — cited, not re-pinned here:
+// - Structure (name / subscribe 'cleave:done' / emit 'tactical:done' / index order):
+//   attackRollDamageSteps.test.js structure lane (:228-247 owner).
+// - Cleave lane (offer/resolve/map): attackRollDamageSteps-cleaveMastery.test.js (#1031 exemplar).
+// - Topple lane (save DC + CON save resolve): attackRollDamageSteps-toppleMastery.test.js.
+// - collectWeaponMastery collection + weapon-KIND gate (#969/#970): passives-module lanes own it;
+//   it is a boundary stub here.
+// No dice/DC math in this lane — dice stubs are inert (never rolled). Logging happens inside
+// applyMasteryEffect (weaponMasteryHandler internals), not this step.
+// Old->new: condition x3 -> t1 (table); miss-guard + null-mastery-guard -> t2 (zero-write pins);
+// auto-apply Push/Sap + skip Graze/Topple/Nick + already-applied skip + Slow-latch-except -> t3
+// (two labeled runs, exact call arrays); replace-modal -> t4 (exact full payload); choice-mode
+// featureName threading -> t5 (exact full payload, replace-empty fallback + distinct byte sources).
 
-// ── Mocks ────────────────────────────────────────────────────────
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// ── Mocks (module-graph stubs for the assembled pipeline; the tacticalMaster lane
+//    rolls no dice and prompts no saves — those stubs stay inert) ───────────────
 
 vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = rolls.reduce((s, r) => s + r, 0) + modStr;
-      return { total, rolls, modifier: modStr };
-    }
-    return { total: 6, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionDoubled: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = (rolls.reduce((s, r) => s + r, 0) * 2) + modStr;
-      const doubledRolls = rolls.concat(rolls);
-      return { total, rolls, doubledRolls, modifier: modStr };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionMaximized: vi.fn((formula) => {
-    if (!formula) return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      return { total: count * sides + modStr, rolls: Array(count).fill(sides), modifier: modStr, maximized: true };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
+  rollExpression: vi.fn(),
+  rollExpressionDoubled: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
 }));
 
 vi.mock('../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn().mockResolvedValue({ creatures: [{ name: 'Orc' }] }),
+  getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 1),
-  loadCombatSummary: vi.fn(() => Promise.resolve({ creatures: [{ name: 'Orc' }], lastAttack: {} })),
+  loadCombatSummary: vi.fn(),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_characterKey, _propertyName, _campaignName) => null),
-  setRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(() => Promise.resolve({})),
   setRuntimeObject: vi.fn(),
 }));
 
@@ -118,19 +102,18 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
-  isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
-  isWithinRange: vi.fn().mockResolvedValue(true),
+  isDistanceInRange: vi.fn(),
+  isWithinRange: vi.fn(),
 }));
 
 vi.mock('../../automation/common/savePrompt.js', () => ({
-  createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id', promise: Promise.resolve({ success: true }) })),
+  createSaveListener: vi.fn(),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────
 
 const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
-const { loadCombatSummary } = await import('../../encounters/combatData.js');
 const { collectWeaponMastery } = await import('../../combat/automation/automationService.js');
 const { applyMasteryEffect } = await import('../../automation/handlers/combat/weaponMasteryHandler.js');
 
@@ -152,234 +135,198 @@ function makeCtx(overrides = {}) {
   };
 }
 
+// Campaign-keyed runtime stub (#1029): lastAttack + optional mastery latches.
+// Source reads latches under the literal characterKey 'campaign' (:581).
+function stubRuntime(lastAttack, latches = {}) {
+  getRuntimeValue.mockImplementation((_characterKey, propertyName) => {
+    if (propertyName === 'lastAttack') return lastAttack;
+    if (propertyName in latches) return latches[propertyName];
+    return null;
+  });
+}
+
+// Always set the consulted bytes (#1035 falsifiability mandate): hit flag,
+// targetName, and attackName are all consumed downstream of the guards.
+const HIT_ON_ORC = { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
+
+function tacticalStep(steps) {
+  return steps.find((s) => s.name === 'tacticalMaster');
+}
+
 // ── Tests ────────────────────────────────────────────────────────
 
-describe('buildAttackRollDamageSteps - tacticalMaster', () => {
+describe('tacticalMaster step (assembled)', () => {
   let steps;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(loadCombatSummary).mockImplementation(() => Promise.resolve({ lastAttack: { hit: true } }));
-    getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-      if (propertyName === 'lastAttack') return { hit: true };
-      return null;
-    });
+    collectWeaponMastery.mockReturnValue(null);
+    applyMasteryEffect.mockResolvedValue(undefined);
+    stubRuntime(HIT_ON_ORC);
     steps = buildAttackRollDamageSteps();
   });
 
-  describe('condition', () => {
-    it('returns truthy when attack.name and playerStats.automation exist', () => {
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      expect(steps[tacticalIdx].condition(ctx)).toBeTruthy();
-    });
-
-    it('returns falsy when attack.name is missing', () => {
-      const ctx = makeCtx({
-        attack: {},
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      expect(steps[tacticalIdx].condition(ctx)).toBeFalsy();
-    });
-
-    it('returns falsy when playerStats.automation is missing', () => {
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: {},
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      expect(steps[tacticalIdx].condition(ctx)).toBeFalsy();
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('handler', () => {
-    it('returns early when lastAttack did not hit', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: false };
-        return null;
-      });
+  it('condition: armed only with a named attack and automation data', () => {
+    const step = tacticalStep(steps);
+    const arms = [
+      ['armed: attack.name + automation', makeCtx({ attack: { name: 'Greataxe' } }), true],
+      ['attack.name missing', makeCtx({ attack: {} }), false],
+      ['playerStats.automation missing', makeCtx({ attack: { name: 'Greataxe' }, playerStats: { name: 'TestChar' } }), false],
+    ];
+    for (const [label, ctx, expected] of arms) {
+      expect(step.condition(ctx) ? true : false, label).toBe(expected);
+    }
+  });
 
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      const result = await steps[tacticalIdx].handler(ctx);
+  it('refuses on guard misses — data {} and zero writes, applies, or prompts', async () => {
+    const step = tacticalStep(steps);
 
-      expect(result.data).toEqual({});
+    // Run A: last attack missed (:598 guard) — mastery collection never even consulted.
+    const ctxA = makeCtx({ attack: { name: 'Greataxe' }, setModalState: vi.fn() });
+    stubRuntime({ hit: false, targetName: 'Orc', attackName: 'Greataxe' });
+    const resA = await step.handler(ctxA);
+    expect(resA.data).toEqual({ });
+    expect(resA.modal).toBeUndefined();
+    expect(collectWeaponMastery).not.toHaveBeenCalled();
+    expect(applyMasteryEffect).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(ctxA.setModalState).not.toHaveBeenCalled();
+
+    // Run B: hit but no masteries on this weapon (:601 guard) — boundary passthrough pinned.
+    const ctxB = makeCtx({ attack: { name: 'Greataxe' }, setModalState: vi.fn() });
+    stubRuntime(HIT_ON_ORC);
+    collectWeaponMastery.mockReturnValue(null);
+    const resB = await step.handler(ctxB);
+    expect(resB.data).toEqual({});
+    expect(resB.modal).toBeUndefined();
+    expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', 'test-campaign');
+    expect(collectWeaponMastery).toHaveBeenCalledWith('Greataxe', ctxB.playerStats);
+    expect(applyMasteryEffect).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(ctxB.setModalState).not.toHaveBeenCalled();
+  });
+
+  it('auto-apply lane: exclusion list, exact-target latch, Slow writes no latch, exact payloads', async () => {
+    const step = tacticalStep(steps);
+
+    // Run A math, derived by hand once (source :570-587):
+    //   allMasteries   = [Push, Slow, Sap, Graze, Topple, Nick]
+    //   autoApply      = allMasteries minus [Graze, Topple, Nick, ...choice, ...replace]
+    //                  = [Push, Slow, Sap]
+    //   loop: Push latched on 'Orc' -> skip (:582);  Slow -> apply, NO latch write (:583);
+    //         Sap -> latch 'campaign/_Sap_appliedTarget'='Orc' + apply.
+    //   modalOptions [] -> terminal { data: {} } (:609).
+    const ctxA = makeCtx({ attack: { name: 'Greataxe' }, setModalState: vi.fn() });
+    stubRuntime(HIT_ON_ORC, { '_Push_appliedTarget': 'Orc' });
+    collectWeaponMastery.mockReturnValue({
+      baseMastery: 'Push',
+      extraMasteries: ['Slow', 'Sap', 'Graze', 'Topple', 'Nick'],
+      replaceMasteryOptions: [],
+      choiceMasteries: [],
     });
+    const resA = await step.handler(ctxA);
 
-    it('returns early when collectWeaponMastery returns null', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue(null);
+    expect(resA).toEqual({ data: {} });
+    expect(applyMasteryEffect.mock.calls).toEqual([
+      ['Slow', ctxA.playerStats, 'test-campaign', 'Orc'],
+      ['Sap', ctxA.playerStats, 'test-campaign', 'Orc'],
+    ]);
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['campaign', '_Sap_appliedTarget', 'Orc', 'test-campaign'],
+    ]);
+    expect(getRuntimeValue).toHaveBeenCalledWith('campaign', '_Push_appliedTarget', 'test-campaign');
+    expect(ctxA.setModalState).not.toHaveBeenCalled();
 
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      const result = await steps[tacticalIdx].handler(ctx);
+    // Run B: latch holds a DIFFERENT target ('Goblin' !== 'Orc') — the === comparison at
+    // :582 must still allow re-application and overwrite the latch to the current target.
+    applyMasteryEffect.mockClear();
+    setRuntimeValue.mockClear();
+    const ctxB = makeCtx({ attack: { name: 'Greataxe' }, setModalState: vi.fn() });
+    stubRuntime(HIT_ON_ORC, { '_Sap_appliedTarget': 'Goblin' });
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap' });
+    const resB = await step.handler(ctxB);
 
-      expect(result.data).toEqual({});
+    expect(resB).toEqual({ data: {} });
+    expect(applyMasteryEffect).toHaveBeenCalledWith('Sap', ctxB.playerStats, 'test-campaign', 'Orc');
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['campaign', '_Sap_appliedTarget', 'Orc', 'test-campaign'],
+    ]);
+    expect(ctxB.setModalState).not.toHaveBeenCalled();
+  });
+
+  it('replace-options modal: exact pending bytes, same bytes to setModalState, auto lane runs first', async () => {
+    const ctx = makeCtx({ attack: { name: 'Greataxe' }, setModalState: vi.fn() });
+    stubRuntime(HIT_ON_ORC);
+    collectWeaponMastery.mockReturnValue({
+      baseMastery: 'Push',
+      replaceMasteryOptions: ['Sap', 'Vex'],
     });
+    const result = await tacticalStep(steps).handler(ctx);
 
-    it('auto-applies mastery effects when no replace options', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Push',
-        extraMasteries: ['Sap'],
-        replaceMasteryOptions: [],
-      });
-
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      const result = await steps[tacticalIdx].handler(ctx);
-
-      expect(applyMasteryEffect).toHaveBeenCalledWith('Push', expect.anything(), 'test-campaign', 'Orc');
-      expect(applyMasteryEffect).toHaveBeenCalledWith('Sap', expect.anything(), 'test-campaign', 'Orc');
-      expect(result.data).toEqual({});
-    });
-
-    it('skips Graze, Topple, Nick in auto-apply', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Graze',
-        extraMasteries: ['Topple', 'Nick'],
-        replaceMasteryOptions: [],
-      });
-
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      await steps[tacticalIdx].handler(ctx);
-
-      expect(applyMasteryEffect).not.toHaveBeenCalled();
-    });
-
-    it('skips mastery when already applied to target', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
-        if (propertyName === '_Push_appliedTarget') return 'Orc';
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Push',
-        extraMasteries: [],
-        replaceMasteryOptions: [],
-      });
-
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      await steps[tacticalIdx].handler(ctx);
-
-      expect(applyMasteryEffect).not.toHaveBeenCalled();
-    });
-
-    it('does not set _Slow_appliedTarget for Slow mastery', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Slow',
-        extraMasteries: [],
-        replaceMasteryOptions: [],
-      });
-
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      await steps[tacticalIdx].handler(ctx);
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'test-campaign',
-        '_Slow_appliedTarget',
-        'Orc',
-        'test-campaign',
-      );
-    });
-
-    it('prompts for tactical master replacement when options exist', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Orc', attackName: 'Greataxe' };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Push',
-        replaceMasteryOptions: ['Sap', 'Vex'],
-      });
-
-      const setModalState = vi.fn();
-      const ctx = makeCtx({
-        attack: { name: 'Greataxe' },
-        playerStats: { automation: { actions: [] } },
-        setModalState: setModalState,
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      const result = await steps[tacticalIdx].handler(ctx);
-
-      expect(setModalState).toHaveBeenCalled();
-      expect(result.modal).toEqual({
+    // autoApply = [Push] (base not in replace list) runs before the modal offer (:607).
+    expect(applyMasteryEffect.mock.calls).toEqual([
+      ['Push', ctx.playerStats, 'test-campaign', 'Orc'],
+    ]);
+    expect(result).toEqual({
+      data: { _tacticalMasterPending: true },
+      modal: {
         type: 'tacticalMaster',
-        props: expect.objectContaining({
+        props: {
           attackName: 'Greataxe',
           baseMastery: 'Push',
           replaceOptions: ['Sap', 'Vex'],
           targetName: 'Orc',
-        }),
-      });
-      expect(result.data._tacticalMasterPending).toBe(true);
+          isChoiceMode: false,
+          featureName: null,
+        },
+      },
     });
+    // Pending runtime bytes are byte-identical to modal props (:611-623).
+    expect(ctx.setModalState).toHaveBeenCalledWith({
+      tacticalMasterPending: result.modal.props,
+    });
+  });
 
-    it('threads the granting featureName through choice-mode modal props (Battering Roots)', async () => {
-      getRuntimeValue.mockImplementation((_characterKey, propertyName, _campaignName) => {
-        if (propertyName === 'lastAttack') return { hit: true, targetName: 'Goblin', attackName: 'Longsword' };
-        return null;
-      });
-      collectWeaponMastery.mockReturnValue({
-        baseMastery: 'Sap',
-        replaceMasteryOptions: ['Push', 'Topple'],
-        choiceMasteries: ['Push', 'Topple'],
-        featureName: 'Battering Roots',
-      });
+  it('choice-mode fallback: empty replace list falls to choiceMasteries, featureName threaded, props sourced from lastAttack not ctx.attack', async () => {
+    // ctx.attack.name ('Longsword') differs from lastAttack.attackName ('Warhammer'):
+    // modal props must come from lastAttack (:613), falsifying a byte-source swap.
+    const ctx = makeCtx({ attack: { name: 'Longsword' }, setModalState: vi.fn() });
+    stubRuntime({ hit: true, targetName: 'Goblin', attackName: 'Warhammer' });
+    collectWeaponMastery.mockReturnValue({
+      baseMastery: 'Sap',
+      replaceMasteryOptions: [],
+      choiceMasteries: ['Push', 'Topple'],
+      featureName: 'Battering Roots',
+    });
+    const result = await tacticalStep(steps).handler(ctx);
 
-      const setModalState = vi.fn();
-      const ctx = makeCtx({
-        attack: { name: 'Longsword' },
-        playerStats: { automation: { actions: [] } },
-        setModalState: setModalState,
-      });
-      const tacticalIdx = steps.map((s) => s.name).indexOf('tacticalMaster');
-      const result = await steps[tacticalIdx].handler(ctx);
-
-      expect(result.modal.props.featureName).toBe('Battering Roots');
-      expect(result.modal.props.isChoiceMode).toBe(true);
-      expect(setModalState).toHaveBeenCalledWith(expect.objectContaining({
-        tacticalMasterPending: expect.objectContaining({ featureName: 'Battering Roots' }),
-      }));
+    // autoApply = [Sap] (choice list [Push, Topple] excluded from auto-apply, :575).
+    expect(applyMasteryEffect.mock.calls).toEqual([
+      ['Sap', ctx.playerStats, 'test-campaign', 'Goblin'],
+    ]);
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['campaign', '_Sap_appliedTarget', 'Goblin', 'test-campaign'],
+    ]);
+    expect(result).toEqual({
+      data: { _tacticalMasterPending: true },
+      modal: {
+        type: 'tacticalMaster',
+        props: {
+          attackName: 'Warhammer',
+          baseMastery: 'Sap',
+          replaceOptions: ['Push', 'Topple'],
+          targetName: 'Goblin',
+          isChoiceMode: true,
+          featureName: 'Battering Roots',
+        },
+      },
+    });
+    expect(ctx.setModalState).toHaveBeenCalledWith({
+      tacticalMasterPending: result.modal.props,
     });
   });
 });

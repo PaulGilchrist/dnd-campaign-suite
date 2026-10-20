@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// Lane #1054 — hexDamage (attack-step): Hex's Curse damage bonus on a weapon hit.
+// Hex-family map:
+//   - #1051 eldritchStrikes pins the Hex Strike latch-key derivation ('_Hex_Strike_usedRound',
+//     space→underscore contract). Hex STRIKE consumption is NOT this lane.
+//   - spellCastService.hexEffects / helpers.js cover Hex-on-CAST application (targetEffects
+//     disadvantage stamps) — NOT this attack-damage step.
+//   - This lane owns the HIT-time decision bytes: caster channelling concentration
+//     { spell: 'Hex' } (exact ===, per concentrationService.addConcentration shape
+//     { id, spell, dc, target }) AND cursed-target match → +1d6 necrotic appended.
+//   - No per-turn latch here: concentration itself is the gate; zero-applied must not burn
+//     anything (#1026) — every guard refusal before the roll never calls rollExpression;
+//     only rollExpression's own null return passes prevData through unchanged (no re-roll).
+// Old→new map: 20 tests → 8 (null/undefined and near-duplicate refusals table-driven;
+// success runs consolidated to one exact-full-result run with distinguishable dice bytes).
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
@@ -19,13 +35,40 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 
+const CAMPAIGN = 'test-campaign';
+const ATK = 'Ranger1';
+const CURSED = 'Goblin1';
+
 function makeCtx(overrides = {}) {
   return {
-    campaignName: 'test-campaign',
-    playerStats: { name: 'Ranger1' },
-    targetName: 'Goblin1',
+    campaignName: CAMPAIGN,
+    playerStats: { name: ATK },
+    targetName: CURSED,
     ...overrides,
   };
+}
+
+// Fresh prevData per run (distinguishable bytes: 8+3 = 11, no 4s — hex roll is visible).
+function makePrev() {
+  return { formula: '1d8+3', total: 11, rolls: [8, 3] };
+}
+
+// Arm the caster with a live Hex concentration (concentrationService.addConcentration shape).
+// NO_CONC omits the key entirely (explicit `undefined` would hit the default param).
+const NO_CONC = Symbol('no concentration');
+function armHex(concentration = { spell: 'Hex', target: CURSED }) {
+  const creature = { name: ATK };
+  if (concentration !== NO_CONC) creature.concentration = concentration;
+  getCombatContext.mockResolvedValue({ creatures: [creature] });
+}
+
+// A refusal must return prevData byte-identical and never touch the dice.
+async function expectRefusal(ctx) {
+  const prevData = makePrev();
+  const result = await hexDamage.handler(ctx, prevData);
+
+  expect(result).toEqual({ data: prevData });
+  expect(rollExpression).not.toHaveBeenCalled();
 }
 
 // ── Tests ────────────────────────────────────────────────────────
@@ -35,294 +78,90 @@ describe('hexDamage', () => {
     vi.clearAllMocks();
   });
 
-  describe('condition', () => {
-    it('always returns true', () => {
-      expect(hexDamage.condition(makeCtx())).toBe(true);
+  it('step contract: name "hexDamage", condition always true', () => {
+    expect(hexDamage.name).toBe('hexDamage');
+    expect(hexDamage.condition(makeCtx())).toBe(true);
+    expect(hexDamage.condition({})).toBe(true);
+  });
+
+  describe('refusals — no dice rolled, prevData untouched', () => {
+    it.each([
+      ['no combat summary', null],
+      ['attacker not in combat', { creatures: [{ name: 'Orc1' }] }],
+      ['creatures list missing', {}],
+    ])('refuses when %s', async (_label, cs) => {
+      getCombatContext.mockResolvedValue(cs);
+      await expectRefusal(makeCtx());
     });
 
-    it('returns true with empty context', () => {
-      expect(hexDamage.condition({})).toBe(true);
+    // Strict === 'Hex' byte contract — near-miss bytes and missing concentration refuse
+    // (cites #1051: exact-match keys in this family are never substring/loose matched).
+    it.each([
+      ['no concentration', NO_CONC],
+      ['null concentration', null],
+      ['channelling another spell', { spell: 'Bane', target: CURSED }],
+      ['lowercase spell byte', { spell: 'hex', target: CURSED }],
+      ['near-miss spell byte', { spell: 'HexingStriker', target: CURSED }],
+    ])('refuses when %s', async (_label, concentration) => {
+      armHex(concentration);
+      await expectRefusal(makeCtx());
+    });
+
+    // Co-located falsifier (#948): the exact same armed state ACROSS below — only the
+    // target byte flips the outcome. Uncursed targets never take the bonus.
+    it('refuses when the attack target is not the cursed target', async () => {
+      armHex({ spell: 'Hex', target: 'Orc1' });
+      await expectRefusal(makeCtx({ targetName: CURSED }));
+    });
+
+    it('refuses when rollExpression returns null (dice rolled but zero burned)', async () => {
+      armHex();
+      rollExpression.mockReturnValue(null);
+
+      const prevData = makePrev();
+      const result = await hexDamage.handler(makeCtx(), prevData);
+
+      expect(result).toEqual({ data: prevData });
+      expect(rollExpression).toHaveBeenCalledTimes(1);
+      expect(rollExpression).toHaveBeenCalledWith('1d6');
     });
   });
 
-  describe('handler', () => {
-    describe('early returns — no combat context', () => {
-      it('returns prevData when getCombatContext returns null', async () => {
-        getCombatContext.mockResolvedValue(null);
+  describe('application — +1d6 necrotic appended', () => {
+    it('cursed target hit: appends 1d6 [necrotic] with exact full-result shape', async () => {
+      armHex();
+      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
+      const prevData = makePrev();
+      const result = await hexDamage.handler(makeCtx(), prevData);
 
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        data: { formula: '1d8+3 + 1d6 [necrotic]', total: 15, rolls: [8, 3, 4] },
       });
+      expect(rollExpression).toHaveBeenCalledWith('1d6');
+      expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+      expect(prevData).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+    });
 
-      it('returns prevData when getCombatContext returns undefined', async () => {
-        getCombatContext.mockResolvedValue(undefined);
+    it('applies when concentration carries no target (addConcentration default null)', async () => {
+      armHex({ spell: 'Hex', target: null });
+      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
+      const result = await hexDamage.handler(makeCtx(), makePrev());
 
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        data: { formula: '1d8+3 + 1d6 [necrotic]', total: 15, rolls: [8, 3, 4] },
       });
     });
 
-    describe('early returns — attacker not found in combat context', () => {
-      it('returns prevData when attacker name not in creatures array', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'OtherCreature' }],
-        });
+    it('defaults missing prevData.rolls to [] before appending hex dice', async () => {
+      armHex();
+      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
+      const result = await hexDamage.handler(makeCtx(), { formula: 'flat', total: 5 });
 
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when creatures array is missing', async () => {
-        getCombatContext.mockResolvedValue({});
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when creatures array is null', async () => {
-        getCombatContext.mockResolvedValue({ creatures: null });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('early returns — not concentrating on Hex', () => {
-      it('returns prevData when concentration is null', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'Ranger1', concentration: null }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when concentration is undefined', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'Ranger1' }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when concentration spell is not Hex', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'Ranger1', concentration: { spell: 'Bane' } }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when concentration spell is "HexingStriker" (not exact match)', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{ name: 'Ranger1', concentration: { spell: 'HexingStriker' } }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('early returns — target mismatch', () => {
-      it('returns prevData when concentration target differs from ctx.targetName', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Orc1' },
-          }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('returns prevData when concentration target is different string', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'DifferentTarget' },
-          }],
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('early returns — rollExpression returns null', () => {
-      it('returns prevData when rollExpression returns null', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue(null);
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result).toEqual({ data: prevData });
-      });
-    });
-
-    describe('successful application', () => {
-      it('adds 1d6 necrotic damage when hex target matches', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('1d8+3 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(15);
-        expect(result.data.rolls).toEqual([8, 3, 4]);
-      });
-
-      it('rolls 1d6 and adds to existing formula', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 6, rolls: [6], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: '2d6+4', total: 15, rolls: [3, 5, 4] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('2d6+4 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(21);
-        expect(result.data.rolls).toEqual([3, 5, 4, 6]);
-      });
-
-      it('rolls 1d6 and adds to existing formula with max roll', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 1, rolls: [1], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: '1d8+5', total: 13, rolls: [8, 5] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('1d8+5 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(14);
-        expect(result.data.rolls).toEqual([8, 5, 1]);
-      });
-
-      it('works when concentration has no target (unrestricted)', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('1d8+3 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(14);
-        expect(result.data.rolls).toEqual([8, 3, 3]);
-      });
-
-      it('works with empty prevData.rolls', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: 'flat', total: 5, rolls: [] };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('flat + 1d6 [necrotic]');
-        expect(result.data.total).toBe(10);
-        expect(result.data.rolls).toEqual([5]);
-      });
-
-      it('works when prevData.rolls is undefined', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0, formula: '1d6' });
-
-        const prevData = { formula: '1d8+3', total: 11 };
-        const result = await hexDamage.handler(makeCtx(), prevData);
-
-        expect(result.data.formula).toBe('1d8+3 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(14);
-        expect(result.data.rolls).toEqual([3]);
-      });
-
-      it('uses different attacker name from ctx.targetName to verify target match', async () => {
-        getCombatContext.mockResolvedValue({
-          creatures: [{
-            name: 'Ranger1',
-            concentration: { spell: 'Hex', target: 'Goblin1' },
-          }],
-        });
-        rollExpression.mockReturnValue({ total: 2, rolls: [2], modifier: 0, formula: '1d6' });
-
-        const ctx = makeCtx({
-          playerStats: { name: 'Ranger1' },
-          targetName: 'Goblin1',
-        });
-        const prevData = { formula: '1d10+2', total: 9, rolls: [7, 2] };
-        const result = await hexDamage.handler(ctx, prevData);
-
-        expect(result.data.formula).toBe('1d10+2 + 1d6 [necrotic]');
-        expect(result.data.total).toBe(11);
-        expect(result.data.rolls).toEqual([7, 2, 2]);
+      expect(result).toEqual({
+        data: { formula: 'flat + 1d6 [necrotic]', total: 9, rolls: [4] },
       });
     });
   });

@@ -1,62 +1,52 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Lane: directSpellDamageSteps.js steps[3] spellFeatureRiders — the generic spell-side
+// rider dispatch loop. Contract (source :162-174): seed prevData {formula,total,rolls}
+// from ctx (rolls copied), gate each featureModules entry on condition(ctx), await
+// handler(ctx, data), then per result: null → continue, modal → ABORT returning the
+// whole result verbatim, data → replace, sideEffects → awaited inline before the loop
+// advances. Spell riders here are feature-module dispatch only — no dice math (that is
+// the rolling lane, idx 2) and no builder routing (attack-path riders live in
+// attackRollRiders #1041; this loop shares no helpers with it).
+//
+// directSpellDamageSteps family idx map:
+//   0 spellHousekeeping / 1 spellContext      → cla120 #1042 (VERBATIM baseline),
+//     context #1043 (multi-option gate, throwing sentinels), radiantSoul #1045 (latch)
+//   2 spellRollDamage                           → rolling lane (owns roll lanes + RS stamp)
+//   3 spellFeatureRiders                        → THIS FILE (dispatch contract only)
+//   4 spellOverchannel / 5 spellProceedToDamage → overchannel #1044
+//   names/subscribe/emit structure table        → structure lane (cited, not repeated)
+//   Siblings pin featureModules statically [] — dispatch lives nowhere else.
+//
+// old -> new map (8 -> 4):
+//   'returns data with formula, total, and copied rolls' + 'handles missing rolls
+//     gracefully'          → T1: exact full-result toEqual, copy semantics pinned, co-located
+//   'skips false' + 'calls when true' + 'passes prevData' → T2: armed/unarmed pair,
+//     ctx identity on condition, exact seed bytes, null-result passthrough
+//   'updates data' + 'calls sideEffects' + 'processes multiple in sequence' → T3:
+//     one replace→chain flow with inline ordering, pending-sideEffect not-resolved pin,
+//     null-preserves-data
+//   'returns modal result' + 'stops processing when modal' → T4: verbatim whole-result
+//     abort (extra key proves `return result`, not a rebuild), later feature never gated
+//
+// Dead-mock purge: the old diceRoller parse-loop was a re-implemented dice oracle that
+// this lane never calls (rolling lives at idx 2) — stubbed to inert vi.fn imports only.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildDirectSpellDamageSteps } from './directSpellDamageSteps.js';
 
+// Import-stability stubs only: diceRoller/postCastRiderService/logService/choiceStorage
+// are consulted by OTHER idx lanes, never by spellFeatureRiders. Zero network (#841).
 vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = rolls.reduce((s, r) => s + r, 0) + modStr;
-      return { total, rolls, modifier: modStr };
-    }
-    return { total: 6, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionDoubled: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
-      const total = (rolls.reduce((s, r) => s + r, 0) * 2) + modStr;
-      const doubledRolls = rolls.concat(rolls);
-      return { total, rolls, doubledRolls, modifier: modStr };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
-  rollExpressionMaximized: vi.fn((formula) => {
-    if (!formula) return null;
-    const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
-    if (!baseFormula) return null;
-    const match = baseFormula.match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-    if (match) {
-      const count = parseInt(match[1], 10);
-      const sides = parseInt(match[2], 10);
-      const modStr = match[3] ? parseInt(match[3], 10) : 0;
-      return { total: count * sides + modStr, rolls: Array(count).fill(sides), modifier: modStr, maximized: true };
-    }
-    return { total: 12, rolls: [6], modifier: 0 };
-  }),
+  rollExpression: vi.fn(),
+  rollExpressionDoubled: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
 }));
-
 vi.mock('../../rules/spells/postCastRiderService.js', () => ({
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }));
-
 vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve({})),
 }));
-
 vi.mock('../../../services/automation/common/choiceStorage.js', () => ({
   getChosenRuntimeValue: vi.fn(() => undefined),
 }));
@@ -66,229 +56,102 @@ vi.mock('./features/index.js', () => ({
   get featureModules() { return _featureModulesRef.value; },
 }));
 
-const { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } = await import('../../rules/spells/postCastRiderService.js');
-
-function makeCtx(overrides = {}) {
-  return {
-    attack: {},
-    playerStats: {
-      name: 'TestWizard',
-      abilities: [
-        { name: 'Intelligence', bonus: 3 },
-        { name: 'Wisdom', bonus: 2 },
-      ],
-      automation: { actions: [] },
-    },
-    proceedWithDamage: vi.fn(),
-    campaignName: 'test-campaign',
-    ...overrides,
-  };
-}
-
-describe('buildDirectSpellDamageSteps - spellFeatureRiders', () => {
+describe('buildDirectSpellDamageSteps — steps[3] spellFeatureRiders dispatch', () => {
   let steps;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(getEmpoweredEvocationFeatures).mockReturnValue([]);
-    vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValue(0);
     _featureModulesRef.value = [];
     steps = buildDirectSpellDamageSteps();
   });
 
-  describe('handler with empty featureModules', () => {
-    it('returns data with formula, total, and copied rolls', async () => {
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6, 5, 4, 3, 2, 4],
-      });
-      const result = await steps[3].handler(ctx);
-      expect(result.data).toEqual(
-        expect.objectContaining({
-          formula: '8d6',
-          total: 24,
-          rolls: [6, 5, 4, 3, 2, 4],
-        }),
-      );
-    });
-
-    it('handles missing rolls gracefully', async () => {
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-      });
-      const result = await steps[3].handler(ctx);
-      expect(result.data.rolls).toEqual([]);
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('handler with feature modules', () => {
-    it('skips features whose condition returns false', async () => {
-      const mockFeature = {
-        condition: vi.fn(() => false),
-        handler: vi.fn(),
-      };
-      _featureModulesRef.value = [mockFeature];
+  it('passthrough: seeds exact {formula,total,rolls} and never mutates ctx.rolls', async () => {
+    const rolls = [6, 5, 4, 3, 2, 4];
+    const ctx = { formula: '8d6', total: 24, rolls };
+    const result = await steps[3].handler(ctx);
+    expect(result).toEqual({ data: { formula: '8d6', total: 24, rolls: [6, 5, 4, 3, 2, 4] } });
+    // Copy semantics: a rider mutating pipeline data cannot corrupt the caller's ctx.
+    expect(result.data.rolls).not.toBe(rolls);
+    expect(ctx.rolls).toEqual([6, 5, 4, 3, 2, 4]);
 
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      await steps[3].handler(ctx);
-      expect(mockFeature.handler).not.toHaveBeenCalled();
-    });
+    // Near-miss co-located: missing rolls seeds [] (not undefined).
+    const bare = await steps[3].handler({ formula: '8d6', total: 24 });
+    expect(bare).toEqual({ data: { formula: '8d6', total: 24, rolls: [] } });
+  });
 
-    it('calls feature handler when condition returns true', async () => {
-      const mockFeature = {
-        condition: vi.fn(() => true),
-        handler: vi.fn(async () => null),
-      };
-      _featureModulesRef.value = [mockFeature];
+  it('condition(ctx) gate: unarmed skipped, armed called once with ctx and the exact seed', async () => {
+    const armed = { condition: vi.fn(() => true), handler: vi.fn(async () => null) };
+    const unarmed = { condition: vi.fn(() => false), handler: vi.fn() };
+    _featureModulesRef.value = [unarmed, armed];
 
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      await steps[3].handler(ctx);
-      expect(mockFeature.handler).toHaveBeenCalledWith(ctx, expect.any(Object));
-    });
+    const ctx = { formula: '8d6', total: 24, rolls: [6, 5] };
+    const result = await steps[3].handler(ctx);
 
-    it('passes prevData to feature handler with formula, total, and rolls', async () => {
-      const mockFeature = {
-        condition: vi.fn(() => true),
-        handler: vi.fn(async () => null),
-      };
-      _featureModulesRef.value = [mockFeature];
+    expect(unarmed.condition).toHaveBeenCalledWith(ctx);
+    expect(armed.condition).toHaveBeenCalledWith(ctx);
+    expect(unarmed.handler).not.toHaveBeenCalled();
+    expect(armed.handler).toHaveBeenCalledTimes(1);
+    expect(armed.handler).toHaveBeenCalledWith(ctx, { formula: '8d6', total: 24, rolls: [6, 5] });
+    // null result → continue: seed passes through untouched.
+    expect(result).toEqual({ data: { formula: '8d6', total: 24, rolls: [6, 5] } });
+  });
 
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6, 5],
-      });
-      await steps[3].handler(ctx);
-      const passedData = mockFeature.handler.mock.calls[0][1];
-      expect(passedData).toEqual({
-        formula: '8d6',
-        total: 24,
-        rolls: [6, 5],
-      });
-    });
+  it('replace-then-chain: sideEffect awaited inline before the next feature, which sees the replaced data', async () => {
+    const replaced = { formula: '8d6 + 6 [Test Rider]', total: 30, rolls: [6] };
+    const tracker = [];
+    let resolveSide;
+    const f1 = {
+      condition: () => true,
+      handler: vi.fn(async () => {
+        tracker.push('f1');
+        return {
+          data: replaced,
+          sideEffects: vi.fn(() => {
+            tracker.push('side');
+            return new Promise((resolve) => { resolveSide = resolve; });
+          }),
+        };
+      }),
+    };
+    const f2 = { condition: () => true, handler: vi.fn(async () => { tracker.push('f2'); return null; }) };
+    _featureModulesRef.value = [f1, f2];
 
-    it('returns modal result when feature returns modal', async () => {
-      const mockFeature = {
-        condition: vi.fn(() => true),
-        handler: vi.fn(async () => ({
-          modal: { type: 'test', props: {} },
-        })),
-      };
-      _featureModulesRef.value = [mockFeature];
+    const pending = steps[3].handler({ formula: '8d6', total: 24, rolls: [6] });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    // Pending sideEffect blocks the step AND the next feature (inline await, no race).
+    expect(tracker).toEqual(['f1', 'side']);
+    resolveSide();
+    const result = await pending;
 
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      const result = await steps[3].handler(ctx);
-      expect(result).toEqual({ modal: { type: 'test', props: {} } });
-    });
+    expect(tracker).toEqual(['f1', 'side', 'f2']);
+    expect(f2.handler.mock.calls[0][1]).toEqual(replaced);
+    // f2's null result preserves f1's replacement as the final data.
+    expect(result).toEqual({ data: replaced });
+  });
 
-    it('updates data when feature returns data', async () => {
-      const mockFeature = {
-        condition: vi.fn(() => true),
-        handler: vi.fn(async () => ({
-          data: { total: 30, formula: '8d6 + 6 [Feature]' },
-        })),
-      };
-      _featureModulesRef.value = [mockFeature];
+  it('modal aborts: whole rider result returned verbatim, later features never gated', async () => {
+    const modalResult = {
+      modal: { type: 'rider-modal', props: { token: 'abort-42' } },
+      data: { formula: '8d6', total: 77, rolls: [6] },
+    };
+    const tracker = [];
+    const f1 = {
+      condition: () => true,
+      handler: vi.fn(async () => { tracker.push('f1'); return { data: { formula: '8d6', total: 28, rolls: [6] } }; }),
+    };
+    const f2 = { condition: () => true, handler: vi.fn(async () => { tracker.push('f2'); return modalResult; }) };
+    const f3 = { condition: vi.fn(() => true), handler: vi.fn(async () => { tracker.push('f3'); return { data: { total: 999 } }; }) };
+    _featureModulesRef.value = [f1, f2, f3];
 
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      const result = await steps[3].handler(ctx);
-      expect(result.data).toEqual({
-        formula: '8d6 + 6 [Feature]',
-        total: 30,
-      });
-    });
+    const result = await steps[3].handler({ formula: '8d6', total: 24, rolls: [6] });
 
-    it('calls sideEffects when feature returns them', async () => {
-      const sideEffectsMock = vi.fn();
-      const mockFeature = {
-        condition: vi.fn(() => true),
-        handler: vi.fn(async () => ({
-          data: { total: 30 },
-          sideEffects: sideEffectsMock,
-        })),
-      };
-      _featureModulesRef.value = [mockFeature];
-
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      await steps[3].handler(ctx);
-      expect(sideEffectsMock).toHaveBeenCalled();
-    });
-
-    it('processes multiple features in sequence', async () => {
-      const feature1Handler = vi.fn(async () => ({
-        data: { total: 28 },
-      }));
-      const feature2Handler = vi.fn(async () => ({
-        data: { total: 32 },
-      }));
-      _featureModulesRef.value = [
-        { condition: () => true, handler: feature1Handler },
-        { condition: () => true, handler: feature2Handler },
-      ];
-
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      await steps[3].handler(ctx);
-      expect(feature1Handler).toHaveBeenCalledTimes(1);
-      expect(feature2Handler).toHaveBeenCalledTimes(1);
-    });
-
-    it('stops processing when a feature returns modal', async () => {
-      const feature1Handler = vi.fn(async () => ({
-        data: { total: 28 },
-      }));
-      const feature2Handler = vi.fn(async () => ({
-        modal: { type: 'modal' },
-      }));
-      _featureModulesRef.value = [
-        { condition: () => true, handler: feature1Handler },
-        { condition: () => true, handler: feature2Handler },
-      ];
-
-      const ctx = makeCtx({
-        attack: { damage: '8d6' },
-        formula: '8d6',
-        total: 24,
-        rolls: [6],
-      });
-      const _result = await steps[3].handler(ctx);
-      expect(feature1Handler).toHaveBeenCalledTimes(1);
-      expect(feature2Handler).toHaveBeenCalledTimes(1);
-      expect(_result).toEqual({ modal: { type: 'modal' } });
-    });
+    // Verbatim return of the feature's FULL result (extra data key survives — proof
+    // this is `return result`, not a {modal} rebuild; f1's 28 is gone, f3's 999 never).
+    expect(result).toEqual(modalResult);
+    expect(tracker).toEqual(['f1', 'f2']);
+    expect(f3.condition).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,22 @@
+// @maintained-by-ai
+// shieldBash step lane map (owner cites):
+//  - THIS file owns src/services/combat/steps/features/shieldBash.js:
+//    condition gate (FT-103), handler gate table, save-DC resolution
+//    (new/old-style + fallback), STR save prompt + exact modal build,
+//    Push/Prone/skip effects, oncePerTurn latch stamp (FT-074),
+//    restoreBaseAttackAfterBash (FT-082).
+//  - Rider dispatch → attackRiderHandler*.test.js · Modal UI →
+//    modals/ShieldBashChoiceModal.test.jsx · Resume lane →
+//    useAttackDamageResolution.shieldBashResume.test.js · mastery push →
+//    weaponMasteryHandler.push.test.js · gladiator DC →
+//    gladiator-shield-bash-dc-success.test.js.
+// Old→new: 33 duplicated-setup tests → behavior tables; every former leg
+// kept (each reaches a distinct source branch), modal/log/latch assertions
+// tightened from toContain fragments to exact full objects.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks ────────────────────────────────────────────────────────
+// ── Mocks (all 8 are imported by shieldBash.js — verified, no dead mocks) ──
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -20,12 +36,12 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../../automation/common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn(() => 13),
-  createSaveListener: vi.fn(() => ({ promise: Promise.resolve({ success: false, total: 7, roll: 7, saveBonus: 0 }) })),
+  buildSaveDc: vi.fn(),
+  createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../../automation/common/oncePerTurn.js', () => ({
-  checkOncePerTurnWithSkip: vi.fn(() => null),
+  checkOncePerTurnWithSkip: vi.fn(),
 }));
 
 vi.mock('../../../../services/combat/conditions/conditionSaveService.js', () => ({
@@ -33,7 +49,7 @@ vi.mock('../../../../services/combat/conditions/conditionSaveService.js', () => 
 }));
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn(() => Promise.resolve(true)),
+  isWithinRange: vi.fn(),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────
@@ -51,15 +67,12 @@ import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function makeCtx(overrides = {}) {
-  return {
-    campaignName: 'test-campaign',
-    playerStats: { name: 'Fighter1' },
-    ...overrides,
-  };
-}
+const CAMPAIGN = 'test-campaign';
+const PREV_DATA = { formula: '1d8+3' };
+const LAST_ATTACK = { attackName: 'Longsword', hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' };
+const BASE_ATTACK = { attackName: 'Scimitar', hit: true, damageType: 'Slashing', attackerName: 'Fighter1', targetName: 'Zombie 1' };
 
-function makeShieldPassive(options = {}) {
+function oldPassive(options = {}) {
   return {
     type: 'attack_rider',
     trigger: 'melee_hit_with_shield_equipped',
@@ -69,7 +82,7 @@ function makeShieldPassive(options = {}) {
   };
 }
 
-function makeNewStylePassive(options = {}) {
+function newPassive(options = {}) {
   return {
     type: 'attack_rider',
     effect: 'push_or_prone',
@@ -79,372 +92,251 @@ function makeNewStylePassive(options = {}) {
   };
 }
 
-function makeShieldCtx(extraPassives) {
-  const passives = extraPassives || [makeShieldPassive()];
-  return makeCtx({
+function makeCtx(passives = [oldPassive()], playerStatsOverrides = {}) {
+  return {
+    campaignName: CAMPAIGN,
     playerStats: {
       name: 'Fighter1',
       automation: { passives },
       inventory: { equipped: ['Shield'] },
       equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+      ...playerStatsOverrides,
     },
+  };
+}
+
+// Campaign/character-faithful store stub: any read off the correct lane
+// returns a loud decoy so a wrong-campaign/character read fails assertions.
+function stubStore(map = {}) {
+  getRuntimeValue.mockImplementation((character, key, campaign) => {
+    if (campaign && campaign !== CAMPAIGN) return { attackName: 'DECOY-WRONG-CAMPAIGN' };
+    return map[`${character}.${key}`] ?? null;
   });
 }
 
-const PREV_DATA = { formula: '1d8+3' };
+function withoutTimestamp(entry) {
+  const { timestamp, ...rest } = entry;
+  expect(typeof timestamp).toBe('number');
+  return rest;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  parseMagicItemName.mockImplementation((name) => ({ baseName: name, magicBonus: 0 }));
+  isWithinRange.mockResolvedValue(true);
+  checkOncePerTurnWithSkip.mockResolvedValue(null);
+  getRuntimeValue.mockReturnValue(null);
+  getCombatContext.mockResolvedValue({ round: 3, activeCreatureName: 'StaleMirrorName' });
+});
 
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('shieldBash', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('step name contract', () => {
+    expect(shieldBash.name).toBe('shieldBash');
   });
 
-  describe('condition', () => {
-    it('returns true when automation.passives exists', () => {
-      const ctx = makeCtx({ playerStats: { automation: { passives: [makeShieldPassive()] } } });
-      expect(shieldBash.condition(ctx)).toBe(true);
+  describe('condition (FT-103: rides the Attack action, never a reaction)', () => {
+    it.each([
+      ['passives present, not an opportunity attack', { automation: { passives: [oldPassive()] } }, undefined, true],
+      ['automation without passives', { automation: {} }, undefined, false],
+      ['no automation at all', {}, undefined, false],
+      ['opportunity attack', { automation: { passives: [oldPassive()] } }, true, false],
+    ])('%s → %s', (_label, playerStats, isOpportunityAttack, expected) => {
+      const ctx = { campaignName: CAMPAIGN, playerStats, ...(isOpportunityAttack ? { isOpportunityAttack } : {}) };
+      expect(shieldBash.condition(ctx)).toBe(expected);
     });
 
-    it('returns false when automation.passives is missing', () => {
-      expect(shieldBash.condition(makeCtx({ playerStats: { automation: {} } }))).toBe(false);
-    });
-
-    it('returns false when automation is missing', () => {
-      expect(shieldBash.condition(makeCtx({ playerStats: {} }))).toBe(false);
-    });
-
-    it('throws when playerStats is null', () => {
-      expect(() => shieldBash.condition(makeCtx({ playerStats: null }))).toThrow();
+    it('throws TypeError honestly when playerStats is null', () => {
+      expect(() => shieldBash.condition({ campaignName: CAMPAIGN, playerStats: null })).toThrow(TypeError);
     });
   });
 
-  describe('handler', () => {
-    describe('early returns — no shield bash passive', () => {
-      it('returns null when no passives exist', async () => {
-        const ctx = makeCtx({ playerStats: { automation: { passives: [] } } });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toBeNull();
-      });
+  describe('handler — no matching passive', () => {
+    it.each([
+      ['no passives', []],
+      ['rider with unrelated effect', [{ type: 'attack_rider', effect: 'other' }]],
+      ['old-style trigger with empty options', [{ type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped', options: [] }]],
+      ['new-style effect without oncePerTurn', [{ type: 'attack_rider', effect: 'push_or_prone' }]],
+    ])('%s → null, bails before any store read', async (_label, passives) => {
+      const ctx = makeCtx(passives);
+      expect(await shieldBash.handler(ctx, PREV_DATA)).toBeNull();
+      expect(getRuntimeValue).not.toHaveBeenCalled();
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+  });
 
-      it('returns null when no passive matches old-style', async () => {
-        const ctx = makeCtx({ playerStats: { automation: { passives: [{ type: 'attack_rider', effect: 'other' }] } } });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toBeNull();
-      });
+  describe('handler — gates return { data: prevData } with zero writes', () => {
+    it.each([
+      ['lastAttack is null', { lastAttack: null }],
+      ['lastAttack missed', { lastAttack: { ...LAST_ATTACK, hit: false } }],
+      ['attacker is not the player', { lastAttack: { ...LAST_ATTACK, attackerName: 'Goblin1' } }],
+      ['ranged attack', { lastAttack: { ...LAST_ATTACK, weaponType: 'ranged' } }],
+      ['target missing', { lastAttack: { ...LAST_ATTACK, targetName: undefined } }],
+      ['target beyond 5 ft (FT-074)', { lastAttack: { ...LAST_ATTACK }, within: false }],
+      ['no shield equipped', { noShield: true }],
+      ['once-per-turn skip, armor_category shield', { skip: true }],
+      ['once-per-turn skip, equipment_category shield', { skip: true, shieldByEquipmentCategory: true }],
+    ])('%s', async (_label, cfg) => {
+      stubStore({ 'campaign.lastAttack': cfg.lastAttack !== undefined ? cfg.lastAttack : { ...LAST_ATTACK } });
+      if (cfg.within === false) isWithinRange.mockResolvedValue(false);
+      if (cfg.skip) checkOncePerTurnWithSkip.mockResolvedValue({ type: 'popup' });
+      const la = cfg.lastAttack !== undefined ? cfg.lastAttack : LAST_ATTACK;
+      const reachesRange = !!(la && la.hit && la.attackerName === 'Fighter1' && la.weaponType === 'melee' && la.targetName);
+      const overrides = cfg.noShield
+        ? { inventory: { equipped: ['Longsword'] }, equipment: [{ name: 'Longsword', armor_category: 'Heavy', equipment_category: 'Weapon' }] }
+        : cfg.shieldByEquipmentCategory
+          ? { inventory: { equipped: ['Tower Shield'] }, equipment: [{ name: 'Tower Shield', equipment_category: 'Shield' }] }
+          : {};
+      const ctx = makeCtx([oldPassive()], overrides);
 
-      it('returns null when no passive matches new-style', async () => {
-        const ctx = makeCtx({ playerStats: { automation: { passives: [{ type: 'attack_rider', effect: 'other', oncePerTurn: true }] } } });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toBeNull();
-      });
+      expect(await shieldBash.handler(ctx, PREV_DATA)).toEqual({ data: PREV_DATA });
+
+      expect(createSaveListener).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(addEntry).not.toHaveBeenCalled();
+      // branch-reach pins: gate ordering must be observed, not assumed
+      if (reachesRange) expect(isWithinRange).toHaveBeenCalledWith('Fighter1', LAST_ATTACK.targetName, 5);
+      else expect(isWithinRange).not.toHaveBeenCalled();
+      if (cfg.noShield) expect(checkOncePerTurnWithSkip).not.toHaveBeenCalled();
+      if (cfg.skip) expect(checkOncePerTurnWithSkip).toHaveBeenCalledWith('Shield Bash', '_Shield_Bash_usedRound', '_Shield_Bash_skippedRound', ctx.playerStats, CAMPAIGN);
+    });
+  });
+
+  describe('save DC resolution', () => {
+    // byte-source-swap: distinguishable automation objects prove WHICH
+    // passive was consulted, not just that a DC appeared.
+    it('new-style passive wins when both styles exist; its automation computes the DC', async () => {
+      const oldAuto = { saveDc: 'ability', saveAbility: 'STR' };
+      const newAuto = { saveDc: 'spell', saveAbility: 'CON' };
+      stubStore({ 'campaign.lastAttack': { ...LAST_ATTACK } });
+      buildSaveDc.mockImplementation((auto) => (auto === newAuto ? 17 : 14));
+      createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
+      const ctx = makeCtx([oldPassive({ automation: oldAuto }), newPassive({ automation: newAuto })]);
+
+      const result = await shieldBash.handler(ctx, PREV_DATA);
+
+      expect(buildSaveDc).toHaveBeenCalledTimes(1);
+      expect(buildSaveDc.mock.calls[0][0]).toBe(newAuto);
+      expect(result.modal.props.saveDc).toBe(17);
     });
 
-    describe('early returns — lastAttack checks', () => {
-      function setupShieldCtx() {
-        return makeShieldCtx();
-      }
+    it('old-style automation computes the DC when it is the only style', async () => {
+      const oldAuto = { saveDc: 'ability', saveAbility: 'STR' };
+      stubStore({ 'campaign.lastAttack': { ...LAST_ATTACK } });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
+      const ctx = makeCtx([oldPassive({ automation: oldAuto })]);
 
-      it('returns { data: prevData } when lastAttack is null', async () => {
-        getRuntimeValue.mockResolvedValue(null);
-        expect(await shieldBash.handler(setupShieldCtx(), PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
+      await shieldBash.handler(ctx, PREV_DATA);
 
-      it('returns { data: prevData } when lastAttack.hit is false', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: false, targetName: 'Goblin1' });
-        expect(await shieldBash.handler(setupShieldCtx(), PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
-
-      it('returns { data: prevData } when attackerName does not match player', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Goblin1', weaponType: 'melee', targetName: 'Goblin2' });
-        expect(await shieldBash.handler(setupShieldCtx(), PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
-
-      it('returns { data: prevData } when weaponType is ranged', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'ranged', targetName: 'Goblin1' });
-        expect(await shieldBash.handler(setupShieldCtx(), PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
-
-      it('returns { data: prevData } when targetName is missing', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee' });
-        expect(await shieldBash.handler(setupShieldCtx(), PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
+      expect(buildSaveDc).toHaveBeenCalledWith(oldAuto, ctx.playerStats);
     });
 
-    describe('early returns — shield check', () => {
-      it('returns { data: prevData } when no shield equipped', async () => {
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeShieldPassive()] },
-            inventory: { equipped: ['Longsword'] },
-            equipment: [{ name: 'Longsword', armor_category: 'Heavy', equipment_category: 'Weapon' }],
+    it.each([
+      ['STR bonus + proficiency → 8+4+2', [{ name: 'Strength', bonus: 4 }], 2, 14],
+      ['STR missing → bonus 0, 8+0+2', [{ name: 'Dexterity', bonus: 3 }], 2, 10],
+      ['proficiency missing → 8+4+0', [{ name: 'Strength', bonus: 4 }], undefined, 12],
+    ])('fallback DC without passive automation: %s', async (_label, abilities, proficiency, expectedDc) => {
+      stubStore({ 'campaign.lastAttack': { ...LAST_ATTACK } });
+      createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
+      const ctx = makeCtx(
+        [{ type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped', options: ['push'] }],
+        { abilities, proficiency },
+      );
+
+      await shieldBash.handler(ctx, PREV_DATA);
+
+      expect(buildSaveDc).not.toHaveBeenCalled();
+      expect(createSaveListener).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({ saveDc: expectedDc }));
+    });
+  });
+
+  describe('save prompt flow', () => {
+    it('failed save → exact stash, exact prompt, exact log, exact full modal result', async () => {
+      const target = 'Ogrillion';
+      const lastAttack = { ...LAST_ATTACK, targetName: target };
+      stubStore({ 'campaign.lastAttack': lastAttack });
+      buildSaveDc.mockReturnValue(17);
+      createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 8, roll: 6, saveBonus: 2 }) });
+      const ctx = makeCtx();
+
+      const result = await shieldBash.handler(ctx, PREV_DATA);
+
+      // FT-082: base attack stashed verbatim BEFORE the save prompt
+      expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', '_shieldBashBaseAttack', lastAttack, CAMPAIGN);
+      expect(createSaveListener).toHaveBeenCalledWith(CAMPAIGN, {
+        targetName: target, saveType: 'STR', saveDc: 17, dcSuccess: false, sourceName: 'Shield Bash',
+      });
+      expect(withoutTimestamp(addEntry.mock.calls[0][1])).toEqual({
+        type: 'roll', name: 'Shield Bash', characterName: 'Fighter1', rollType: 'save-damage',
+        targetName: target, saveDc: 17, saveType: 'STR',
+        description: `Shield Bash: ${target} must make a STR saving throw (DC 17).`,
+      });
+      expect(withoutTimestamp(addEntry.mock.calls[1][1])).toEqual({
+        type: 'roll', name: 'Shield Bash', characterName: 'Fighter1', rollType: 'save-damage',
+        targetName: target, saveDc: 17, saveType: 'STR', saveResult: 'failure',
+        total: 8, rolls: [6], bonus: 2, formula: '1d20+2',
+        description: `${target} failed the STR save (DC 17). Shield Bash effect applied.`,
+      });
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      expect(result).toEqual({
+        modal: {
+          type: 'shieldBash',
+          props: {
+            action: {
+              name: 'Shield Bash',
+              options: [
+                { name: 'Push', effect: 'push', value: 5 },
+                { name: 'Prone', effect: 'prone' },
+              ],
+            },
+            playerStats: ctx.playerStats,
+            campaignName: CAMPAIGN,
+            targetName: target,
+            saveDc: 17,
           },
-        });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toEqual({ data: PREV_DATA });
+        },
+        data: PREV_DATA,
       });
-
-      it('returns { data: prevData } when shield equipped but checkOncePerTurn skips (armor_category)', async () => {
-        checkOncePerTurnWithSkip.mockResolvedValue({ type: 'popup' });
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeShieldPassive()] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-          },
-        });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
-
-      it('returns { data: prevData } when shield equipped but checkOncePerTurn skips (equipment_category)', async () => {
-        checkOncePerTurnWithSkip.mockResolvedValue({ type: 'popup' });
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeShieldPassive()] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
-          },
-        });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
+      expect(result.modal.props.playerStats).toBe(ctx.playerStats);
     });
 
-    describe('early returns — oncePerTurn skip', () => {
-      it('returns { data: prevData } when checkOncePerTurnWithSkip returns truthy', async () => {
-        checkOncePerTurnWithSkip.mockResolvedValue({ type: 'popup' });
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeShieldPassive()] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-          },
-        });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        expect(await shieldBash.handler(ctx, PREV_DATA)).toEqual({ data: PREV_DATA });
-      });
+    it('successful save → { data: prevData } and FT-082 restore sequence (stash, restore, clear)', async () => {
+      const lastAttack = { ...LAST_ATTACK };
+      // model the stash write having landed: same reference under the stash key
+      stubStore({ 'campaign.lastAttack': lastAttack, 'Fighter1._shieldBashBaseAttack': lastAttack });
+      buildSaveDc.mockReturnValue(17);
+      createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: true, total: 18, roll: 13, saveBonus: 5 }) });
+      const ctx = makeCtx();
+
+      const result = await shieldBash.handler(ctx, PREV_DATA);
+
+      expect(result).toEqual({ data: PREV_DATA });
+      expect(setRuntimeValue.mock.calls).toEqual([
+        ['Fighter1', '_shieldBashBaseAttack', lastAttack, CAMPAIGN],
+        ['campaign', 'lastAttack', lastAttack, CAMPAIGN],
+        ['Fighter1', '_shieldBashBaseAttack', null, CAMPAIGN],
+      ]);
     });
 
-    describe('save prompt flow — failed save', () => {
-      function setupSaveFlow(saveResult) {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        buildSaveDc.mockReturnValue(15);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve(saveResult) });
-        return makeShieldCtx();
-      }
+    it.each([
+      ['success, +5 bonus', { success: true, total: 20, roll: 15, saveBonus: 5 }, '1d20+5', 'succeeded'],
+      ['failure, zero bonus', { success: false, total: 13, roll: 13, saveBonus: 0 }, '1d20', 'failed'],
+    ])('outcome log: %s → formula %s', async (_label, saveResult, formula, word) => {
+      stubStore({ 'campaign.lastAttack': { ...LAST_ATTACK } });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promise: Promise.resolve(saveResult) });
 
-      it('creates save listener and returns modal on failed save', async () => {
-        const ctx = setupSaveFlow({ success: false, total: 5, roll: 5, saveBonus: 0 });
-        const result = await shieldBash.handler(ctx, PREV_DATA);
+      await shieldBash.handler(makeCtx(), PREV_DATA);
 
-        expect(createSaveListener).toHaveBeenCalledWith(
-          'test-campaign',
-          expect.objectContaining({ targetName: 'Goblin1', saveType: 'STR', saveDc: 15, dcSuccess: false, sourceName: 'Shield Bash' }),
-        );
-        expect(addEntry).toHaveBeenCalledTimes(2);
-        expect(addEntry).toHaveBeenNthCalledWith(1, 'test-campaign', expect.objectContaining({
-          type: 'roll', name: 'Shield Bash', targetName: 'Goblin1', saveDc: 15, saveType: 'STR',
-        }));
-        expect(result).toHaveProperty('modal');
-        expect(result.modal.type).toBe('shieldBash');
-        expect(result.modal.props.action.name).toBe('Shield Bash');
-        expect(result.modal.props.targetName).toBe('Goblin1');
-        expect(result.modal.props.saveDc).toBe(15);
-      });
-
-      it('returns { data: prevData } on successful save', async () => {
-        const ctx = setupSaveFlow({ success: true, total: 18, roll: 13, saveBonus: 5 });
-        const result = await shieldBash.handler(ctx, PREV_DATA);
-        expect(result).toEqual({ data: PREV_DATA });
-        expect(addEntry).toHaveBeenCalledTimes(2);
-      });
-    });
-
-    describe('save prompt flow — log entries', () => {
-      function setupLogFlow(saveResult) {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Orc1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        buildSaveDc.mockReturnValue(16);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve(saveResult) });
-        return makeShieldCtx();
-      }
-
-      it('logs save result with correct fields on failure', async () => {
-        const ctx = setupLogFlow({ success: false, total: 8, roll: 6, saveBonus: 2 });
-        await shieldBash.handler(ctx, PREV_DATA);
-        const entry = addEntry.mock.calls[1][1];
-        expect(entry).toMatchObject({ type: 'roll', saveResult: 'failure', total: 8, rolls: [6], bonus: 2, formula: '1d20+2' });
-        expect(entry.description).toContain('failed');
-      });
-
-      it('logs save result with correct fields on success', async () => {
-        const ctx = setupLogFlow({ success: true, total: 20, roll: 15, saveBonus: 5 });
-        await shieldBash.handler(ctx, PREV_DATA);
-        const entry = addEntry.mock.calls[1][1];
-        expect(entry).toMatchObject({ type: 'roll', saveResult: 'success', total: 20, rolls: [15], bonus: 5, formula: '1d20+5' });
-        expect(entry.description).toContain('succeeded');
-      });
-
-      it('logs save result with zero bonus', async () => {
-        buildSaveDc.mockReturnValue(13);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 13, roll: 13, saveBonus: 0 }) });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Orc1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeShieldCtx();
-        await shieldBash.handler(ctx, PREV_DATA);
-        const entry = addEntry.mock.calls[1][1];
-        expect(entry.bonus).toBe(0);
-        expect(entry.formula).toBe('1d20');
-      });
-    });
-
-    describe('save DC calculation', () => {
-      it('uses buildSaveDc when new-style passive has automation', async () => {
-        buildSaveDc.mockReturnValue(17);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeNewStylePassive()] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-          },
-        });
-        await shieldBash.handler(ctx, PREV_DATA);
-        expect(buildSaveDc).toHaveBeenCalledWith(expect.objectContaining({ saveDc: 'ability', saveAbility: 'STR' }), expect.any(Object));
-        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ saveDc: 17 }));
-      });
-
-      it('uses buildSaveDc when old-style passive has automation', async () => {
-        buildSaveDc.mockReturnValue(14);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeShieldCtx();
-        await shieldBash.handler(ctx, PREV_DATA);
-        expect(buildSaveDc).toHaveBeenCalledWith(expect.objectContaining({ saveDc: 'ability', saveAbility: 'STR' }), expect.any(Object));
-      });
-
-      it('uses fallback DC calculation when passive has no automation', async () => {
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [{ type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped', options: ['push'] }] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            abilities: [{ name: 'Strength', bonus: 4 }],
-            proficiency: 2,
-          },
-        });
-        await shieldBash.handler(ctx, PREV_DATA);
-        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ saveDc: 14 }));
-      });
-
-      it('uses fallback DC with zero ability bonus when Strength not found', async () => {
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [{ type: 'attack_rider', trigger: 'melee_hit_with_shield_equipped', options: ['push'] }] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-            abilities: [{ name: 'Dexterity', bonus: 3 }],
-            proficiency: 2,
-          },
-        });
-        await shieldBash.handler(ctx, PREV_DATA);
-        expect(createSaveListener).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ saveDc: 10 }));
-      });
-    });
-
-    describe('new-style passive', () => {
-      it('finds new-style passive when both old and new style exist', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        buildSaveDc.mockReturnValue(15);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        const ctx = makeCtx({
-          playerStats: {
-            name: 'Fighter1',
-            automation: { passives: [makeShieldPassive(), makeNewStylePassive()] },
-            inventory: { equipped: ['Shield'] },
-            equipment: [{ name: 'Shield', armor_category: 'Shield' }],
-          },
-        });
-        const result = await shieldBash.handler(ctx, PREV_DATA);
-        expect(result.modal.type).toBe('shieldBash');
-      });
-    });
-
-    describe('range gate (FT-074)', () => {
-      it('returns { data: prevData } when target is beyond 5 ft', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        isWithinRange.mockResolvedValue(false);
-        const ctx = makeShieldCtx();
-        const result = await shieldBash.handler(ctx, PREV_DATA);
-        expect(isWithinRange).toHaveBeenCalledWith('Fighter1', 'Goblin1', 5);
-        expect(createSaveListener).not.toHaveBeenCalled();
-        expect(result).toEqual({ data: PREV_DATA });
-        isWithinRange.mockResolvedValue(true);
-      });
-
-      it('proceeds when target is within 5 ft', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Goblin1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        buildSaveDc.mockReturnValue(15);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        isWithinRange.mockResolvedValue(true);
-        const ctx = makeShieldCtx();
-        const result = await shieldBash.handler(ctx, PREV_DATA);
-        expect(isWithinRange).toHaveBeenCalledWith('Fighter1', 'Goblin1', 5);
-        expect(result.modal.type).toBe('shieldBash');
-      });
-    });
-
-    describe('modal structure', () => {
-      it('returns modal with correct options', async () => {
-        getRuntimeValue.mockResolvedValue({ hit: true, attackerName: 'Fighter1', weaponType: 'melee', targetName: 'Dragon1' });
-        checkOncePerTurnWithSkip.mockResolvedValue(null);
-        parseMagicItemName.mockReturnValue({ baseName: 'Shield', magicBonus: 0 });
-        buildSaveDc.mockReturnValue(18);
-        createSaveListener.mockReturnValue({ promise: Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 }) });
-        const ctx = makeShieldCtx();
-        const result = await shieldBash.handler(ctx, PREV_DATA);
-
-        expect(result.modal.type).toBe('shieldBash');
-        expect(result.modal.props.action.name).toBe('Shield Bash');
-        expect(result.modal.props.action.options).toEqual([
-          { name: 'Push', effect: 'push', value: 5 },
-          { name: 'Prone', effect: 'prone' },
-        ]);
-        expect(result.modal.props.targetName).toBe('Dragon1');
-        expect(result.modal.props.saveDc).toBe(18);
-        expect(result.modal.props.campaignName).toBe('test-campaign');
+      expect(withoutTimestamp(addEntry.mock.calls[1][1])).toEqual({
+        type: 'roll', name: 'Shield Bash', characterName: 'Fighter1', rollType: 'save-damage',
+        targetName: 'Goblin1', saveDc: 15, saveType: 'STR',
+        saveResult: saveResult.success ? 'success' : 'failure',
+        total: saveResult.total, rolls: [saveResult.roll], bonus: saveResult.saveBonus, formula,
+        description: `Goblin1 ${word} the STR save (DC 15).${saveResult.success ? '' : ' Shield Bash effect applied.'}`,
       });
     });
   });
@@ -454,161 +346,102 @@ describe('shieldBash', () => {
 // the base weapon attack must be restored so Slasher Hamstring gating works
 // on shield holders within the same turn.
 describe('restoreBaseAttackAfterBash (FT-082 collateral)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const stats = { name: 'EvasiveFighter' };
-
-  it('restores stashed base attack as campaign lastAttack and clears stash', async () => {
-    const baseAttack = { attackName: 'Scimitar', hit: true, damageType: 'Slashing', attackerName: 'EvasiveFighter', targetName: 'Zombie 1' };
-    getRuntimeValue.mockImplementation((name, key) => (key === '_shieldBashBaseAttack' ? baseAttack : null));
-
-    await restoreBaseAttackAfterBash(stats, 'test-campaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', baseAttack, 'test-campaign');
-    expect(setRuntimeValue).toHaveBeenCalledWith('EvasiveFighter', '_shieldBashBaseAttack', null, 'test-campaign');
-  });
-
-  it('is a silent no-op when nothing was stashed', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    await restoreBaseAttackAfterBash(stats, 'test-campaign');
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('does not restore junk stashes (arrays / bash records)', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === '_shieldBashBaseAttack') return [{ junk: true }];
-      return null;
+  it.each([
+    ['valid base attack → restore then clear', BASE_ATTACK, [
+      ['campaign', 'lastAttack', BASE_ATTACK],
+      ['Fighter1', '_shieldBashBaseAttack', null],
+    ]],
+    ['bash save record → clear only, never restored', { ...BASE_ATTACK, attackName: 'Shield Bash' }, [
+      ['Fighter1', '_shieldBashBaseAttack', null],
+    ]],
+    ['nothing stashed → zero writes', null, []],
+    ['array junk → zero writes', [{ junk: true }], []],
+    ['object without attackName → zero writes', { hit: true }, []],
+  ])('%s', async (_label, stash, expectedWrites) => {
+    getRuntimeValue.mockImplementation((character, key, campaign) => {
+      if (campaign !== CAMPAIGN || character !== 'Fighter1') return { attackName: 'DECOY-WRONG-LANE' };
+      return key === '_shieldBashBaseAttack' ? stash : null;
     });
-    await restoreBaseAttackAfterBash(stats, 'test-campaign');
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('campaign', 'lastAttack', expect.anything(), 'test-campaign');
-  });
 
-  it('applyShieldBashEffect restores the base attack after Push (shield-holder hamstring gate)', async () => {
-    const baseAttack = { attackName: 'Scimitar', hit: true, damageType: 'Slashing', attackerName: 'EvasiveFighter', targetName: 'Zombie 1' };
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === '_shieldBashBaseAttack') return baseAttack;
-      if (key === 'targetEffects') return [];
-      return null;
-    });
-    getCombatContext.mockResolvedValue({ round: 4, activeCreatureName: 'EvasiveFighter' });
+    await restoreBaseAttackAfterBash({ name: 'Fighter1' }, CAMPAIGN);
 
-    await applyShieldBashEffect({ action: { automation: {} }, playerStats: { name: 'EvasiveFighter' }, campaignName: 'test-campaign', targetName: 'Zombie 1', chosenOption: 'Push', saveDc: 15 });
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'lastAttack', baseAttack, 'test-campaign');
+    expect(setRuntimeValue.mock.calls).toEqual(expectedWrites.map(([c, k, v]) => [c, k, v, CAMPAIGN]));
   });
 });
 
 describe('applyShieldBashEffect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  const baseAction = { automation: {} };
   const basePlayerStats = { name: 'Fighter1' };
 
-  function setupApplyEffect(contextOverride) {
-    getRuntimeValue.mockReturnValue([]);
-    getCombatContext.mockResolvedValue(contextOverride || { round: 3, activeCreatureName: 'Fighter1' });
+  function setup(chosenOption, { targetEffects = [], stash = BASE_ATTACK, cs = { round: 7, activeCreatureName: 'StaleMirrorName' }, saveDc = 15, targetName = 'Goblin1', action = { automation: { keep: 'me' } } } = {}) {
+    stubStore({ 'campaign.targetEffects': targetEffects, 'Fighter1._shieldBashBaseAttack': stash });
+    getCombatContext.mockResolvedValue(cs);
+    return applyShieldBashEffect({ action, playerStats: basePlayerStats, campaignName: CAMPAIGN, targetName, chosenOption, saveDc });
   }
 
-  it('returns null and logs when chosenOption is skip', async () => {
-    setupApplyEffect(null);
-    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'skip', saveDc: 15 });
+  it('skip → null, FT-082 restore still runs, no effects/latch, exact log', async () => {
+    const result = await setup('skip');
+
     expect(result).toBeNull();
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'ability_use', abilityName: 'Shield Bash', description: expect.stringContaining('skipped'),
-    }));
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['campaign', 'lastAttack', BASE_ATTACK, CAMPAIGN],
+      ['Fighter1', '_shieldBashBaseAttack', null, CAMPAIGN],
+    ]);
     expect(getCombatContext).not.toHaveBeenCalled();
+    expect(addCondition).not.toHaveBeenCalled();
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+      type: 'ability_use', characterName: 'Fighter1', abilityName: 'Shield Bash',
+      description: 'Shield Bash: skipped (no effect, use not consumed).',
+    });
   });
 
-  it('applies push effect and logs', async () => {
-    setupApplyEffect(null);
-    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign', 'targetEffects',
-      expect.arrayContaining([expect.objectContaining({ target: 'Goblin1', source: 'Shield Bash', option: 'Push', effect: 'push', value: 5, duration: 'instant' })]),
-      'test-campaign',
-    );
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'ability_use', abilityName: 'Shield Bash', description: expect.stringContaining('pushed 5 ft'),
-    }));
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('pushed 5 ft');
+  it('Push → exact te append, latch stamped round 7 with holder name, exact log + popup', async () => {
+    const existing = { target: 'Other', effect: 'blessing' };
+    const action = { automation: { keep: 'me' } };
+    const result = await setup('Push', { targetEffects: [existing], action });
+
+    const teWrite = setRuntimeValue.mock.calls.find(([c, k]) => c === 'campaign' && k === 'targetEffects');
+    expect(teWrite).toEqual(['campaign', 'targetEffects', [
+      existing,
+      { target: 'Goblin1', source: 'Shield Bash', option: 'Push', effect: 'push', value: 5, duration: 'instant' },
+    ], CAMPAIGN]);
+    expect(teWrite[2][0]).toBe(existing); // existing entries kept by reference, appended not merged
+    // FT-074: latch owner is the holder, not the stale cs mirror
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', '_Shield_Bash_usedRound', { round: 7, activeCreature: 'Fighter1' }, CAMPAIGN);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+      type: 'ability_use', characterName: 'Fighter1', abilityName: 'Shield Bash',
+      description: 'Shield Bash used against Goblin1: pushed 5 ft.',
+    });
+    expect(result).toEqual({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Shield Bash', description: 'Shield Bash: Goblin1 pushed 5 ft.', automation: { keep: 'me' } },
+    });
+    expect(result.payload.automation).toBe(action.automation);
   });
 
-  it('applies prone effect, adds condition, and logs', async () => {
-    setupApplyEffect({ round: 3, activeCreatureName: 'Fighter1' });
-    const result = await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Orc1', chosenOption: 'Prone', saveDc: 16 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign', 'targetEffects',
-      expect.arrayContaining([expect.objectContaining({ target: 'Orc1', source: 'Shield Bash', option: 'Prone', effect: 'prone_and_push', value: 5, duration: 'until_start_of_next_turn', saveType: 'STR', saveDc: 16, saveAbility: 'STR' })]),
-      'test-campaign',
-    );
-    expect(addCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        combatSummary: expect.any(Object), creatureName: 'Orc1', conditionDef: { key: 'prone', label: 'Prone' }, dc: 16, ability: 'STR',
-        getRuntimeValue, setRuntimeValue, campaignName: 'test-campaign', playerStats: basePlayerStats,
-      }),
-    );
-    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-      type: 'ability_use', abilityName: 'Shield Bash', description: expect.stringContaining('Prone condition'),
-    }));
-    expect(result.payload.description).toContain('Prone condition');
+  it('Prone → exact te, addCondition wired to the resolved combat context, latch + log + popup', async () => {
+    const cs = { round: 7, activeCreatureName: 'StaleMirrorName' };
+    const result = await setup('Prone', { targetName: 'Orc1', saveDc: 16, cs });
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+      { target: 'Orc1', source: 'Shield Bash', option: 'Prone', effect: 'prone_and_push', value: 5, duration: 'until_start_of_next_turn', saveType: 'STR', saveDc: 16, saveAbility: 'STR' },
+    ], CAMPAIGN);
+    expect(addCondition).toHaveBeenCalledTimes(1);
+    expect(addCondition).toHaveBeenCalledWith({
+      combatSummary: cs, creatureName: 'Orc1', conditionDef: { key: 'prone', label: 'Prone' },
+      dc: 16, ability: 'STR', getRuntimeValue, setRuntimeValue, campaignName: CAMPAIGN, playerStats: basePlayerStats,
+    });
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', '_Shield_Bash_usedRound', { round: 7, activeCreature: 'Fighter1' }, CAMPAIGN);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+      type: 'ability_use', characterName: 'Fighter1', abilityName: 'Shield Bash',
+      description: 'Shield Bash used against Orc1: target has Prone condition.',
+    });
+    expect(result.payload.description).toBe('Shield Bash: Orc1 has Prone condition.');
   });
 
-  it('marks oncePerTurn as used after push', async () => {
-    setupApplyEffect({ round: 5, activeCreatureName: 'Fighter1' });
-    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Fighter1', '_Shield_Bash_usedRound', { round: 5, activeCreature: 'Fighter1' }, 'test-campaign',
-    );
-  });
+  it('missing combat context → latch falls back to round 1, still stamped to holder', async () => {
+    await setup('Push', { cs: null });
 
-  it('marks oncePerTurn as used after prone', async () => {
-    setupApplyEffect({ round: 2, activeCreatureName: 'Fighter1' });
-    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Prone', saveDc: 14 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Fighter1', '_Shield_Bash_usedRound', { round: 2, activeCreature: 'Fighter1' }, 'test-campaign',
-    );
-  });
-
-  it('stamps the holder name (not the stale cs mirror) as latch owner (FT-074)', async () => {
-    setupApplyEffect({ round: 1, activeCreatureName: 'AasimarTest' });
-    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Prone', saveDc: 15 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Fighter1', '_Shield_Bash_usedRound', { round: 1, activeCreature: 'Fighter1' }, 'test-campaign',
-    );
-  });
-
-  it('handles existing targetEffects when applying push', async () => {
-    getRuntimeValue.mockReturnValue([{ target: 'Goblin1', effect: 'slowed' }]);
-    getCombatContext.mockResolvedValue(null);
-    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign', 'targetEffects',
-      expect.arrayContaining([expect.objectContaining({ effect: 'slowed' }), expect.objectContaining({ effect: 'push' })]),
-      'test-campaign',
-    );
-  });
-
-  it('handles missing combat context gracefully for round tracking', async () => {
-    getRuntimeValue.mockReturnValue([]);
-    getCombatContext.mockResolvedValue(null);
-    await applyShieldBashEffect({ action: baseAction, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Fighter1', '_Shield_Bash_usedRound', { round: 1, activeCreature: 'Fighter1' }, 'test-campaign',
-    );
-  });
-
-  it('preserves automation reference in popup result', async () => {
-    getRuntimeValue.mockReturnValue([]);
-    getCombatContext.mockResolvedValue(null);
-    const action = { automation: { someKey: 'someValue' } };
-    const result = await applyShieldBashEffect({ action, playerStats: basePlayerStats, campaignName: 'test-campaign', targetName: 'Goblin1', chosenOption: 'Push', saveDc: 15 });
-    expect(result.payload.automation).toEqual({ someKey: 'someValue' });
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter1', '_Shield_Bash_usedRound', { round: 1, activeCreature: 'Fighter1' }, CAMPAIGN);
   });
 });

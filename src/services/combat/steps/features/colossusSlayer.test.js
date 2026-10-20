@@ -1,24 +1,42 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * Feature-decision lane: steps/features/colossusSlayer.js (Hunter's Prey choice).
+ * Owns the colossusSlayer decision bytes: the "_Hunter's_Prey_choice" (with
+ * apostrophe) condition byte vs 'Colossus Slayer', the below-max-HP gate
+ * (null-guard ladder: currentHp null / maxHp null / full HP false, maxHp-1
+ * and 0 HP true — 0 also falsifies a truthiness guard), the
+ * '_Hunters_Prey_Colossus_UsedRound' (NO apostrophe — key bytes differ from
+ * the condition key) once-per-round latch read/write, the +1d8 [extra]
+ * formula/total/rolls append bytes, sideEffects-deferred stamping, and
+ * zero-applied-must-not-burn on rollExpression failure (#1026).
+ *
+ * Family map (steps/features/): no sibling unit test touches colossusSlayer
+ * (superiorHuntersPrey tests cover only the superior upgrade; the
+ * hunterPreyHandler test covers the choice-prompt, citing this step's key).
+ * Pipeline dispatch view (riders chain mounting at attackRollPostDamage)
+ * lives on the featureDamage pipeline lane (#1034 owns dispatch) and is NOT
+ * duplicated here; this lane pins the step handler internals.
+ *
+ * Latch round source: getCurrentCombatRound() is called WITHOUT campaignName
+ * here while siblings (assassinate.js:28, eldritchStrikes.js:27) pass it —
+ * pinned verbatim as current behavior; cross-campaign impact reported.
+ *
+ * Old→new: condition ×5→1; no-context + no-target ×2→1; full-HP ×2 +
+ * null-hp ×2→1 HP-gate; success ×3 (adds, rolls 1d8, sideEffects setter)
+ * →1 exact-bytes test; used-round + marks-used ×2→1 two-call honest latch
+ * (+ 0-HP near-miss folded in); roll-null ×1 kept as the latch-not-burned
+ * falsifier. Weird call-scanning getRuntimeValue mock replaced with the
+ * faithful campaign-keyed store (#1049 shape); duplicate full-HP case,
+ * duplicate latch case, and redundant second success case removed.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
 
 vi.mock('../../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn((formula) => {
-    if (formula === '1d8') {
-      return { total: 5, rolls: [5], modifier: 0, formula: '1d8' };
-    }
-    return null;
-  }),
-}));
-
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((characterKey, propertyName) => {
-    const store = vi.mocked(getRuntimeValue).getCalls().find(
-      (c) => c[0] === characterKey && c[1] === propertyName
-    )?.[2];
-    return store?.[propertyName] ?? null;
-  }),
-  setRuntimeValue: vi.fn(),
+  rollExpression: vi.fn((formula) =>
+    formula === '1d8' ? { total: 5, rolls: [5], modifier: 0, formula: '1d8' } : null
+  ),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -30,16 +48,25 @@ vi.mock('../../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(),
 }));
 
+// Faithful campaign-keyed store: latch/condition reads and writes must carry campaignName.
+const runtimeStore = {};
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: (name, key, campaign) => runtimeStore[`${campaign}:${name}:${key}`],
+  setRuntimeValue: (name, key, value, campaign) => { runtimeStore[`${campaign}:${name}:${key}`] = value; },
+}));
+
 // ── Imports ──────────────────────────────────────────────────────
 
 import { colossusSlayer } from './colossusSlayer.js';
-
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────
+
+const CHOICE_KEY = "_Hunter's_Prey_choice"; // apostrophe — byte-exact vs latch key
+const LATCH = '_Hunters_Prey_Colossus_UsedRound'; // no apostrophe
+const LATCH_KEY = `test-campaign:Fighter1:${LATCH}`;
 
 function makeCtx(overrides = {}) {
   return {
@@ -49,293 +76,123 @@ function makeCtx(overrides = {}) {
   };
 }
 
+function makePrevData() {
+  return { formula: '1d8+3', total: 11, rolls: [8, 3] };
+}
+
+// Arm every gate open except the byte under test: context present, target
+// below max HP (default 7/10 — the maxHp-1 near-miss), fresh round.
+function arm({ currentHp = 7, maxHp = 10, round = 3 } = {}) {
+  const cs = { creatures: [] };
+  getCombatContext.mockResolvedValue(cs);
+  getTargetFromAttacker.mockReturnValue({ currentHp, maxHp });
+  getCurrentCombatRound.mockReturnValue(round);
+  return cs;
+}
+
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('colossusSlayer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
   });
 
-  describe('condition', () => {
-    it('returns true when _Hunter\'s_Prey_choice is Colossus Slayer', () => {
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === "_Hunter's_Prey_choice") return 'Colossus Slayer';
-        return null;
-      });
-
-      expect(colossusSlayer.condition(makeCtx())).toBe(true);
-    });
-
-    it('returns false when _Hunter\'s_Prey_choice is not Colossus Slayer', () => {
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === "_Hunter's_Prey_choice") return 'Other Feature';
-        return null;
-      });
-
-      expect(colossusSlayer.condition(makeCtx())).toBe(false);
-    });
-
-    it('returns false when _Hunter\'s_Prey_choice is null', () => {
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === "_Hunter's_Prey_choice") return null;
-        return null;
-      });
-
-      expect(colossusSlayer.condition(makeCtx())).toBe(false);
-    });
-
-    it('returns false when _Hunter\'s_Prey_choice is undefined', () => {
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === "_Hunter's_Prey_choice") return undefined;
-        return null;
-      });
-
-      expect(colossusSlayer.condition(makeCtx())).toBe(false);
-    });
-
-    it('returns false when _Hunter\'s_Prey_choice is empty string', () => {
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === "_Hunter's_Prey_choice") return '';
-        return null;
-      });
-
-      expect(colossusSlayer.condition(makeCtx())).toBe(false);
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('handler', () => {
-    describe('early returns — no combat context', () => {
-      it('returns prevData when getCombatContext returns null', async () => {
-        getCombatContext.mockResolvedValue(null);
-        getRuntimeValue.mockReturnValue(null);
+  it('condition is true only when the campaign-keyed _Hunter\'s_Prey_choice byte is exactly "Colossus Slayer"', () => {
+    runtimeStore[`test-campaign:Fighter1:${CHOICE_KEY}`] = 'Colossus Slayer';
+    expect(colossusSlayer.condition(makeCtx())).toBe(true);
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
+    // Near-miss bytes and emptiness all refuse; another campaign's choice never leaks.
+    runtimeStore[`test-campaign:Fighter1:${CHOICE_KEY}`] = 'colossus slayer';
+    expect(colossusSlayer.condition(makeCtx())).toBe(false);
+    runtimeStore[`test-campaign:Fighter1:${CHOICE_KEY}`] = 'Giant Slayer';
+    expect(colossusSlayer.condition(makeCtx())).toBe(false);
+    delete runtimeStore[`test-campaign:Fighter1:${CHOICE_KEY}`];
+    expect(colossusSlayer.condition(makeCtx())).toBe(false);
+    runtimeStore[`other-campaign:Fighter1:${CHOICE_KEY}`] = 'Colossus Slayer';
+    expect(colossusSlayer.condition(makeCtx())).toBe(false);
+  });
 
-        expect(result).toEqual({ data: prevData });
-        expect(getTargetFromAttacker).not.toHaveBeenCalled();
-      });
-    });
+  it('missing combat context short-circuits before target lookup; an unresolvable target passes prevData through', async () => {
+    getCombatContext.mockResolvedValueOnce(null);
+    expect(await colossusSlayer.handler(makeCtx(), makePrevData())).toEqual({ data: makePrevData() });
+    expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
+    expect(getTargetFromAttacker).not.toHaveBeenCalled(); // guard ordering: context before target
 
-    describe('early returns — no target', () => {
-      it('returns prevData when getTargetFromAttacker returns null', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue(null);
+    const cs = { creatures: [] };
+    getCombatContext.mockResolvedValue(cs);
+    getTargetFromAttacker.mockReturnValueOnce(null);
+    expect(await colossusSlayer.handler(makeCtx(), makePrevData())).toEqual({ data: makePrevData() });
+    expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Fighter1');
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(runtimeStore).toEqual({});
+  });
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
+  it('HP gate: null currentHp, null maxHp, or a target at full HP gets no bonus and burns nothing', async () => {
+    for (const target of [
+      { currentHp: null, maxHp: 10 }, // null-guard leg
+      { currentHp: 5, maxHp: null },  // null-guard leg
+      { currentHp: 10, maxHp: 10 },   // exact-full-HP near-miss (>=, not >)
+    ]) {
+      arm(target);
+      const prevData = makePrevData();
+      expect(await colossusSlayer.handler(makeCtx(), prevData)).toEqual({ data: prevData });
+    }
+    expect(rollExpression).not.toHaveBeenCalled();
+    expect(runtimeStore).toEqual({}); // latch never stamped on a refused hit
+  });
 
-        expect(result).toEqual({ data: prevData });
-      });
-    });
+  it('below max HP adds exactly 1d8 [extra] and defers the campaign-keyed latch stamp to sideEffects', async () => {
+    const cs = arm(); // 7/10, round 3
+    const result = await colossusSlayer.handler(makeCtx(), makePrevData());
 
-    describe('early returns — target at full HP', () => {
-      it('returns prevData when target currentHp >= maxHp', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 10, maxHp: 10 });
+    expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Fighter1');
+    expect(rollExpression).toHaveBeenCalledTimes(1);
+    expect(rollExpression).toHaveBeenCalledWith('1d8');
+    expect(result.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
+    expect(runtimeStore).toEqual({}); // nothing stamped before sideEffects runs
+    await result.sideEffects();
+    expect(runtimeStore[LATCH_KEY]).toBe(3);
+    // Current behavior pinned: round read WITHOUT campaignName (siblings pass it — reported).
+    expect(getCurrentCombatRound).toHaveBeenCalledWith();
+  });
 
-        expect(result).toEqual({ data: prevData });
-      });
+  it('latches once per round: same-round follow-up refused, next round applies again at 0 HP', async () => {
+    arm({ currentHp: 7, maxHp: 10, round: 1 });
+    const prevData = makePrevData();
+    const first = await colossusSlayer.handler(makeCtx(), prevData);
+    expect(first.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
+    await first.sideEffects();
+    expect(runtimeStore[LATCH_KEY]).toBe(1);
 
-      it('returns prevData when target currentHp equals maxHp', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: 5 });
+    // Second hit, same round: latch byte equals current round — no dice, no reforged formula.
+    expect(await colossusSlayer.handler(makeCtx(), prevData)).toEqual({ data: prevData });
+    expect(rollExpression).toHaveBeenCalledTimes(1);
+    expect(runtimeStore[LATCH_KEY]).toBe(1);
 
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
+    // Round 2 re-arms; currentHp 0 still counts as below max (falsifies a truthiness guard).
+    getCurrentCombatRound.mockReturnValue(2);
+    getTargetFromAttacker.mockReturnValue({ currentHp: 0, maxHp: 10 });
+    const second = await colossusSlayer.handler(makeCtx(), prevData);
+    expect(second.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
+    await second.sideEffects();
+    expect(runtimeStore[LATCH_KEY]).toBe(2);
+    expect(rollExpression).toHaveBeenCalledTimes(2);
+  });
 
-        expect(result).toEqual({ data: prevData });
-      });
-    });
+  it('a failed roll grants nothing and never burns the latch — the follow-up attack still gets its 1d8', async () => {
+    arm(); // 7/10, round 3
+    rollExpression.mockReturnValueOnce(null);
+    const prevData = makePrevData();
+    expect(await colossusSlayer.handler(makeCtx(), prevData)).toEqual({ data: prevData });
+    expect(runtimeStore).toEqual({}); // stamp is gated on a successful roll, not merely attempted
 
-    describe('early returns — already used this round', () => {
-      it('returns prevData when already used in current round', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: 10 });
-        getCurrentCombatRound.mockReturnValue(3);
-        getRuntimeValue.mockImplementation((_key, prop) => {
-          if (prop === '_Hunters_Prey_Colossus_UsedRound') return 3;
-          return null;
-        });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('successful application', () => {
-      it('adds 1d8 to the damage when target is below max HP and not used this round', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: 10 });
-        getCurrentCombatRound.mockReturnValue(3);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d8' });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result.data.formula).toBe('1d8+3 + 1d8 [extra]');
-        expect(result.data.total).toBe(16);
-        expect(result.data.rolls).toEqual([8, 3, 5]);
-      });
-
-      it('returns a sideEffects function that sets the runtime value', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: 10 });
-        getCurrentCombatRound.mockReturnValue(3);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0, formula: '1d8' });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result.sideEffects).toBeDefined();
-        expect(typeof result.sideEffects).toBe('function');
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-
-        await result.sideEffects();
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'Fighter1',
-          '_Hunters_Prey_Colossus_UsedRound',
-          3,
-          'test-campaign',
-        );
-      });
-
-      it('rolls 1d8 and adds the result to prevData', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 3, maxHp: 15 });
-        getCurrentCombatRound.mockReturnValue(1);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0, formula: '1d8' });
-
-        const prevData = { formula: '2d6+4', total: 14, rolls: [3, 5, 4] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(rollExpression).toHaveBeenCalledWith('1d8');
-        expect(result.data.formula).toBe('2d6+4 + 1d8 [extra]');
-        expect(result.data.total).toBe(21);
-        expect(result.data.rolls).toEqual([3, 5, 4, 7]);
-      });
-
-      it('uses prevData as-is when rollExpression returns null', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: 10 });
-        getCurrentCombatRound.mockReturnValue(2);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue(null);
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result).toEqual({ data: prevData });
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-      });
-
-      it('uses prevData when target has null currentHp', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: null, maxHp: 10 });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('uses prevData when target has null maxHp', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 5, maxHp: null });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result).toEqual({ data: prevData });
-        expect(rollExpression).not.toHaveBeenCalled();
-      });
-
-      it('marks used for current round after successful application', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 2, maxHp: 20 });
-        getCurrentCombatRound.mockReturnValue(5);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0, formula: '1d8' });
-
-        const prevData = { formula: '1d6+2', total: 9, rolls: [6, 2] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result.sideEffects).toBeDefined();
-        await result.sideEffects();
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-          'Fighter1',
-          '_Hunters_Prey_Colossus_UsedRound',
-          5,
-          'test-campaign',
-        );
-      });
-
-      it('applies when target is at 0 HP (below max HP)', async () => {
-        getCombatContext.mockResolvedValue({});
-        getTargetFromAttacker.mockReturnValue({ currentHp: 0, maxHp: 10 });
-        getCurrentCombatRound.mockReturnValue(1);
-        getRuntimeValue.mockReturnValue(null);
-        rollExpression.mockReturnValue({ total: 3, rolls: [3], modifier: 0, formula: '1d8' });
-
-        const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-        const result = await colossusSlayer.handler(
-          makeCtx(),
-          prevData,
-        );
-
-        expect(result.data.formula).toBe('1d8+3 + 1d8 [extra]');
-        expect(result.data.total).toBe(14);
-        expect(result.data.rolls).toEqual([8, 3, 3]);
-      });
-    });
+    const retry = await colossusSlayer.handler(makeCtx(), prevData);
+    expect(retry.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
   });
 });

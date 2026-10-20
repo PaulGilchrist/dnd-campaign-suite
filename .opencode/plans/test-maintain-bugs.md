@@ -636,3 +636,15 @@ recs #1022/#1023/#1027 APPLIED #1029 (bs weak dice legs cut, Hamstring clock NEW
 - 🔴 attackRollBonuses.js:405-419 natural20 step has NO oncePerTurn/latch guard (vs celestial :449/:467) — stacks every nat20, no consumption stamp (#1035)
 - ⚠ attackRollDamageSteps-automationBonuses.test.js:436-457 celestial guard suite all omit targetName — short-circuit :433, pass wrong-reason (falsifiability failure); :458-468 app dupe — remove at ITS touch; keep :422 Math.max leg unique (#1035)
 rec #1029 APPLIED #1035 (1d6 byte-identical fold verified :374-385, guards trimmed, #973 legs eliminated)
+- 🔴 attackRollPostDamage.js:677-679 hasTopple consults extra/choiceMasteries but next line returns unless baseMastery==='Topple' — choice/extra-granted Topple (Battering Roots) never prompts; hasTopple dead unless base; pinned refusal leg #1037
+- 📌 rec #1029 weaponHitBonuses ADJUDICATED #1038: not wholesale-dup — 11 arms folded to #1029, 2 repo-unique option-APPLY positives KEPT (:277 polarity + :274 upgrades||name key derivation, fold negative-only cannot catch '_undefined_option' silent loss); file now 2-test lane
+- 🔴 attackRollRiders.js:174 BI handler returns bare null vs {data:{}} siblings :168/:204 — shape-inconsistent pipeline result no-die/no-uses paths (#1041)
+- 📌 CITE refresh: useAttackDamageResolution.maneuvers.test.js:8-9 delegation stale since #1039 zero-body attackRollDamageSteps.test.js — retarget to attackRollRiders.test.js ITS turn (#1041)
+- 📌 REC cross-file: radiantSoul.test.js:91-101 spellRollDamage consumption-flag leg sits in wrong lane — consolidate into directSpellDamageSteps-rolling.test.js at ITS turn (#1042)
+- 📌 REC cross-file: directSpellDamageSteps-rolling.test.js:101-115 spellRollDamage condition trio fold (#1043); directSpellDamageSteps-overchannel.test.js:126-148 useCount >1 rows fold (#1043)
+- 🔴 directSpellDamageSteps.js:189-205 roll-null → step still emits spell:ready {data:{}} — Overchannel self-damage silently skipped, unlogged free ride (#1044)
+- 📌 REC cross-file: steps/index.test.js:37-47 spell-pipeline toContain subsumed by structure golden #1048; :5-35 four run-toBeDefined smokes assert nothing — collapse at ITS turn (#1048)
+- 🔴 colossusSlayer.js:17/:29 getCurrentCombatRound() missing campaignName (signature combatData.js:79 requires; siblings assassinate:28/eldritchStrikes:27 pass it) — multi-campaign round pins 1, latch once-per-rest; pinned honest (#1050). Same-arity: crusher.js:33, epitomeEmpoweredStrikes.js:14 (#1050)
+- 🔴 colossusSlayer step + dispatcher attackRollPostDamage.js:35-45 never addEntry/log — app logging mandate violated on trigger, 11 siblings self-log (#1050)
+- 🔴 epitomeEmpoweredStrikes.js:14 no-arg getCurrentCombatRound ESCALATED: getCombatSummary(undefined)->null->round const 1 (combatData.js:48/:81) — latch stamps 1, feature once-per-rest NEVER re-arms; old re-arm test was mock-fiction, pinned false (#1052 vs #1050 class)
+- ⚠ sacredWeapon.js:11/:16/:18 leftover [sw-debug] console.log noise in prod step (app logging mandate); :7 ctx.playerStats unguarded deref TypeError when weapon-byte passes w/ null stats — both pinned honest tests (#1056)
