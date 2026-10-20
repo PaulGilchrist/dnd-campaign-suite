@@ -1,30 +1,53 @@
-// MA-0694: Empyrean "Bolster" legendary self-buff legs on the MA-0655/0658
-// monsterSelfBuff seam. §165 header-swallow fix made Bolster a gated child
-// (shared legendary gate spends in the modal BEFORE arming); this file pins
-// the EFFECT TRANSPORT axes: automation.temp_hp self THP via tempHpService
-// (replace-if-larger, MA-0275 semantics) + automation.ally_radius_ft te
-// `bolster_advantage` on self + allied combatants (gridless: every non-PC
-// board member lenient, §42 advisory) — all keys ride ONE merged clock
-// (rounds:2 = survives the boundary + the empyrean's next turn, clears at
-// the start of the round after — closest round-clock to RAW "until the end
-// of the empyrean's next turn"). Already-bolstered refuses with
-// `bolster_refused` / already_bolstered, zero spend/THP/te.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// MA-0694: Empyrean "Bolster" legendary self-buff lane on the monsterSelfBuff
+// seam (§165 header-swallow fix: Bolster is a gated child — the shared legendary
+// gate spends upstream in the modal BEFORE arming, the child row authors NO uses).
+// This file pins the BOLSTER-DISTINCT behavior of resolveMonsterSelfBuffRow:
+//   - automation.temp_hp self THP through the REAL tempHpService (replace-if-larger,
+//     MA-0275) — only the runtime store is mocked (store-faithful, #1091);
+//   - automation.ally_radius_ft te `bolster_advantage` on self + gridless allied
+//     combatants (§42 lenient membership, PC decoy excluded loudly);
+//   - ONE merged rounds:2 clock (§37: survives the boundary + the empyrean's next
+//     turn, clears at round start R+2; target-LESS ally entry clears every stamp);
+//   - honest double press: te latch refuses replace-not-stacks, zero spend /
+//     zero THP burn / zero te / zero clock (#949, #1026 economy watch 🔴);
+//   - gridless guard reaching its branch: console.error + self-only advantage
+//     (#1035), grant stays honest (#945).
+// Clock is a round counter only — never wall-clock (#app MANDATORY).
+//
+// Family dup-map (owners hold, this file does not re-drive):
+//   ./monsterSelfBuff.test.js ................ base seam: spend-before-arming,
+//     exhausted gate, not-self-buff, enlarge/invisible, duration-note branches
+//   ./monsterSelfBuff.ma2071-*.test.js ....... ziz legendary-child twin (spend-free shape)
+//   ../combat/conditions/conditionEffects.bolster.test.js ... te CONSUMER fold (+1 adv)
+//   ../combat/conditions/targetEffectDefinitions.test.js:105-106 .. registry rows
+//     `bolstered` + `bolster_advantage` exact table bytes (old "registry" test DELETED, #1012)
+//   ../automation/handlers/buffs/tempHpService.js .... replace-if-larger implementation
+// Old->new: header/shockwave/smite disk mirrors DROPPED (legendary-economy lane,
+// not consumed here — reported); standalone refusal test folded into honest
+// double press; duration-note + builder direct-units folded into press-path bytes.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   isMonsterSelfBuffRow,
   resolveMonsterSelfBuffRow,
   bolsterTempHp,
   bolsterAllyRadiusFt,
-  buildBolsterTempHpLog,
-  buildBolsterAllyGrantLog,
   selfBuffRounds,
 } from './monsterSelfBuff.js';
-import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition } from '../combat/conditions/targetEffectDefinitions.js';
+import { setRuntimeValue as setRuntimeValueMock } from '../../hooks/runtime/useRuntimeState.js';
+import { addExpiration as addExpirationMock } from '../../services/rules/effects/expirations.js';
 import monstersData from '../../../public/data/monsters.json';
 
+// Store-faithful runtime: the REAL tempHpService runs on this in-memory store
+// (replace-if-larger Math.max is production code, not mock code).
+const rt = vi.hoisted(() => ({ thp: 0 }));
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn((characterKey, propertyName) => (propertyName === 'tempHp' ? rt.thp : undefined)),
+  setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
+    if (propertyName === 'tempHp') rt.thp = value;
+    return Promise.resolve();
+  }),
   getAllStoreKeys: vi.fn(() => []),
 }));
 vi.mock('../../services/ui/logService.js', () => ({
@@ -39,11 +62,12 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 }));
 
 const emp = monstersData.find(m => m.index === 'empyrean');
-const HEADER = emp.legendary_actions[0];
-const BOLSTER = emp.legendary_actions[1];
-const SHOCKWAVE = emp.legendary_actions[2];
-const SMITE = emp.legendary_actions[3];
+// BY NAME (never by index — index pins break on benign sibling edits).
+const BOLSTER = emp.legendary_actions.find(a => a.name === 'Bolster');
+const duergar = monstersData.find(m => m.index === 'duergar');
+const ENLARGE = duergar.actions.find(a => a.name === 'Enlarge');
 
+// Two allied NPC decoys ride, the PC decoy must never.
 const CREATURES = [
   { name: 'Empyrean 1', type: 'npc', currentHp: 346, maxHp: 346 },
   { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 11 },
@@ -51,165 +75,173 @@ const CREATURES = [
   { name: 'AasimarTest', type: 'player', currentHp: 200, maxHp: 200 },
 ];
 
-function makeDeps({ activeTe = null, creatures = CREATURES, existingTempHp = 0 } = {}) {
-  const store = { te: [], logs: [], thp: existingTempHp, expirations: [] };
+function makeDeps({ creatures = CREATURES } = {}) {
+  const store = { te: [], logs: [] };
   return {
     store,
     registerTargetEffect: vi.fn((campaign, target, effect, source, extra) => {
       store.te.push({ campaign, target, effect, source, extra });
     }),
-    getActiveTargetEffect: vi.fn(() => activeTe),
-    addExpiration: vi.fn((entry) => { store.expirations.push(entry); }),
+    // Store-backed latch: a press arms, a re-press reads what the first press wrote.
+    getActiveTargetEffect: vi.fn((campaign, target, effect) =>
+      store.te.find(e => e.target === target && e.effect === effect) || null),
     getRuntimeValue: vi.fn(() => ({})),
     setRuntimeValue: vi.fn(() => Promise.resolve()),
     addEntry: vi.fn((c, entry) => { store.logs.push(entry); return Promise.resolve(); }),
-    setTempHp: vi.fn((name, amount) => { store.thp = Math.max(store.thp, amount); return store.thp; }),
     getCombatContext: vi.fn(() => Promise.resolve(creatures == null ? null : { creatures })),
   };
 }
 
+async function press(deps, setPopupHtml = vi.fn()) {
+  return resolveMonsterSelfBuffRow({
+    action: BOLSTER,
+    monsterName: 'Empyrean 1',
+    campaignName: 'test-campaign',
+    setPopupHtml,
+    storedUses: {},
+    deps,
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  rt.thp = 0;
 });
 
-describe('MA-0694 disk data shape: empyrean legendary header + Bolster automation', () => {
-  it('legendary_actions[0] is the canonical header with numeric uses:1 (§165)', () => {
-    expect(HEADER.name).toBe('Legendary Action Uses: 1');
-    expect(HEADER.uses).toBe(1);
-    expect(HEADER.description).toMatch(/Immediately after another creature's turn, the empyrean can expend a use/);
-    expect(HEADER.description).toMatch(/regains all expended uses at the start of each of its turns/);
-  });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
-  it('Bolster child rides the self-buff seam: monster_self_buff/bolstered, rounds:2, temp_hp:10, ally_radius_ft:30, own uses dropped', () => {
-    expect(BOLSTER.name).toBe('Bolster');
-    expect(BOLSTER.uses).toBeUndefined();
+describe('MA-0694 Bolster disk row (by name) + inert helpers', () => {
+  it('Bolster rides the self-buff seam verbatim: automation {type,effect,rounds:2,temp_hp:10,ally_radius_ft:30}, NO own uses (§165 child)', () => {
     expect(BOLSTER.automation).toEqual({ type: 'monster_self_buff', effect: 'bolstered', rounds: 2, temp_hp: 10, ally_radius_ft: 30 });
+    expect(BOLSTER.uses).toBeUndefined();
+    expect(BOLSTER.maxUses).toBeUndefined();
     expect(isMonsterSelfBuffRow(BOLSTER)).toBe(true);
     expect(selfBuffRounds(BOLSTER)).toBe(2);
     expect(bolsterTempHp(BOLSTER)).toBe(10);
     expect(bolsterAllyRadiusFt(BOLSTER)).toBe(30);
   });
 
-  it('Shockwave keeps its numeric save fields riding the shared gate; Smite delegates_to Divine Ray with uses dropped (§165 same-pass)', () => {
-    expect(SHOCKWAVE.name).toBe('Shockwave of Glory');
-    expect(SHOCKWAVE.save_dc).toBe(23);
-    expect(SHOCKWAVE.save_type).toBe('Constitution');
-    expect(SHOCKWAVE.uses).toBeUndefined();
-    expect(SMITE.name).toBe('Smite');
-    expect(SMITE.delegates_to).toBe('Divine Ray');
-    expect(SMITE.uses).toBeUndefined();
-    const ray = emp.actions.find(a => a.name === 'Divine Ray');
-    expect(ray.attack_bonus).toBe(15);
-  });
-
-  it('both new te keys are registered in the targetEffect registry', () => {
-    const adv = getEffectDefinition('bolster_advantage');
-    expect(adv).toBeDefined();
-    expect(adv.label).toBe('Bolstered (Advantage on D20 Tests)');
-    expect(adv.cls).toBe('effect-buff');
-    expect(adv.group).toBe('Spells');
-    expect(adv.icon).toMatch(/^fa-/);
-    const marker = getEffectDefinition('bolstered');
-    expect(marker).toBeDefined();
-    expect(marker.label).toBe('Bolstered');
-    expect(marker.cls).toBe('effect-buff');
-    expect(TARGET_EFFECT_DEFINITIONS.filter(d => d.effect === 'bolster_advantage')).toHaveLength(1);
-    expect(TARGET_EFFECT_DEFINITIONS.filter(d => d.effect === 'bolstered')).toHaveLength(1);
-  });
-
-  it('duergar self-buff rows carry neither bolster field (seam stays byte-inert)', () => {
-    const duergar = monstersData.find(m => m.index === 'duergar');
-    expect(bolsterTempHp(duergar.actions[0])).toBe(0);
-    expect(bolsterAllyRadiusFt(duergar.actions[0])).toBe(0);
+  it('non-bolster self-buff rows are byte-inert to the new fields: no bolster keys authored, helpers default to 0', () => {
+    expect(ENLARGE.automation).toEqual({ type: 'monster_self_buff', effect: 'enlarged', rounds: 10 });
+    expect(bolsterTempHp(ENLARGE)).toBe(0);
+    expect(bolsterAllyRadiusFt(ENLARGE)).toBe(0);
+    expect(bolsterTempHp({})).toBe(0);
+    expect(bolsterAllyRadiusFt(undefined)).toBe(0);
   });
 });
 
-describe('MA-0694 Bolster grant flow', () => {
-  it('first grant: THP via tempHpService, te bolstered on self, bolster_advantage on self + allied NPCs (PC excluded), ONE merged clock, spend-free (gate lives on the legendary seam), grant + ally + THP logs', async () => {
+describe('MA-0694 Bolster press path — real tempHpService, one merged clock, zero legendary spend', () => {
+  it('first press exact census: te bytes stamped self `bolstered` (duration:minute) then `bolster_advantage` on self + allied NPCs in board order (PC decoy excluded), addExpiration ONE exact rounds:2 clock with target-LESS ally entry, tempHpService writes 10 THP campaign-keyed, ordered grant logs, popup, zero ability_use/monsterSpellUses', async () => {
     const deps = makeDeps();
     const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSelfBuffRow({
-      action: BOLSTER, monsterName: 'Empyrean 1', campaignName: 'test-campaign', setPopupHtml, storedUses: {}, deps,
+    const result = await press(deps, setPopupHtml);
+
+    expect(result).toEqual({
+      resolved: true,
+      effectKey: 'bolstered',
+      rounds: 2,
+      remaining: null,
+      thp: { amount: 10, held: 10 },
+      allyNames: ['Bandit 1', 'Bandit 2'],
     });
-    expect(result.resolved).toBe(true);
-    expect(result.thp).toEqual({ amount: 10, held: 10 });
-    expect(deps.setTempHp).toHaveBeenCalledWith('Empyrean 1', 10, 'test-campaign');
-    const teKeys = deps.registerTargetEffect.mock.calls.map(c => `${c[1]}:${c[2]}`);
-    expect(teKeys).toEqual(['Empyrean 1:bolstered', 'Empyrean 1:bolster_advantage', 'Bandit 1:bolster_advantage', 'Bandit 2:bolster_advantage']);
-    expect(teKeys).not.toContain('AasimarTest:bolster_advantage');
-    expect(deps.addExpiration).toHaveBeenCalledTimes(1);
-    const clock = deps.store.expirations[0];
-    expect(clock.rounds).toBe(2);
-    expect(clock.effects).toEqual([
-      { type: 'remove_target_effect', effectKey: 'bolstered', source: 'Empyrean 1', target: 'Empyrean 1' },
-      { type: 'remove_target_effect', effectKey: 'bolster_advantage', source: 'Empyrean 1' },
+
+    // Exact ordered register bytes (campaign, target, effect, source, extra).
+    expect(deps.registerTargetEffect.mock.calls).toEqual([
+      ['test-campaign', 'Empyrean 1', 'bolstered', 'Empyrean 1', { duration: 'minute', rounds: 2, actionName: 'Bolster' }],
+      ['test-campaign', 'Empyrean 1', 'bolster_advantage', 'Empyrean 1', { duration: 'rounds', rounds: 2, actionName: 'Bolster' }],
+      ['test-campaign', 'Bandit 1', 'bolster_advantage', 'Empyrean 1', { duration: 'rounds', rounds: 2, actionName: 'Bolster' }],
+      ['test-campaign', 'Bandit 2', 'bolster_advantage', 'Empyrean 1', { duration: 'rounds', rounds: 2, actionName: 'Bolster' }],
     ]);
-    const types = deps.store.logs.map(l => l.automationType);
-    expect(types).toEqual(['bolstered_granted', 'bolster_temp_hp_granted', 'bolster_advantage_granted']);
-    const thpLog = deps.store.logs.find(l => l.automationType === 'bolster_temp_hp_granted');
-    expect(thpLog.description).toMatch(/10 Temporary Hit Points.*replace-if-larger.*10 THP standing/s);
-    expect(deps.store.logs[2].description).toMatch(/Bandit 1, Bandit 2/);
-    expect(deps.store.logs[2].description).toMatch(/GM-enforced .*§42/s);
-    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/Bolstered/);
-    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/10 Temporary Hit Points/);
-    expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/30 ft/);
-  });
 
-  it('THP replace-if-larger: existing 15 beats the new 10 — held 15 in the log', async () => {
-    const deps = makeDeps({ existingTempHp: 15 });
-    await resolveMonsterSelfBuffRow({
-      action: BOLSTER, monsterName: 'Empyrean 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), storedUses: {}, deps,
+    // ONE merged clock: self entry targeted; ally entry target-LESS so every
+    // stamped combatant clears together (§37).
+    expect(addExpirationMock).toHaveBeenCalledTimes(1);
+    expect(addExpirationMock).toHaveBeenCalledWith({
+      attackerName: 'Empyrean 1',
+      targetName: 'Empyrean 1',
+      campaignName: 'test-campaign',
+      rounds: 2,
+      effects: [
+        { type: 'remove_target_effect', effectKey: 'bolstered', source: 'Empyrean 1', target: 'Empyrean 1' },
+        { type: 'remove_target_effect', effectKey: 'bolster_advantage', source: 'Empyrean 1' },
+      ],
     });
-    expect(deps.store.thp).toBe(15);
-    expect(deps.store.logs.find(l => l.automationType === 'bolster_temp_hp_granted').description).toMatch(/10 Temporary Hit Points.*15 THP standing/s);
+
+    // Real tempHpService on the store-faithful runtime mock.
+    expect(rt.thp).toBe(10);
+    expect(setRuntimeValueMock).toHaveBeenCalledWith('Empyrean 1', 'tempHp', 10, 'test-campaign');
+
+    // Economy watch (#1026 🔴): gate lives on the legendary seam upstream —
+    // this row must never write monsterSpellUses nor emit an ability_use log.
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.store.logs.some(l => l.type === 'ability_use')).toBe(false);
+
+    // Ordered logs with exact transport copy.
+    expect(deps.store.logs.map(l => l.automationType)).toEqual(['bolstered_granted', 'bolster_temp_hp_granted', 'bolster_advantage_granted']);
+    expect(deps.store.logs[1].description).toBe('Empyrean 1 Bolster: 10 Temporary Hit Points granted via tempHpService (replace-if-larger — 10 THP standing).');
+    expect(deps.store.logs[0].description).toMatch(/armed on itself for 2 rounds/);
+    expect(deps.store.logs[0].description).toMatch(/and allies within 30 ft/);
+    expect(deps.store.logs[0].description).toMatch(/§42/);
+    expect(deps.store.logs[2].description).toMatch(/stamped on itself \+ Bandit 1, Bandit 2/);
+    expect(deps.store.logs[2].description).toMatch(/exact 30-ft radius \+ ally membership GM-enforced/);
+
+    const popup = String(setPopupHtml.mock.calls[0][0]);
+    expect(popup).toMatch(/Bolstered/);
+    expect(popup).toMatch(/10 Temporary Hit Points/);
+    expect(popup).toMatch(/allies within 30 ft/);
+    expect(popup).toMatch(/2 rounds/);
   });
 
-  it('gridless advisory: cs missing logs console.error, advantage stays on self only, zero ally te', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const deps = makeDeps({ creatures: null });
-    const result = await resolveMonsterSelfBuffRow({
-      action: BOLSTER, monsterName: 'Empyrean 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), storedUses: {}, deps,
-    });
-    expect(result.allyNames).toEqual([]);
-    const targets = deps.registerTargetEffect.mock.calls.filter(c => c[2] === 'bolster_advantage').map(c => c[1]);
-    expect(targets).toEqual(['Empyrean 1']);
-    expect(errSpy).toHaveBeenCalled();
-    errSpy.mockRestore();
+  it('replace-if-larger is tempHpService\'s own lane — 15 standing beats the new 10: held 15 passes through result, store write and log verbatim', async () => {
+    rt.thp = 15;
+    const deps = makeDeps();
+    const result = await press(deps);
+
+    expect(result.thp).toEqual({ amount: 10, held: 15 });
+    expect(rt.thp).toBe(15);
+    expect(setRuntimeValueMock).toHaveBeenCalledWith('Empyrean 1', 'tempHp', 15, 'test-campaign');
+    expect(deps.store.logs[1].description).toBe('Empyrean 1 Bolster: 10 Temporary Hit Points granted via tempHpService (replace-if-larger — 15 THP standing).');
   });
 
-  it('already bolstered refuses with zero spend, zero THP, zero te, zero clock: bolster_refused / already_bolstered', async () => {
-    const deps = makeDeps({ activeTe: { target: 'Empyrean 1', effect: 'bolstered', source: 'Empyrean 1' } });
+  it('honest double press replaces-not-stacks (#949): first press arms, second press refuses already_bolstered with zero extra te, zero extra clock, zero THP change, exactly one refusal log, Already Bolstered popup', async () => {
+    const deps = makeDeps();
+    const first = await press(deps);
+    expect(first.resolved).toBe(true);
+
     const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSelfBuffRow({
-      action: BOLSTER, monsterName: 'Empyrean 1', campaignName: 'test-campaign', setPopupHtml, storedUses: {}, deps,
-    });
-    expect(result.resolved).toBe(false);
-    expect(result.reason).toBe('already-active');
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.addExpiration).not.toHaveBeenCalled();
-    expect(deps.setTempHp).not.toHaveBeenCalled();
-    expect(deps.store.logs).toHaveLength(1);
-    expect(deps.store.logs[0].automationType).toBe('bolster_refused');
-    expect(deps.store.logs[0].automationDetail).toBe('already_bolstered');
+    const second = await press(deps, setPopupHtml);
+    expect(second).toEqual({ resolved: false, reason: 'already-active' });
+
+    // Zero delta on every write lane.
+    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(4);
+    expect(addExpirationMock).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValueMock).toHaveBeenCalledTimes(1);
+    expect(rt.thp).toBe(10);
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+
+    expect(deps.store.logs).toHaveLength(4);
+    const refusal = deps.store.logs[3];
+    expect(refusal.automationType).toBe('bolster_refused');
+    expect(refusal.automationDetail).toBe('already_bolstered');
+    expect(refusal.description).toBe('Empyrean 1 is already bolstered — Bolster refused, zero use spent. Refusal reason: already_bolstered.');
     expect(String(setPopupHtml.mock.calls[0][0])).toMatch(/Already Bolstered/);
   });
 
-  it('rounds:2 duration note reads "2 rounds" (sub-minute branch); enlarged/invisible notes byte-unchanged', async () => {
-    const deps = makeDeps();
-    const result = await resolveMonsterSelfBuffRow({
-      action: BOLSTER, monsterName: 'Empyrean 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), storedUses: {}, deps,
-    });
-    const grant = deps.store.logs.find(l => l.automationType === 'bolstered_granted');
-    expect(grant.description).toMatch(/armed on itself for 2 rounds/);
-    expect(result.rounds).toBe(2);
-  });
+  it('gridless advisory guard (#1035): combatSummary missing logs console.error, advantage lands on self only, honest zero-ally grant still resolves with the same merged clock', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const deps = makeDeps({ creatures: null });
+    const result = await press(deps);
 
-  it('buildBolsterTempHpLog / buildBolsterAllyGrantLog carry the raw numbers + advisory tokens', () => {
-    const thpLog = buildBolsterTempHpLog({ monsterName: 'Empyrean 1', action: BOLSTER, amount: 10, held: 10 });
-    expect(thpLog.type).toBe('automation');
-    expect(thpLog.abilityName).toBe('Bolster');
-    const allyLog = buildBolsterAllyGrantLog({ monsterName: 'Empyrean 1', action: BOLSTER, radiusFt: 30, allyNames: [], rounds: 2 });
-    expect(allyLog.description).toMatch(/no allied combatants on the board/);
-    expect(allyLog.description).toMatch(/30-ft radius \+ ally membership GM-enforced/);
+    expect(result.resolved).toBe(true);
+    expect(result.allyNames).toEqual([]);
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(deps.registerTargetEffect.mock.calls.map(c => `${c[1]}:${c[2]}`)).toEqual(['Empyrean 1:bolstered', 'Empyrean 1:bolster_advantage']);
+    expect(rt.thp).toBe(10);
+    // Clock keeps the target-LESS entry — clearing unstamped stamps is inert.
+    expect(addExpirationMock).toHaveBeenCalledTimes(1);
+    expect(addExpirationMock.mock.calls[0][0].effects.some(e => e.effectKey === 'bolster_advantage' && e.target === undefined)).toBe(true);
+    expect(deps.store.logs[2].description).toMatch(/no allied combatants on the board/);
   });
 });

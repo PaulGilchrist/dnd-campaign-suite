@@ -1,20 +1,52 @@
-// MA-0648: Drow Mage "Summon Demon" (actions[1]) — formerly inert
-// other-type row. Authored automation:{type:"monster_summon"} arms a chip
-// that routes resolveMonsterSummonRow: 1/Day gate via the MA-0020
-// monsterSpellUses economy (spend first, exhausted refuses `<slug>_refused`
-// zero-spend/zero-spawn), single honest d100 coin flip (≤50 → shadow-demon,
-// miss → quasit fallback), spawn into combatSummary as an ally acting right
-// after the caster (summonSpiritHandler cs push + sort + set seam), te
-// "summoned" registered on the spawn, attempt/outcome/spawn each logged.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  isMonsterSummonRow,
-  adjudicateSummonAttempt,
-  resolveMonsterSummonRow,
-  buildSummonCoinFlipLog,
-  buildSummonSpawnLog,
-  buildSummonSelfDamageLog,
-} from './monsterSummon.js';
+// @maintained-by-ai
+// MA-0648 CANON: monster_summon lane base — Drow Mage "Summon Demon" (1/Day
+// gate → d100 coin flip ≤50 shadow-demon else quasit fallback → spawn into
+// combatSummary as ally right after caster → te "summoned" → logs), extended
+// by MA-0651 (no-fallback failed flip routes authored self-damage through
+// applyDamageToTarget), MA-0664 (count dice rolls ONLY after the flip
+// lands), MA-0757/0759/1604 (chance-less guaranteed constant-count self-
+// summons: zero dice, stat_override stamp, self-summon guard strips
+// monster_summon actions), MA-1215 (recharge-gated consult/spend FIRST via
+// the live MA-0031 map; unauthored duration rides advisory verbatim — never
+// a fabricated "10 minutes") and MA-1729 (chance-less corpse-rise advisory).
+//
+// PRESERVED-CITED-BY (monsterSummon.orcus-conjure-undead.test.js #1154/MA-1957
+// and monsterSummon.sun-wukong-monkey-clones.test.js #1155/MA-2009 cite these
+// behaviors — refreshed ranges this cycle):
+//  - isMonsterSummonRow truth table :132-138 + coin-flip boundary/fallback
+//    generics + chance-less guarantee + consumed-vs-never RNG pins :140-157
+//    — folds old :75-101, :243, :250, :383-386, :546-550, :916-920, :1075-1079;
+//  - 1/Day exhausted refusal byte-shape :193-205 — old :153-173;
+//  - count-dice-after-flip + unique-name multi-spawn + ONE summons log
+//    :333-360 (zero-count honest fail :319-331) — old :412-447 (+ :390);
+//  - constant-count ZERO-dice twin press :420-476 (galeb-duhr leg)
+//    — old :553-598;
+//  - duration-kind honest legs: sovereign advisory verbatim :541-546
+//    — old :810-817; wraith advisory verbatim :633-640 — old :1064-1072.
+//
+// OLD -> NEW MAP / DUP-MAP (#1038 — every cut cites its owner):
+//  45 tests -> 23. Adjudication standalones (:84/:89/:94/:243/:250/:383/:546/
+//  :916/:1075) -> $-table with per-leg consumed-pin (chance rows flip EXACTLY
+//  once, #1072) and never-pin (chance-less). Disk trawls (:68 etc) -> by-name
+//  ac/hp pins folded into each data lock. :188 collision standalone -> covered
+//  by count press collision census + success press empty-board base name.
+//  :340 builder standalone -> self-damage press exact bytes. :449 count-1 ->
+//  empty-board branch lives in the success press; dice-count owned by :412 leg.
+//  :600-612 'MA-0648 twin byte-unchanged' DELETED per #1154 rec — re-drove the
+//  success press already owned at old :104-134 (flip + coin-flip log both
+//  asserted there, now exact toBe + RNG consumed-pin; #1116 no-card-mirror).
+//  Extra exhausted standalones (:463/:614/:693/:970) -> refusal shape canon
+//  here once + monsterAbilityUses.test.js #829/#1082 slug derivation; galib
+//  press (:656) is a galeb byte-mirror (MA-0757 ticket rides same seam) —
+//  galib still rides the resolver in the legacy-twins zero-write census.
+//  Galib/treant data standalones -> twins it.each. :846 recovery walk ->
+//  monsterRecharge.test.js gate truth-table + d6 recovery lifecycle own the
+//  axis; fresh(:786)/spent(:820) store states both pinned here.
+//  Lifecycle→summonedCreatureService.test.js (#1067) cited, not re-driven.
+//  Zones enforcement is OFF in this harness ⇒ NO duration_clock_armed clock
+//  ever arms — pinned in every spawn press (seams, NEVER wall-clock).
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { isMonsterSummonRow, adjudicateSummonAttempt, resolveMonsterSummonRow } from './monsterSummon.js';
 import { MONSTER_RECHARGE_KEY } from './monsterRecharge.js';
 import monstersData from '../../../public/data/monsters.json';
 
@@ -22,6 +54,30 @@ const drowMage = monstersData.find(m => m.index === 'drow-mage');
 const SUMMON_ROW = drowMage.actions[1];
 const quasit = monstersData.find(m => m.index === 'quasit');
 const shadowDemon = monstersData.find(m => m.index === 'shadow-demon');
+
+const priestess = monstersData.find(m => m.index === 'drow-priestess-of-lolth');
+const PRIESTESS_ROW = priestess.actions.find(a => a.name === 'Summon Demon');
+const yochlol = monstersData.find(m => m.index === 'yochlol');
+
+const dustMephit = monstersData.find(m => m.index === 'dust-mephit');
+const SUMMON_MEPHITS_ROW = dustMephit.actions[2];
+
+const galebDuhr = monstersData.find(m => m.index === 'galeb-duhr');
+const ANIMATE_ROW = galebDuhr.actions[1];
+const galibDuhr = monstersData.find(m => m.index === 'galib-duhr');
+const GALIB_ANIMATE_ROW = galibDuhr.actions[1];
+const treant = monstersData.find(m => m.index === 'treant');
+const TREANT_ANIMATE_ROW = treant.actions[3];
+
+const sovereign = monstersData.find(m => m.index === 'myconid-sovereign');
+const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
+const sporeServant = monstersData.find(m => m.index === 'myconid-spore-servant');
+const SOV_ADV = ANIMATING_ROW.automation.advisory;
+
+const wraith = monstersData.find(m => m.index === 'wraith');
+const CREATE_SPECTER_ROW = wraith.actions.find(a => a.name === 'Create Specter');
+const specter = monstersData.find(m => m.index === 'specter');
+const WR_ADV = CREATE_SPECTER_ROW.automation.advisory;
 
 function makeDeps(stored = {}, roll = 50) {
   const store = { logs: [], ...stored };
@@ -42,12 +98,16 @@ function makeDeps(stored = {}, roll = 50) {
   };
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+async function press(action, monsterName, deps, storedUses = {}) {
+  const setPopupHtml = vi.fn();
+  const result = await resolveMonsterSummonRow({ action, monsterName, campaignName: 'test-campaign', setPopupHtml, storedUses, deps });
+  return { result, setPopupHtml };
+}
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('MA-0648 disk data shape', () => {
-  it('drow-mage Summon Demon row authors monster_summon automation + numeric uses', () => {
+  it('drow-mage Summon Demon row: monster_summon automation + numeric uses; spawn targets pinned by name', () => {
     expect(SUMMON_ROW.name).toBe('Summon Demon');
     expect(SUMMON_ROW.automation).toEqual({
       type: 'monster_summon',
@@ -63,13 +123,10 @@ describe('MA-0648 disk data shape', () => {
     expect(SUMMON_ROW.usage).toEqual({ type: 'per day', times: 1 });
     expect(SUMMON_ROW.save_dc).toBeUndefined();
     expect(SUMMON_ROW.attack_bonus).toBeUndefined();
-  });
-
-  it('quasit + shadow-demon spawn targets exist on disk with full blocks', () => {
-    expect(quasit.hit_points).toBeGreaterThan(0);
-    expect(quasit.actions.length).toBeGreaterThan(0);
-    expect(shadowDemon.hit_points).toBeGreaterThan(0);
-    expect(shadowDemon.actions.length).toBeGreaterThan(0);
+    expect(quasit).toMatchObject({ name: 'Quasit', armor_class: 13, hit_points: 25 });
+    expect(quasit.actions[0].name).toBe('Rend');
+    expect(shadowDemon).toMatchObject({ name: 'Shadow Demon', armor_class: 14, hit_points: 66 });
+    expect(shadowDemon.actions.map(a => a.name)).toEqual(['Umbral Claw']);
   });
 
   it('isMonsterSummonRow: only monster_summon rows with options arm', () => {
@@ -80,87 +137,62 @@ describe('MA-0648 disk data shape', () => {
   });
 });
 
-describe('MA-0648 coin-flip adjudication', () => {
-  it('d100 ≤ 50 lands the shadow-demon attempt', () => {
-    const verdict = adjudicateSummonAttempt(SUMMON_ROW.automation.options, () => 50);
-    expect(verdict).toMatchObject({ monster: 'shadow-demon', roll: 50, success: true, chance: 0.5 });
-  });
-
-  it('d100 > 50 fails the attempt and falls back to quasit', () => {
-    const verdict = adjudicateSummonAttempt(SUMMON_ROW.automation.options, () => 51);
-    expect(verdict).toMatchObject({ monster: 'quasit', roll: 51, success: false });
-  });
-
-  it('one d100 roll per adjudication, chance-less rows never flip', () => {
-    const rollFn = vi.fn(() => 37);
-    adjudicateSummonAttempt(SUMMON_ROW.automation.options, rollFn);
-    expect(rollFn).toHaveBeenCalledTimes(1);
-    expect(adjudicateSummonAttempt([{ monster: 'quasit' }], rollFn)).toMatchObject({ monster: 'quasit', roll: null, success: true });
-    expect(rollFn).toHaveBeenCalledTimes(1);
+describe('coin-flip adjudication — boundary/fallback/chance-less census', () => {
+  const LEGS = [
+    { label: 'drow-mage d100 50 boundary lands the shadow-demon attempt', options: SUMMON_ROW.automation.options, roll: 50, flips: true, verdict: { monster: 'shadow-demon', roll: 50, success: true, chance: 0.5 } },
+    { label: 'drow-mage d100 51 misses to the chance-less quasit fallback', options: SUMMON_ROW.automation.options, roll: 51, flips: true, verdict: { monster: 'quasit', roll: 51, success: false, chance: 0.5 } },
+    { label: 'priestess per-row chance: d100 30 lands yochlol at 30%', options: PRIESTESS_ROW.automation.options, roll: 30, flips: true, verdict: { monster: 'yochlol', roll: 30, success: true, chance: 0.3 } },
+    { label: 'priestess d100 31 fails with NO fallback: monster null routes self-damage', options: PRIESTESS_ROW.automation.options, roll: 31, flips: true, verdict: { monster: null, roll: 31, success: false, chance: 0.3 } },
+    { label: 'dust-mephit d100 25 boundary lands at 25%', options: SUMMON_MEPHITS_ROW.automation.options, roll: 25, flips: true, verdict: { monster: 'dust-mephit', roll: 25, success: true, chance: 0.25 } },
+    { label: 'dust-mephit d100 26 fails, no fallback: monster null', options: SUMMON_MEPHITS_ROW.automation.options, roll: 26, flips: true, verdict: { monster: null, roll: 26, success: false, chance: 0.25 } },
+    { label: 'galeb-duhr chance-less is guaranteed: zero d100 flipped', options: ANIMATE_ROW.automation.options, roll: 50, flips: false, verdict: { monster: 'galeb-duhr', roll: null, success: true, chance: null } },
+    { label: 'treant chance-less is guaranteed: zero d100 flipped', options: TREANT_ANIMATE_ROW.automation.options, roll: 50, flips: false, verdict: { monster: 'treant', roll: null, success: true, chance: null } },
+    { label: 'wraith chance-less rise is guaranteed: zero d100 flipped', options: CREATE_SPECTER_ROW.automation.options, roll: 50, flips: false, verdict: { monster: 'specter', roll: null, success: true, chance: null } },
+  ];
+  it.each(LEGS)('$label', ({ options, roll, flips, verdict }) => {
+    const rollFn = vi.fn(() => roll);
+    expect(adjudicateSummonAttempt(options, rollFn)).toEqual(verdict);
+    expect(rollFn).toHaveBeenCalledTimes(flips ? 1 : 0);
   });
 });
 
-describe('MA-0648 activation', () => {
-  it('success flip: spends 1/Day, spawns shadow-demon into cs as ally after caster, registers te, logs flip + spawn', async () => {
+describe('MA-0648 drow mage activation', () => {
+  it('success d100 42: spends 1/Day, spawns Shadow Demon right after the caster, te @10_minutes, exact flip/spawn/popup bytes, ZERO clock armed', async () => {
     const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', type: 'npc', initiative: '12' }] } }, 42);
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_ROW,
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
+    const { result, setPopupHtml } = await press(SUMMON_ROW, 'Drow Mage 1', deps);
     expect(result).toMatchObject({ resolved: true, summonedName: 'Shadow Demon', summonedNames: ['Shadow Demon'], countRoll: null, verdict: { monster: 'shadow-demon', roll: 42, success: true, chance: 0.5 }, remaining: 0 });
+    expect(deps.rollDie).toHaveBeenCalledTimes(1);
     expect(deps.store.uses).toEqual({ 'Summon Demon': 1 });
     const spawned = deps.store.cs.creatures.find(c => c.name === 'Shadow Demon');
     expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'shadow-demon', ac: 14, maxHp: 66, currentHp: 66, summonedBy: 'Drow Mage 1', summonSource: 'monster_ability', initiative: '11.9' });
     expect(spawned.actions[0].name).toBe('Umbral Claw');
     expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Shadow Demon', 'summoned', 'Drow Mage 1', { duration: '10_minutes' });
-    expect(deps.setCombatSummary).toHaveBeenCalled();
+    expect(deps.setCombatSummary).toHaveBeenCalledTimes(1);
     const flipLog = deps.logs.find(e => e.rollType === 'monster_summon_coin_flip');
     expect(flipLog).toMatchObject({ type: 'roll', characterName: 'Drow Mage 1', rolls: [42], total: 42 });
-    expect(flipLog.description).toContain('d100 42 vs 50%');
-    expect(flipLog.description).toContain('success, summons shadow-demon');
+    expect(flipLog.description).toBe('Drow Mage 1 flips for Summon Demon: d100 42 vs 50% — success, summons shadow-demon.');
     const spawnLog = deps.logs.find(e => e.type === 'summons');
     expect(spawnLog.summonedCreatures).toEqual(['Shadow Demon']);
-    expect(spawnLog.description).toContain('60 ft');
-    expect(spawnLog.description).toContain('10 minutes');
-    const spendLog = deps.logs.find(e => e.type === 'ability_use');
-    expect(spendLog.description).toContain('Summon Demon');
-    expect(spendLog.description).toContain('0 left today');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Shadow Demon'));
+    expect(spawnLog.description).toBe('Drow Mage 1 summons Shadow Demon via Summon Demon — ally of Drow Mage 1, appears within 60 ft, remains 10 minutes (expiry clock, dismiss-as-action and "can\'t summon other creature" are §70 GM-enforced residuals).');
+    expect(deps.logs.find(e => e.type === 'ability_use').description).toContain('Summon Demon');
+    expect(deps.logs.find(e => e.type === 'ability_use').description).toContain('0 left today');
+    expect(deps.logs.some(e => e.automationType === 'duration_clock_armed')).toBe(false);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Drow Mage 1 summons Shadow Demon</h3><p>Coin flip: d100 42 — summon attempt succeeds.\nShadow Demon joins the fight as an ally of Drow Mage 1, acting right after it, for 10 minutes (§70 expiry GM-enforced). 0 use(s) left today (resets at dawn, GM-enforced).</p></div>');
   });
 
-  it('failed flip: spawns quasit fallback, logged honestly', async () => {
+  it('failed d100 77: the chance-less quasit fallback still spawns (ac 13/hp 25 block) with the honest miss log', async () => {
     const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', type: 'npc', initiative: '8' }] } }, 77);
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_ROW,
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      storedUses: {},
-      deps,
-    });
-    expect(result.resolved).toBe(true);
-    expect(result.summonedName).toBe('Quasit');
-    expect(deps.store.cs.creatures.some(c => c.name === 'Quasit')).toBe(true);
-    const flipLog = deps.logs.find(e => e.rollType === 'monster_summon_coin_flip');
-    expect(flipLog.description).toContain('failure, falls back to quasit');
+    const { result, setPopupHtml } = await press(SUMMON_ROW, 'Drow Mage 1', deps);
+    expect(result).toMatchObject({ resolved: true, summonedName: 'Quasit', verdict: { monster: 'quasit', roll: 77, success: false } });
+    const spawned = deps.store.cs.creatures.find(c => c.name === 'Quasit');
+    expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'quasit', ac: 13, maxHp: 25, currentHp: 25, summonedBy: 'Drow Mage 1', summonSource: 'monster_ability', initiative: '7.9' });
+    expect(deps.logs.find(e => e.rollType === 'monster_summon_coin_flip').description).toBe('Drow Mage 1 flips for Summon Demon: d100 77 vs 50% — failure, falls back to quasit.');
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Drow Mage 1 summons Quasit</h3><p>Coin flip: d100 77 — attempt fails.\nQuasit joins the fight as an ally of Drow Mage 1, acting right after it, for 10 minutes (§70 expiry GM-enforced). 0 use(s) left today (resets at dawn, GM-enforced).</p></div>');
   });
 
   it('second same-day click: refused with summon_demon_refused, zero roll/spend/spawn/te', async () => {
     const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', initiative: '12' }] }, uses: { 'Summon Demon': 1 } });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_ROW,
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Summon Demon': 1 },
-      deps,
-    });
+    const { result, setPopupHtml } = await press(SUMMON_ROW, 'Drow Mage 1', deps, { 'Summon Demon': 1 });
     expect(result).toEqual({ resolved: false, reason: 'exhausted' });
     expect(deps.rollDie).not.toHaveBeenCalled();
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
@@ -174,56 +206,28 @@ describe('MA-0648 activation', () => {
 
   it('non-summon rows never route', async () => {
     const deps = makeDeps();
-    const result = await resolveMonsterSummonRow({
-      action: drowMage.actions[0],
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      deps,
-    });
+    const { result } = await press(drowMage.actions[0], 'Drow Mage 1', deps);
     expect(result).toEqual({ resolved: false, reason: 'not-monster-summon' });
     expect(deps.logs).toHaveLength(0);
   });
-
-  it('name collision: second spawn gets numbered suffix', async () => {
-    const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', initiative: '12' }, { name: 'Quasit', initiative: '5' }] } }, 77);
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_ROW,
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      deps,
-    });
-    expect(result.summonedName).toBe('Quasit 1');
-    const log = buildSummonSpawnLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, summonedNames: ['Quasit 1'], durationMinutes: 10 });
-    expect(log.summonedCreatures).toEqual(['Quasit 1']);
-    const flipLog = buildSummonCoinFlipLog({ monsterName: 'Drow Mage 1', action: SUMMON_ROW, verdict: { monster: 'quasit', roll: 77, success: false, chance: 0.5 } });
-    expect(flipLog.total).toBe(77);
-  });
 });
 
-// MA-0651: Drow Priestess of Lolth "Summon Demon" — single chance-option
-// row (yochlol @ 30%) with NO fallback: failed flip spawns nothing and the
-// summoner takes 1d10 psychic via applyDamageToTarget; uses:3 gate spends
-// then refuses at 0.
-const priestess = monstersData.find(m => m.index === 'drow-priestess-of-lolth');
-const PRIESTESS_ROW = priestess.actions.find(a => a.name === 'Summon Demon');
-const yochlol = monstersData.find(m => m.index === 'yochlol');
+describe('MA-0651 priestess self-damage summon', () => {
+  function makeSelfDmgDeps(cs, roll, dmgRoll = { total: 7, rolls: [7], modifier: 0, formula: '1d10' }) {
+    const deps = makeDeps({ cs }, roll);
+    deps.monsters = [yochlol];
+    deps.rollExpression = vi.fn(() => dmgRoll);
+    deps.applyDamageToTarget = vi.fn(async (summary, target, raw) => {
+      const c = summary.creatures.find(x => x.name === target);
+      c.currentHp -= raw;
+      return { finalDamage: raw, newHp: c.currentHp };
+    });
+    return deps;
+  }
 
-function makeSelfDmgDeps(stored = {}, roll = 50, dmgRoll = { total: 7, rolls: [7], modifier: 0, formula: '1d10' }) {
-  const deps = makeDeps(stored, roll);
-  deps.monsters = [yochlol];
-  deps.rollExpression = vi.fn(() => dmgRoll);
-  deps.applyDamageToTarget = vi.fn(async (cs, target, raw) => {
-    const c = cs.creatures.find(x => x.name === target);
-    c.currentHp -= raw;
-    return { finalDamage: raw, newHp: c.currentHp };
-  });
-  return deps;
-}
+  const PRIESTESS_CS = () => ({ round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] });
 
-describe('MA-0651 Priestess summon data', () => {
-  it('authors monster_summon automation: yochlol 30% + structured self-damage + uses 3', () => {
+  it('disk byte-shape: yochlol 30% + structured self-damage + uses 3; yochlol target pinned', () => {
     expect(isMonsterSummonRow(PRIESTESS_ROW)).toBe(true);
     expect(PRIESTESS_ROW.automation).toEqual({
       type: 'monster_summon',
@@ -237,133 +241,66 @@ describe('MA-0651 Priestess summon data', () => {
     expect(PRIESTESS_ROW.maxUses).toBe(3);
     expect(PRIESTESS_ROW.description).toContain('1d10');
     expect(PRIESTESS_ROW.description).not.toContain('1dlO');
-    expect(yochlol.hit_points).toBeGreaterThan(0);
+    expect(yochlol).toMatchObject({ name: 'Yochlol', armor_class: 15, hit_points: 153 });
   });
 
-  it('per-row chance: 30% here vs 50% on the Drow Mage twin', () => {
-    expect(adjudicateSummonAttempt(PRIESTESS_ROW.automation.options, () => 30)).toMatchObject({ monster: 'yochlol', roll: 30, success: true, chance: 0.3 });
-    expect(adjudicateSummonAttempt(SUMMON_ROW.automation.options, () => 50)).toMatchObject({ monster: 'shadow-demon', success: true, chance: 0.5 });
-  });
-});
-
-describe('MA-0651 failed summon with no fallback', () => {
-  it('d100 31 > 30: verdict.monster null, no spawn', () => {
-    const verdict = adjudicateSummonAttempt(PRIESTESS_ROW.automation.options, () => 31);
-    expect(verdict).toEqual({ monster: null, roll: 31, success: false, chance: 0.3 });
-  });
-
-  it('fail: spends a use, zero spawn/te, rolls 1d10 applied to summoner via applyDamageToTarget, flips+self-damage logged', async () => {
-    const deps = makeSelfDmgDeps({ cs: { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] } }, 88, { total: 7, rolls: [7], modifier: 0, formula: '1d10' });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: PRIESTESS_ROW,
-      monsterName: 'Drow Priestess of Lolth',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
-    expect(result.resolved).toBe(true);
-    expect(result.summonedName).toBeNull();
-    expect(result.remaining).toBe(2);
-    expect(deps.store.cs.creatures.some(c => c.name === 'Yochlol')).toBe(false);
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.rollExpression).toHaveBeenCalledWith('1d10');
-    expect(deps.applyDamageToTarget).toHaveBeenCalledWith(deps.store.cs, 'Drow Priestess of Lolth', 7, ['psychic'], { campaignName: 'test-campaign', characters: [], attackerName: 'Drow Priestess of Lolth' });
-    expect(deps.store.cs.creatures[0].currentHp).toBe(106);
-    expect(deps.store.uses).toEqual({ 'Summon Demon': 1 });
-    const flipLog = deps.logs.find(e => e.rollType === 'monster_summon_coin_flip');
-    expect(flipLog.description).toContain('d100 88 vs 30%');
-    expect(flipLog.description).toContain('failure, no summon answers');
-    const dmgLog = deps.logs.find(e => e.rollType === 'monster_summon_self_damage');
+  it('failed d100 88: 1/3 spent, zero spawn/te, 1d10 psychic backlash applied via applyDamageToTarget with exact log/popup bytes; success d100 30 NEVER rolls backlash', async () => {
+    const failDeps = makeSelfDmgDeps(PRIESTESS_CS(), 88);
+    const { result: fail, setPopupHtml } = await press(PRIESTESS_ROW, 'Drow Priestess of Lolth', failDeps);
+    expect(fail).toMatchObject({ resolved: true, summonedName: null, remaining: 2 });
+    expect(failDeps.store.uses).toEqual({ 'Summon Demon': 1 });
+    expect(failDeps.store.cs.creatures.some(c => c.name === 'Yochlol')).toBe(false);
+    expect(failDeps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(failDeps.rollExpression).toHaveBeenCalledWith('1d10');
+    expect(failDeps.applyDamageToTarget).toHaveBeenCalledWith(failDeps.store.cs, 'Drow Priestess of Lolth', 7, ['psychic'], { campaignName: 'test-campaign', characters: [], attackerName: 'Drow Priestess of Lolth' });
+    expect(failDeps.store.cs.creatures[0].currentHp).toBe(106);
+    expect(failDeps.logs.find(e => e.rollType === 'monster_summon_coin_flip').description).toBe('Drow Priestess of Lolth flips for Summon Demon: d100 88 vs 30% — failure, no summon answers.');
+    const dmgLog = failDeps.logs.find(e => e.rollType === 'monster_summon_self_damage');
     expect(dmgLog).toMatchObject({ type: 'roll damage', characterName: 'Drow Priestess of Lolth', rolls: [7], total: 7, damageType: 'psychic', formula: '1d10' });
-    expect(dmgLog.description).toContain('7 psychic damage (rolled 7)');
-    expect(deps.logs.some(e => e.type === 'summons')).toBe(false);
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
+    expect(dmgLog.description).toBe('Drow Priestess of Lolth\'s Summon Demon attempt fails — it takes 7 psychic damage (rolled 7).');
+    expect(failDeps.logs.some(e => e.type === 'summons')).toBe(false);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Drow Priestess of Lolth\'s summon fails</h3><p>Coin flip: d100 88 — attempt fails.\nNo summon answers the call. Drow Priestess of Lolth takes 7 psychic damage (rolled 7). 2 use(s) left today (resets at dawn, GM-enforced).</p></div>');
+
+    const okDeps = makeSelfDmgDeps(PRIESTESS_CS(), 30);
+    const { result: ok } = await press(PRIESTESS_ROW, 'Drow Priestess of Lolth', okDeps);
+    expect(ok).toMatchObject({ resolved: true, summonedName: 'Yochlol', remaining: 2 });
+    const spawned = okDeps.store.cs.creatures.find(c => c.name === 'Yochlol');
+    expect(spawned).toMatchObject({ monsterIndex: 'yochlol', ac: 15, maxHp: 153, summonedBy: 'Drow Priestess of Lolth', summonSource: 'monster_ability', initiative: '14.9' });
+    expect(okDeps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Yochlol', 'summoned', 'Drow Priestess of Lolth', { duration: '10_minutes' });
+    expect(okDeps.rollExpression).not.toHaveBeenCalled();
+    expect(okDeps.applyDamageToTarget).not.toHaveBeenCalled();
+    expect(okDeps.store.cs.creatures.find(c => c.name === 'Drow Priestess of Lolth').currentHp).toBe(113);
+    expect(okDeps.logs.some(e => e.type === 'summons')).toBe(true);
   });
 
-  it('success d100 30: spawns Yochlol ally, self-damage NEVER rolls', async () => {
-    const deps = makeSelfDmgDeps({ cs: { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] } }, 30);
-    const result = await resolveMonsterSummonRow({
-      action: PRIESTESS_ROW,
-      monsterName: 'Drow Priestess of Lolth',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      storedUses: {},
-      deps,
-    });
-    expect(result).toMatchObject({ resolved: true, summonedName: 'Yochlol', remaining: 2 });
-    const spawned = deps.store.cs.creatures.find(c => c.name === 'Yochlol');
-    expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'yochlol', summonedBy: 'Drow Priestess of Lolth', summonSource: 'monster_ability', initiative: '14.9' });
-    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Yochlol', 'summoned', 'Drow Priestess of Lolth', { duration: '10_minutes' });
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(deps.applyDamageToTarget).not.toHaveBeenCalled();
-    expect(deps.store.cs.creatures.find(c => c.name === 'Drow Priestess of Lolth').currentHp).toBe(113);
-    expect(deps.logs.some(e => e.type === 'summons')).toBe(true);
-  });
-
-  it('uses gate counts 3→2→1→0 then refuses with summon_demon_refused, zero roll/self-damage/spawn', async () => {
-    const cs = { round: 1, creatures: [{ name: 'Drow Priestess of Lolth', type: 'npc', initiative: '15', currentHp: 113, maxHp: 113 }] };
-    for (const used of [0, 1, 2]) {
-      const deps = makeSelfDmgDeps({ cs, uses: { 'Summon Demon': used } }, 88);
-      const result = await resolveMonsterSummonRow({
-        action: PRIESTESS_ROW,
-        monsterName: 'Drow Priestess of Lolth',
-        campaignName: 'test-campaign',
-        setPopupHtml: vi.fn(),
-        storedUses: { 'Summon Demon': used },
-        deps,
-      });
-      expect(result).toMatchObject({ resolved: true, remaining: 2 - used });
-      expect(deps.store.uses).toEqual({ 'Summon Demon': used + 1 });
-    }
-    const deps = makeSelfDmgDeps({ cs, uses: { 'Summon Demon': 3 } }, 88);
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: PRIESTESS_ROW,
-      monsterName: 'Drow Priestess of Lolth',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Summon Demon': 3 },
-      deps,
-    });
+  it('exhausted at 3/3: refused with summon_demon_refused, ZERO dice, ZERO backlash, zero spawn/spend', async () => {
+    const deps = makeSelfDmgDeps(PRIESTESS_CS(), 88);
+    deps.store.uses = { 'Summon Demon': 3 };
+    const { result, setPopupHtml } = await press(PRIESTESS_ROW, 'Drow Priestess of Lolth', deps, { 'Summon Demon': 3 });
     expect(result).toEqual({ resolved: false, reason: 'exhausted' });
     expect(deps.rollDie).not.toHaveBeenCalled();
     expect(deps.rollExpression).not.toHaveBeenCalled();
     expect(deps.applyDamageToTarget).not.toHaveBeenCalled();
     expect(deps.setCombatSummary).not.toHaveBeenCalled();
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(deps.store.cs.creatures[0].currentHp).toBe(113);
     expect(deps.store.uses).toEqual({ 'Summon Demon': 3 });
     expect(deps.logs.find(e => e.automationType === 'summon_demon_refused')).toBeTruthy();
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
   });
-
-  it('buildSummonSelfDamageLog carries roll detail', () => {
-    const log = buildSummonSelfDamageLog({ monsterName: 'Drow Priestess of Lolth', action: PRIESTESS_ROW, damageRoll: { total: 5, rolls: [5], modifier: 0, formula: '1d10' } });
-    expect(log).toMatchObject({ type: 'roll damage', rollType: 'monster_summon_self_damage', total: 5, damageType: 'psychic' });
-    expect(log.description).toContain('5 psychic damage (rolled 5)');
-  });
 });
 
-// MA-0664: Dust Mephit "Variant: Summon Mephits" (actions[2]) — formerly an
-// inert usage-only row. Authored automation {monster_summon, options:[dust-
-// mephit @ 25%], count:"1d4", range_ft:60, duration_minutes:1} + numeric
-// uses/maxUses:1 rides the MA-0648 seam extended with COUNT: the count dice
-// rolls only AFTER the chance flip succeeds (failed flip = zero count roll,
-// zero spawn, honest popup, 1/Day already spent); N self-copies spawn with
-// unique names via getNextUniqueMonsterName, ONE summons log lists names +
-// count detail, te "summoned" per spawn with the row's 1-minute duration.
-const dustMephit = monstersData.find(m => m.index === 'dust-mephit');
-const SUMMON_MEPHITS_ROW = dustMephit.actions[2];
+describe('MA-0664 dust-mephit count summon', () => {
+  function makeCountDeps(cs, coin, countRoll = { total: 3, rolls: [1, 1, 1], modifier: 0, formula: '1d4' }) {
+    const deps = makeDeps({ cs }, coin);
+    deps.monsters = [dustMephit];
+    deps.rollExpression = vi.fn(() => countRoll);
+    return deps;
+  }
 
-function makeCountDeps(cs, coin = 25, countRoll = { total: 3, rolls: [1, 1, 1], modifier: 0, formula: '1d4' }, uses = {}) {
-  const deps = makeDeps({ cs, uses }, coin);
-  deps.monsters = [dustMephit];
-  deps.rollExpression = vi.fn(() => countRoll);
-  return deps;
-}
+  const MEPHIT_CS = () => ({ round: 1, creatures: [{ name: 'Dust Mephit 1', type: 'npc', initiative: '14', currentHp: 17, maxHp: 17 }] });
 
-describe('MA-0664 dust-mephit summon data', () => {
-  it('actions[2] authors monster_summon + count dice + numeric 1/Day gate, keeps usage', () => {
+  it('disk byte-shape: count dice "1d4" + chance 0.25 + numeric 1/Day gate, keeps usage; target pinned', () => {
     expect(SUMMON_MEPHITS_ROW.name).toBe('Variant: Summon Mephits');
     expect(SUMMON_MEPHITS_ROW.automation).toEqual({
       type: 'monster_summon',
@@ -376,50 +313,26 @@ describe('MA-0664 dust-mephit summon data', () => {
     expect(SUMMON_MEPHITS_ROW.maxUses).toBe(1);
     expect(SUMMON_MEPHITS_ROW.usage).toEqual({ type: 'per day', times: 1 });
     expect(isMonsterSummonRow(SUMMON_MEPHITS_ROW)).toBe(true);
-    expect(dustMephit.hit_points).toBeGreaterThan(0);
-    expect(dustMephit.actions.length).toBeGreaterThan(0);
+    expect(dustMephit).toMatchObject({ name: 'Dust Mephit', armor_class: 12, hit_points: 17 });
   });
 
-  it('chance boundary: d100 25 lands, 26 fails with no fallback', () => {
-    expect(adjudicateSummonAttempt(SUMMON_MEPHITS_ROW.automation.options, () => 25)).toMatchObject({ monster: 'dust-mephit', roll: 25, success: true, chance: 0.25 });
-    expect(adjudicateSummonAttempt(SUMMON_MEPHITS_ROW.automation.options, () => 26)).toEqual({ monster: null, roll: 26, success: false, chance: 0.25 });
-  });
-});
-
-describe('MA-0664 count spawn resolution', () => {
-  it('failed flip d100 26: spends 1/Day, ZERO count roll, ZERO spawn/te, honest fails popup', async () => {
-    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', type: 'npc', initiative: '14', currentHp: 17, maxHp: 17 }] }, 26);
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_MEPHITS_ROW,
-      monsterName: 'Dust Mephit 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
+  it('failed d100 26: spends 1/Day, ZERO count roll, ZERO spawn/te, honest exact fails popup', async () => {
+    const deps = makeCountDeps(MEPHIT_CS(), 26);
+    const { result, setPopupHtml } = await press(SUMMON_MEPHITS_ROW, 'Dust Mephit 1', deps);
     expect(result).toMatchObject({ resolved: true, summonedName: null, summonedNames: [], countRoll: null, remaining: 0 });
     expect(deps.rollExpression).not.toHaveBeenCalled();
     expect(deps.setCombatSummary).not.toHaveBeenCalled();
     expect(deps.registerTargetEffect).not.toHaveBeenCalled();
     expect(deps.store.cs.creatures).toHaveLength(1);
     expect(deps.store.uses).toEqual({ 'Variant: Summon Mephits': 1 });
-    expect(deps.logs.find(e => e.rollType === 'monster_summon_coin_flip').description).toContain('d100 26 vs 25%');
+    expect(deps.logs.find(e => e.rollType === 'monster_summon_coin_flip').description).toBe('Dust Mephit 1 flips for Variant: Summon Mephits: d100 26 vs 25% — failure, no summon answers.');
     expect(deps.logs.some(e => e.type === 'summons')).toBe(false);
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Dust Mephit 1\'s summon fails</h3><p>Coin flip: d100 26 — attempt fails.\nNo summon answers the call. 0 use(s) left today (resets at dawn, GM-enforced).</p></div>');
   });
 
-  it('success flip d100 25 + 1d4=3: count rolled AFTER flip, 3 unique-named self-copies spawn after caster, te per spawn @1_minutes, ONE summons log with count detail', async () => {
-    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', type: 'npc', initiative: '14', currentHp: 17, maxHp: 17 }] }, 25);
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_MEPHITS_ROW,
-      monsterName: 'Dust Mephit 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
+  it('success d100 25 + 1d4=3: count rolled AFTER the flip, 3 unique-named self-copies after the caster, te per spawn @1_minutes, ONE summons log + popup with count detail', async () => {
+    const deps = makeCountDeps(MEPHIT_CS(), 25);
+    const { result, setPopupHtml } = await press(SUMMON_MEPHITS_ROW, 'Dust Mephit 1', deps);
     expect(deps.rollDie).toHaveBeenCalledTimes(1);
     expect(deps.rollExpression).toHaveBeenCalledWith('1d4');
     expect(result).toMatchObject({ resolved: true, summonedName: 'Dust Mephit', countRoll: { total: 3 } });
@@ -440,359 +353,178 @@ describe('MA-0664 count spawn resolution', () => {
     expect(spawnLogs[0].summonedCreatures).toEqual(['Dust Mephit', 'Dust Mephit 2', 'Dust Mephit 3']);
     expect(spawnLogs[0].summonCount).toBe(3);
     expect(spawnLogs[0].countRoll).toEqual({ total: 3, rolls: [1, 1, 1], modifier: 0, formula: '1d4' });
-    expect(spawnLogs[0].description).toContain('1d4 rolled 3');
-    expect(spawnLogs[0].description).toContain('60 ft');
-    expect(spawnLogs[0].description).toContain('remain 1 minutes');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Count: 1d4 rolled 3'));
-  });
-
-  it('count 1 spawns base name only, no suffix on empty board', async () => {
-    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Bandit', type: 'npc', initiative: '10' }] }, 12, { total: 1, rolls: [1], modifier: 0, formula: '1d4' });
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_MEPHITS_ROW,
-      monsterName: 'Dust Mephit 1',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      storedUses: {},
-      deps,
-    });
-    expect(result.summonedNames).toEqual(['Dust Mephit']);
-    expect(deps.store.cs.creatures.map(c => c.name)).toEqual(['Bandit', 'Dust Mephit']);
-  });
-
-  it('1/Day gate: second click refused with variant_summon_mephits_refused, zero coin/count/spend/spawn', async () => {
-    const deps = makeCountDeps({ round: 1, creatures: [{ name: 'Dust Mephit 1', initiative: '14' }] }, 5, { total: 4 }, { 'Variant: Summon Mephits': 1 });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: SUMMON_MEPHITS_ROW,
-      monsterName: 'Dust Mephit 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Variant: Summon Mephits': 1 },
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.setCombatSummary).not.toHaveBeenCalled();
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.logs.find(e => e.automationType === 'variant_summon_mephits_refused')).toBeTruthy();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+    expect(spawnLogs[0].description).toBe('Dust Mephit 1 summons 1d4 rolled 3 (1 + 1 + 1): Dust Mephit, Dust Mephit 2, Dust Mephit 3 via Variant: Summon Mephits — allies of Dust Mephit 1, appear within 60 ft, remain 1 minutes (expiry clock, dismiss-as-action and "can\'t summon other creatures" are §70 GM-enforced residuals).');
+    expect(deps.logs.some(e => e.automationType === 'duration_clock_armed')).toBe(false);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Dust Mephit 1 summons Dust Mephit, Dust Mephit 2, Dust Mephit 3</h3><p>Coin flip: d100 25 — summon attempt succeeds.\n3 copies join the fight as allies of Dust Mephit 1, acting right after it, for 1 minute (§70 expiry GM-enforced). Count: 1d4 rolled 3. 0 use(s) left today (resets at dawn, GM-enforced).</p></div>');
   });
 });
 
-// MA-0757: Galeb Duhr "Animate Boulders" (actions[1]) — formerly a
-// zero-affordance OTHER-type row with a silently-ignored uses:"1/Day"
-// STRING. Authored automation {monster_summon, options:[galeb-duhr @
-// stat_override int/cha 1], count:2 (numeric CONSTANT — RAW "one or two"
-// is the duhr's choice; no chooser seam app-wide, so the row adjudicates
-// the max of two animated boulders, GM holds one back if "one"), range 60,
-// duration 1} + numeric uses/maxUses rides the MA-0020 gate. SELF-SUMMON
-// guard: the boulder IS the summoner's block ("lacks this action", RAW),
-// so monster_summon automation actions are stripped from every spawn —
-// boulders can never chain-animate. Chance-less rows never flip a d100 and
-// log no coin-flip entry (no bogus "d100 null vs 0%").
-const galebDuhr = monstersData.find(m => m.index === 'galeb-duhr');
-const ANIMATE_ROW = galebDuhr.actions[1];
+describe('honest guards — unresolvable rows refuse with zero spawn', () => {
+  it('unknown monster index AND unparsable count dice both refuse resolved:false, console.error pinned, zero cs/te writes', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lostDeps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', initiative: '12' }] } }, 42);
+    lostDeps.monsters = [];
+    const { result: lost, setPopupHtml: lostPopup } = await press(SUMMON_ROW, 'Drow Mage 1', lostDeps);
+    expect(lost).toMatchObject({ resolved: false, reason: 'monster-not-found' });
+    expect(lostDeps.setCombatSummary).not.toHaveBeenCalled();
+    expect(lostDeps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[monsterSummon] Monster "shadow-demon" not found'));
+    expect(lostPopup).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
 
-describe('MA-0757 galeb-duhr Animate Boulders data', () => {
-  it('authors monster_summon automation + numeric count + numeric 1/Day gate; uses-string removed', () => {
-    expect(ANIMATE_ROW.name).toBe('Animate Boulders');
-    expect(ANIMATE_ROW.automation).toEqual({
-      type: 'monster_summon',
-      options: [{ monster: 'galeb-duhr', stat_override: { int: 1, cha: 1 } }],
-      count: 2,
-      range_ft: 60,
-      duration_minutes: 1,
-    });
-    expect(ANIMATE_ROW.uses).toBe(1);
-    expect(ANIMATE_ROW.maxUses).toBe(1);
-    expect(typeof ANIMATE_ROW.uses).toBe('number');
-    expect(ANIMATE_ROW.usage).toBeUndefined();
-    expect(isMonsterSummonRow(ANIMATE_ROW)).toBe(true);
+    const bogusRow = { ...SUMMON_MEPHITS_ROW, automation: { ...SUMMON_MEPHITS_ROW.automation, count: 'no-such-dice' } };
+    const bogusDeps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Dust Mephit 1', initiative: '14' }] } }, 25);
+    bogusDeps.monsters = [dustMephit];
+    bogusDeps.rollExpression = vi.fn(() => null);
+    const { result: bogus, setPopupHtml: bogusPopup } = await press(bogusRow, 'Dust Mephit 1', bogusDeps);
+    expect(bogus).toMatchObject({ resolved: false, reason: 'count-unparsable' });
+    expect(bogusDeps.setCombatSummary).not.toHaveBeenCalled();
+    expect(bogusDeps.registerTargetEffect).not.toHaveBeenCalled();
+    expect(bogusDeps.store.cs.creatures).toHaveLength(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[monsterSummon] unparsable count "no-such-dice"'));
+    expect(bogusPopup).toHaveBeenCalledWith(expect.stringContaining('summon fails'));
   });
+});
 
-  // MA-0759 twin fix: galib-duhr's formerly inert row rides the SAME seam
-  // with the byte-shape mirrored from galeb-duhr. Its cosmetic usage DICT
-  // (§241 twin discriminator vs the silent uses-STRING) is dropped exactly
-  // like MA-0757 dropped its uses-string — numeric uses/maxUses gate now.
-  it('MA-0759 galib-duhr twin row mirrors the galeb-duhr byte-shape', () => {
-    const galib = monstersData.find(m => m.index === 'galib-duhr');
-    const row = galib.actions[1];
-    expect(row.name).toBe('Animate Boulders');
+describe('MA-0757/0759/1604 animate twins — data byte-shape', () => {
+  const TWIN_LEGS = [
+    { index: 'galeb-duhr', row: ANIMATE_ROW, duration_minutes: 1 },
+    { index: 'galib-duhr', row: GALIB_ANIMATE_ROW, duration_minutes: 1 },
+    { index: 'treant', row: TREANT_ANIMATE_ROW, duration_minutes: 1440 },
+  ];
+  it.each(TWIN_LEGS)('$index Animate row: chance-less option + stat_override int/cha 1, constant count 2, numeric 1/Day gate (uses-STRING retired)', ({ index, row, duration_minutes }) => {
+    expect(row.name).toMatch(/^Animate /);
     expect(row.automation).toEqual({
       type: 'monster_summon',
-      options: [{ monster: 'galib-duhr', stat_override: { int: 1, cha: 1 } }],
+      options: [{ monster: index, stat_override: { int: 1, cha: 1 } }],
       count: 2,
       range_ft: 60,
-      duration_minutes: 1,
+      duration_minutes,
     });
     expect(row.uses).toBe(1);
     expect(row.maxUses).toBe(1);
     expect(typeof row.uses).toBe('number');
     expect(row.usage).toBeUndefined();
     expect(isMonsterSummonRow(row)).toBe(true);
-    // OCR restamp (§23): mangled bytes gone, readable prose in.
-    expect(row.description).toContain('of a galeb duhr');
-    expect(row.description).toContain('concentrating on a spell');
-    expect(row.description).not.toContain('ofa');
-    expect(row.description).not.toContain('spel1');
-    // Galib variant framing kept distinct from galeb-duhr's text.
-    expect(row.description).toContain('up to two boulders');
-    expect(row.description).not.toBe(galebDuhr.actions[1].description);
   });
 
-  it('chance-less summon is guaranteed: adjudication never flips a d100', () => {
-    const rollFn = vi.fn(() => 50);
-    expect(adjudicateSummonAttempt(ANIMATE_ROW.automation.options, rollFn)).toMatchObject({ monster: 'galeb-duhr', roll: null, success: true, chance: null });
-    expect(rollFn).not.toHaveBeenCalled();
+  it('MA-0759 galib-duhr OCR-restamp: readable prose, galib framing kept distinct from galeb-duhr', () => {
+    expect(GALIB_ANIMATE_ROW.description).toContain('of a galeb duhr');
+    expect(GALIB_ANIMATE_ROW.description).toContain('concentrating on a spell');
+    expect(GALIB_ANIMATE_ROW.description).toContain('up to two boulders');
+    expect(GALIB_ANIMATE_ROW.description).not.toContain('ofa');
+    expect(GALIB_ANIMATE_ROW.description).not.toContain('spel1');
+    expect(GALIB_ANIMATE_ROW.description).not.toBe(ANIMATE_ROW.description);
   });
 });
 
-describe('MA-0757 constant-count self-summon resolution', () => {
-  function makeGalebDeps(cs, uses = {}) {
-    const deps = makeDeps({ cs, uses });
-    deps.monsters = [galebDuhr];
-    deps.rollExpression = vi.fn(() => ({ total: 99, rolls: [99], modifier: 99, formula: 'must-not-roll' }));
-    return deps;
-  }
-
-  const DUHR_CS = () => ({ round: 1, creatures: [{ name: 'Galeb Duhr 1', type: 'npc', monsterIndex: 'galeb-duhr', initiative: '10', currentHp: 95, maxHp: 95 }] });
-
-  it('spawns TWO boulders (constant count, ZERO dice rolled) right after the duhr; each lacks Animate Boulders, Int/Cha 1 stamped, te @1_minutes; no coin-flip log; summons+ability_use logged', async () => {
-    const deps = makeGalebDeps(DUHR_CS());
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: ANIMATE_ROW,
-      monsterName: 'Galeb Duhr 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
+describe('MA-0757/1604 constant-count self-summon press — ZERO dice, self-summon guard', () => {
+  const LEGS = [
+    {
+      label: 'galeb-duhr animates TWO boulders right after itself (count 2 constant, zero dice)',
+      action: ANIMATE_ROW, monster: galebDuhr, caster: 'Galeb Duhr 1',
+      cs: () => ({ round: 1, creatures: [{ name: 'Galeb Duhr 1', type: 'npc', monsterIndex: 'galeb-duhr', initiative: '10', currentHp: 95, maxHp: 95 }] }),
+      names: ['Galeb Duhr', 'Galeb Duhr 2'],
+      spawn: { type: 'npc', monsterIndex: 'galeb-duhr', summonedBy: 'Galeb Duhr 1', summonSource: 'monster_ability', ac: 16, maxHp: 123, currentHp: 123, initiative: '9.9' },
+      abilities: { str: 20, dex: 14, con: 20, int: 1, wis: 12, cha: 1 },
+      actions: ['Avalanche Slam'],
+      useKey: 'Animate Boulders', duration: '1_minutes', durationText: 'remain 1 minutes',
+    },
+    {
+      label: 'treant animates TWO trees right after itself (count 2 constant, zero dice, 1440-minute authored duration)',
+      action: TREANT_ANIMATE_ROW, monster: treant, caster: 'Treant 1',
+      cs: () => ({ round: 1, creatures: [{ name: 'Treant 1', type: 'npc', monsterIndex: 'treant', initiative: '19', currentHp: 138, maxHp: 138 }] }),
+      names: ['Treant', 'Treant 2'],
+      spawn: { type: 'npc', monsterIndex: 'treant', summonedBy: 'Treant 1', summonSource: 'monster_ability', ac: 16, maxHp: 138, currentHp: 138, initiative: '18.9' },
+      abilities: { str: 23, dex: 8, con: 21, int: 1, wis: 16, cha: 1 },
+      actions: ['Multiattack', 'Slam', 'Hail of Bark'],
+      useKey: 'Animate Trees', duration: '1440_minutes', durationText: 'remain 1440 minutes',
+    },
+  ];
+  it.each(LEGS)('$label', async ({ action, monster, caster, cs, names, spawn, abilities, actions, useKey, duration, durationText }) => {
+    const deps = makeDeps({ cs: cs() });
+    deps.monsters = [monster];
+    // Loud decoys: a chance-less constant-count row must NEVER touch a die.
+    deps.rollDie = vi.fn(() => { throw new Error('chance-less summon must never flip a d100'); });
+    deps.rollExpression = vi.fn(() => { throw new Error('constant count must never roll count dice'); });
+    const { result, setPopupHtml } = await press(action, caster, deps);
     expect(result).toMatchObject({ resolved: true, countRoll: null, remaining: 0 });
-    expect(result.summonedNames).toEqual(['Galeb Duhr', 'Galeb Duhr 2']);
-    const boulders = deps.store.cs.creatures.filter(c => c.name !== 'Galeb Duhr 1');
-    expect(boulders.map(c => c.name)).toEqual(['Galeb Duhr', 'Galeb Duhr 2']);
-    for (const b of boulders) {
-      expect(b).toMatchObject({ type: 'npc', monsterIndex: 'galeb-duhr', summonedBy: 'Galeb Duhr 1', summonSource: 'monster_ability', ac: 16, maxHp: 123, currentHp: 123, initiative: '9.9' });
-      expect(b.ability_scores).toMatchObject({ str: 20, dex: 14, con: 20, int: 1, wis: 12, cha: 1 });
-      expect(b.actions.map(a => a.name)).toEqual(['Avalanche Slam']);
-      expect(b.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
+    expect(result.summonedNames).toEqual(names);
+    const copies = deps.store.cs.creatures.filter(c => c.name !== caster);
+    expect(copies.map(c => c.name)).toEqual(names);
+    for (const c of copies) {
+      expect(c).toMatchObject(spawn);
+      expect(c.ability_scores).toMatchObject(abilities);
+      expect(c.actions.map(a => a.name)).toEqual(actions);
+      // Self-summon guard: the copy IS the summoner's block — never carries
+      // another monster_summon automation (no chain-animate, RAW + recursion).
+      expect(c.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
     }
     expect(deps.registerTargetEffect).toHaveBeenCalledTimes(2);
-    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Galeb Duhr', 'summoned', 'Galeb Duhr 1', { duration: '1_minutes' });
-    expect(deps.store.uses).toEqual({ 'Animate Boulders': 1 });
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', names[0], 'summoned', caster, { duration });
+    expect(deps.store.uses).toEqual({ [useKey]: 1 });
     expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    expect(deps.logs.some(e => e.automationType === 'duration_clock_armed')).toBe(false);
     const spawnLog = deps.logs.find(e => e.type === 'summons');
-    expect(spawnLog.summonedCreatures).toEqual(['Galeb Duhr', 'Galeb Duhr 2']);
+    expect(spawnLog.summonedCreatures).toEqual(names);
     expect(spawnLog.summonCount).toBe(2);
     expect(spawnLog.description).toContain('60 ft');
-    expect(spawnLog.description).toContain('remain 1 minutes');
-    const spendLog = deps.logs.find(e => e.type === 'ability_use');
-    expect(spendLog.description).toContain('Animate Boulders');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Galeb Duhr'));
-  });
-
-  it('MA-0648 twin byte-unchanged: chance row still flips and coin-flip log still lands', async () => {
-    const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', type: 'npc', initiative: '12' }] } }, 42);
-    await resolveMonsterSummonRow({
-      action: SUMMON_ROW,
-      monsterName: 'Drow Mage 1',
-      campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
-      storedUses: {},
-      deps,
-    });
-    expect(deps.rollDie).toHaveBeenCalledTimes(1);
-    expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(true);
-  });
-
-  it('1/Day gate: refire refused with animate_boulders_refused, zero spend/spawn/te', async () => {
-    const deps = makeGalebDeps(DUHR_CS(), { 'Animate Boulders': 1 });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: ANIMATE_ROW,
-      monsterName: 'Galeb Duhr 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Animate Boulders': 1 },
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.setCombatSummary).not.toHaveBeenCalled();
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.store.cs.creatures).toHaveLength(1);
-    expect(deps.logs.find(e => e.automationType === 'animate_boulders_refused')).toBeTruthy();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
+    expect(spawnLog.description).toContain(durationText);
+    expect(deps.logs.find(e => e.type === 'ability_use').description).toContain(useKey);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(names.join(', ')));
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('acting right after it'));
   });
 });
 
-// MA-0759: Galib Duhr "Animate Boulders" (actions[1]) — galeb-duhr twin
-// riding the same MA-0757 extensions verbatim: chance-less guaranteed
-// summon, constant count 2 ("up to two" authored as the adjudicable max,
-// zero dice), option-level stat_override {int:1, cha:1}, and the
-// self-summon guard stripping monster_summon actions from the boulders
-// ("lacks this action", RAW — boulders can never chain-animate).
-const galibDuhr = monstersData.find(m => m.index === 'galib-duhr');
-const GALIB_ANIMATE_ROW = galibDuhr.actions[1];
+describe('MA-1215 sovereign recharge-gated summon', () => {
+  const SOVEREIGN_CS = () => ({ round: 1, creatures: [
+    { name: 'Myconid Sovereign 1', type: 'npc', monsterIndex: 'myconid-sovereign', initiative: '16', currentHp: 45, maxHp: 45 },
+    { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
+  ] });
 
-describe('MA-0759 galib-duhr constant-count self-summon resolution', () => {
-  function makeGalibDeps(cs, uses = {}) {
-    const deps = makeDeps({ cs, uses });
-    deps.monsters = [galibDuhr];
-    deps.rollExpression = vi.fn(() => ({ total: 99, rolls: [99], modifier: 99, formula: 'must-not-roll' }));
-    return deps;
+  function makeRechargeDeps(storedRecharge = {}, cs = SOVEREIGN_CS()) {
+    const store = { logs: [], recharge: storedRecharge, cs, setKeys: [] };
+    return {
+      store,
+      monsters: [sporeServant],
+      skipDomEvents: true,
+      rollDie: vi.fn(() => { throw new Error('guaranteed summon must never flip a d100'); }),
+      rollExpression: vi.fn(() => null),
+      getCombatSummary: vi.fn(() => store.cs),
+      setCombatSummary: vi.fn(c => { store.cs = c; }),
+      registerTargetEffect: vi.fn((campaign, target, effect, source, extra) => {
+        store.te = { campaign, target, effect, source, extra };
+      }),
+      getRuntimeValue: vi.fn((name, key) => (key === MONSTER_RECHARGE_KEY ? (store.recharge || {}) : {})),
+      setRuntimeValue: vi.fn((name, key, v) => {
+        store.setKeys.push(key);
+        if (key === MONSTER_RECHARGE_KEY) store.recharge = v;
+        return Promise.resolve();
+      }),
+      addEntry: vi.fn((c, entry) => { store.logs.push(entry); return Promise.resolve(); }),
+      get logs() { return store.logs; },
+    };
   }
 
-  const GALIB_CS = () => ({ round: 1, creatures: [{ name: 'Galib Duhr 1', type: 'npc', monsterIndex: 'galib-duhr', initiative: '10', currentHp: 85, maxHp: 85 }] });
-
-  it('spawns TWO boulders (constant count, ZERO dice rolled) right after the duhr; each lacks Animate Boulders, Int/Cha 1 stamped, te @1_minutes; no coin-flip log; summons+ability_use logged', async () => {
-    const deps = makeGalibDeps(GALIB_CS());
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: GALIB_ANIMATE_ROW,
-      monsterName: 'Galib Duhr 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ resolved: true, countRoll: null, remaining: 0 });
-    expect(result.summonedNames).toEqual(['Galib Duhr', 'Galib Duhr 2']);
-    const boulders = deps.store.cs.creatures.filter(c => c.name !== 'Galib Duhr 1');
-    expect(boulders.map(c => c.name)).toEqual(['Galib Duhr', 'Galib Duhr 2']);
-    for (const b of boulders) {
-      expect(b).toMatchObject({ type: 'npc', monsterIndex: 'galib-duhr', summonedBy: 'Galib Duhr 1', summonSource: 'monster_ability', ac: 16, maxHp: 85, currentHp: 85, initiative: '9.9' });
-      expect(b.ability_scores).toMatchObject({ str: 20, dex: 14, con: 20, int: 1, wis: 12, cha: 1 });
-      expect(b.actions.map(a => a.name)).toEqual(['Slam']);
-      expect(b.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
-    }
-    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(2);
-    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Galib Duhr', 'summoned', 'Galib Duhr 1', { duration: '1_minutes' });
-    expect(deps.store.uses).toEqual({ 'Animate Boulders': 1 });
-    expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
-    const spawnLog = deps.logs.find(e => e.type === 'summons');
-    expect(spawnLog.summonedCreatures).toEqual(['Galib Duhr', 'Galib Duhr 2']);
-    expect(spawnLog.summonCount).toBe(2);
-    expect(spawnLog.description).toContain('60 ft');
-    expect(spawnLog.description).toContain('remain 1 minutes');
-    const spendLog = deps.logs.find(e => e.type === 'ability_use');
-    expect(spendLog.description).toContain('Animate Boulders');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Galib Duhr'));
-  });
-
-  it('1/Day gate: refire refused with animate_boulders_refused, zero spend/spawn/te', async () => {
-    const deps = makeGalibDeps(GALIB_CS(), { 'Animate Boulders': 1 });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: GALIB_ANIMATE_ROW,
-      monsterName: 'Galib Duhr 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Animate Boulders': 1 },
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.setCombatSummary).not.toHaveBeenCalled();
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.store.cs.creatures).toHaveLength(1);
-    expect(deps.logs.find(e => e.automationType === 'animate_boulders_refused')).toBeTruthy();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
-  });
-});
-
-// MA-1215: Myconid Sovereign "Animating Spores" (actions[2]) — formerly the
-// junk "+0" attack chip adjudicating bogus zero-damage to-hit rolls while
-// burning the Recharge-3 economy, with no consumer for the RAW corpse→Spore
-// Servant spawn. DATA: attack_bonus:null kills the junk chip; automation
-// {monster_summon, options:[myconid-spore-servant], range_ft:5, advisory}
-// routes the spawn through the canonical MA-0648 seam. CODE: recharge-gated
-// summon clicks — gateSummonRecharge consults the live MA-0031 recharge map
-// FIRST (spent refuses `animating_spores_refused` + "Not Recharged" popup,
-// zero flip/spend/spawn); fresh spends via spendMonsterRecharge (ability_use
-// log) then spawns the disk servant block guaranteed (chance-less: zero
-// dice). Unauthored duration_minutes → advisory rides log/popup verbatim —
-// no fabricated "10 minutes"; te duration stamp gm_adjudicated (§70 clocks).
-const sovereign = monstersData.find(m => m.index === 'myconid-sovereign');
-const ANIMATING_ROW = sovereign.actions.find(a => a.name === 'Animating Spores');
-const sporeServant = monstersData.find(m => m.index === 'myconid-spore-servant');
-
-const SOVEREIGN_CS = () => ({ round: 1, creatures: [
-  { name: 'Myconid Sovereign 1', type: 'npc', monsterIndex: 'myconid-sovereign', initiative: '16', currentHp: 45, maxHp: 45 },
-  { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
-] });
-
-function makeRechargeDeps(storedRecharge = {}, cs = SOVEREIGN_CS()) {
-  const store = { logs: [], recharge: storedRecharge, cs, setKeys: [] };
-  return {
-    store,
-    monsters: [sporeServant],
-    skipDomEvents: true,
-    rollDie: vi.fn(() => { throw new Error('guaranteed summon must never flip a d100'); }),
-    rollExpression: vi.fn(() => null),
-    getCombatSummary: vi.fn(() => store.cs),
-    setCombatSummary: vi.fn(c => { store.cs = c; }),
-    registerTargetEffect: vi.fn((campaign, target, effect, source, extra) => {
-      store.te = { campaign, target, effect, source, extra };
-    }),
-    getRuntimeValue: vi.fn((name, key) => (key === MONSTER_RECHARGE_KEY ? (store.recharge || {}) : {})),
-    setRuntimeValue: vi.fn((name, key, v) => {
-      store.setKeys.push(key);
-      if (key === MONSTER_RECHARGE_KEY) store.recharge = v;
-      return Promise.resolve();
-    }),
-    addEntry: vi.fn((c, entry) => { store.logs.push(entry); return Promise.resolve(); }),
-    get logs() { return store.logs; },
-  };
-}
-
-describe('MA-1215 Animating Spores data lock', () => {
-  it('junk +0 killed (attack_bonus:null), recharge:"3" + uses-free economy preserved, narrative byte-unchanged', () => {
+  it('disk byte-shape: junk +0 killed (attack_bonus null), recharge "3" uses-free, advisory carries the RAW 24h/1d4+1 weeks clocks verbatim', () => {
     expect(ANIMATING_ROW.name).toBe('Animating Spores');
     expect(ANIMATING_ROW.attack_bonus).toBeNull();
     expect(ANIMATING_ROW.recharge).toBe('3');
     expect(ANIMATING_ROW.uses).toBeUndefined();
     expect(ANIMATING_ROW.maxUses).toBeUndefined();
     expect(ANIMATING_ROW.description).toBe("The myconid releases spores at a Medium or Small corpse within 5 feet of it that wasn't a Construct or an Undead. In 24 hours, the corpse rises as a <strong>Myconid Spore Servant</strong>. The corpse stays animate for 1d4 + 1 weeks or until destroyed, and it can't be animated again in this way.");
-  });
-
-  it('automation rides the MA-0648 camelCase byte-shape: spore-servant option (disk index hyphenated), range 5, RAW advisory', () => {
     expect(isMonsterSummonRow(ANIMATING_ROW)).toBe(true);
     expect(Object.keys(ANIMATING_ROW.automation)).toEqual(['type', 'options', 'range_ft', 'advisory']);
-    expect(ANIMATING_ROW.automation.type).toBe('monster_summon');
     expect(ANIMATING_ROW.automation.options).toEqual([{ monster: 'myconid-spore-servant' }]);
     expect(ANIMATING_ROW.automation.range_ft).toBe(5);
-    expect(ANIMATING_ROW.automation.advisory).toContain('24 hours');
-    expect(ANIMATING_ROW.automation.advisory).toContain('1d4+1 weeks');
-    expect(ANIMATING_ROW.automation.advisory).toContain('GM-adjudicated');
-    expect(sporeServant.name).toBe('Myconid Spore Servant');
-    expect(sporeServant.hit_points).toBeGreaterThan(0);
+    expect(SOV_ADV).toContain('24 hours');
+    expect(SOV_ADV).toContain('1d4+1 weeks');
+    expect(SOV_ADV).toContain('GM-adjudicated');
+    expect(sporeServant).toMatchObject({ name: 'Myconid Spore Servant', armor_class: 13, hit_points: 37 });
   });
-});
 
-describe('MA-1215 recharge-gated summon resolution', () => {
-  it('fresh press: spends Recharge-3 (ability_use), spawns disk Spore Servant right after the sovereign, te summoned @gm_adjudicated, summons log carries the RAW advisory — ZERO dice, ZERO rollType:attack', async () => {
+  it('fresh press: spends Recharge-3 (ability_use), spawns disk Spore Servant right after the sovereign, te @gm_adjudicated, summons log + popup carry the advisory EXACTLY — never "10 minutes", zero dice, zero clock armed', async () => {
     const deps = makeRechargeDeps();
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: ANIMATING_ROW,
-      monsterName: 'Myconid Sovereign 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
+    const { result, setPopupHtml } = await press(ANIMATING_ROW, 'Myconid Sovereign 1', deps);
     expect(result).toMatchObject({ resolved: true, summonedName: 'Myconid Spore Servant', summonedNames: ['Myconid Spore Servant'], countRoll: null, verdict: { monster: 'myconid-spore-servant', roll: null, success: true }, remaining: null });
     const spawned = deps.store.cs.creatures.find(c => c.name === 'Myconid Spore Servant');
     expect(spawned).toMatchObject({ type: 'npc', monsterIndex: 'myconid-spore-servant', ac: 13, maxHp: 37, currentHp: 37, summonedBy: 'Myconid Sovereign 1', summonSource: 'monster_ability', initiative: '15.9' });
@@ -803,30 +535,20 @@ describe('MA-1215 recharge-gated summon resolution', () => {
     expect(deps.rollDie).not.toHaveBeenCalled();
     expect(deps.store.logs.some(e => e.rollType === 'attack')).toBe(false);
     expect(deps.store.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
+    expect(deps.logs.some(e => e.automationType === 'duration_clock_armed')).toBe(false);
     const spendLog = deps.logs.find(e => e.type === 'ability_use');
     expect(spendLog.abilityName).toBe('Animating Spores');
     expect(spendLog.description).toContain('Recharge 3');
     const spawnLog = deps.logs.find(e => e.type === 'summons');
     expect(spawnLog.summonedCreatures).toEqual(['Myconid Spore Servant']);
-    expect(spawnLog.description).toContain('5 ft');
-    expect(spawnLog.description).toContain('24 hours');
-    expect(spawnLog.description).toContain('1d4+1 weeks');
-    expect(spawnLog.description).not.toContain('10 minutes');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Myconid Spore Servant'));
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('cannot be re-animated'));
+    expect(spawnLog.description).toBe(`Myconid Sovereign 1 summons Myconid Spore Servant via Animating Spores — ally of Myconid Sovereign 1, appears within 5 ft. ${SOV_ADV}`);
+    expect(setPopupHtml).toHaveBeenCalledWith(`<div class="mc-prerequisite-refusal"><h3>Myconid Sovereign 1 summons Myconid Spore Servant</h3><p>Myconid Spore Servant joins the fight as an ally of Myconid Sovereign 1, acting right after it. ${SOV_ADV}</p></div>`);
     expect(setPopupHtml).toHaveBeenCalledWith(expect.not.stringContaining('10 minutes'));
   });
 
-  it('spent press: refused with animating_spores_refused + Not Recharged popup, ZERO spawn/spend/te/dice', async () => {
+  it('spent press: refused with animating_spores_refused + Not Recharged popup, ZERO spawn/spend/te/dice, recharge map untouched', async () => {
     const deps = makeRechargeDeps({ 'Animating Spores': { recharged: false, threshold: 3 } });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: ANIMATING_ROW,
-      monsterName: 'Myconid Sovereign 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
+    const { result, setPopupHtml } = await press(ANIMATING_ROW, 'Myconid Sovereign 1', deps);
     expect(result).toEqual({ resolved: false, reason: 'not-recharged' });
     expect(deps.rollDie).not.toHaveBeenCalled();
     expect(deps.rollExpression).not.toHaveBeenCalled();
@@ -843,30 +565,13 @@ describe('MA-1215 recharge-gated summon resolution', () => {
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Not Recharged'));
   });
 
-  it('recovery walk: refused press leaves map untouched; recharge flip to recharged:true re-arms a fresh spawn+spend', async () => {
-    const spent = makeRechargeDeps({ 'Animating Spores': { recharged: false, threshold: 3 } });
-    const refused = await resolveMonsterSummonRow({ action: ANIMATING_ROW, monsterName: 'Myconid Sovereign 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps: spent });
-    expect(refused).toEqual({ resolved: false, reason: 'not-recharged' });
-    expect(spent.store.recharge).toEqual({ 'Animating Spores': { recharged: false, threshold: 3 } });
-    const recharged = makeRechargeDeps({ 'Animating Spores': { recharged: true, threshold: 3 } });
-    const result = await resolveMonsterSummonRow({ action: ANIMATING_ROW, monsterName: 'Myconid Sovereign 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps: recharged });
-    expect(result.resolved).toBe(true);
-    expect(recharged.store.recharge).toEqual({ 'Animating Spores': { recharged: false, threshold: 3 } });
-    expect(recharged.store.cs.creatures.some(c => c.name === 'Myconid Spore Servant')).toBe(true);
-    expect(recharged.logs.some(e => e.type === 'ability_use')).toBe(true);
-    expect(recharged.logs.some(e => e.type === 'summons')).toBe(true);
-  });
-});
-
-describe('MA-1215 legacy twins byte-unchanged', () => {
-  it('no-recharge summon rows never write MONSTER_RECHARGE_KEY (gate null, recharge spend skipped; uses economy intact)', async () => {
-    const twin = monstersData.find(m => m.index === 'galib-duhr');
+  it('legacy twins byte-unchanged: no-recharge summon rows never write MONSTER_RECHARGE_KEY (uses economy intact, zero attack logs)', async () => {
     const legs = [
       [SUMMON_ROW, 'Drow Mage 1', [quasit, shadowDemon]],
       [PRIESTESS_ROW, 'Drow Priestess of Lolth', [yochlol]],
       [SUMMON_MEPHITS_ROW, 'Dust Mephit 1', [dustMephit]],
       [ANIMATE_ROW, 'Galeb Duhr 1', [galebDuhr]],
-      [GALIB_ANIMATE_ROW, 'Galib Duhr 1', [twin]],
+      [GALIB_ANIMATE_ROW, 'Galib Duhr 1', [galibDuhr]],
     ];
     for (const [action, name, monsters] of legs) {
       expect(action.recharge).toBeUndefined();
@@ -876,7 +581,7 @@ describe('MA-1215 legacy twins byte-unchanged', () => {
       deps.rollExpression = vi.fn(() => ({ total: 1, rolls: [1], modifier: 0, formula: '1d4' }));
       const keys = [];
       deps.setRuntimeValue = vi.fn((n, k) => { keys.push(k); return Promise.resolve(); });
-      const result = await resolveMonsterSummonRow({ action, monsterName: name, campaignName: 'test-campaign', setPopupHtml: vi.fn(), storedUses: {}, deps });
+      const { result } = await press(action, name, deps);
       expect(result.resolved).toBe(true);
       expect(keys).toContain('monsterSpellUses');
       expect(keys).not.toContain(MONSTER_RECHARGE_KEY);
@@ -885,132 +590,13 @@ describe('MA-1215 legacy twins byte-unchanged', () => {
   });
 });
 
-// MA-1604: Treant "Animate Trees" (actions[3]) — MA-0757 byte-twin on the
-// same monster_summon seam. Formerly a uses-STRING zero-affordance row
-// ("uses":"1/Day" renders NOTHING and gates NOTHING, §240). Now authored
-// automation {monster_summon, options:[treant @ stat_override int/cha 1],
-// count:2 (RAW "up to two" adjudicable max, no chooser seam), range 60,
-// duration 1 day = 1440 min} + numeric uses/maxUses on the MA-0020 gate.
-// SELF-SUMMON guard strips Animate Trees from every spawned copy ("lacks
-// this action", RAW) — animated trees can never chain-animate.
-const treant = monstersData.find(m => m.index === 'treant');
-const TREANT_ANIMATE_ROW = treant.actions[3];
+describe('MA-1729 wraith Create Specter', () => {
+  const WRAITH_CS = () => ({ round: 1, creatures: [
+    { name: 'Wraith 1', type: 'npc', monsterIndex: 'wraith', initiative: '16', currentHp: 67, maxHp: 67 },
+    { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
+  ] });
 
-describe('MA-1604 treant Animate Trees data', () => {
-  it('authors monster_summon automation + numeric count + numeric 1/Day gate; uses-string removed', () => {
-    expect(TREANT_ANIMATE_ROW.name).toBe('Animate Trees');
-    expect(TREANT_ANIMATE_ROW.automation).toEqual({
-      type: 'monster_summon',
-      options: [{ monster: 'treant', stat_override: { int: 1, cha: 1 } }],
-      count: 2,
-      range_ft: 60,
-      duration_minutes: 1440,
-    });
-    expect(TREANT_ANIMATE_ROW.uses).toBe(1);
-    expect(TREANT_ANIMATE_ROW.maxUses).toBe(1);
-    expect(typeof TREANT_ANIMATE_ROW.uses).toBe('number');
-    expect(TREANT_ANIMATE_ROW.usage).toBeUndefined();
-    expect(isMonsterSummonRow(TREANT_ANIMATE_ROW)).toBe(true);
-  });
-
-  it('chance-less summon is guaranteed: adjudication never flips a d100', () => {
-    const rollFn = vi.fn(() => 50);
-    expect(adjudicateSummonAttempt(TREANT_ANIMATE_ROW.automation.options, rollFn)).toMatchObject({ monster: 'treant', roll: null, success: true, chance: null });
-    expect(rollFn).not.toHaveBeenCalled();
-  });
-});
-
-describe('MA-1604 constant-count self-summon resolution', () => {
-  function makeTreantDeps(cs, uses = {}) {
-    const deps = makeDeps({ cs, uses });
-    deps.monsters = [treant];
-    deps.rollExpression = vi.fn(() => ({ total: 99, rolls: [99], modifier: 99, formula: 'must-not-roll' }));
-    return deps;
-  }
-
-  const TREANT_CS = () => ({ round: 1, creatures: [{ name: 'Treant 1', type: 'npc', monsterIndex: 'treant', initiative: '19', currentHp: 138, maxHp: 138 }] });
-
-  it('spawns TWO treants (constant count, ZERO dice rolled) right after the caster; each lacks Animate Trees, Int/Cha 1 stamped, te @1440_minutes; no coin-flip log; summons+ability_use logged', async () => {
-    const deps = makeTreantDeps(TREANT_CS());
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: TREANT_ANIMATE_ROW,
-      monsterName: 'Treant 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: {},
-      deps,
-    });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ resolved: true, countRoll: null, remaining: 0 });
-    expect(result.summonedNames).toEqual(['Treant', 'Treant 2']);
-    const copies = deps.store.cs.creatures.filter(c => c.name !== 'Treant 1');
-    expect(copies.map(c => c.name)).toEqual(['Treant', 'Treant 2']);
-    for (const b of copies) {
-      expect(b).toMatchObject({ type: 'npc', monsterIndex: 'treant', summonedBy: 'Treant 1', summonSource: 'monster_ability', ac: 16, maxHp: 138, currentHp: 138, initiative: '18.9' });
-      expect(b.ability_scores).toMatchObject({ str: 23, dex: 8, con: 21, int: 1, wis: 16, cha: 1 });
-      expect(b.actions.map(a => a.name)).toEqual(['Multiattack', 'Slam', 'Hail of Bark']);
-      expect(b.actions.some(a => a.automation?.type === 'monster_summon')).toBe(false);
-    }
-    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(2);
-    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Treant', 'summoned', 'Treant 1', { duration: '1440_minutes' });
-    expect(deps.store.uses).toEqual({ 'Animate Trees': 1 });
-    expect(deps.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
-    const spawnLog = deps.logs.find(e => e.type === 'summons');
-    expect(spawnLog.summonedCreatures).toEqual(['Treant', 'Treant 2']);
-    expect(spawnLog.summonCount).toBe(2);
-    expect(spawnLog.description).toContain('60 ft');
-    expect(spawnLog.description).toContain('remain 1440 minutes');
-    const spendLog = deps.logs.find(e => e.type === 'ability_use');
-    expect(spendLog.description).toContain('Animate Trees');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Treant'));
-  });
-
-  it('1/Day gate: refire refused with animate_trees_refused, zero spend/spawn/te', async () => {
-    const deps = makeTreantDeps(TREANT_CS(), { 'Animate Trees': 1 });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: TREANT_ANIMATE_ROW,
-      monsterName: 'Treant 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      storedUses: { 'Animate Trees': 1 },
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
-    expect(deps.rollDie).not.toHaveBeenCalled();
-    expect(deps.rollExpression).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.setCombatSummary).not.toHaveBeenCalled();
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.store.cs.creatures).toHaveLength(1);
-    expect(deps.logs.find(e => e.automationType === 'animate_trees_refused')).toBeTruthy();
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
-  });
-});
-
-// MA-1729: Wraith "Create Specter" (actions[1]) — formerly a zero-affordance
-// inert {name,description} row (§60 fingerprint), zero producer/consumer for the
-// RAW corpse→Specter rise under the wraith's control. DATA fix rides the live
-// MA-0648/MA-1215 monster_summon lane byte-shape: automation
-// {type:monster_summon, options:[specter], range_ft:10, advisory}. A chance-less
-// guaranteed spawn (no coin flip, no count); NO fabricated recharge/uses economy
-// (the RAW limit is the seven-specter control cap, not a recharge — inventing a
-// Recharge-3 like MA-1215 would be wrong). Corpse eligibility, the 1-minute
-// corpse-age clock, and the seven-specter cap are §70 GM-adjudicated residuals
-// carried verbatim on the advisory (MA-1215 byte-twin).
-const wraith = monstersData.find(m => m.index === 'wraith');
-const CREATE_SPECTER_ROW = wraith.actions.find(a => a.name === 'Create Specter');
-const specter = monstersData.find(m => m.index === 'specter');
-
-const WRAITH_CS = () => ({ round: 1, creatures: [
-  { name: 'Wraith 1', type: 'npc', monsterIndex: 'wraith', initiative: '16', currentHp: 67, maxHp: 67 },
-  { name: 'Bandit', type: 'npc', initiative: '11', currentHp: 999, maxHp: 999, ac: 12 },
-] });
-
-describe('MA-1729 Wraith Create Specter data lock', () => {
-  it('inert row armed on the MA-1215 byte-shape: type/options/range_ft/advisory, specter @10 ft, narrative byte-unchanged, no fabricated economy', () => {
+  it('inert row armed on the MA-1215 byte-shape: specter @10 ft advisory-only, NO fabricated economy, narrative byte-unchanged', () => {
     expect(CREATE_SPECTER_ROW.name).toBe('Create Specter');
     expect(CREATE_SPECTER_ROW.attack_bonus).toBeUndefined();
     expect(CREATE_SPECTER_ROW.save_dc).toBeUndefined();
@@ -1020,36 +606,19 @@ describe('MA-1729 Wraith Create Specter data lock', () => {
     expect(CREATE_SPECTER_ROW.description).toBe("The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.");
     expect(isMonsterSummonRow(CREATE_SPECTER_ROW)).toBe(true);
     expect(Object.keys(CREATE_SPECTER_ROW.automation)).toEqual(['type', 'options', 'range_ft', 'advisory']);
-    expect(CREATE_SPECTER_ROW.automation.type).toBe('monster_summon');
     expect(CREATE_SPECTER_ROW.automation.options).toEqual([{ monster: 'specter' }]);
     expect(CREATE_SPECTER_ROW.automation.range_ft).toBe(10);
-    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('Humanoid corpse');
-    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('1 minute');
-    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('seven specters');
-    expect(CREATE_SPECTER_ROW.automation.advisory).toContain('GM-adjudicated');
-    expect(specter.name).toBe('Specter');
-    expect(specter.hit_points).toBeGreaterThan(0);
+    expect(WR_ADV).toContain('Humanoid corpse');
+    expect(WR_ADV).toContain('seven specters');
+    expect(WR_ADV).toContain('GM-adjudicated');
+    expect(specter).toMatchObject({ name: 'Specter', armor_class: 12, hit_points: 22 });
   });
-});
 
-describe('MA-1729 Create Specter chance-less summon resolution', () => {
-  function makeWraithDeps(cs = WRAITH_CS()) {
-    const deps = makeDeps({ cs });
+  it('chance-less rise press: Specter ally right after the wraith, te @gm_adjudicated, advisory bytes EXACT in log + popup — zero dice/coin-flip/ability_use/recharge write/clock', async () => {
+    const deps = makeDeps({ cs: WRAITH_CS() });
     deps.monsters = [specter];
     deps.rollExpression = vi.fn(() => null);
-    return deps;
-  }
-
-  it('fresh press: spawns a Specter ally right after the wraith (init 15.9), te summoned @gm_adjudicated, ZERO dice/coin-flip/ability_use/recharge write; summons log + popup carry the RAW advisory', async () => {
-    const deps = makeWraithDeps();
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterSummonRow({
-      action: CREATE_SPECTER_ROW,
-      monsterName: 'Wraith 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
+    const { result, setPopupHtml } = await press(CREATE_SPECTER_ROW, 'Wraith 1', deps);
     expect(result).toMatchObject({ resolved: true, summonedName: 'Specter', summonedNames: ['Specter'], countRoll: null, verdict: { monster: 'specter', roll: null, success: true }, remaining: null });
     expect(deps.rollDie).not.toHaveBeenCalled();
     expect(deps.rollExpression).not.toHaveBeenCalled();
@@ -1060,21 +629,12 @@ describe('MA-1729 Create Specter chance-less summon resolution', () => {
     expect(deps.store.logs.some(e => e.rollType === 'attack')).toBe(false);
     expect(deps.store.logs.some(e => e.rollType === 'monster_summon_coin_flip')).toBe(false);
     expect(deps.store.logs.some(e => e.type === 'ability_use')).toBe(false);
+    expect(deps.store.logs.some(e => e.automationType === 'duration_clock_armed')).toBe(false);
     expect(deps.setRuntimeValue).not.toHaveBeenCalled();
     const spawnLog = deps.logs.find(e => e.type === 'summons');
     expect(spawnLog.summonedCreatures).toEqual(['Specter']);
-    expect(spawnLog.description).toContain('10 ft');
-    expect(spawnLog.description).toContain('Humanoid corpse');
-    expect(spawnLog.description).toContain('seven specters');
-    expect(spawnLog.description).not.toContain('10 minutes');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Specter'));
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('GM-adjudicated'));
+    expect(spawnLog.description).toBe(`Wraith 1 summons Specter via Create Specter — ally of Wraith 1, appears within 10 ft. ${WR_ADV}`);
+    expect(setPopupHtml).toHaveBeenCalledWith(`<div class="mc-prerequisite-refusal"><h3>Wraith 1 summons Specter</h3><p>Specter joins the fight as an ally of Wraith 1, acting right after it. ${WR_ADV}</p></div>`);
     expect(setPopupHtml).toHaveBeenCalledWith(expect.not.stringContaining('10 minutes'));
-  });
-
-  it('guaranteed rise: adjudication never flips a d100', () => {
-    const rollFn = vi.fn(() => 50);
-    expect(adjudicateSummonAttempt(CREATE_SPECTER_ROW.automation.options, rollFn)).toMatchObject({ monster: 'specter', roll: null, success: true, chance: null });
-    expect(rollFn).not.toHaveBeenCalled();
   });
 });

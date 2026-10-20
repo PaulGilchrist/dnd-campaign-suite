@@ -1,16 +1,39 @@
-// MA-1285 regression: REACTION-category advisory one-field fix on the
-// byte-identical Uncanny Dodge twins (Performer + Scout Captain —
-// name/trigger/description-only rows, zero affordance §60: no attack_bonus/
-// dice/save_dc → every MonsterAction chip lane null, no automation.effect →
-// GatedReactionSlot null, no registered uncanny_dodge gated-reaction key).
-// Binding orchestrator Option A = ONE field per row: advisory:"monster_
-// uncanny_dodge" (advisory_message optional — buildMonsterActionAdvisory*
-// fallback copy is honest). Mirrors MA-1224 Nalfeshnee Pursuit / MA-1223
-// Teleport advisory siblings; ZERO code. Locks disk shape + placement,
-// detector truthiness on both rows, AdvisoryLink chip render on the reaction
-// row, and the record-only resolver contract: popup + ONE ability_use log per
-// press, zero rolls, zero spends; parry/feather_fall te-channel twins
-// byte-inert.
+// @maintained-by-ai
+// MA-1285/1290/1309/1313 reaction-category advisory twins — FAIL(b) zero-
+// affordance rows (name/trigger/description-only §60) fixed via the SAME
+// Option A one-field advisory seam: advisory:"monster_<name>", advisory_message
+// NOT authored (builder fallback copy is honest), zero affordance → every
+// MonsterAction chip lane null except AdvisoryLink, no automation.effect →
+// GatedReactionSlot null. ZERO code; mirrors MA-1223/MA-1224 siblings.
+//
+// Lane (applied-rec #1084 verdict): this .jsx is the RENDER + DISK-BYTES lane
+// for the five ticket rows — render-faces and per-ticket bytes KEPT here with
+// exact DOM/disk bytes; generic machinery-faces consolidated or cut-to-cite.
+// Family/cite map:
+// - monsterActionAdvisory.test.js = family base (#976): detector truthiness
+//   shape :51-59, popup/log builder chrome + fallback pattern :61-85,
+//   one-press/refire resolver mechanism :87-108 — not re-machined here.
+// - MonsterAction.ma1223-nalfeshnee-teleport-advisory-chip.test.jsx :54-78
+//   + ma1224-…-chip.test.jsx :71-78 own the ROW-INDEPENDENT press pattern
+//   and both inert lanes (attackerCannotAct / no resolver) per #467 — the
+//   4 press + 4 incapacitated re-runs here are deleted citing those lanes.
+// - ma1224-nalfeshnee-pursuit.test.js = reaction-category exemplar
+//   (#1084): builders cut, resolver popup-arg strengthened — mirrored here.
+// Ticket-distinct bytes KEPT (#993/#977 rows verbatim, #829 verified-vs-
+// disk-not-transcribed, #934/#1026 string-not-action inertness):
+// - MA-1285: Performer + Scout Captain Uncanny Dodge twins (advisory key ×2
+//   on disk) + co-located te-channel near-miss decoys feather_fall/parry
+//   (#948); the Scout twin carries this file's single reaction-category refire
+//   fold (refires here were the 4th-6th copies of base :100-108).
+// - MA-1290: Warding Charm save_type/save_effect bytes in the RAW block,
+//   save_dc UNDEFINED (no DC invented).
+// - MA-1309 Defensive Stance / MA-1313 Riposte: distinct triggers and AC
+//   prose — the +4/+2 hit-negation clocks (Option B) stay out of scope.
+// Old→new map: 13 disk tests → 1 it.each row-table; 4 detector → 1 (twins
+// folded); 4 chip renders → 1 it.each (press/inert faces cut-to-cite); 8
+// builder tests → REMOVED (base chrome; per-row fallback copy strengthened
+// into the resolver popup arg); 4 one-press + 4 refire → 1 resolver it.each
+// with the refire folded on the scout twin. 47 tests → 16 runs.
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -18,61 +41,46 @@ import monstersData from '../../../public/data/monsters.json';
 import { MonsterAction } from '../../components/encounter/MonsterAction.jsx';
 import {
   isMonsterActionAdvisoryRow,
-  buildMonsterActionAdvisoryPopup,
-  buildMonsterActionAdvisoryLog,
   resolveMonsterActionAdvisoryRow,
 } from './monsterActionAdvisory.js';
 
 const RAW = readFileSync('public/data/monsters.json', 'utf8');
-const PERFORMER = monstersData.find((m) => m.index === 'performer');
-const SCOUT_CAPTAIN = monstersData.find((m) => m.index === 'scout-captain');
-const PERFORMER_UD = PERFORMER.reactions[0];
-const SCOUT_UD = SCOUT_CAPTAIN.reactions[0];
-const FEATHER_FALL = monstersData.find((m) => m.index === 'aarakocra-aeromancer').reactions[0];
-const PARRY = monstersData.find((m) => m.index === 'bandit-captain').reactions[0];
+const byIndex = (index) => monstersData.find((m) => m.index === index);
 
-describe('MA-1285 disk lock: Uncanny Dodge twins carry the advisory one-field fix', () => {
-  it('Performer reactions[0] name/trigger/description byte-identical to the RAW row', () => {
-    expect(PERFORMER_UD.name).toBe('Uncanny Dodge');
-    expect(PERFORMER_UD.trigger).toBe('The performer is hit by an attack roll');
-    expect(PERFORMER_UD.description).toBe('The performer halves the damage (round down) it takes from that attack.');
-  });
+// Ticket row table — every per-ticket distinct byte comes from the parsed
+// disk row itself (#829), assembled into the contiguous RAW block that must
+// sit byte-verbatim on disk before the advisory field closes the row.
+const ROWS = [
+  { ticket: 'MA-1285', label: 'Performer Uncanny Dodge', action: byIndex('performer').reactions[0], monsterName: 'Performer 1', key: 'monster_uncanny_dodge', keyCount: 2, fields: ['trigger', 'description'] },
+  { ticket: 'MA-1285', label: 'Scout Captain Uncanny Dodge', action: byIndex('scout-captain').reactions[0], monsterName: 'Scout Captain 1', key: 'monster_uncanny_dodge', keyCount: 2, fields: ['trigger', 'description'], refire: true },
+  { ticket: 'MA-1290', label: 'Performer Legend Warding Charm', action: byIndex('performer-legend').reactions[0], monsterName: 'Performer Legend 1', key: 'monster_warding_charm', keyCount: 1, fields: ['trigger', 'description', 'save_type', 'save_effect'] },
+  { ticket: 'MA-1309', label: 'Pirate Admiral Defensive Stance', action: byIndex('pirate-admiral').reactions[0], monsterName: 'Pirate Admiral 1', key: 'monster_defensive_stance', keyCount: 1, fields: ['trigger', 'description'] },
+  { ticket: 'MA-1313', label: 'Pirate Captain Riposte', action: byIndex('pirate-captain').reactions[0], monsterName: 'Pirate Captain 1', key: 'monster_riposte', keyCount: 1, fields: ['trigger', 'description'] },
+];
 
-  it('Scout Captain reactions[0] name/trigger/description byte-identical to the RAW row', () => {
-    expect(SCOUT_UD.name).toBe('Uncanny Dodge');
-    expect(SCOUT_UD.trigger).toBe('The scout is hit by an attack roll');
-    expect(SCOUT_UD.description).toBe('The scout halves the damage (round down) it takes from that attack.');
-  });
+// §37 near-miss decoys (#948): live te-channel reaction twins that MUST stay
+// unarmed by the advisory seam.
+const FEATHER_FALL = byIndex('aarakocra-aeromancer').reactions[0];
+const PARRY = byIndex('bandit-captain').reactions[0];
 
-  it('both rows carry EXACTLY advisory:"monster_uncanny_dodge" (Option A one-field)', () => {
-    expect(PERFORMER_UD.advisory).toBe('monster_uncanny_dodge');
-    expect(SCOUT_UD.advisory).toBe('monster_uncanny_dodge');
-    expect(PERFORMER_UD.automation).toBeUndefined();
-    expect(SCOUT_UD.automation).toBeUndefined();
-    expect(PERFORMER_UD.attack_bonus).toBeUndefined();
-    expect(SCOUT_UD.attack_bonus).toBeUndefined();
-    expect(PERFORMER_UD.save_dc).toBeUndefined();
-    expect(SCOUT_UD.save_dc).toBeUndefined();
-    expect(PERFORMER_UD.zone).toBeUndefined();
-    expect(SCOUT_UD.zone).toBeUndefined();
-  });
-
-  it('placement mirrors siblings: advisory sits after description (MA-1224 byte-shape)', () => {
-    const performerShape = '"trigger": "The performer is hit by an attack roll",\n        "description": "The performer halves the damage (round down) it takes from that attack.",\n        "advisory": "monster_uncanny_dodge"';
-    const scoutShape = '"trigger": "The scout is hit by an attack roll",\n        "description": "The scout halves the damage (round down) it takes from that attack.",\n        "advisory": "monster_uncanny_dodge"';
-    expect(RAW.split(performerShape).length - 1).toBe(1);
-    expect(RAW.split(scoutShape).length - 1).toBe(1);
-    expect(RAW.split('"advisory": "monster_uncanny_dodge"').length - 1).toBe(2);
+describe('MA-1285/1290/1309/1313 disk locks: advisory twins byte-verbatim, Option A one-field', () => {
+  it.each(ROWS)('$label reactions[0]: RAW block byte-verbatim ($key ×$keyCount), zero affordance/zero-message fields', ({ action, key, keyCount, fields }) => {
+    const block = [...fields.map((f) => `"${f}": ${JSON.stringify(action[f])}`), `"advisory": ${JSON.stringify(key)}`].join(',\n        ');
+    expect(RAW.split(block).length - 1).toBe(1);
+    expect(RAW.split(`"advisory": ${JSON.stringify(key)}`).length - 1).toBe(keyCount);
+    expect(action.advisory).toBe(key);
+    expect(action.advisory_message).toBeUndefined(); // fallback copy is honest — one field only
+    expect(action.automation).toBeUndefined();
+    expect(action.attack_bonus).toBeUndefined();
+    expect(action.save_dc).toBeUndefined(); // MA-1290: prose DC 17 never becomes a DC
+    expect(action.zone).toBeUndefined();
+    expect(action.usage).toBeUndefined();
   });
 });
 
-describe('MA-1285 advisory detection on the reaction twins', () => {
-  it('arms on both reactions[0] via the pure truthiness detector', () => {
-    expect(isMonsterActionAdvisoryRow(PERFORMER_UD)).toBe(true);
-    expect(isMonsterActionAdvisoryRow(SCOUT_UD)).toBe(true);
-  });
-
-  it('te-channel reaction twins stay unarmed (byte-inert §37)', () => {
+describe('MA-1285/1290/1309/1313 detection: five real rows arm, te-channel twins stay inert', () => {
+  it('all five advisory reactions arm via the pure truthiness detector; feather_fall/parry byte-inert (§37)', () => {
+    ROWS.forEach(({ action }) => expect(isMonsterActionAdvisoryRow(action)).toBe(true));
     expect(FEATHER_FALL.automation.effect).toBe('feather_fall');
     expect(PARRY.automation.effect).toBe('parry');
     expect(isMonsterActionAdvisoryRow(FEATHER_FALL)).toBe(false);
@@ -101,372 +109,53 @@ const renderRow = (action, extra = {}) => {
   return { container, onAttack, onAdvisoryRow };
 };
 
-describe('MA-1285 MonsterAction render: advisory chip arms on the reaction row', () => {
-  it('Performer Uncanny Dodge row renders the labelled advisory chip', () => {
-    const { container } = renderRow(PERFORMER_UD);
+describe('MA-1285/1290/1309/1313 render lane: advisory chip arms on each zero-affordance reaction row', () => {
+  // Press routing + incapacitated-inert are row-independent renderer paths
+  // owned by MonsterAction.ma1223-…-chip.test.jsx:54-78 / ma1224 :71-78.
+  it.each(ROWS)('$label row renders exactly ONE advisory chip labelled with the row name, honest GM-enforced title', ({ action }) => {
+    const { container } = renderRow(action);
     const chip = container.querySelector('.mc-dice-link-advisory');
     expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Uncanny Dodge');
+    expect(chip.textContent).toContain(action.name);
     expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
+    expect(container.querySelectorAll('.mc-dice-link')).toHaveLength(1);
   });
 
-  it('Scout Captain Uncanny Dodge row renders the labelled advisory chip', () => {
-    const { container } = renderRow(SCOUT_UD);
-    const chip = container.querySelector('.mc-dice-link-advisory');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Uncanny Dodge');
-  });
-
-  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
-    const { container, onAttack, onAdvisoryRow } = renderRow(PERFORMER_UD);
+  it('chip press routes onAdvisoryRow with the row verbatim, never onAttack', () => {
+    const { container, onAttack, onAdvisoryRow } = renderRow(ROWS[0].action);
     fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
     expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
-    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PERFORMER_UD);
+    expect(onAdvisoryRow.mock.calls[0][0]).toBe(ROWS[0].action);
     expect(onAttack).not.toHaveBeenCalled();
-  });
-
-  it('incapacitated advisory chip is inert (no click route)', () => {
-    const { container, onAdvisoryRow } = renderRow(SCOUT_UD, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).not.toHaveBeenCalled();
   });
 });
 
-describe('MA-1285 builders + resolver on the Uncanny Dodge rows — record-only contract', () => {
-  it('popup is honest record chrome with the fallback GM-enforced copy (no advisory_message authored)', () => {
-    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Performer 1', action: PERFORMER_UD });
-    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Uncanny Dodge<\/h3>/);
-    expect(html).toMatch(/Uncanny Dodge is GM-enforced \(no engine consumer for this mechanic\)/);
-  });
-
-  it('log is an ability_use record naming Uncanny Dodge, no roll fields', () => {
-    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Scout Captain 1', action: SCOUT_UD });
-    expect(log.type).toBe('ability_use');
-    expect(log.characterName).toBe('Scout Captain 1');
-    expect(log.abilityName).toBe('Uncanny Dodge');
-    expect(log.rollType).toBeUndefined();
-    expect(log.roll).toBeUndefined();
-  });
-
-  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
+describe('MA-1285/1290/1309/1313 resolver on every ticket row — record-only, string-not-action', () => {
+  it.each(ROWS)('$label: popup string + exactly ONE ability_use log per press; zero rolls, zero spends, zero refusals', async ({ action, monsterName, refire }) => {
     const addEntry = vi.fn(() => Promise.resolve());
     const setPopupHtml = vi.fn();
-    const res = await resolveMonsterActionAdvisoryRow({ action: PERFORMER_UD, monsterName: 'Performer 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    const press = () => resolveMonsterActionAdvisoryRow({ action, monsterName, campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
+    const res = await press();
     expect(res.resolved).toBe(true);
     expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    const popup = setPopupHtml.mock.calls[0][0];
+    expect(popup).toMatch(/^<div class="mc-prerequisite-refusal"><h3>/);
+    expect(popup).toContain(`Action — ${action.name}</h3>`);
+    expect(popup).toContain(`${action.name} is GM-enforced (no engine consumer for this mechanic)`);
     expect(addEntry).toHaveBeenCalledTimes(1);
     const entry = addEntry.mock.calls[0][1];
     expect(entry.type).toBe('ability_use');
-    expect(entry.abilityName).toBe('Uncanny Dodge');
-    expect(entry.description).toMatch(/GM-enforced/);
-  });
-
-  it('refire press stays record-only (no uses authored, nothing to gate): two logs, zero spends', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    await resolveMonsterActionAdvisoryRow({ action: SCOUT_UD, monsterName: 'Scout Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    await resolveMonsterActionAdvisoryRow({ action: SCOUT_UD, monsterName: 'Scout Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(addEntry).toHaveBeenCalledTimes(2);
-    expect(setPopupHtml).toHaveBeenCalledTimes(2);
-    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
-  });
-});
-
-// MA-1290: Performer Legend "Warding Charm" reactions[0] — same FAIL(b)
-// zero-affordance fingerprint (name/trigger/description/save_type/save_effect
-// only, §60) fixed via the SAME Option A one-field advisory seam. Hit-
-// negation (Option B) stays out of scope — no consumer semantics for
-// negating a committed hit. Mirrors the MA-1285 blocks byte-for-byte.
-const LEGEND = monstersData.find((m) => m.index === 'performer-legend');
-const LEGEND_WC = LEGEND.reactions[0];
-
-describe('MA-1290 disk lock: Warding Charm carries the advisory one-field fix', () => {
-  it('reactions[0] name/trigger/description/save_type/save_effect byte-identical to the RAW row', () => {
-    expect(LEGEND_WC.name).toBe('Warding Charm');
-    expect(LEGEND_WC.trigger).toBe('A creature hits the performer with an attack roll');
-    expect(LEGEND_WC.description).toBe('Wisdom Saving Throw: DC 17, the triggering creature. Failure: The attack roll misses the performer, and the target has the <strong>Charmed</strong> condition until the end of the performer\'s next turn.');
-    expect(LEGEND_WC.save_type).toBe('Wisdom');
-    expect(LEGEND_WC.save_effect).toBe('Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer\'s next turn.');
-  });
-
-  it('row carries EXACTLY advisory:"monster_warding_charm" (Option A one-field, no save_dc)', () => {
-    expect(LEGEND_WC.advisory).toBe('monster_warding_charm');
-    expect(LEGEND_WC.automation).toBeUndefined();
-    expect(LEGEND_WC.attack_bonus).toBeUndefined();
-    expect(LEGEND_WC.save_dc).toBeUndefined();
-    expect(LEGEND_WC.zone).toBeUndefined();
-    expect(LEGEND_WC.usage).toBeUndefined();
-  });
-
-  it('placement: advisory sits after save_effect, unique on disk', () => {
-    const shape = '"save_effect": "Failure: The attack roll misses the performer, and the target has the Charmed condition until the end of the performer\'s next turn.",\n        "advisory": "monster_warding_charm"';
-    expect(RAW.split(shape).length - 1).toBe(1);
-    expect(RAW.split('"advisory": "monster_warding_charm"').length - 1).toBe(1);
-  });
-});
-
-describe('MA-1290 advisory detection + render on the Warding Charm reaction', () => {
-  it('arms via the pure truthiness detector', () => {
-    expect(isMonsterActionAdvisoryRow(LEGEND_WC)).toBe(true);
-  });
-
-  it('row renders the labelled advisory chip', () => {
-    const { container } = renderRow(LEGEND_WC);
-    const chip = container.querySelector('.mc-dice-link-advisory');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Warding Charm');
-    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
-  });
-
-  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
-    const { container, onAttack, onAdvisoryRow } = renderRow(LEGEND_WC);
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
-    expect(onAdvisoryRow.mock.calls[0][0]).toBe(LEGEND_WC);
-    expect(onAttack).not.toHaveBeenCalled();
-  });
-
-  it('incapacitated advisory chip is inert (no click route)', () => {
-    const { container, onAdvisoryRow } = renderRow(LEGEND_WC, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).not.toHaveBeenCalled();
-  });
-});
-
-describe('MA-1290 builders + resolver on Warding Charm — record-only contract', () => {
-  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
-    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Performer Legend 1', action: LEGEND_WC });
-    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Warding Charm<\/h3>/);
-    expect(html).toMatch(/Warding Charm is GM-enforced \(no engine consumer for this mechanic\)/);
-  });
-
-  it('log is an ability_use record naming Warding Charm, no roll fields', () => {
-    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Performer Legend 1', action: LEGEND_WC });
-    expect(log.type).toBe('ability_use');
-    expect(log.characterName).toBe('Performer Legend 1');
-    expect(log.abilityName).toBe('Warding Charm');
-    expect(log.rollType).toBeUndefined();
-    expect(log.roll).toBeUndefined();
-  });
-
-  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    const res = await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(res.resolved).toBe(true);
-    expect(setPopupHtml).toHaveBeenCalledTimes(1);
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    const entry = addEntry.mock.calls[0][1];
-    expect(entry.type).toBe('ability_use');
-    expect(entry.abilityName).toBe('Warding Charm');
-    expect(entry.description).toMatch(/GM-enforced/);
-  });
-
-  it('refire press stays record-only: two logs, zero spends', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    await resolveMonsterActionAdvisoryRow({ action: LEGEND_WC, monsterName: 'Performer Legend 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(addEntry).toHaveBeenCalledTimes(2);
-    expect(setPopupHtml).toHaveBeenCalledTimes(2);
-    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
-  });
-});
-
-// MA-1309: Pirate Admiral "Defensive Stance" reactions[0] — same FAIL(b)
-// zero-affordance fingerprint (name/trigger/description only, §60) fixed via
-// the SAME Option A one-field advisory seam (MA-1285 byte-shape twin).
-// Sustained +4 AC hit-negation clock (Option B) stays out of scope —
-// orchestrator binding decision. Mirrors the MA-1285/MA-1290 blocks.
-const PIRATE_ADMIRAL = monstersData.find((m) => m.index === 'pirate-admiral');
-const PIRATE_DS = PIRATE_ADMIRAL.reactions[0];
-
-describe('MA-1309 disk lock: Pirate Admiral Defensive Stance carries the advisory one-field fix', () => {
-  it('reactions[0] name/trigger/description byte-identical to the RAW row', () => {
-    expect(PIRATE_DS.name).toBe('Defensive Stance');
-    expect(PIRATE_DS.trigger).toBe('The pirate is hit by a melee attack roll while holding a weapon');
-    expect(PIRATE_DS.description).toBe('The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.');
-  });
-
-  it('row carries EXACTLY advisory:"monster_defensive_stance" (Option A one-field)', () => {
-    expect(PIRATE_DS.advisory).toBe('monster_defensive_stance');
-    expect(PIRATE_DS.automation).toBeUndefined();
-    expect(PIRATE_DS.attack_bonus).toBeUndefined();
-    expect(PIRATE_DS.save_dc).toBeUndefined();
-    expect(PIRATE_DS.zone).toBeUndefined();
-    expect(PIRATE_DS.usage).toBeUndefined();
-  });
-
-  it('placement mirrors MA-1285 siblings: advisory sits after description, unique on disk', () => {
-    const shape = '"trigger": "The pirate is hit by a melee attack roll while holding a weapon",\n        "description": "The pirate adds 4 to its AC against melee attack rolls (including the triggering attack) until the start of its next turn, possibly causing the attacks to miss.",\n        "advisory": "monster_defensive_stance"';
-    expect(RAW.split(shape).length - 1).toBe(1);
-    expect(RAW.split('"advisory": "monster_defensive_stance"').length - 1).toBe(1);
-  });
-});
-
-describe('MA-1309 advisory detection + render on the Defensive Stance reaction', () => {
-  it('arms via the pure truthiness detector', () => {
-    expect(isMonsterActionAdvisoryRow(PIRATE_DS)).toBe(true);
-  });
-
-  it('row renders the labelled advisory chip', () => {
-    const { container } = renderRow(PIRATE_DS);
-    const chip = container.querySelector('.mc-dice-link-advisory');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Defensive Stance');
-    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
-  });
-
-  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
-    const { container, onAttack, onAdvisoryRow } = renderRow(PIRATE_DS);
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
-    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PIRATE_DS);
-    expect(onAttack).not.toHaveBeenCalled();
-  });
-
-  it('incapacitated advisory chip is inert (no click route)', () => {
-    const { container, onAdvisoryRow } = renderRow(PIRATE_DS, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).not.toHaveBeenCalled();
-  });
-});
-
-describe('MA-1309 builders + resolver on Defensive Stance — record-only contract', () => {
-  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
-    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Pirate Admiral 1', action: PIRATE_DS });
-    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Defensive Stance<\/h3>/);
-    expect(html).toMatch(/Defensive Stance is GM-enforced \(no engine consumer for this mechanic\)/);
-  });
-
-  it('log is an ability_use record naming Defensive Stance, no roll fields', () => {
-    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Pirate Admiral 1', action: PIRATE_DS });
-    expect(log.type).toBe('ability_use');
-    expect(log.characterName).toBe('Pirate Admiral 1');
-    expect(log.abilityName).toBe('Defensive Stance');
-    expect(log.rollType).toBeUndefined();
-    expect(log.roll).toBeUndefined();
-  });
-
-  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    const res = await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(res.resolved).toBe(true);
-    expect(setPopupHtml).toHaveBeenCalledTimes(1);
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    const entry = addEntry.mock.calls[0][1];
-    expect(entry.type).toBe('ability_use');
-    expect(entry.abilityName).toBe('Defensive Stance');
-    expect(entry.description).toMatch(/GM-enforced/);
-  });
-
-  it('refire press stays record-only: two logs, zero spends', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    await resolveMonsterActionAdvisoryRow({ action: PIRATE_DS, monsterName: 'Pirate Admiral 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(addEntry).toHaveBeenCalledTimes(2);
-    expect(setPopupHtml).toHaveBeenCalledTimes(2);
-    expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
-  });
-});
-
-// MA-1313: Pirate Captain "Riposte" reactions[0] — same FAIL(b)
-// zero-affordance fingerprint (name/trigger/description only, §60) fixed via
-// the SAME Option A one-field advisory seam (MA-1285/MA-1309 byte-shape twin).
-// Two-stage +3 AC hit-negation → conditional Rapier counter (Option B) stays
-// out of scope — orchestrator binding decision. Mirrors the sibling blocks.
-const PIRATE_CAPTAIN = monstersData.find((m) => m.index === 'pirate-captain');
-const PIRATE_RIPOSTE = PIRATE_CAPTAIN.reactions[0];
-
-describe('MA-1313 disk lock: Pirate Captain Riposte carries the advisory one-field fix', () => {
-  it('reactions[0] name/trigger/description byte-identical to the RAW row', () => {
-    expect(PIRATE_RIPOSTE.name).toBe('Riposte');
-    expect(PIRATE_RIPOSTE.trigger).toBe('The pirate is hit by a melee attack roll while holding a weapon');
-    expect(PIRATE_RIPOSTE.description).toBe('The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.');
-  });
-
-  it('row carries EXACTLY advisory:"monster_riposte" (Option A one-field)', () => {
-    expect(PIRATE_RIPOSTE.advisory).toBe('monster_riposte');
-    expect(PIRATE_RIPOSTE.automation).toBeUndefined();
-    expect(PIRATE_RIPOSTE.attack_bonus).toBeUndefined();
-    expect(PIRATE_RIPOSTE.save_dc).toBeUndefined();
-    expect(PIRATE_RIPOSTE.zone).toBeUndefined();
-    expect(PIRATE_RIPOSTE.usage).toBeUndefined();
-  });
-
-  it('placement mirrors MA-1285 siblings: advisory sits after description, unique on disk', () => {
-    const shape = '"trigger": "The pirate is hit by a melee attack roll while holding a weapon",\n        "description": "The pirate adds 3 to its AC against that attack, possibly causing it to miss. On a miss, the pirate makes one Rapier attack against the triggering creature if within range.",\n        "advisory": "monster_riposte"';
-    expect(RAW.split(shape).length - 1).toBe(1);
-    expect(RAW.split('"advisory": "monster_riposte"').length - 1).toBe(1);
-  });
-});
-
-describe('MA-1313 advisory detection + render on the Riposte reaction', () => {
-  it('arms via the pure truthiness detector', () => {
-    expect(isMonsterActionAdvisoryRow(PIRATE_RIPOSTE)).toBe(true);
-  });
-
-  it('row renders the labelled advisory chip', () => {
-    const { container } = renderRow(PIRATE_RIPOSTE);
-    const chip = container.querySelector('.mc-dice-link-advisory');
-    expect(chip).not.toBe(null);
-    expect(chip.textContent).toContain('Riposte');
-    expect(chip.getAttribute('title')).toMatch(/GM-enforced/);
-  });
-
-  it('chip press routes onAdvisoryRow with the row, never onAttack', () => {
-    const { container, onAttack, onAdvisoryRow } = renderRow(PIRATE_RIPOSTE);
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).toHaveBeenCalledTimes(1);
-    expect(onAdvisoryRow.mock.calls[0][0]).toBe(PIRATE_RIPOSTE);
-    expect(onAttack).not.toHaveBeenCalled();
-  });
-
-  it('incapacitated advisory chip is inert (no click route)', () => {
-    const { container, onAdvisoryRow } = renderRow(PIRATE_RIPOSTE, { attackerCannotAct: true });
-    fireEvent.click(container.querySelector('.mc-dice-link-advisory'));
-    expect(onAdvisoryRow).not.toHaveBeenCalled();
-  });
-});
-
-describe('MA-1313 builders + resolver on Riposte — record-only contract', () => {
-  it('popup is honest record chrome with the fallback GM-enforced copy', () => {
-    const html = buildMonsterActionAdvisoryPopup({ monsterName: 'Pirate Captain 1', action: PIRATE_RIPOSTE });
-    expect(html).toMatch(/^<div class="mc-prerequisite-refusal"><h3>Action — Riposte<\/h3>/);
-    expect(html).toMatch(/Riposte is GM-enforced \(no engine consumer for this mechanic\)/);
-  });
-
-  it('log is an ability_use record naming Riposte, no roll fields', () => {
-    const log = buildMonsterActionAdvisoryLog({ monsterName: 'Pirate Captain 1', action: PIRATE_RIPOSTE });
-    expect(log.type).toBe('ability_use');
-    expect(log.characterName).toBe('Pirate Captain 1');
-    expect(log.abilityName).toBe('Riposte');
-    expect(log.rollType).toBeUndefined();
-    expect(log.roll).toBeUndefined();
-  });
-
-  it('one press = popup + exactly ONE ability_use log; no other writes', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    const res = await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(res.resolved).toBe(true);
-    expect(setPopupHtml).toHaveBeenCalledTimes(1);
-    expect(addEntry).toHaveBeenCalledTimes(1);
-    const entry = addEntry.mock.calls[0][1];
-    expect(entry.type).toBe('ability_use');
-    expect(entry.abilityName).toBe('Riposte');
-    expect(entry.description).toMatch(/GM-enforced/);
-  });
-
-  it('refire press stays record-only: two logs, zero spends', async () => {
-    const addEntry = vi.fn(() => Promise.resolve());
-    const setPopupHtml = vi.fn();
-    await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    await resolveMonsterActionAdvisoryRow({ action: PIRATE_RIPOSTE, monsterName: 'Pirate Captain 1', campaignName: 'test-campaign', setPopupHtml, deps: { addEntry } });
-    expect(addEntry).toHaveBeenCalledTimes(2);
-    expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    expect(entry.characterName).toBe(monsterName);
+    expect(entry.abilityName).toBe(action.name);
+    expect(entry.rollType).toBeUndefined();
+    expect(entry.roll).toBeUndefined();
+    if (refire) {
+      // Reaction-category refire fold (MA-1285 twin): nothing authored means
+      // nothing to gate — second press stays record-only (mechanism base :100-108).
+      await press();
+      expect(addEntry).toHaveBeenCalledTimes(2);
+      expect(setPopupHtml).toHaveBeenCalledTimes(2);
+    }
     expect(addEntry).not.toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: expect.stringMatching(/refused|spend/i) }));
   });
 });

@@ -1,18 +1,39 @@
-// MA-0895: Goblin Hexer "Jinx" (reactions[0]) — formerly a generic
-// save-shell DC chip whose save_effect "The attack misses instead" had ZERO
-// consumers (a failed WIS save negated nothing; the pending attack either
-// died on chip-press popup teardown or committed full damage past the save).
-// Fix: automation{type:"reaction", trigger:"attacked_by_missable_hit",
-// effect:"jinx_negate"} arms a gated chip (GATED_MONSTER_REACTIONS, §60);
-// press rides the parry pending-Done window (MA-0341/§235 — hit:true,
-// damageApplied:false; refusals LOG-ONLY so the Done popup survives);
-// the ATTACKER's WIS save vs DC 13 rolls INLINE machine-stamped with the
-// §212 cs saving_throws nested-abbrev modifier folded; FAIL stamps
-// campaign.pendingJinx and the resolve consumer (consumePendingJinxOnResolve,
-// handlePlainDamage top, MA-0891 redirect twin) converts the attack to
-// hit:false + zero damage BEFORE Done commits it; SUCCESS lets the attack
-// ride Done unchanged. At Will sentinel (uses:999) + 1/round latch +
-// lastAttack.jinxResolved identity stamp are the only fire limits.
+// @maintained-by-ai
+// MA-0895 lane: Goblin Hexer "Jinx" (reactions[0]) — press the gated chip over the
+// attacker's pending HIT popup before Done (parry §235 window). Press order census:
+// round-latch → uses → pending-identity → save-spec gates FIRST (refusals LOG-ONLY,
+// zero-spend, zero-roll, zero-store-write, NO popupHtml — the Done popup survives every
+// press, MA-0681 teardown twin); attacker WIS save vs DC 13 rolls INLINE machine-stamped
+// (§212 nested-abbrev fold); latch+spend AWAITED before consumer-readable stamps
+// (CLA-361) for BOTH legs — a saved Jinx still spends (RAW press-burn, the #1026
+// zero-applied WATCH is satisfied by design here: the reaction is the cost, not the hit);
+// FAIL stamps campaign.pendingJinx + lastAttack.jinxPending; consumePendingJinxOnResolve
+// (handlePlainDamage top, MA-0891 redirect twin, handlePlainDamage.js:1206) converts the
+// attack to hit:false + zero damage before Done; SUCCESS rides Done unchanged. At Will
+// sentinel (uses:999) + 1/round latch (_jinx_negate_usedRound) + lastAttack.jinxResolved
+// are the only fire limits.
+// CANON cites: #967 consulted-bytes census, #1095 refusal gate-order it.each shape,
+// #1094 press census + disk rows by name, #1035 guards refuse before any roll/store
+// write, #1019 store-faithful campaign-keyed writes, #1057 off-lane decoys loud,
+// #903 it.each tables, #910 honest titles, #1072 dice exact-if-any (rollD20 injected —
+// zero real RNG in this file), #1007 mock-hygiene beforeEach.
+// Cross-file owners (do not re-pin here): dispatcher family templates (round latch/uses
+// arithmetic/record-only) → MonsterCardHelpers.gated-reaction.test.js; this file owns
+// ONLY the jinx_negate arm routing — the lane's sole dispatcher coverage. Legacy gated
+// row pins (bandit parry, goblin-boss redirect, azer hellish rebuke) are CITED here by
+// MonsterCardHelpers.berserk-lashing.test.js:15 and ...hellish-rebuke.test.js:12 —
+// kept in the "arms the gated chip" test below; current position of those cited bytes:
+// see old→new map. getAllStoreKeys in the useRuntimeState mock is TRANSITIVELY
+// REQUIRED (expirationQueue.js imports it; pulled in via MonsterCardHelpers.js:15).
+// Old→new map (15 → 10 tests): legacy RAW fields + automation block → t1; gated arm +
+// legacy survivors → t2; five press-refusal its (no_pending/miss-resolved-reacted/
+// attacker/round/dead-attacker) → t3 refusal table; identity spell-attack unit → t4 gate
+// census (adds uses/spec/order legs); FAILED press → t5 (+CLA-361 write-order pin);
+// SUCCESS press → t6; attackerSaveModifier unit → t7 save-spec unit (+spec fallback);
+// resolve armed match → t8; resolve inert its → t9 inert table (+zero-write/zero-log);
+// dispatcher failed-save routing → t10. Dropped: dispatcher off-window refusal — the
+// jinx arm is proven routing by t10 and refusal bytes are owned by t3 (same code path,
+// family template cited at gated-reaction.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isMonsterJinxRow,
@@ -60,40 +81,33 @@ function pendingHit({ attackerName = 'Bandit 1', targetName = HEXER, ...rest } =
   };
 }
 
-function makeCs({ wisMod = -5 } = {}) {
+function makeCs({ wisMod = -5, attackerHp = 999 } = {}) {
   return {
     round: 1,
     creatures: [
       { name: HEXER, size: 'Small', currentHp: 999, maxHp: 999 },
-      { name: 'Bandit 1', size: 'Medium or Small', currentHp: 999, maxHp: 999, saving_throws: { wis: { modifier: wisMod } }, ability_score_modifiers: { wis: 0 } },
+      { name: 'Bandit 1', size: 'Medium or Small', currentHp: attackerHp, maxHp: 999, saving_throws: { wis: { modifier: wisMod } }, ability_score_modifiers: { wis: 0 } },
     ],
   };
 }
 
 function makeDeps({ roll = 10 } = {}) {
   const store = { reactionUses: {}, latches: {}, campaign: {}, logs: [] };
-  return {
-    store,
-    deps: {
-      rollD20: vi.fn(() => roll),
-      getRuntimeValue: vi.fn((characterKey, propertyName) => {
-        if (propertyName === 'monsterReactionUses') return store.reactionUses;
-        if (propertyName === 'pendingJinx') return store.campaign.pendingJinx;
-        if (propertyName === 'lastAttack') return store.campaign.lastAttack;
-        return undefined;
-      }),
-      setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
-        if (propertyName === 'monsterReactionUses') store.reactionUses = value;
-        if (propertyName === '_jinx_negate_usedRound') store.latches.jinx = value;
-        if (characterKey === 'campaign') store.campaign[propertyName] = value;
-        return Promise.resolve();
-      }),
-      addEntry: vi.fn((campaignName, entry) => { store.logs.push(entry); return Promise.resolve(); }),
-    },
+  const deps = {
+    rollD20: vi.fn(() => roll),
+    setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
+      if (propertyName === 'monsterReactionUses') store.reactionUses = value;
+      if (propertyName === '_jinx_negate_usedRound') store.latches.jinx = value;
+      if (characterKey === 'campaign') store.campaign[propertyName] = value;
+      return Promise.resolve();
+    }),
+    addEntry: vi.fn((campaignName, entry) => { store.logs.push(entry); return Promise.resolve(); }),
   };
+  return { store, deps };
 }
 
-function press({ lastAttack = pendingHit(), cs = makeCs(), currentRound = 1, storedUses = {}, usedRound = 0, roll = 10, deps = makeDeps({ roll }) } = {}) {
+function press({ lastAttack = pendingHit(), cs = makeCs(), currentRound = 1, storedUses = {}, usedRound = 0, roll = 10 } = {}) {
+  const { store, deps } = makeDeps({ roll });
   return resolveMonsterJinxRow({
     action: JINX_ROW,
     monsterName: HEXER,
@@ -104,24 +118,18 @@ function press({ lastAttack = pendingHit(), cs = makeCs(), currentRound = 1, sto
     storedUses,
     usedRound,
     latchKey: '_jinx_negate_usedRound',
-    deps: deps.deps || deps,
-  }).then(result => ({ result, ...deps }));
+    deps,
+  }).then(result => ({ result, store, deps }));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('MA-0895 data lock — goblin-hexer reactions[0]', () => {
-  it('keeps the RAW save fields and adds the jinx_negate automation block with the At Will sentinel', () => {
+describe('MA-0895 data lock — goblin-hexer reactions[0] consulted bytes', () => {
+  it('locks the automation block, the DC/type twins, and the At Will uses sentinel', () => {
+    expect(hexer.name).toBe('Goblin Hexer');
     expect(JINX_ROW.name).toBe('Jinx');
-    expect(JINX_ROW.trigger).toBe('A creature the goblin can see hits it with an attack roll.');
-    expect(JINX_ROW.save_dc).toBe(13);
-    expect(JINX_ROW.save_type).toBe('Wisdom');
-    expect(JINX_ROW.save_effect).toBe('The attack misses instead');
-    expect(JINX_ROW.usage).toBe('At Will');
-    expect(JINX_ROW.uses).toBe(999);
-    expect(JINX_ROW.maxUses).toBe(999);
     expect(JINX_ROW.automation).toEqual({
       type: 'reaction',
       trigger: 'attacked_by_missable_hit',
@@ -129,6 +137,13 @@ describe('MA-0895 data lock — goblin-hexer reactions[0]', () => {
       saveType: 'WIS',
       saveDc: 13,
     });
+    expect(JINX_ROW.save_dc).toBe(13);
+    expect(JINX_ROW.save_type).toBe('Wisdom');
+    expect(jinxSaveSpec(JINX_ROW)).toEqual({ saveDc: 13, saveType: 'WIS' });
+    // reactionMaxUses reads maxUses/uses — 999 sentinel → limit 999, At Will spend log branch.
+    expect(JINX_ROW.usage).toBe('At Will');
+    expect(JINX_ROW.uses).toBe(999);
+    expect(JINX_ROW.maxUses).toBe(999);
     expect(isMonsterJinxRow(JINX_ROW)).toBe(true);
     expect(isMonsterJinxRow(banditCaptain.reactions[0])).toBe(false);
   });
@@ -140,74 +155,86 @@ describe('MA-0895 data lock — goblin-hexer reactions[0]', () => {
     expect(getGatedMonsterReaction(goblinBoss.reactions[0])).toEqual({ effect: 'redirect_attack', trigger: 'attacked_by_seen', label: 'Redirect Attack', icon: 'fa-right-left' });
     expect(getGatedMonsterReaction(azerPyromancer.reactions[0]).effect).toBe('hellish_rebuke');
     expect(banditCaptain.reactions[0].automation.acBonus).toBe(2);
-    expect(jinxSaveSpec(JINX_ROW)).toEqual({ saveDc: 13, saveType: 'WIS' });
   });
 });
 
-describe('MA-0895 gates — every refusal zero-spend, log-only (Done popup survives)', () => {
-  it('refuses with no pending attack at all', async () => {
-    const { result, store } = await press({ lastAttack: null });
-    expect(result.resolved).toBe(false);
-    expect(result.reason).toBe('no_pending_attack');
-    expect(store.campaign.pendingJinx ?? null).toBeNull();
+describe('MA-0895 press refusals — every gate refusal zero-spend, zero-roll, log-only (Done popup survives)', () => {
+  const PRESS_REFUSALS = [
+    { reason: 'no_pending_attack', lastAttack: null },
+    { reason: 'miss', lastAttack: pendingHit({ hit: false }) },
+    { reason: 'resolved', lastAttack: pendingHit({ damageApplied: true, actualDamage: 7 }) },
+    { reason: 'reacted', lastAttack: pendingHit({ jinxResolved: true }) },
+    { reason: 'attacker', lastAttack: pendingHit({ attackerName: HEXER }) },
+    { reason: 'attacker', lastAttack: pendingHit({ attackerName: null }) },
+    { reason: 'round', usedRound: 1 },
+    { reason: 'attacker_inactive', cs: makeCs({ attackerHp: 0 }) },
+  ];
+
+  it.each(PRESS_REFUSALS)('refuses $reason before any roll — store byte-inert, single honest log', async ({ reason, lastAttack, cs, usedRound }) => {
+    const { result, store, deps } = await press({ lastAttack, cs, usedRound });
+    expect(result).toMatchObject({ resolved: false, refused: true, reason });
+    expect(result.popupHtml ?? null).toBeNull();
+    // Guards refuse BEFORE touching dice or store (§1035 reach-branch, MA-0681 teardown twin).
+    expect(deps.rollD20).not.toHaveBeenCalled();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
     expect(store.reactionUses.jinx_negate ?? 0).toBe(0);
     expect(store.latches.jinx ?? 0).toBe(0);
-    expect(store.logs.some(l => l.automationType === 'jinx_refused' && l.automationDetail === 'no_pending_attack')).toBe(true);
+    expect(store.campaign.pendingJinx ?? null).toBeNull();
+    expect(deps.addEntry).toHaveBeenCalledTimes(1);
+    const [campaignName, entry] = deps.addEntry.mock.calls[0];
+    expect(campaignName).toBe(CAMPAIGN);
+    expect(entry).toMatchObject({ type: 'automation', automationType: 'jinx_refused', automationDetail: reason, characterName: HEXER });
+    expect(entry.description.startsWith(`Jinx refused (${reason}):`)).toBe(true);
   });
+});
 
-  it('refuses a missed attack, a resolved (damage-applied) attack, and an already-jinxed attack', async () => {
-    const miss = await press({ lastAttack: pendingHit({ hit: false }) });
-    expect(miss.result.reason).toBe('miss');
-    const done = await press({ lastAttack: pendingHit({ damageApplied: true, actualDamage: 7 }) });
-    expect(done.result.reason).toBe('resolved');
-    const reacted = await press({ lastAttack: pendingHit({ jinxResolved: true }) });
-    expect(reacted.result.reason).toBe('reacted');
-    for (const run of [miss, done, reacted]) {
-      expect(run.store.reactionUses.jinx_negate ?? 0).toBe(0);
-      expect(run.result.popupHtml ?? null).toBeNull();
+describe('MA-0895 gate census — round > uses > identity > spec, RAW trigger is any attack roll', () => {
+  const gateParams = (overrides = {}) => ({ lastAttack: pendingHit(), monsterName: HEXER, currentRound: 1, storedUses: {}, usedRound: 0, action: JINX_ROW, ...overrides });
+
+  it.each([
+    ['plain pending hit passes with authored spec and 999 limit', {}, true, undefined],
+    ['spell-attack pendings qualify (no melee-only filter)', { lastAttack: pendingHit({ rollType: 'spell-attack' }) }, true, undefined],
+    ['round-latch outranks uses AND identity', { usedRound: 1, storedUses: { jinx_negate: 999 }, lastAttack: null }, false, 'round'],
+    ['uses exhaustion outranks identity', { storedUses: { jinx_negate: 999 }, lastAttack: null }, false, 'uses'],
+    ['default limit is 1 when no uses/maxUses authored', { action: { name: 'Jinx', automation: { type: 'reaction', effect: 'jinx_negate', saveType: 'WIS', saveDc: 13 } }, storedUses: { jinx_negate: 1 } }, false, 'uses'],
+    ['attack targeting someone else is not pending for the hexer', { lastAttack: pendingHit({ targetName: 'Bandit 2' }) }, false, 'no_pending_attack'],
+    ['non-attack rollTypes never qualify', { lastAttack: pendingHit({ rollType: 'damage' }) }, false, 'no_pending_attack'],
+    ['non-numeric save DC row honestly refuses (spec)', { action: { name: 'Jinx', automation: { type: 'reaction', effect: 'jinx_negate', saveType: 'WIS' } } }, false, 'spec'],
+  ])('%s', (_name, overrides, ok, reason) => {
+    const gate = jinxGate(gateParams(overrides));
+    expect(gate.ok).toBe(ok);
+    if (ok) {
+      expect(gate).toMatchObject({ used: 0, limit: 999, attackerName: 'Bandit 1', spec: { saveDc: 13, saveType: 'WIS' } });
+    } else {
+      expect(gate.reason).toBe(reason);
+      expect(gate.message).toBeTruthy();
     }
   });
 
-  it('refuses when the attacker is the hexer itself or missing', async () => {
-    const self = await press({ lastAttack: pendingHit({ attackerName: HEXER }) });
-    expect(self.result.reason).toBe('attacker');
-    const anon = await press({ lastAttack: pendingHit({ attackerName: null }) });
-    expect(anon.result.reason).toBe('attacker');
-  });
-
-  it('round-latch refuses a same-round re-press zero-spend', async () => {
-    const { result, store } = await press({ usedRound: 1, currentRound: 1 });
-    expect(result.ok ?? result.resolved ?? false).toBe(false);
-    expect(result.reason).toBe('round');
-    expect(store.logs.some(l => l.automationType === 'jinx_refused' && l.automationDetail === 'round')).toBe(true);
-    expect(store.reactionUses.jinx_negate ?? 0).toBe(0);
-  });
-
-  it('refuses a dead/absent attacker zero-spend', async () => {
-    const cs = makeCs();
-    cs.creatures[1].currentHp = 0;
-    const { result } = await press({ cs });
-    expect(result.reason).toBe('attacker_inactive');
-  });
-
-  it('jinxIdentityRefusal accepts spell-attack pendings too (no melee-only filter)', () => {
-    expect(jinxIdentityRefusal(pendingHit({ rollType: 'spell-attack' }), HEXER)).toBeNull();
-    expect(jinxIdentityRefusal(pendingHit({ rollType: 'damage' }), HEXER)).toBe('no_pending_attack');
-    expect(jinxGate({ lastAttack: pendingHit(), monsterName: HEXER, currentRound: 1, storedUses: {}, usedRound: 0, action: JINX_ROW }).ok).toBe(true);
+  it('jinxIdentityRefusal tokens match gate reasons one-for-one', () => {
+    expect(jinxIdentityRefusal(pendingHit(), HEXER)).toBeNull();
+    expect(jinxIdentityRefusal(null, HEXER)).toBe('no_pending_attack');
+    expect(jinxIdentityRefusal(pendingHit({ hit: false }), HEXER)).toBe('miss');
+    expect(jinxIdentityRefusal(pendingHit({ actualDamage: 3 }), HEXER)).toBe('resolved');
   });
 });
 
-describe('MA-0895 press — attacker WIS save rolled inline, machine-stamped, §212 mod folded', () => {
-  it('FAILED save (nat10 −5 = 5 < 13): pending-miss stamp, latch, spend, NO popupHtml', async () => {
+describe('MA-0895 press legs — attacker WIS save inline, machine-stamped, latch+spend both legs', () => {
+  it('FAILED save (nat10 −5 = 5 < 13): pending-miss stamps AFTER awaited latch+spend, no popupHtml', async () => {
     const { result, store, deps } = await press({ roll: 10 });
     expect(result).toEqual({ resolved: true, success: false, saveTotal: 5, remaining: 998 });
     expect(deps.rollD20).toHaveBeenCalledTimes(1);
+    // CLA-361 order: round-latch and uses spend are written BEFORE the consumer-readable
+    // lastAttack.jinxPending / campaign.pendingJinx stamps, every write campaign-keyed.
+    const writes = deps.setRuntimeValue.mock.calls.map(([characterKey, propertyName, , campaignName]) => ({ characterKey, propertyName, campaignName }));
+    expect(writes.map(w => w.propertyName)).toEqual(['_jinx_negate_usedRound', 'monsterReactionUses', 'lastAttack', 'pendingJinx']);
+    expect(writes.every(w => w.campaignName === CAMPAIGN)).toBe(true);
     const pending = store.campaign.pendingJinx;
     expect(pending).toMatchObject({ attackerName: 'Bandit 1', targetName: HEXER, by: HEXER, saveDc: 13, saveRoll: 10, saveBonus: -5, saveTotal: 5, consumed: false, attackTotal: 17, targetAc: 13 });
     expect(store.campaign.lastAttack).toMatchObject({ jinxResolved: true, jinxPending: true, jinxSaveResult: 'failure', jinxSaveTotal: 5, hit: true });
     expect(store.latches.jinx).toBe(1);
     expect(store.reactionUses.jinx_negate).toBe(1);
-    const saveLog = store.logs.find(l => l.automationType !== 'ability_use' && l.rollType === 'save');
+    const saveLog = store.logs.find(l => l.rollType === 'save');
     expect(saveLog).toMatchObject({ type: 'roll', characterName: 'Bandit 1', saveType: 'WIS', saveDc: 13, saveRoll: 10, saveBonus: -5, total: 5, saveResult: 'failure', note: 'jinx_negate_attacker_save' });
     const spendLog = store.logs.find(l => l.type === 'ability_use');
     expect(spendLog.description).toContain('FAILED');
@@ -215,7 +242,7 @@ describe('MA-0895 press — attacker WIS save rolled inline, machine-stamped, §
     expect(result.popupHtml ?? null).toBeNull();
   });
 
-  it('SUCCESS save (+19 fold: nat4+19 = 23 ≥ 13): no pending stamp, jinx_saved, attack rides Done', async () => {
+  it('SUCCESS save (+19 fold: nat4+19 = 23 ≥ 13): no pending stamp, jinx_saved — reaction still spent (RAW press-burn)', async () => {
     const { result, store } = await press({ roll: 4, cs: makeCs({ wisMod: 19 }) });
     expect(result).toEqual({ resolved: true, success: true, saveTotal: 23, remaining: 998 });
     expect(store.campaign.pendingJinx ?? null).toBeNull();
@@ -227,7 +254,10 @@ describe('MA-0895 press — attacker WIS save rolled inline, machine-stamped, §
     expect(result.popupHtml ?? null).toBeNull();
   });
 
-  it('falls back to ability_score_modifiers when no §212 saving_throws stamp is present', () => {
+  it('save-spec units: automation twins win, save_dc fallback folds, §212 nested-abbrev beats ability_score_modifiers', () => {
+    expect(jinxSaveSpec({ save_dc: 15, automation: { type: 'reaction', effect: 'jinx_negate' } })).toEqual({ saveDc: 15, saveType: 'WIS' });
+    expect(jinxSaveSpec({ automation: { type: 'reaction', effect: 'jinx_negate', saveDc: 0 } })).toBeNull();
+    expect(jinxSaveSpec({})).toBeNull();
     expect(attackerSaveModifier({ ability_score_modifiers: { wis: 2 } }, 'wis')).toBe(2);
     expect(attackerSaveModifier({ saving_throws: { wis: { modifier: -5 } }, ability_score_modifiers: { wis: 2 } }, 'wis')).toBe(-5);
     expect(attackerSaveModifier(null, 'wis')).toBe(0);
@@ -260,60 +290,62 @@ describe('MA-0895 resolve consumer — Done converts the stamped pending hit to 
     return { store, deps };
   }
 
-  it('matching Done: lastAttack rewritten hit:false + jinx_negated + zero damage, popup honest, pending cleared', async () => {
+  it('matching Done: lastAttack rewritten hit:false + jinx_negated + zero damage over preserved roll bytes, pending cleared, popup honest', async () => {
     const { store, deps } = consumeSetup();
     const context = { attackerName: 'Bandit 1', targetName: HEXER, attackName: 'Scimitar', damageType: 'Slashing' };
     const outcome = await consumePendingJinxOnResolve(CAMPAIGN, context, deps);
     expect(outcome.negated).toBe(true);
     expect(store.campaign.pendingJinx).toBeNull();
-    expect(store.campaign.lastAttack).toMatchObject({ hit: false, jinx_negated: true, negatedBy: HEXER, actualDamage: 0, damageApplied: false, jinxSaveTotal: 5 });
+    expect(store.campaign.lastAttack).toMatchObject({
+      hit: false, jinx_negated: true, negatedBy: HEXER, jinxSaveResult: 'failure', jinxSaveTotal: 5,
+      actualDamage: 0, damageApplied: false,
+      // merge preserves the original attack roll bytes the popup still shows.
+      attackerName: 'Bandit 1', targetName: HEXER, attackName: 'Scimitar', d20: 14, total: 17, targetAc: 13,
+    });
     expect(store.logs.some(l => l.automationType === 'jinx_attack_negated' && l.description.includes('NEGATED'))).toBe(true);
     expect(outcome.popupData).toMatchObject({ type: 'auto-miss', computedHit: false, name: 'Scimitar', targetName: HEXER, jinxNegated: true, finalDamage: 0, note: 'attack negated — Jinx' });
   });
 
-  it('byte-inert with no pending, consumed pending, attacker mismatch, or a re-armed different target', async () => {
-    expect(await consumePendingJinxOnResolve(CAMPAIGN, { attackerName: 'Bandit 1', targetName: HEXER }, consumeSetup({ pending: null }).deps)).toBeNull();
-    expect(await consumePendingJinxOnResolve(CAMPAIGN, { attackerName: 'Bandit 1', targetName: HEXER }, consumeSetup({ pending: { ...armedPending(), consumed: true } }).deps)).toBeNull();
-    expect(await consumePendingJinxOnResolve(CAMPAIGN, { attackerName: 'Bandit 2', targetName: HEXER }, consumeSetup().deps)).toBeNull();
-    expect(await consumePendingJinxOnResolve(CAMPAIGN, { attackerName: 'Bandit 1', targetName: 'Bandit 2' }, consumeSetup().deps)).toBeNull();
+  it.each([
+    ['no armed pending', null, { attackerName: 'Bandit 1', targetName: HEXER }],
+    ['already-consumed pending', { ...armedPending(), consumed: true }, { attackerName: 'Bandit 1', targetName: HEXER }],
+    ['attacker mismatch', armedPending(), { attackerName: 'Bandit 2', targetName: HEXER }],
+    ['target mismatch', armedPending(), { attackerName: 'Bandit 1', targetName: 'Bandit 2' }],
+  ])('byte-inert with %s: null, zero writes, zero logs', async (_name, pending, context) => {
+    const { store, deps } = consumeSetup({ pending });
+    const before = store.campaign.lastAttack;
+    expect(await consumePendingJinxOnResolve(CAMPAIGN, context, deps)).toBeNull();
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(store.logs).toHaveLength(0);
+    expect(store.campaign.lastAttack).toBe(before);
   });
 });
 
-describe('MA-0895 dispatcher — resolveMonsterGatedReaction routes the jinx row through the pending window', () => {
-  function gatedDeps({ roll = 10, lastAttack = pendingHit() } = {}) {
-    const store = { reactionUses: {}, latches: {}, campaign: { lastAttack }, logs: [] };
+describe('MA-0895 dispatcher — the jinx_negate arm routes through the pending window', () => {
+  it('failed save resolves via resolveMonsterGatedReaction and arms pendingJinx (chip press, not the generic save chip)', async () => {
+    const lastAttack = pendingHit();
+    const store = { campaign: { lastAttack }, logs: [] };
     const deps = {
       findLastAttack: vi.fn(async () => lastAttack),
       getCombatContext: vi.fn(async () => makeCs()),
-      rollD20: vi.fn(() => roll),
+      rollD20: vi.fn(() => 10),
       getRuntimeValue: vi.fn((characterKey, propertyName) => {
-        if (propertyName === 'monsterReactionUses') return store.reactionUses;
-        if (propertyName === 'pendingJinx') return store.campaign.pendingJinx;
+        if (propertyName === 'monsterReactionUses') return {};
+        if (propertyName === 'pendingJinx') return store.campaign.pendingJinx ?? null;
         return null;
       }),
       setRuntimeValue: vi.fn(async (characterKey, propertyName, value) => {
         if (propertyName === 'monsterReactionUses') store.reactionUses = value;
-        if (propertyName === '_jinx_negate_usedRound') store.latches.jinx = value;
+        if (propertyName === '_jinx_negate_usedRound') store.latches = { jinx: value };
         if (characterKey === 'campaign') store.campaign[propertyName] = value;
       }),
       addEntry: vi.fn(async (campaignName, entry) => { store.logs.push(entry); }),
     };
-    return { store, deps };
-  }
-
-  it('failed save resolves through the gated channel and arms pendingJinx (chip press, not the generic save chip)', async () => {
-    const { store, deps } = gatedDeps({ roll: 10 });
     const result = await resolveMonsterGatedReaction({ action: JINX_ROW, monsterName: HEXER, campaignName: CAMPAIGN, deps });
-    expect(result).toMatchObject({ resolved: true, success: false, saveTotal: 5 });
-    expect(store.campaign.pendingJinx).toMatchObject({ attackerName: 'Bandit 1', consumed: false });
+    expect(result).toMatchObject({ resolved: true, success: false, saveTotal: 5, remaining: 998 });
+    expect(store.campaign.pendingJinx).toMatchObject({ attackerName: 'Bandit 1', targetName: HEXER, consumed: false });
+    expect(store.campaign.lastAttack).toMatchObject({ jinxPending: true, hit: true });
+    expect(store.latches.jinx).toBe(1);
     expect(store.reactionUses.jinx_negate).toBe(1);
-  });
-
-  it('off-window press refuses zero-spend through the same channel', async () => {
-    const { store, deps } = gatedDeps({ lastAttack: null });
-    const result = await resolveMonsterGatedReaction({ action: JINX_ROW, monsterName: HEXER, campaignName: CAMPAIGN, deps });
-    expect(result).toMatchObject({ resolved: false, refused: true, reason: 'no_pending_attack' });
-    expect(store.reactionUses.jinx_negate ?? 0).toBe(0);
-    expect(store.latches.jinx ?? 0).toBe(0);
   });
 });

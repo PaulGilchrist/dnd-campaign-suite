@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1020: Imp "Shape-Shift" — formerly a zero-affordance dead prose row
 // (name + description ONLY; MA-1020 audit: 0 buttons/chips/pointer children,
 // 0 whole-log shape-shift transport). NOW a dedicated `monster_shape_shift`
@@ -17,7 +18,24 @@
 // save-modifier context key (conditionEffectsInternal.js) — no te registered
 // or stamped here. "True Form" deletes the stamp so runMonster restores the
 // authored stat-block Speed (imp disk block: walk 20 ft., fly 40 ft.).
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+//
+// Lane cite table — shapeShift family map (NO base monsterShapeShift.test.js
+// exists; MA-1020 is the origin lane, generics owned here, tickets stay
+// byte-distinct citing "per MA-1020 byte-shape"):
+//   monsterShapeShift.ma1113-lizardfolk.test.js — Crocodile walk 20 + own disk revert
+//   monsterShapeShift.ma1260-oni.test.js       — Humanoid/Giant walk 30, junk +0 cleanup
+//   monsterShapeShift.ma1371-quasit.test.js    — Bat/Centipede/Toad, no-swim §571(a)
+//   monsterSelfBuff.imp-invisibility.test.js    — #1140 cut its Shape-Shift mirror
+//     cross-lane: imp form + flight bytes (Raven fly 60, disk fly 40) owned HERE.
+// Modal seam resolveShapeShiftSelection/declineShapeShiftSelection: tested
+// ONLY in this file — family owner of the chooser wrappers.
+// Old->new map (consolidations): old "At Will gate"→1; old "siblings
+// byte-inert"+old "formless resolves"→3; old "Rat/Spider apply"→dict table 4
+// (apply→cs stamp form-agnostic, pinned via Raven 5); old "no clock no te"
+// +old "popup copy §70"→5; old "imp disk speed backstop"→6 (same bytes flow
+// through the revert log); old refusals trio + refusal-popup copy→7 it.each
+// table (#903/#1095 shape); whole-DB armed census stays unique here.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   isMonsterShapeShiftRow,
   shapeShiftForms,
@@ -27,8 +45,6 @@ import {
   resolveMonsterShapeShiftRow,
   resolveShapeShiftSelection,
   declineShapeShiftSelection,
-  buildShapeShiftAppliedLog,
-  buildShapeShiftRefusalPopup,
 } from './monsterShapeShift.js';
 import { monsterAbilitySaveUsesGate } from './monsterAbilityUses.js';
 import { isUtilitySpellCastRow } from '../../components/encounter/MonsterCardHelpers.js';
@@ -97,8 +113,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks(); // #1007 — no spy leaks on failed assertions
+});
+
 describe('MA-1020 Imp Shape-Shift disk data — dedicated monster_shape_shift lane, At Will', () => {
-  it('imp actions[2] authors monster_shape_shift automation with the four RAW forms; description byte-unchanged', () => {
+  it('imp actions[2] authors the four RAW forms byte-exact; At Will keeps the MA-0020 gate honestly null (§230)', () => {
     expect(SHAPE_ROW.name).toBe('Shape-Shift');
     expect(SHAPE_ROW.description).toBe(SHAPE_DESC);
     expect(SHAPE_ROW.automation).toEqual({
@@ -113,27 +133,16 @@ describe('MA-1020 Imp Shape-Shift disk data — dedicated monster_shape_shift la
     });
     expect(isMonsterShapeShiftRow(SHAPE_ROW)).toBe(true);
     expect(shapeShiftForms(SHAPE_ROW).map(f => f.name)).toEqual(['Rat', 'Raven', 'Spider', 'True Form']);
-  });
-
-  it('At Will RAW: no uses/maxUses/usage authored — MA-0020 gate stays honestly null (§230)', () => {
     expect(SHAPE_ROW.uses).toBeUndefined();
     expect(SHAPE_ROW.maxUses).toBeUndefined();
     expect(SHAPE_ROW.usage).toBeUndefined();
     expect(monsterAbilitySaveUsesGate(SHAPE_ROW, {})).toBeNull();
   });
 
-  it('siblings byte-inert + the MA-1014 utility census never arms this row (automation exclusion §429)', () => {
-    expect(isMonsterShapeShiftRow(STING_ROW)).toBe(false);
-    expect(isMonsterShapeShiftRow(INVIS_ROW)).toBe(false);
-    expect(isMonsterShapeShiftRow({ name: 'X', automation: { type: 'monster_shape_shift' } })).toBe(false);
-    expect(isMonsterShapeShiftRow({ name: 'X', automation: { type: 'monster_shape_shift', forms: [] } })).toBe(false);
-    expect(isUtilitySpellCastRow(SHAPE_ROW)).toBe(false);
-  });
-
-  it('whole-database scan: monster_shape_shift arms imp/Shape-Shift + MA-1113 lizardfolk-shaman/Change Shape + MA-1260 oni/Shape-Shift + MA-1371 quasit/Shape-Shift (pin inverted post-MA-1113/MA-1260/MA-1371 §216)', () => {
+  it('whole-database scan: monster_shape_shift arms imp/Shape-Shift + MA-1113 lizardfolk-shaman/Change Shape + MA-1260 oni/Shape-Shift + MA-1371 quasit/Shape-Shift and nothing else (pin inverted post-MA-1113/MA-1260/MA-1371 §216)', () => {
     const armed = [];
     for (const mo of monstersData) {
-      for (const key of ['actions', 'legendary_actions', 'reactions']) {
+      for (const key of ['actions', 'bonus_actions', 'legendary_actions', 'reactions']) {
         for (const a of Array.isArray(mo[key]) ? mo[key] : []) {
           if (a && typeof a === 'object' && isMonsterShapeShiftRow(a)) armed.push(`${mo.index}/${a.name}`);
         }
@@ -141,10 +150,24 @@ describe('MA-1020 Imp Shape-Shift disk data — dedicated monster_shape_shift la
     }
     expect(armed).toEqual(['imp/Shape-Shift', 'lizardfolk-shaman/Change Shape (Recharges after a Short or Long Rest)', 'oni/Shape-Shift', 'quasit/Shape-Shift']);
   });
+
+  it('row guards: sting/invisibility siblings, missing/empty forms, and the MA-1014 utility census never arm; foreign/formless resolves are byte-inert with a zero-write zero-log census (§429)', async () => {
+    expect(isMonsterShapeShiftRow(STING_ROW)).toBe(false);
+    expect(isMonsterShapeShiftRow(INVIS_ROW)).toBe(false);
+    expect(isMonsterShapeShiftRow({ name: 'X', automation: { type: 'monster_shape_shift' } })).toBe(false);
+    expect(isMonsterShapeShiftRow({ name: 'X', automation: { type: 'monster_shape_shift', forms: [] } })).toBe(false);
+    expect(isUtilitySpellCastRow(SHAPE_ROW)).toBe(false);
+    const deps = makeDeps();
+    expect(await resolveMonsterShapeShiftRow({ action: STING_ROW, form: RAVEN, monsterName: 'Imp 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps })).toEqual({ resolved: false, reason: 'not-shape-shift' });
+    expect(await resolveMonsterShapeShiftRow({ action: SHAPE_ROW, form: null, monsterName: 'Imp 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps })).toEqual({ resolved: false, reason: 'no-form' });
+    expect(await resolveMonsterShapeShiftRow()).toEqual({ resolved: false, reason: 'not-shape-shift' });
+    expect(deps.writes).toHaveLength(0);
+    expect(deps.logs).toHaveLength(0);
+  });
 });
 
 describe('MA-1020 Speed dict builders — stat-block shape the card renderer reads', () => {
-  it('rat / raven / spider stamp walk+mode dicts; True Form reverts (null)', () => {
+  it('rat walk-only / raven walk+fly / spider walk+climb dicts; True Form reverts (null); speed text mirrors the dict (#1140 flight bytes owned here)', () => {
     expect(shapeShiftSpeedDict(RAT)).toEqual({ walk: '20 ft.' });
     expect(shapeShiftSpeedDict(RAVEN)).toEqual({ walk: '20 ft.', fly: '60 ft.' });
     expect(shapeShiftSpeedDict(SPIDER)).toEqual({ walk: '20 ft.', climb: '20 ft.' });
@@ -154,14 +177,10 @@ describe('MA-1020 Speed dict builders — stat-block shape the card renderer rea
     expect(shapeShiftSpeedText(RAVEN)).toBe('walk 20 ft., fly 60 ft.');
     expect(shapeShiftSpeedText(TRUE_FORM)).toBe('true-form');
   });
-
-  it('imp authored true-form Speed on disk is walk 20 ft., fly 40 ft. (revert backstop)', () => {
-    expect(imp.speed).toEqual({ walk: '20 ft.', fly: '40 ft.' });
-  });
 });
 
 describe('MA-1020 apply — ONE merged cs POST stamps the Speed dict; NO clock, NO te', () => {
-  it('Raven: single full-store cs POST with speed dict + shapeShiftForm on the Imp only; other combatants byte-untouched', async () => {
+  it('Raven: single full-store cs POST with speed dict + shapeShiftForm on the Imp only; other combatants byte-untouched; log+popup honest, At Will zero spend, no clock no te (§39/§70)', async () => {
     const deps = makeDeps();
     const setPopupHtml = vi.fn();
     const result = await apply(RAVEN, deps, setPopupHtml);
@@ -179,23 +198,19 @@ describe('MA-1020 apply — ONE merged cs POST stamps the Speed dict; NO clock, 
     expect(applied).toBeTruthy();
     expect(applied.characterName).toBe('Imp 1');
     expect(applied.abilityName).toBe('Shape-Shift');
+    expect(applied.description).toContain('shape-shifts into Raven');
     expect(applied.description).toContain('walk 20 ft., fly 60 ft.');
     expect(applied.description).toContain('no expiration clock');
+    expect(applied.description).toContain('§70');
     expect(deps.logs.some(e => e.type === 'ability_use')).toBe(false); // At Will zero spend
+    expect(deps.logs.every(e => e.type === 'automation')).toBe(true);
+    expect(JSON.stringify(deps.writes[0])).not.toMatch(/expir|shape_shifted/); // no clock, no te §70
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Raven'));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('walk 20 ft., fly 60 ft.'));
   });
 
-  it('Rat stamps walk-only; Spider stamps walk+climb (no stray fly)', async () => {
-    const deps = makeDeps();
-    await apply(RAT, deps);
-    expect(deps.writes[0].creatures.find(c => c.name === 'Imp 1').speed).toEqual({ walk: '20 ft.' });
-    const deps2 = makeDeps();
-    await apply(SPIDER, deps2);
-    expect(deps2.writes[0].creatures.find(c => c.name === 'Imp 1').speed).toEqual({ walk: '20 ft.', climb: '20 ft.' });
-  });
-
-  it('True Form: clears stamp + marker with ONE POST and logs the restored stat-block Speed read from disk', async () => {
+  it('True Form: clears stamp + marker with ONE POST and logs the restored stat-block Speed read from disk (imp backstop: walk 20 ft., fly 40 ft.)', async () => {
+    expect(imp.speed).toEqual({ walk: '20 ft.', fly: '40 ft.' });
     const deps = makeDeps();
     await apply(RAT, deps);
     const setPopupHtml = vi.fn();
@@ -211,60 +226,33 @@ describe('MA-1020 apply — ONE merged cs POST stamps the Speed dict; NO clock, 
     expect(reverted.description).toContain('walk 20 ft., fly 40 ft.');
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('walk 20 ft., fly 40 ft.'));
   });
-
-  it('no clock, no te, no targetEffects write anywhere in the flow (RAW persists until shift-back §70)', async () => {
-    const deps = makeDeps();
-    await apply(RAVEN, deps);
-    expect(deps.writes).toHaveLength(1);
-    expect(JSON.stringify(deps.writes[0])).not.toMatch(/expir|shape_shifted/);
-    expect(deps.logs.every(e => e.type === 'automation')).toBe(true);
-  });
 });
 
-describe('MA-1020 refusals — zero-write, zero-spend, honest popup+log', () => {
-  it('re-pick of the standing form: shape_shift_refused / already_in_raven_form, no second POST', async () => {
-    const deps = makeDeps();
-    await apply(RAVEN, deps);
+describe('MA-1020 refusals — zero-write, zero-spend, honest popup+log (#903 table)', () => {
+  it.each([
+    { label: 're-pick of the standing Raven form', preshift: [RAVEN], form: RAVEN, reason: 'already_in_form', detail: 'already_in_raven_form' },
+    { label: 'True Form while already true', preshift: [], form: TRUE_FORM, reason: 'already_true_form', detail: 'already_true_form' },
+    { label: 'missing cs combatant', preshift: [], form: RAVEN, reason: 'no_combat_summary_entry', detail: 'no_combat_summary_entry', cs: null },
+  ])('$label: $reason — zero POST, refusal log, honest popup naming the human reason', async ({ preshift, form, reason, detail, cs }) => {
+    const deps = makeDeps({ cs }); // cs:null rows get no combatSummary at all
+    for (const pre of preshift) await apply(pre, deps);
+    const writesBefore = deps.writes.length;
+    const errSpy = cs === null ? vi.spyOn(console, 'error').mockImplementation(() => {}) : null;
     const setPopupHtml = vi.fn();
-    const again = await apply(RAVEN, deps, setPopupHtml);
-    expect(again).toEqual({ resolved: false, reason: 'already_in_form' });
-    expect(deps.writes).toHaveLength(1);
-    const refusal = deps.logs.find(e => e.automationType === 'shape_shift_refused');
+    const result = await apply(form, deps, setPopupHtml);
+    expect(result).toEqual({ resolved: false, reason });
+    expect(deps.writes).toHaveLength(writesBefore); // zero extra POST
+    expect(deps.logs.some(e => e.type === 'ability_use')).toBe(false); // zero spend
+    const refusal = deps.logs.find(e => e.automationDetail === detail);
     expect(refusal).toBeTruthy();
-    expect(refusal.automationDetail).toBe('already_in_raven_form');
+    expect(refusal.automationType).toBe('shape_shift_refused');
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Shape-Shift Refused'));
-  });
-
-  it('True Form while already true: already_true_form refusal, zero writes', async () => {
-    const deps = makeDeps();
-    const result = await apply(TRUE_FORM, deps);
-    expect(result).toEqual({ resolved: false, reason: 'already_true_form' });
-    expect(deps.writes).toHaveLength(0);
-    expect(deps.logs.find(e => e.automationDetail === 'already_true_form')).toBeTruthy();
-  });
-
-  it('missing cs combatant: console.error + honest refusal, zero POST', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const deps = makeDeps({ cs: null });
-    const result = await apply(RAVEN, deps);
-    expect(result).toEqual({ resolved: false, reason: 'no_combat_summary_entry' });
-    expect(deps.writes).toHaveLength(0);
-    expect(errSpy).toHaveBeenCalled();
-    expect(deps.logs.find(e => e.automationDetail === 'no_combat_summary_entry')).toBeTruthy();
-    errSpy.mockRestore();
-  });
-
-  it('non-shape-shift rows and formless resolves are byte-inert', async () => {
-    const deps = makeDeps();
-    expect(await resolveMonsterShapeShiftRow({ action: STING_ROW, form: RAVEN, monsterName: 'Imp 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps })).toEqual({ resolved: false, reason: 'not-shape-shift' });
-    expect(await resolveMonsterShapeShiftRow({ action: SHAPE_ROW, form: null, monsterName: 'Imp 1', campaignName: 'test-campaign', setPopupHtml: vi.fn(), deps })).toEqual({ resolved: false, reason: 'no-form' });
-    expect(await resolveMonsterShapeShiftRow()).toEqual({ resolved: false, reason: 'not-shape-shift' });
-    expect(deps.writes).toHaveLength(0);
-    expect(deps.logs).toHaveLength(0);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(detail.replace(/_/g, ' ')));
+    if (errSpy) expect(errSpy).toHaveBeenCalled();
   });
 });
 
-describe('MA-1020 modal seam — chooser resolve/decline wrappers', () => {
+describe('MA-1020 modal seam — chooser resolve/decline wrappers (family-owned, tested only here)', () => {
   it('resolveShapeShiftSelection closes the chooser then stamps the picked form', async () => {
     const deps = makeDeps();
     const setChooser = vi.fn();
@@ -287,14 +275,5 @@ describe('MA-1020 modal seam — chooser resolve/decline wrappers', () => {
     const deps2 = makeDeps();
     await declineShapeShiftSelection({ chooser: null, monsterName: 'Imp 1', campaignName: 'test-campaign', setChooser: vi.fn(), deps: deps2 });
     expect(deps2.logs).toHaveLength(0);
-  });
-
-  it('popup refusal copy names the form and the At-Will re-click path', () => {
-    const popup = buildShapeShiftRefusalPopup({ monsterName: 'Imp 1', form: RAVEN, reason: 'already_in_raven_form' });
-    expect(popup).toContain('already in raven form');
-    expect(popup).toContain('Raven');
-    const grant = buildShapeShiftAppliedLog({ monsterName: 'Imp 1', action: SHAPE_ROW, form: RAT, speedText: 'walk 20 ft.' });
-    expect(grant.description).toContain('shape-shifts into Rat');
-    expect(grant.description).toContain('§70');
   });
 });

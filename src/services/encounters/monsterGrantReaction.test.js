@@ -1,30 +1,43 @@
-// MA-0882: Gnoll Pack Lord "Incite Rampage" — formerly a zero-affordance inert
-// row (description + cosmetic <em> (5-6)</em> only, recharge economy never
-// engaged). The monsterGrantReaction seam arms a chip whose click runs the live
-// MA-0031 monsterRechargeGate FIRST (spent → refusal popup +
-// `incite_rampage_refused` log, zero grant), resolves the GM-armed target
-// (getTargetFromAttacker — ANOTHER creature, no-target/self-target refuse
-// zero-spend), refuses an already-incited target zero-spend, then
-// spendsMonsterRecharge FIRST (ability_use log), registers te `incite_rampage`
-// ON THE TARGET with ONE rounds:1 addExpiration clock, and logs the grant
-// ("can take a Reaction to make one melee attack" + §70 Rampage-prerequisite
-// advisory). Mirrors the MA-0648/0655 sanctioned twins.
+// @maintained-by-ai
+// MA-0882 service lane: monsterGrantReaction resolver — Gnoll Pack Lord "Incite
+// Rampage" chip click (automation {type:"monster_grant_reaction", effect:
+// "incite_rampage", range_ft:60}; formerly an inert row with cosmetic (5-6) text
+// only). One click = recharge gate FIRST (live MA-0031 monsterRechargeGate — spent
+// row refuses even with a target armed), then the GM-armed-target seam
+// (getTargetFromAttacker — RAW ANOTHER creature ≤60 ft; unarmed/self-armed refuse),
+// then the already-incited gate (re-grant on a live target refuses rather than
+// stacks or double-spends — refuses-not-replaces pinned honest #949); all refusals
+// zero-spend/zero-te/zero-clock (#1026 zero-applied-must-not-burn). Met →
+// spendMonsterRecharge FIRST (ability_use log before grant log), stamp te
+// `incite_rampage` on the TARGET with exactly ONE rounds:1 addExpiration clock
+// (reaction window clears at the next-round seam — never wall-clock, #app MANDATORY),
+// grant log + popup, campaign-keyed writes (#1019).
+//
+// Cite-owner table:
+//   te key existence + definition bytes ..... targetEffectDefinitions.test.js #820 golden census ('incite_rampage' row) — #1012 retired this lane's registration test
+//   recharge gate math + ability_use shape .. monsterRecharge.test.js (MA-0031; live-consumed here, shape not restated)
+//   reaction-bucket economy ................. CANON turnState #1070; trigger predicate #1018; generic gate machinery gated-reaction.test.js #1091
+//   chip render / press routing ............. MonsterAction.grant-reaction.test.jsx
+//
+// Old -> new: disk-shape test -> disk shape (row found by NAME, magic actions[3]
+// index gone); te-registration test -> REMOVED (owner: golden census #1012);
+// 4 refusal its -> one it.each refusal economy (#903); 2 log-builder unit its ->
+// folded into the press + refusal route-throughs (#1080 producer bytes via real
+// production route); press -> kept, strengthened (exact register/addExpiration
+// positional bytes, 2-log census with spend-before-grant order, single
+// campaign-keyed store write = zero-RNG proof #1072 — the d6 5-6 recovery rolls
+// ride rollMonsterRecharges, never here).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isMonsterGrantReactionRow,
   grantReactionRangeFt,
   resolveMonsterGrantReactionRow,
-  buildGrantReactionGrantLog,
-  buildGrantTargetRefusalLog,
-  buildAlreadyIncitedRefusalLog,
 } from './monsterGrantReaction.js';
-import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition } from '../combat/conditions/targetEffectDefinitions.js';
 import monstersData from '../../../public/data/monsters.json';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
-  getAllStoreKeys: vi.fn(() => []),
 }));
 vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -35,7 +48,7 @@ vi.mock('../../services/rules/effects/expirations.js', () => ({
 }));
 
 const packLord = monstersData.find(m => m.index === 'gnoll-pack-lord');
-const INCITE_ROW = packLord.actions[3];
+const INCITE_ROW = packLord.actions.find(a => a.name === 'Incite Rampage');
 const BONE_WHIP = packLord.actions.find(a => a.name === 'Bone Whip');
 
 function makeDeps({ rechargeMap = {}, cs = null, activeTe = null } = {}) {
@@ -69,35 +82,28 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('MA-0882 disk data shape', () => {
-  it('gnoll-pack-lord actions[3] Incite Rampage authors monster_grant_reaction automation + recharge 5-6 kept', () => {
-    expect(INCITE_ROW.name).toBe('Incite Rampage');
+describe('MA-0882 disk shape + row predicate', () => {
+  it('Incite Rampage authors monster_grant_reaction with recharge 5-6 kept; predicate reads it, other rows never arm the affordance', () => {
     expect(INCITE_ROW.automation).toEqual({ type: 'monster_grant_reaction', effect: 'incite_rampage', range_ft: 60 });
     expect(INCITE_ROW.recharge).toBe('5-6');
     expect(INCITE_ROW.range).toBe('60 feet');
     expect(isMonsterGrantReactionRow(INCITE_ROW)).toBe(true);
     expect(grantReactionRangeFt(INCITE_ROW)).toBe(60);
+    // no row, no automation, and type-without-effect rows are never grant affordances
     expect(isMonsterGrantReactionRow(BONE_WHIP)).toBe(false);
     expect(isMonsterGrantReactionRow({ name: 'Multiattack', automation: { type: 'monster_grant_reaction' } })).toBe(false);
-  });
-
-  it('te `incite_rampage` is registered exactly once in targetEffectDefinitions', () => {
-    const def = getEffectDefinition('incite_rampage');
-    expect(def).toBeDefined();
-    expect(def.label).toBe('Incited Rampage');
-    expect(def.icon).toMatch(/^fa-/);
-    expect(def.cls).toBe('effect-buff');
-    expect(def.group).toBe('Spells');
-    expect(TARGET_EFFECT_DEFINITIONS.filter(d => d.effect === 'incite_rampage')).toHaveLength(1);
-    expect(def.description).toMatch(/Reaction to make one melee attack/i);
-    expect(def.description).toMatch(/GM-enforced/i);
-    expect(def.description).toMatch(/Rampage/i);
+    expect(isMonsterGrantReactionRow(undefined)).toBe(false);
   });
 });
 
-describe('MA-0882 recharge gate + target gate refusals (zero grant, zero spend)', () => {
-  it('not recharged: refusal popup + incite_rampage_refused log, zero te, zero clock, zero spend', async () => {
-    const deps = makeDeps({ rechargeMap: { 'Incite Rampage': { recharged: false, threshold: 5 } } });
+describe('MA-0882 refusal economy — zero spend, zero te, zero clock (#1026)', () => {
+  it.each([
+    { name: 'spent recharge', rechargeMap: { 'Incite Rampage': { recharged: false, threshold: 5 } }, reason: 'not-recharged', detail: undefined, token: 'not recharged', popup: 'Not Recharged' },
+    { name: 'unarmed target', cs: { creatures: [{ name: 'Gnoll Pack Lord 1', targetName: null }, { name: 'Bandit 1' }] }, reason: 'no-target', detail: 'no_target', token: 'no_target', popup: 'No Target Armed' },
+    { name: 'self-armed target (RAW another creature)', cs: { creatures: [{ name: 'Gnoll Pack Lord 1', targetName: 'Gnoll Pack Lord 1' }] }, reason: 'self-target', detail: 'self_target', token: 'self_target', popup: 'Cannot Incite Yourself' },
+    { name: 'already-incited target (refuses, not stacks #949)', activeTe: { target: 'Bandit 1', effect: 'incite_rampage', source: 'Gnoll Pack Lord 1' }, reason: 'already-active', detail: 'already_incite_rampage', token: 'already_incite_rampage', popup: 'Already Incited' },
+  ])('$name: refuses $reason with one refused-log and zero spend/te/clock', async ({ rechargeMap, cs, activeTe, reason, detail, token, popup }) => {
+    const deps = makeDeps({ rechargeMap, cs, activeTe });
     const setPopupHtml = vi.fn();
     const result = await resolveMonsterGrantReactionRow({
       action: INCITE_ROW,
@@ -106,88 +112,37 @@ describe('MA-0882 recharge gate + target gate refusals (zero grant, zero spend)'
       setPopupHtml,
       deps,
     });
-    expect(result).toEqual({ resolved: false, reason: 'not-recharged' });
+    expect(result).toEqual({ resolved: false, reason });
     expect(deps.registerTargetEffect).not.toHaveBeenCalled();
     expect(deps.addExpiration).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.store.logs).toHaveLength(1);
-    expect(deps.store.logs[0].automationType).toBe('incite_rampage_refused');
-    expect(deps.store.logs[0].description).toContain('not recharged');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Not Recharged'));
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled(); // never burn recharge on a refusal
+    expect(deps.store.te).toBeNull();
+    const refusals = deps.store.logs.filter(e => e.automationType === 'incite_rampage_refused');
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0].automationDetail).toBe(detail);
+    expect(refusals[0].description).toContain(token);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining(popup));
   });
 
-  it('no armed target: no_target refusal, zero spend, zero te', async () => {
-    const deps = makeDeps({ cs: { creatures: [{ name: 'Gnoll Pack Lord 1', targetName: null }, { name: 'Bandit 1' }] } });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterGrantReactionRow({
-      action: INCITE_ROW,
-      monsterName: 'Gnoll Pack Lord 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'no-target' });
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.addExpiration).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    const refusal = deps.store.logs.find(e => e.automationType === 'incite_rampage_refused');
-    expect(refusal).toBeTruthy();
-    expect(refusal.automationDetail).toBe('no_target');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Target Armed'));
-  });
-
-  it('self-armed target: self_target refusal (RAW targets ANOTHER creature), zero spend', async () => {
-    const deps = makeDeps({ cs: { creatures: [{ name: 'Gnoll Pack Lord 1', targetName: 'Gnoll Pack Lord 1' }] } });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterGrantReactionRow({
-      action: INCITE_ROW,
-      monsterName: 'Gnoll Pack Lord 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'self-target' });
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    expect(deps.store.logs.some(e => e.automationType === 'incite_rampage_refused' && e.automationDetail === 'self_target')).toBe(true);
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Cannot Incite Yourself'));
-  });
-
-  it('already-incited target: already-active refusal, zero recharge spent, zero te', async () => {
-    const deps = makeDeps({ activeTe: { target: 'Bandit 1', effect: 'incite_rampage', source: 'Gnoll Pack Lord 1' } });
-    const setPopupHtml = vi.fn();
-    const result = await resolveMonsterGrantReactionRow({
-      action: INCITE_ROW,
-      monsterName: 'Gnoll Pack Lord 1',
-      campaignName: 'test-campaign',
-      setPopupHtml,
-      deps,
-    });
-    expect(result).toEqual({ resolved: false, reason: 'already-active' });
-    expect(deps.registerTargetEffect).not.toHaveBeenCalled();
-    expect(deps.addExpiration).not.toHaveBeenCalled();
-    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
-    const refusal = deps.store.logs.find(e => e.automationType === 'incite_rampage_refused');
-    expect(refusal.automationDetail).toBe('already_incite_rampage');
-    expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Already Incited'));
-  });
-
-  it('non-grant-reaction rows never resolve', async () => {
+  it('out-of-lane row resolves nothing, logs nothing, pops nothing', async () => {
     const deps = makeDeps();
+    const setPopupHtml = vi.fn();
     const result = await resolveMonsterGrantReactionRow({
       action: BONE_WHIP,
       monsterName: 'Gnoll Pack Lord 1',
       campaignName: 'test-campaign',
-      setPopupHtml: vi.fn(),
+      setPopupHtml,
       deps,
     });
     expect(result).toEqual({ resolved: false, reason: 'not-grant-reaction' });
     expect(deps.store.logs).toHaveLength(0);
+    expect(setPopupHtml).not.toHaveBeenCalled();
   });
 });
 
-describe('MA-0882 grant flow (press)', () => {
-  it('press: spends recharge FIRST (ability_use log), registers te incite_rampage on the armed target with ONE rounds:1 clock, grant log + popup', async () => {
+describe('MA-0882 grant press', () => {
+  it('press: spends FIRST, stamps te incite_rampage on the target with ONE rounds:1 clock, exact 2-log census + popup, campaign-keyed, zero dice', async () => {
     const deps = makeDeps();
     const setPopupHtml = vi.fn();
     const result = await resolveMonsterGrantReactionRow({
@@ -198,13 +153,14 @@ describe('MA-0882 grant flow (press)', () => {
       deps,
     });
     expect(result).toEqual({ resolved: true, effectKey: 'incite_rampage', targetName: 'Bandit 1', rangeFt: 60 });
-    expect(deps.store.te).toEqual({
-      campaign: 'test-campaign',
-      target: 'Bandit 1',
-      effect: 'incite_rampage',
-      source: 'Gnoll Pack Lord 1',
-      extra: expect.objectContaining({ rounds: 1, duration: 'rounds', actionName: 'Incite Rampage' }),
+    // exact producer te bytes on the TARGET (#993/#1080)
+    expect(deps.registerTargetEffect).toHaveBeenCalledTimes(1);
+    expect(deps.registerTargetEffect).toHaveBeenCalledWith('test-campaign', 'Bandit 1', 'incite_rampage', 'Gnoll Pack Lord 1', {
+      duration: 'rounds',
+      rounds: 1,
+      actionName: 'Incite Rampage',
     });
+    // ONE rounds:1 expiration clock — window clears at the next-round seam, never wall-clock
     expect(deps.addExpiration).toHaveBeenCalledTimes(1);
     expect(deps.addExpiration).toHaveBeenCalledWith({
       attackerName: 'Gnoll Pack Lord 1',
@@ -213,29 +169,28 @@ describe('MA-0882 grant flow (press)', () => {
       rounds: 1,
       effects: [{ type: 'remove_target_effect', effectKey: 'incite_rampage', source: 'Gnoll Pack Lord 1', target: 'Bandit 1' }],
     });
-    const spend = deps.store.logs.find(e => e.type === 'ability_use');
-    expect(spend.abilityName).toBe('Incite Rampage');
-    const grant = deps.store.logs.find(e => e.automationType === 'incite_rampage_granted');
+    // log census is exactly TWO: ability_use spend (shape owned by monsterRecharge.test.js)
+    // BEFORE the grant log — spend-first double-spend guard, and no silent extra entries.
+    expect(deps.store.logs).toHaveLength(2);
+    expect(deps.store.logs[0].type).toBe('ability_use');
+    expect(deps.store.logs[0].abilityName).toBe('Incite Rampage');
+    const grant = deps.store.logs[1];
+    expect(grant.automationType).toBe('incite_rampage_granted');
+    expect(grant.description).toContain('`incite_rampage`');
     expect(grant.description).toContain('can take a Reaction to make one melee attack (GM-enforced)');
-    expect(grant.description).toContain('Rampage');
+    expect(grant.description).toContain('Rampage Bonus Action prerequisite');
     expect(grant.description).toContain('§70');
+    expect(grant.description).toContain('§42');
+    expect(grant.description).toContain('Recharge 5-6 spent');
+    // the ONLY store write is the spent stamp — zero dice rolled here (d6 5-6 recovery
+    // rides rollMonsterRecharges, owned by the monsterRecharge lane #1072) — and it is
+    // campaign-keyed (#1019).
     expect(deps.store.recharge).toEqual({ 'Incite Rampage': { recharged: false, threshold: 5 } });
+    expect(deps.setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(deps.setRuntimeValue).toHaveBeenCalledWith('Gnoll Pack Lord 1', 'monsterRecharge', { 'Incite Rampage': { recharged: false, threshold: 5 } }, 'test-campaign');
+    expect(deps.addEntry.mock.calls.every(([campaign]) => campaign === 'test-campaign')).toBe(true);
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Bandit 1'));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Recharge 5-6 spent'));
-  });
-});
-
-describe('MA-0882 log builders', () => {
-  it('grant log honest: reaction copy + §70 Rampage advisory', () => {
-    const log = buildGrantReactionGrantLog({ monsterName: 'Gnoll Pack Lord', action: INCITE_ROW, targetName: 'Gnoll 2', rangeFt: 60 });
-    expect(log.abilityName).toBe('Incite Rampage');
-    expect(log.description).toContain('`incite_rampage`');
-    expect(log.description).toContain('GM-enforced');
-    expect(log.description).toContain('§42');
-  });
-
-  it('target refusal log carries <slug>_refused + reason token', () => {
-    expect(buildGrantTargetRefusalLog({ monsterName: 'Gnoll Pack Lord', action: INCITE_ROW, reason: 'no_target' }).automationType).toBe('incite_rampage_refused');
-    expect(buildAlreadyIncitedRefusalLog({ monsterName: 'Gnoll Pack Lord', action: INCITE_ROW, targetName: 'Bandit 1' }).automationDetail).toBe('already_incite_rampage');
   });
 });

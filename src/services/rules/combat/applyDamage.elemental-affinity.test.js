@@ -1,14 +1,28 @@
-// CLA-110 regression: Elemental Affinity (2024 Draconic Sorcery lv6).
+// @maintained-by-ai
+// CLA-110 regression: Elemental Affinity (2024 Draconic Sorcery lv6) — CONSUMER seam.
 // The chosen-type chooser stamps the runtime key `_Elemental_Affinity_chosenType`
-// (producer = elementalAffinityHandler, via choiceStorage name "Elemental
-// Affinity"). rulesFactory merges it into computedStats.resistances for RENDER
-// only — the damage pipeline must read that SAME producer key LIVE at
-// hit-resolution (FT-009 Energy Resistances lane twin) so a mid-session
-// re-pick halves damage WITHOUT a computedStats recompute.
-// Locks: chosen Fire halves Fire (floor(raw/2), resisted), unchosen Cold lands
-// full, re-pick Fire→Cold switches live, the halving is logged via the
-// passive-resistance channel, and an absent key stays byte-inert.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// (producer = elementalAffinityHandler, via choiceStorage name "Elemental Affinity" —
+// producer bytes owned by elementalAffinityHandler.test.js, NOT re-driven here).
+// rulesFactory.js:179 merges the key into computedStats.resistances for RENDER only
+// and stamps provenance `_elementalAffinityResistedType` — the damage pipeline must
+// read that SAME producer key LIVE at hit-resolution (FT-009 Energy Resistances twin)
+// so a mid-session re-pick halves damage WITHOUT a computedStats recompute.
+// This lane owns the live-fold/REPLACE at applyDamage.js:730-750 (single-slot
+// chooser). Axis verdict vs family #1182-#1190 (#1190 verbatim): CLA-110 = player
+// chooser live-key lane, axis-distinct from NPC absorption fold — absorbed nothing.
+// FT-009 chooser-twin sits behind: generic chooser machinery (choiceStorage
+// getChosenRuntimeValue) is shared and owned there/via #976 shared-chooser-machinery;
+// the FEATURE bytes here (single chosenType key, stamp-gated REPLACE — FT-009 has no
+// provenance stamp) stay distinct.
+//
+// Leg table (dup-map #1038): chosen-vs-unchosen byte-distinct #1022 · exact live
+// producer key #993 · consume-vs-retain census #1183 (affinity is NOT one-shot) ·
+// precedence falsifier buff-channel vs affinity-key #1186/#1036 · stamp-gated filter
+// honest leg #948/#1026 · absent-key byte-inert + wrong-name decoy guard.
+// NOT re-driven here (owned elsewhere): case-insensitive match + floor(raw/2) raw
+// math = canonical in applyDamage.helpers.test.js:52-84 (computeDamageAfterResistances);
+// render merge/stamp = rulesFactory.js:179; choiceStorage key shape = FT-009 lane.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -87,10 +101,9 @@ function createPlayerCreature(name) {
   };
 }
 
-// Stale computedStats: the chooser stamped the runtime key AFTER this was
-// computed. rulesFactory :179 merges the chosen type AND stamps its
-// provenance (_elementalAffinityResistedType) — the damage lane must REPLACE
-// the stamped slot live (CLA-110 re-pick), not just union into it.
+// Disk-shape character: computedStats is what rulesFactory :179 left behind.
+// Optional stale chooser slot + provenance stamp (CLA-336 staleness) — the
+// damage lane must REPLACE the stamped slot live, key-gated on the stamp.
 function createSorcererCharacter(name, computedResistances = [], stampedType) {
   return {
     name,
@@ -118,10 +131,13 @@ function applyWithCharacter(character, damageTypes, rawDamage) {
   });
 }
 
-function stubRuntime(chosenType) {
+// Store-faithful keyed stub #1137/#1057: only known keys answer; unknown keys
+// return undefined, so the exact producer key `_Elemental_Affinity_chosenType`
+// read is itself under test (wrong key → undefined → no halving → red).
+function stubRuntime(chosenType, activeBuffs = []) {
   getRuntimeValue.mockImplementation((_charName, key) => {
     if (key === 'lastAttack') return null;
-    if (key === 'activeBuffs') return [];
+    if (key === 'activeBuffs') return activeBuffs;
     if (key === 'arcaneWardActive') return false;
     if (key === 'arcaneWardHp') return 0;
     if (key === 'currentHitPoints') return 62;
@@ -135,13 +151,7 @@ function stubRuntime(chosenType) {
 }
 
 function apply(damageTypes, rawDamage) {
-  const cs = makeCombatSummary([createPlayerCreature(PLAYER)]);
-  return applyDamageToTarget(cs, PLAYER, rawDamage, damageTypes, {
-    campaignName: 'test-campaign',
-    characters: [createSorcererCharacter(PLAYER)],
-    ignoreResistance: false,
-    attackerName: 'DivinationWizard',
-  });
+  return applyWithCharacter(createSorcererCharacter(PLAYER), damageTypes, rawDamage);
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -151,45 +161,27 @@ describe('applyDamageToTarget — CLA-110 Elemental Affinity chosen-type live re
     vi.clearAllMocks();
   });
 
-  it('halves Fire while Fire is chosen (resisted)', async () => {
-    stubRuntime('Fire');
-    const result = await apply(['Fire'], 21);
-    expect(result.finalDamage).toBe(10);
-    expect(result.resistanceDetails).toEqual([{ damageType: 'Fire', status: 'resistant' }]);
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('halves lowercase fire (normalization mirrors the FT-009 sibling)', async () => {
+  // Chosen-vs-unchosen byte-distinct #1022 + retain census #1183 (not one-shot).
+  // Raw floor/case-match math is canonical in helpers.test.js:52-84 — not re-driven.
+  it.each([
+    ['Fire', 21, 10, [{ damageType: 'Fire', status: 'resistant' }]],
+    ['Cold', 13, 13, []],
+  ])('%s while Fire is chosen → %i (chosen absorbs, unchosen passes)', async (type, raw, expected, details) => {
     stubRuntime('Fire');
-    const result = await apply(['fire'], 25);
-    expect(result.finalDamage).toBe(12);
-    expect(result.resistanceDetails).toEqual([{ damageType: 'fire', status: 'resistant' }]);
+    const result = await apply([type], raw);
+    expect(result.finalDamage).toBe(expected);
+    expect(result.resistanceDetails).toEqual(details);
+    // Retain census: the chooser key persists across hits — second hit identical.
+    const again = await apply([type], raw);
+    expect(again.finalDamage).toBe(expected);
   });
 
-  it('does NOT halve Cold while Fire is chosen — full damage', async () => {
-    stubRuntime('Fire');
-    const result = await apply(['Cold'], 21);
-    expect(result.finalDamage).toBe(21);
-    expect(result.resistanceDetails).toEqual([]);
-  });
-
-  it('does NOT halve non-elemental Slashing while Fire is chosen', async () => {
-    stubRuntime('Fire');
-    const result = await apply(['Slashing'], 16);
-    expect(result.finalDamage).toBe(16);
-    expect(result.resistanceDetails).toEqual([]);
-  });
-
-  it('halves the Fire leg of a mixed Slashing+Fire attack via the breakdown', async () => {
-    stubRuntime('Fire');
-    const slashResult = await apply(['Slashing'], 16);
-    expect(slashResult.finalDamage).toBe(16);
-    expect(slashResult.resistanceDetails).toEqual([]);
-    const fireResult = await apply(['Fire'], 21);
-    expect(fireResult.finalDamage).toBe(10);
-  });
-
-  it('re-pick Fire→Cold switches LIVE — stale computedStats slot is REPLACED (CLA-336 staleness)', async () => {
-    // Computed while Fire was live: rulesFactory merged Fire AND stamped the provenance.
+  it('re-pick Fire→Cold switches LIVE — stale stamped slot is REPLACED (CLA-336 staleness)', async () => {
+    // Computed while Fire was live: rulesFactory :179 merged Fire AND stamped it.
     const staleChar = createSorcererCharacter(PLAYER, ['Fire'], 'Fire');
     stubRuntime('Fire');
     const first = await applyWithCharacter(staleChar, ['Fire'], 21);
@@ -205,18 +197,21 @@ describe('applyDamageToTarget — CLA-110 Elemental Affinity chosen-type live re
     expect(coldAfter.resistanceDetails).toEqual([{ damageType: 'Cold', status: 'resistant' }]);
   });
 
-  it('does not strip non-chooser resistances when replacing the stale slot', async () => {
-    // computedStats carried Fire (chooser, stale) + Necrotic (unrelated source).
+  it('stamp REPLACE strips ONLY the chooser slot — buff and computedStats channels survive (#1186/#1036 precedence falsifier)', async () => {
+    // computedStats carried Fire (chooser, stale) + Necrotic (unrelated source);
+    // activeBuffs carries Fire via the SEPARATE buff channel. Live choice is Cold.
     const staleChar = createSorcererCharacter(PLAYER, ['Fire', 'Necrotic'], 'Fire');
-    stubRuntime('Cold');
+    stubRuntime('Cold', [{ resistanceTypes: ['Fire'] }]);
+    const buffFire = await applyWithCharacter(staleChar, ['Fire'], 21);
+    expect(buffFire.finalDamage).toBe(10); // buff channel, folded AFTER the filter (:757)
     const necrotic = await applyWithCharacter(staleChar, ['Necrotic'], 14);
-    expect(necrotic.finalDamage).toBe(7);
-    const fire = await applyWithCharacter(staleChar, ['Fire'], 21);
-    expect(fire.finalDamage).toBe(21);
+    expect(necrotic.finalDamage).toBe(7); // computedStats channel untouched by the filter
+    const cold = await applyWithCharacter(staleChar, ['Cold'], 13);
+    expect(cold.finalDamage).toBe(6); // affinity channel, live
   });
 
-  it('replace slot is byte-inert without the provenance stamp (legacy computedStats)', async () => {
-    // Legacy pre-CLA-110 computedStats: merged Fire present, no stamp — union keeps it.
+  it('filter is stamp-gated — legacy computedStats without provenance keeps merged Fire (union, honest leg #948/#1026)', async () => {
+    // Legacy pre-CLA-110 computedStats: merged Fire present, no stamp — no replace.
     const legacyChar = createSorcererCharacter(PLAYER, ['Fire']);
     stubRuntime('Cold');
     const fire = await applyWithCharacter(legacyChar, ['Fire'], 21);
@@ -225,9 +220,8 @@ describe('applyDamageToTarget — CLA-110 Elemental Affinity chosen-type live re
     expect(cold.finalDamage).toBe(6);
   });
 
-  it('logs the halving via the passive-resistance log channel', async () => {
+  it('logs the halving via the passive-resistance log channel (exact, #app)', async () => {
     stubRuntime('Fire');
-    addEntry.mockClear();
     await apply(['Fire'], 21);
     const resistLog = addEntry.mock.calls.find(
       (c) => c[1].type === 'automation' && c[1].name === 'Damage Resistance'
@@ -239,38 +233,25 @@ describe('applyDamageToTarget — CLA-110 Elemental Affinity chosen-type live re
     expect(resistLog[1].description).toContain('10');
   });
 
-  it('is byte-inert when no chosen type is set (absent key → full damage)', async () => {
-    stubRuntime(null);
+  it('is byte-inert when the producer key is absent — wrong-name decoys never leak', async () => {
+    // Affinity key absent while a wrong-feature-name key carries live values:
+    // if the lane ever reads the wrong key (#993), Fire halves and this goes red.
+    getRuntimeValue.mockImplementation((_charName, key) => {
+      if (key === '_Elemental_Adept_chosenType') return 'Fire'; // decoy — no lane reads this
+      if (key === 'lastAttack') return null;
+      if (key === 'activeBuffs') return [];
+      if (key === 'arcaneWardActive') return false;
+      if (key === 'arcaneWardHp') return 0;
+      if (key === 'currentHitPoints') return 62;
+      if (key === 'activeConditions') return [];
+      if (key === 'tempHp') return 0;
+      if (key === 'polymorphTempHp') return 0;
+      return undefined;
+    });
     for (const [type, dmg] of [['Fire', 21], ['Cold', 13], ['Lightning', 15]]) {
       const result = await apply([type], dmg);
       expect(result.finalDamage).toBe(dmg);
       expect(result.resistanceDetails).toEqual([]);
     }
-  });
-
-  it('reads the live producer key, not a wrong name (key mismatch guard)', async () => {
-    getRuntimeValue.mockImplementation((_charName, key) => {
-      if (key === '_Elemental_Adept_chosenType') return 'Fire'; // wrong feature name
-      if (key === '_Energy_Resistances_chosenTypes') return []; // sibling lane, empty
-      if (key === '_Elemental_Affinity_chosenType') return 'Lightning'; // the live producer key
-      if (key === 'activeBuffs') return [];
-      if (key === 'currentHitPoints') return 62;
-      return undefined;
-    });
-    const cs = makeCombatSummary([createPlayerCreature(PLAYER)]);
-    const fire = await applyDamageToTarget(cs, PLAYER, 21, ['Fire'], {
-      campaignName: 'test-campaign',
-      characters: [createSorcererCharacter(PLAYER)],
-      attackerName: 'DivinationWizard',
-    });
-    expect(fire.finalDamage).toBe(21);
-    expect(fire.resistanceDetails).toEqual([]);
-    const lightning = await applyDamageToTarget(cs, PLAYER, 15, ['Lightning'], {
-      campaignName: 'test-campaign',
-      characters: [createSorcererCharacter(PLAYER)],
-      attackerName: 'DivinationWizard',
-    });
-    expect(lightning.finalDamage).toBe(7);
-    expect(lightning.resistanceDetails).toEqual([{ damageType: 'Lightning', status: 'resistant' }]);
   });
 });

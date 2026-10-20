@@ -1,21 +1,43 @@
-// MA-1952: Nidhogg legendary_actions[3] "Grave Gale (Costs 2 Actions)" shipped
+// @maintained-by-ai
+// MA-1952: Nidhogg legendary_actions "Grave Gale (Costs 2 Actions)" shipped
 // delegates_to:"Corpse Wind (Recharge 5-6)" with NO numeric fields — the gated
-// press self-resolved nothing and the delegate leg (:895) hijacked the master's
-// save pool: popup header "Corpse Wind (Recharge 5-6)", 12d10, lastAttack
-// saveType CONSTITUTION, 60/70 dmg where RAW max is 18 (~3.7× overkill), and the
-// press even siphoned Corpse Wind's MA-1948 recharge stamp {recharged:false}.
-// The row's own prose authors the mechanic: "one creature within 60 ft. must
-// succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be
-// pushed 30 ft." — save-or-suck, success stated as NOTHING (no "half" byte, vs
-// Corpse Wind's explicit "Success: Half damage."), so dc_success:"none"
-// (MV-20/MA-0481/MA-1928 half-leak family). FIX (this file's lock): copy the
-// row's numeric truth onto the child. delegates_to STAYS byte-unchanged —
-// legendaryRowHasNumericMechanic (MonsterCardModal.jsx:744, byte-duplicated below;
-// unexported, §385 mock-surface) returns true on save_dc>0, so the delegate leg
-// at :895 is guarded OFF and the child self-resolves BEFORE it (smaller diff;
-// MA-1928 removed delegates_to only because its hijack was attack-pool).
-// DC0 decoy convention MA-0551; "pushed 30 ft." stays §70 advisory (push te is
-// save-picker-only + "push(ed) up to" regex — no consumer, not this ticket).
+// press self-resolved nothing and the delegate leg hijacked the master's save
+// pool: popup header "Corpse Wind (Recharge 5-6)", 12d10 CON save where RAW is
+// DC 24 STR 4d8 (~3.7× overkill), even siphoning Corpse Wind's MA-1948
+// recharge stamp {recharged:false}. FIX (this file's lock): copy the row's own
+// prose numerics onto the child — save quartet + dc_success:"none" (save-or-suck,
+// prose has NO half clause vs Corpse Wind's explicit half-default). This is the
+// DELEGATE-KEPT variant (vs jormungandr #1928 which REMOVED delegates_to):
+// delegates_to stays byte-unchanged because legendaryRowHasNumericMechanic
+// (MonsterCardModal.jsx:744, byte-duplicated below — unexported, §385
+// mock-surface) returns true on save_dc>0, so the delegate leg (:895) is
+// guarded OFF and the child self-resolves BEFORE it. DC0 decoy convention
+// MA-0551; "pushed 30 ft." stays §70 advisory (no consumer). REAL on-disk row
+// pinned programmatic disk-bytes (#1086), lookup by NAME not index (#1094),
+// verbatim description ground truth (#993), honest title (#910), decoy sweep by
+// NAME, no wall-clock (#app).
+//
+// Framework-owned (cited, not re-run here):
+//  - uses/gate generics (header uses:3, "(Costs 2 Actions)" token) →
+//    monsterAbilityUses CANON #1082 — header pin dropped (#1093 / #1100 rec);
+//  - save-quartet consumers (handleSaveRoll / resolveBlockSaveDcSuccess half
+//    default) → MonsterCardModal conditions family; save-core canonical for the
+//    removed-delegate twin → monsterLegendarySave.ma1928-jormungandr-capsize
+//    (#1100, closed) — this twin locks only its delegate-kept difference;
+//  - recharge axis → monsterRecharge lane (cited if touched);
+//  - whole-DB save tripwires (prose-agree, dc_success enum) → #1099 cited,
+//    not re-driven.
+//
+// old→new: old 6 tests → 2. Old "row prose numerics" + "dc_success prose
+// justification" + "key order/bait" + "delegates_to kept" + "predicate guard"
+// → test 1 single real-row lock (exact save quartet + honest dc_success +
+// verbatim description + delegate-kept fix signature + guard-off through the
+// predicate + absence canaries; brittle Object.keys order dropped — no consumer
+// reads key order, absence canaries carry the shape). Old "Corpse Wind
+// byte-guard" + "header/siblings byte-inert" → test 2 decoy sweep by NAME
+// (Grave Gale is the ONLY self-resolving save row on the lane; hijack-source
+// Corpse Wind stays in the attack lane MA-1948-intact). Header uses:3 pin cut
+// per #1082 CANON.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -24,95 +46,73 @@ import { legendaryDelegateAction } from '../../services/encounters/monsterLegend
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const NIDHOGG = monsters.find((m) => m.index === 'nidhogg');
-const GALE = NIDHOGG.legendary_actions[3];
-const WIND = NIDHOGG.actions[3];
+// lookup by NAME, not index (#1094 brittle-index fix)
+const GALE = NIDHOGG.legendary_actions.find((a) => a.name === 'Grave Gale (Costs 2 Actions)');
+const WIND = NIDHOGG.actions.find((a) => a.name === 'Corpse Wind (Recharge 5-6)');
 
 // Byte-duplicate of legendaryRowHasNumericMechanic (MonsterCardModal.jsx:744).
-// extractDamageDiceFromDescription (:934) returns existingDamageDice FIRST, so
-// with damage_dice_primary authored the formula is that byte — no parse needed.
+// resolveLegendaryRow (:895) enters the delegate branch ONLY when this is false.
 const numericSelfResolve = (action) =>
   action.attack_bonus != null || Number(action.save_dc) > 0
   || canRollExpression(action.damage_dice_primary ?? '');
 
-describe('MA-1952 disk fingerprint: Nidhogg Grave Gale self-resolves DC 24 STR 4d8', () => {
-  it('authors the row prose numerics — DC 24 Strength, 4d8 Necrotic, nothing on success', () => {
+describe('MA-1952 disk fingerprint: Nidhogg Grave Gale self-resolves DC 24 STR 4d8 with delegate kept-but-guarded', () => {
+  it('real-row lock: prose numerics authored on the child — DC 24 Strength 4d8 Necrotic nothing-on-success, delegates_to byte-unchanged so the :895 delegate leg is provably guarded off', () => {
     expect(NIDHOGG.name).toBe('Nidhogg');
     expect(GALE.name).toBe('Grave Gale (Costs 2 Actions)');
+    // verbatim description ground truth (#993): "must succeed … or take 18 (4d8)
+    // Necrotic damage and be pushed 30 ft." — no half clause → dc_success honest.
+    expect(GALE.description).toBe(
+      'Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft.'
+    );
+    // exact save quartet + honest dc_success ("none", vs Corpse Wind's half-default)
     expect(GALE.save_dc).toBe(24);
     expect(GALE.save_type).toBe('Strength');
     expect(GALE.damage_dice_primary).toBe('4d8');
     expect(GALE.damage_type_primary).toBe('Necrotic');
     expect(GALE.dc_success).toBe('none');
     expect(canRollExpression(GALE.damage_dice_primary)).toBe(true);
-  });
-
-  it('dc_success:"none" justified from the row prose — save-or-suck, no half clause', () => {
-    // Disk prose byte (anchor): "must succeed … or take 18 (4d8) Necrotic damage and be pushed 30 ft."
-    expect(GALE.description).toBe(
-      'Nidhogg beats his wings, exhaling a blast of corpse-light wind: one creature within 60 ft. must succeed on a DC 24 Strength saving throw or take 18 (4d8) Necrotic damage and be pushed 30 ft.'
-    );
-    expect(/half/i.test(GALE.description)).toBe(false); // zero half-on-success wording → authored "none" is honest
-    // resolveBlockSaveDcSuccess twin (MonsterCardModal.jsx:286): authored wins over the half-default.
-    expect(GALE.dc_success ?? 'half').toBe('none');
-  });
-
-  it('numeric self-resolve predicate is TRUE on the child — delegate leg :895 guarded off', () => {
-    expect(numericSelfResolve(GALE)).toBe(true);
-    // resolveLegendaryRow (:895) enters the delegate branch ONLY when the
-    // predicate is false — with save_dc 24 authored the child reaches
-    // resolveLegendaryRowMechanic as itself: handleSaveRoll(action, "4d8") →
-    // DC 24 STRENGTH 4d8, popup/header "Grave Gale (Costs 2 Actions)".
-    const entersDelegateLeg = !numericSelfResolve(GALE) && Boolean(GALE.delegates_to);
-    expect(entersDelegateLeg).toBe(false);
-  });
-
-  it('delegates_to kept byte-unchanged (sanctioned, predicate provably precedes)', () => {
+    // absence canaries carry the shape (key order has no consumer): no hit-axis
+    // bait (§153/MA-1898), no save_effect ("pushed" is advisory §70), no
+    // attack_bonus (§225), Corpse Wind's recharge must NOT ride the legendary lane.
+    expect(GALE.attack_bonus).toBeUndefined();
+    expect(GALE.hit_conditions).toBeUndefined();
+    expect(GALE.save_effect).toBeUndefined();
+    expect(GALE.recharge).toBeUndefined();
+    // the ticket's fix signature (DELEGATE-KEPT twin vs #1928): the hijack
+    // fingerprint was predicate-false + delegates_to-truthy → pool hijacked to
+    // 12d10 CON. With the numerics authored, the predicate is TRUE and the
+    // delegate leg is guarded off: entersDelegateLeg must stay false.
     expect(GALE.delegates_to).toBe('Corpse Wind (Recharge 5-6)');
-    // The delegate still RESOLVES (data intact for the byte-shape) — it is the
-    // routing guard that never reaches it. legendaryDelegateAttackName's mislead
-    // "(Corpse Wind (Recharge 5-6) save)" spend suffix is delegate-leg-only.
+    expect(numericSelfResolve(GALE)).toBe(true);
+    expect(!numericSelfResolve(GALE) && Boolean(GALE.delegates_to)).toBe(false);
+    // delegate data stays intact for the byte-shape — production still resolves
+    // Gale→Wind; only the routing guard never reaches it.
     expect(legendaryDelegateAction(NIDHOGG, GALE)).toBe(WIND);
   });
 
-  it('key order: structured keys authored after description; no save_effect / hit_conditions bait', () => {
-    expect(Object.keys(GALE)).toEqual([
-      'name',
-      'delegates_to',
-      'description',
-      'save_dc',
-      'save_type',
-      'damage_dice_primary',
-      'damage_type_primary',
-      'dc_success',
-    ]);
-    // No canonical condition word on the row ("pushed" is advisory §70) — save_effect
-    // stays absent; hit_conditions is attack-lane bait (§153/MA-1898).
-    expect(GALE.save_effect).toBeUndefined();
-    expect(GALE.hit_conditions).toBeUndefined();
-    expect(GALE.attack_bonus).toBeUndefined();
-    expect(GALE.recharge).toBeUndefined(); // Corpse Wind's recharge must NOT ride the legendary lane
-  });
-
-  it('Corpse Wind actions[3] byte-guard — MA-1948 recharge fix intact, untouched', () => {
-    expect(WIND.name).toBe('Corpse Wind (Recharge 5-6)');
+  it('decoy sweep: Grave Gale is the ONLY self-resolving save row on the legendary lane, and hijack-source Corpse Wind stays attack-lane MA-1948-intact', () => {
+    // Only-save-row-unique-on-lane pin: no legendary sibling can shadow or
+    // duplicate the DC 24 STR grant, and no recharge byte leaks onto the lane.
+    const saveRows = NIDHOGG.legendary_actions
+      .filter((a) => a.save_dc != null || a.save_type != null || a.save_effect != null || a.dc_success != null)
+      .map((a) => a.name);
+    expect(saveRows).toEqual(['Grave Gale (Costs 2 Actions)']);
+    expect(NIDHOGG.legendary_actions.some((a) => a.recharge != null)).toBe(false);
+    // pure-delegate children (predicate-false + delegates_to): exactly Bite/Claw —
+    // the pre-fix Grave Gale fingerprint (delegates without numerics) is dead.
+    const pureDelegates = NIDHOGG.legendary_actions
+      .filter((a) => a.delegates_to && !numericSelfResolve(a))
+      .map((a) => a.name);
+    expect(pureDelegates).toEqual(['Bite', 'Claw']);
+    // hijack-source decoy row: Corpse Wind's master bytes untouched (MA-1948 pin)
+    // — 12d10 CON half-default must stay in the attack lane, ~3.7× overkill if
+    // it ever adjudicated the legendary press again.
     expect(WIND.recharge).toBe('5-6');
     expect(WIND.save_dc).toBe(24);
     expect(WIND.save_type).toBe('Constitution');
     expect(WIND.damage_dice_primary).toBe('12d10');
     expect(WIND.damage_type_primary).toBe('Necrotic');
-    expect(WIND.dc_success).toBeUndefined(); // half-default RAW-correct for the master (MA-1948 pin)
-  });
-
-  it('header + pure-delegate siblings byte-inert: uses:3 header, Bite/Claw stay delegate children', () => {
-    const [header, bite, claw] = NIDHOGG.legendary_actions;
-    expect(header.name).toBe('Legendary Action Uses: 3');
-    expect(header.uses).toBe(3);
-    expect(header.save_dc).toBeUndefined();
-    expect(bite.name).toBe('Bite');
-    expect(bite.delegates_to).toBe('Bite');
-    expect(numericSelfResolve(bite)).toBe(false); // stays a delegate — only Grave Gale self-resolves
-    expect(claw.name).toBe('Claw');
-    expect(claw.delegates_to).toBe('Claw');
-    expect(claw.save_dc).toBeUndefined();
+    expect(WIND.dc_success).toBeUndefined(); // half-default RAW-correct for the master
   });
 });

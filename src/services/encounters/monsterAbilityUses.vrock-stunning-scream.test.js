@@ -1,83 +1,82 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// MA-1674 Vrock Stunning Scream (1/Day, DC 15 CON, 3d6 Thunder + Stunned) —
+// ticket lane: vrock-only bytes from the REAL on-disk monsters.json row
+// (no transcription, #977; ground-truth verbatim, #993).
+//
+// Incident-class data fix pinned here: the legacy `uses:"1/Day"` STRING made
+// abilitySaveMaxUses Number("1/Day")=NaN → monsterAbilitySaveUsesGate null →
+// unenforced AND unrecorded same-day double-dip on a damage+condition dealer
+// (live: second press fired FULL, zero refusal, monsterSpellUses never
+// written, no "(N left)" counter chip). The numeric usage/uses/maxUses triple
+// on this real row is the fix — this row pin is ticket-distinct (#1082
+// explicit) and the legacy-NaN→null half of the incident is pinned by the
+// framework below on the same row shape.
+//
+// Owns here:
+//  - real-row lock: DC 15 CON, 20-foot Emanation, 3d6 Thunder,
+//    stunned-on-fail save_effect verbatim row text, dc_success "none"
+//    (half-leak close — the other half of this ticket's data fix), and the
+//    numeric 1/Day triple replacing the NaN uses-STRING;
+//  - off-lane decoy (#948, banshee test-4 shape verbatim): the vrock's
+//    other actions carry no uses fields and cannot spend the day.
+//
+// Framework-owned (monsterAbilityUses.test.js, MA-0020 Aboleth — cited, not
+// re-run here): useKey suffix-strip mechanism incl. no-suffix verbatim
+// passthrough ('Stunning Scream' is a no-suffix row, dretch leg covers it),
+// maxUses coercion census (#959) + honest NaN leg, gate ladder truth-table
+// incl. over-spend clamp, unlimited→null, refusal log/popup canonical shape
+// pinned ONCE (#829), campaign-keyed spend cycle + double-spend guard
+// (#932/#1019/#1026). Store faithful keyed (#1019); no wall-clock — resets
+// are dawn/seam-adjacent text only (#app).
+//
+// Applied-recs verdicts (#1080/#1081/#1082 forwards):
+//  - #1080 :37-51 hand-built gate/refusal block → DELETED (gate truth-table
+//    and refusal shape owned by framework);
+//  - #1081 :28-35 numeric 1/Day uses fields → CONSOLIDATED into the row-lock
+//    test citing MA-0020; tautological not.toBeInstanceOf(Object) dropped;
+//  - #1082 :45-51 refusal asserts → DELETED (duplicate the #829 pin);
+//    :54-82 generic hand-crafted spend cycle → DELETED, superseded by the
+//    folded-up framework cycle; tests 1-2 kept as the NaN-string data-fix
+//    row bytes (ticket-distinct core).
+//
+// old→new: old "authored ground truth" + old "numeric 1/Day uses fields
+// replace the NaN uses-STRING" → test 1 (single real-row lock); old
+// "gate: fresh/spent + refusal log/popup" and old "counter decrements
+// through spend…" → deleted, cited to framework; decoy added (#948).
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { abilitySaveUseKey, abilitySaveMaxUses, monsterAbilitySaveUsesGate, buildAbilitySaveRefusalLog, buildAbilitySaveRefusalPopup, spendMonsterAbilityUse } from './monsterAbilityUses.js';
+import { abilitySaveMaxUses, monsterAbilitySaveUsesGate } from './monsterAbilityUses.js';
 
-// MA-1674 Vrock Stunning Scream (1/Day, DC 15 CON, 3d6 Thunder + Stunned)
-// — on-disk row lock, MA-0633 Dretch Fetid Cloud byte-shape twin: the
-// legacy `uses:"1/Day"` STRING made abilitySaveMaxUses Number("1/Day")=NaN
-// → monsterAbilitySaveUsesGate null → unenforced AND unrecorded same-day
-// double-dip on a damage+condition dealer (live: second press fired FULL,
-// zero refusal, monsterSpellUses never written, no "(N left)" counter chip).
-// The numeric usage/uses/maxUses triple arms resolveAbilityUsesGate
-// (MonsterCardModal :1506) + picker-open spendMonsterAbilityUse
-// (:455, MA-0633 sanctioned consumer) + the counter at MonsterAction :123.
 const monsters = JSON.parse(readFileSync(resolve(__dirname, '../../../public/data/monsters.json'), 'utf8'));
 const vrock = monsters.find(m => m.index === 'vrock');
 const scream = vrock.actions.find(a => a.name === 'Stunning Scream');
 
-describe('MA-1674 Vrock Stunning Scream data row', () => {
-    it('authored ground truth: DC 15 CON emanation 3d6 Thunder stunned-on-fail', () => {
+describe('MA-1674 Vrock Stunning Scream (1/Day) — real on-disk row', () => {
+    it('real-row lock: DC 15 CON 20-ft emanation 3d6 Thunder stunned-on-fail, dc_success none, numeric 1/Day triple replaces the legacy NaN uses-string', () => {
+        expect(scream).toBeTruthy();
+        expect(scream.name).toBe('Stunning Scream');
         expect(scream.save_dc).toBe(15);
         expect(scream.save_type).toBe('Constitution');
         expect(scream.range).toBe('20-foot Emanation');
         expect(scream.damage_dice_primary).toBe('3d6');
-        expect(scream.save_effect).toMatch(/Stunned/i);
-    });
-
-    it('standard numeric 1/Day uses fields replace the NaN uses-STRING', () => {
+        expect(scream.dc_success).toBe('none'); // success takes ZERO — half-leak close (this ticket's data fix)
+        expect(scream.save_effect).toBe("10 (3d6) Thunder damage, and the target has the Stunned condition until the end of the vrock's next turn");
+        // the MA-1674 data-fix bytes: numeric triple arms the gate that the
+        // legacy uses:"1/Day" string left null (Number("1/Day")=NaN).
         expect(scream.usage).toBe('1/Day');
-        expect(scream.usage).not.toBeInstanceOf(Object);
         expect(scream.uses).toBe(1);
         expect(scream.maxUses).toBe(1);
-        expect(abilitySaveUseKey(scream)).toBe('Stunning Scream');
-        expect(abilitySaveMaxUses(scream)).toBe(1);
+        expect(abilitySaveMaxUses(scream)).toBe(1); // fixed row resolves through the gate (coercion census owned by MA-0020 framework)
     });
 
-    it('gate: fresh monster can fire; after 1 spent use the second fire refuses', () => {
-        const fresh = monsterAbilitySaveUsesGate(scream, {});
-        expect(fresh).toMatchObject({ useKey: 'Stunning Scream', maxUses: 1, used: 0, remaining: 1, exhausted: false });
-
-        const spent = monsterAbilitySaveUsesGate(scream, { 'Stunning Scream': 1 });
-        expect(spent.exhausted).toBe(true);
-        expect(spent.remaining === 0).toBe(true);
-
-        const refusal = buildAbilitySaveRefusalLog({ monsterName: 'Vrock 1', useKey: spent.useKey, maxUses: spent.maxUses });
-        expect(refusal.type).toBe('automation');
-        expect(refusal.automationType).toBe('stunning_scream_refused');
-        expect(refusal.description).toMatch(/already used Stunning Scream today \(1\/Day\)/);
-        const popup = buildAbilitySaveRefusalPopup({ monsterName: 'Vrock 1', useKey: spent.useKey, maxUses: spent.maxUses });
-        expect(popup).toMatch(/Uses Exhausted/);
-        expect(popup).toMatch(/No save rolled, nothing spent/);
-    });
-
-    it('counter decrements through spend and the double-spend guard refuses zero-spend', async () => {
-        const store = { 'Vrock 1.monsterSpellUses': {} };
-        const deps = {
-            getRuntimeValue: (name, key) => store[`${name}.${key}`],
-            setRuntimeValue: (name, key, value) => { store[`${name}.${key}`] = value; return Promise.resolve(); },
-            addEntry: vi.fn(() => Promise.resolve()),
-        };
-        const remaining = await spendMonsterAbilityUse({
-            monsterName: 'Vrock 1',
-            use: { useKey: 'Stunning Scream', maxUses: 1, actionName: 'Stunning Scream' },
-            campaignName: 'test-campaign',
-            deps,
-        });
-        expect(remaining).toBe(0);
-        expect(store['Vrock 1.monsterSpellUses']).toEqual({ 'Stunning Scream': 1 });
-        const gateAfter = monsterAbilitySaveUsesGate(scream, store['Vrock 1.monsterSpellUses']);
-        expect(gateAfter).toMatchObject({ remaining: 0, exhausted: true });
-
-        const dup = await spendMonsterAbilityUse({
-            monsterName: 'Vrock 1',
-            use: { useKey: 'Stunning Scream', maxUses: 1, actionName: 'Stunning Scream' },
-            campaignName: 'test-campaign',
-            deps,
-        });
-        expect(dup).toBeNull();
-        expect(store['Vrock 1.monsterSpellUses']).toEqual({ 'Stunning Scream': 1 });
-        const refusalEntry = deps.addEntry.mock.calls.map(c => c[1]).find(e => e && e.automationType === 'stunning_scream_refused');
-        expect(refusalEntry).toBeTruthy();
+    it('decoy: vrock\'s other actions carry no uses fields — gate null, only Stunning Scream can spend the day (unlimited→null mechanism owned by framework file)', () => {
+        const others = vrock.actions.filter(a => a.name !== scream.name);
+        expect(others.length).toBeGreaterThan(0);
+        for (const other of others) {
+            expect(other.uses).toBeUndefined();
+            expect(other.maxUses).toBeUndefined();
+            expect(monsterAbilitySaveUsesGate(other, { 'Stunning Scream': 1 })).toBeNull();
+        }
     });
 });

@@ -1,75 +1,62 @@
+// @maintained-by-ai
+// Lane: secret-door wall-derivation (SOLE OWNER — verified by consumer census).
+// Consumers of computeEffectiveWalls: coverService.js, maps/reachability.js,
+// spellOverlayService.js, components/map/Map.jsx, useFogOfWar.js, Map3D.
+// Consumer lanes verify their own behavior THROUGH the wrapper, never the
+// derivation itself, and cite here for internals:
+//   reachability.test.js:57,64 ....... movement obstacles (blocked/passable)
+//   spellOverlayService.test.js:190,204 overlay line-of-sight
+//   useFogOfWar.test.js:14 ............ "secret-door wall derivation internals ...
+//                                        services/maps/effectiveWalls.test.js"
+// Pinned here: base passthrough, hidden add / discovered remove, visibility
+// coercion (strict === false), input coercion (Set/array/null), key building
+// (x,y order, 0-is-data), non-secretDoor noise ignored, input immutability.
+// Old->new map: base-unchanged+hidden-add+hidden-in-base+multi+noise -> T1;
+// discovered-open+discovered-remove -> T2 (it.each); array-or-Set -> T3
+// (pinned to literals, self-compare purged); no-mutate -> T5.
 import { describe, it, expect } from 'vitest';
 import { computeEffectiveWalls } from './effectiveWalls.js';
 
 describe('computeEffectiveWalls', () => {
-  it('returns base walls unchanged when there are no secret doors', () => {
-    const result = computeEffectiveWalls(['1,1', '2,2'], []);
-    expect(result).toBeInstanceOf(Set);
-    expect(result.has('1,1')).toBe(true);
-    expect(result.has('2,2')).toBe(true);
-    expect(result.size).toBe(2);
+  it('derives the full wall set: base passthrough, hidden doors added (incl. 0-coords), noise ignored', () => {
+    // Coordinates all distinguishable so an x/y swap in the key recipe fails.
+    const result = computeEffectiveWalls(['1,1', '5,6'], [
+      { type: 'secretDoor', gridX: 3, gridY: 4, visible: false }, // hidden, not in base -> added
+      { type: 'secretDoor', gridX: 5, gridY: 6, visible: false }, // hidden, already a base wall -> stays
+      { type: 'secretDoor', gridX: 0, gridY: 7, visible: false }, // hidden at 0-coords -> '0,7'
+      { type: 'door', gridX: 8, gridY: 8, visible: false, open: true }, // ignored
+      { type: 'chair', gridX: 9, gridY: 2, visible: true }, // ignored
+    ]);
+    expect(result).toEqual(new Set(['1,1', '3,4', '5,6', '0,7']));
   });
 
-  it('accepts walls as an array or a Set', () => {
-    const fromArray = computeEffectiveWalls(['1,1'], []);
-    const fromSet = computeEffectiveWalls(new Set(['1,1']), []);
-    expect(fromArray).toEqual(fromSet);
+  it.each([
+    ['visible: true', { visible: true }],
+    ['visible missing (undefined !== false)', {}],
+    ['visible: 0 (falsy but not === false)', { visible: 0 }],
+  ])('treats a discovered secret door as open (%s): removed from base, never added', (_label, visible) => {
+    const result = computeEffectiveWalls(['1,1', '7,3'], [
+      { type: 'secretDoor', gridX: 7, gridY: 3, ...visible }, // in base -> removed
+      { type: 'secretDoor', gridX: 8, gridY: 4, ...visible }, // not in base -> stays absent
+    ]);
+    expect(result).toEqual(new Set(['1,1']));
   });
 
-  it('adds a hidden secret door cell as a wall', () => {
-    const items = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: false }];
-    const result = computeEffectiveWalls([], items);
-    expect(result.has('3,4')).toBe(true);
+  it('accepts walls as array, Set, or nullish, and returns empty on degenerate inputs', () => {
+    const hidden = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: false }];
+    const expected = new Set(['1,1', '3,4']);
+    expect(computeEffectiveWalls(['1,1'], hidden)).toEqual(expected);
+    expect(computeEffectiveWalls(new Set(['1,1']), hidden)).toEqual(expected);
+    expect(computeEffectiveWalls(undefined, undefined)).toEqual(new Set());
+    expect(computeEffectiveWalls(null, null)).toEqual(new Set());
   });
 
-  it('treats a discovered (visible) secret door as an empty cell', () => {
-    const items = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: true }];
-    const result = computeEffectiveWalls([], items);
-    expect(result.has('3,4')).toBe(false);
-  });
-
-  it('removes a discovered secret door cell that is also in the base walls', () => {
-    const items = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: true }];
-    const result = computeEffectiveWalls(['1,1', '3,4'], items);
-    expect(result.has('3,4')).toBe(false);
-    expect(result.has('1,1')).toBe(true);
-  });
-
-  it('keeps a hidden secret door cell that is already in the base walls', () => {
-    const items = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: false }];
-    const result = computeEffectiveWalls(['3,4'], items);
-    expect(result.has('3,4')).toBe(true);
-    expect(result.size).toBe(1);
-  });
-
-  it('ignores non-secret-door items', () => {
-    const items = [
-      { type: 'door', gridX: 5, gridY: 5, visible: false, open: false },
-      { type: 'chair', gridX: 6, gridY: 6, visible: true },
-    ];
-    const result = computeEffectiveWalls(['1,1'], items);
-    expect(result.has('5,5')).toBe(false);
-    expect(result.has('6,6')).toBe(false);
-    expect(result.size).toBe(1);
-  });
-
-  it('handles multiple secret doors independently', () => {
-    const items = [
-      { type: 'secretDoor', gridX: 1, gridY: 1, visible: false },
-      { type: 'secretDoor', gridX: 2, gridY: 2, visible: true },
-      { type: 'secretDoor', gridX: 3, gridY: 3, visible: false },
-    ];
-    const result = computeEffectiveWalls(['2,2'], items);
-    expect(result.has('1,1')).toBe(true);
-    expect(result.has('2,2')).toBe(false);
-    expect(result.has('3,3')).toBe(true);
-  });
-
-  it('does not mutate the input Set', () => {
-    const input = new Set(['1,1']);
-    const items = [{ type: 'secretDoor', gridX: 3, gridY: 4, visible: false }];
-    computeEffectiveWalls(input, items);
-    expect(input.size).toBe(1);
-    expect(input.has('3,4')).toBe(false);
+  it('does not mutate the input walls', () => {
+    const walls = new Set(['1,1', '5,6']);
+    computeEffectiveWalls(walls, [
+      { type: 'secretDoor', gridX: 3, gridY: 4, visible: false }, // must not add to input
+      { type: 'secretDoor', gridX: 5, gridY: 6, visible: true }, // must not delete from input
+    ]);
+    expect(walls).toEqual(new Set(['1,1', '5,6']));
   });
 });

@@ -1,406 +1,327 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// Lane: custom-NPC combat-readiness guards + NPC→monster stat-block byte contract.
+//
+// OWNED HERE (other lanes cite, do not re-drive):
+//   - npcHasStatBlock / npcHasAttacks guard matrix — npcCombatService.test.js mocks
+//     these (seam only), NPCListItem.test.jsx cites "guard matrix lives elsewhere".
+//   - npcToMonsterFormat output bytes — createNpcClickHandler-npc-path.test.jsx:48
+//     explicitly routes the formatter's bytes here; monsterUtils.test.js mocks the
+//     formatter. getMonsterData's local-vs-bestiary resolution (#1078) relies on
+//     these bytes for the CUSTOM-NPC leg (AGENTS.md: npcs.json is CUSTOM NPCs only).
+//   - Initiative *assembly* is NOT here: initiativeService.test.js #1079 (real rollD20
+//     seam), encounterToInitiative.test.js #1078 (assembly byte contract),
+//     combatData.test.js #1074 (campaign-key-miss → null).
+//
+// Fixtures are production-shaped per NPCStatBlockForm.js: AC arrives as a parsed
+// number (null when blank), save/skill bonuses arrive as RAW STRINGS, traits and
+// reactions are textarea STRINGS, resistances are trimmed arrays, and objects carry
+// junk keys (id/race/tags/imagePath) that the formatter must not forward.
+//
+// Old → new map (35 tests → 12):
+//   npcHasStatBlock ×3            → one branch table
+//   npcHasAttacks ×2              → one branch table
+//   calculateAbilityModifier      → it.each score/mod pairs (parity boundaries kept)
+//   findNPCByName ×7              → one lookup table (tautological non-trailing-digit
+//                                   leg replaced with real falsifier: 'Bandit' vs npc
+//                                   named '123 Bandit' must miss)
+//   full-integration + forwards ×9 (name/size/type, abilityScores, defaults, immunities,
+//     traits/actions, hitPoints/hitDice, speed) → two full-object toEqual byte pins
+//     (production-shape + minimal-shape)
+//   saves/skills ×2               → one filter table (+ zero-is-data and junk-key legs)
+//   initiative ×2                 → one format table
+//   AC ×2                         → one spy test (numeric path must NOT log)
+//   passive perception ×2         → one table
+//   unarmed ×3 (incl. defaultUnarmedStrike direct call) → one scaling table; the exact
+//     full fallback object (incl. description + secondary slots) is byte-pinned inside
+//     the minimal-shape pin, so the direct-call test was redundant.
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   findNPCByName,
   npcHasStatBlock,
   npcHasAttacks,
   calculateAbilityModifier,
   npcToMonsterFormat,
-  defaultUnarmedStrike,
 } from './npcStatBlockUtils.js';
 
-// ---- Helper fixtures ----
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 function makeNPC(overrides = {}) {
   return {
     name: 'Test NPC',
     armorClass: 15,
     hitPoints: 20,
-    hitDice: '4d8',
-    speed: { walk: '30 ft.' },
-    size: 'Medium',
     classRole: 'Warrior',
-    abilityScores: {
-      str: 16,
-      dex: 14,
-      con: 12,
-      int: 10,
-      wis: 8,
-      cha: 18,
-    },
-    savingThrowBonuses: {},
-    skillBonuses: {},
-    initiativeBonus: undefined,
-    damageResistances: [],
-    damageImmunities: [],
-    conditionImmunities: [],
-    traits: [],
-    actions: [],
-    reactions: [],
+    abilityScores: { str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 18 },
     ...overrides,
   };
 }
 
-// ===================================================================
-// npcHasStatBlock
-// ===================================================================
 describe('npcHasStatBlock', () => {
-  it('returns true only when both numeric AC and positive HP are filled in', () => {
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: 20 })).toBe(true);
-    expect(npcHasStatBlock({ armorClass: 0, hitPoints: '7' })).toBe(true);
-    expect(npcHasStatBlock({ armorClass: -5, hitPoints: 1 })).toBe(true);
-  });
-
-  it('returns false when HP is missing, zero, negative, or unparseable', () => {
-    expect(npcHasStatBlock({ armorClass: 15 })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: null })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: '' })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: 0 })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: -3 })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: 15, hitPoints: '6d8+2' })).toBe(false);
-  });
-
-  it('returns false for missing or non-numeric armorClass', () => {
-    expect(npcHasStatBlock({ armorClass: '15', hitPoints: 20 })).toBe(false);
-    expect(npcHasStatBlock({ hitPoints: 20 })).toBe(false);
-    expect(npcHasStatBlock({ armorClass: null, hitPoints: 20 })).toBe(false);
-    expect(npcHasStatBlock({})).toBe(false);
-    expect(npcHasStatBlock(null)).toBe(false);
+  // Combat-ready = tracker can run them: finite numeric AC + positive numeric HP.
+  it.each([
+    { label: 'numeric AC and HP', npc: { armorClass: 15, hitPoints: 20 }, expected: true },
+    { label: 'AC 0 is data', npc: { armorClass: 0, hitPoints: 20 }, expected: true },
+    { label: 'negative AC is data', npc: { armorClass: -5, hitPoints: 1 }, expected: true },
+    { label: 'numeric-string HP', npc: { armorClass: 15, hitPoints: '7' }, expected: true },
+    { label: 'null npc', npc: null, expected: false },
+    { label: 'empty object', npc: {}, expected: false },
+    { label: 'string AC', npc: { armorClass: '15', hitPoints: 20 }, expected: false },
+    { label: 'missing AC', npc: { hitPoints: 20 }, expected: false },
+    { label: 'NaN AC', npc: { armorClass: NaN, hitPoints: 20 }, expected: false },
+    { label: 'Infinity AC', npc: { armorClass: Infinity, hitPoints: 20 }, expected: false },
+    { label: 'missing HP', npc: { armorClass: 15 }, expected: false },
+    { label: 'null HP', npc: { armorClass: 15, hitPoints: null }, expected: false },
+    { label: 'empty-string HP', npc: { armorClass: 15, hitPoints: '' }, expected: false },
+    { label: 'HP 0 is not alive', npc: { armorClass: 15, hitPoints: 0 }, expected: false },
+    { label: 'negative HP', npc: { armorClass: 15, hitPoints: -3 }, expected: false },
+    { label: 'dice-expression HP', npc: { armorClass: 15, hitPoints: '6d8+2' }, expected: false },
+    { label: 'Infinity HP', npc: { armorClass: 15, hitPoints: Infinity }, expected: false },
+  ])('$label → $expected', ({ npc, expected }) => {
+    expect(npcHasStatBlock(npc)).toBe(expected);
   });
 });
 
-// ===================================================================
-// npcHasAttacks
-// ===================================================================
 describe('npcHasAttacks', () => {
-  it('returns true for actions with an attack bonus or damage dice', () => {
-    expect(npcHasAttacks({ actions: [{ name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8' }] })).toBe(true);
-    expect(npcHasAttacks({ actions: [{ name: 'Bite', attack_bonus: '+0' }] })).toBe(true);
-    expect(npcHasAttacks({ actions: [{ name: 'Breath', damage_dice_primary: '2d6' }] })).toBe(true);
-  });
-
-  it('returns false when no action is a usable attack', () => {
-    expect(npcHasAttacks({})).toBe(false);
-    expect(npcHasAttacks({ actions: [] })).toBe(false);
-    expect(npcHasAttacks({ actions: [{ name: 'Shout' }] })).toBe(false);
-    expect(npcHasAttacks({ actions: [{ name: 'Stare', attack_bonus: '' }] })).toBe(false);
-    expect(npcHasAttacks({ actions: [{ attack_bonus: '+3' }] })).toBe(false);
-    expect(npcHasAttacks({ actions: [{ name: 'Rearrange', attack_bonus: '', damage_dice_primary: '' }] })).toBe(false);
+  // A usable attack: non-blank name AND (attack bonus OR damage dice).
+  it.each([
+    { label: 'name + bonus + damage', npc: { actions: [{ name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8' }] }, expected: true },
+    { label: 'bonus +0 is data', npc: { actions: [{ name: 'Bite', attack_bonus: '+0' }] }, expected: true },
+    { label: 'damage only', npc: { actions: [{ name: 'Breath', damage_dice_primary: '2d6' }] }, expected: true },
+    { label: 'numeric 0 bonus survives ??', npc: { actions: [{ name: 'Slam', attack_bonus: 0 }] }, expected: true },
+    { label: 'padded name still detected', npc: { actions: [{ name: ' Claw ', damage_dice_primary: '1d6' }] }, expected: true },
+    { label: 'no npc', npc: null, expected: false },
+    { label: 'no actions', npc: {}, expected: false },
+    { label: 'null actions', npc: { actions: null }, expected: false },
+    { label: 'name-only is not an attack', npc: { actions: [{ name: 'Shout' }] }, expected: false },
+    { label: 'blank bonus + blank damage', npc: { actions: [{ name: 'Rearrange', attack_bonus: '', damage_dice_primary: '' }] }, expected: false },
+    { label: 'bonus without name', npc: { actions: [{ attack_bonus: '+3' }] }, expected: false },
+    { label: 'blank name with bonus', npc: { actions: [{ name: '  ', attack_bonus: '+3' }] }, expected: false },
+  ])('$label → $expected', ({ npc, expected }) => {
+    expect(npcHasAttacks(npc)).toBe(expected);
   });
 });
 
-// ===================================================================
-// calculateAbilityModifier
-// ===================================================================
 describe('calculateAbilityModifier', () => {
-  it('returns the correct modifier for a range of ability scores', () => {
-    // D&D standard scores: floor((score - 10) / 2)
-    expect(calculateAbilityModifier(-1)).toBe(-6);
-    expect(calculateAbilityModifier(0)).toBe(-5);
-    expect(calculateAbilityModifier(1)).toBe(-5);
-    expect(calculateAbilityModifier(3)).toBe(-4);
-    expect(calculateAbilityModifier(4)).toBe(-3);
-    expect(calculateAbilityModifier(5)).toBe(-3);
-    expect(calculateAbilityModifier(8)).toBe(-1);
-    expect(calculateAbilityModifier(9)).toBe(-1);
-    expect(calculateAbilityModifier(10)).toBe(0);
-    expect(calculateAbilityModifier(11)).toBe(0);
-    expect(calculateAbilityModifier(12)).toBe(1);
-    expect(calculateAbilityModifier(14)).toBe(2);
-    expect(calculateAbilityModifier(16)).toBe(3);
-    expect(calculateAbilityModifier(18)).toBe(4);
-    expect(calculateAbilityModifier(20)).toBe(5);
-    expect(calculateAbilityModifier(21)).toBe(5);
-    expect(calculateAbilityModifier(22)).toBe(6);
+  // floor((score - 10) / 2) — one leg per parity boundary.
+  it.each([
+    [-1, -6], [0, -5], [1, -5], [4, -3], [9, -1], [10, 0],
+    [11, 0], [12, 1], [14, 2], [20, 5], [21, 5], [22, 6],
+  ])('score %i → modifier %s', (score, mod) => {
+    expect(calculateAbilityModifier(score)).toBe(mod);
   });
 });
 
-// ===================================================================
-// findNPCByName
-// ===================================================================
 describe('findNPCByName', () => {
-  const npcWithStats = makeNPC();
-  const npcNoStats = { name: 'Bandit' };
+  const ready = makeNPC();
+  const blank = { name: 'Bandit' };
+  const frontNumbered = makeNPC({ name: '123 Bandit' });
+  const other = makeNPC({ name: 'Guard' });
 
-  it('returns null when npcName is falsy or npcs is falsy/empty', () => {
-    expect(findNPCByName(null, [npcWithStats])).toBeNull();
-    expect(findNPCByName(undefined, [npcWithStats])).toBeNull();
-    expect(findNPCByName('', [npcWithStats])).toBeNull();
-    expect(findNPCByName('Test NPC', null)).toBeNull();
-    expect(findNPCByName('Test NPC', undefined)).toBeNull();
-    expect(findNPCByName('Test NPC', [])).toBeNull();
-  });
-
-  it('finds an NPC by exact name match (case-insensitive)', () => {
-    expect(findNPCByName('Test NPC', [npcWithStats])).toBe(npcWithStats);
-    expect(findNPCByName('test npc', [npcWithStats])).toBe(npcWithStats);
-    expect(findNPCByName('TEST NPC', [npcWithStats])).toBe(npcWithStats);
-    expect(findNPCByName('TeSt NpC', [npcWithStats])).toBe(npcWithStats);
-  });
-
-  it('strips trailing numeric suffix from search name', () => {
-    expect(findNPCByName('Test NPC 123', [npcWithStats])).toBe(npcWithStats);
-    expect(findNPCByName('Test NPC  42', [npcWithStats])).toBe(npcWithStats);
-  });
-
-  it('does not strip non-trailing numbers from search name', () => {
-    const numbered = makeNPC({ name: '123 Bandit' });
-    expect(findNPCByName('123 Bandit', [numbered])).toBe(numbered);
-  });
-
-  it('returns the first matching NPC with a stat block', () => {
-    const npc1 = makeNPC({ name: 'Guard' });
-    const npc2 = makeNPC({ name: 'Guard' });
-    expect(findNPCByName('Guard', [npc1, npc2])).toBe(npc1);
-  });
-
-  it('skips NPCs without stat blocks', () => {
-    expect(findNPCByName('Bandit', [npcNoStats])).toBeNull();
-    expect(findNPCByName('Test NPC', [npcNoStats, npcWithStats])).toBe(npcWithStats);
-  });
-
-  it('returns null when no NPC matches', () => {
-    expect(findNPCByName('Nonexistent', [npcWithStats])).toBeNull();
+  it.each([
+    { label: 'null name', name: null, npcs: [ready], expected: null },
+    { label: 'empty name', name: '', npcs: [ready], expected: null },
+    { label: 'null list', name: 'Test NPC', npcs: null, expected: null },
+    { label: 'empty list', name: 'Test NPC', npcs: [], expected: null },
+    { label: 'exact match', name: 'Test NPC', npcs: [ready], expected: ready },
+    { label: 'case-insensitive', name: 'tEsT NpC', npcs: [ready], expected: ready },
+    { label: 'trailing digit stripped', name: 'Test NPC 123', npcs: [ready], expected: ready },
+    { label: 'multi-space trailing digits stripped', name: 'Test NPC  42', npcs: [ready], expected: ready },
+    { label: 'leading digits are NOT stripped', name: 'Bandit', npcs: [frontNumbered], expected: null },
+    { label: 'leading-digit name still matches verbatim', name: '123 Bandit', npcs: [frontNumbered], expected: frontNumbered },
+    { label: 'statless NPC skipped, later ready NPC found', name: 'Test NPC', npcs: [blank, ready], expected: ready },
+    { label: 'only statless match → null', name: 'Bandit', npcs: [blank], expected: null },
+    { label: 'first ready match wins', name: 'Guard', npcs: [other, makeNPC({ name: 'Guard' })], expected: other },
+    { label: 'no match → null', name: 'Nonexistent', npcs: [ready], expected: null },
+  ])('$label', ({ name, npcs, expected }) => {
+    expect(findNPCByName(name, npcs)).toBe(expected);
   });
 });
 
-// ===================================================================
-// npcToMonsterFormat
-// ===================================================================
 describe('npcToMonsterFormat', () => {
   it('returns null for null or undefined npc', () => {
     expect(npcToMonsterFormat(null)).toBeNull();
     expect(npcToMonsterFormat(undefined)).toBeNull();
   });
 
-  // --- Saving throws & skills (shared filter+convert+default logic) ---
-  it('includes saving throws with defined numeric bonuses', () => {
-    const npc = makeNPC({ savingThrowBonuses: { str: 3, con: 1 } });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.saving_throws.str).toEqual({ modifier: 3 });
-    expect(monster.saving_throws.con).toEqual({ modifier: 1 });
-    expect(monster.saving_throws.dex).toBeUndefined();
+  it('produces the full monster byte contract from a production-shaped NPC form save', () => {
+    // Shape mirrors what NPCStatBlockForm/NPCFormModal actually persist:
+    // raw-string save/skill bonuses, textarea-string traits/reactions, junk keys.
+    const npc = {
+      id: 'npc-1',
+      name: 'Bardima',
+      race: 'Half-Elf',
+      classRole: 'Bard',
+      attitude: 'friendly',
+      tags: 'ally',
+      imagePath: 'images/bardima.png',
+      armorClass: 14,
+      hitPoints: 27,
+      hitDice: '6d8',
+      speed: { walk: '30 ft.', fly: '' },
+      initiativeBonus: 3,
+      abilityScores: { str: 8, dex: 16, con: 12, int: 14, wis: 10, cha: 17 },
+      savingThrowBonuses: { dex: '5', cha: '6' },
+      skillBonuses: { Performance: '7', Stealth: '5' },
+      damageResistances: ['cold'],
+      damageImmunities: [],
+      conditionImmunities: ['charmed'],
+      traits: 'Magnetic Personality\nCutting Wit',
+      reactions: '',
+      actions: [{ name: 'Rapier', attack_bonus: '5', damage_dice_primary: '1d8+3', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '' }],
+    };
+
+    expect(npcToMonsterFormat(npc)).toEqual({
+      name: 'Bardima',
+      size: 'Medium',
+      type: 'Bard',
+      subtype: null,
+      alignment: 'Unaligned',
+      armor_class: 14,
+      hit_points: 27,
+      hit_dice: '6d8',
+      speed: { walk: '30 ft.', fly: '' },
+      initiative_details: '+3',
+      ability_scores: { str: 8, dex: 16, con: 12, int: 14, wis: 10, cha: 17 },
+      ability_score_modifiers: { str: -1, dex: 3, con: 1, int: 2, wis: 0, cha: 3 },
+      saving_throws: { dex: { modifier: 5 }, cha: { modifier: 6 } },
+      skills: { Performance: { modifier: 7 }, Stealth: { modifier: 5 } },
+      senses: { passive_perception: 10 },
+      languages: '',
+      damage_vulnerabilities: [],
+      damage_resistances: ['cold'],
+      damage_immunities: [],
+      condition_immunities: ['charmed'],
+      traits: 'Magnetic Personality\nCutting Wit',
+      actions: [{ name: 'Rapier', attack_bonus: '5', damage_dice_primary: '1d8+3', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '' }],
+      reactions: [],
+      legendary_actions: [],
+      lair_actions: null,
+      regional_effects: null,
+      desc: null,
+      challenge_rating: null,
+      xp: null,
+      legendary_resistance: null,
+    });
   });
 
-  it('excludes saving throws with undefined, null, or empty string bonuses and converts string values', () => {
-    const npc1 = makeNPC({ savingThrowBonuses: { str: undefined, dex: null, con: '' } });
-    expect(Object.keys(npcToMonsterFormat(npc1).saving_throws)).toEqual([]);
-
-    const npc2 = makeNPC({ savingThrowBonuses: { int: '2' } });
-    expect(npcToMonsterFormat(npc2).saving_throws.int.modifier).toBe(2);
+  it('produces the full defaults byte contract from a minimal NPC (incl. exact Unarmed Strike fallback)', () => {
+    expect(npcToMonsterFormat({ armorClass: 10 })).toEqual({
+      name: 'Unknown',
+      size: 'Medium',
+      type: 'NPC',
+      subtype: null,
+      alignment: 'Unaligned',
+      armor_class: 10,
+      hit_points: '',
+      hit_dice: '',
+      speed: { walk: '30 ft.' },
+      initiative_details: null,
+      ability_scores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      ability_score_modifiers: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+      saving_throws: {},
+      skills: {},
+      senses: { passive_perception: 10 },
+      languages: '',
+      damage_vulnerabilities: [],
+      damage_resistances: [],
+      damage_immunities: [],
+      condition_immunities: [],
+      traits: [],
+      actions: [{
+        name: 'Unarmed Strike',
+        attack_bonus: '+0',
+        damage_dice_primary: '1',
+        damage_type_primary: 'bludgeoning',
+        damage_dice_secondary: '',
+        damage_type_secondary: '',
+        description: 'Fallback attack — add a real weapon in the NPC Stats tab to replace it.',
+      }],
+      reactions: [],
+      legendary_actions: [],
+      lair_actions: null,
+      regional_effects: null,
+      desc: null,
+      challenge_rating: null,
+      xp: null,
+      legendary_resistance: null,
+    });
   });
 
-  it('includes skills with defined numeric bonuses and excludes invalid values', () => {
-    const npc1 = makeNPC({ skillBonuses: { Stealth: 4, Perception: 2 } });
-    const monster = npcToMonsterFormat(npc1);
-    expect(monster.skills.Stealth).toEqual({ modifier: 4 });
-    expect(monster.skills.Perception).toEqual({ modifier: 2 });
-
-    const npc2 = makeNPC({ skillBonuses: { Acrobatics: undefined, Athletics: null, History: '' } });
-    expect(Object.keys(npcToMonsterFormat(npc2).skills)).toEqual([]);
-
-    const npc3 = makeNPC({ skillBonuses: { Insight: '-1' } });
-    expect(npcToMonsterFormat(npc3).skills.Insight.modifier).toBe(-1);
-  });
-
-  // --- Identity defaults ---
-  it('returns correct defaults for minimal NPC', () => {
-    const npc = { armorClass: 10 };
-    const monster = npcToMonsterFormat(npc);
-
-    expect(monster.name).toBe('Unknown');
-    expect(monster.size).toBe('Medium');
-    expect(monster.type).toBe('NPC');
-    expect(monster.subtype).toBeNull();
-    expect(monster.alignment).toBe('Unaligned');
-    expect(monster.languages).toBe('');
-    expect(monster.damage_vulnerabilities).toEqual([]);
-    expect(monster.challenge_rating).toBeNull();
-    expect(monster.xp).toBeNull();
-    expect(monster.legendary_resistance).toBeNull();
-    expect(monster.legendary_actions).toEqual([]);
-    expect(monster.lair_actions).toBeNull();
-    expect(monster.regional_effects).toBeNull();
-    expect(monster.desc).toBeNull();
-  });
-
-  // --- Named fields ---
-  it('forwards custom name, size, and classRole', () => {
-    const npc = makeNPC({ name: 'Orc Warrior', size: 'Large', classRole: 'Cleric' });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.name).toBe('Orc Warrior');
-    expect(monster.size).toBe('Large');
-    expect(monster.type).toBe('Cleric');
-  });
-
-  // --- Ability scores & modifiers ---
-  it('forwards abilityScores and calculates modifiers', () => {
-    const npc = makeNPC();
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.ability_scores).toEqual({ str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 18 });
-    expect(monster.ability_score_modifiers).toEqual({ str: 3, dex: 2, con: 1, int: 0, wis: -1, cha: 4 });
-  });
-
-  it('defaults ability scores to all 10 when not provided', () => {
-    const npc = { armorClass: 10 };
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.ability_scores).toEqual({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
-    expect(monster.ability_score_modifiers).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
-  });
-
-  // --- Initiative ---
-  it('formats initiative_details for positive, zero, and negative bonuses', () => {
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: 5 })).initiative_details).toBe('+5');
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: 0 })).initiative_details).toBe('+0');
-    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: -3 })).initiative_details).toBe('-3');
-  });
-
-  it('omits initiative_details for undefined, null, or empty string bonuses', () => {
-    const { initiative_details } = npcToMonsterFormat(makeNPC({ initiativeBonus: undefined }));
-    expect(initiative_details).toBeNull();
-    const { initiative_details: initNull } = npcToMonsterFormat(makeNPC({ initiativeBonus: null }));
-    expect(initNull).toBeNull();
-    const { initiative_details: initEmpty } = npcToMonsterFormat(makeNPC({ initiativeBonus: '' }));
-    expect(initEmpty).toBeNull();
-  });
-
-  // --- Armor class ---
-  it('uses numeric armorClass directly', () => {
-    expect(npcToMonsterFormat(makeNPC({ armorClass: 18 })).armor_class).toBe(18);
-  });
-
-  it('defaults AC to 10 and logs an error when armorClass is not a number', () => {
+  it('uses numeric AC silently; defaults to 10 with a byte-pinned error when not a number', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const npc = { name: 'Broken NPC', armorClass: undefined };
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.armor_class).toBe(10);
+
+    expect(npcToMonsterFormat(makeNPC({ armorClass: 18 })).armor_class).toBe(18);
+    expect(spy).not.toHaveBeenCalled();
+
+    expect(npcToMonsterFormat({ name: 'Broken NPC' }).armor_class).toBe(10);
     expect(spy).toHaveBeenCalledWith(
       '[AC] NPC "Broken NPC" has no armorClass defined. Defaulting to 10.'
     );
-    spy.mockRestore();
   });
 
-  // --- Passive perception ---
-  it('computes passive_perception from wis modifier + 10', () => {
-    const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 14, cha: 10 } });
-    expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(12);
+  it.each([
+    [5, '+5'],
+    [0, '+0'],
+    [-3, '-3'],
+    ['4', '+4'],
+    ['-1', '-1'],
+  ])('initiative bonus %s formats to %s', (bonus, expected) => {
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: bonus })).initiative_details).toBe(expected);
   });
 
-  it('handles negative wisdom modifier for passive perception', () => {
-    const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 6, cha: 10 } });
-    expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(8);
+  it.each([
+    [undefined],
+    [null],
+    [''],
+  ])('initiative bonus %s is omitted as null', (bonus) => {
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: bonus })).initiative_details).toBeNull();
   });
 
-  // --- Damage / condition immunities and resistances ---
-  it('forwards damage and condition arrays, defaults to empty', () => {
+  // saving_throws iterates fixed ABILITY_KEYS; skills keeps arbitrary names.
+  it.each([
+    { field: 'savingThrowBonuses', out: 'saving_throws', bonuses: { str: 3, con: 1 }, expected: { str: { modifier: 3 }, con: { modifier: 1 } } },
+    { field: 'savingThrowBonuses', out: 'saving_throws', bonuses: { str: undefined, dex: null, con: '' }, expected: {} },
+    { field: 'savingThrowBonuses', out: 'saving_throws', bonuses: { str: 0 }, expected: { str: { modifier: 0 } } },
+    { field: 'savingThrowBonuses', out: 'saving_throws', bonuses: { int: '2' }, expected: { int: { modifier: 2 } } },
+    { field: 'savingThrowBonuses', out: 'saving_throws', bonuses: { bogus: 9, wis: -2 }, expected: { wis: { modifier: -2 } } },
+    { field: 'skillBonuses', out: 'skills', bonuses: { Stealth: 4, Insight: '-1' }, expected: { Stealth: { modifier: 4 }, Insight: { modifier: -1 } } },
+    { field: 'skillBonuses', out: 'skills', bonuses: { Acrobatics: undefined, History: '' }, expected: {} },
+    { field: 'skillBonuses', out: 'skills', bonuses: { SleightOfHand: 0 }, expected: { SleightOfHand: { modifier: 0 } } },
+    { field: 'skillBonuses', out: 'skills', bonuses: { 'Custom Tool Check': 3 }, expected: { 'Custom Tool Check': { modifier: 3 } } },
+  ])('$field → $out', ({ field, out, bonuses, expected }) => {
+    expect(npcToMonsterFormat(makeNPC({ [field]: bonuses }))[out]).toEqual(expected);
+  });
+
+  // Fallback strike: attack = str modifier, damage = max(1 + str mod, 1).
+  it.each([
+    [6, '-2', '1'],
+    [8, '-1', '1'],
+    [10, '+0', '1'],
+    [16, '+3', '4'],
+    [20, '+5', '6'],
+  ])('str %i → attack %s, damage %s bludgeoning', (str, attackBonus, damage) => {
     const npc = makeNPC({
-      damageResistances: ['cold', 'fire'],
-      damageImmunities: ['psychic'],
-      conditionImmunities: ['charmed', 'poisoned'],
+      actions: [],
+      abilityScores: { str, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.damage_resistances).toEqual(['cold', 'fire']);
-    expect(monster.damage_immunities).toEqual(['psychic']);
-    expect(monster.condition_immunities).toEqual(['charmed', 'poisoned']);
-  });
-
-  // --- Traits, actions, reactions ---
-  it('forwards traits, actions, and reactions arrays', () => {
-    const npc = makeNPC({
-      traits: [{ name: 'Keen Sense' }],
-      actions: [{ name: 'Slash' }],
-      reactions: [{ name: 'Opportunity Attack' }],
-    });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.traits).toEqual([{ name: 'Keen Sense' }]);
-    expect(monster.actions).toEqual([{ name: 'Slash' }]);
-    expect(monster.reactions).toEqual([{ name: 'Opportunity Attack' }]);
-  });
-
-  // --- Unarmed strike fallback ---
-  it('substitutes an Unarmed Strike when the NPC has no actions', () => {
-    const monster = npcToMonsterFormat(makeNPC({ actions: [] }));
-    expect(monster.actions).toHaveLength(1);
-    expect(monster.actions[0].name).toBe('Unarmed Strike');
-    // str 16 → +3 to hit, 1 + 3 = 4 bludgeoning
-    expect(monster.actions[0].attack_bonus).toBe('+3');
-    expect(monster.actions[0].damage_dice_primary).toBe('4');
-    expect(monster.actions[0].damage_type_primary).toBe('bludgeoning');
-  });
-
-  it('scales the Unarmed Strike from the STR modifier, minimum 1 damage', () => {
-    const weak = npcToMonsterFormat(makeNPC({ actions: [], abilityScores: { str: 6, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
-    expect(weak.actions[0].attack_bonus).toBe('-2');
-    expect(weak.actions[0].damage_dice_primary).toBe('1');
-
-    const mighty = npcToMonsterFormat(makeNPC({ actions: [], abilityScores: { str: 20, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } }));
-    expect(mighty.actions[0].attack_bonus).toBe('+5');
-    expect(mighty.actions[0].damage_dice_primary).toBe('6');
-  });
-
-  it('defaultUnarmedStrike defaults to a +0, 1-damage strike for a statless NPC', () => {
-    expect(defaultUnarmedStrike(null)).toMatchObject({
+    const [strike] = npcToMonsterFormat(npc).actions;
+    expect(strike).toMatchObject({
       name: 'Unarmed Strike',
-      attack_bonus: '+0',
-      damage_dice_primary: '1',
+      attack_bonus: attackBonus,
+      damage_dice_primary: damage,
       damage_type_primary: 'bludgeoning',
     });
   });
 
-  // --- HP, hit dice, speed ---
-  it('forwards hitPoints and hitDice', () => {
-    const npc = makeNPC({ hitPoints: 50, hitDice: '10d8' });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.hit_points).toBe(50);
-    expect(monster.hit_dice).toBe('10d8');
-  });
-
-  it('forwards custom speed object and defaults to walk 30 ft.', () => {
-    const npc = makeNPC({ speed: { walk: '40 ft.', fly: '30 ft.' } });
-    expect(npcToMonsterFormat(npc).speed).toEqual({ walk: '40 ft.', fly: '30 ft.' });
-    expect(npcToMonsterFormat({ armorClass: 10 }).speed).toEqual({ walk: '30 ft.' });
-  });
-
-  // --- Full integration ---
-  it('produces a complete monster object from a full NPC', () => {
-    const npc = makeNPC({
-      name: 'Dark Elf Rogue',
-      size: 'Small',
-      classRole: 'Rogue',
-      armorClass: 14,
-      hitPoints: 27,
-      hitDice: '6d8',
-      speed: { walk: '30 ft.' },
-      abilityScores: { str: 8, dex: 16, con: 12, int: 14, wis: 10, cha: 12 },
-      savingThrowBonuses: { dex: 4 },
-      skillBonuses: { Stealth: 5, Perception: 2 },
-      initiativeBonus: 3,
-      damageResistances: ['cold'],
-      damageImmunities: [],
-      conditionImmunities: [],
-      traits: [{ name: 'Darkvision' }],
-      actions: [{ name: 'Shortsword' }],
-      reactions: [],
-    });
-
-    const monster = npcToMonsterFormat(npc);
-
-    expect(monster.name).toBe('Dark Elf Rogue');
-    expect(monster.size).toBe('Small');
-    expect(monster.type).toBe('Rogue');
-    expect(monster.subtype).toBeNull();
-    expect(monster.alignment).toBe('Unaligned');
-    expect(monster.armor_class).toBe(14);
-    expect(monster.hit_points).toBe(27);
-    expect(monster.hit_dice).toBe('6d8');
-    expect(monster.speed.walk).toBe('30 ft.');
-    expect(monster.initiative_details).toBe('+3');
-    expect(monster.ability_scores.dex).toBe(16);
-    expect(monster.ability_score_modifiers.dex).toBe(3);
-    expect(monster.saving_throws.dex.modifier).toBe(4);
-    expect(monster.skills.Stealth.modifier).toBe(5);
-    expect(monster.skills.Perception.modifier).toBe(2);
-    expect(monster.damage_resistances).toEqual(['cold']);
-    expect(monster.traits).toEqual([{ name: 'Darkvision' }]);
-    expect(monster.actions).toEqual([{ name: 'Shortsword' }]);
-    expect(monster.reactions).toEqual([]);
+  it.each([
+    [14, 12],
+    [10, 10],
+    [6, 8],
+  ])('passive_perception with wis %i is %i', (wis, expected) => {
+    const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis, cha: 10 } });
+    expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(expected);
   });
 });

@@ -1,17 +1,33 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ────────────────────────────────────────
+// ── aoeService lane: area-target orchestration only ─────────────────
+// Cite table (owners consulted, not re-driven here):
+//   shape geometry / exact-cell hits .... SpellOverlay.test.js (hitTestOverlay mocked)
+//   save prompt internals ............... conditionSaveService CANON #1005
+//   corona util scoping (dmg-type/elist)  coronaAuraUtils.test.js sync-lane describe
+//   post-save damage arithmetic ......... applyDamage.helpers.test.js #1182
+//   evasion save-type matching .......... evasionUtils.test.js (hasEvasionForSave mocked)
+//   ability-scoped te predicate ......... targetEffectDefinitions (real code runs here)
+// This file's faces: merged players+placedItems selection output, per-NPC
+// roll→compute→apply wiring with full-output goldens (#1160), te rider apply
+// vs consume byte-distinct legs (#903), soulstitch zero-damage, prompt payload
+// + guid allocation, degenerate honest refusals (#945), heightenTarget legs.
+// Old->new map: getAffectedCreatures 8→2; processAoeNpcs 15→9 (happy golden +
+// fail/precedence/null folded; dcSuccess+evasion folded; multi+mixed folded;
+// soulstitch 2→1; rider apply+consume 2→1; corona negs dropped→util owner);
+// sendAoePlayerSaves 8→5 (param dupes folded into full-output golden).
+
+// ── Mocks BEFORE imports ────────────────────────────────────────────
 
 vi.mock('../../../models/SpellOverlay.js', () => ({
   hitTestOverlay: vi.fn(),
-  OverlayShape: { SPHERE: 'sphere', CYLINDER: 'cylinder' },
 }));
 
 vi.mock('./applyDamage.js', () => ({
   rollSaveForCreature: vi.fn(),
-  computeDamageAfterSave: vi.fn(),
-  applyDamageToTarget: vi.fn(),
   computeDamageAfterEvasion: vi.fn(),
+  applyDamageToTarget: vi.fn(),
   hasEvasionForSave: vi.fn(),
   normalizeSaveType: vi.fn(),
 }));
@@ -25,17 +41,17 @@ vi.mock('../../ui/utils.js', () => ({
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
-  getStore: vi.fn(() => ({ keys: () => [] })),
+  getStore: vi.fn(),
 }));
 
-// CLA-063: getCoronaSaveDisadvantageSync participants fall back to the cached
-// combat summary — mock it so the cache stays cold (false) for legacy pins.
+// Corona sync lane runs REAL (getCoronaSaveDisadvantageSync); its participant
+// fallback hits this combat-summary cache — kept cold by default for legacy pins.
 vi.mock('../../encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => null),
-  getCombatContext: vi.fn(async () => null),
+  getCombatSummary: vi.fn(),
+  getCombatContext: vi.fn(),
 }));
 
-// ── Imports ─────────────────────────────────────────────────────
+// ── Imports ─────────────────────────────────────────────────────────
 
 import {
   getAffectedCreatures,
@@ -46,23 +62,23 @@ import {
 import { hitTestOverlay } from '../../../models/SpellOverlay.js';
 import {
   rollSaveForCreature,
-  applyDamageToTarget,
   computeDamageAfterEvasion,
+  applyDamageToTarget,
   hasEvasionForSave,
   normalizeSaveType,
 } from './applyDamage.js';
 import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getStore } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 
-// ── Helpers ─────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────
 
 function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }
 
-function createNpcCreature(name, gridX, gridY) {
+function createNpcCreature(name, gridX = 1, gridY = 1) {
   return { name, type: 'npc', currentHp: 20, maxHp: 20, conditions: [], gridX, gridY };
 }
 
@@ -70,502 +86,371 @@ function createPlayerCreature(name) {
   return { name, type: 'player' };
 }
 
-// ── Tests for getAffectedCreatures ─────────────────────────────
+// Standard processAoeNpcs args — one fixture, per-test overrides.
+function npcArgs(creature, overrides = {}) {
+  return {
+    combatSummary: makeCombatSummary([creature]),
+    affected: [{ creature }],
+    rawDamage: 6,
+    damageType: 'Fire',
+    saveDc: 15,
+    saveType: 'dexterity',
+    dcSuccess: 'half',
+    campaignName: 'TestCampaign',
+    attackerName: 'TestHero',
+    characters: [],
+    ...overrides,
+  };
+}
+
+// Standard sendAoePlayerSaves args.
+const PLAYER_SAVE_ARGS = {
+  rawDamage: 8,
+  damageType: 'Fire',
+  saveDc: 15,
+  saveType: 'dexterity',
+  dcSuccess: 'half',
+  campaignName: 'TestCampaign',
+  spellName: 'Fireball',
+  attackerName: 'Wizard',
+  formula: '3d6',
+};
+
+// Determinism re-arm (#1057): every test starts from a cold store, neutral
+// modifiers, identity save normalization — no sticky cross-test leakage.
+beforeEach(() => {
+  vi.resetAllMocks();
+  normalizeSaveType.mockImplementation((t) => t);
+  getRuntimeValue.mockReturnValue(null);
+  getCombatSummary.mockReturnValue(null);
+  getStore.mockReturnValue({ keys: () => [] });
+  hasEvasionForSave.mockReturnValue(false);
+});
+
+// ── getAffectedCreatures ────────────────────────────────────────────
 
 describe('getAffectedCreatures', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns empty array when overlay is null', () => {
+  it('returns [] when overlay or combat-summary creatures are missing', () => {
     expect(getAffectedCreatures(null, [], [], makeCombatSummary([]))).toEqual([]);
-  });
-
-  it('returns empty array when combatSummary is missing creatures', () => {
     expect(getAffectedCreatures({ shape: 'sphere' }, [], [], {})).toEqual([]);
   });
 
-  it('returns empty array when no creatures match overlay', () => {
-    hitTestOverlay.mockReturnValue(false);
-    const cs = makeCombatSummary([createNpcCreature('Goblin')]);
-    const result = getAffectedCreatures(
-      { shape: 'sphere' },
-      [{ name: 'Goblin', gridX: 5, gridY: 5 }],
-      [],
-      cs
-    );
-    expect(result).toEqual([]);
-  });
-
-  it('returns creatures hit by overlay from players list', () => {
-    hitTestOverlay.mockReturnValue(true);
-    const player = createPlayerCreature('Alchemist');
-    const cs = makeCombatSummary([player]);
-    const result = getAffectedCreatures(
-      { shape: 'sphere' },
-      [{ name: 'Alchemist', gridX: 3, gridY: 4 }],
-      [],
-      cs
-    );
-    expect(result).toEqual([
-      { creature: player, gridX: 3, gridY: 4 },
-    ]);
-  });
-
-  it('returns creatures hit by overlay from placedItems list', () => {
-    hitTestOverlay.mockReturnValue(true);
-    const npc = createNpcCreature('Orc');
-    const cs = makeCombatSummary([npc]);
-    const result = getAffectedCreatures(
-      { shape: 'cube' },
-      [],
-      [{ type: 'npc', name: 'Orc', gridX: 7, gridY: 8 }],
-      cs
-    );
-    expect(result).toEqual([
-      { creature: npc, gridX: 7, gridY: 8 },
-    ]);
-  });
-
-  it('skips placedItems that are not type npc', () => {
-    const cs = makeCombatSummary([createNpcCreature('Goblin')]);
-    const result = getAffectedCreatures(
-      {},
-      [],
-      [{ type: 'wall', gridX: 3, gridY: 4 }],
-      cs
-    );
-    expect(result).toEqual([]);
-    expect(hitTestOverlay).not.toHaveBeenCalled();
-  });
-
-  it('matches creatures by name across players and placedItems position maps', () => {
-    hitTestOverlay.mockImplementation((_overlay, x, y) => x === 3 && y === 4);
-
-    const player = createPlayerCreature('Hero');
-    const cs = makeCombatSummary([player]);
-
-    const result = getAffectedCreatures(
-      { shape: 'sphere' },
-      [{ name: 'Hero', gridX: 3, gridY: 4 }],
-      [{ type: 'npc', name: 'Goblin', gridX: 7, gridY: 8 }],
-      cs
-    );
-
-    expect(result).toEqual([
-      { creature: player, gridX: 3, gridY: 4 },
-    ]);
-  });
-
-  it('handles multiple creatures hit by overlay', () => {
-    hitTestOverlay.mockReturnValue(true);
+  it('selects combatants from the merged players + placedItems position maps — exact output, untracked/non-npc/unnamed never consulted', () => {
     const hero = createPlayerCreature('Hero');
     const ranger = createPlayerCreature('Ranger');
-    const cs = makeCombatSummary([hero, ranger]);
+    const goblin = createNpcCreature('Goblin', 7, 8);
+    const overlay = { shape: 'sphere' };
+    hitTestOverlay.mockImplementation((_o, x, y) => (x === 3 && y === 4) || (x === 7 && y === 8));
+
     const result = getAffectedCreatures(
-      {},
+      overlay,
       [
         { name: 'Hero', gridX: 3, gridY: 4 },
         { name: 'Ranger', gridX: 5, gridY: 6 },
       ],
-      [],
-      cs
+      [
+        { type: 'npc', name: 'Goblin', gridX: 7, gridY: 8 },
+        { type: 'wall', name: 'Wall', gridX: 9, gridY: 9 },
+        { type: 'npc', gridX: 1, gridY: 1 },
+      ],
+      makeCombatSummary([hero, ranger, goblin, createNpcCreature('Ghost')])
     );
-    expect(result).toHaveLength(2);
-    expect(result[0].creature).toBe(hero);
-    expect(result[1].creature).toBe(ranger);
+
+    // Hero + Goblin hit; Ranger misses on its own cell; Ghost (no position),
+    // Wall (non-npc) and the unnamed npc item never reach the hit-test.
+    expect(result).toEqual([
+      { creature: hero, gridX: 3, gridY: 4 },
+      { creature: goblin, gridX: 7, gridY: 8 },
+    ]);
+    expect(hitTestOverlay.mock.calls).toEqual([
+      [overlay, 3, 4],
+      [overlay, 5, 6],
+      [overlay, 7, 8],
+    ]);
   });
 });
 
-// ── Tests for processAoeNpcs ────────────────────────────────────
+// ── processAoeNpcs ──────────────────────────────────────────────────
 
 describe('processAoeNpcs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue(undefined);
-    hasEvasionForSave.mockReturnValue(false);
-    normalizeSaveType.mockImplementation((t) => t);
-  });
-
-  it('returns empty array for no affected creatures', () => {
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([]), affected: [], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-    expect(result).toEqual([]);
-  });
-
-  it('skips player creatures in affected list', () => {
+  it('returns [] when affected is empty or players-only, rolling nothing', () => {
     const player = createPlayerCreature('Hero');
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([player]), affected: [{ creature: player }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-    expect(result).toEqual([]);
+    expect(processAoeNpcs(npcArgs(player, { affected: [], combatSummary: makeCombatSummary([]) }))).toEqual([]);
+    expect(processAoeNpcs(npcArgs(player))).toEqual([]);
     expect(rollSaveForCreature).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
   });
 
-  it('processes NPC with successful save and applies damage', () => {
+  it('happy-path NPC: full output tuple, exact roll/compute/apply wiring, cold modifiers', () => {
     const npc = createNpcCreature('Orc');
     rollSaveForCreature.mockReturnValue({ success: true, roll: 18, bonus: 3 });
     computeDamageAfterEvasion.mockReturnValue(3);
     applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17, damageReduced: false });
 
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
+    const args = npcArgs(npc);
+    const result = processAoeNpcs(args);
 
-    expect(result).toEqual([
-      {
-        creatureName: 'Orc',
-        saveSuccess: true,
-        saveRoll: 18,
-        saveBonus: 3,
-        finalDamage: 3,
-        newHp: 17,
-        damageReduced: false,
-        soulstitchProtected: false,
-      },
-    ]);
+    expect(result).toEqual([{
+      creatureName: 'Orc',
+      saveSuccess: true,
+      saveRoll: 18,
+      saveBonus: 3,
+      finalDamage: 3,
+      newHp: 17,
+      damageReduced: false,
+      soulstitchProtected: false,
+    }]);
+    // disadvantage=corona/te (cold), advantage=circleOfPower (cold store)
+    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
+    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', false);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(args.combatSummary, 'Orc', 3, ['Fire'], {
+      campaignName: 'TestCampaign',
+      characters: [],
+      ignoreResistance: false,
+      attackerName: 'TestHero',
+    });
   });
 
-  it('processes NPC with failed save taking full damage', () => {
-    const npc = createNpcCreature('Goblin');
+  it('failed save takes full damage; applyDamageToTarget result wins over compute, null apply falls back', () => {
+    const goblin = createNpcCreature('Goblin');
     rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14, damageReduced: true });
 
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'constitution', dcSuccess: 'half', campaignName: 'TestCampaign' });
+    expect(processAoeNpcs(npcArgs(goblin))).toEqual([{
+      creatureName: 'Goblin',
+      saveSuccess: false,
+      saveRoll: 5,
+      saveBonus: 0,
+      finalDamage: 6,
+      newHp: 14,
+      damageReduced: true,
+      soulstitchProtected: false,
+    }]);
 
-    expect(result[0].saveSuccess).toBe(false);
-    expect(result[0].finalDamage).toBe(6);
-    expect(result[0].newHp).toBe(14);
+    // resistance applied inside apply: its finalDamage/newHp override compute's
+    const dragon = createNpcCreature('Dragon');
+    rollSaveForCreature.mockReturnValue({ success: true, roll: 12, bonus: 1 });
+    computeDamageAfterEvasion.mockReturnValue(5);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 2, newHp: 18 });
+    const r2 = processAoeNpcs(npcArgs(dragon, { rawDamage: 6 }));
+    expect(r2[0].finalDamage).toBe(2);
+    expect(r2[0].damageReduced).toBeUndefined();
+
+    // null apply result → honest fallback to the compute value, newHp undefined
+    const golem = createNpcCreature('Golem');
+    rollSaveForCreature.mockReturnValue({ success: true, roll: 20, bonus: 5 });
+    computeDamageAfterEvasion.mockReturnValue(0);
+    applyDamageToTarget.mockReturnValue(null);
+    expect(processAoeNpcs(npcArgs(golem, { rawDamage: 10 }))).toEqual([{
+      creatureName: 'Golem',
+      saveSuccess: true,
+      saveRoll: 20,
+      saveBonus: 5,
+      finalDamage: 0,
+      newHp: undefined,
+      damageReduced: undefined,
+      soulstitchProtected: false,
+    }]);
+
+    expect(computeDamageAfterEvasion.mock.calls).toEqual([
+      [6, false, 'half', false],
+      [6, true, 'half', false],
+      [10, true, 'half', false],
+    ]);
   });
 
-  it('applies half damage on success with dcSuccess "half", no damage with "none"', () => {
-    let npc = createNpcCreature('Goblin');
+  it('dcSuccess policy and evasion flag flow through computeDamageAfterEvasion', () => {
+    const goblin = createNpcCreature('Goblin');
     rollSaveForCreature.mockReturnValue({ success: true, roll: 15, bonus: 2 });
-    computeDamageAfterEvasion.mockReturnValue(4);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 16 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
-    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(8, true, 'half', false);
-
-    npc = createNpcCreature('Goblin2');
-    rollSaveForCreature.mockReturnValue({ success: true, roll: 20, bonus: 5 });
     computeDamageAfterEvasion.mockReturnValue(0);
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
 
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'none', campaignName: 'TestCampaign' });
-    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(10, true, 'none', false);
+    processAoeNpcs(npcArgs(goblin, { rawDamage: 8, dcSuccess: 'half' }));
+    processAoeNpcs(npcArgs(goblin, { rawDamage: 10, dcSuccess: 'none' }));
+
+    // evasion matches only when the lane forwards evasionEffects + normalized type
+    const rogue = createNpcCreature('Rogue');
+    rogue.evasionEffects = [{ saveType: 'DEX' }];
+    hasEvasionForSave.mockReturnValue(true);
+    processAoeNpcs(npcArgs(rogue, { rawDamage: 6 }));
+
+    expect(computeDamageAfterEvasion.mock.calls).toEqual([
+      [8, true, 'half', false],
+      [10, true, 'none', false],
+      [6, true, 'half', true],
+    ]);
+    expect(hasEvasionForSave).toHaveBeenLastCalledWith([{ saveType: 'DEX' }], 'dexterity');
   });
 
-  it('handles multiple NPCs independently with different outcomes', () => {
-    const npc1 = createNpcCreature('Goblin 1');
-    const npc2 = createNpcCreature('Goblin 2');
+  it('processes each NPC independently in affected order, skipping players', () => {
+    const goblin1 = createNpcCreature('Goblin 1');
+    const hero = createPlayerCreature('Hero');
+    const goblin2 = createNpcCreature('Goblin 2');
 
     rollSaveForCreature
       .mockReturnValueOnce({ success: true, roll: 15, bonus: 2 })
       .mockReturnValueOnce({ success: false, roll: 3, bonus: -1 });
-    computeDamageAfterEvasion
-      .mockReturnValueOnce(3)
-      .mockReturnValueOnce(8);
+    computeDamageAfterEvasion.mockReturnValueOnce(3).mockReturnValueOnce(8);
     applyDamageToTarget
       .mockReturnValueOnce({ finalDamage: 3, newHp: 17, damageReduced: true })
       .mockReturnValueOnce({ finalDamage: 8, newHp: 7 });
 
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc1, npc2]), affected: [{ creature: npc1 }, { creature: npc2 }], rawDamage: 6, damageType: 'Cold', saveDc: 14, saveType: 'wisdom', dcSuccess: 'none', campaignName: 'TestCampaign' });
+    const result = processAoeNpcs(npcArgs(goblin1, {
+      combatSummary: makeCombatSummary([goblin1, hero, goblin2]),
+      affected: [{ creature: goblin1 }, { creature: hero }, { creature: goblin2 }],
+      damageType: 'Cold',
+      saveType: 'wisdom',
+    }));
 
-    expect(result).toHaveLength(2);
-    expect(result[0].creatureName).toBe('Goblin 1');
-    expect(result[0].saveSuccess).toBe(true);
-    expect(result[1].creatureName).toBe('Goblin 2');
-    expect(result[1].saveSuccess).toBe(false);
+    expect(result).toEqual([
+      { creatureName: 'Goblin 1', saveSuccess: true, saveRoll: 15, saveBonus: 2, finalDamage: 3, newHp: 17, damageReduced: true, soulstitchProtected: false },
+      { creatureName: 'Goblin 2', saveSuccess: false, saveRoll: 3, saveBonus: -1, finalDamage: 8, newHp: 7, damageReduced: undefined, soulstitchProtected: false },
+    ]);
+    expect(rollSaveForCreature.mock.calls.map(([c]) => c.name)).toEqual(['Goblin 1', 'Goblin 2']);
   });
 
-  it('calls applyDamageToTarget with correct parameters', () => {
-    const npc = createNpcCreature('Troll');
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 7, bonus: 1 });
-    computeDamageAfterEvasion.mockReturnValue(5);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 15 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 5, damageType: 'Acid', saveDc: 13, saveType: 'strength', dcSuccess: 'half', campaignName: 'MyCampaign', attackerName: 'TestHero', characters: ['char1', 'char2'] });
-
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Troll', 5, ['Acid'], { campaignName: 'MyCampaign', characters: ['char1', 'char2'], ignoreResistance: false, attackerName: 'TestHero' });
-  });
-
-  it('uses finalDamage from applyDamageToTarget when it differs from computeDamageAfterEvasion', () => {
-    const npc = createNpcCreature('Dragon');
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 8, bonus: 2 });
-    computeDamageAfterEvasion.mockReturnValue(5);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 2, newHp: 18 });
-
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
-
-    expect(result[0].finalDamage).toBe(2);
-  });
-
-  it('falls back to computeDamageAfterEvasion when applyDamageToTarget returns null', () => {
-    const npc = createNpcCreature('Golem');
-    rollSaveForCreature.mockReturnValue({ success: true, roll: 20, bonus: 5 });
-    computeDamageAfterEvasion.mockReturnValue(0);
-    applyDamageToTarget.mockReturnValue(null);
-
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 10, damageType: 'Bludgeoning', saveDc: 20, saveType: 'constitution', dcSuccess: 'half', campaignName: 'TestCampaign' });
-
-    expect(result[0].finalDamage).toBe(0);
-  });
-
-  it('passes rollSaveForCreature correct creature and save params', () => {
-    const npc = createNpcCreature('Orc');
-    npc.saveBonuses = { dexterity: 3 };
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 10, bonus: 3 });
-    computeDamageAfterEvasion.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
-  });
-
-  it('handles mixed NPC and player in affected list — only processes NPCs', () => {
-    const npc = createNpcCreature('Goblin');
-    const player = createPlayerCreature('Hero');
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 8, bonus: 1 });
-    computeDamageAfterEvasion.mockReturnValue(4);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 16 });
-
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc, player]), affected: [{ creature: npc }, { creature: player }], rawDamage: 4, damageType: 'Fire', saveDc: 12, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign' });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].creatureName).toBe('Goblin');
-  });
-
-  it('marks creature as soulstitchProtected when getRuntimeValue returns matching array', () => {
-    const npc = createNpcCreature('Ally');
-    getRuntimeValue.mockReturnValue(['Ally']);
-
+  it('soulstitch: attacker-stored name list forces success at zero damage (compute skipped); unlisted targets take normal damage', () => {
     rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterEvasion.mockReturnValue(0);
+    const ally = createNpcCreature('Ally');
+
+    getRuntimeValue.mockImplementation((key) => (key === 'Nemesis' ? ['Ally'] : null));
     applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
+    expect(processAoeNpcs(npcArgs(ally, { attackerName: 'Nemesis' }))).toEqual([{
+      creatureName: 'Ally',
+      saveSuccess: true,
+      saveRoll: 5,
+      saveBonus: 0,
+      finalDamage: 0,
+      newHp: 20,
+      damageReduced: undefined,
+      soulstitchProtected: true,
+    }]);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Nemesis', '_Nemesis_Soulstitch_Spells_active', 'TestCampaign');
+    expect(computeDamageAfterEvasion).not.toHaveBeenCalled();
 
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Nemesis' });
-
-    expect(result[0].soulstitchProtected).toBe(true);
-    expect(result[0].saveSuccess).toBe(true);
-    expect(result[0].finalDamage).toBe(0);
+    getRuntimeValue.mockImplementation((key) => (key === 'Nemesis' ? ['OtherPerson'] : null));
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+    const r2 = processAoeNpcs(npcArgs(ally, { attackerName: 'Nemesis' }));
+    expect(r2[0].soulstitchProtected).toBe(false);
+    expect(r2[0].saveSuccess).toBe(false);
+    expect(r2[0].finalDamage).toBe(6);
   });
 
-  it('does not mark protected when target name is not in stored array', () => {
-    const npc = createNpcCreature('Ally');
-    getRuntimeValue.mockReturnValue(['OtherPerson']);
-
+  it('te riders: disadvantage_on_next_save applies once and consumes (writing remaining te); ability_save_disadvantage (MA-1352) is save-type-scoped and never consumed', () => {
     rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    const result = processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Nemesis' });
+    // Byte-distinct decoy te survives the consume-write untouched.
+    const decoy = { target: 'Someone Else', effect: 'slow' };
+    const rider = { target: 'Goblin', effect: 'disadvantage_on_next_save' };
+    const goblin = createNpcCreature('Goblin');
+    getRuntimeValue.mockImplementation((key, prop) =>
+      (key === 'campaign' && prop === 'targetEffects') ? [decoy, rider] : null);
 
-    expect(result[0].soulstitchProtected).toBe(false);
+    processAoeNpcs(npcArgs(goblin));
+    expect(rollSaveForCreature).toHaveBeenCalledWith(goblin, 'dexterity', 15, true, false);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [decoy], 'TestCampaign');
+
+    // Ability-scoped te: INT save pays, WIS save unaffected, store never rewritten.
+    const intTe = { target: 'Goblin', effect: 'ability_save_disadvantage', ability: 'int', source: 'Psychic Gray Ooze 1' };
+    getRuntimeValue.mockImplementation((key, prop) =>
+      (key === 'campaign' && prop === 'targetEffects') ? [intTe] : null);
+    setRuntimeValue.mockClear();
+
+    processAoeNpcs(npcArgs(goblin, { saveType: 'INT', damageType: 'Psychic' }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(goblin, 'INT', 15, true, false);
+
+    processAoeNpcs(npcArgs(goblin, { saveType: 'WIS', damageType: 'Psychic' }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(goblin, 'WIS', 15, false, false);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('applies disadvantage when target has disadvantage_on_next_save targetEffect', () => {
-    const npc = createNpcCreature('Goblin');
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Goblin', effect: 'disadvantage_on_next_save' }];
-      }
-      return null;
-    });
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterEvasion.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, true, false);
-  });
-
-  it('applies evasion when creature has matching evasionEffects', () => {
-    const npc = createNpcCreature('Rogue');
-    npc.evasionEffects = [{ saveType: 'DEX' }];
-    hasEvasionForSave.mockReturnValue(true);
-    rollSaveForCreature.mockReturnValue({ success: true, roll: 18, bonus: 3 });
-    computeDamageAfterEvasion.mockReturnValue(0);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 20 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', true);
-    expect(hasEvasionForSave).toHaveBeenCalledWith([{ saveType: 'DEX' }], 'dexterity');
-  });
-
-  it('does not apply evasion when creature has no evasionEffects', () => {
-    const npc = createNpcCreature('Goblin');
-    rollSaveForCreature.mockReturnValue({ success: true, roll: 15, bonus: 2 });
-    computeDamageAfterEvasion.mockReturnValue(3);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', false);
-  });
-
-  it('does not apply evasion when save type does not match evasionEffects', () => {
-    const npc = createNpcCreature('Rogue');
-    npc.evasionEffects = [{ saveType: 'CON' }];
-    rollSaveForCreature.mockReturnValue({ success: true, roll: 15, bonus: 2 });
-    computeDamageAfterEvasion.mockReturnValue(3);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 3, newHp: 17 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(computeDamageAfterEvasion).toHaveBeenCalledWith(6, true, 'half', false);
-  });
-
-  it('consumes disadvantage_on_next_save effect after applying', () => {
-    const npc = createNpcCreature('Goblin');
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Goblin', effect: 'disadvantage_on_next_save' }];
-      }
-      return null;
-    });
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterEvasion.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign', 'targetEffects', [], 'TestCampaign'
-    );
-  });
-
-  // CLA-063: Corona of Light save-disadvantage on the AoE NPC lane (sync variant).
-  function seedCoronaCaster() {
+  it('CLA-063: corona sunlight_aura disadvantages a listed enemy on Fire saves (sync lane)', () => {
     getCombatSummary.mockReturnValue(makeCombatSummary([createPlayerCreature('TestHero')]));
     getRuntimeValue.mockImplementation((key, prop) => {
       if (key === 'TestHero' && prop === 'activeBuffs') {
         return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
       }
-      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') {
-        return ['Goblin'];
-      }
-      return null;
-    });
-  }
-
-  it('applies corona sunlight_aura disadvantage to Fire saves on listed enemies', () => {
-    const npc = createNpcCreature('Goblin');
-    seedCoronaCaster();
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterEvasion.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, true, false);
-  });
-
-  it('does not apply corona disadvantage for non-Fire/Radiant damage types', () => {
-    const npc = createNpcCreature('Goblin');
-    seedCoronaCaster();
-    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
-    computeDamageAfterEvasion.mockReturnValue(6);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
-
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Cold', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
-
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
-  });
-
-  it('does not apply corona disadvantage to unlisted enemies', () => {
-    const npc = createNpcCreature('Goblin');
-    seedCoronaCaster();
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'TestHero' && prop === 'activeBuffs') {
-        return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
-      }
-      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') {
-        return ['Someone Else'];
-      }
+      if (key === 'TestHero' && prop === 'coronaOfLightEnemies') return ['Goblin'];
       return null;
     });
     rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
     computeDamageAfterEvasion.mockReturnValue(6);
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
-    processAoeNpcs({ combatSummary: makeCombatSummary([npc]), affected: [{ creature: npc }], rawDamage: 6, damageType: 'Fire', saveDc: 15, saveType: 'dexterity', dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'TestHero' });
+    processAoeNpcs(npcArgs(createNpcCreature('Goblin')));
 
-    expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15, false, false);
+    expect(rollSaveForCreature).toHaveBeenCalledWith(expect.objectContaining({ name: 'Goblin' }), 'dexterity', 15, true, false);
+  });
+
+  it('heightenTarget disadvantages the named target only', () => {
+    rollSaveForCreature.mockReturnValue({ success: false, roll: 5, bonus: 0 });
+    computeDamageAfterEvasion.mockReturnValue(6);
+    applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
+
+    const goblin = createNpcCreature('Goblin');
+    processAoeNpcs(npcArgs(goblin, { heightenTarget: 'Goblin' }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(goblin, 'dexterity', 15, true, false);
+
+    processAoeNpcs(npcArgs(goblin, { heightenTarget: 'Someone Else' }));
+    expect(rollSaveForCreature).toHaveBeenLastCalledWith(goblin, 'dexterity', 15, false, false);
   });
 });
 
-// ── Tests for sendAoePlayerSaves ────────────────────────────────
+// ── sendAoePlayerSaves ──────────────────────────────────────────────
 
 describe('sendAoePlayerSaves', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns empty array for no affected creatures', () => {
-    const result = sendAoePlayerSaves({
-      affected: [], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: '', attackerName: '', formula: '',
-    });
-    expect(result).toEqual([]);
-  });
-
-  it('skips NPC creatures and returns empty array', () => {
-    const npc = createNpcCreature('Goblin');
-    const result = sendAoePlayerSaves({
-      affected: [{ creature: npc }], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: '', attackerName: '', formula: '',
-    });
-    expect(result).toEqual([]);
+  it('returns [] and sends no prompts when there are no player targets', () => {
+    expect(sendAoePlayerSaves({ affected: [], ...PLAYER_SAVE_ARGS })).toEqual([]);
+    expect(sendAoePlayerSaves({ affected: [{ creature: createNpcCreature('Goblin') }], ...PLAYER_SAVE_ARGS })).toEqual([]);
     expect(sendSavePrompt).not.toHaveBeenCalled();
   });
 
-  it('sends save prompt and returns pending entry for each player', () => {
-    const player = createPlayerCreature('Hero');
-    utils.guid.mockReturnValue('guid-abc');
+  it('one exact prompt per player in order — full pending tuples, guids consumed per player, NPCs skipped', () => {
+    const hero = createPlayerCreature('Hero');
+    const ranger = createPlayerCreature('Ranger');
+    utils.guid.mockReturnValueOnce('guid-1').mockReturnValueOnce('guid-2');
 
     const results = sendAoePlayerSaves({
-      affected: [{ creature: player }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '3d6',
+      affected: [{ creature: createNpcCreature('Goblin') }, { creature: hero }, { creature: ranger }],
+      ...PLAYER_SAVE_ARGS,
     });
 
-    expect(results).toHaveLength(1);
-    expect(results[0].targetName).toBe('Hero');
-    expect(results[0].creature).toBe(player);
-    expect(results[0].promptId).toBe('guid-abc');
-
-    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', {
-      promptId: 'guid-abc',
-      targetName: 'Hero',
-      saveType: 'dexterity',
-      saveDc: 15,
-      dcSuccess: 'half',
-      damageFormula: '3d6',
-      damageType: 'Fire',
-      sourceName: 'Fireball',
-      sourceAttackerName: 'Wizard',
-      rawDamage: 8,
-      disadvantage: false,
-    });
+    expect(results).toEqual([
+      { promptId: 'guid-1', targetName: 'Hero', creature: hero },
+      { promptId: 'guid-2', targetName: 'Ranger', creature: ranger },
+    ]);
+    expect(utils.guid).toHaveBeenCalledTimes(2);
+    expect(sendSavePrompt.mock.calls).toEqual([
+      ['TestCampaign', {
+        promptId: 'guid-1', targetName: 'Hero', saveType: 'dexterity', saveDc: 15,
+        dcSuccess: 'half', damageFormula: '3d6', damageType: 'Fire',
+        sourceName: 'Fireball', sourceAttackerName: 'Wizard', rawDamage: 8, disadvantage: false,
+      }],
+      ['TestCampaign', {
+        promptId: 'guid-2', targetName: 'Ranger', saveType: 'dexterity', saveDc: 15,
+        dcSuccess: 'half', damageFormula: '3d6', damageType: 'Fire',
+        sourceName: 'Fireball', sourceAttackerName: 'Wizard', rawDamage: 8, disadvantage: false,
+      }],
+    ]);
   });
 
-  it('CLA-063: prompt carries corona sunlight_aura disadvantage for listed enemies vs Fire/Radiant', () => {
-    const player = createPlayerCreature('Hero');
+  it('CLA-063: prompt carries corona sunlight_aura disadvantage for a listed enemy vs Fire', () => {
+    const hero = createPlayerCreature('Hero');
     utils.guid.mockReturnValue('guid-coro');
     getCombatSummary.mockReturnValue(makeCombatSummary([createPlayerCreature('Wizard')]));
     getRuntimeValue.mockImplementation((key, prop) => {
       if (key === 'Wizard' && prop === 'activeBuffs') {
         return [{ effect: 'sunlight_aura', enemiesDisadvantageSaves: ['Fire', 'Radiant'] }];
       }
-      if (key === 'Wizard' && prop === 'coronaOfLightEnemies') {
-        return ['Hero'];
-      }
+      if (key === 'Wizard' && prop === 'coronaOfLightEnemies') return ['Hero'];
       return null;
     });
 
-    sendAoePlayerSaves({
-      affected: [{ creature: player }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '3d6',
-    });
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS });
 
     expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'Hero',
@@ -574,168 +459,48 @@ describe('sendAoePlayerSaves', () => {
     }));
   });
 
-  it('returns pending list for all player creatures, calls sendSavePrompt once per player, generates unique prompt IDs', () => {
+  it('prompt disadvantage from rider te (never consumed on this lane) and from heightenTarget only', () => {
     const hero = createPlayerCreature('Hero');
-    const ranger = createPlayerCreature('Ranger');
-    utils.guid
-      .mockReturnValueOnce('guid-1')
-      .mockReturnValueOnce('guid-2');
-
-    let results = sendAoePlayerSaves({
-      affected: [{ creature: hero }, { creature: ranger }], rawDamage: 5, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '4d6',
-    });
-    expect(results).toHaveLength(2);
-    expect(results[0].targetName).toBe('Hero');
-    expect(results[0].creature).toBe(hero);
-    expect(results[1].targetName).toBe('Ranger');
-    expect(results[1].creature).toBe(ranger);
-
-    sendSavePrompt.mockClear();
-    sendAoePlayerSaves({
-      affected: [
-        { creature: createPlayerCreature('Hero') },
-        { creature: createPlayerCreature('Ranger') },
-        { creature: createPlayerCreature('Cleric') },
-      ], rawDamage: 10, damageType: 'Thunder', saveDc: 15, saveType: 'strength',
-      dcSuccess: 'none', campaignName: 'MyCampaign', spellName: 'Thunderstorm', attackerName: 'Druid', formula: '8d6',
-    });
-    expect(sendSavePrompt).toHaveBeenCalledTimes(3);
-
-    utils.guid.mockClear();
-    utils.guid
-      .mockReturnValueOnce('id-a')
-      .mockReturnValueOnce('id-b');
-
-    results = sendAoePlayerSaves({
-      affected: [
-        { creature: createPlayerCreature('Player1') },
-        { creature: createPlayerCreature('Player2') },
-      ], rawDamage: 5, damageType: 'Fire', saveDc: 10, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Burning Hands', attackerName: 'Wizard', formula: '4d6',
-    });
-    expect(results[0].promptId).toBe('id-a');
-    expect(results[1].promptId).toBe('id-b');
-    expect(utils.guid).toHaveBeenCalledTimes(2);
-  });
-
-  it('handles mixed players and NPCs — only sends prompts for players', () => {
-    const results = sendAoePlayerSaves({
-      affected: [
-        { creature: createNpcCreature('Goblin') },
-        { creature: createPlayerCreature('Hero') },
-        { creature: createNpcCreature('Orc') },
-      ], rawDamage: 5, damageType: 'Fire', saveDc: 12, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Burning Hands', attackerName: null, formula: '',
-    });
-
-    expect(results).toHaveLength(1);
-    expect(sendSavePrompt).toHaveBeenCalledTimes(1);
-  });
-
-  it('passes all params correctly to sendSavePrompt', () => {
-    utils.guid.mockReturnValue('guid-target');
-
-    sendAoePlayerSaves({
-      affected: [{ creature: createPlayerCreature('Target') }], rawDamage: 7, damageType: 'Radiant', saveDc: 16, saveType: 'wisdom',
-      dcSuccess: 'half', campaignName: 'CampaignX', spellName: 'Guiding Bolt', attackerName: 'Cleric', formula: '4d8',
-    });
-
-    expect(sendSavePrompt).toHaveBeenCalledWith('CampaignX', {
-      promptId: 'guid-target',
-      targetName: 'Target',
-      saveType: 'wisdom',
-      saveDc: 16,
-      dcSuccess: 'half',
-      damageFormula: '4d8',
-      damageType: 'Radiant',
-      sourceName: 'Guiding Bolt',
-      sourceAttackerName: 'Cleric',
-      rawDamage: 7,
-      disadvantage: false,
-    });
-  });
-
-  it('includes disadvantage in prompt when target has disadvantage_on_next_save', () => {
     utils.guid.mockReturnValue('guid-rider');
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Hero', effect: 'disadvantage_on_next_save' }];
-      }
-      return null;
-    });
+    getRuntimeValue.mockImplementation((key, prop) =>
+      (key === 'campaign' && prop === 'targetEffects')
+        ? [{ target: 'Hero', effect: 'disadvantage_on_next_save' }]
+        : null);
 
-    sendAoePlayerSaves({
-      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Fire', saveDc: 15, saveType: 'dexterity',
-      dcSuccess: 'half', campaignName: 'TestCampaign', spellName: 'Fireball', attackerName: 'Wizard', formula: '8d6',
-    });
-
-    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-      targetName: 'Hero',
-      disadvantage: true,
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS });
+    expect(sendSavePrompt).toHaveBeenLastCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero', disadvantage: true,
     }));
-  });
-});
+    // Player lane is read-only on the store — the rider survives for the roller.
+    expect(setRuntimeValue).not.toHaveBeenCalled();
 
-describe('MA-1352 ability_save_disadvantage (Psychic Gray Ooze Pseudopod) — AoE seams', () => {
-  const teFor = (target) => [{ target, effect: 'ability_save_disadvantage', ability: 'int', source: 'Psychic Gray Ooze 1', duration: 'until_start_of_next_turn' }];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    hasEvasionForSave.mockReturnValue(false);
-    computeDamageAfterEvasion.mockReturnValue(4);
-    applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 5, damageReduced: false });
-    rollSaveForCreature.mockReturnValue({ roll: 3, total: 3, bonus: 0, success: false, rawRolls: [3, 1] });
-  });
-
-  function teRuntime(overrides = {}) {
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') return overrides.targetEffects || [];
-      return null;
-    });
-  }
-
-  it('processAoeNpcs: INT save pays Disadvantage from the ability-scoped te', () => {
-    teRuntime({ targetEffects: teFor('Bandit 1') });
-    processAoeNpcs({
-      combatSummary: makeCombatSummary([createNpcCreature('Bandit 1')]),
-      affected: [{ creature: createNpcCreature('Bandit 1'), gridX: 1, gridY: 1 }],
-      rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'INT',
-      dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Caster', characters: [],
-    });
-    expect(rollSaveForCreature).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Bandit 1' }), 'INT', 15, true, expect.anything());
-  });
-
-  it('processAoeNpcs: WIS save is unaffected by the INT te', () => {
-    teRuntime({ targetEffects: teFor('Bandit 1') });
-    processAoeNpcs({
-      combatSummary: makeCombatSummary([createNpcCreature('Bandit 1')]),
-      affected: [{ creature: createNpcCreature('Bandit 1'), gridX: 1, gridY: 1 }],
-      rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'WIS',
-      dcSuccess: 'half', campaignName: 'TestCampaign', attackerName: 'Caster', characters: [],
-    });
-    expect(rollSaveForCreature).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Bandit 1' }), 'WIS', 15, false, expect.anything());
-  });
-
-  it('sendAoePlayerSaves: prompt carries disadvantage on the matching save type only', () => {
-    utils.guid.mockReturnValue('guid-ability');
-    teRuntime({ targetEffects: teFor('Hero') });
-    sendAoePlayerSaves({
-      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'INT',
-      dcSuccess: 'none', campaignName: 'TestCampaign', spellName: 'Symbol', attackerName: 'Ooze', formula: '8d6',
-    });
-    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+    getRuntimeValue.mockReturnValue(null);
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS, heightenTarget: 'Hero' });
+    expect(sendSavePrompt).toHaveBeenLastCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'Hero', disadvantage: true,
     }));
 
-    sendSavePrompt.mockClear();
-    sendAoePlayerSaves({
-      affected: [{ creature: createPlayerCreature('Hero') }], rawDamage: 8, damageType: 'Psychic', saveDc: 15, saveType: 'DEX',
-      dcSuccess: 'none', campaignName: 'TestCampaign', spellName: 'Symbol', attackerName: 'Ooze', formula: '8d6',
-    });
-    expect(sendSavePrompt).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS, heightenTarget: 'Someone Else' });
+    expect(sendSavePrompt).toHaveBeenLastCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero', disadvantage: false,
+    }));
+  });
+
+  it('MA-1352: ability-scoped te disadvantages only the matching save type', () => {
+    const hero = createPlayerCreature('Hero');
+    utils.guid.mockReturnValue('guid-ability');
+    getRuntimeValue.mockImplementation((key, prop) =>
+      (key === 'campaign' && prop === 'targetEffects')
+        ? [{ target: 'Hero', effect: 'ability_save_disadvantage', ability: 'int', source: 'Psychic Gray Ooze 1' }]
+        : null);
+
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS, saveType: 'INT' });
+    expect(sendSavePrompt).toHaveBeenLastCalledWith('TestCampaign', expect.objectContaining({
+      targetName: 'Hero', disadvantage: true,
+    }));
+
+    sendAoePlayerSaves({ affected: [{ creature: hero }], ...PLAYER_SAVE_ARGS, saveType: 'DEX' });
+    expect(sendSavePrompt).toHaveBeenLastCalledWith('TestCampaign', expect.objectContaining({
       targetName: 'Hero', disadvantage: false,
     }));
   });

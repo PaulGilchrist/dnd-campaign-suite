@@ -1,3 +1,31 @@
+// @maintained-by-ai
+// Lane: npcCombatService.addNPCToInitiative — sole owner of NPC-initiative assembly
+// (source read in full: hard gate → dup check → weapon prompt → roll → push → sort →
+// storage.set → event → log fetch → callback).
+//
+// Cited, never re-driven here:
+//   npcStatBlockUtils gates are inputs — predicate internals owned by
+//     npcStatBlockUtils.test.js (its header disclaims initiative assembly).
+//   initiativeService CANON #1079 owns the PC-side rollD20 seam; this file mocks
+//     rollD20 only to pin NPC-side bonus arithmetic determinism.
+//   combatData #1074 owns loadCombatSummary; here it is a canned transport stub.
+//   Store-faithful campaign-keyed tuple #932/#1019 — storage.set('combatSummary', …, campaign)
+//     pinned once below; refusals zero-write census #1026/#1095 inline per branch.
+//   RNG consumed-in-order #1076: rollD20 consumed exactly once, after all refusal gates.
+//   Log exact payload #app mandate; coercion/zero-is-data #945/#950; it.each #903;
+//     seams never wall-clock (setTimeout below is a microtask flush only).
+//
+// Consumers (components/npcs/NPCs.test.jsx, sessions/Sessions.test.jsx) mock this
+// service — they cover wiring only, no behavior duplicated there.
+//
+// Old → new map:
+//   hard-gate ×2 → 1 refuse census; "asks" + "adds anyway" → weapon-cancel;
+//   summary-init default → folded into default-bytes; "preserves" + "sorts" → preserve-sort-append;
+//   dup "different names" → removed (baseline covered by every happy path);
+//   initiative pos/neg/invalid loop → it.each table (loop read stale calls[0]);
+//   creature-fields ×6 → exact-bytes ×2 + image-fallback;
+//   transport + event → 1; log ×3 → it.each exact-payload ×3 (adds nat20/nat1);
+//   resilience → real rejection + console.flush (old mock pre-swallowed its own error).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { npcHasStatBlock, npcHasAttacks } from '../encounters/npcStatBlockUtils.js';
@@ -28,6 +56,8 @@ vi.mock('../ui/utils.js', () => ({
 }));
 
 const CAMPAIGN = 'testCampaign';
+const LOG_URL = `/api/campaigns/${encodeURIComponent(CAMPAIGN)}/log`;
+
 const defaultNPC = () => ({ name: 'Goblin', armorClass: 12, hitPoints: 7 });
 const withAttack = (npc) => ({
   ...npc,
@@ -51,264 +81,240 @@ describe('npcCombatService - addNPCToInitiative', () => {
     vi.restoreAllMocks();
   });
 
-  describe('hard gate: combat stats required', () => {
-    it('throws without loading combat or persisting when the NPC lacks AC and HP', async () => {
-      npcHasStatBlock.mockReturnValue(false);
-      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).rejects.toThrow(/needs AC and HP/);
-      expect(loadCombatSummary).not.toHaveBeenCalled();
-      expect(storage.set).not.toHaveBeenCalled();
-    });
+  it('refuses an NPC lacking AC/HP: throws, zero reads, rolls, prompts, writes, or callbacks', async () => {
+    npcHasStatBlock.mockReturnValue(false);
+    const callback = vi.fn();
 
-    it('does not invoke onViewInitiative when the NPC lacks a stat block', async () => {
-      npcHasStatBlock.mockReturnValue(false);
-      const callback = vi.fn();
-      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC(), callback)).rejects.toThrow();
-      expect(callback).not.toHaveBeenCalled();
-    });
+    await expect(addNPCToInitiative(CAMPAIGN, defaultNPC(), callback)).rejects.toThrow(/needs AC and HP/);
+
+    expect(loadCombatSummary).not.toHaveBeenCalled();
+    expect(rollD20).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
   });
 
   describe('weapon prompt when the NPC has no attacks', () => {
-    it('asks for a weapon when the NPC has no usable attacks', async () => {
+    it('prompts, then adds (unarmed fallback) and fires onViewInitiative when the GM cancels', async () => {
       npcHasAttacks.mockReturnValue(false);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
+      const callback = vi.fn();
+
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
+
       expect(window.confirm).toHaveBeenCalledTimes(1);
       expect(window.confirm.mock.calls[0][0]).toMatch(/no weapons or attacks/i);
+      expect(result).toBe('added');
+      expect(storage.set).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledTimes(1);
     });
 
-    it('returns needs-weapon without persisting when the GM opts to provide a weapon', async () => {
+    it('returns needs-weapon with a zero-write census when the GM opts to provide a weapon', async () => {
       npcHasAttacks.mockReturnValue(false);
       window.confirm.mockReturnValue(true);
       const callback = vi.fn();
-      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
-      expect(result).toBe('needs-weapon');
-      expect(storage.set).not.toHaveBeenCalled();
-      expect(callback).not.toHaveBeenCalled();
-    });
 
-    it('adds the NPC anyway when the GM cancels the prompt (unarmed strike fallback)', async () => {
-      npcHasAttacks.mockReturnValue(false);
-      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(result).toBe('added');
-      expect(storage.set).toHaveBeenCalledTimes(1);
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
+
+      expect(result).toBe('needs-weapon');
+      expect(rollD20).not.toHaveBeenCalled();
+      expect(storage.set).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(callback).not.toHaveBeenCalled();
     });
 
     it('does not prompt when the NPC has a usable attack', async () => {
       const result = await addNPCToInitiative(CAMPAIGN, withAttack(defaultNPC()));
+
       expect(result).toBe('added');
       expect(window.confirm).not.toHaveBeenCalled();
     });
   });
 
-  describe('combat summary initialization', () => {
-    it('creates a default combatSummary when none exists', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const saved = storage.set.mock.calls[0][1];
-      expect(saved.round).toBe(1);
-      expect(saved.creatures.length).toBe(1);
-    });
-
-    it('preserves existing round number and creatures from combat summary', async () => {
-      loadCombatSummary.mockResolvedValue({ round: 5, creatures: [{ type: 'pc', name: 'Hero' }] });
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const saved = storage.set.mock.calls[0][1];
-      expect(saved.round).toBe(5);
-      expect(saved.creatures.length).toBe(2);
-    });
-  });
-
   describe('duplicate NPC check', () => {
-    it('returns already without persisting when NPC already exists as npc type', async () => {
+    it('returns already with a zero-write census and no roll or prompt when an npc of that name is in initiative', async () => {
+      npcHasAttacks.mockReturnValue(false);
       loadCombatSummary.mockResolvedValue({ round: 1, creatures: [{ type: 'npc', name: 'Goblin' }] });
       const callback = vi.fn();
+
       const result = await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
+
       expect(result).toBe('already');
       expect(callback).toHaveBeenCalledTimes(1);
+      expect(rollD20).not.toHaveBeenCalled();
+      expect(window.confirm).not.toHaveBeenCalled();
       expect(storage.set).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('allows an NPC with the same name but different type (pc)', async () => {
+    it('adds an NPC whose name matches only a pc creature', async () => {
       loadCombatSummary.mockResolvedValue({ round: 1, creatures: [{ type: 'pc', name: 'Goblin' }] });
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const saved = storage.set.mock.calls[0][1];
-      expect(saved.creatures.length).toBe(2);
-    });
 
-    it('adds NPC when only NPCs with different names exist', async () => {
-      loadCombatSummary.mockResolvedValue({ round: 1, creatures: [{ type: 'npc', name: 'Orc' }] });
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
+
+      expect(result).toBe('added');
       const saved = storage.set.mock.calls[0][1];
-      expect(saved.creatures.length).toBe(2);
+      expect(saved.creatures.map((c) => c.name)).toEqual(['Goblin', 'Goblin']);
+      expect(saved.creatures.filter((c) => c.type === 'npc')).toHaveLength(1);
     });
   });
 
-  describe('initiative bonus', () => {
-    it('adds a positive bonus to the d20 roll', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '+3' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiative).toBe('18');
-      expect(creature.initiativeBonus).toBe(3);
-    });
+  // initiativeBonus coercion truth table (rollD20 stubbed at 15). undefined-absent
+  // is exercised by every other test; zero is data #945/#950.
+  it.each([
+    ['+3', '18', 3],
+    ['-2', '13', -2],
+    [2, '17', 2],
+    [0, '15', 0],
+    ['invalid', '15', 0],
+    [null, '15', 0],
+  ])('initiativeBonus %s joins as initiative %s (parsed %s)', async (bonus, initiative, parsed) => {
+    await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: bonus });
 
-    it('subtracts a negative bonus from the d20 roll', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '-2' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.initiative).toBe('13');
-    });
-
-    it('defaults bonus to 0 for invalid, empty, null, whitespace, and undefined values', async () => {
-      const invalidValues = ['invalid', '', null, '   ', undefined];
-      for (const bonus of invalidValues) {
-        await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: bonus });
-        const creature = storage.set.mock.calls[0][1].creatures[0];
-        expect(creature.initiative).toBe('15');
-        expect(creature.initiativeBonus).toBe(0);
-      }
-    });
+    const creature = storage.set.mock.calls[0][1].creatures[0];
+    expect(creature.initiative).toBe(initiative);
+    expect(creature.initiativeBonus).toBe(parsed);
   });
 
-  describe('creature fields', () => {
-    it('sets all required default fields on the pushed creature', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const creature = storage.set.mock.calls[0][1].creatures[0];
+  describe('creature record', () => {
+    it('pushes an exact minimal npc creature and starts a fresh round-1 summary', async () => {
+      const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
 
-      expect(creature.type).toBe('npc');
-      expect(creature.name).toBe('Goblin');
-      expect(creature.targetName).toBeNull();
-      expect(creature.concentration).toBeNull();
-      expect(creature.saveBonuses).toEqual({});
-      expect(creature.ac).toBe(12);
-      expect(creature.maxHp).toBe(7);
-      expect(creature.currentHp).toBe(7);
-      expect(creature.resistances).toEqual([]);
-      expect(creature.immunities).toEqual([]);
-      expect(creature.imagePath).toBe('');
+      expect(result).toBe('added');
+      const saved = storage.set.mock.calls[0][1];
+      expect(saved.round).toBe(1);
+      expect(saved.creatures).toEqual([
+        {
+          name: 'Goblin',
+          type: 'npc',
+          monsterType: undefined,
+          initiative: '15',
+          targetName: null,
+          ac: 12,
+          resistances: [],
+          immunities: [],
+          concentration: null,
+          imagePath: '',
+          initiativeBonus: 0,
+          maxHp: 7,
+          currentHp: 7,
+          saveBonuses: {},
+        },
+      ]);
     });
 
-    it('copies AC straight from the NPC — no silent 10 default', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 15, hitPoints: 7 });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.ac).toBe(15);
-    });
-
-    it('copies HP straight from the NPC — no silent 10 default', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: 25 });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.maxHp).toBe(25);
-      expect(creature.currentHp).toBe(25);
-    });
-
-    it('accepts string HP (the form stores text), coercing once', async () => {
-      await addNPCToInitiative(CAMPAIGN, { name: 'Goblin', armorClass: 12, hitPoints: '18' });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.maxHp).toBe(18);
-      expect(creature.currentHp).toBe(18);
-    });
-
-    it('carries over damageResistances and damageImmunities from NPC', async () => {
+    it('copies rich NPC fields verbatim — string HP coerced once, imagePath wins over image', async () => {
       await addNPCToInitiative(CAMPAIGN, {
-        ...defaultNPC(),
+        name: 'Goblin',
+        type: 'humanoid',
+        armorClass: 15,
+        hitPoints: '18',
+        initiativeBonus: '+2',
         damageResistances: ['fire', 'cold'],
         damageImmunities: ['poison'],
+        imagePath: '/images/goblin.jpg',
+        image: '/stale/goblin.png',
       });
-      const creature = storage.set.mock.calls[0][1].creatures[0];
-      expect(creature.resistances).toEqual(['fire', 'cold']);
-      expect(creature.immunities).toEqual(['poison']);
-    });
 
-    it('prefers imagePath over image when both are present', async () => {
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), imagePath: '/images/goblin.jpg', image: '/images/goblin.png' });
-      expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('/images/goblin.jpg');
-    });
-  });
-
-  describe('sorting and persistence', () => {
-    it('sorts creatures by initiative in descending order', async () => {
-      loadCombatSummary.mockResolvedValue({
-        round: 1,
-        creatures: [{ type: 'npc', name: 'Orc', initiative: 20 }],
+      expect(storage.set.mock.calls[0][1].creatures[0]).toEqual({
+        name: 'Goblin',
+        type: 'npc',
+        monsterType: 'humanoid',
+        initiative: '17',
+        targetName: null,
+        ac: 15,
+        resistances: ['fire', 'cold'],
+        immunities: ['poison'],
+        concentration: null,
+        imagePath: '/images/goblin.jpg',
+        initiativeBonus: 2,
+        maxHp: 18,
+        currentHp: 18,
+        saveBonuses: {},
       });
-      rollD20.mockReturnValue(8);
-
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const saved = storage.set.mock.calls[0][1];
-      expect(saved.creatures[0].name).toBe('Orc');
-      expect(saved.creatures[1].name).toBe('Goblin');
     });
 
-    it('calls storage.set with combatSummary key and campaignName', async () => {
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(storage.set).toHaveBeenCalledWith(
-        'combatSummary',
-        expect.objectContaining({ round: expect.any(Number), creatures: expect.any(Array) }),
-        CAMPAIGN
-      );
-    });
+    it('falls back to image when imagePath is absent', async () => {
+      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), image: '/images/goblin.png' });
 
-    it('dispatches the initiative-rolled custom event', async () => {
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      expect(dispatchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'initiative-rolled' })
-      );
-      dispatchSpy.mockRestore();
-    });
-
-    it('calls onViewInitiative callback after adding a new NPC', async () => {
-      const callback = vi.fn();
-      await addNPCToInitiative(CAMPAIGN, defaultNPC(), callback);
-      expect(callback).toHaveBeenCalledTimes(1);
+      expect(storage.set.mock.calls[0][1].creatures[0].imagePath).toBe('/images/goblin.png');
     });
   });
 
-  describe('logInitiativeRoll fetch payload', () => {
-    it('sends correct log payload for a normal roll', async () => {
-      rollD20.mockReturnValue(14);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-
-      const callArgs = global.fetch.mock.calls[0];
-      expect(callArgs[0]).toBe(`/api/campaigns/${encodeURIComponent(CAMPAIGN)}/log`);
-      const body = JSON.parse(callArgs[1].body);
-      expect(body.type).toBe('roll');
-      expect(body.characterName).toBe('Goblin');
-      expect(body.rollType).toBe('initiative');
-      expect(body.name).toBe('Initiative');
-      expect(body.rolls).toEqual([14]);
-      expect(body.total).toBe(14);
-      expect(body.bonus).toBe(0);
-      expect(body.isNatural20).toBe(false);
-      expect(body.isNatural1).toBe(false);
+  it('preserves round and existing creatures, then sorts the whole field descending', async () => {
+    loadCombatSummary.mockResolvedValue({
+      round: 5,
+      creatures: [
+        { type: 'npc', name: 'Orc', initiative: '20' },
+        { type: 'pc', name: 'Hero', initiative: '15' },
+      ],
     });
+    rollD20.mockReturnValue(8);
 
-    it('includes the initiative bonus in the log payload', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '+3' });
-      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      expect(body.bonus).toBe(3);
-    });
+    const result = await addNPCToInitiative(CAMPAIGN, defaultNPC());
 
-    it('includes a timestamp and GUID id in the log payload', async () => {
-      rollD20.mockReturnValue(15);
-      await addNPCToInitiative(CAMPAIGN, defaultNPC());
-      const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      expect(body.timestamp).toBeTypeOf('number');
-      expect(body.id).toBe('test-guid');
+    expect(result).toBe('added');
+    const saved = storage.set.mock.calls[0][1];
+    expect(saved.round).toBe(5);
+    expect(saved.creatures.map((c) => c.name)).toEqual(['Orc', 'Hero', 'Goblin']);
+    expect(saved.creatures[1]).toEqual({ type: 'pc', name: 'Hero', initiative: '15' });
+    expect(saved.creatures[2].initiative).toBe('8');
+  });
+
+  it('persists under the campaign-keyed combatSummary tuple and dispatches initiative-rolled', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    await addNPCToInitiative(CAMPAIGN, defaultNPC());
+
+    expect(storage.set).toHaveBeenCalledWith(
+      'combatSummary',
+      expect.objectContaining({ round: expect.any(Number), creatures: expect.any(Array) }),
+      CAMPAIGN
+    );
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'initiative-rolled' })
+    );
+  });
+
+  // Exact log payload #app mandate — full-body toEqual per natural-roll row.
+  // total is the raw die (bonus is carried separately by design).
+  it.each([
+    [20, true, false],
+    [1, false, true],
+    [14, false, false],
+  ])('logs a natural %s roll with an exact payload', async (die, isNat20, isNat1) => {
+    rollD20.mockReturnValue(die);
+
+    await addNPCToInitiative(CAMPAIGN, { ...defaultNPC(), initiativeBonus: '+3' });
+
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe(LOG_URL);
+    expect(init.method).toBe('POST');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body)).toEqual({
+      type: 'roll',
+      characterName: 'Goblin',
+      rollType: 'initiative',
+      name: 'Initiative',
+      rolls: [die],
+      total: die,
+      bonus: 3,
+      mode: 'normal',
+      isNatural20: isNat20,
+      isNatural1: isNat1,
+      timestamp: expect.any(Number),
+      id: 'test-guid',
     });
   });
 
-  describe('resilience', () => {
-    it('does not throw when the logInitiativeRoll fetch fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('still adds and persists when the log fetch rejects', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn(() => Promise.reject(new Error('network error')));
 
-      global.fetch = vi.fn(() =>
-        Promise.reject(new Error('network error')).catch(() => {})
-      );
+    await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).resolves.toBe('added');
+    expect(storage.set).toHaveBeenCalledTimes(1);
 
-      await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).resolves.toBe('added');
-      expect(storage.set).toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
-    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
   });
 });

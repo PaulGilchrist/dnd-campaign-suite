@@ -1,260 +1,187 @@
+// @maintained-by-ai
+// Lane: CANONICAL owner of getMonsterImageUrl / getMonsterData resolution — the
+// custom-vs-bestiary lookup seam (@app invariant: npcs.json is CUSTOM NPCs only;
+// pre-made monsters resolve from monsters.json — the two lanes stay byte-distinct #1022).
+// Ownership split (do not re-drive here):
+//   npcStatBlockUtils.test.js #1159 — findNPCByName + npcToMonsterFormat OUTPUT SHAPE
+//     (monsterUtils does NOT export findNPCByName — its matcher is an inline dup of it;
+//     that inlined matcher is pinned behaviorally here through the public API only).
+//   initiativeService.test.js #1079 — WIRING of resolved imagePath onto combatSummary
+//     bytes; encounterToInitiative.test.js #1078 — assembly byte contract.
+//   monsterIrvUtils.test.js #1176 — IRV resolution. Consumers (Initiative.jsx,
+//   useNpcImageCache.test.js #1010-exact-args) prove call sites, never resolution.
+// Transport discipline #1010: loadMonsters fetch counts asserted on the EXACT mock
+// instance consumed after vi.resetModules (mocks survive resetModules — references are
+// re-acquired per test, no stale-ref theater #1137); zero-fetch proofs on campaign hits.
+// No wall-clock #app: monstersCache is seam-free module state, no TTL.
+// Old->new map (22 -> 9): URL guard -> U1; URL case/suffix -> U2 (+cache exactly-once);
+// URL "not found" + "empty/null/undefined npcs" -> U3 shape table; URL custom-lane
+// prefers/skips/first-wins/case+suffix/no-fetch (old #4,#5,#6,#7,#8,#10) -> U4 mega;
+// NEW U5 campaign-path prefix branches (were UNTESTED, live via Initiative.jsx:286,
+// initiativeService.js:160). DATA guard -> D1; AC coercion 0 vs '15' vs absent
+// (old #5,#6) -> D2 table (#959 coercion honesty, #945 zero-is-data); DATA custom lane
+// (old #4,#7,#8,#9,#11) -> D3 sentinel-identity mega (npcToMonsterFormat shape is a
+// stub sentinel on purpose — shape accuracy owned by #1159, no fake `formatted:true`
+// shape theater); DATA bestiary/miss/fallback/fetch (old #2,#3,#10,#12) -> D4 table.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { loadMonsters } from '../ui/dataLoader.js';
-import { npcToMonsterFormat } from '../encounters/npcStatBlockUtils.js';
-
 vi.mock('../ui/dataLoader.js', () => ({
-  loadWildMagicSurgeTable: vi.fn(async () => []),
+  // Bestiary stub: names/indices verbatim from real public/data/monsters.json (#977);
+  // only consumed bytes are name + index (#967) — kept minimal, keeps tests offline.
   loadMonsters: vi.fn(() => Promise.resolve([
     { index: 'goblin', name: 'Goblin' },
     { index: 'orc', name: 'Orc' },
     { index: 'tarrasque', name: 'Tarrasque' },
-    { index: 'dragon', name: 'Ancient Dragon' },
   ])),
 }));
 
 vi.mock('../encounters/npcStatBlockUtils.js', () => ({
-  npcToMonsterFormat: vi.fn((npc) => ({
-    name: npc.name,
-    armorClass: npc.armorClass,
-    formatted: true,
-  })),
+  // Honest stub: distinct sentinel per call so pass-through identity is provable;
+  // real output-shape correctness lives in npcStatBlockUtils.test.js (#1159).
+  npcToMonsterFormat: vi.fn((npc) => ({ __customStatBlockFrom: npc.name })),
 }));
 
-const FAKE_MONSTERS = [
-  { index: 'goblin', name: 'Goblin' },
-  { index: 'orc', name: 'Orc' },
-  { index: 'tarrasque', name: 'Tarrasque' },
-  { index: 'dragon', name: 'Ancient Dragon' },
-];
-
-function makeNpc(name, overrides = {}) {
-  return { name, armorClass: 15, ...overrides };
+// Fresh module instance per test resets the module-level monstersCache; imports are
+// sequential so loadMonsters/npcToMonsterFormat below are the EXACT instances
+// monsterUtils consumes (#1010/#1137), not stale top-level references.
+async function fresh() {
+  const dataLoader = await import('../ui/dataLoader.js');
+  const statBlocks = await import('../encounters/npcStatBlockUtils.js');
+  const monsterUtils = await import('./monsterUtils.js');
+  return {
+    getMonsterImageUrl: monsterUtils.getMonsterImageUrl,
+    getMonsterData: monsterUtils.getMonsterData,
+    loadMonsters: dataLoader.loadMonsters,
+    npcToMonsterFormat: statBlocks.npcToMonsterFormat,
+  };
 }
 
-describe('monsterUtils', () => {
+const BESTIARY_URL = 'https://paulgilchrist.github.io/dnd-tools/images';
+
+describe('getMonsterImageUrl', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
   });
 
-  describe('getMonsterImageUrl', () => {
-    it('returns null for falsy and whitespace-only names', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      for (const name of ['', null, undefined, '   ']) {
-        await expect(getMonsterImageUrl(name)).resolves.toBeNull();
-      }
-    });
-
-    it('looks up monster data case-insensitively with trailing number stripping', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      await expect(getMonsterImageUrl('gObLiN')).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-      await expect(getMonsterImageUrl('Goblin 1')).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-      await expect(getMonsterImageUrl('Orc 42')).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/orc.jpg'
-      );
-    });
-
-    it('returns null when monster is not found in data or campaign NPCs', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      await expect(getMonsterImageUrl('Unicorn')).resolves.toBeNull();
-      await expect(getMonsterImageUrl('Unicorn', [])).resolves.toBeNull();
-      await expect(getMonsterImageUrl('Unicorn', [{ name: 'Goblin', imagePath: '/x.png' }])).resolves.toBeNull();
-    });
-
-    it('prefers campaign NPC avatar over monster data', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Goblin', { imagePath: '/custom/goblin.png' })];
-      await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/goblin.png');
-    });
-
-    it('falls back to monster data when campaign NPC has falsy imagePath', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [
-        makeNpc('Goblin', { imagePath: null }),
-        makeNpc('Orc', { imagePath: '' }),
-        makeNpc('Ancient Dragon', { imagePath: false }),
-      ];
-      await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-      await expect(getMonsterImageUrl('Orc', npcs)).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/orc.jpg'
-      );
-      await expect(getMonsterImageUrl('Ancient Dragon', npcs)).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/dragon.jpg'
-      );
-    });
-
-    it('matches campaign NPCs case-insensitively with trailing number stripping', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('GOBLIN', { imagePath: '/custom/goblin.png' })];
-      await expect(getMonsterImageUrl('goblin 1', npcs)).resolves.toBe('/custom/goblin.png');
-    });
-
-    it('uses first campaign NPC with matching name and valid imagePath', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [
-        makeNpc('Goblin', { imagePath: null }),
-        makeNpc('Goblin', { imagePath: '/custom/first.png' }),
-        makeNpc('Goblin', { imagePath: '/custom/second.png' }),
-      ];
-      await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/first.png');
-    });
-
-    it('skips campaign NPCs with falsy or empty name and falls back to monster data', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [
-        { name: '', imagePath: '/custom/empty.png' },
-        { name: null, imagePath: '/custom/null.png' },
-        { name: undefined, imagePath: '/custom/undef.png' },
-        makeNpc('Goblin', { imagePath: '/custom/goblin.png' }),
-      ];
-      await expect(getMonsterImageUrl('Goblin', npcs)).resolves.toBe('/custom/goblin.png');
-    });
-
-    it('falls back to monster data when npcs is empty, null, or undefined', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      await expect(getMonsterImageUrl('Goblin', [])).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-      await expect(getMonsterImageUrl('Goblin', null)).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-      await expect(getMonsterImageUrl('Goblin', undefined)).resolves.toBe(
-        'https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg'
-      );
-    });
-
-    it('does not call loadMonsters when campaign NPC provides an image', async () => {
-      const { getMonsterImageUrl } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Goblin', { imagePath: '/custom/goblin.png' })];
-      await getMonsterImageUrl('Goblin', npcs);
-      expect(loadMonsters).not.toHaveBeenCalled();
-    });
+  it.each([
+    ['empty string', ''],
+    ['null', null],
+    ['undefined', undefined],
+  ])('resolves %s to null without fetching', async (_label, name) => {
+    const { getMonsterImageUrl, loadMonsters } = await fresh();
+    await expect(getMonsterImageUrl(name)).resolves.toBeNull();
+    expect(loadMonsters).not.toHaveBeenCalled();
   });
 
-  describe('getMonsterData', () => {
-    it('returns null for falsy and whitespace-only names', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      for (const name of ['', null, undefined, '   ']) {
-        await expect(getMonsterData(name)).resolves.toBeNull();
-      }
-    });
+  it('resolves bestiary image URLs case-insensitively with query suffix-stripping, fetching exactly once across lookups', async () => {
+    const { getMonsterImageUrl, loadMonsters } = await fresh();
+    await expect(getMonsterImageUrl('gObLiN')).resolves.toBe(`${BESTIARY_URL}/goblin.jpg`);
+    await expect(getMonsterImageUrl('Goblin 1')).resolves.toBe(`${BESTIARY_URL}/goblin.jpg`);
+    await expect(getMonsterImageUrl('Orc 42')).resolves.toBe(`${BESTIARY_URL}/orc.jpg`);
+    await expect(getMonsterImageUrl('tarrasque')).resolves.toBe(`${BESTIARY_URL}/tarrasque.jpg`);
+    expect(loadMonsters).toHaveBeenCalledTimes(1); // cache hit after first fetch #1010
+  });
 
-    it('returns null when monster is not found in data or campaign NPCs', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      await expect(getMonsterData('Unicorn')).resolves.toBeNull();
-      await expect(getMonsterData('Unicorn', [])).resolves.toBeNull();
-      await expect(getMonsterData('Unicorn', [{ name: 'Goblin', armorClass: 10 }])).resolves.toBeNull();
-    });
+  it.each([
+    ['unknown name, npcs omitted', 'Unicorn', undefined, null],
+    ['unknown name, empty npcs', 'Unicorn', [], null],
+    ['unknown name, non-matching npcs', 'Unicorn', [{ name: 'Goblin', imagePath: '/x.png' }], null],
+    ['known name, empty npcs', 'Goblin', [], `${BESTIARY_URL}/goblin.jpg`],
+    ['known name, null npcs', 'Goblin', null, `${BESTIARY_URL}/goblin.jpg`],
+    ['known name, undefined npcs', 'Goblin', undefined, `${BESTIARY_URL}/goblin.jpg`],
+    // Whitespace-only passes the !npcName guard, fetches, matches nothing -> null.
+    ['whitespace-only name fetches then misses', '   ', undefined, null],
+  ])('custom lane disengages: %s', async (_label, name, npcs, expected) => {
+    const { getMonsterImageUrl } = await fresh();
+    await expect(getMonsterImageUrl(name, npcs)).resolves.toBe(expected);
+  });
 
-    it('looks up monster data case-insensitively with trailing number stripping', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      await expect(getMonsterData('gObLiN')).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-      await expect(getMonsterData('Goblin 1')).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-    });
+  it('takes the first valid campaign avatar over bestiary, skipping invalid entries, matching case-insensitively with query suffix-stripping, without fetching', async () => {
+    const { getMonsterImageUrl, loadMonsters } = await fresh();
+    const matched = { name: 'GOBLIN', imagePath: 'assets/goblin-avatar.png' };
+    const npcs = [
+      { name: '', imagePath: '/junk/empty-name.png' }, // skipped: empty name
+      { name: 'Orc', imagePath: '' },                   // skipped: falsy imagePath
+      matched,                                          // matches 'gObLiN 1' -> 'goblin'
+      { name: 'goblin', imagePath: '/custom/second.png' }, // ignored: first valid wins
+    ];
+    await expect(getMonsterImageUrl('gObLiN 1', npcs)).resolves.toBe('assets/goblin-avatar.png');
+    expect(loadMonsters).not.toHaveBeenCalled(); // custom hit short-circuits bestiary
+  });
 
-    it('prefers campaign NPC with numeric armorClass over monster data', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Goblin', { armorClass: 15 })];
-      const result = await getMonsterData('Goblin', npcs);
-      expect(result).toEqual({ name: 'Goblin', armorClass: 15, formatted: true });
-      expect(npcToMonsterFormat).toHaveBeenCalled();
-    });
+  it.each([
+    ['prefixes relative avatar with campaign path', 'assets/g.png', 'Frostfall', 'campaigns/Frostfall/assets/g.png'],
+    ['leaves already-campaign-scoped path untouched', 'campaigns/other/assets/g.png', 'Frostfall', 'campaigns/other/assets/g.png'],
+    ['returns raw path when campaignName omitted', 'assets/g.png', undefined, 'assets/g.png'],
+  ])('campaign-path branch: %s', async (_label, imagePath, campaignName, expected) => {
+    const { getMonsterImageUrl } = await fresh();
+    const npcs = [{ name: 'Goblin', imagePath }];
+    await expect(getMonsterImageUrl('Goblin', npcs, campaignName)).resolves.toBe(expected);
+  });
+});
 
-    it('treats armorClass: 0 as a valid stat block', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Orc', { armorClass: 0 })];
-      const result = await getMonsterData('Orc', npcs);
-      expect(result).toEqual({ name: 'Orc', armorClass: 0, formatted: true });
-      expect(npcToMonsterFormat).toHaveBeenCalled();
-    });
+describe('getMonsterData', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
 
-    it('skips campaign NPCs without numeric armorClass and falls back to monster data', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [
-        makeNpc('Goblin', { armorClass: '15' }),
-        { name: 'Ancient Dragon' },
-      ];
-      await expect(getMonsterData('Goblin', npcs)).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-      await expect(getMonsterData('Ancient Dragon', npcs)).resolves.toEqual({
-        index: 'dragon',
-        name: 'Ancient Dragon',
-      });
-    });
+  it.each([
+    ['empty string', ''],
+    ['null', null],
+    ['undefined', undefined],
+  ])('resolves %s to null without fetching', async (_label, name) => {
+    const { getMonsterData, loadMonsters } = await fresh();
+    await expect(getMonsterData(name)).resolves.toBeNull();
+    expect(loadMonsters).not.toHaveBeenCalled();
+  });
 
-    it('matches campaign NPCs case-insensitively with trailing number stripping', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('GOBLIN', { armorClass: 15 })];
-      const result = await getMonsterData('goblin 1', npcs);
-      expect(result).toEqual({ name: 'GOBLIN', armorClass: 15, formatted: true });
-    });
+  it.each([
+    // Zero-is-data #945: armorClass 0 is a number -> custom lane engages.
+    ['numeric AC 0 is valid stat block data', 0, { name: 'Orc', armorClass: 0 }],
+    ['string AC is rejected', '15', { name: 'Orc', armorClass: '15' }],
+    ['absent AC is rejected', undefined, { name: 'Orc' }],
+    ['null AC is rejected', null, { name: 'Orc', armorClass: null }],
+  ])('AC coercion (#959 typeof-number gate): %s', async (_label, _ac, npc) => {
+    const { getMonsterData, npcToMonsterFormat } = await fresh();
+    const result = await getMonsterData('Orc', [npc]);
+    const engaged = typeof npc.armorClass === 'number';
+    if (engaged) {
+      expect(npcToMonsterFormat).toHaveBeenCalledTimes(1);
+      expect(npcToMonsterFormat).toHaveBeenCalledWith(npc); // exact bytes of the match
+    } else {
+      expect(npcToMonsterFormat).not.toHaveBeenCalled();
+      expect(result).toEqual({ index: 'orc', name: 'Orc' }); // fell through to bestiary
+    }
+  });
 
-    it('uses first campaign NPC with matching name and numeric armorClass', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [
-        makeNpc('Goblin', { armorClass: '10' }),
-        makeNpc('Goblin', { armorClass: 15 }),
-        makeNpc('Goblin', { armorClass: 20 }),
-      ];
-      const result = await getMonsterData('Goblin', npcs);
-      expect(result).toEqual({ name: 'Goblin', armorClass: 15, formatted: true });
-    });
+  it('passes the first valid campaign NPC verbatim to npcToMonsterFormat over bestiary, skipping invalid entries, without fetching', async () => {
+    const { getMonsterData, loadMonsters, npcToMonsterFormat } = await fresh();
+    const matched = { name: 'GOBLIN', armorClass: 15 };
+    const sentinel = { __sentinel: 'custom-statblock' };
+    npcToMonsterFormat.mockReturnValueOnce(sentinel);
+    const npcs = [
+      { name: '', armorClass: 10 },              // skipped: empty name
+      { name: 'goblin', armorClass: '10' },     // skipped: non-numeric AC
+      matched,                                   // matches 'goblin 1' -> 'goblin'
+      { name: 'goblin', armorClass: 20 },       // ignored: first valid wins
+    ];
+    await expect(getMonsterData('goblin 1', npcs)).resolves.toBe(sentinel); // verbatim pass-through
+    expect(npcToMonsterFormat).toHaveBeenCalledTimes(1);
+    expect(npcToMonsterFormat).toHaveBeenCalledWith(matched);
+    expect(loadMonsters).not.toHaveBeenCalled();
+  });
 
-    it('skips campaign NPCs with falsy or empty name and falls back to monster data', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [
-        { name: '', armorClass: 10 },
-        { name: null, armorClass: 11 },
-        { name: undefined, armorClass: 12 },
-        makeNpc('Goblin', { armorClass: 12 }),
-      ];
-      const result = await getMonsterData('Goblin', npcs);
-      expect(result).toEqual({ name: 'Goblin', armorClass: 12, formatted: true });
-    });
-
-    it('falls back to monster data when npcs is empty, null, or undefined', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      await expect(getMonsterData('Goblin', [])).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-      await expect(getMonsterData('Goblin', null)).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-      await expect(getMonsterData('Goblin', undefined)).resolves.toEqual({
-        index: 'goblin',
-        name: 'Goblin',
-      });
-    });
-
-    it('does not call loadMonsters when campaign NPC provides a stat block', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const npcs = [makeNpc('Goblin', { armorClass: 15 })];
-      await getMonsterData('Goblin', npcs);
-      expect(loadMonsters).not.toHaveBeenCalled();
-    });
-
-    it('calls loadMonsters and returns raw monster data when no campaign NPC match is found', async () => {
-      const { getMonsterData } = await import('./monsterUtils.js');
-      const result = await getMonsterData('Tarrasque');
-      expect(loadMonsters).toHaveBeenCalled();
-      expect(result).toEqual(FAKE_MONSTERS.find((m) => m.index === 'tarrasque'));
-    });
+  it('resolves raw bestiary bytes case-insensitively with suffix-stripping, null on miss, across falsy npcs shapes, fetching once', async () => {
+    const { getMonsterData, npcToMonsterFormat, loadMonsters } = await fresh();
+    await expect(getMonsterData('tArRaSqUe 2')).resolves.toEqual({ index: 'tarrasque', name: 'Tarrasque' });
+    await expect(getMonsterData('Goblin', [])).resolves.toEqual({ index: 'goblin', name: 'Goblin' });
+    await expect(getMonsterData('Goblin', null)).resolves.toEqual({ index: 'goblin', name: 'Goblin' });
+    await expect(getMonsterData('Unicorn', [{ name: 'Goblin', armorClass: 15 }])).resolves.toBeNull();
+    await expect(getMonsterData('   ')).resolves.toBeNull(); // passes guard, matches nothing
+    expect(npcToMonsterFormat).not.toHaveBeenCalled(); // bestiary lane returns raw bytes
+    expect(loadMonsters).toHaveBeenCalledTimes(1);
   });
 });

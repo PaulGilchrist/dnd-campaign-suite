@@ -1,24 +1,53 @@
-// MA-1981: Scylla "Snatch" legendary child shipped a prose-only prerequisite
-// ("One head lunges at a Grappled or Restrained creature") with NO structured
-// target_prerequisite — parseTargetPrerequisite (MA-0019, Helpers:979) returned
-// null and the live MA-0687 attack-lane gate passed EVERY target (repro
-// 2026-10-12: ungated +16 fired on a zero-condition Bandit, ability_use spent
-// 1/3, 4d10+8 = 38 damage, zero refusal, blind to grappled targets too).
-// DATA fix: target_prerequisite {conditions:["grappled","restrained"]} trailing
-// key after damage_type_primary (MA-0687 Stomp / MA-0689 Hooves twin key order).
-// by_attacker adjudication: OMITTED — the RAW row text names no grapple source
-// ("a Grappled or Restrained creature", source-agnostic), matching the attack-row
-// twins Stomp/Hooves and MA-1847 Apep Devour the Boat (by_attacker absent);
-// by_attacker:true is authored only on rows whose prose explicitly names the
-// attacker as grappler (MA-0019 Aboleth "by the aboleth", MA-1275 Otyugh,
-// MA-1890 Fenrir). Scylla authors no grapple/restrain producer at all (MA-1890
-// reach-quirk precedent), so by_attacker would make the row permanently
-// unreachable in-app and wrongly refuse third-party restrains the RAW allows.
-// MA-1931 codification satisfied: parseTargetPrerequisite requires a NON-EMPTY
-// conditions[] — this shape qualifies. Lane: legendary presses route through
-// resolveLegendaryRow → legendaryPrerequisiteRefusal BEFORE expendLegendaryUse
-// (MonsterCardModal :891 vs :920) — refusal is zero-spend zero-roll; handleAttack
-// re-checks at :2342 (defense in depth).
+// @maintained-by-ai
+// MA-1981: Scylla "Snatch" legendary shipped a prose-only prerequisite ("One head
+// lunges at a Grappled or Restrained creature") with NO structured
+// target_prerequisite — parseTargetPrerequisite (MA-0019, Helpers:979) returned null
+// and the live MA-0687 attack-lane gate passed EVERY target (repro 2026-10-12:
+// ungated +16 fired on a zero-condition Bandit, ability_use spent 1/3, 4d10+8 = 38
+// damage, zero refusal). DATA fix: target_prerequisite {conditions:
+// ["grappled","restrained"]} — conditions-only, by_attacker OMITTED (#1086 BY-NAME
+// rationale): the RAW row text names no grapple source ("a Grappled or Restrained
+// creature"), Scylla authors no grapple/restrain producer (MA-1890 reach-quirk
+// precedent), so by_attacker would make the row permanently unreachable in-app and
+// wrongly refuse third-party restrains the RAW allows — source-agnostic twins:
+// Stomp/Hooves/Apep Devour the Boat. MA-1931 codification satisfied (parse requires
+// a NON-EMPTY conditions[]). Refusal is zero-spend zero-roll by construction: the
+// lane gate runs BEFORE expendLegendaryUse (MonsterCardModal) and the helper below
+// reads runtime only — read-census pinned in it2 (#1026).
+//
+// Owner cite table — scylla family map (Snatch = THIS lane; never re-drive here):
+//  - Blood Tide save core + recharge:"5-6" numerics → monsterRecharge.ma1978 :72-108
+//    OWNER (#1123); Shriek save core DC23/WIS/2d10 + Deafened save_effect rider →
+//    monsterLegendaryUses.ma1982 :52-85 OWNER (#1113) — here: prerequisite ABSENCE-only.
+//  - by_attacker:true provenance truth-table → MonsterCardModal.ma1275 Tentacle Slam
+//    OWNER (+ Fenrir twin ma1890); ma1931/ma1890 cite THIS file as the source-agnostic
+//    refuse/admit canonical — do not trim those legs.
+//  - Legendary header uses + "Costs 2 Actions" cost parse → monsterLegendaryUses.test.js
+//    / ma1579 header canon (#1082); canRollExpression truth-table → diceRoller.test.js
+//    (#1072 — only the exact real dice byte pinned here).
+//  - grapple/restrain producers + CANON save channels (#1005) → ma1931 Kong Grab
+//    save-fail lane — cited, never re-driven here.
+//  - modal chip-click press plumbing → ma0687/ma0689 attack-chip lanes; this lane is
+//    the PURE helper with a store-faithful read-only rig (#1137/#1091/#949).
+//
+// Applied recs (#1113 + #1123 reaffirm), verified against owners live before cutting
+// (#1038): old :66-70 key-order lock DROPPED (#1100 class — toEqual key-set suffices);
+// old :136-139 Blood Tide re-lock TRIMMED to prerequisite-absence-only (#1123 owns the
+// numerics @ma1978:74-80); old :125-127 Shriek save-core dupes TRIMMED to
+// prerequisite-absence-only (#1113 owns the core @ma1982:59-63) — both absence legs now
+// ride the ONE card-wide sweep in it1 (guards reach the null branch, #1035).
+//
+// dup-map / old→new (10→3): fingerprint + fix-bytes + parse → it1 real-row lock
+// (+ DB-wide exact-once pair sweep #829/#948 — Vampire Spawn Bite 3-cond and
+// Aboleth/Otyugh/Fenrir by_attacker rows are byte-distinct decoys); key-order →
+// DROPPED; unmet press + undefined-store press → it2 (+ prone/blinded byte-distinct
+// decoy #1035/#948, + zero-write read census with campaign tuples #1026/#932/#1019);
+// grappled/restrained admits → it3 (+ third-party-source and meta-absent admits =
+// the source-agnostic canonical cited by ma1931/ma1890); siblings byte-locks →
+// card-wide prerequisite-absence-only sweep. refusalLog carries Date.now() —
+// field-pinned, never deep-equals (#1057); zero writes → no afterEach needed
+// (#1007/#1121); no wall-clock (#app); honest titles (#910); dead constants
+// purged transitively (#1094).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -29,60 +58,69 @@ import {
 import { canRollExpression } from '../../services/dice/diceRoller.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
-const SCYLLA = monsters.find((m) => m.name === 'Scylla');
-const SNATCH = SCYLLA.legendary_actions[2];
-const HEADER = SCYLLA.legendary_actions[0];
-const BITE_LEGENDARY = SCYLLA.legendary_actions[1];
-const SHRIEK = SCYLLA.legendary_actions[3];
-const BLOOD_TIDE = SCYLLA.actions[2];
-const BITE = SCYLLA.actions[1];
+const SCYLLA = monsters.find((m) => m.index === 'scylla');
+// lookup by NAME, not index (#1094 brittle-index fix)
+const SNATCH = SCYLLA.legendary_actions.find((a) => a.name === 'Snatch');
 
-const gate = (conds, meta) => evaluateTargetPrerequisiteGate({
-  action: SNATCH,
-  target: { name: 'Bandit 1' },
-  monsterName: 'Scylla 1',
-  campaignName: 'test-campaign',
-  getRuntimeValue: (name, key) => (key === 'activeConditions' ? conds : key === 'activeConditionMeta' ? meta : undefined),
-});
+// store-faithful read-only press (#1137/#1091): production runtime signature
+// getRuntimeValue(name, key, campaign) returning null for absent keys, like the
+// live store. Records every read — zero-write census + campaign tuples (#1026/#932).
+const press = (conds, meta) => {
+  const reads = [];
+  const result = evaluateTargetPrerequisiteGate({
+    action: SNATCH,
+    target: { name: 'Bandit 1' },
+    monsterName: 'Scylla 1',
+    campaignName: 'test-campaign',
+    getRuntimeValue: (name, key, campaign) => {
+      reads.push(`${name}|${key}|${campaign}`);
+      if (key === 'activeConditions') return conds ?? null;
+      if (key === 'activeConditionMeta') return meta ?? null;
+      return null;
+    },
+  });
+  return { result, reads };
+};
 
 describe('MA-1981 disk fingerprint: Scylla Snatch prerequisite authored (DATA fix)', () => {
-  it('legendary_actions[2] is Snatch; attack core byte-unchanged', () => {
-    expect(SNATCH.name).toBe('Snatch');
+  it('real-row lock: attack core byte-unchanged, fix byte arms conditions-only prerequisite exact-once DB-wide (no by_attacker — source-agnostic by RAW)', () => {
+    expect(SCYLLA.name).toBe('Scylla');
     expect(SNATCH.description).toBe(
       'One head lunges at a Grappled or Restrained creature. Melee Attack Roll: +16, reach 15 ft. Hit: 30 (4d10 + 8) Piercing damage.'
-    );
+    ); // verbatim ground truth (#993/#1086 BY NAME)
     expect(SNATCH.attack_bonus).toBe(16);
     expect(SNATCH.reach).toBe('15 ft.');
     expect(SNATCH.damage_dice_primary).toBe('4d10 + 8');
     expect(SNATCH.damage_type_primary).toBe('Piercing');
-    expect(canRollExpression(SNATCH.damage_dice_primary)).toBe(true);
-  });
-
-  it('target_prerequisite byte-shape per MA-0687/MA-0689 attack-row twins: conditions-only, no by_attacker', () => {
+    expect(canRollExpression(SNATCH.damage_dice_primary)).toBe(true); // exact-if-dice (#1072)
+    // the ticket's fix byte — key-SET lock via toEqual, not key-order (#1100/#1113):
     expect(SNATCH.target_prerequisite).toEqual({ conditions: ['grappled', 'restrained'] });
     expect(SNATCH.target_prerequisite.by_attacker).toBeUndefined();
-  });
-
-  it('key order mirrors Stomp/Hooves twins: target_prerequisite trailing key after damage_type_primary', () => {
-    const keys = Object.keys(SNATCH);
-    expect(keys.indexOf('target_prerequisite')).toBe(keys.indexOf('damage_type_primary') + 1);
-    expect(keys[keys.length - 1]).toBe('target_prerequisite');
-  });
-});
-
-describe('MA-1981 parseTargetPrerequisite (MA-1931 conditions-only codification)', () => {
-  it('parses lowercase conditions pair, byAttacker false, attackName Snatch', () => {
+    // parse through production (MA-1931 conditions-only codification canonical here):
     expect(parseTargetPrerequisite(SNATCH)).toEqual({
       conditions: ['grappled', 'restrained'],
       byAttacker: false,
       attackName: 'Snatch',
     });
+    // card-wide sweep (#1035 guard reaches the null branch): Snatch is the ONLY
+    // prerequisite-armed row on Scylla — Bite/Multiattack/legendary Bite/
+    // Shriek/header + Blood Tide stay prerequisite-absent-only legs (numerics are
+    // ma1978/ma1982-owned, #1123/#1113 — cited here, not re-driven):
+    expect([...SCYLLA.actions, ...SCYLLA.legendary_actions].filter((a) => a.target_prerequisite).map((a) => a.name)).toEqual(['Snatch']);
+    // DB-wide exact-once (#829): the bare grappled+restrained pair with NO
+    // by_attacker is unique to Scylla Snatch — Vampire Spawn Bite (3-cond, adds
+    // incapacitated) and Aboleth/Otyugh/Fenrir (by_attacker:true) are byte-
+    // distinct decoys (#948), owned by ma1652/ma1275/ma1890 respectively:
+    const pairRows = monsters.flatMap((mon) => [...(mon.actions ?? []), ...(mon.legendary_actions ?? []), ...(mon.reactions ?? [])]
+      .filter((a) => a.target_prerequisite && !a.target_prerequisite.by_attacker && a.target_prerequisite.conditions.length === 2 && a.target_prerequisite.conditions.includes('grappled') && a.target_prerequisite.conditions.includes('restrained'))
+      .map((a) => `${mon.name} ${a.name}`));
+    expect(pairRows).toEqual(['Scylla Snatch']);
   });
 });
 
-describe('MA-1981 evaluateTargetPrerequisiteGate on the Snatch row (MA-0687 §564 pure rig)', () => {
-  it('ungrappled/unrestrained victim refuses: prerequisite popup + snatch_refused log, nothing spent', () => {
-    const r = gate([], {});
+describe('MA-1981 gate lane: source-agnostic refuse/admit through evaluateTargetPrerequisiteGate (canonical cited by ma1931/ma1890)', () => {
+  it('unmet presses refuse: prerequisite popup + snatch_refused log, zero spend zero roll, read-only store census', () => {
+    const { result: r, reads } = press([], {});
     expect(r.satisfied).toBe(false);
     expect(String(r.popupHtml)).toContain('Prerequisite Not Met');
     expect(String(r.popupHtml)).toContain('must be Grappled or Restrained.');
@@ -91,52 +129,39 @@ describe('MA-1981 evaluateTargetPrerequisiteGate on the Snatch row (MA-0687 §56
     expect(r.refusalLog.type).toBe('automation');
     expect(r.refusalLog.automationType).toBe('snatch_refused');
     expect(r.refusalLog.characterName).toBe('Scylla 1');
+    expect(r.refusalLog.abilityName).toBe('Snatch');
     expect(r.refusalLog.targetName).toBe('Bandit 1');
     expect(r.refusalLog.description).toContain('does not satisfy the prerequisite');
     expect(r.refusalLog.description).toContain('No save rolled, nothing spent.');
+    // zero-write census (#1026) + campaign tuples (#932/#1019): the gate reads
+    // exactly the two condition keys off Bandit 1@test-campaign — nothing else:
+    expect([...new Set(reads)].sort()).toEqual([
+      'Bandit 1|activeConditionMeta|test-campaign',
+      'Bandit 1|activeConditions|test-campaign',
+    ]);
+    // byte-distinct decoys (#948/#1035): UNRELATED conditions still refuse —
+    // the gate requires a condition MATCH, not a merely non-empty list;
+    const d = press(['prone', 'blinded'], {});
+    expect(d.result.satisfied).toBe(false);
+    expect(d.result.refusalLog.automationType).toBe('snatch_refused');
+    // absent-store press (repro state): undefined runtime keys still refuse
+    const u = press(undefined, undefined);
+    expect(u.result.satisfied).toBe(false);
+    expect(u.result.popupHtml).toContain('Prerequisite Not Met');
   });
 
-  it('no stored state at all (undefined runtime keys) still refuses', () => {
-    const r = gate(undefined, undefined);
-    expect(r.satisfied).toBe(false);
-    expect(r.refusalLog.automationType).toBe('snatch_refused');
-  });
-
-  it('grappled victim satisfies (any source — source-agnostic twin pin)', () => {
-    const r = gate(['grappled'], { grappled: { source: 'Bandit Captain 1' } });
-    expect(r.satisfied).toBe(true);
-    expect(r.popupHtml).toBeUndefined();
-  });
-
-  it('restrained victim satisfies', () => {
-    const r = gate(['restrained'], { restrained: { source: 'Scylla 1' } });
-    expect(r.satisfied).toBe(true);
-  });
-});
-
-describe('MA-1981 siblings byte-locked', () => {
-  it('legendary header + delegates untouched; Bite/Shriek carry no prerequisite', () => {
-    expect(HEADER.name).toBe('Legendary Action Uses: 3');
-    expect(HEADER.uses).toBe(3);
-    expect(BITE_LEGENDARY.name).toBe('Bite');
-    expect(BITE_LEGENDARY.delegates_to).toBe('Bite');
-    expect(BITE_LEGENDARY.target_prerequisite).toBeUndefined();
-    expect(SHRIEK.name).toBe('Shriek (Costs 2 Actions)');
-    expect(SHRIEK.save_dc).toBe(23);
-    expect(SHRIEK.save_type).toBe('Wisdom');
-    expect(SHRIEK.damage_dice_primary).toBe('2d10');
-    expect(SHRIEK.target_prerequisite).toBeUndefined();
-  });
-
-  it('actions siblings untouched: Bite attack ungated, Blood Tide byte-stable (MA-1978 recharge fix intact, no prerequisite)', () => {
-    expect(BITE.name).toBe('Bite');
-    expect(BITE.attack_bonus).toBe(16);
-    expect(BITE.damage_dice_primary).toBe('4d10 + 8');
-    expect(BITE.target_prerequisite).toBeUndefined();
-    expect(BLOOD_TIDE.name).toBe('Blood Tide (Recharge 5-6)');
-    expect(BLOOD_TIDE.save_dc).toBe(25);
-    expect(BLOOD_TIDE.save_type).toBe('Dexterity');
-    expect(BLOOD_TIDE.recharge).toBe('5-6');
-    expect(BLOOD_TIDE.target_prerequisite).toBeUndefined();
+  it('met presses admit from ANY source — by_attacker absent means provenance is never checked (RAW: "a Grappled or Restrained creature")', () => {
+    // grapple held by a THIRD PARTY admits: the source-agnostic canonical leg
+    // (the mirror-refusal twin, where provenance decides, is by_attacker:true
+    // territory owned by ma1275/ma1890 — not re-driven here):
+    const g = press(['grappled'], { grappled: { source: 'Bandit Captain 1' } });
+    expect(g.result.satisfied).toBe(true);
+    expect(g.result.prerequisite.byAttacker).toBe(false);
+    expect(g.result.popupHtml).toBeUndefined();
+    expect(g.result.refusalLog).toBeUndefined();
+    // restrained admits, meta-absent store admits — condition presence is the
+    // only requirement (twins: Stomp/Hooves/Apep):
+    expect(press(['restrained'], { restrained: { source: 'Zorbo' } }).result.satisfied).toBe(true);
+    expect(press(['grappled'], undefined).result.satisfied).toBe(true);
   });
 });

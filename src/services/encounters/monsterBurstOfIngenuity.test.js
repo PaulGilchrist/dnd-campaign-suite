@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1510: Sphinx of Wonder "Burst of Ingenuity" (reactions[0]) — formerly a
 // zero-affordance plain-text row: no automation (§60 gated lane unarmed),
 // uses:"2/Day" STRING unparseable by every usage parser (MA-1502 NaN gate →
@@ -22,6 +23,30 @@
 // + SavePromptModal fold saves on the live warding_bond saveBonus channel
 // (§76). MONSTER_REACTION_USES[burst_of_ingenuity] spends EVERY press
 // (MA-0013 shield/jinx spend shape) — 2→1→0 then honest refusals.
+//
+// Family map (encounters/ monster-feature lanes):
+// - Generic gated-reaction chip arm/dispatch: MonsterCardHelpers.gated-reaction.test.js
+//   registry generics — this file pins ONLY the burst registry row (MonsterCardHelpers.js:1513,
+//   dispatcher :2282 cited, not re-driven).
+// - uses/latch/store machinery generics: monsterAbilityUses.test.js CANON (#1082, family CLOSED
+//   #1080-#1083) — cited, generics not re-driven here; this lane pins burst-scoped tuples only.
+// - Byte-twin defender lane: monsterGuardianProtection.test.js (MA-1463) owns guardian's
+//   self_target refusal — burst differs: SELF IS RAW-LEGAL, so the self-legality leg lives HERE.
+// - advisory family CLOSED (#1084-#1090): 30-ft gridless advisory rides the grant log as
+//   honest copy only — pinned in the grant description bytes, no separate consumer.
+//
+// Old→new map (this file, trim pass):
+// - disk-row pin / registry arm / roller gate: kept verbatim (contract pins).
+// - economy gate: kept, tabled (+0-byte usedRound leg).
+// - grant press: strengthened — stamped buff now verbatim producer bytes, press writes now
+//   exact ordered campaign-pinned tuples, spend log exact bytes, bystander decoy survivor.
+// - no-roller + latch/uses press refusals + already-armed press: CONSOLIDATED → one it.each
+//   over all four refusal tokens (§235d zero-spend shape is identical; +no-clock +decoy legs).
+// - counter 2→1→0: trimmed to the middle press only — fresh press remaining:1 is owned by the
+//   grant test, press-at-0 refusal by the refusal table; only the storedUses-ride leg is new.
+// - consume fold + consumes-once: CONSOLIDATED into one store-faithful test (the old once-test
+//   hand-reset the store, proving nothing; now the strip write IS the store update).
+// - initiative/unarmed/null guards: strengthened — inert guards must not even READ the store.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isMonsterBurstOfIngenuityRow,
@@ -56,6 +81,7 @@ import { addEntry } from '../../services/ui/logService.js';
 const CAMPAIGN = 'test-campaign';
 const SPHINX = 'Sphinx of Wonder 1';
 const ROLLER = 'Bandit 1';
+const BYSTANDER = 'Priest 2';
 const LATCH_KEY = '_burst_of_ingenuity_usedRound';
 
 const sphinx = monstersData.find(m => m.index === 'sphinx-of-wonder');
@@ -67,12 +93,19 @@ function makeCs({ rollerArmed = true } = {}) {
     creatures: [
       { name: SPHINX, size: 'Tiny', targetName: rollerArmed ? ROLLER : null },
       { name: ROLLER, size: 'Medium' },
+      { name: BYSTANDER, size: 'Medium' },
     ],
   };
 }
 
+// Holder-scoped decoy (#1050/#1057): an OFF-LANE burst stamp already living on a
+// BYSTANDER must never gate the roller, never spend, never be consumed.
+function bystanderDecoy() {
+  return buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 2);
+}
+
 function makeDeps({ rollerBuffs = [] } = {}) {
-  const store = { buffs: { [ROLLER]: rollerBuffs }, logs: [], latches: {}, uses: {} };
+  const store = { buffs: { [ROLLER]: rollerBuffs, [BYSTANDER]: [bystanderDecoy()] }, logs: [], latches: {}, uses: {} };
   const getRV = vi.fn((key, prop) => {
     if (prop === 'activeBuffs') return store.buffs[key] || [];
     return undefined;
@@ -121,7 +154,7 @@ describe('MA-1510 disk row + registry arm', () => {
     expect(isMonsterBurstOfIngenuityRow({ name: 'Burst of Ingenuity' })).toBe(false);
   });
 
-  it('arms the gated chip via getGatedMonsterReaction (registry lookup keys off automation.effect only)', () => {
+  it('arms the gated chip via getGatedMonsterReaction (registry lookup keys off automation.effect only; dispatcher seam MonsterCardHelpers.js:2282 cited, generic arm owned by gated-reaction.test.js)', () => {
     const def = getGatedMonsterReaction(BURST_ROW);
     expect(def).toEqual({ effect: 'burst_of_ingenuity', trigger: 'ability_check_or_save', label: 'Burst of Ingenuity', icon: 'fa-lightbulb' });
     expect(getGatedMonsterReaction({ name: 'Burst of Ingenuity' })).toBeNull();
@@ -129,7 +162,7 @@ describe('MA-1510 disk row + registry arm', () => {
 });
 
 describe('MA-1510 roller + economy gates', () => {
-  it('roller gate: no_target refuses unarmed; SELF is RAW-legal ("the sphinx or another creature"); already-armed refuses a double arm', () => {
+  it('roller gate: no_target refuses unarmed; SELF is RAW-legal ("the sphinx or another creature" — unlike the guardian twin there is NO self_target refusal); already-armed refuses a double arm', () => {
     const d = makeDeps();
     expect(burstRollerGate({ cs: makeCs({ rollerArmed: false }), monsterName: SPHINX, getRV: d.getRV }).reason).toBe('no_target');
     const selfArmed = { creatures: [{ name: SPHINX, targetName: SPHINX }] };
@@ -139,17 +172,13 @@ describe('MA-1510 roller + economy gates', () => {
     expect(burstRollerGate({ cs: makeCs(), monsterName: SPHINX, getRV: d.getRV }).roller.name).toBe(ROLLER);
   });
 
-  it('round latch refuses FIRST; uses gate refuses at the numeric limit; bonus rides the automation', () => {
-    const latch = burstOfIngenuityGate({ currentRound: 3, usedRound: 3, storedUses: {}, action: BURST_ROW });
-    expect(latch.ok).toBe(false);
-    expect(latch.reason).toBe('round');
-    const spent = burstOfIngenuityGate({ currentRound: 3, usedRound: 2, storedUses: { burst_of_ingenuity: 2 }, action: BURST_ROW });
-    expect(spent.ok).toBe(false);
-    expect(spent.reason).toBe('uses');
-    const ok = burstOfIngenuityGate({ currentRound: 3, usedRound: 2, storedUses: { burst_of_ingenuity: 1 }, action: BURST_ROW });
-    expect(ok.ok).toBe(true);
-    expect(ok.used).toBe(1);
-    expect(ok.limit).toBe(2);
+  it.each([
+    { name: 'round latch refuses FIRST (fresh uses never reach the uses gate)', args: { currentRound: 3, usedRound: 3, storedUses: {} }, expected: { ok: false, reason: 'round' } },
+    { name: 'uses gate refuses at the numeric 2/Day limit', args: { currentRound: 3, usedRound: 2, storedUses: { burst_of_ingenuity: 2 } }, expected: { ok: false, reason: 'uses' } },
+    { name: 'fresh round, 1/2 spent: passes carrying the spend tuple', args: { currentRound: 3, usedRound: 2, storedUses: { burst_of_ingenuity: 1 } }, expected: { ok: true, used: 1, limit: 2 } },
+    { name: '0-byte usedRound is honest (never a phantom same-round latch)', args: { currentRound: 3, usedRound: 0, storedUses: {} }, expected: { ok: true, used: 0, limit: 2 } },
+  ])('$name', ({ args, expected }) => {
+    expect(burstOfIngenuityGate({ ...args, action: BURST_ROW })).toMatchObject(expected);
   });
 });
 
@@ -158,87 +187,108 @@ describe('MA-1510 resolver press', () => {
     vi.clearAllMocks();
   });
 
-  it('grants: latch + uses spend awaited, ONE-SHOT +2 buff on the ROLLER, ONE anchor clock, spend log, NO popupHtml', async () => {
+  it('grants: press writes AWAITED in order latch→uses→stamp, exact campaign-pinned tuples, verbatim ONE-SHOT +2 stamp on the ROLLER only, ONE anchor clock, exact ability_use log bytes, NO popupHtml, bystander decoy survives', async () => {
     const { store, setRV, call } = resolveCall();
     const result = await call();
-    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ ok: true, bonus: 2, rollerName: ROLLER, remaining: 1 });
     expect(result.popupHtml).toBeUndefined();
-    expect(result.bonus).toBe(2);
-    expect(result.rollerName).toBe(ROLLER);
-    expect(result.remaining).toBe(1);
 
-    const stamped = store.buffs[ROLLER];
-    expect(stamped).toHaveLength(1);
-    expect(stamped[0].effect).toBe('burst_of_ingenuity');
-    expect(stamped[0].name).toBe(BURST_OF_INGENUITY_BUFF_NAME);
-    expect(stamped[0].saveBonus).toBe(2);
-    expect(stamped[0].oneShot).toBe(true);
-    expect(stamped[0].grantedBy).toBe(SPHINX);
-    expect(store.buffs[SPHINX]).toBeUndefined();
+    const [stamp] = store.buffs[ROLLER];
+    expect(stamp).toMatchObject({
+      effect: 'burst_of_ingenuity',
+      name: BURST_OF_INGENUITY_BUFF_NAME,
+      saveBonus: 2,
+      oneShot: true,
+      source: 'Burst of Ingenuity',
+      grantedBy: SPHINX,
+      grantedToRollTypes: ['check', 'skill', 'save'],
+      grantedRound: 3,
+    });
 
-    expect(store.latches[SPHINX]).toBe(3);
-    expect(store.uses[SPHINX]).toEqual({ burst_of_ingenuity: 1 });
-    const latchWrite = setRV.mock.calls.find(c => c[1] === LATCH_KEY);
-    const spendWrite = setRV.mock.calls.find(c => c[1] === 'monsterReactionUses');
-    expect(latchWrite && spendWrite && latchWrite[0]).toBe(spendWrite[0]);
+    // CLA-361/§39: latch AWAITED before uses spend before the stamp; every tuple campaign-pinned (#1019/#1021/#932).
+    expect(setRV.mock.calls).toEqual([
+      [SPHINX, LATCH_KEY, 3, CAMPAIGN],
+      [SPHINX, 'monsterReactionUses', { burst_of_ingenuity: 1 }, CAMPAIGN],
+      [ROLLER, 'activeBuffs', [stamp], CAMPAIGN],
+    ]);
 
     expect(addExpiration).toHaveBeenCalledTimes(1);
-    const clock = addExpiration.mock.calls[0][0];
-    expect(clock.expireOnCreatureName).toBe(SPHINX);
-    expect(clock.rounds).toBeUndefined();
-    expect(clock.targetName).toBe(ROLLER);
-    expect(clock.effects).toEqual([{ type: 'remove_active_buff', buffName: BURST_OF_INGENUITY_BUFF_NAME }]);
+    expect(addExpiration.mock.calls[0][0]).toEqual({
+      attackerName: SPHINX,
+      targetName: ROLLER,
+      campaignName: CAMPAIGN,
+      rounds: undefined,
+      expireOnCreatureName: SPHINX,
+      effects: [{ type: 'remove_active_buff', buffName: BURST_OF_INGENUITY_BUFF_NAME }],
+    });
 
-    expect(store.logs.some(l => l.type === 'ability_use' && l.characterName === SPHINX)).toBe(true);
-    expect(store.logs.every(l => l.automationType !== 'burst_of_ingenuity_refused')).toBe(true);
+    expect(store.logs).toHaveLength(1);
+    expect(store.logs[0]).toMatchObject({
+      type: 'ability_use',
+      characterName: SPHINX,
+      abilityName: 'Burst of Ingenuity',
+      description: `${SPHINX} uses Burst of Ingenuity (Reaction) — ${ROLLER} gains +2 on the next ability check or saving throw it makes (consumed on that roll). 30-ft proximity GM-enforced (gridless advisory, §42). 2/Day · 1 left today.`,
+    });
+
+    // Holder-scoped: latch/uses key ONLY the card owner; the bystander's decoy stamp survives untouched.
+    expect(store.buffs[BYSTANDER]).toHaveLength(1);
+    expect(store.buffs[BYSTANDER][0]).toMatchObject({ effect: 'burst_of_ingenuity', grantedRound: 2 });
+    expect(store.buffs[SPHINX]).toBeUndefined();
+    expect(store.latches[BYSTANDER]).toBeUndefined();
+    expect(store.uses[BYSTANDER]).toBeUndefined();
   });
 
-  it('press with no roller armed refuses ZERO-spend: no latch, no uses write, no buff, log-only', async () => {
-    const { store, setRV, call } = resolveCall();
-    const r = await call(makeCs({ rollerArmed: false }));
+  it.each([
+    {
+      name: 'round latch refuses FIRST — an unarmed card still answers round, not no_target',
+      press: { cs: makeCs({ rollerArmed: false }), currentRound: 3, usedRound: 3, storedUses: {} },
+      reason: 'round',
+      message: 'Burst of Ingenuity: Reaction already used this round — refused.',
+    },
+    {
+      name: 'uses exhausted at the numeric 2/Day limit',
+      press: { cs: makeCs(), currentRound: 3, usedRound: 2, storedUses: { burst_of_ingenuity: 2 } },
+      reason: 'uses',
+      message: 'Burst of Ingenuity: 2/Day uses already spent today — refused. Uses reset at a long rest; GM-enforced for monsters.',
+    },
+    {
+      name: 'no roller armed (bystander burst decoy must NOT answer already_armed — the gate reads the armed card only)',
+      press: { cs: makeCs({ rollerArmed: false }), currentRound: 3, usedRound: 2, storedUses: {} },
+      reason: 'no_target',
+      message: `Burst of Ingenuity: ${SPHINX} has no roller armed on the card — arm the creature about to make the ability check or saving throw first (gridless proxy for the RAW 30-ft proximity).`,
+    },
+    {
+      name: 'already-armed roller refuses a double arm (one buff instance per roller)',
+      press: { cs: makeCs(), currentRound: 3, usedRound: 2, storedUses: {}, rollerBuffs: [buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 3)] },
+      reason: 'already_armed',
+      message: `Burst of Ingenuity: ${ROLLER} is already carrying an armed +2 — one buff instance per roller; refused.`,
+    },
+  ])('$name — refused log-only §235d with ZERO spend', async ({ press, reason, message }) => {
+    const { store, setRV, call } = resolveCall({ rollerBuffs: press.rollerBuffs });
+    const r = await call(press.cs, press.currentRound, press.usedRound, press.storedUses);
     expect(r.ok).toBe(false);
-    expect(r.reason).toBe('no_target');
+    expect(r.reason).toBe(reason);
     expect(r.popupHtml).toBeUndefined();
-    expect(store.latches[SPHINX]).toBeUndefined();
-    expect(store.uses[SPHINX]).toBeUndefined();
-    expect(store.buffs[ROLLER]).toEqual([]);
+    expect(setRV).not.toHaveBeenCalled();
+    expect(addExpiration).not.toHaveBeenCalled();
+    expect(store.buffs[ROLLER]).toHaveLength(press.rollerBuffs ? 1 : 0);
+    expect(store.buffs[BYSTANDER]).toHaveLength(1);
+    expect(store.buffs[BYSTANDER][0].effect).toBe('burst_of_ingenuity');
     const refused = store.logs.filter(l => l.automationType === 'burst_of_ingenuity_refused');
     expect(refused).toHaveLength(1);
-    expect(refused[0].automationDetail).toBe('no_target');
-    expect(setRV).not.toHaveBeenCalled();
+    expect(refused[0]).toMatchObject({ type: 'automation', automationDetail: reason, characterName: SPHINX, abilityName: 'Burst of Ingenuity' });
+    expect(refused[0].description).toBe(`Burst of Ingenuity refused (${reason}): ${message}`);
   });
 
-  it('same-round re-press refuses (round latch) and 0-uses press refuses (uses) — both zero-spend', async () => {
-    const latched = resolveCall();
-    const r1 = await latched.call(makeCs(), 3, 3);
-    expect(r1.reason).toBe('round');
-    expect(latched.store.uses[SPHINX]).toBeUndefined();
-    expect(latched.store.buffs[ROLLER]).toEqual([]);
-
-    const exhausted = resolveCall();
-    const r2 = await exhausted.call(makeCs(), 3, 2, { burst_of_ingenuity: 2 });
-    expect(r2.reason).toBe('uses');
-    expect(exhausted.store.latches[SPHINX]).toBeUndefined();
-    expect(exhausted.store.uses[SPHINX]).toBeUndefined();
-    expect(exhausted.store.buffs[ROLLER]).toEqual([]);
-    expect(exhausted.store.logs.map(l => l.automationDetail)).toEqual(['uses']);
-  });
-
-  it('already-armed roller refuses a double arm, zero spend', async () => {
-    const dup = resolveCall({ rollerBuffs: [buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 3)] });
-    const r = await dup.call();
-    expect(r.reason).toBe('already_armed');
-    expect(dup.store.uses[SPHINX]).toBeUndefined();
-    expect(dup.store.buffs[ROLLER]).toHaveLength(1);
-  });
-
-  it('counter spends 2→1→0: second press rides storedUses, third refuses at 0', async () => {
-    const first = resolveCall();
-    expect((await first.call()).remaining).toBe(1);
-    const second = resolveCall();
-    expect((await second.call(makeCs(), 4, 3, { burst_of_ingenuity: 1 })).remaining).toBe(0);
-    const third = resolveCall();
-    expect((await third.call(makeCs(), 5, 4, { burst_of_ingenuity: 2 })).reason).toBe('uses');
+  it('second press rides storedUses: spends 1→0 with the spread preserving off-lane bytes, log honest at 0 left today (fresh press owned by the grant test, press-at-0 by the refusal table — 2→1→0 end to end)', async () => {
+    const { store, setRV, call } = resolveCall();
+    const r = await call(makeCs(), 4, 3, { burst_of_ingenuity: 1, other_reaction: 5 });
+    expect(r.ok).toBe(true);
+    expect(r.remaining).toBe(0);
+    const spendWrite = setRV.mock.calls.find(c => c[1] === 'monsterReactionUses');
+    expect(spendWrite).toEqual([SPHINX, 'monsterReactionUses', { burst_of_ingenuity: 2, other_reaction: 5 }, CAMPAIGN]);
+    expect(store.logs[0].description).toBe(`${SPHINX} uses Burst of Ingenuity (Reaction) — ${ROLLER} gains +2 on the next ability check or saving throw it makes (consumed on that roll). 30-ft proximity GM-enforced (gridless advisory, §42). 2/Day · 0 left today.`);
+    expect(store.buffs[ROLLER]).toHaveLength(1);
   });
 });
 
@@ -247,35 +297,41 @@ describe('MA-1510 roll-seam consume', () => {
     vi.clearAllMocks();
   });
 
-  it('consume folds +2 on the armed roller check/skill/save, strips the ONE-SHOT stamp, logs applied', () => {
-    const buff = buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 3);
+  it('armed roller check folds +2, the strip write is the ONLY store update (co-located warding_bond survives byte-identical), exact applied log bytes — and the same roller then rolls byte-inert zero (clear on roll, not press §214)', () => {
     const other = { effect: 'warding_bond', saveBonus: 1 };
-    getRuntimeValue.mockReturnValue([other, buff]);
-    const folded = consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'check', rollName: 'Acrobatics' });
-    expect(folded).toEqual({ bonus: 2, applied: true });
-    const strip = setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(strip[0]).toBe(ROLLER);
-    expect(strip[2]).toEqual([other]);
-    const applied = addEntry.mock.calls.map(c => c[1]).find(e => e && e.automationType === 'burst_of_ingenuity_applied');
-    expect(applied).toBeTruthy();
-    expect(applied.targetName).toBe(ROLLER);
-    expect(applied.characterName).toBe(SPHINX);
-  });
-
-  it('consumes once — the armed buff never re-folds a second roll (clear on roll, not press)', () => {
     const buff = buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 3);
-    let store = [buff];
-    getRuntimeValue.mockImplementation(() => store);
-    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'save', rollName: 'DEX' }).bonus).toBe(2);
-    store = [];
-    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'save', rollName: 'DEX' }).bonus).toBe(0);
+    let buffs = [other, buff];
+    getRuntimeValue.mockImplementation(() => buffs);
+    setRuntimeValue.mockImplementation((key, prop, value) => { buffs = value; return Promise.resolve(); });
+
+    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'check', rollName: 'Acrobatics' })).toEqual({ bonus: 2, applied: true });
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue.mock.calls[0]).toEqual([ROLLER, 'activeBuffs', [other], CAMPAIGN]);
+
+    const applied = addEntry.mock.calls[0];
+    expect(applied[0]).toBe(CAMPAIGN);
+    expect(applied[1]).toMatchObject({
+      type: 'automation',
+      automationType: 'burst_of_ingenuity_applied',
+      characterName: SPHINX,
+      targetName: ROLLER,
+      abilityName: BURST_OF_INGENUITY_BUFF_NAME,
+      description: `Burst of Ingenuity: +2 folded into ${ROLLER}'s check (Acrobatics) — buff consumed.`,
+    });
+
+    // ONE-SHOT — store-faithful: the strip already landed, so a second roll is honest zero.
+    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'save', rollName: 'DEX' })).toEqual({ bonus: 0, applied: false });
+    expect(addEntry).toHaveBeenCalledTimes(1);
   });
 
-  it('initiative NEVER folds (RAW: ability check or saving throw only); unarmed roller is byte-inert zero', () => {
+  it('initiative NEVER folds (RAW: ability check or saving throw only) — inert guards do not even READ the store; unarmed and null rollers are byte-inert zero', () => {
     getRuntimeValue.mockReturnValue([buildBurstOfIngenuityBuff(BURST_ROW, SPHINX, 3)]);
-    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'initiative' }).applied).toBe(false);
+    expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'initiative' })).toEqual({ bonus: 0, applied: false });
+    expect(getRuntimeValue).not.toHaveBeenCalled();
     getRuntimeValue.mockReturnValue([]);
     expect(consumeBurstOfIngenuityBuff(ROLLER, CAMPAIGN, { rollType: 'check' })).toEqual({ bonus: 0, applied: false });
     expect(consumeBurstOfIngenuityBuff(null, CAMPAIGN, { rollType: 'save' })).toEqual({ bonus: 0, applied: false });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });

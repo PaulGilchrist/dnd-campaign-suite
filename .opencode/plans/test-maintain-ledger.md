@@ -1969,3 +1969,78 @@ run2#1072: diceRoller ENGINE CANON -> maintained (45->15/123): ZERO range assert
 ## Batch #190 GREEN — run2#1059-#1072 (14 files)
 ## Batch #190 — PROGRESS: completed 2208 / remaining 476 (total 2684)
 - Suite: lint clean; 2752 files, 32,131 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 19th consecutive; evidence /tmp/batch190.log). 32,103->32,131 (+28 net: diceRoller engine census +123 exact-cases, turnState lifecycle +6, teleport/thiefs tables minus steps/index 9->3, genericSteps 20->8, sseObservers 13->6, observers 9->7, hunterPrey pair 43->16, tavernBrawler pair 23->14 folds).
+run2#1073: encounters/autoEncounterService -> maintained (4->5 doubled): disarmed triple-shape w/ full roster proving short-circuit BEFORE loadMonsters (lint caught real leg-defect); dispatch tuple + phase bytes + audit log exact; determinism re-arm guards
+run2#1074: encounters/combatData -> maintained (29->22): #1052 ROOT pins campaign-key-miss->null + round const-1 decoy-provable; cache-identity mutation semantics; failed-loads cache-untouched stale-until-clear; dead scaffolding purged. 🔴 :29/:59 3-arg arity ignored logged
+run2#1075: encounters/combatLoggingService -> maintained (20->19 exact): campaign arg pinned EVERYWHERE (old never asserted); mockGuid consumed proof; persistent-rejection leak FIXED; CLA-209 [8,14]->14 kills take-first/last/min. 🔴 :45 'Concentration: undefined' logged
+run2#1076: encounters/encounterGenerator -> maintained (25->31 exact): flagship RNG [0.4...] consumed-pin 5 + reproducible; zero-RNG-consumed throw proofs; verbatim monsters.json; ALL range-only/isArray deleted
+run2#1077: encounters/encountersService CRUD -> maintained (21->4/18): URL-encoding every site (old none); per-site generic fallbacks; network sweep re-arms, no retry storms; verbatim server error passthrough
+run2#1078: encounterToInitiative -> maintained (44->18/32): #1014 byte contract full-object toEqual SP-094/MN-015; deterministic sort distinguishable dice; dead-mock purge surfaced undefined-name imported by real consumer; in-place mutation copy-guard
+run2#1079: encounters/initiativeService -> maintained (38 blocks trimmed): real rollD20 seam over Math.random spy; resolvePhantasmalHp RUNTIME-seam FIRST; image-map updaters local-vs-bestiary distinguishable
+run2#1080: MA-0352 banshee -> maintained (5->4): economy THROUGH spendMonsterAbilityUse consumer bytes; real-row lock verbatim; (1/Day) suffix-strip family-unique leg; framework verdict ABILITYUSES.test.js owns generics
+run2#1081: MA-0633 dretch -> maintained (3 strengthened): rec applied hand-built refusal->consumer shape; damageless-condition-dealer lock family-distinct; dead imports purged
+run2#1082: monsterAbilityUses FRAMEWORK CANON -> maintained (8->12/33): PRESERVED-cited-by all tickets; suffix-strip ladder + #959 coercion census NEW; campaign-pinned spend tuple gate-reads-what-spend-wrote; vrock cycle folded up
+run2#1083: MA-1674 vrock -> maintained (5->2): recs x3 APPLIED verified; NaN-string data-fix row kept core + decoy NEW; ~46 lines deleted->framework. 📌 damage_type_primary gap logged
+run2#1084: MA-1224 nalfeshnee -> maintained (11->4): disk-extracted bytes; string-not-action resolver strengthened; advisory family framework-owner verdict base
+run2#1085: MA-1285 uncanny-dodge -> maintained (47->17, 472->175 lines): rec applied 12 machinery copies deleted citing base; row-locks it.each disk-verified; chip sole-render-lane kept
+run2#1086: MA-1450 seahorse -> maintained (10->3): programmatic disk lock full-row toEqual shape-closure; Ram decoy ticket-distinct; renderer-cites applied .js service ticket
+run2#1087: MA-1851 archlich -> maintained (13->4): refire 4th-copy deleted; 4-tests disk-lock/detector/render/resolver; exact title bytes incl em-dash
+
+## Batch #191 GREEN — run2#1073-#1087 (15 files, encounters/ subdomain sweep)
+## Batch #191 — PROGRESS: completed 2223 / remaining 461 (total 2684)
+- Suite: lint clean; 2752 files, 32,057 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 20th consecutive; evidence /tmp/batch191.log). 32,131->32,057 (-74 net: advisory-family folds 47->17/13->4/11->4/10->3, CRUD 21->4, assembly 44->18, combatData 29->22, logging 20->19, initiativeService trimmed minus generator 25->31 exact-CRD refactor and autoEncounter 4->5).
+run2#1088: MA-2018 thunderbird advisory -> maintained (13->4): family recs x3 applied; ticket-distinct decoys (Thunderstrike save-chip §128 + spell_reflection te-channel); refire 4th-copy deleted
+run2#1089: MA-2068 ziz advisory -> maintained (13->4): archlich decoy byte-dupes deleted; quetzalcoatl Wing Defense closest-confusion decoy NEW; 📌 quetzalcoatl advisory-gap data ticket flagged
+run2#1090: advisory FRAMEWORK CANON -> maintained (20->7/27): refire orc self-copy folded (rec #1087); byte-source-swap falsifier on builder fallback; canonical zero-write pin hosted once; 6-ticket cite-table refreshed
+run2#1091: burstOfIngenuity -> maintained (12->9/15): CLA-361 ordered write census; bystander decoy vs already_armed; hand-reset once-test fixed store-faithful; 🗑 REFUSAL_MESSAGES.round/.uses dead branches logged
+run2#1092: monsterEpicCohort -> maintained (209->104): engine seams run REAL consumers (dead-button guard cost<=pool); named exception maps; vacuous circular pins + monkey-clone dupes removed
+run2#1093: MA-1931 king-kong grab -> maintained (7->2): production extractor through-row; save-fail-axis canaries; Thunder Roar zero-leakage canary decoy
+run2#1094: monsterGrantReaction -> maintained (10->3/7): rec #1012 APPLIED registration deleted->golden census; press-path ordered census spend-before-grant; brittle actions[3] index fixed
+run2#1095: guardianProtection -> maintained (7 arms/16): twin divergence honored (self refuses vs burst RAW); latch-write gap closed full ordered census; full addExpiration toEqual
+run2#1096: MA-1927 jormungandr hit -> maintained (4->2): save-quartet absence canaries extended; name-lookup decoys; hit-axis-only split pinned
+run2#1097: MA-1939 ladon constrict -> maintained (7->2): apep twin dupes deleted->MA-1842 owner; escape_dc+ongoing-damage exact; non-duplication canary honest
+run2#1098: monsterJinx -> maintained (15->8/28): refusal+gate it.each new legs (uses-exhaustion, missing-DC); CLA-361 write order FAILED press; ⚠ save_type doc/code drift logged
+run2#1099: monsterLairActions -> maintained (6947->328 lines, 587->32): per-ticket sprawl->whole-DB tripwires x7 + golden affordance census {save:63,zone:13,attack:3,advisory:14,inert:5}; damage routing FIRST coverage
+run2#1100: MA-1928 capsize -> maintained (5->2): only-save-row-on-lane shadow-prevention falsifier; save-core PRESERVED-cited-by ma1927; key-order locks dropped
+run2#1101: MA-1952 nidhogg -> maintained (6->2): rec :108-110 APPLIED; delegate-KEPT twin variant through production-resolver; hijack fingerprint explicit
+run2#1102: MA-1579 tarrasque-general -> maintained (10->3): SOLE uses-lane owner adjudicated; toBe exact header once; gate-table dup deleted->MA-0021; trims forwarded x3
+
+## Batch #192 GREEN — run2#1088-#1102 (15 files, advisory family complete + legendary cluster + lair mega-fold)
+## Batch #192 — PROGRESS: completed 2238 / remaining 446 (total 2684)
+- Suite: lint clean; 2752 files, 31,380 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 21st consecutive; evidence /tmp/batch192.log). 32,057->31,380 (-677 net: monsterLairActions 587->32 mega-fold dominates, minus minor expansions jinx/guardian/burst tables).
+run2#1103: ma1580 tarrasque-delegate -> maintained (9->3): rec #1102 APPLIED header-delete verified; resolver identity Claw +19/reach15; 6 transitive dupes deleted-citing
+run2#1104: ma1581 tarrasque-advisory -> maintained (10->5): recs #1102+#1103 APPLIED owners-live; disk anchor exact-once name-decoys; inert popup exact-toBe
+run2#1105: ma1582 tarrasque-chomp -> maintained (8->3): cost-2 odd-3-pool chunk 3->1 + near-miss frozen; recs x2 APPLIED; stale COST-2-UNENFORCED note fixed honest
+run2#1106: ma1868 psychic-shatter -> maintained (5->3+it.each): field-not-name gate arming falsifier NEW; own-turn clear regained:false unique; MA-0073 canon dupes deleted
+run2#1107: ma1883 demogorgon -> maintained (20->11/23): PRESERVED grammar+even-2-pool strengthened campaign-ordered; data-lock deleted->ma1879 modal owner; afterEach added
+run2#1108: ma1907-1910 garuda -> maintained (5->3): field-not-name recharge arming; per-ticket split honest; recs forwarded ma2002/ma2054
+run2#1109: ma1936 climbing-dash -> maintained (9->3): #1104 template VERBATIM; refuse vocab 4th-copy deletions begun; Rock Throw sole-owner pin
+run2#1110: ma1944 ladon-vigilant -> maintained (12->3): recs #1101+#1109 APPLIED verified; cost-2 LIVE 3->1 anchored; uses pinned once
+run2#1111: ma1962 orcus -> maintained (12->3): 4th verbatim-refusal lane closed; siblings deleted->ma1958/59 modal owners; unsanitized-prose baseline honest
+run2#1112: ma1974 quetzalcoatl -> maintained (5->3): skills-honest-miss t2; #1089 data-note SUPERSEDED disk has structured save bytes; WingDefense honest lock
+run2#1113: ma1982 scylla-shriek -> maintained (5->2): fix byte whole-DB exact-once; misleading extractor-compare cut; save-lane uniqueness sweep
+run2#1114: ma2002 smaug -> maintained (6->3): twin sweep DELETE adjudicated both-owners; full disk skills map honest bare-number provenance +11
+run2#1115: ma2054 yamata -> maintained (5->2): recs x3 APPLIED all owners verified; wis-fallback +2 honest provenance NEW; out-of-lane pins removed
+
+## Batch #193 GREEN — run2#1103-#1115 (13 files, legendaryUses ticket-family complete)
+## Batch #193 — PROGRESS: completed 2251 / remaining 433 (total 2684)
+- Suite: lint clean; 2752 files, 31,326 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 22nd consecutive; evidence /tmp/batch193.log). 31,380->31,326 (-54 net: tarrasque/advisory/detection family folds 9->3/10->5/8->3/12->3/12->3/6->3/5->2 minus tables).
+run2#1116: monsterLegendaryUses FRAMEWORK CANON -> maintained (1452->648 lines): PRESERVED-CITED-BY table refreshed all ~13 tickets; 7 economy walks->live census press across 17 monsters; refuse vocab exact-toBe once. 🔴 :228 dict-collapses-0 logged
+run2#1117: MA-1916 godzilla -> maintained (6->4): family-owner verdict base CANON; triple truth-tables deleted; one-shot LIVE gate-arm; 26d6 pins honest (epicCohort no dice-lock); folds ma1970/ma1978 reced
+run2#1118: MA-1924 venomous-surge -> maintained (3->2): rec fold APPLIED + extractor vacuous-note honest; axis-inverse decoy discipline (no re-lock #1096/#1100 bytes)
+run2#1119: MA-1932 thunder-roar -> maintained (5->2): recs x3; DC23 Wis owned-core preserved; grab sibling pins trim-cited; extractor-KEPT (ticket fixed save_effect, honest inversion vs #1118)
+run2#1120: MA-1940 sleeping-mist -> maintained (5->2): whole-DB unique byte-triple extended to uniqueness; bytes owned-per-#1097-citation; Constrict/Bite gate-null decoys
+run2#1121: MA-1948 corpse-wind -> maintained (3->2): Ziz Solar Flare DC24 twin DISCOVERED, anchor->66(12d10) count=1; Grave Gale absence-only (#1101 owns core)
+run2#1122: MA-1970 hurricane-breath -> maintained (4->3): recs x3 APPLIED; PRESERVED #1112-cited cores verbatim; Behemoth DC25 twin extended->description count=1
+run2#1123: MA-1978 blood-tide -> maintained (3->2): recs x3 CONFIRMED; save-core PRESERVED canonical; DC25 twin pool->lair-mouth bytes; drag-namesake honest
+run2#1124: MA-1987 purifying-blaze -> maintained (3->2): scope-honest extractor purge; DC24 9-row pool->unique 84(12d12) anchor; five-fold family copy closed
+run2#1125: PHANTOM INCIDENT VOIDED - subagent fabricated 'ma1995-soul-sight' pass (no file, no monster); real head untouched, ledger clean, re-dispatched #1125R
+run2#1125R: MA-1996 smaug -> maintained (3->2): twin-collision DC24+5-6=9 rows -> 77(22d6) count=1; two-byte fix distinct; picker claims marked recorded-not-simulated (#910 honest)
+run2#1126: MA-2017 thunderstrike -> maintained (3->2): Nidhogg shapeless CON-twin caught, anchor->DEX/Lightning count=1; rec #2022 cross-file trim forwarded
+run2#1127: MA-2041 typhon -> maintained (3->2): DC27 3-row pool->ST/Bludgeoning count=1; no cross-file dupes found honest
+run2#1128: MA-2051 venom-mist -> maintained (4->2): mock d6-ladder deleted->base :84-122; Fenrir/Apep twins->22d6 Poison count=1
+run2#1129: MA-2059 glacier-wave -> maintained (7->3): FIXED-bytes extractor KEEP per #1119 scope; DC26 5-row pool->Line/14d10 count=1; rec #2081 forwarded
+run2#1130: MA-2067 solar-flare -> maintained (4->2): carried recs x5 executed VERBATIM; documented twin collision resolved ->9d10 Radiant count=1
+
+## Batch #194 GREEN — run2#1116-#1130 (15 files, legendaryUses CANON + recharge family sweep)
+## Batch #194 — PROGRESS: completed 2266 / remaining 418 (total 2684)
+- Suite: lint clean; 2752 files, 31,340 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 23rd consecutive; evidence /tmp/batch194.log). 31,326->31,340 (+14 net: framework census expansions #1116 tables/17-monster press minus recharge folds 7->3/6->4/4->2... x10 incl #1125R; #1125 phantom contributed zero).

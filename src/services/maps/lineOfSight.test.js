@@ -1,235 +1,166 @@
+// @maintained-by-ai
+// Lane: LOS ray + visibility scan (SOLE OWNER of bresenham cell sequences and
+// computeVisibility blocked/clear outcomes — verified by consumer census).
+// Consumers cite here, never re-drive ray math:
+//   combat/lineOfSightGate.test.js:16 ..... gate lane cites "bresenham + computeVisibility cells".
+//   useFogOfWar.test.js:13 ................ mocks this module; ray math cited back here.
+//   combat/coverService.js, spellOverlayService.js, rules/combat/coverService.js — integration
+//   bytes through bresenham stay in their own lanes (#1013 cover, #1169 wall derivation).
+//   maps/reachability .... editor movement; maps/effectiveWalls #1169 .... wall derivation.
+// Discipline: byte-exact Set goldens per scenario (#903/#1160 strengthened from boolean-only
+// pins — goldens computed row-major from the source, incl. honest bresenham graze shadows);
+// distinguishable minimal grids (#1022 — blockers offset so axis-flip fails visibly);
+// walls-vs-closedDoors arg falsifier via identical goldens (#967); endpoint-vs-interior
+// blocking semantics; degenerate honest (#945); multi-player union with a strict-subset
+// shadow so the golden is not replicable by either player alone. Pure functions, zero mocks (#1137).
+// Old->new map: 8 bresenham its -> T1 (it.each, incl. symmetry via exact reverse bytes);
+// own-cell+unblocked+edge+size1+large-grid -> T2 rows; wall-blocks+door-blocks+identical+
+// diagonal-blocks+off-ray+around-wall+endpoint+multi-wall-stack+see-through-walls+
+// corridor -> T3 (it.each goldens); aggregation+duplicates -> T4; instanceof Set -> purged
+// (vacuous, goldens prove shape); reverse-symmetry toReversed compare -> folded into T1.
 import { describe, it, expect } from 'vitest';
 import { bresenham, computeVisibility } from './lineOfSight.js';
 
+const ALL25 = new Set([
+  '0,0', '0,1', '0,2', '0,3', '0,4',
+  '1,0', '1,1', '1,2', '1,3', '1,4',
+  '2,0', '2,1', '2,2', '2,3', '2,4',
+  '3,0', '3,1', '3,2', '3,3', '3,4',
+  '4,0', '4,1', '4,2', '4,3', '4,4',
+]);
+
 describe('bresenham', () => {
-  it('should return a single cell when start equals end', () => {
-    const cells = bresenham(3, 3, 3, 3);
-    expect(cells).toEqual([{ x: 3, y: 3 }]);
+  it.each([
+    { name: 'degenerate same cell', from: [3, 3], to: [3, 3], expected: [{ x: 3, y: 3 }] },
+    {
+      name: 'horizontal', from: [0, 0], to: [4, 0],
+      expected: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }, { x: 4, y: 0 }],
+    },
+    {
+      name: 'vertical', from: [0, 0], to: [0, 4],
+      expected: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }, { x: 0, y: 3 }, { x: 0, y: 4 }],
+    },
+    {
+      name: 'exact diagonal advances both axes', from: [0, 0], to: [4, 4],
+      expected: [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 4 }],
+    },
+    {
+      name: 'shallow slope steps x, occasionally y', from: [0, 0], to: [3, 1],
+      expected: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 1 }, { x: 3, y: 1 }],
+    },
+    {
+      name: 'steep slope steps y, occasionally x', from: [0, 0], to: [1, 3],
+      expected: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 2 }, { x: 1, y: 3 }],
+    },
+    {
+      name: 'reversed steep slope is exact reverse bytes (direction symmetry)', from: [1, 3], to: [0, 0],
+      expected: [{ x: 1, y: 3 }, { x: 1, y: 2 }, { x: 0, y: 1 }, { x: 0, y: 0 }],
+    },
+    {
+      name: 'negative coordinates', from: [-2, -1], to: [1, 2],
+      expected: [{ x: -2, y: -1 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 2 }],
+    },
+  ])('$name', ({ from, to, expected }) => {
+    expect(bresenham(from[0], from[1], to[0], to[1])).toEqual(expected);
   });
-
-  it('should include start and end cells for any line', () => {
-    const cells = bresenham(0, 0, 2, 0);
-    expect(cells[0]).toEqual({ x: 0, y: 0 });
-    expect(cells.at(-1)).toEqual({ x: 2, y: 0 });
-  });
-
-  it('should produce the correct number of cells for axis-aligned lines', () => {
-    const hCells = bresenham(0, 0, 4, 0);
-    expect(hCells.length).toBe(5);
-
-    const vCells = bresenham(0, 0, 0, 4);
-    expect(vCells.length).toBe(5);
-  });
-
-  it('should produce symmetric results regardless of direction', () => {
-    const fwd = bresenham(0, 0, 3, 3);
-    const rev = bresenham(3, 3, 0, 0);
-    expect(rev).toEqual(fwd.toReversed());
-  });
-
-  it('should work with negative coordinates', () => {
-    const cells = bresenham(-2, -2, 0, 0);
-    expect(cells.length).toBe(3);
-  });
-
-  it('should pass through correct intermediate cells on a steep diagonal', () => {
-    const cells = bresenham(0, 0, 1, 3);
-    const expected = [
-      { x: 0, y: 0 },
-      { x: 0, y: 1 },
-      { x: 1, y: 2 },
-      { x: 1, y: 3 },
-    ];
-    expect(cells).toEqual(expected);
-  });
-
-  it('should pass through correct intermediate cells on a shallow diagonal', () => {
-    const cells = bresenham(0, 0, 3, 1);
-    const expected = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 2, y: 1 },
-      { x: 3, y: 1 },
-    ];
-    expect(cells).toEqual(expected);
-  });
-
-  it('should handle a 45-degree diagonal', () => {
-    const cells = bresenham(0, 0, 4, 4);
-    const expected = [
-      { x: 0, y: 0 },
-      { x: 1, y: 1 },
-      { x: 2, y: 2 },
-      { x: 3, y: 3 },
-      { x: 4, y: 4 },
-    ];
-    expect(cells).toEqual(expected);
-  });
-
 });
 
 describe('computeVisibility', () => {
-  it('should return a Set of visible cell keys', () => {
-    const players = [{ gridX: 2, gridY: 2 }];
-    const result = computeVisibility(players, new Set(), new Set(), 5);
-    expect(result).toBeInstanceOf(Set);
+  it('returns an empty Set with no players', () => {
+    expect(computeVisibility([], new Set(), new Set(), 5)).toEqual(new Set());
   });
 
-  it('should always include the player\'s own cell', () => {
-    const result = computeVisibility([{ gridX: 3, gridY: 4 }], new Set(), new Set(), 10);
-    expect(result.has('3,4')).toBe(true);
+  // Byte-exact goldens (row-major). Grazing cells inside shadow edges are the
+  // pinned coarse-bresenham behavior consumers (fog, gate, cover) depend on.
+  it.each([
+    {
+      name: 'unblocked corner player sees whole grid incl. own cell and diagonals',
+      players: [{ gridX: 0, gridY: 0 }], walls: new Set(), doors: new Set(), grid: 3,
+      expected: new Set(['0,0', '0,1', '0,2', '1,0', '1,1', '1,2', '2,0', '2,1', '2,2']),
+    },
+    {
+      name: 'grid of size 1 yields only the own cell',
+      players: [{ gridX: 0, gridY: 0 }], walls: new Set(), doors: new Set(), grid: 1,
+      expected: new Set(['0,0']),
+    },
+    {
+      name: 'player outside the grid still contributes own cell and scans in-grid targets',
+      players: [{ gridX: 10, gridY: 10 }], walls: new Set(), doors: new Set(), grid: 2,
+      expected: new Set(['0,0', '0,1', '1,0', '1,1', '10,10']),
+    },
+    {
+      name: 'wall mid-ray blocks its colinear AND grazing shadow (interior-only)',
+      players: [{ gridX: 0, gridY: 2 }], walls: new Set(['2,2']), doors: new Set(), grid: 5,
+      expected: new Set([
+        '0,0', '0,1', '0,2', '0,3', '0,4',
+        '1,0', '1,1', '1,2', '1,3', '1,4',
+        '2,0', '2,1', '2,2', '2,3', '2,4',
+        '3,0', '3,1', '3,3', '3,4',
+        '4,0', '4,4',
+      ]), // shadow: 3,2 / 4,1 / 4,2 / 4,3 — 4,1 and 4,3 graze (2,2) and go with it
+    },
+    {
+      name: 'closed door mid-ray blocks exactly like a wall (arg falsifier)',
+      players: [{ gridX: 0, gridY: 2 }], walls: new Set(), doors: new Set(['2,2']), grid: 5,
+      expected: new Set([
+        '0,0', '0,1', '0,2', '0,3', '0,4',
+        '1,0', '1,1', '1,2', '1,3', '1,4',
+        '2,0', '2,1', '2,2', '2,3', '2,4',
+        '3,0', '3,1', '3,3', '3,4',
+        '4,0', '4,4',
+      ]),
+    },
+    {
+      name: 'wall on diagonal casts wide diagonal shadow, horizontal stays clear',
+      players: [{ gridX: 0, gridY: 0 }], walls: new Set(['1,1']), doors: new Set(), grid: 5,
+      expected: new Set([
+        '0,0', '0,1', '0,2', '0,3', '0,4',
+        '1,0', '1,1', '1,2', '1,3', '1,4',
+        '2,0', '2,1', '2,4',
+        '3,0', '3,1',
+        '4,0', '4,1', '4,2',
+      ]), // blocks 2,2 2,3 3,2 3,3 3,4 4,3 4,4 — subsumes the old 2,2/3,3/4,4 boolean pins
+    },
+    {
+      name: 'wall directly ahead blocks the column behind it, flanks stay visible',
+      players: [{ gridX: 2, gridY: 0 }], walls: new Set(['2,1']), doors: new Set(), grid: 5,
+      expected: new Set([
+        '0,0', '0,1', '0,2', '0,3',
+        '1,0', '1,1',
+        '2,0', '2,1',
+        '3,0', '3,1',
+        '4,0', '4,1', '4,2', '4,3',
+      ]),
+    },
+    {
+      name: 'wall off every ray blocks nothing at all',
+      players: [{ gridX: 1, gridY: 2 }], walls: new Set(['3,0']), doors: new Set(), grid: 5,
+      expected: ALL25,
+    },
+    {
+      name: 'wall on the target endpoint never blocks (interior-only rule)',
+      players: [{ gridX: 0, gridY: 2 }], walls: new Set(['4,2']), doors: new Set(), grid: 5,
+      expected: ALL25,
+    },
+  ])('$name', ({ players, walls, doors, grid, expected }) => {
+    expect(computeVisibility(players, walls, doors, grid)).toEqual(expected);
   });
 
-  it('should see all cells in an unblocked grid', () => {
-    const players = [{ gridX: 2, gridY: 2 }];
-    const result = computeVisibility(players, new Set(), new Set(), 5);
-    for (let x = 0; x < 5; x++) {
-      for (let y = 0; y < 5; y++) {
-        expect(result.has(`${x},${y}`)).toBe(true);
-      }
-    }
-  });
-
-  it('should return an empty Set with no players', () => {
-    const result = computeVisibility([], new Set(), new Set(), 5);
-    expect(result.size).toBe(0);
-  });
-
-  it('should block visibility through a wall on the direct path', () => {
-    const players = [{ gridX: 0, gridY: 2 }];
+  it('unions per-player vision (strict-subset shadow) and tolerates duplicate positions', () => {
+    // A(0,1) alone loses 3,2 3,3 4,3 4,4; B(1,2) alone loses 3,1 3,2 3,3 4,1 4,2 4,3.
+    // Together only the shared shadow 3,2 3,3 4,3 stays dark: 4,4 is recovered by B
+    // and 3,1 4,1 4,2 by A. Golden cannot be reproduced by either player alone, so
+    // any single-player (or ignore-walls) regression fails it. Duplicated A must not
+    // change the result.
+    const A = { gridX: 0, gridY: 1 };
+    const B = { gridX: 1, gridY: 2 };
     const walls = new Set(['2,2']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('4,2')).toBe(false);
-  });
-
-  it('should block visibility through a closed door on the direct path', () => {
-    const players = [{ gridX: 0, gridY: 2 }];
-    const closedDoors = new Set(['2,2']);
-    const result = computeVisibility(players, new Set(), closedDoors, 5);
-    expect(result.has('4,2')).toBe(false);
-  });
-
-  it('should treat walls and closed doors identically for blocking', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const wallResult = computeVisibility(players, new Set(['2,2']), new Set(), 5);
-    const doorResult = computeVisibility(players, new Set(), new Set(['2,2']), 5);
-    expect(wallResult.has('4,4')).toBe(false);
-    expect(doorResult.has('4,4')).toBe(false);
-  });
-
-  it('should not block when obstacle is off the line of sight', () => {
-    const players = [{ gridX: 1, gridY: 2 }];
-    const walls = new Set(['3,0']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('4,2')).toBe(true);
-  });
-
-  it('should allow visibility around a wall that blocks only part of the grid', () => {
-    const players = [{ gridX: 2, gridY: 0 }];
-    const walls = new Set(['2,1']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('2,3')).toBe(false);
-    expect(result.has('0,0')).toBe(true);
-    expect(result.has('4,0')).toBe(true);
-  });
-
-  it('should block diagonal visibility when a wall sits on the bresenham path', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const walls = new Set(['1,1']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('3,3')).toBe(false);
-  });
-
-  it('should block when multiple walls stack along the same line', () => {
-    const players = [{ gridX: 0, gridY: 2 }];
-    const walls = new Set(['1,2', '2,2']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('3,2')).toBe(false);
-  });
-
-  it('should not block a target when the wall is the target cell itself', () => {
-    const players = [{ gridX: 0, gridY: 2 }];
-    const walls = new Set(['4,2']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('4,2')).toBe(true);
-  });
-
-  it('should aggregate visibility from multiple players behind different obstacles', () => {
-    const players = [
-      { gridX: 0, gridY: 2 },
-      { gridX: 4, gridY: 2 },
-    ];
-    const walls = new Set(['1,2']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    // Player A is blocked from seeing past (1,2), but Player B at (4,2) sees back toward (3,2)
-    expect(result.has('3,2')).toBe(true);
-    // Both players\' own cells are visible
-    expect(result.has('0,2')).toBe(true);
-    expect(result.has('4,2')).toBe(true);
-  });
-
-  it('should handle a corridor blocked by a single wall', () => {
-    const players = [{ gridX: 0, gridY: 1 }];
-    const walls = new Set(['2,1']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    expect(result.has('4,1')).toBe(false);
-    // But cells before the wall are still visible
-    expect(result.has('1,1')).toBe(true);
-  });
-
-  it('should handle a player at a grid edge', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const result = computeVisibility(players, new Set(), new Set(), 3);
-    expect(result.has('0,0')).toBe(true);
-    expect(result.has('2,2')).toBe(true);
-  });
-
-  it('should handle a player beyond the grid boundary', () => {
-    const players = [{ gridX: 10, gridY: 10 }];
-    const result = computeVisibility(players, new Set(), new Set(), 5);
-    expect(result.has('10,10')).toBe(true);
-    expect(result.size).toBeGreaterThanOrEqual(1);
-  });
-
-  it('should handle duplicate player positions without error', () => {
-    const players = [
-      { gridX: 2, gridY: 2 },
-      { gridX: 2, gridY: 2 },
-    ];
-    const result = computeVisibility(players, new Set(), new Set(), 5);
-    expect(result.has('2,2')).toBe(true);
-    expect(result.size).toBe(25);
-  });
-
-  it('should handle a large grid without errors', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const result = computeVisibility(players, new Set(), new Set(), 20);
-    expect(result.size).toBe(400);
-  });
-
-  it('should handle a grid of size 1', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const result = computeVisibility(players, new Set(), new Set(), 1);
-    expect(result.has('0,0')).toBe(true);
-    expect(result.size).toBe(1);
-  });
-
-  it('should allow visibility to a target when an intermediate cell on a different ray is blocked', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    const walls = new Set(['1,1']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    // (1,1) blocks the diagonal to (2,2), but not the horizontal to (3,0)
-    expect(result.has('2,2')).toBe(false);
-    expect(result.has('3,0')).toBe(true);
-  });
-
-  it('should see through an open cell between two walls on the same line', () => {
-    const players = [{ gridX: 0, gridY: 0 }];
-    // Walls at (1,1) and (3,3) but (2,2) is open — line from (0,0) to (4,4) passes through all three
-    const walls = new Set(['1,1', '3,3']);
-    const result = computeVisibility(players, walls, new Set(), 5);
-    // (2,2) is blocked by (1,1), and (4,4) is blocked by (1,1) since the ray from (0,0) hits (1,1) first
-    expect(result.has('2,2')).toBe(false);
-    expect(result.has('4,4')).toBe(false);
+    expect(computeVisibility([A, A, B], walls, new Set(), 5)).toEqual(new Set([
+      '0,0', '0,1', '0,2', '0,3', '0,4',
+      '1,0', '1,1', '1,2', '1,3', '1,4',
+      '2,0', '2,1', '2,2', '2,3', '2,4',
+      '3,0', '3,1', '3,4',
+      '4,0', '4,1', '4,2', '4,4',
+    ]));
   });
 });

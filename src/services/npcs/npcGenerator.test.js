@@ -1,51 +1,102 @@
+// @maintained-by-ai
+// Lane: npcGenerator.js — pure random custom-NPC factory. Sole export: generateNPC(existingNPCs).
+// Split (owner): npcsService.test.js owns campaign-CRUD transport (/api/.../npcs);
+// npcFormUtils.test.js owns form defaults (#1179); npcCombatService.test.js owns initiative (#1178);
+// NPCs.*.test.jsx owns UI wiring (mocks this module — real generator never runs there).
+// This file is the ONLY verifier of the real generator: exact-if-fetch table transport (#1010),
+// RNG-consumed-in-order byte-exact pins (#1076/#1160), loud decoys (#1166), exact name lanes,
+// dedupe suffixes, CR/dice scaling. Custom-NPC invariant (@app): output lands in the custom
+// npcs.json lane via the NPCs.jsx save flow; distinctness vs bestiary is server-enforced (#1177) —
+// the generator's load-bearing contribution is unique-name suffixing, pinned in the dedupe table.
+// No wall-clock (#app): zero timers here. No logging in source → no log assertions (#app).
+//
+// RNG slot map (Math.random consumption order, generateNPC):
+//   1 race | 2 gender | 3 name (race pool or Human fallback) | 4-9 classRole/attitude/
+//   appearance/personality/goals/secrets | 10 numTags=randomInt(1,3) | 11..(10+numTags) pickN
+//   | includeStatBlock (>0.3) | then stat block: cr, abilityScore, hp, ac, speed(+extra pick if
+//   cr>=2 && roll>0.75), primary, secondary | per action: builder roll, template pick, index pick,
+//   one roll per die of scaled dice | traits roll (+pool pick if cr>=1 && roll>0.5).
+//
+// Old->new map (13 old tests -> 6 units / 12 cases):
+//   core fields + tags string                -> seed census byte-exact outputs
+//   fetches both data files                  -> transport exact-if-fetch + cache
+//   name matches race/gender                 -> census + name-lane table row A
+//   race-missing fallback                    -> name-lane row B
+//   gender-pool-empty fallback (mislabelled: fell back to Human female, not male) -> rows C/D
+//   numeric suffix / empty+undefined arrays -> dedupe table 1/2/3
+//   skip stat block + minimal NPC            -> decoy guard test (zero stat-block RNG proof)
+//   complete stat block, empty immunities, saves/skills objects, ability-CR scaling
+//   (vacuous if-guard)                       -> census exact pins
+//   melee/spell action tests (vacuous if-guards) -> census exact action objects
+//   propagates fetch rejection               -> kept, extended (no cache poisoning)
+//   successive independent NPCs (toBeDefined noise) -> removed, low value
+// RNG slot map consumed once by hand (#815); fixtures mirror real /data shapes (#977/#993).
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-// ─── Fixtures ───────────────────────────────────────────────────────────────
+// ─── Fixtures (mirror real public/data/npc-names.json + npc-generator-traits.json shapes) ──
 
-function createNamesFixture() {
-  return {
-    Human: { male: ['Aldric', 'Bram'], female: ['Elena', 'Fiona'] },
-    Elf: { male: ['Legolas', 'Elrond'], female: ['Arwen', 'Galadriel'] },
-    Dwarf: { male: ['Thorgar'], female: [] },
-  };
-}
+const NAMES = {
+  Human: { male: ['Aldric', 'Bram'], female: ['Elena', 'Fiona'] },
+  Elf: { male: ['Legolas', 'Elrond'], female: ['Arwen', 'Galadriel'] },
+  Dwarf: { male: ['Thorgar'], female: [] },
+};
 
-function createTraitsFixture(extra = {}) {
-  return {
-    races: ['Human', 'Elf'],
-    classRoles: ['Warrior', 'Rogue'],
-    attitudes: ['Friendly', 'Hostile'],
-    appearances: ['Tall', 'Stocky'],
-    personalities: ['Brave', 'Cautious'],
-    goals: ['Wealth', 'Power'],
-    secrets: ['None', 'Has a dark past'],
-    tags: ['merchant', 'soldier', 'hermit'],
-    ...extra,
-  };
-}
+const TRAITS = {
+  races: ['Human', 'Elf'],
+  classRoles: ['Warrior', 'Rogue'],
+  attitudes: ['Friendly', 'Hostile'],
+  appearances: ['Tall', 'Stocky'],
+  personalities: ['Brave', 'Cautious'],
+  goals: ['Wealth', 'Power'],
+  secrets: ['None', 'Has a dark past'],
+  tags: ['merchant', 'soldier', 'hermit'],
+};
+
+const NAMES_WITH_MISSING_HUMAN_FEMALE = {
+  ...NAMES,
+  // female KEY ABSENT: the fallback `||` chain short-circuits only on undefined, never on [].
+  Human: { male: ['Aldric', 'Bram'] },
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function loadModule(names, traits, randomValue) {
+async function loadGenerator({ names = NAMES, traits = TRAITS } = {}) {
   vi.resetModules();
-
   const fetchMock = vi.fn((url) => {
-    const data = url.includes('npc-names') ? names : traits;
+    const data = url === '/data/npc-names.json' ? names : traits;
     return Promise.resolve({ json: () => Promise.resolve(data) });
   });
-
   vi.stubGlobal('fetch', fetchMock);
-  Math.random = () => randomValue;
-
   const mod = await import('./npcGenerator.js');
   return { mod, fetchMock };
 }
 
-// ─── Teardown ───────────────────────────────────────────────────────────────
+// Sequence RNG pinned in documented slot order; overrun THROWS (loud decoy — any
+// un-pinned consumption, e.g. a stat block rolling on a guard path, fails loudly).
+function pinRandom(slots) {
+  const queue = [...slots];
+  Math.random = () => {
+    if (queue.length === 0) {
+      throw new Error('RNG overrun: generator consumed more randomness than pinned');
+    }
+    return queue.shift();
+  };
+}
+
+// 12 base-path slots ending in includeStatBlock=false (<=0.3): the throw-on-overrun
+// slot after value 12 proves the stat block consumed zero randomness.
+const BASE_NO_STAT = [
+  0.1, 0.7, 0.1, // race Human, gender male, name Aldric
+  0.1, 0.1, 0.1, 0.1, 0.1, 0.1, // Warrior, Friendly, Tall, Brave, Wealth, None
+  0.2, // numTags = 1
+  0.5, // pickN -> 'soldier'
+  0.2, // includeStatBlock = false
+];
 
 const originalRandom = Math.random;
 
 afterEach(() => {
+  // Intact-state teardown (#1161): restore real RNG + fetch for every subsequent test.
   Math.random = originalRandom;
   vi.unstubAllGlobals();
 });
@@ -53,294 +104,203 @@ afterEach(() => {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe('generateNPC', () => {
-  describe('core fields', () => {
-    it('returns an NPC with all required top-level fields', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.5,
-      );
+  // Seed census (#903): two distinct seeds, each output pinned byte-exact (#1160);
+  // the two pinned objects being different IS the byte-distinctness proof.
+  it.each([
+    {
+      // CR2 via roll 0.85: prof 2, atk +3, actionsCount 2 (melee 0.3 + ranged 0.7),
+      // dice floored to 2d (cr>=2), 2 traits rolls -> Frightful Presence. Hand-derived once (#815).
+      label: 'CR2 Human Warrior: melee + ranged actions, roll traits',
+      traits: TRAITS,
+      slots: [
+        0.4, 0.7, 0.2, // race Human, male, Aldric
+        0.1, 0.1, 0.1, 0.1, 0.1, 0.1, // Warrior, Friendly, Tall, Brave, Wealth, None
+        0.5, 0.1, 0.6, // numTags 2 -> merchant, hermit
+        0.9, // includeStatBlock true
+        0.85, 0.6, 0.38, 0.3, // cr 2, abilityScore 10+3+1=14, hp floor(.38*25)+51=60, ac floor(.3*4)+14=15
+        0.5, // speed: no extra (0.5 <= 0.75)
+        0.2, 0.25, // primary str=14; secondary others=['dex','con',...] idx1 -> con=10+2=12, dex stays 10
+        0.3, 0.1, 0.05, 0.7, 0.9, // melee: Longsword 1d8->2d8, dice 6+8=14
+        0.7, 0.1, 0.05, 0.5, 0.4, // ranged: Longbow 1d8->2d8, dice 5+4=9
+        0.8, 0.8, // traits roll > 0.5 -> pool idx floor(.8*12)=9 Frightful Presence
+      ],
+      expected: {
+        name: 'Aldric', race: 'Human', classRole: 'Warrior', attitude: 'Friendly',
+        appearance: 'Tall', personality: 'Brave', goals: 'Wealth', secrets: 'None',
+        tags: 'merchant, hermit', notes: '',
+        armorClass: 15, hitPoints: '60', hitDice: '5d6+5', initiativeBonus: '0',
+        speed: { walk: '30 ft.' },
+        abilityScores: { str: 14, dex: 10, con: 12, int: 10, wis: 10, cha: 10 },
+        savingThrowBonuses: {}, skillBonuses: {},
+        damageResistances: [], damageImmunities: [], conditionImmunities: [],
+        actions: [
+          {
+            name: 'Longsword', attack_bonus: '+3', damage_dice_primary: '2d8+2',
+            damage_type_primary: 'Slashing',
+            description: 'Melee Attack Roll: +3, reach 5 ft. Hit: 14 (2d8+2) Slashing damage.',
+          },
+          {
+            // verbatim quirk pinned: ranged drops the ability mod from damage fields and
+            // double-periods "ft.." because range strings already end in "ft."
+            name: 'Longbow', attack_bonus: '+3', damage_dice_primary: '2d8',
+            damage_type_primary: 'Piercing',
+            description: 'Ranged Attack Roll: +3, range 150/600 ft.. Hit: 9 (2d8) Piercing damage.',
+          },
+        ],
+        traits: "**Frightful Presence.** Each creature of the creature's choice within 30 feet must succeed on a DC 11 Wisdom saving throw or become frightened for 1 minute.",
+        reactions: '',
+      },
+    },
+    {
+      // CR3 caster via 'Wizard' (cr roll 0.90 < 0.94): prof 2 + floor(3*0.7)=2 -> atk +4,
+      // actionsCount 3 (spell, spell, melee<=0.4 — caster can still swing), fly speed branch
+      // (0.8>0.75), spell 1d10->2d10 (cr>=2 floor), hitDice cr>=3 -> d8 + con bonus,
+      // traits skipped (0.1). Spell rows pin the verbatim empty attack_bonus/damage fields.
+      label: 'CR3 Elf Wizard: spell + spell + melee actions, fly speed, no traits',
+      traits: { ...TRAITS, classRoles: ['Wizard'] },
+      slots: [
+        0.5, 0.9, 0.8, // race Elf, male, Elrond
+        0.5, 0.9, 0.9, 0.5, 0.1, 0.5, // Wizard, Hostile, Stocky, Cautious, Wealth, dark past
+        0.2, 0.5, // numTags 1 -> soldier
+        0.9, // includeStatBlock true
+        0.90, 0.8, 0.5, 0.3, // cr 3 (<0.94), abilityScore 10+4+1=15, hp floor(.5*25)+76=88, ac floor(.3*4)+15=16
+        0.8, 0.1, // speed extra (cr>=2, 0.8>0.75) -> fly
+        0.45, 0.85, // caster primary int=15, secondary cha=10+3=13; con=max(10,10+2)=12
+        0.6, 0.1, 0.05, 0.65, 0.75, // spell: Firebolt 1d10->2d10, dice 7+8=15
+        0.5, 0.6, 0.1, 0.6, 0.2, 0.7, // spell: Burning Hands 3d6, dice 4+2+5=11
+        0.2, 0.3, 0.5, 0.4, 0.5, // melee: Warhammer 1d8->2d8, dice 4+5=9
+        0.1, // traits roll <= 0.5 -> none
+      ],
+      expected: {
+        name: 'Elrond', race: 'Elf', classRole: 'Wizard', attitude: 'Hostile',
+        appearance: 'Stocky', personality: 'Cautious', goals: 'Wealth', secrets: 'Has a dark past',
+        tags: 'soldier', notes: '',
+        armorClass: 16, hitPoints: '88', hitDice: '7d8+7', initiativeBonus: '0',
+        speed: { walk: '30 ft.', fly: '30 ft.' },
+        abilityScores: { str: 10, dex: 10, con: 12, int: 15, wis: 10, cha: 13 },
+        savingThrowBonuses: {}, skillBonuses: {},
+        damageResistances: [], damageImmunities: [], conditionImmunities: [],
+        actions: [
+          {
+            name: 'Firebolt', attack_bonus: '', damage_dice_primary: '',
+            damage_type_primary: '',
+            description: 'Spell Attack Roll: +4, range 60 ft.. Hit: 15 (2d10) Fire/Cold/Necrotic/Force/Radiant damage.',
+          },
+          {
+            name: 'Burning Hands', attack_bonus: '', damage_dice_primary: '',
+            damage_type_primary: '',
+            description: 'Spell Attack Roll: +4, range 60 ft.. Hit: 11 (3d6) Fire/Thunder/Cold/Lightning/Radiant damage.',
+          },
+          {
+            name: 'Warhammer', attack_bonus: '+4', damage_dice_primary: '2d8+2',
+            damage_type_primary: 'Bludgeoning',
+            description: 'Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d8+2) Bludgeoning damage.',
+          },
+        ],
+        traits: '',
+        reactions: '',
+      },
+    },
+  ])('seed census: $label', async ({ traits, slots, expected }) => {
+    const { mod } = await loadGenerator({ traits });
+    pinRandom(slots);
+    expect(await mod.generateNPC()).toEqual(expected);
+  });
 
-      const npc = await mod.generateNPC();
+  it('no-stat-block guard: exact minimal output, stat block consumes zero RNG (overrun throws)', async () => {
+    const { mod } = await loadGenerator();
+    pinRandom(BASE_NO_STAT);
 
-      expect(npc.name).toBeDefined();
-      expect(['Human', 'Elf']).toContain(npc.race);
-      expect(['Warrior', 'Rogue']).toContain(npc.classRole);
-      expect(['Friendly', 'Hostile']).toContain(npc.attitude);
-      expect(['Tall', 'Stocky']).toContain(npc.appearance);
-      expect(['Brave', 'Cautious']).toContain(npc.personality);
-      expect(['Wealth', 'Power']).toContain(npc.goals);
-      expect(['None', 'Has a dark past']).toContain(npc.secrets);
-      expect(npc.notes).toBe('');
-    });
+    const npc = await mod.generateNPC();
 
-    it('returns tags as a comma-separated string from the available tags', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.5,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(typeof npc.tags).toBe('string');
-      const availableTags = ['merchant', 'soldier', 'hermit'];
-      const npcTagList = npc.tags.split(', ').map((t) => t.trim());
-      expect(npcTagList.length).toBeGreaterThanOrEqual(1);
-      expect(npcTagList.length).toBeLessThanOrEqual(3);
-      expect(npcTagList.every((t) => availableTags.includes(t))).toBe(true);
-    });
-
-    it('fetches both names and traits data files', async () => {
-      const { mod, fetchMock } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.5,
-      );
-      await mod.generateNPC();
-
-      expect(fetchMock).toHaveBeenCalledWith('/data/npc-names.json');
-      expect(fetchMock).toHaveBeenCalledWith('/data/npc-generator-traits.json');
+    expect(npc).toEqual({
+      name: 'Aldric', race: 'Human', classRole: 'Warrior', attitude: 'Friendly',
+      appearance: 'Tall', personality: 'Brave', goals: 'Wealth', secrets: 'None',
+      tags: 'soldier', notes: '',
     });
   });
 
-  describe('name generation', () => {
-    it('selects a name matching the chosen race and gender', async () => {
-      const names = createNamesFixture();
-      const { mod } = await loadModule(names, createTraitsFixture(), 0.3);
+  // Name resolution lanes: exact names pin which pool the fallback chain (source ~L287-294) chose.
+  it.each([
+    {
+      label: 'race pool hit: Elf male draws from Elf.male',
+      traits: { ...TRAITS, races: ['Elf'] },
+      slots: [0.5, 0.7, 0.1, ...BASE_NO_STAT.slice(3)],
+      name: 'Legolas', race: 'Elf',
+    },
+    {
+      label: 'race absent from names table: female falls back to Human.female',
+      traits: { ...TRAITS, races: ['Gnome'] },
+      slots: [0.5, 0.4, 0.1, ...BASE_NO_STAT.slice(3)],
+      name: 'Elena', race: 'Gnome',
+    },
+    {
+      label: 'race female pool empty: falls back to Human.female (NOT Dwarf.male)',
+      traits: { ...TRAITS, races: ['Dwarf'] },
+      slots: [0.5, 0.4, 0.6, ...BASE_NO_STAT.slice(3)],
+      name: 'Fiona', race: 'Dwarf',
+    },
+    {
+      label: 'Human.female key absent: || chain lands on Human.male (empty [] would yield undefined — latent hole, unreachable in real data)',
+      traits: { ...TRAITS, races: ['Human'] },
+      names: NAMES_WITH_MISSING_HUMAN_FEMALE,
+      slots: [0.5, 0.4, 0.6, ...BASE_NO_STAT.slice(3)],
+      name: 'Bram', race: 'Human',
+    },
+  ])('name lane: $label', async ({ traits, names = NAMES, slots, name, race }) => {
+    const { mod } = await loadGenerator({ names, traits });
+    pinRandom(slots);
 
-      const npc = await mod.generateNPC();
+    const npc = await mod.generateNPC();
 
-      const raceNames = names[npc.race];
-      const allNames = [
-        ...(raceNames?.male ?? []),
-        ...(raceNames?.female ?? []),
-        ...(names.Human?.male ?? []),
-        ...(names.Human?.female ?? []),
-      ];
-      expect(allNames).toContain(npc.name.replace(/ \d+$/, ''));
-    });
-
-    it('falls back to Human names when the selected race has no name data', async () => {
-      const traits = createTraitsFixture({ races: ['Gnome'] });
-      const { mod } = await loadModule(createNamesFixture(), traits, 0.5);
-
-      const npc = await mod.generateNPC();
-
-      expect(npc.race).toBe('Gnome');
-      expect(npc.name.length).toBeGreaterThan(0);
-    });
-
-    it('falls back to male names when the gender pool is empty', async () => {
-      const traits = createTraitsFixture({ races: ['Dwarf'] });
-      const { mod } = await loadModule(createNamesFixture(), traits, 0.5);
-
-      const npc = await mod.generateNPC();
-
-      expect(npc.race).toBe('Dwarf');
-      expect(npc.name.length).toBeGreaterThan(0);
-    });
-
-    it('appends a numeric suffix to avoid duplicate names', async () => {
-      const names = createNamesFixture();
-      const { mod } = await loadModule(names, createTraitsFixture(), 0.5);
-
-      const existingNPCs = [
-        { name: 'Aldric' },
-        { name: 'Bram' },
-        { name: 'Elena' },
-        { name: 'Fiona' },
-      ];
-      const npc = await mod.generateNPC(existingNPCs);
-
-      expect(existingNPCs.every((e) => e.name !== npc.name)).toBe(true);
-    });
-
-    it('handles empty and undefined existingNPCs arrays', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.5,
-      );
-
-      const npc1 = await mod.generateNPC([]);
-      expect(npc1).toBeDefined();
-      expect(typeof npc1.name).toBe('string');
-      expect(npc1.name.length).toBeGreaterThan(0);
-
-      const { mod: mod2 } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.6,
-      );
-      const npc2 = await mod2.generateNPC(undefined);
-      expect(npc2).toBeDefined();
-      expect(typeof npc2.name).toBe('string');
-    });
+    expect({ name: npc.name, race: npc.race }).toEqual({ name, race });
   });
 
-  describe('stat block generation', () => {
-    it('skips stat block fields when includeStatBlock is false', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.1,
-      );
+  // Unique-name suffix (custom-npc invariant contribution, see header).
+  it.each([
+    { label: 'collision appends " 2"', existing: [{ name: 'Aldric' }], name: 'Aldric 2' },
+    { label: 'taken suffix " 2" is skipped, lands " 3"', existing: [{ name: 'Aldric' }, { name: 'Aldric 2' }], name: 'Aldric 3' },
+    { label: 'undefined existingNPCs defaults to [] — no suffix', existing: undefined, name: 'Aldric' },
+  ])('dedupe: $label', async ({ existing, name }) => {
+    const { mod } = await loadGenerator();
+    pinRandom(BASE_NO_STAT);
 
-      const npc = await mod.generateNPC();
+    const npc = await mod.generateNPC(existing);
 
-      expect(npc.armorClass).toBeUndefined();
-      expect(npc.hitPoints).toBeUndefined();
-      expect(npc.actions).toBeUndefined();
-    });
-
-    it('includes a complete stat block when generated', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(typeof npc.armorClass).toBe('number');
-      expect(typeof npc.hitPoints).toBe('string');
-      expect(typeof npc.hitDice).toBe('string');
-      expect(typeof npc.initiativeBonus).toBe('string');
-      expect(typeof npc.speed).toBe('object');
-      expect(npc.speed.walk).toBe('30 ft.');
-      expect(typeof npc.abilityScores).toBe('object');
-      expect(Array.isArray(npc.actions)).toBe(true);
-      expect(npc.actions.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('scales ability scores with challenge rating', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.95,
-      );
-
-      const npc = await mod.generateNPC();
-
-      if (npc.abilityScores) {
-        const primary = Object.values(npc.abilityScores).reduce((a, b) =>
-          a > b ? a : b,
-        );
-        expect(primary).toBeGreaterThanOrEqual(12);
-      }
-    });
-
-    it('includes empty arrays for damage/condition immunities', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(Array.isArray(npc.damageResistances)).toBe(true);
-      expect(npc.damageResistances).toEqual([]);
-      expect(Array.isArray(npc.damageImmunities)).toBe(true);
-      expect(npc.damageImmunities).toEqual([]);
-      expect(Array.isArray(npc.conditionImmunities)).toBe(true);
-      expect(npc.conditionImmunities).toEqual([]);
-    });
-
-    it('includes savingThrowBonuses and skillBonuses objects', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(npc.savingThrowBonuses).toBeDefined();
-      expect(typeof npc.savingThrowBonuses).toBe('object');
-      expect(npc.skillBonuses).toBeDefined();
-      expect(typeof npc.skillBonuses).toBe('object');
-    });
+    expect(npc.name).toBe(name);
   });
 
-  describe('action types', () => {
-    it('generates melee weapon actions by default', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture({ classRoles: ['Warrior'] }),
-        0.9,
-      );
+  it('fetches each data table exactly once per module lifetime (exact-if-fetch + cache)', async () => {
+    const { mod, fetchMock } = await loadGenerator();
+    pinRandom([...BASE_NO_STAT, 0.1, 0.7, 0.9, ...BASE_NO_STAT.slice(3)]);
 
-      const npc = await mod.generateNPC();
+    const npc1 = await mod.generateNPC();
+    const npc2 = await mod.generateNPC();
 
-      if (npc.actions && npc.actions.length > 0) {
-        const action = npc.actions[0];
-        expect(typeof action.name).toBe('string');
-        expect(action.name.length).toBeGreaterThan(0);
-        expect(typeof action.description).toBe('string');
-      }
-    });
-
-    it('generates spell actions for caster class roles', async () => {
-      const traits = createTraitsFixture({ classRoles: ['Wizard'] });
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        traits,
-        0.9,
-      );
-
-      const npc = await mod.generateNPC();
-
-      if (npc.actions && npc.actions.length > 0) {
-        const action = npc.actions[0];
-        expect(typeof action.name).toBe('string');
-        expect(action.description).toContain('Spell Attack Roll');
-      }
-    });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      '/data/npc-names.json',
+      '/data/npc-generator-traits.json',
+    ]);
+    expect(npc1.tags).toBe('soldier');
+    // second call re-rolls with cache served: name slot picks Bram, zero new fetches
+    expect(npc2.name).toBe('Bram');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  describe('edge cases', () => {
-    it('propagates a fetch rejection', async () => {
-      vi.resetModules();
-      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Network failed'))));
+  it('propagates a fetch rejection without poisoning the cache', async () => {
+    vi.resetModules();
+    const failing = vi.fn(() => Promise.reject(new Error('Network failed')));
+    vi.stubGlobal('fetch', failing);
+    pinRandom(BASE_NO_STAT);
 
-      const mod = await import('./npcGenerator.js');
+    const mod = await import('./npcGenerator.js');
+    await expect(mod.generateNPC()).rejects.toThrow('Network failed');
 
-      await expect(mod.generateNPC()).rejects.toThrow('Network failed');
-    });
-
-    it('generates a minimal NPC without a stat block', async () => {
-      const { mod } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.1,
-      );
-
-      const npc = await mod.generateNPC();
-
-      expect(npc.name).toBeDefined();
-      expect(npc.race).toBeDefined();
-      expect(npc.armorClass).toBeUndefined();
-    });
-
-    it('generates independent NPCs on successive calls', async () => {
-      const { mod: mod1 } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.3,
-      );
-      const npc1 = await mod1.generateNPC();
-
-      const { mod: mod2 } = await loadModule(
-        createNamesFixture(),
-        createTraitsFixture(),
-        0.7,
-      );
-      const npc2 = await mod2.generateNPC();
-
-      expect(npc1).toBeDefined();
-      expect(npc2).toBeDefined();
-    });
+    // failed load leaves the cache unset — retry with working fetch still generates
+    const { fetchMock } = await loadGenerator();
+    pinRandom(BASE_NO_STAT);
+    const npc = await mod.generateNPC();
+    expect(npc.name).toBe('Aldric');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
