@@ -2044,3 +2044,35 @@ run2#1130: MA-2067 solar-flare -> maintained (4->2): carried recs x5 executed VE
 ## Batch #194 GREEN — run2#1116-#1130 (15 files, legendaryUses CANON + recharge family sweep)
 ## Batch #194 — PROGRESS: completed 2266 / remaining 418 (total 2684)
 - Suite: lint clean; 2752 files, 31,340 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 23rd consecutive; evidence /tmp/batch194.log). 31,326->31,340 (+14 net: framework census expansions #1116 tables/17-monster press minus recharge folds 7->3/6->4/4->2... x10 incl #1125R; #1125 phantom contributed zero).
+run2#1191: MA element-affinity -> maintained (10->6/7): NEW precedence falsifier (buffs-fold-after vs stamp-REPLACE); chooser-pair adjudication FT-009/CLA-110 distinct axes; helpers case-fold re-drives deleted
+run2#1192: FT-009 energy-resistance -> maintained (8->6/12): headline re-pick add+remove LIVE delta finally driven; multi-slot retain census; key-inertness decoy corrected honest (CLA-110 key NOT inert same entry point)
+run2#1193: epitome -> maintained (8->4): #1050 round-latch class EXONERATED for fold (no latch, store 2-arg by-design); false-positive dead-mock purge avoided (hitPoints kept live via logDamageApplication)
+run2#1194: falling-trigger -> maintained (2->2 rewrite): leak-falsifier organic stale-trigger via keyed store (hand-seeded hid stub aliasing defect, fixed); full stamp bytes + HP chain
+run2#1195: heavyArmorMaster -> maintained (6->4/6): ~20-line reductionApplies mirror deleted, verbatim disk feats.json drives real gate E2E; fixture fake-name corrected ('Leather Armor'->'Leather'); refusal ternary both arms killed
+
+## Batch #195 GREEN — run2#1191-#1195 (5 files, chooser-pair CLOSED + applyDamage family completion + #1050-class exoneration)
+## Batch #195 — PROGRESS: completed 2339 / remaining 354 (total 2693)
+- Suite: lint clean; 2751 files, 31,209 passed, 2 canon FIXME fails (exact known pair: steps-config languageWarnings + Players dragging) + 3 expected = GREEN canon. No flake (clean 24th consecutive; WizardStepSpells flake-watch silent since #183; evidence /tmp/batch195.log). 31,340->31,209 (-131 net: family folds dominant #1191 10->6, #1192 8->6, #1193 8->4, #1195 6->4, maps/npcs sweeps; honest-legs & falsifier tables offset).
+- USER PAUSE honored: dispatched nothing during/after this check until resumed.
+
+NOTE (integrity, #195 flush): per-file ledger lines run2#1131-#1190 were never flushed before compaction and their detailed summaries are unrecoverable from transcript — NOT re-invented here. Disk marker truth confirms all 60 files completed (2266@#194 + marker-gate verified each + recount 2339 at #195 = consistent). Domain-level record survives in state file: selfAura/selfBuff/shapeShift/summon/utility families CLOSED, items/maps/npcs domains CLOSED, applyDamage #1182-#1195, census fix 2693.
+run2#1196: applyDamage.helpers -> maintained CANON REFRESH (20->18): NEW cite ranges resistances :53-86/save :88-104/rollSave :106-166/hasEvasion :168-182/evasion :184-196; ignoreResistance bypass + Dexterity->DEX normalize contract added; fabricated dcSuccess:'all' -> real 'other'; empty-saveType pin purged
+run2#1197: hypnotic-break -> maintained (2->3): vacuous old test2 replaced SP-069 fire+containment pair; zero-strip-log golden pins break-before-generic-read order :546-552; #1187 confusion near-miss falsifier
+run2#1198: lastStand -> maintained (6->4): 3 identical-path trigger legs -> full-contract golden (return+6 stamp bytes+exact heal log); it.each silent-guard falsifier; monkey-patch+boilerplate purged; rec: undyingSentinel/relentlessEndurance share legacy shape; 🗑 isLastStandAvailable/getLastStandUsed dead exports
+run2#1199: natures-ward -> maintained (5 it/9 runs->2 it.each/5): golden log bytes verbatim :327; predicate census deleted citing landResistance :86-95; falsifier guard + log-silence added
+run2#1200: npcConcentrationAdvanced -> maintained (14->7): MA-0038 con-disadvantage arming :655-668 ZERO coverage repo-wide -> now driven; CLA-395 dead-ternary-arm dupes cut; rec: applyDamage.test.js :252-262/:264-274 weak NPC legs fold
+run2#1201: relentlessEndurance -> maintained (9->6): #1198 rec consumed; vacuous sequence test rebuilt real _reTriggeredSequenceIds contract (hit2 pins1/hit3 kills/latch x1); exact hp_change log
+run2#1202: relentlessHunter -> maintained (4->2): level axis :159 NEW coverage; class axis un-vacuated (Hex short-circuited before gate -> Warlock/Hunter's Mark); exact prompt payloads
+run2#1203: save-full -> maintained CANON (6->3): 'full' ownership verified (base :89 defers); dcSuccess disk-derived monsters.json; /half/i prose-absence guard NEW; half/none legs deleted citing base :88-104/:184-196
+run2#1204: silence -> maintained (5->3): delta-0 suppression (no hp_change, immunity sole record); SP-106 golden bytes; armed-zone falsifier trio
+run2#1205: spellResistance -> maintained (10->5 decl/12 cases): isSpellDamage:true arm NEW repo-wide :933 census; near-vacuous local pin -> store arith; distinct function vs base noted
+run2#1206: stormbornResistance -> maintained (5->2/6): 5-row gate x type it.each fire=1/silent=0; unarmed table trim citing automationPassives :108-116; exact log pin; disk fixture provenance
+run2#1207: applyDamage.test BASE -> maintained (27->15, 669->411): #1200 recs EXECUTED (:252-262/:264-274 removed); DC recalc :334-366 4 legs incl 2 never-covered branches; monster-fixture-class fixed; NEW cite table guards :146-155/HP :157-177+monster :201-223/resists :179-199/ward :367-411; 🔴 NEW :552-557 frightened+charmed resurrects Frightened (stale snapshot); 🗑 :1189 unreachable recovering branch
+run2#1208: thoughtShield -> maintained (13->4 blocks+9-row refusal table): uniform zero-spend falsifier (was 1/8); exact apply args + verbatim ability_use golden; local-mock-arith pins purged
+run2#1209: undyingSentinel -> maintained (11->4/9): #1198 rec consumed full-contract golden; it.each formula lane min(1+3L,maxHp); 4-row silent-guard falsifier NEW negatives
+run2#1210: applyHealing -> maintained (8->6): maxHp vacuous-equal killed; isDead:0 + exact write-count(6) pins; MA-0367 infernal-wound chokepoint NEW caller-lane coverage; death-save 4->2 falsifier pairs
+
+## Batch #196 GREEN — run2#1196-#1210 (15 files, applyDamage family COMPLETE incl base lanes)
+## Batch #196 — PROGRESS: completed 2354 / remaining 339 (total 2693)
+- Suite: lint clean; 2751 files, 31,157 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 25th consecutive; WizardStepSpells silent since #183; evidence /tmp/batch196.log). 31,209->31,157 (-52 net: base consolidation dominant #1207 27->15, #1200 14->7, #1208 13-table-fold, #1209 11->4; NEW coverage legs offset: MA-0367 chokepoint #1210, isSpellDamage arm #1205, level axis #1202, con-disadvantage #1200).
+- BASE CITE TABLES LIVE: helpers #1196 + applyDamage.test #1207 (guards :146-155, DC recalc :334-366, ward :367-411) — stale-cite retarget recs queued for consuming lanes in state file.

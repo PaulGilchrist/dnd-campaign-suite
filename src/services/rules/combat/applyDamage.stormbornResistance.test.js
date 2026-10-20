@@ -1,10 +1,21 @@
-// CLA-336 Stormborn (Circle of the Sea lv10) regression tests.
-// Locks down: while wrathOfTheSeaActive is TRUE the damage pipeline halves
-// Cold/Lightning/Thunder LIVE (via live getDamageResistances); Bludgeoning is
-// NOT halved; while the Wrath badge is removed (key false) full damage returns.
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// CLA-336 lane at the DAMAGE seam: with stale computedStats (runtime toggles never
+// recompute it, applyDamage.js:217-226), the LIVE getDamageResistances gate must
+// inject the Stormborn triple at hit-resolution. Disk bytes: public/data/2024/classes.json
+// Circle of the Sea lv10 automation row {type:'resistance',damageTypes:['Cold',
+// 'Lightning','Thunder'],casting_time:'passive'}; the name byte rides feature flattening.
+// Gate consulted under the target's store name — the name+key-routed stub (#1057/#1186)
+// answers ONLY `${name}.wrathOfTheSeaActive`, so a wrong-name consult resolves unarmed
+// and fails every armed row. Guard-falsifier discipline (#1187): armed C/L/T halve and
+// log 'Damage Resistance' verbatim (applyDamage.js:317-330); armed Bludgeoning stays
+// full; badge-removed stays full and silent. Gate truth-table per damage type lives in
+// automationPassives.stormbornResistance.test.js; generic arithmetic is owned by
+// applyDamage.helpers.test.js :53-86/:88-104/:106-166/:168-182/:184-196; HP bookkeeping
+// by applyDamage.test.js; categorical Spell clause by applyDamage.spellResistance.test.js.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
+import * as logService from '../../ui/logService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -41,7 +52,7 @@ vi.mock('../../rules/features/silenceService.js', () => ({
   isCreatureInSilenceZone: vi.fn(() => false),
 }));
 
-// automationPassives is NOT mocked — getDamageResistances runs LIVE here.
+// automationPassives is NOT mocked — the wrath gate runs LIVE here (CLA-336 core).
 vi.mock('../../combat/automation/automationExpressions.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
@@ -61,8 +72,17 @@ vi.mock('../../ui/logService.js', () => ({
 
 global.fetch = vi.fn(() => new Promise(() => {}));
 
-// ── Helpers ─────────────────────────────────────────────────────
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
+// ── Fixtures ─────────────────────────────────────────────────────
+
+const CAMPAIGN = 'test-campaign';
+const NAME = 'Wild_Sage_Druid';
+
+// automationPassives.stormbornResistance.test.js:66-71 byte-twin — disk envelope plus
+// the flattened feature-name byte that gatedResistanceTypes exact-matches (automationPassives.js:307).
 const STORMBORN_PASSIVE = {
   type: 'resistance',
   name: 'Stormborn',
@@ -70,28 +90,11 @@ const STORMBORN_PASSIVE = {
   casting_time: 'passive',
 };
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
-
-function createPlayerCreature(name) {
-  return {
-    name,
-    type: 'player',
-    maxHp: 143,
-    currentHp: 143,
-    resistances: [],
-    immunities: [],
-    conditions: [],
-    concentration: null,
-    saveBonuses: {},
-  };
-}
-
-function createDruidCharacter(name) {
-  // Stale computedStats: rulesFactory folded nothing in (wrath toggles never recompute).
-  return {
-    name,
+function characters() {
+  // Stale computedStats: resistances stays [] — the live gate is the ONLY resistance
+  // source, exactly the CLA-336 production shape (keys verbatim from character JSON).
+  return [{
+    name: NAME,
     computedStats: {
       resistances: [],
       immunities: [],
@@ -101,94 +104,76 @@ function createDruidCharacter(name) {
       allFeatures: [],
       automation: { passives: [STORMBORN_PASSIVE] },
     },
-  };
+  }];
 }
 
+// Name+key-routed store stub (#1057/#1186): only the exact `${name}.${key}` routes this
+// lane reads answer; any other lookup stays explicitly null (#940).
 function stubRuntime(wrathActive) {
-  getRuntimeValue.mockImplementation((_charName, key) => {
-    if (key === 'lastAttack') return null;
-    if (key === 'activeBuffs') return [];
-    if (key === 'wrathOfTheSeaActive') return wrathActive;
-    if (key === 'arcaneWardActive') return false;
-    if (key === 'arcaneWardHp') return 0;
-    if (key === 'currentHitPoints') return 143;
-    if (key === 'hitPoints') return 143;
-    if (key === 'activeConditions') return [];
-    if (key === 'tempHp') return 0;
-    if (key === 'polymorphTempHp') return 0;
-    return undefined;
+  const values = {
+    [`${NAME}.wrathOfTheSeaActive`]: wrathActive,
+    [`${NAME}.currentHitPoints`]: 143,
+    [`${NAME}.hitPoints`]: 143,
+    [`${NAME}.activeBuffs`]: [],
+    [`${NAME}.activeConditions`]: [],
+    [`${NAME}.tempHp`]: 0,
+    [`${NAME}.polymorphTempHp`]: 0,
+    [`${NAME}.arcaneWardActive`]: false,
+    [`${NAME}.arcaneWardHp`]: 0,
+    [`${NAME}.projectedWardDamage`]: 0,
+    'campaign.lastAttack': null,
+    'campaign.targetEffects': [],
+  };
+  getRuntimeValue.mockImplementation((storeName, key) => values[`${storeName}.${key}`] ?? null);
+}
+
+function damageResistanceLogs() {
+  return logService.addEntry.mock.calls.filter((c) => c[1].name === 'Damage Resistance');
+}
+
+function apply(damageTypes, rawDamage) {
+  return applyDamageToTarget(
+    { round: 1, creatures: [{ name: NAME, type: 'player', maxHp: 143, currentHp: 143, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} }] },
+    NAME, rawDamage, damageTypes,
+    { campaignName: CAMPAIGN, characters: characters(), ignoreResistance: false, attackerName: 'Air Elemental 1' },
+  );
+}
+
+// ── Tests ────────────────────────────────────────────────────────
+
+describe('applyDamageToTarget — CLA-336 Stormborn wrath-gated halving at the damage seam', () => {
+  // Truth table over gate byte × damage type: fires AND stays silent (#1187).
+  it.each([
+    ['Lightning halved while Wrath is armed', true, 'Lightning', 15, 7, [{ damageType: 'Lightning', status: 'resistant' }]],
+    ['Thunder halved while Wrath is armed', true, 'Thunder', 12, 6, [{ damageType: 'Thunder', status: 'resistant' }]],
+    ['Cold halved while Wrath is armed', true, 'Cold', 16, 8, [{ damageType: 'Cold', status: 'resistant' }]],
+    ['Bludgeoning NOT halved while Wrath is armed', true, 'Bludgeoning', 8, 8, []],
+    ['Lightning NOT halved after the Wrath badge is removed', false, 'Lightning', 15, 15, []],
+  ])('%s', async (_label, wrathActive, damageType, rawDamage, expectedFinal, expectedDetails) => {
+    stubRuntime(wrathActive);
+
+    const result = await apply([damageType], rawDamage);
+
+    expect(result.finalDamage).toBe(expectedFinal);
+    expect(result.damageReduced).toBe(expectedFinal < rawDamage);
+    expect(result.resistanceDetails).toEqual(expectedDetails);
+    expect(damageResistanceLogs()).toHaveLength(expectedFinal < rawDamage ? 1 : 0);
   });
-}
 
-function apply(cs, damageTypes, rawDamage) {
-  return applyDamageToTarget(cs, 'Wild_Sage_Druid', rawDamage, damageTypes, { campaignName: 'test-campaign', characters: [ createDruidCharacter('Wild_Sage_Druid'), ], ignoreResistance: false, attackerName: 'Air Elemental 1' });
-}
-
-// ── Integration ─────────────────────────────────────────────────
-
-describe('applyDamageToTarget — CLA-336 Stormborn wrath-gated resistance', () => {
-  it('halves Lightning while Wrath of the Sea is active and logs', async () => {
+  it('logs the exact Damage Resistance bytes when Stormborn halves', async () => {
     stubRuntime(true);
-    const logModule = await import('../../ui/logService.js');
-    logModule.addEntry.mockClear();
 
-    const player = createPlayerCreature('Wild_Sage_Druid');
-    const cs = makeCombatSummary([player]);
-
-    const result = await apply(cs, ['Lightning'], 15);
+    const result = await apply(['Lightning'], 15);
 
     expect(result.finalDamage).toBe(7);
-    expect(result.damageReduced).toBe(true);
-    expect(result.resistanceDetails).toEqual([{ damageType: 'Lightning', status: 'resistant' }]);
-
-    const resistLog = logModule.addEntry.mock.calls.find(
-      (c) => c[1].type === 'automation' && c[1].name === 'Damage Resistance'
-    );
-    expect(resistLog).toBeDefined();
-    expect(resistLog[1].description).toContain('Wild_Sage_Druid');
-    expect(resistLog[1].description).toContain('15');
-    expect(resistLog[1].description).toContain('7');
-  });
-
-  it('halves Thunder while Wrath of the Sea is active', async () => {
-    stubRuntime(true);
-    const player = createPlayerCreature('Wild_Sage_Druid');
-    const cs = makeCombatSummary([player]);
-
-    const result = await apply(cs, ['Thunder'], 12);
-
-    expect(result.finalDamage).toBe(6);
-  });
-
-  it('halves Cold while Wrath of the Sea is active', async () => {
-    stubRuntime(true);
-    const player = createPlayerCreature('Wild_Sage_Druid');
-    const cs = makeCombatSummary([player]);
-
-    const result = await apply(cs, ['Cold'], 16);
-
-    expect(result.finalDamage).toBe(8);
-  });
-
-  it('does NOT halve Bludgeoning while Wrath of the Sea is active', async () => {
-    stubRuntime(true);
-    const player = createPlayerCreature('Wild_Sage_Druid');
-    const cs = makeCombatSummary([player]);
-
-    const result = await apply(cs, ['Bludgeoning'], 8);
-
-    expect(result.finalDamage).toBe(8);
-    expect(result.resistanceDetails).toEqual([]);
-  });
-
-  it('does NOT halve Cold/Lightning/Thunder after the Wrath badge is removed', async () => {
-    stubRuntime(false);
-    for (const [type, dmg] of [['Cold', 16], ['Lightning', 15], ['Thunder', 12]]) {
-      const player = createPlayerCreature('Wild_Sage_Druid');
-      const cs = makeCombatSummary([player]);
-      const result = await apply(cs, [type], dmg);
-      expect(result.finalDamage).toBe(dmg);
-      expect(result.resistanceDetails).toEqual([]);
-    }
+    const logs = damageResistanceLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0][0]).toBe(CAMPAIGN);
+    expect(logs[0][1]).toEqual(expect.objectContaining({
+      type: 'automation',
+      creatureName: NAME,
+      name: 'Damage Resistance',
+      description: 'Wild_Sage_Druid has resistance to Lightning damage — 15 damage halved to 7.',
+    }));
   });
 });

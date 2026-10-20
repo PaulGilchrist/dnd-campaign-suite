@@ -1,11 +1,17 @@
+// @maintained-by-ai
 // CLA-237 regression at the applyDamage choke point: Nature's Ward (2024
 // Circle of the Land lv10) — when the PC save-damage lane forwards FULL-STAT
 // characters (the modal fix), the CLA-336 land_resistance fold in
 // resolveCreatureDefenses must read the LIVE `_circleOfTheLandType` runtime key
 // and halve the mapped type: floor(raw/2) + resisted breakdown + the
-// "Damage Resistance" passive-resistance log. Unmapped types stay FULL.
+// "Damage Resistance" passive-resistance log + HP actually landing.
 // cs player stubs stay resistances:[] — the fold comes from automation, not
 // the stub lists (the CLA-119 stub bug fed exactly these stubs and folded nil).
+// Lane ownership: automationPassives.landResistance.test.js:86-95 owns the
+// predicate's full landMappings census — this seam pins live-byte behavior
+// with two legs (mapped byte folds its type; same byte FULL when unchosen or
+// land unset) and stays silent when the guard should not fire (#1187).
+// Generic halving arithmetic is owned by applyDamage.helpers.test.js:53-86.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
@@ -64,11 +70,14 @@ global.fetch = vi.fn(() => new Promise(() => {}));
 // ── Helpers ─────────────────────────────────────────────────────
 
 const DRUID = 'Wild_Sage_Druid';
+const START_HP = 143;
 
+// Byte-exact Nature's Ward automation envelope from public/data/2024/classes.json.
 const LAND_PASSIVE = {
   type: 'land_resistance',
   conditionImmunity: 'poisoned',
   landMappings: { arid: 'Fire', polar: 'Cold', temperate: 'Lightning', tropical: 'Poison' },
+  casting_time: 'passive',
 };
 
 function makeCombatSummary() {
@@ -77,8 +86,8 @@ function makeCombatSummary() {
     creatures: [{
       name: DRUID,
       type: 'player',
-      maxHp: 143,
-      currentHp: 143,
+      maxHp: START_HP,
+      currentHp: START_HP,
       resistances: [],
       immunities: [],
       conditions: [],
@@ -100,17 +109,20 @@ function makeFullStatDruid() {
   };
 }
 
-function apply(landType, damageTypes, rawDamage) {
-  getRuntimeValue.mockImplementation((_charName, key) => {
-    if (key === '_circleOfTheLandType') return landType;
-    if (key === 'lastAttack') return null;
-    if (key === 'activeBuffs') return [];
-    if (key === 'activeConditions') return [];
-    if (key === 'currentHitPoints') return 143;
-    if (key === 'tempHp') return 0;
-    if (key === 'polymorphTempHp') return 0;
-    return undefined;
-  });
+// Keyed `${name}.${key}` store (#1057/#1186): only exact routings answer;
+// every other lookup is undefined. Land bytes are modal-capital — the exact
+// bytes CircleOfTheLandSpellsModal writes to the runtime store.
+function applyDamage(landByte, damageTypes, rawDamage) {
+  const store = new Map([
+    [`${DRUID}._circleOfTheLandType`, landByte],
+    ['campaign.lastAttack', null],
+    [`${DRUID}.activeBuffs`, []],
+    [`${DRUID}.activeConditions`, []],
+    [`${DRUID}.currentHitPoints`, START_HP],
+    [`${DRUID}.tempHp`, 0],
+    [`${DRUID}.polymorphTempHp`, 0],
+  ]);
+  getRuntimeValue.mockImplementation((name, key) => store.get(`${name}.${key}`));
   return applyDamageToTarget(makeCombatSummary(), DRUID, rawDamage, damageTypes, {
     campaignName: 'test-campaign',
     characters: [makeFullStatDruid()],
@@ -119,51 +131,52 @@ function apply(landType, damageTypes, rawDamage) {
   });
 }
 
+function damageResistanceLogs() {
+  return addEntry.mock.calls.filter(
+    ([, entry]) => entry.type === 'automation' && entry.name === 'Damage Resistance'
+  );
+}
+
 // ── Tests ───────────────────────────────────────────────────────
 
-describe('applyDamageToTarget — CLA-237 Nature\'s Ward land_resistance fold (save-damage lane)', () => {
+describe('applyDamageToTarget — CLA-237 Nature\'s Ward land_resistance fold (save-damage seam)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('Temperate halves Lightning: floor(raw/2) + resisted breakdown', async () => {
-    const result = await apply('Temperate', ['Lightning'], 25);
+  // The live land byte, not a hardcoded type, drives the fold: same raw 25
+  // halves under its own mapped land and lands as real HP (143 → 131).
+  it.each([
+    ['Temperate', 'Lightning'],
+    ['Arid', 'Fire'],
+  ])('live land byte %s folds %s: floor(25/2)=12 + breakdown + golden log bytes', async (landByte, type) => {
+    const result = await applyDamage(landByte, [type], 25);
+
     expect(result.finalDamage).toBe(12);
-    expect(result.resistanceDetails).toEqual([{ damageType: 'Lightning', status: 'resistant' }]);
-  });
+    expect(result.newHp).toBe(131);
+    expect(result.resistanceDetails).toEqual([{ damageType: type, status: 'resistant' }]);
 
-  it('logs the halving via the Damage Resistance automation channel', async () => {
-    await apply('Temperate', ['Lightning'], 25);
-    const resistLog = addEntry.mock.calls.find(
-      (c) => c[1].type === 'automation' && c[1].name === 'Damage Resistance'
+    const logs = damageResistanceLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0][1].creatureName).toBe(DRUID);
+    expect(logs[0][1].description).toBe(
+      `${DRUID} has resistance to ${type} damage — 25 damage halved to 12.`
     );
-    expect(resistLog).toBeDefined();
-    expect(resistLog[1].description).toContain(DRUID);
-    expect(resistLog[1].description).toContain('Lightning');
-    expect(resistLog[1].description).toContain('25');
-    expect(resistLog[1].description).toContain('12');
   });
 
-  it('control: unmapped types land FULL while Temperate is chosen', async () => {
-    const slash = await apply('Temperate', ['Slashing'], 16);
-    expect(slash.finalDamage).toBe(16);
-    expect(slash.resistanceDetails).toEqual([]);
-    const fire = await apply('Temperate', ['Fire'], 21);
-    expect(fire.finalDamage).toBe(21);
-  });
+  // Guard falsifier (#1187): the fold fires ONLY for the chosen land's mapped
+  // type against a live byte — another land's mapped type, unmapped type, and
+  // an unset land byte all stay FULL with zero "Damage Resistance" logs.
+  it.each([
+    ['Temperate', 'Fire', 21],
+    ['Temperate', 'Slashing', 16],
+    [null, 'Lightning', 25],
+  ])('stays FULL and silent: land %s vs %s damage', async (landByte, type, raw) => {
+    const result = await applyDamage(landByte, [type], raw);
 
-  it('all four land mappings fold their type live', async () => {
-    const cases = [['arid', 'Fire'], ['polar', 'Cold'], ['temperate', 'Lightning'], ['tropical', 'Poison']];
-    for (const [land, type] of cases) {
-      const result = await apply(land, [type], 21);
-      expect(result.finalDamage).toBe(10);
-      expect(result.resistanceDetails).toEqual([{ damageType: type, status: 'resistant' }]);
-    }
-  });
-
-  it('no land chosen (runtime key unset, no class fallback) → Lightning stays FULL', async () => {
-    const result = await apply(null, ['Lightning'], 25);
-    expect(result.finalDamage).toBe(25);
+    expect(result.finalDamage).toBe(raw);
+    expect(result.newHp).toBe(START_HP - raw);
     expect(result.resistanceDetails).toEqual([]);
+    expect(damageResistanceLogs()).toHaveLength(0);
   });
 });

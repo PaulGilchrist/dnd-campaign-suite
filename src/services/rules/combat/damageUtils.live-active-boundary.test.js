@@ -1,10 +1,13 @@
+// @maintained-by-ai
 // BUG (MA-1966 infra): getCombatContext PREFERRED the baked combatSummary.activeCreatureName
 // over the live top-level activeCreatureName (patching only when absent), so the boundary
 // stamp consumed by legendaryExpendGate froze mid-round and every fresh-boundary legendary
 // press was honestly refused (turn)/own-turn. Fix: the LIVE top-level key wins whenever
 // present (playbook §31 codifies it as truth); the baked field is the fallback.
 // These tests pin the precedence AND chain it into expendLegendaryUse with the REAL
-// getCombatContext (fetch stubbed, cs mirror deliberately stale).
+// getCombatContext (fetch stubbed, cs mirror deliberately stale). The generic gate
+// truth-table and economy lifecycle live in monsterLegendaryUses.test.js — this lane
+// owns ONLY the live-vs-baked boundary stamp.
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { getCombatContext } from './damageUtils.js';
 import { expendLegendaryUse } from '../../encounters/monsterLegendaryUses.js';
@@ -17,6 +20,9 @@ const MONSTER = {
   ],
 };
 
+// Production-shaped change-data: initiative navigation writes the TOP-LEVEL
+// activeCreatureName first at every Next/Prev step (initiative/navigationHandlers.js);
+// the baked combatSummary only moves at round-wrap/resort writes — hence "stale".
 function stubChangeData({ csActive, liveActive, round = 1 }) {
   global.fetch = vi.fn(() => Promise.resolve({
     ok: true,
@@ -33,29 +39,19 @@ describe('getCombatContext live-active precedence (MA-1966 infra)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('live top-level activeCreatureName WINS over the baked cs field (inverted precedence)', async () => {
-    stubChangeData({ csActive: 'AasimarTest', liveActive: 'Disciplined_Monk' });
+  it('live top-level activeCreatureName WINS over the baked cs field, other fields intact', async () => {
+    stubChangeData({ csActive: 'AasimarTest', liveActive: 'Disciplined_Monk', round: 3 });
     const cs = await getCombatContext('test-campaign');
     expect(cs.activeCreatureName).toBe('Disciplined_Monk');
+    expect(cs.round).toBe(3);
+    expect(cs.creatures).toEqual([{ name: 'Mummy Lord 1' }]);
   });
 
-  it('stale cs mirror is overridden at every fresh boundary while the baked field alone would freeze', async () => {
-    // cs stays frozen on 'AasimarTest' across all three live boundaries.
-    stubChangeData({ csActive: 'AasimarTest', liveActive: 'AberrantSorcerer' });
-    expect((await getCombatContext('test-campaign')).activeCreatureName).toBe('AberrantSorcerer');
-    stubChangeData({ csActive: 'AasimarTest', liveActive: 'Disciplined_Monk' });
-    expect((await getCombatContext('test-campaign')).activeCreatureName).toBe('Disciplined_Monk');
-    stubChangeData({ csActive: 'AasimarTest', liveActive: 'DivinationWizard' });
-    expect((await getCombatContext('test-campaign')).activeCreatureName).toBe('DivinationWizard');
-  });
-
-  it('baked cs field remains the fallback when no top-level key exists', async () => {
+  it('baked cs field is the fallback with no live key; no combatSummary is null even with a live key', async () => {
     stubChangeData({ csActive: 'AasimarTest', liveActive: undefined });
-    const cs = await getCombatContext('test-campaign');
-    expect(cs.activeCreatureName).toBe('AasimarTest');
-  });
+    expect((await getCombatContext('test-campaign')).activeCreatureName).toBe('AasimarTest');
 
-  it('no combatSummary → null regardless of top-level key', async () => {
+    // Guard short-circuit (combatSummary &&): a live key alone never fabricates a summary.
     global.fetch = vi.fn(() => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ activeCreatureName: 'Ghost' }),
@@ -120,11 +116,14 @@ describe('legendary gate chain over a stale cs mirror (MA-1966 infra)', () => {
     expect(logs.filter(e => e.automationType === 'legendary_use_refused')).toHaveLength(2);
   });
 
-  it('own-turn refusal unchanged: live boundary on the monster itself refuses (turn mirror state)', async () => {
-    // Mummy Lord idx0: top-level lands on the monster at round-wrap; its own turn must refuse.
-    const own = await press('Mummy Lord 1', { csActive: 'Mummy Lord 1', round: 2 });
+  it('own-turn refusal holds when ONLY the live key names the monster — the frozen mirror would have wrongly allowed the spend', async () => {
+    // cs stays baked on 'AasimarTest'; the live tracker lands on the monster at round-wrap.
+    // Pre-fix the stale 'AasimarTest' won the boundary stamp → legal spend; live-wins → own-turn.
+    const own = await press('Mummy Lord 1', { csActive: 'AasimarTest', round: 2 });
     expect(own.spent).toBe(false);
     expect(own.reason).toBe('own-turn');
     expect(store['Mummy Lord 1.monsterLegendaryUses']).toBeUndefined();
+    expect(store['Mummy Lord 1._legendaryUses_usedRound']).toBeUndefined();
+    expect(logs.filter(e => e.automationType === 'legendary_use_refused')).toHaveLength(1);
   });
 });

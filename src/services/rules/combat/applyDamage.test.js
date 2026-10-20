@@ -1,3 +1,19 @@
+// @maintained-by-ai
+// LANE — applyDamageToTarget base lane: entry guards, player + monster HP bookkeeping
+// canon, computedStats/static defenses, damage-triggered condition removal, drop-to-0
+// death-save handling, hp_change log + threshold bytes, concentration DC recalculation
+// canon (applyDamage.js:901-905), and the projectedWardDamage RECORD seam (:513-525).
+// Owned elsewhere, never re-driven here:
+//   - generic arithmetic CANON → applyDamage.helpers.test.js :53-86/:88-104/:106-166/:168-182/:184-196 (#1196)
+//   - NPC concentration auto-roll (fail + pass golden bytes) → applyDamage.npcConcentrationAdvanced.test.js
+//     (absorbs old :252-262/:264-274 — pending rec #1200: fail leg asserted only the
+//     player-lane prompt handoff and the pass leg was bare-notNull; the monster lane owns both)
+//   - player concentration prompt payload + Relentless Hunter exemption → applyDamage.relentlessHunter.test.js
+//   - buff/aura/chooser/silence/dc-'full'/dominate/hypnotic/zero-HP-feature seams → their lanes
+//   - Projected Ward reaction CLICK producer (arms arcaneWardActive/arcaneWardHp) → arcaneWardHandler.test.js
+// Honest note (#1185): applyDamage.js:451 reads currentHitPoints WITHOUT campaignName.
+// The keyed store stub below does not model campaign boundaries, so no leg here can
+// discriminate that defect — runtime-store lanes own the campaign-keying contract.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -37,45 +53,26 @@ vi.mock('./rangeValidation.js', () => ({
 
 // ── Imports ─────────────────────────────────────────────────────
 
-import {
-  applyDamageToTarget,
-} from './applyDamage.js';
+import { applyDamageToTarget } from './applyDamage.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
-import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 
-// ── Globals ────────────────────────────────────────────────────
+// ── Globals / helpers ──────────────────────────────────────────
 
-global.fetch = vi.fn(() => new Promise(() => {}));
+const CAMPAIGN = 'TestCampaign';
 
-// ── Helpers ─────────────────────────────────────────────────────
+global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
+function makeCs(creature) {
+  return { round: 1, creatures: [creature] };
 }
 
-function createNpcCreature(name, maxHp, currentHp, extra = {}) {
+function makeCreature(name, over = {}) {
   return {
     name,
     type: 'player',
-    maxHp,
-    currentHp,
-    resistances: [],
-    immunities: [],
-    conditions: [],
-    template: [],
-    concentration: null,
-    saveBonuses: {},
-    ...extra,
-  };
-}
-
-function createPlayerCreature(name, extra = {}) {
-  return {
-    name,
-    type: 'player',
-    maxHp: 30,
+    maxHp: 45,
     currentHp: 30,
     resistances: [],
     immunities: [],
@@ -83,11 +80,15 @@ function createPlayerCreature(name, extra = {}) {
     template: [],
     concentration: null,
     saveBonuses: {},
-    ...extra,
+    ...over,
   };
 }
 
-function createPlayerCharacter(name, extra = {}) {
+function makeMonster(name, over = {}) {
+  return { ...makeCreature(name, over), type: over.type || 'monster' };
+}
+
+function makeCharacter(name, extra = {}) {
   return {
     name,
     computedStats: {
@@ -97,52 +98,41 @@ function createPlayerCharacter(name, extra = {}) {
       equipment: [],
       characterAdvancement: [],
       allFeatures: [],
-      ...extra.computedExtra,
-    },
-    ...extra,
-  };
-}
-
-function createMinimalCharacter(name) {
-  return {
-    name,
-    computedStats: {
-      resistances: [],
-      immunities: [],
-      class_levels: [],
-      equipment: [],
-      characterAdvancement: [],
-      allFeatures: [],
+      ...extra,
     },
   };
 }
 
-function stubPlayerRuntime(currentHp, conditions = []) {
-  getRuntimeValue.mockReset();
-  getRuntimeValue
-    .mockImplementation((key, subKey) => {
-      if (subKey === 'activeBuffs') return [];
-      if (subKey === 'arcaneWardActive') return undefined;
-      if (subKey === 'arcaneWardHp') return 0;
-      if (subKey === 'lastMetamagicDamage') return undefined;
-      if (subKey === 'currentHitPoints') return currentHp;
-      if (subKey === 'activeConditions') return conditions;
-      return undefined;
-    });
+// Runtime store stub keyed `${name}.${key}` (#1057/#1186): reads and writes mirror
+// one Map so multi-apply sequences and absence checks are observable. Unlisted keys
+// return undefined — every consumer guards them (|| [], Array.isArray, ?? 0).
+function stubStore(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  getRuntimeValue.mockImplementation((name, key) => store.get(`${name}.${key}`));
+  setRuntimeValue.mockImplementation((name, key, value) => { store.set(`${name}.${key}`, value); });
+  return store;
 }
 
-function stubNpcRuntime(currentHp, conditions = []) {
-  getRuntimeValue.mockReset();
-  getRuntimeValue
-    .mockImplementation((key, subKey) => {
-      if (subKey === 'activeBuffs') return [];
-      if (subKey === 'arcaneWardActive') return undefined;
-      if (subKey === 'arcaneWardHp') return 0;
-      if (subKey === 'lastMetamagicDamage') return undefined;
-      if (subKey === 'currentHitPoints') return currentHp;
-      if (subKey === 'activeConditions') return conditions;
-      return undefined;
-    });
+function applyDamage(cs, targetName, rawDamage, damageTypes, options = {}) {
+  return applyDamageToTarget(cs, targetName, rawDamage, damageTypes, {
+    campaignName: CAMPAIGN,
+    characters: [makeCharacter(targetName)],
+    ...options,
+  });
+}
+
+function logPosts() {
+  return global.fetch.mock.calls
+    .filter(c => String(c[0]).includes('/log'))
+    .map(c => JSON.parse(c[1].body));
+}
+
+function hpLog(name) {
+  return logPosts().find(b => b.type === 'hp_change' && b.targetName === name);
+}
+
+function conditionLogs() {
+  return logPosts().filter(b => b.type === 'condition');
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -150,520 +140,272 @@ function stubNpcRuntime(currentHp, conditions = []) {
 describe('applyDamageToTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch.mockReset();
+    global.fetch.mockImplementation(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
   });
 
-  it('returns null when combatSummary is null or undefined', async () => {
-    expect(await applyDamageToTarget(null, 'Goblin', 5, ['Bludgeoning'], { campaignName: 'TestCampaign' })).toBeNull();
-    expect(await applyDamageToTarget(undefined, 'Goblin', 5, ['Bludgeoning'], { campaignName: 'TestCampaign' })).toBeNull();
+  it('returns null at every entry guard without touching the store or the log', async () => {
+    const cs = makeCs(makeMonster('Orc'));
+    expect(await applyDamage(null, 'Orc', 5, ['Bludgeoning'])).toBeNull();
+    expect(await applyDamage(undefined, 'Orc', 5, ['Bludgeoning'])).toBeNull();
+    expect(await applyDamage(cs, 'MissingTarget', 5, ['Slashing'])).toBeNull();
+    expect(await applyDamage(cs, 'Orc', NaN, ['Slashing'])).toBeNull();
+    expect(await applyDamage(cs, 'Orc', null, ['Slashing'])).toBeNull();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('returns null when target creature not found', async () => {
-    const cs = makeCombatSummary([createNpcCreature('Orc', 10, 10)]);
-    expect(await applyDamageToTarget(cs, 'MissingTarget', 5, ['Slashing'], { campaignName: 'TestCampaign' })).toBeNull();
+  it('applies player damage: result shape, runtime HP write, summary event, and full hp_change log bytes', async () => {
+    // maxHp 45 on the creature vs 30 in the runtime store: the log must read
+    // hitPoints from the runtime store (:1194-1195), not the creature object.
+    const alchemist = makeCreature('Alchemist', { currentHp: 25 });
+    stubStore({ 'Alchemist.currentHitPoints': 25, 'Alchemist.hitPoints': 30 });
+    let dispatched = false;
+    window.addEventListener('combat-summary-updated', () => { dispatched = true; });
+
+    const result = await applyDamage(makeCs(alchemist), 'Alchemist', 8, ['Slashing']);
+
+    expect(result).toMatchObject({ finalDamage: 8, oldHp: 25, newHp: 17, damageReduced: false, damageReducedByFeature: 0 });
+    expect(setRuntimeValue).toHaveBeenCalledWith('Alchemist', 'currentHitPoints', 17, CAMPAIGN);
+    expect(dispatched).toBe(true);
+    expect(hpLog('Alchemist')).toEqual({
+      type: 'hp_change', targetName: 'Alchemist', delta: -8, currentHp: 17, maxHp: 30,
+      isHealing: false, isUnconscious: false,
+    });
+    expect(sendConcentrationPrompt).not.toHaveBeenCalled();
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Alchemist', 'deathSaves', expect.anything(), CAMPAIGN);
   });
 
-  describe('NPC damage application', () => {
-    it('reduces NPC HP and returns result object', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10);
-      const cs = makeCombatSummary([npc]);
-      const result = await applyDamageToTarget(cs, 'Goblin', 6, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(result.oldHp).toBe(10);
-      expect(result.newHp).toBe(4);
-      expect(result.finalDamage).toBe(6);
-      expect(result.damageReduced).toBe(false);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 4, 'TestCampaign');
+  it('resolves player defenses from computedStats — resistance halves with floor, immunity zeroes and suppresses the hp_change log (delta 0)', async () => {
+    const goliath = makeCreature('Goliath', { currentHp: 30 });
+    const store = stubStore({ 'Goliath.currentHitPoints': 30, 'Goliath.hitPoints': 30 });
+    const resistant = await applyDamage(makeCs(goliath), 'Goliath', 7, ['Cold'], {
+      characters: [makeCharacter('Goliath', { resistances: ['cold'] })],
+    });
+    expect(resistant.finalDamage).toBe(3);
+    expect(resistant.damageReduced).toBe(true);
+    expect(store.get('Goliath.currentHitPoints')).toBe(27);
+
+    vi.clearAllMocks();
+    const celestial = makeCreature('Celestial', { currentHp: 30 });
+    stubStore({ 'Celestial.currentHitPoints': 30, 'Celestial.hitPoints': 30 });
+    const immune = await applyDamage(makeCs(celestial), 'Celestial', 15, ['Fire'], {
+      characters: [makeCharacter('Celestial', { immunities: ['fire'] })],
+    });
+    expect(immune.finalDamage).toBe(0);
+    expect(immune.damageReduced).toBe(true);
+    expect(immune.newHp).toBe(30);
+    expect(hpLog('Celestial')).toBeUndefined();
+  });
+
+  it('applies static resistances/immunities to monsters and mutates combatSummary.currentHp — never the player runtime HP store', async () => {
+    const orc = makeMonster('Orc', { maxHp: 20, currentHp: 20, resistances: ['fire'] });
+    stubStore();
+    const resistant = await applyDamage(makeCs(orc), 'Orc', 9, ['Fire']);
+    expect(resistant.finalDamage).toBe(4);
+    expect(resistant.oldHp).toBe(20);
+    expect(resistant.newHp).toBe(16);
+    expect(orc.currentHp).toBe(16);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Orc', 'currentHitPoints', expect.anything(), CAMPAIGN);
+    expect(hpLog('Orc')).toEqual({
+      type: 'hp_change', targetName: 'Orc', delta: -4, currentHp: 16, maxHp: 20,
+      isHealing: false, isUnconscious: false,
     });
 
-    it('clamps HP to 0 when damage exceeds max', async () => {
-      stubNpcRuntime(5);
-      const npc = createNpcCreature('Goblin', 5, 5);
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 0, 'TestCampaign');
+    vi.clearAllMocks();
+    const skeleton = makeMonster('Skeleton', { maxHp: 20, currentHp: 20, immunities: ['necrotic'] });
+    stubStore();
+    const immune = await applyDamage(makeCs(skeleton), 'Skeleton', 15, ['Necrotic']);
+    expect(immune.finalDamage).toBe(0);
+    expect(immune.damageReduced).toBe(true);
+    expect(skeleton.currentHp).toBe(20);
+    expect(hpLog('Skeleton')).toBeUndefined();
+  });
+
+  it('throws when runtime currentHitPoints is missing for a player target, before any log fires', async () => {
+    stubStore();
+    await expect(applyDamage(makeCs(makeCreature('Monk')), 'Monk', 5, ['Bludgeoning']))
+      .rejects.toThrow('currentHitPoints not found for "Monk"');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('removes Frightened/Charmed on real damage with reason bytes per lane, preserving other conditions', async () => {
+    // player: uppercase 'Frightened' stripped (case-insensitive match), 'poisoned' preserved
+    const ranger = makeCreature('Ranger', { currentHp: 20 });
+    let store = stubStore({ 'Ranger.currentHitPoints': 20, 'Ranger.hitPoints': 30, 'Ranger.activeConditions': ['Frightened', 'poisoned'] });
+    await applyDamage(makeCs(ranger), 'Ranger', 5, ['Bludgeoning']);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Ranger', 'activeConditions', ['poisoned'], CAMPAIGN);
+    expect(store.get('Ranger.activeConditions')).toEqual(['poisoned']);
+    const frightLog = conditionLogs().find(b => b.condition === 'Frightened');
+    expect(frightLog).toEqual(expect.objectContaining({ type: 'condition', action: 'removed', characterName: 'Ranger', reason: 'took damage' }));
+    expect(conditionLogs().some(b => b.condition === 'Charmed')).toBe(false);
+
+    // monster: 'charmed' stripped ('poisoned' preserved); NPC charm reason byte differs.
+    // NOTE (reported, not pinned): frightened+charmed held TOGETHER resurrects frightened
+    // — both removals filter the same single-read snapshot (:552-557, last-write-wins).
+    vi.clearAllMocks();
+    const wolf = makeMonster('Wolf', { maxHp: 10, currentHp: 10 });
+    store = stubStore({ 'Wolf.activeConditions': ['charmed', 'poisoned'] });
+    await applyDamage(makeCs(wolf), 'Wolf', 3, ['Piercing']);
+    expect(store.get('Wolf.activeConditions')).toEqual(['poisoned']);
+    const charmLog = conditionLogs().find(b => b.condition === 'Charmed');
+    expect(charmLog).toEqual(expect.objectContaining({ action: 'removed', characterName: 'Wolf', reason: 'took damage (Charm)' }));
+
+    // player charm reason byte differs from the NPC lane ('(Friends)')
+    vi.clearAllMocks();
+    const bard = makeCreature('Bard', { currentHp: 20 });
+    store = stubStore({ 'Bard.currentHitPoints': 20, 'Bard.hitPoints': 30, 'Bard.activeConditions': ['charmed'] });
+    await applyDamage(makeCs(bard), 'Bard', 4, ['Force']);
+    expect(store.get('Bard.activeConditions')).toEqual([]);
+    expect(conditionLogs().find(b => b.condition === 'Charmed')).toEqual(
+      expect.objectContaining({ characterName: 'Bard', reason: 'took damage (Friends)' }),
+    );
+  });
+
+  it('suppresses every damage-triggered effect when immunity zeroes the hit', async () => {
+    const frosty = makeCreature('Frosty', { currentHp: 30, concentration: { spell: 'Haste', dc: 17 } });
+    const store = stubStore({
+      'Frosty.currentHitPoints': 30,
+      'Frosty.hitPoints': 30,
+      'Frosty.activeConditions': ['frightened'],
     });
 
-    it('applies resistance for NPC', async () => {
-      stubNpcRuntime(100);
-      const npc = createNpcCreature('Dragon', 100, 100, { resistances: ['fire'] });
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Dragon', { computedExtra: { resistances: ['fire'] }, })] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'currentHitPoints', 95, 'TestCampaign');
+    const result = await applyDamage(makeCs(frosty), 'Frosty', 5, ['Cold'], {
+      characters: [makeCharacter('Frosty', { immunities: ['cold'] })],
     });
 
-    it('applies immunity for NPC', async () => {
-      stubNpcRuntime(20);
-      const npc = createNpcCreature('Skeleton', 20, 20, { immunities: ['necrotic'] });
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Skeleton', { computedExtra: { immunities: ['necrotic'] }, })] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Skeleton', 'currentHitPoints', 20, 'TestCampaign');
+    expect(result.finalDamage).toBe(0);
+    expect(result.damageReduced).toBe(true);
+    expect(result.newHp).toBe(30);
+    expect(store.get('Frosty.activeConditions')).toEqual(['frightened']);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Frosty', 'activeConditions', expect.anything(), CAMPAIGN);
+    expect(sendConcentrationPrompt).not.toHaveBeenCalled();
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
+    expect(frosty.concentration.dc).toBe(17);
+    expect(hpLog('Frosty')).toBeUndefined();
+  });
+
+  it('drops a player to 0: HP clamps to 0, death prompt fires, deathSaves/deathFailures reset, log says dead', async () => {
+    const fighter = makeCreature('Fighter', { currentHp: 5 });
+    stubStore({ 'Fighter.currentHitPoints': 5, 'Fighter.hitPoints': 30 });
+
+    const result = await applyDamage(makeCs(fighter), 'Fighter', 10, ['Slashing']);
+
+    expect(result.newHp).toBe(0);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'currentHitPoints', 0, CAMPAIGN);
+    expect(sendDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, { promptId: 'test-guid-001', targetName: 'Fighter' });
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'deathSaves', [false, false, false], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'deathFailures', [false, false, false], CAMPAIGN);
+    expect(hpLog('Fighter')).toEqual({
+      type: 'hp_change', targetName: 'Fighter', delta: -5, currentHp: 0, maxHp: 30,
+      isHealing: false, isUnconscious: true, threshold: 'dead',
     });
 
-    it('removes frightened condition on NPC taking damage > 0, preserves other conditions, and does not remove when immune', async () => {
-      stubNpcRuntime(10, ['frightened']);
-      const npc1 = createNpcCreature('Goblin', 10, 10, {
-        conditions: [{ key: 'frightened' }],
-      });
-      const cs1 = makeCombatSummary([npc1]);
-      await applyDamageToTarget(cs1, 'Goblin', 3, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], 'TestCampaign');
+    // already at 0: the HP write still happens, but prompt/deathSaves/log stay silent
+    vi.clearAllMocks();
+    const wounded = makeCreature('Wounded', { currentHp: 0 });
+    stubStore({ 'Wounded.currentHitPoints': 0, 'Wounded.hitPoints': 30 });
+    await applyDamage(makeCs(wounded), 'Wounded', 5, ['Slashing']);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Wounded', 'currentHitPoints', 0, CAMPAIGN);
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Wounded', 'deathSaves', expect.anything(), CAMPAIGN);
+    expect(hpLog('Wounded')).toBeUndefined();
+  });
 
-      stubNpcRuntime(10, ['frightened', 'poisoned']);
-      const npc2 = createNpcCreature('Goblin2', 10, 10, {
-        conditions: [{ key: 'frightened' }, { key: 'poisoned' }],
-      });
-      const cs2 = makeCombatSummary([npc2]);
-      await applyDamageToTarget(cs2, 'Goblin2', 3, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin2')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin2', 'activeConditions', ['poisoned'], 'TestCampaign');
-
-      stubNpcRuntime(100, ['frightened']);
-      const npc3 = createNpcCreature('Dragon', 100, 100, {
-        immunities: ['fire'],
-        conditions: [{ key: 'frightened' }],
-      });
-      const cs3 = makeCombatSummary([npc3]);
-      await applyDamageToTarget(cs3, 'Dragon', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Dragon', { computedExtra: { immunities: ['fire'] }, })] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'currentHitPoints', 100, 'TestCampaign');
+  it('stamps threshold "bloodied" only on the crossing hit and omits threshold entirely once already bloodied', async () => {
+    const orc = makeMonster('Orc', { maxHp: 40, currentHp: 30 });
+    stubStore();
+    await applyDamage(makeCs(orc), 'Orc', 15, ['Slashing']);
+    expect(hpLog('Orc')).toEqual({
+      type: 'hp_change', targetName: 'Orc', delta: -15, currentHp: 15, maxHp: 40,
+      isHealing: false, isUnconscious: false, threshold: 'bloodied',
     });
 
-    it('removes charmed condition on NPC when endsOnDamage is true', async () => {
-      stubNpcRuntime(10, ['charmed']);
-      const npc = createNpcCreature('Wolf', 10, 10, {
-        type: 'monster',
-        conditions: [{ key: 'charmed', endsOnDamage: true }],
-      });
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Wolf', 3, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wolf')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Wolf', 'activeConditions', [], 'TestCampaign');
-    });
-
-    it('updates concentration DC on NPC when damage > 0', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10, {
-        concentration: { spell: 'Haste', dc: 10 },
-      });
-      const cs = makeCombatSummary([npc]);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
-      await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(npc.concentration.dc).toBe(10);
-    });
-
-    it('breaks NPC concentration save on fail', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10, {
-        concentration: { spell: 'Haste', dc: 15 },
-        saveBonuses: { con: -1 },
-      });
-      const cs = makeCombatSummary([npc]);
-      rollConcentrationSave.mockReturnValue({ success: false, roll: 8, total: 7 });
-      await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(sendConcentrationPrompt).toHaveBeenCalled();
-    });
-
-    it('keeps NPC concentration on save success', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 5 },
-      });
-      const cs = makeCombatSummary([npc]);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 12, total: 17 });
-      await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(npc.concentration).not.toBeNull();
-    });
-
-    it('recalculates concentration DC for odd damage', async () => {
-      stubNpcRuntime(20);
-      const npc = createNpcCreature('Orc', 20, 20, {
-        concentration: { spell: 'Thunderwave' },
-      });
-      const cs = makeCombatSummary([npc]);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
-      await applyDamageToTarget(cs, 'Orc', 11, ['Thunder'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Orc')] });
-      expect(npc.concentration.dc).toBe(Math.max(10, Math.floor(11 / 2)));
-    });
-
-    it('dispatches combat-summary-updated event', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10);
-      const cs = makeCombatSummary([npc]);
-      let dispatched = false;
-      window.addEventListener('combat-summary-updated', () => { dispatched = true; });
-      await applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(dispatched).toBe(true);
-    });
-
-    it('sets damageReduced based on final vs raw damage', async () => {
-      stubNpcRuntime(100);
-      const npc1 = createNpcCreature('Dragon', 100, 100, { resistances: ['fire'] });
-      const cs1 = makeCombatSummary([npc1]);
-      const result1 = await applyDamageToTarget(cs1, 'Dragon', 10, ['Fire'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Dragon', { computedExtra: { resistances: ['fire'] }, })] });
-      expect(result1.damageReduced).toBe(true);
-
-      stubNpcRuntime(10);
-      const npc2 = createNpcCreature('Goblin', 10, 10);
-      const cs2 = makeCombatSummary([npc2]);
-      const result2 = await applyDamageToTarget(cs2, 'Goblin', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(result2.damageReduced).toBe(false);
-
-      stubNpcRuntime(20);
-      const npc3 = createNpcCreature('Skeleton', 20, 20, { immunities: ['cold'] });
-      const cs3 = makeCombatSummary([npc3]);
-      const result3 = await applyDamageToTarget(cs3, 'Skeleton', 5, ['Cold'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Skeleton', { computedExtra: { immunities: ['cold'] }, })] });
-      expect(result3.damageReduced).toBe(true);
-    });
-
-    it('handles zero damage without removing frightened', async () => {
-      stubNpcRuntime(10, ['frightened']);
-      const npc = createNpcCreature('Dragon', 10, 10, {
-        immunities: ['fire'],
-        conditions: [{ key: 'frightened' }],
-      });
-      const cs = makeCombatSummary([npc]);
-      const result = await applyDamageToTarget(cs, 'Dragon', 5, ['Fire'], { campaignName: 'TestCampaign', characters: [createPlayerCharacter('Dragon', { computedExtra: { immunities: ['fire'] }, })] });
-      expect(result.finalDamage).toBe(0);
-      // Ward damage is 0 (immune), so activeConditions is never touched
-      const conditionCalls = setRuntimeValue.mock.calls.filter(
-        c => c[1] === 'activeConditions',
-      );
-      expect(conditionCalls).toHaveLength(0);
+    vi.clearAllMocks();
+    const goblin = makeMonster('Goblin', { maxHp: 10, currentHp: 3 });
+    stubStore();
+    await applyDamage(makeCs(goblin), 'Goblin', 2, ['Slashing']);
+    expect(hpLog('Goblin')).toEqual({
+      type: 'hp_change', targetName: 'Goblin', delta: -2, currentHp: 1, maxHp: 10,
+      isHealing: false, isUnconscious: false,
     });
   });
 
-  describe('Player damage application', () => {
-    it('applies damage to player HP via runtime state', async () => {
-      stubPlayerRuntime(25);
-      const player = createPlayerCreature('Alchemist');
-      const cs = makeCombatSummary([player]);
-      const result = await applyDamageToTarget(cs, 'Alchemist', 8, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Alchemist')] });
-      expect(result.oldHp).toBe(25);
-      expect(result.newHp).toBe(17);
-      expect(setRuntimeValue).toHaveBeenCalledWith('Alchemist', 'currentHitPoints', 17, 'TestCampaign');
+  it('recalculates concentration DC on damage — halves, clamps at 10, honors concentrationTotalDamage, and skipConcentration stays silent', async () => {
+    // halve: dc 10 → 15 on 30 damage; the queued prompt carries the RECALCULATED dc
+    const wizard = makeCreature('Wizard', { currentHp: 40, concentration: { spell: 'Haste', dc: 10 } });
+    stubStore({ 'Wizard.currentHitPoints': 40, 'Wizard.hitPoints': 40 });
+    await applyDamage(makeCs(wizard), 'Wizard', 30, ['Slashing']);
+    expect(wizard.concentration.dc).toBe(15);
+    expect(sendConcentrationPrompt).toHaveBeenCalledWith(CAMPAIGN, {
+      promptId: 'test-guid-001', targetName: 'Wizard', spellName: 'Haste', dc: 15, attackerName: null,
     });
 
-    it('uses player computedStats for resistances', async () => {
-      stubPlayerRuntime(30);
-      const player = createPlayerCreature('Paladin');
-      const characters = [createPlayerCharacter('Paladin', {
-        computedExtra: { resistances: ['poison'] },
-      })];
-      const cs = makeCombatSummary([player]);
-      const result = await applyDamageToTarget(cs, 'Paladin', 10, ['Poison'], { campaignName: 'TestCampaign', characters: characters });
-      expect(result.finalDamage).toBe(5);
-    });
+    // clamp: dc 17 → 10 (floor(8/2)=4 clamped to the 10 minimum)
+    vi.clearAllMocks();
+    const druid = makeCreature('Druid', { currentHp: 20, concentration: { spell: 'Speak with Animals', dc: 17 } });
+    stubStore({ 'Druid.currentHitPoints': 20, 'Druid.hitPoints': 20 });
+    await applyDamage(makeCs(druid), 'Druid', 8, ['Slashing']);
+    expect(druid.concentration.dc).toBe(10);
 
-    it('uses player computedStats for immunities', async () => {
-      stubPlayerRuntime(30);
-      const player = createPlayerCreature('Celestial');
-      const characters = [createPlayerCharacter('Celestial', {
-        computedExtra: { immunities: ['fire'] },
-      })];
-      const cs = makeCombatSummary([player]);
-      const result = await applyDamageToTarget(cs, 'Celestial', 15, ['Fire'], { campaignName: 'TestCampaign', characters: characters });
-      expect(result.finalDamage).toBe(0);
-    });
+    // sequence override: actual damage 4 but accumulated total 30 → dc from the total
+    vi.clearAllMocks();
+    const cleric = makeCreature('Cleric', { currentHp: 40, concentration: { spell: 'Spirit Guardians', dc: 10 } });
+    stubStore({ 'Cleric.currentHitPoints': 40, 'Cleric.hitPoints': 40 });
+    await applyDamage(makeCs(cleric), 'Cleric', 4, ['Slashing'], { concentrationTotalDamage: 30 });
+    expect(cleric.concentration.dc).toBe(15);
 
-    it('removes Frightened from player conditions on damage > 0, does not remove non-Frightened', async () => {
-      stubPlayerRuntime(20, ['Frightened']);
-      const player1 = createPlayerCreature('Ranger');
-      const cs1 = makeCombatSummary([player1]);
-      await applyDamageToTarget(cs1, 'Ranger', 5, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Ranger')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Ranger', 'activeConditions', [], 'TestCampaign');
-
-      setRuntimeValue.mockClear();
-      stubPlayerRuntime(20, ['Poisoned']);
-      const player2 = createPlayerCreature('Ranger2');
-      const cs2 = makeCombatSummary([player2]);
-      await applyDamageToTarget(cs2, 'Ranger2', 5, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Ranger2')] });
-      const conditionCalls = setRuntimeValue.mock.calls.filter(
-        c => c[1] === 'activeConditions',
-      );
-      expect(conditionCalls).toHaveLength(0);
-    });
-
-    it('sends death save prompt when player goes from alive to unconscious, not when already at 0 HP', async () => {
-      stubPlayerRuntime(5);
-      const player1 = createPlayerCreature('Fighter');
-      const cs1 = makeCombatSummary([player1]);
-      await applyDamageToTarget(cs1, 'Fighter', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter')] });
-      expect(sendDeathSavePrompt).toHaveBeenCalledWith('TestCampaign', {
-        promptId: 'test-guid-001',
-        targetName: 'Fighter',
-      });
-
-      sendDeathSavePrompt.mockClear();
-      stubPlayerRuntime(0);
-      const player2 = createPlayerCreature('Fighter2');
-      const cs2 = makeCombatSummary([player2]);
-      await applyDamageToTarget(cs2, 'Fighter2', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter2')] });
-      expect(sendDeathSavePrompt).not.toHaveBeenCalled();
-    });
-
-    it('sends concentration prompt for player with active spell, not when no concentration or damage is 0', async () => {
-      stubPlayerRuntime(30);
-      const player1 = createPlayerCreature('Wizard', {
-        concentration: { spell: 'Thunderwave' },
-      });
-      const cs1 = makeCombatSummary([player1]);
-      await applyDamageToTarget(cs1, 'Wizard', 8, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wizard')] });
-      expect(sendConcentrationPrompt).toHaveBeenCalled();
-
-      sendConcentrationPrompt.mockClear();
-      stubPlayerRuntime(30);
-      const player2 = createPlayerCreature('Bard');
-      player2.concentration = null;
-      const cs2 = makeCombatSummary([player2]);
-      await applyDamageToTarget(cs2, 'Bard', 5, ['Force'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Bard')] });
-      expect(sendConcentrationPrompt).not.toHaveBeenCalled();
-
-      sendConcentrationPrompt.mockClear();
-      stubPlayerRuntime(30);
-      const player3 = createPlayerCreature('Wizard2', { concentration: { spell: 'Haste' } });
-      const characters = [createPlayerCharacter('Wizard2', {
-        computedExtra: { immunities: ['cold'] },
-      })];
-      const cs3 = makeCombatSummary([player3]);
-      await applyDamageToTarget(cs3, 'Wizard2', 5, ['Cold'], { campaignName: 'TestCampaign', characters: characters });
-      expect(sendConcentrationPrompt).not.toHaveBeenCalled();
-    });
-
-    it('handles characters array matching by name prefix with space', async () => {
-      stubPlayerRuntime(20);
-      const player = createPlayerCreature('Druid');
-      const characters = [createPlayerCharacter('Druid the Wise', {
-        computedExtra: { resistances: [] },
-      })];
-      const cs = makeCombatSummary([player]);
-      const result = await applyDamageToTarget(cs, 'Druid', 5, ['Fire'], { campaignName: 'TestCampaign', characters: characters });
-      expect(result.oldHp).toBe(20);
-    });
-
-    it('sets damageReduced for player with/without resistance, saves runtime state on unconscious', async () => {
-      stubPlayerRuntime(30);
-      const player1 = createPlayerCreature('Goliath');
-      const characters = [createPlayerCharacter('Goliath', {
-        computedExtra: { resistances: ['cold'] },
-      })];
-      const cs1 = makeCombatSummary([player1]);
-      const result1 = await applyDamageToTarget(cs1, 'Goliath', 7, ['Cold'], { campaignName: 'TestCampaign', characters: characters });
-      expect(result1.damageReduced).toBe(true);
-
-      stubPlayerRuntime(30);
-      const player2 = createPlayerCreature('Human');
-      const cs2 = makeCombatSummary([player2]);
-      const result2 = await applyDamageToTarget(cs2, 'Human', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Human')] });
-      expect(result2.damageReduced).toBe(false);
-
-      stubPlayerRuntime(3);
-      const player3 = createPlayerCreature('Fighter');
-      const cs3 = makeCombatSummary([player3]);
-      await applyDamageToTarget(cs3, 'Fighter', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'currentHitPoints', 0, 'TestCampaign');
-    });
-
-    it('throws when currentHitPoints is not set from runtime', async () => {
-      stubPlayerRuntime(null);
-      const player = createPlayerCreature('Monk');
-      const cs = makeCombatSummary([player]);
-      await expect(applyDamageToTarget(cs, 'Monk', 5, ['Bludgeoning'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Monk')] })).rejects.toThrow('currentHitPoints not found for "Monk"');
-    });
-
-    it('dispatches combat-summary-updated for player damage', async () => {
-      stubPlayerRuntime(25);
-      const player = createPlayerCreature('Warlock');
-      const cs = makeCombatSummary([player]);
-      let dispatched = false;
-      window.addEventListener('combat-summary-updated', () => { dispatched = true; });
-      await applyDamageToTarget(cs, 'Warlock', 3, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Warlock')] });
-      expect(dispatched).toBe(true);
-    });
-
-    it('handles zero damage without sending death save prompt', async () => {
-      stubPlayerRuntime(5);
-      const player = createPlayerCreature('Fighter');
-      player.concentration = null;
-      const cs = makeCombatSummary([player]);
-      const result = await applyDamageToTarget(cs, 'Fighter', 0, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter')] });
-      expect(result.finalDamage).toBe(0);
-      expect(sendDeathSavePrompt).not.toHaveBeenCalled();
-    });
+    // skipConcentration: dc untouched, no prompt — but damage still lands
+    vi.clearAllMocks();
+    const barbarian = makeCreature('Barbarian', { currentHp: 20, concentration: { spell: 'Haste', dc: 17 } });
+    stubStore({ 'Barbarian.currentHitPoints': 20, 'Barbarian.hitPoints': 20 });
+    await applyDamage(makeCs(barbarian), 'Barbarian', 8, ['Slashing'], { skipConcentration: true });
+    expect(barbarian.concentration.dc).toBe(17);
+    expect(sendConcentrationPrompt).not.toHaveBeenCalled();
+    expect(setRuntimeValue).toHaveBeenCalledWith('Barbarian', 'currentHitPoints', 12, CAMPAIGN);
   });
 
   describe('Projected Ward recent-damage writer', () => {
     it('records projectedWardDamage on a damaged non-warden player', async () => {
-      stubPlayerRuntime(73);
-      const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 13, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('HexWarlock')], ignoreResistance: false, attackerName: 'Wight 1' });
-      expect(setRuntimeValue).toHaveBeenCalledWith('HexWarlock', 'projectedWardDamage',
-        expect.objectContaining({ rawDamage: 13, damageType: 'Slashing', attackerName: 'Wight 1' }), 'TestCampaign');
+      const store = stubStore({ 'HexWarlock.currentHitPoints': 73, 'HexWarlock.hitPoints': 73 });
+      await applyDamage(makeCs(makeCreature('HexWarlock', { currentHp: 73 })), 'HexWarlock', 13, ['Slashing'], { attackerName: 'Wight 1' });
+      expect(store.get('HexWarlock.projectedWardDamage')).toEqual(expect.objectContaining({
+        rawDamage: 13, damageType: 'Slashing', attackerName: 'Wight 1',
+      }));
     });
 
     it('does not record projectedWardDamage when the damaged player is an active warden (self-absorbed)', async () => {
-      stubPlayerRuntime(73);
-      getRuntimeValue.mockImplementation((key, subKey) => {
-        if (subKey === 'activeBuffs') return [];
-        if (subKey === 'arcaneWardActive') return true;
-        if (subKey === 'arcaneWardHp') return 0;
-        if (subKey === 'currentHitPoints') return 73;
-        if (subKey === 'activeConditions') return [];
-        return undefined;
+      const store = stubStore({
+        'DivinationWizard.currentHitPoints': 73,
+        'DivinationWizard.hitPoints': 73,
+        'DivinationWizard.arcaneWardActive': true,
       });
-      const warden = createPlayerCreature('DivinationWizard', { currentHp: 73 });
-      const cs = makeCombatSummary([warden]);
-      await applyDamageToTarget(cs, 'DivinationWizard', 10, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('DivinationWizard')], ignoreResistance: false, attackerName: 'Wight 1' });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('DivinationWizard', 'projectedWardDamage', expect.anything(), 'TestCampaign');
+      await applyDamage(makeCs(makeCreature('DivinationWizard', { currentHp: 73 })), 'DivinationWizard', 10, ['Necrotic'], { attackerName: 'Wight 1' });
+      expect(store.has('DivinationWizard.projectedWardDamage')).toBe(false);
+      expect(store.get('DivinationWizard.currentHitPoints')).toBe(63); // damage flow continued past the guard
     });
 
     it('does not record projectedWardDamage for zero damage', async () => {
-      stubPlayerRuntime(73);
-      const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 0, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('HexWarlock')], ignoreResistance: false, attackerName: 'Wight 1' });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('HexWarlock', 'projectedWardDamage', expect.anything(), 'TestCampaign');
+      const store = stubStore({ 'HexWarlock.currentHitPoints': 73, 'HexWarlock.hitPoints': 73 });
+      await applyDamage(makeCs(makeCreature('HexWarlock', { currentHp: 73 })), 'HexWarlock', 0, ['Slashing'], { attackerName: 'Wight 1' });
+      expect(store.has('HexWarlock.projectedWardDamage')).toBe(false);
     });
 
     it('accumulates multi-part damage from the same attacker sequence', async () => {
-      const store = new Map([['HexWarlock.currentHitPoints', 73]]);
-      getRuntimeValue.mockImplementation((storeName, subKey) => store.get(`${storeName}.${subKey}`));
-      setRuntimeValue.mockImplementation((storeName, subKey, value) => { store.set(`${storeName}.${subKey}`, value); });
-      const player = createPlayerCreature('HexWarlock', { currentHp: 73 });
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'HexWarlock', 7, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('HexWarlock')], ignoreResistance: false, attackerName: 'Wight 1' });
-      await applyDamageToTarget(cs, 'HexWarlock', 6, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('HexWarlock')], ignoreResistance: false, attackerName: 'Wight 1' });
+      const store = stubStore({ 'HexWarlock.currentHitPoints': 73, 'HexWarlock.hitPoints': 73 });
+      const cs = makeCs(makeCreature('HexWarlock', { currentHp: 73 }));
+      await applyDamage(cs, 'HexWarlock', 7, ['Slashing'], { attackerName: 'Wight 1' });
+      await applyDamage(cs, 'HexWarlock', 6, ['Necrotic'], { attackerName: 'Wight 1' });
       expect(store.get('HexWarlock.projectedWardDamage').rawDamage).toBe(13);
       expect(store.get('HexWarlock.currentHitPoints')).toBe(60);
     });
 
-    it('does not record projectedWardDamage on NPC targets', async () => {
-      stubNpcRuntime(55);
-      const npc = { ...createNpcCreature('Wight 1', 55, 55), type: 'npc' };
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Wight 1', 12, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Wight 1')], ignoreResistance: false, attackerName: 'HexWarlock' });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('Wight 1', 'projectedWardDamage', expect.anything(), 'TestCampaign');
-    });
-  });
-
-  describe('logDamageApplication side effects', () => {
-    it('logs hp_change entry via fetch with correct type and isHealing', async () => {
-      stubNpcRuntime(10);
-      const npc = createNpcCreature('Goblin', 10, 10);
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(global.fetch).toHaveBeenCalled();
-      const callBody = JSON.parse(global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}');
-      expect(callBody.type).toBe('hp_change');
-      expect(callBody.isHealing).toBe(false);
-    });
-
-    it('sets isUnconscious and threshold dead when creature dies', async () => {
-      stubNpcRuntime(5);
-      const npc = createNpcCreature('Goblin', 5, 5);
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      const callBody = JSON.parse(
-        global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}',
-      );
-      expect(callBody.isUnconscious).toBe(true);
-      expect(callBody.threshold).toBe('dead');
-    });
-
-    it('sets threshold to "bloodied" when crossing bloodied line, not when going from bloodied to below', async () => {
-      // First, find the Orc log call
-      const npc = { name: 'Orc', type: 'monster', maxHp: 40, currentHp: 30, conditions: [], template: [], concentration: null };
-      const cs = makeCombatSummary([npc]);
-      await applyDamageToTarget(cs, 'Orc', 15, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Orc')] });
-      console.log('ORC TEST fetch calls:', JSON.stringify(global.fetch.mock.calls));
-      const orcCall = global.fetch.mock.calls.find(c => c[0].includes('/log'));
-      const orcBody = JSON.parse(orcCall?.[1]?.body || '{}');
-      expect(orcBody.threshold).toBe('bloodied');
-
-      // Now test bloodied -> below bloodied (no recovering threshold)
-      global.fetch.mockClear();
-      stubNpcRuntime(3);
-      const npc2 = createNpcCreature('Goblin', 10, 3);
-      const cs2 = makeCombatSummary([npc2]);
-      await applyDamageToTarget(cs2, 'Goblin', 2, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      const goblinCall = global.fetch.mock.calls.find(c => c[0].includes('/log'));
-      const goblinBody = JSON.parse(goblinCall?.[1]?.body || '{}');
-      expect(goblinBody.threshold).toBeUndefined();
-    });
-
-    it('does not set threshold or death saves when already dead, resets death saves when player dies', async () => {
-      stubPlayerRuntime(0);
-      const player = createPlayerCreature('Fighter');
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter')] });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.any(String), 'deathSaves', expect.any(Array), expect.any(String),
-      );
-
-      stubPlayerRuntime(3);
-      const player2 = createPlayerCreature('Fighter2');
-      const cs2 = makeCombatSummary([player2]);
-      await applyDamageToTarget(cs2, 'Fighter2', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Fighter2')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter2', 'deathSaves', [false, false, false], 'TestCampaign',
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Fighter2', 'deathFailures', [false, false, false], 'TestCampaign',
-      );
-    });
-
-    it('does not set death saves when not dying (still alive)', async () => {
-      stubPlayerRuntime(30);
-      const player = createPlayerCreature('Cleric');
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'Cleric', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Cleric')] });
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.any(String), 'deathSaves', expect.any(Array), expect.any(String),
-      );
-    });
-
-    it('handles Frightened condition as string (not object)', async () => {
-      stubPlayerRuntime(20, ['frightened']);
-      const player = createPlayerCreature('Rogue');
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'Rogue', 3, ['Piercing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Rogue')] });
-      expect(setRuntimeValue).toHaveBeenCalledWith('Rogue', 'activeConditions', [], 'TestCampaign');
-    });
-
-    it('uses currentHp as oldHp for NPC even when creature has no maxHp', async () => {
-      stubNpcRuntime(8);
-      const npc = { name: 'Creature', type: 'player', currentHp: 8, conditions: [], template: [], concentration: null };
-      const cs = makeCombatSummary([npc]);
-      const result = await applyDamageToTarget(cs, 'Creature', 3, ['Acid'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Creature')] });
-      expect(result.oldHp).toBe(8);
-      expect(result.newHp).toBe(5);
-    });
-
-    it('uses getRuntimeValue for player maxHp in log when not on creature', async () => {
-      stubPlayerRuntime(30);
-      getRuntimeValue.mockReturnValueOnce(30);
-      const player = createPlayerCreature('Bard');
-      delete player.maxHp;
-      const cs = makeCombatSummary([player]);
-      await applyDamageToTarget(cs, 'Bard', 5, ['Force'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Bard')] });
-    });
-  });
-
-  describe('concentration save logging for NPC', () => {
-    it('does not run concentration save when no concentration or finalDamage is 0', async () => {
-      stubNpcRuntime(10);
-      const npc1 = createNpcCreature('Goblin', 10, 10, { concentration: null });
-      const cs1 = makeCombatSummary([npc1]);
-      await applyDamageToTarget(cs1, 'Goblin', 5, ['Slashing'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Goblin')] });
-      expect(rollConcentrationSave).not.toHaveBeenCalled();
-
-      stubNpcRuntime(20);
-      const npc2 = createNpcCreature('Skeleton', 20, 20, {
-        concentration: { spell: 'Haste' },
-        immunities: ['necrotic'],
-      });
-      const cs2 = makeCombatSummary([npc2]);
-      await applyDamageToTarget(cs2, 'Skeleton', 10, ['Necrotic'], { campaignName: 'TestCampaign', characters: [createMinimalCharacter('Skeleton')] });
-      expect(rollConcentrationSave).not.toHaveBeenCalled();
+    it('does not record projectedWardDamage on monster targets', async () => {
+      const store = stubStore();
+      const wight = makeMonster('Wight 1', { maxHp: 55, currentHp: 55 });
+      await applyDamage(makeCs(wight), 'Wight 1', 12, ['Slashing'], { attackerName: 'HexWarlock' });
+      expect(store.has('Wight 1.projectedWardDamage')).toBe(false);
+      expect(wight.currentHp).toBe(43);
     });
   });
 });

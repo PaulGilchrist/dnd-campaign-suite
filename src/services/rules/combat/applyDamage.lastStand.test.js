@@ -1,6 +1,18 @@
+// @maintained-by-ai
+// Lane: Boon of Recovery (Last Stand) zero-HP interception through applyDamageToTarget.
+// Owns the last-stand-unique contract: the drop-to-0 intercept return bytes (incl.
+// interceptedFeature identity from the ZERO_HP_INTERCEPTORS dispatch order), the full
+// stamped write-set (heal, latch, stabilise, unconscious-filter), the 'healing' log entry,
+// and the gate legs proving the guard fires on lethal damage and stays silent otherwise.
+// Generic resistance/save/evasion arithmetic lives in applyDamage.helpers.test.js — not re-driven here.
+// Handler-lane ('hp_change' logs via survive_and_heal) lives in boonOfRecoveryHandler.test.js — not duplicated here.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
+import { addEntry } from '../../ui/logService.js';
+import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
@@ -41,19 +53,8 @@ vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-// Suppress CustomEvent dispatch in tests — produce a real Event
-const OriginalCustomEvent = window.CustomEvent;
-beforeEach(() => {
-  window.CustomEvent = function (type) { return new Event(type); };
-});
-afterAll(() => {
-  window.CustomEvent = OriginalCustomEvent;
-});
-
 // Prevent unhandled fetch rejections in tests
 globalThis.fetch = vi.fn(() => new Promise(() => {}));
-
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 function makeCreature(name, extra = {}) {
   return {
@@ -70,189 +71,138 @@ function makeCreature(name, extra = {}) {
   };
 }
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
-
-function makeCharacter(name, opts = {}) {
-  const {
-    level = 20,
-    maxHp = 180,
-    features = [],
-    className = 'Paladin',
-    classLevel = 20,
-  } = opts;
+// Player entry in the characters list — the interceptor's playerComputed comes from
+// here (options.characters), NOT from the combat-summary creature's own fields.
+function makeCharacter(name, { maxHp = 180, features = [] } = {}) {
   return {
     name,
     computedStats: {
       name,
-      level,
+      level: 20,
       hitPoints: { max: maxHp },
-      class: { name: className, class_levels: [{ level: classLevel }] },
+      class: { name: 'Paladin', class_levels: [{ level: 20 }] },
       allFeatures: features,
       equipment: [],
     },
   };
 }
 
-/**
- * Returns a default getRuntimeValue implementation that provides sensible
- * defaults for the keys the tested code paths read.  Each test can layer
- * specific overrides on top by calling the returned function with a map
- * of { key: value } pairs.
- */
-function defaultGetRuntimeValue(overrides = {}) {
-  return vi.fn((charName, key, _campaign) => {
-    const keyOverride = overrides[key];
-    if (keyOverride !== undefined) return keyOverride;
-    if (key === 'activeConditions') return [];
-    if (key === 'activeBuffs') return [];
-    if (key === 'arcaneWardActive') return undefined;
-    if (key === 'undyingSentinelUsed' || key === 'relentlessEnduranceUsed' || key === 'boonOfRecoveryLastStandUsed') return false;
-    if (key === 'currentHitPoints') return 10;
-    if (key === 'hitPoints') return 180;
-    if (key === 'holyAuraSaveDc') return undefined;
-    if (key === 'lastMetamagicDamage') return undefined;
-    if (key === 'targetEffects') return [];
-    if (key === 'tempHp') return 0;
-    if (key === 'resistanceUsedThisTurn') return undefined;
-    if (key === 'stealthAttackCost') return undefined;
-    return undefined;
+const LAST_STAND = [{ name: 'Last Stand' }];
+
+// Runtime-store stub keyed by `${name}.${key}` factories — never positional-once-chains.
+function store(overrides = {}) {
+  const defaults = {
+    activeConditions: () => [],
+    activeBuffs: () => [],
+    targetEffects: () => [],
+    tempHp: () => 0,
+  };
+  return (name, key) => {
+    const k = `${name}.${key}`;
+    if (k in overrides) return overrides[k];
+    const def = defaults[key];
+    return def ? def() : undefined;
+  };
+}
+
+function makeSummary(name) {
+  return { round: 1, creatures: [makeCreature(name)] };
+}
+
+function applyLethal(cs, name, { maxHp = 180, features = LAST_STAND, damage = 10 } = {}) {
+  return applyDamageToTarget(cs, name, damage, ['Slashing'], {
+    campaignName,
+    characters: [makeCharacter(name, { maxHp, features })],
   });
 }
 
 describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockImplementation(defaultGetRuntimeValue());
   });
 
-  function createCharacterWithBoon(name, opts = {}) {
-    const { level = 20, maxHp = 180 } = opts;
-    return makeCreature(name, {
-      level,
-      computedStats: {
-        name,
-        level,
-        hitPoints: { max: maxHp },
-        class: { name: 'Paladin', class_levels: [{ level }] },
-        allFeatures: [{ name: 'Last Stand' }, { name: 'Other Feature' }],
-        equipment: [],
-      },
-    });
-  }
+  it('intercepts drop-to-0: heals 1 + floor(maxHp/2), stamps latch and stabilise bytes, logs healing', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'BoonChar.currentHitPoints': 10,
+      'BoonChar.hitPoints': 180,
+      'BoonChar.activeConditions': ['unconscious', 'poisoned'],
+    }));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-  describe('trigger conditions', () => {
-    it('heals to 1 + half max HP when dropping to 0 HP', async () => {
-      const char = createCharacterWithBoon('BoonChar', { level: 20, maxHp: 180 });
-      const cs = makeCombatSummary([char]);
+    const cs = makeSummary('BoonChar');
+    const result = await applyLethal(cs, 'BoonChar');
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 180,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
-
-      expect(result.intercepted).toBe(true);
-      expect(result.finalDamage).toBe(0);
-      expect(result.newHp).toBe(91); // 1 + floor(180/2)
+    // Return contract: intercepted at the zero-HP seam, attributed to this feature,
+    // damage fully annulled (oldHp retained, 10 damage rolled off).
+    expect(result).toMatchObject({
+      intercepted: true,
+      interceptedFeature: 'Boon of Recovery',
+      finalDamage: 0,
+      damageDealt: 10,
+      oldHp: 10,
+      newHp: 91, // 1 + floor(180/2), capped at maxHp
     });
 
-    it('does not trigger if already used this long rest', async () => {
-      const char = createCharacterWithBoon('BoonChar', { level: 20 });
-      const cs = makeCombatSummary([char]);
+    // Stamped bytes: heal, one-shot latch, death-save stabilise,
+    // unconscious stripped while other conditions are preserved.
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'currentHitPoints', 91, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'deathSaves', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'deathFailures', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'isDead', 0, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('BoonChar', 'activeConditions', ['poisoned'], campaignName);
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 180,
-        boonOfRecoveryLastStandUsed: true,
-      }));
+    // Combat-summary creature mirror updated so the card renders the revival.
+    expect(cs.creatures[0].currentHp).toBe(91);
 
-      const result = await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
+    // Healing log entry verbatim.
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'healing',
+      targetName: 'BoonChar',
+      delta: 91,
+      amount: 91,
+      currentHp: 91,
+      maxHp: 180,
+      isHealing: true,
+      isUnconscious: false,
+      sourceName: 'Boon Of Recovery - Last Stand',
     });
-
-    it('does not trigger if feature is not present', async () => {
-      const fighter = makeCreature('Fighter', {
-        level: 20,
-        computedStats: {
-          name: 'Fighter',
-          level: 20,
-          hitPoints: { max: 200 },
-          class: { name: 'Fighter', class_levels: [{ level: 20 }] },
-          allFeatures: [{ name: 'Extra Attack' }],
-          equipment: [],
-        },
-      });
-      const cs = makeCombatSummary([fighter]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 200,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], { campaignName, characters: [makeCharacter('Fighter', { level: 20, maxHp: 200, features: [{ name: 'Extra Attack' }], className: 'Fighter', classLevel: 20, })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+    dispatchSpy.mockRestore();
   });
 
-  describe('side effects', () => {
-    it('resets death saves and removes unconscious condition when triggering', async () => {
-      const char = createCharacterWithBoon('BoonChar', { level: 20 });
-      const cs = makeCombatSummary([char]);
+  it.each([
+    ['the long-rest latch is already set', LAST_STAND, { 'BoonChar.boonOfRecoveryLastStandUsed': true }],
+    ['the Last Stand feature is not present', [{ name: 'Extra Attack' }], {}],
+  ])('stays silent when %s — damage drops target to 0 and normal death handling takes over', async (_label, features, overrides) => {
+    getRuntimeValue.mockImplementation(store({
+      'BoonChar.currentHitPoints': 10,
+      'BoonChar.hitPoints': 180,
+      ...overrides,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 180,
-        activeConditions: ['unconscious'],
-      }));
+    const result = await applyLethal(makeSummary('BoonChar'), 'BoonChar', { features });
 
-      await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
+    // Guard fires: no interception, damage lands, target falls to 0.
+    expect(result.finalDamage).toBe(10);
+    expect(result.newHp).toBe(0);
+    expect(result.intercepted).toBeUndefined();
+    expect(result.interceptedFeature).toBeUndefined();
+    expect(sendDeathSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'BoonChar' }));
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'BoonChar', 'deathSaves', [false, false, false], campaignName,
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'BoonChar', 'deathFailures', [false, false, false], campaignName,
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'BoonChar', 'activeConditions', [], campaignName,
-      );
-    });
-
-    it('marks feature as used when triggering', async () => {
-      const char = createCharacterWithBoon('BoonChar', { level: 20 });
-      const cs = makeCombatSummary([char]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 180,
-      }));
-
-      await applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName,
-      );
-    });
+    // Guard stays silent: no latch stamp, no stabilise bytes, no healing log.
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('BoonChar', 'isDead', 0, campaignName);
+    expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Boon Of Recovery - Last Stand' }));
   });
 
-  describe('edge cases', () => {
-    it('throws when hitPoints is null from runtime', async () => {
-      const char = createCharacterWithBoon('BoonChar', { level: 20 });
-      const cs = makeCombatSummary([char]);
+  it('throws loudly (no silent fallback) when stored max HP is missing', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'BoonChar.currentHitPoints': 10,
+      'BoonChar.hitPoints': null,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: null,
-      }));
-
-      await expect(applyDamageToTarget(cs, 'BoonChar', 10, ['Slashing'], { campaignName, characters: [makeCharacter('BoonChar', { level: 20, maxHp: 180, features: [{ name: 'Last Stand' }], className: 'Paladin', classLevel: 20, })] })).rejects.toThrow('Last Stand: hitPoints not found for BoonChar');
-    });
+    await expect(applyLethal(makeSummary('BoonChar'), 'BoonChar')).rejects.toThrow('Last Stand: hitPoints not found for BoonChar');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName);
   });
 });

@@ -1,10 +1,21 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 import { addEntry } from '../../ui/logService.js';
-import storage from '../../ui/storage.js';
+
+// NPC concentration auto-roll lane only — handleNpcConcentrationBreak (applyDamage.js
+// :644-699): advantage/disadvantage arming, Relentless Hunter exemption (NPC side),
+// broken/intact concentration state, and log bytes.
+// Owned elsewhere, never re-driven here:
+//   - generic arithmetic / spent / floor / resistance math → applyDamage.helpers.test.js
+//     (computeDamageAfterResistances :53-86, computeDamageAfterSave :88-104,
+//      rollSaveForCreature :106-166, hasEvasionForSave :168-182,
+//      computeDamageAfterEvasion :184-196)
+//   - concentration DC recalc after damage → applyDamage.test.js :241-285
+//   - player prompt lane + PC Relentless Hunter exemption → applyDamage.relentlessHunter.test.js
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -46,21 +57,15 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-// ── Globals ─────────────────────────────────────────────────────
-
 global.fetch = vi.fn(() => new Promise(() => {}));
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
-
-function createNpcCreature(name, maxHp, currentHp, extra = {}) {
+function makeCreature(name, currentHp, extra = {}) {
   return {
     name,
     type: 'monster',
-    maxHp,
+    maxHp: currentHp,
     currentHp,
     resistances: [],
     immunities: [],
@@ -72,391 +77,241 @@ function createNpcCreature(name, maxHp, currentHp, extra = {}) {
   };
 }
 
-function createMinimalCharacter(name, charLevel, extra = {}) {
-  return {
+function makeCharacter(name, { level = 1, className = 'Fighter', features = [], saveModifiers } = {}) {
+  const character = {
     name,
-    level: charLevel ?? 1,
+    level,
     computedStats: {
       resistances: [],
       immunities: [],
-      class_levels: [],
+      class_levels: [{ level, features }],
       equipment: [],
       characterAdvancement: [],
-      allFeatures: [],
+      allFeatures: features,
       automation: { passives: [] },
-      ...extra.computedExtra,
+      class: { name: className, class_levels: [{ level, features }] },
     },
-    ...extra,
   };
+  if (saveModifiers) character.saveModifiers = saveModifiers;
+  return character;
 }
 
-function stubNpcRuntime(currentHp, conditions = [], extraOverrides = {}) {
+// Runtime store stub keyed `${name}.${key}` (#1057/#1186). Keys not listed return
+// undefined — the absent-activeBuffs leg of CLA-395 is exercised implicitly by every test.
+function stubRuntime(currentHp, overrides = {}) {
   getRuntimeValue.mockReset();
-  getRuntimeValue
-    .mockImplementation((_charName, key, _campaignName) => {
-      if (extraOverrides[key] !== undefined) return extraOverrides[key];
-      if (key === 'activeBuffs') return [];
-      if (key === 'arcaneWardActive') return false;
-      if (key === 'arcaneWardHp') return 0;
-      if (key === 'lastMetamagicDamage') return undefined;
-      if (key === 'currentHitPoints') return currentHp;
-      if (key === 'activeConditions') return conditions;
-      if (key === 'holyAuraSaveDc') return undefined;
-      if (key === 'stealthAttackCost') return undefined;
-      if (key === 'targetEffects') return [];
-      if (key === 'tempHp') return 0;
-      if (key === 'resistanceUsedThisTurn') return undefined;
-      return undefined;
-    });
+  getRuntimeValue.mockImplementation((name, key) => {
+    const composite = `${name}.${key}`;
+    if (composite in overrides) return overrides[composite];
+    if (key in overrides) return overrides[key];
+    if (key === 'currentHitPoints') return currentHp;
+    if (key === 'activeConditions') return [];
+    return undefined;
+  });
 }
+
+function apply(cs, targetName, damage, options = {}) {
+  return applyDamageToTarget(cs, targetName, damage, ['Slashing'], {
+    campaignName: 'TestCampaign',
+    characters: [makeCharacter(targetName)],
+    ...options,
+  });
+}
+
+function clearRollMocks() {
+  rollConcentrationSave.mockClear();
+  addEntry.mockClear();
+}
+
+const ROLL_SUCCESS = { success: true, roll: 10, total: 10 };
 
 // ── Tests ───────────────────────────────────────────────────────
 
-describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () => {
+describe('applyDamageToTarget — NPC concentration auto-roll lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch.mockReset();
   });
 
-  describe('Dragon Constellation advantage', () => {
-    it('grants concentration save advantage when Starry Form Dragon is active', async () => {
-      const dragonConstellationCreature = createNpcCreature('Druid', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([dragonConstellationCreature]);
+  it('grants concentration save advantage only for the Dragon Starry Form', async () => {
+    const druid = makeCreature('Druid', 30, { concentration: { spell: 'Haste', dc: 10 } });
+    const cs = { round: 1, creatures: [druid] };
+    rollConcentrationSave.mockReturnValue(ROLL_SUCCESS);
 
-      getRuntimeValue.mockReset();
-      getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', constellation: 'Dragon' }];
-        if (key === 'arcaneWardActive') return false;
-        if (key === 'arcaneWardHp') return 0;
-        if (key === 'lastMetamagicDamage') return undefined;
-        if (key === 'currentHitPoints') return 30;
-        if (key === 'activeConditions') return [];
-        if (key === 'holyAuraSaveDc') return undefined;
-        if (key === 'stealthAttackCost') return undefined;
-        if (key === 'targetEffects') return [];
-        if (key === 'tempHp') return 0;
-        if (key === 'resistanceUsedThisTurn') return undefined;
-        return undefined;
-      });
+    // guard fires: Dragon constellation → advantage
+    stubRuntime(30, { 'Druid.activeBuffs': [{ name: 'Starry Form', constellation: 'Dragon' }] });
+    await apply(cs, 'Druid', 10);
+    expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, true, false);
 
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
+    // guard silent: same buff name, different constellation → no advantage
+    clearRollMocks();
+    stubRuntime(30, { 'Druid.activeBuffs': [{ name: 'Starry Form', constellation: 'Raven' }] });
+    await apply(cs, 'Druid', 10);
+    expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, false);
+  });
 
-      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Druid', 1), ] });
+  it("exempts a Relentless Hunter Ranger concentrating Hunter's Mark — no save, maintained log, damage still lands", async () => {
+    const ranger = makeCreature('Ranger', 30, { concentration: { spell: "Hunter's Mark", dc: 10 } });
+    const cs = { round: 1, creatures: [ranger] };
+    stubRuntime(30);
 
-      expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, true, false);
+    await apply(cs, 'Ranger', 10, {
+      characters: [makeCharacter('Ranger', { level: 13, className: 'Ranger', features: [{ name: 'Relentless Hunter' }] })],
     });
 
-    it('does not grant advantage for non-Dragon constellations', async () => {
-      const druidCreature = createNpcCreature('Druid', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([druidCreature]);
-
-      getRuntimeValue.mockReset();
-      getRuntimeValue.mockImplementation((_charName, key, _campaignName) => {
-        if (key === 'activeBuffs') return [{ name: 'Starry Form', constellation: 'Raven' }];
-        if (key === 'arcaneWardActive') return false;
-        if (key === 'arcaneWardHp') return 0;
-        if (key === 'lastMetamagicDamage') return undefined;
-        if (key === 'currentHitPoints') return 30;
-        if (key === 'activeConditions') return [];
-        if (key === 'holyAuraSaveDc') return undefined;
-        if (key === 'stealthAttackCost') return undefined;
-        if (key === 'targetEffects') return [];
-        if (key === 'tempHp') return 0;
-        if (key === 'resistanceUsedThisTurn') return undefined;
-        return undefined;
-      });
-
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
-
-      await applyDamageToTarget(cs, 'Druid', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Druid', 1), ] });
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, false);
+    expect(rollConcentrationSave).not.toHaveBeenCalled();
+    expect(ranger.concentration).toEqual({ spell: "Hunter's Mark", dc: 10 });
+    expect(ranger.currentHp).toBe(20); // exemption suppresses the save, not the damage
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+      type: 'condition',
+      action: 'maintained',
+      characterName: 'Ranger',
+      condition: 'Concentration on Hunter\'s Mark',
+      sourceName: 'Relentless Hunter',
     });
   });
 
-  describe('Relentless Hunter — Ranger concentrating Hunter\'s Mark only', () => {
-    const rangerFeatureLevels = [{ level: 13, features: [{ name: 'Relentless Hunter' }] }];
+  it('keeps the Relentless Hunter exemption silent — save still rolls for non-Hunter\'s-Mark spell (CLA-289), Ranger without the feature, or non-Ranger', async () => {
+    const cases = [
+      { name: 'CLA-289: qualifying Ranger concentrating a non-Hunter\'s-Mark spell', creature: 'Ranger', spell: 'Haste', className: 'Ranger', level: 13, features: [{ name: 'Relentless Hunter' }] },
+      { name: 'Ranger whose class_levels lack the feature', creature: 'Ranger', spell: 'Hunter\'s Mark', className: 'Ranger', level: 12, features: [] },
+      { name: 'non-Ranger carrying the feature name', creature: 'Wizard', spell: 'Hunter\'s Mark', className: 'Wizard', level: 20, features: [{ name: 'Relentless Hunter' }] },
+    ];
 
-    it('skips concentration save for a Ranger with Relentless Hunter concentrating Hunter\'s Mark', async () => {
-      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
-        concentration: { spell: "Hunter's Mark", dc: 10 },
-        saveBonuses: { con: 0 },
+    for (const c of cases) {
+      clearRollMocks();
+      const creature = makeCreature(c.creature, 30, { concentration: { spell: c.spell, dc: 10 } });
+      const cs = { round: 1, creatures: [creature] };
+      stubRuntime(30);
+      rollConcentrationSave.mockReturnValue(ROLL_SUCCESS);
+
+      await apply(cs, c.creature, 10, {
+        characters: [makeCharacter(c.creature, { level: c.level, className: c.className, features: c.features })],
       });
-      const cs = makeCombatSummary([rangerCreature]);
 
-      const rangerCharacter = createMinimalCharacter('Ranger', 13, {
-        computedExtra: {
-          class: { name: 'Ranger', class_levels: rangerFeatureLevels },
-          level: 13,
-        },
-      });
-
-      stubNpcRuntime(30);
-
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
-
-      // Relentless Hunter suppresses the save for Hunter's Mark only
-      expect(rollConcentrationSave).not.toHaveBeenCalled();
-      expect(rangerCreature.concentration).not.toBeNull();
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'condition',
+      expect(rollConcentrationSave, c.name).toHaveBeenCalledTimes(1);
+      expect(rollConcentrationSave, c.name).toHaveBeenCalledWith(0, 10, false, false);
+      expect(creature.concentration, c.name).not.toBeNull();
+      expect(addEntry, c.name).not.toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
         action: 'maintained',
-        characterName: 'Ranger',
-        condition: 'Concentration on Hunter\'s Mark',
         sourceName: 'Relentless Hunter',
       }));
+    }
+  });
+
+  it('throws when the Ranger player level is null for the relentless hunter check', async () => {
+    const ranger = makeCreature('Ranger', 30, { concentration: { spell: "Hunter's Mark", dc: 10 } });
+    const cs = { round: 1, creatures: [ranger] };
+    stubRuntime(30);
+    const levelless = makeCharacter('Ranger', { level: 13, className: 'Ranger', features: [{ name: 'Relentless Hunter' }] });
+    levelless.level = null;
+    levelless.computedStats.level = null;
+
+    await expect(apply(cs, 'Ranger', 10, { characters: [levelless] })).rejects.toThrow('player level is required for relentless hunter check');
+    // guard silent when level is present: covered by the exemption test above (lv13, no throw)
+    expect(rollConcentrationSave).not.toHaveBeenCalled();
+  });
+
+  it('MA-0038: forces disadvantage from a live concentration_disadvantage te or an attacker concentration_breaker — silent when neither', async () => {
+    const orc = makeCreature('Orc', 30, { concentration: { spell: 'Haste', dc: 10 } });
+    const cs = { round: 1, creatures: [orc] };
+    rollConcentrationSave.mockReturnValue(ROLL_SUCCESS);
+
+    // arm 1: live te written by a monster failed-save clause
+    const te = { target: 'Orc', effect: 'concentration_disadvantage', source: 'Adult Black Dragon', actionName: 'Cloud of Insects' };
+    stubRuntime(30, { 'campaign.targetEffects': [te] });
+    await apply(cs, 'Orc', 10);
+    expect(rollConcentrationSave).toHaveBeenLastCalledWith(0, 10, false, true);
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      type: 'automation',
+      automationType: 'concentration_disadvantage_applied',
+      characterName: 'Orc',
+      sourceName: 'Adult Black Dragon',
+      abilityName: 'Cloud of Insects',
+    }));
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      type: 'roll',
+      name: 'Concentration Save',
+      mode: 'disadvantage',
+    }));
+
+    // arm 2: static concentration_breaker on the attacker
+    clearRollMocks();
+    stubRuntime(30);
+    await apply(cs, 'Orc', 10, {
+      attackerName: 'Goblin Boss',
+      characters: [
+        makeCharacter('Orc'),
+        makeCharacter('Goblin Boss', { saveModifiers: [{ condition: 'concentration_breaker', effect: 'disadvantage' }] }),
+      ],
+    });
+    expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, true);
+    expect(addEntry).not.toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
+      automationType: 'concentration_disadvantage_applied',
+    }));
+
+    // guard silent: no te, no breaker → normal save
+    clearRollMocks();
+    stubRuntime(30);
+    await apply(cs, 'Orc', 10);
+    expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, false);
+  });
+
+  it('breaks concentration and logs the removal on a failed save; keeps it and logs the full roll entry on a pass', async () => {
+    // fail: concentration nulled, removed-log golden bytes
+    const failingOrc = makeCreature('OrcFail', 30, { concentration: { spell: 'Haste', dc: 10 }, saveBonuses: { con: 3 } });
+    const cs1 = { round: 1, creatures: [failingOrc] };
+    stubRuntime(30);
+    rollConcentrationSave.mockReturnValue({ success: false, roll: 5, total: 8 });
+
+    await apply(cs1, 'OrcFail', 10);
+
+    expect(rollConcentrationSave).toHaveBeenCalledWith(3, 10, false, false);
+    expect(failingOrc.concentration).toBeNull();
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+      type: 'condition',
+      action: 'removed',
+      characterName: 'OrcFail',
+      condition: 'Concentrating on Haste',
+      sourceName: 'Concentration broken by damage',
     });
 
-    it('DOES roll the concentration save for a qualifying Ranger concentrating a non-Hunter\'s-Mark spell (CLA-289)', async () => {
-      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([rangerCreature]);
+    // pass: concentration intact, roll-log golden bytes, missing con bonus defaults to 0
+    clearRollMocks();
+    const passingOrc = makeCreature('OrcPass', 30, { concentration: { spell: 'Haste', dc: 10 } });
+    const cs2 = { round: 1, creatures: [passingOrc] };
+    stubRuntime(30);
+    rollConcentrationSave.mockReturnValue(ROLL_SUCCESS);
 
-      const rangerCharacter = createMinimalCharacter('Ranger', 13, {
-        computedExtra: {
-          class: { name: 'Ranger', class_levels: rangerFeatureLevels },
-          level: 13,
-        },
-      });
+    await apply(cs2, 'OrcPass', 10);
 
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
-
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
-
-      expect(rollConcentrationSave).toHaveBeenCalled();
-    });
-
-    it('does not exempt a Ranger whose class_levels lack the Relentless Hunter feature', async () => {
-      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
-        concentration: { spell: "Hunter's Mark", dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([rangerCreature]);
-
-      const rangerCharacter = createMinimalCharacter('Ranger', 12, {
-        computedExtra: {
-          class: { name: 'Ranger', class_levels: [{ level: 12, features: [] }] },
-          level: 12,
-        },
-      });
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
-
-      await applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] });
-
-      expect(rollConcentrationSave).toHaveBeenCalled();
-    });
-
-    it('does not exempt non-Rangers regardless of level', async () => {
-      const wizardCreature = createNpcCreature('Wizard', 30, 30, {
-        concentration: { spell: "Hunter's Mark", dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([wizardCreature]);
-
-      const wizardCharacter = createMinimalCharacter('Wizard', 1, {
-        computedExtra: {
-          class: { name: 'Wizard', class_levels: [{ level: 20, features: [{ name: 'Relentless Hunter' }] }] },
-          level: 20,
-        },
-      });
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 15 });
-
-      await applyDamageToTarget(cs, 'Wizard', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [wizardCharacter] });
-
-      expect(rollConcentrationSave).toHaveBeenCalled();
-    });
-
-    it('throws when Ranger player level is null (Hunter\'s Mark concentration)', async () => {
-      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
-        concentration: { spell: "Hunter's Mark", dc: 10 },
-        saveBonuses: { con: 0 },
-      });
-      const cs = makeCombatSummary([rangerCreature]);
-
-      const rangerCharacter = {
-        name: 'Ranger',
-        level: null,
-        computedStats: {
-          resistances: [],
-          immunities: [],
-          class_levels: [],
-          equipment: [],
-          characterAdvancement: [],
-          allFeatures: [],
-          automation: { passives: [] },
-          class: { name: 'Ranger', class_levels: rangerFeatureLevels },
-          level: null,
-        },
-      };
-
-      stubNpcRuntime(30);
-
-      await expect(applyDamageToTarget(cs, 'Ranger', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [rangerCharacter] })).rejects.toThrow('player level is required for relentless hunter check');
+    expect(rollConcentrationSave).toHaveBeenCalledWith(0, 10, false, false);
+    expect(passingOrc.concentration).toEqual({ spell: 'Haste', dc: 10 });
+    expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+      type: 'roll',
+      characterName: 'OrcPass',
+      rollType: 'save',
+      name: 'Concentration Save',
+      targetName: 'Haste',
+      rolls: [10],
+      mode: 'normal',
+      total: 10,
+      bonus: 0,
+      saveType: 'CON',
+      saveDc: 10,
+      saveResult: 'success',
     });
   });
 
+  it('CLA-395: null activeBuffs on an EB monster does not crash the concentration auto-roll', async () => {
+    const wight = makeCreature('Wight 1', 82, { concentration: { spell: 'Wight Hold Person', dc: 10 }, saveBonuses: { con: 2 } });
+    const cs = { round: 1, creatures: [wight] };
+    stubRuntime(82, { 'Wight 1.activeBuffs': null });
+    rollConcentrationSave.mockReturnValue({ success: false, roll: 3, total: 5 });
 
+    await apply(cs, 'Wight 1', 10);
 
-  describe('concentration save logging', () => {
-    it('logs a condition entry when NPC fails save (no special features)', async () => {
-      const orcCreature = createNpcCreature('Orc', 30, 30, {
-        concentration: { spell: 'Haste', dc: 15 },
-        saveBonuses: { con: -1 },
-      });
-      const cs = makeCombatSummary([orcCreature]);
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: false, roll: 5, total: 4 });
-
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
-
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'condition',
-        action: 'removed',
-        characterName: 'Orc',
-        condition: 'Concentrating on Haste',
-      }));
-      expect(orcCreature.concentration).toBeNull();
-    });
-
-    it('logs a roll entry when NPC passes save (no special features)', async () => {
-      const orcCreature = createNpcCreature('Orc', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 5 },
-      });
-      const cs = makeCombatSummary([orcCreature]);
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 12, total: 17 });
-
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
-
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'roll',
-        rollType: 'save',
-        characterName: 'Orc',
-        name: 'Concentration Save',
-        saveType: 'CON',
-        saveDc: 10,
-        saveResult: 'success',
-      }));
-      expect(orcCreature.concentration).not.toBeNull();
-    });
-  });
-
-  describe('CLA-395: null/absent activeBuffs on EB monsters', () => {
-    it('does not throw, rolls concentration save, and persists damage when activeBuffs is null', async () => {
-      const wight = createNpcCreature('Wight 1', 82, 82, {
-        concentration: { spell: 'Wight Hold Person', dc: 10 },
-        saveBonuses: { con: 2 },
-      });
-      const cs = makeCombatSummary([wight]);
-
-      stubNpcRuntime(82, [], { activeBuffs: null });
-      rollConcentrationSave.mockReturnValue({ success: false, roll: 3, total: 5, rawRolls: [3] });
-
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
-      expect(wight.currentHp).toBe(72);
-      expect(wight.concentration).toBeNull();
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'TestCampaign');
-      expect(addEntry).toHaveBeenCalledWith('TestCampaign', expect.objectContaining({
-        type: 'condition',
-        action: 'removed',
-        characterName: 'Wight 1',
-        condition: 'Concentrating on Wight Hold Person',
-      }));
-    });
-
-    it('does not throw when activeBuffs runtime key is absent (undefined)', async () => {
-      const wight = createNpcCreature('Wight 1', 82, 82, {
-        concentration: { spell: 'Wight Hold Person', dc: 10 },
-        saveBonuses: { con: 2 },
-      });
-      const cs = makeCombatSummary([wight]);
-
-      getRuntimeValue.mockReset();
-      getRuntimeValue.mockImplementation((_charName, key) => {
-        if (key === 'arcaneWardActive') return false;
-        if (key === 'arcaneWardHp') return 0;
-        if (key === 'currentHitPoints') return 82;
-        if (key === 'activeConditions') return [];
-        if (key === 'targetEffects') return [];
-        if (key === 'tempHp') return 0;
-        return undefined;
-      });
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
-
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
-      expect(wight.currentHp).toBe(72);
-      expect(wight.concentration).not.toBeNull();
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'TestCampaign');
-    });
-
-    it('still rolls the save with activeBuffs present (control)', async () => {
-      const wight = createNpcCreature('Wight 1', 82, 82, {
-        concentration: { spell: 'Wight Hold Person', dc: 10 },
-        saveBonuses: { con: 2 },
-      });
-      const cs = makeCombatSummary([wight]);
-
-      stubNpcRuntime(82, [], { activeBuffs: [{ name: 'Some Buff' }] });
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
-
-      await expect(applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] })).resolves.toBeTruthy();
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
-      expect(wight.currentHp).toBe(72);
-      expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'TestCampaign');
-    });
-
-    it('still grants Dragon Starry Form advantage from a populated activeBuffs array', async () => {
-      const wight = createNpcCreature('Wight 1', 82, 82, {
-        concentration: { spell: 'Wight Hold Person', dc: 10 },
-        saveBonuses: { con: 2 },
-      });
-      const cs = makeCombatSummary([wight]);
-
-      stubNpcRuntime(82, [], { activeBuffs: [{ name: 'Starry Form', constellation: 'Dragon' }] });
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 17, rawRolls: [15] });
-
-      await applyDamageToTarget(cs, 'Wight 1', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('EvasiveFighter', 18), ] });
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, true, false);
-      expect(wight.currentHp).toBe(72);
-    });
-  });
-
-  describe('save bonus from creature', () => {
-    it('uses creature saveBonuses con for concentration save', async () => {
-      const creature = createNpcCreature('Orc', 30, 30, {
-        concentration: { spell: 'Haste', dc: 10 },
-        saveBonuses: { con: 3 },
-      });
-      const cs = makeCombatSummary([creature]);
-
-      stubNpcRuntime(30);
-      rollConcentrationSave.mockReturnValue({ success: true, roll: 10, total: 13 });
-
-      await applyDamageToTarget(cs, 'Orc', 10, ['Slashing'], { campaignName: 'TestCampaign', characters: [ createMinimalCharacter('Orc', 1), ] });
-
-      expect(rollConcentrationSave).toHaveBeenCalledWith(3, 10, false, false);
-    });
+    expect(rollConcentrationSave).toHaveBeenCalledWith(2, 10, false, false);
+    expect(wight.concentration).toBeNull();
+    expect(wight.currentHp).toBe(72); // damage flow completed past the guard
   });
 });

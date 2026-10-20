@@ -1,10 +1,17 @@
-// CLA-324 Spell Resistance (Wizard / Abjurer lv14) regression tests.
-// Locks down: spell-origin damage halved for a damageResistance:['Spell'] target;
-// non-spell damage NOT halved; non-holder NOT halved.
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// CLA-324 Spell Resistance (Abjurer lv14) — owner of the SPELL-ORIGIN seam at applyDamage:
+// which arms fire the categorical 'Spell' reduction (options.isSpellDamage, campaign
+// lastAttack spell-save / isSpellDamage stamps), which arms stay silent (non-holder,
+// non-spell-origin, ignoreResistance, stale stamps), and the 'Spell Resistance' log bytes.
+// Generic resistance/halving arithmetic lives in applyDamage.helpers.test.js :53-86;
+// passive → ['Spell'] predicate census lives in automationPassives.landResistance.test.js —
+// getDamageResistances is mocked here, so which-arm-arms is what this file pins.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget, computeDamageAfterResistancesWithDetails } from './applyDamage.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getDamageResistances } from '../../combat/automation/automationPassives.js';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
@@ -51,11 +58,13 @@ vi.mock('../../ui/logService.js', () => ({
 
 global.fetch = vi.fn(() => new Promise(() => {}));
 
-// ── Helpers ─────────────────────────────────────────────────────
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
+// ── Fixtures ─────────────────────────────────────────────────────
+
+const CAMPAIGN = 'test-campaign';
 
 function createPlayerCreature(name) {
   return {
@@ -71,9 +80,11 @@ function createPlayerCreature(name) {
   };
 }
 
-function createHolderCharacter(name) {
-  // Abjurer lv14 Spell Resistance passive: passive_immunity damageResistance:['Spell']
-  return {
+// Computed-passive bytes verbatim from disk shape (test-campaign HexWarlock.json
+// passive_immunity entries) — source feature: classes.json subclasses[1].class_levels[3]
+// 'Spell Resistance' (damage_resistance:['Spell'], normalized to camelCase at collection).
+function holderCharacters(name) {
+  return [{
     name,
     computedStats: {
       resistances: [],
@@ -84,15 +95,23 @@ function createHolderCharacter(name) {
       allFeatures: [],
       automation: {
         passives: [
-          { type: 'passive_immunity', damageResistance: ['Spell'], name: 'Spell Resistance' },
+          {
+            type: 'passive_immunity',
+            name: 'Spell Resistance',
+            target: 'self',
+            conditionImmunity: '',
+            damageResistance: ['Spell'],
+            saveAdvantage: [],
+            hasAutomation: true,
+          },
         ],
       },
     },
-  };
+  }];
 }
 
-function createNonHolderCharacter(name) {
-  return {
+function nonHolderCharacters(name) {
+  return [{
     name,
     computedStats: {
       resistances: [],
@@ -103,138 +122,135 @@ function createNonHolderCharacter(name) {
       allFeatures: [],
       automation: { passives: [] },
     },
+  }];
+}
+
+// Name+key-routed store stub (#1057/#1186): only the exact `${name}.${key}` routes this
+// lane reads answer; any other lookup stays explicitly null (#940).
+function stubRuntime({ name, hp, lastAttack = null }) {
+  const values = {
+    [`${name}.currentHitPoints`]: hp,
+    [`${name}.hitPoints`]: hp,
+    [`${name}.activeBuffs`]: [],
+    [`${name}.activeConditions`]: [],
+    [`${name}.tempHp`]: 0,
+    [`${name}.polymorphTempHp`]: 0,
+    [`${name}.arcaneWardActive`]: false,
+    [`${name}.arcaneWardHp`]: 0,
+    [`${name}.projectedWardDamage`]: 0,
+    'campaign.lastAttack': lastAttack,
+    'campaign.targetEffects': [],
   };
+  getRuntimeValue.mockImplementation((storeName, key) => values[`${storeName}.${key}`] ?? null);
 }
 
-function stubRuntime(currentHp, lastAttack = null) {
-  getRuntimeValue.mockImplementation((_charName, key) => {
-    if (key === 'lastAttack') return lastAttack;
-    if (key === 'activeBuffs') return [];
-    if (key === 'arcaneWardActive') return false;
-    if (key === 'arcaneWardHp') return 0;
-    if (key === 'currentHitPoints') return currentHp;
-    if (key === 'hitPoints') return currentHp;
-    if (key === 'activeConditions') return [];
-    if (key === 'tempHp') return 0;
-    if (key === 'polymorphTempHp') return 0;
-    return undefined;
-  });
+function spellResistanceLogCalls() {
+  return logService.addEntry.mock.calls.filter((c) => c[1].name === 'Spell Resistance');
 }
 
-// ── Pure helper ─────────────────────────────────────────────────
+// ── Pure helper: the spellOrigin clause of computeDamageAfterResistancesWithDetails ──
 
-describe('computeDamageAfterResistancesWithDetails — categorical Spell resistance', () => {
-  it('halves spell-origin damage when resistances include Spell', () => {
-    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: false, spellOrigin: true });
-    expect(r.finalDamage).toBe(7);
-    expect(r.typeDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
-  });
-
-  it('does NOT halve non-spell-origin damage even when resistances include Spell', () => {
-    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: false, spellOrigin: false });
-    expect(r.finalDamage).toBe(14);
-    expect(r.typeDetails).toEqual([]);
-  });
-
-  it('does NOT double-halve when a concrete type already matched', () => {
-    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Cold', 'Spell'], immunities: [], ignoreResistance: false, spellOrigin: true });
-    expect(r.finalDamage).toBe(7);
-    expect(r.typeDetails).toEqual([{ damageType: 'Cold', status: 'resistant' }]);
-  });
-
-  it('does NOT halve spell-origin damage when resistance is ignored', () => {
-    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: true, spellOrigin: true });
-    expect(r.finalDamage).toBe(14);
-  });
-
-  it('immunity wins over spell-origin halving', () => {
-    const r = computeDamageAfterResistancesWithDetails({ rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: ['Cold'], ignoreResistance: false, spellOrigin: true });
-    expect(r.finalDamage).toBe(0);
-    expect(r.typeDetails).toEqual([{ damageType: 'Cold', status: 'immune' }]);
+describe('computeDamageAfterResistancesWithDetails — categorical Spell resistance (CLA-324)', () => {
+  it.each([
+    ['halves spell-origin damage once, stamps Spell-resistant detail',
+      { spellOrigin: true }, { finalDamage: 7, typeDetails: [{ damageType: 'Spell', status: 'resistant' }] }],
+    ['stays silent for non-spell-origin damage',
+      { spellOrigin: false }, { finalDamage: 14, typeDetails: [] }],
+    ['ignoreResistance bypasses the spell clause',
+      { spellOrigin: true, ignoreResistance: true }, { finalDamage: 14, typeDetails: [] }],
+    ['does NOT double-halve when a concrete type already matched',
+      { resistances: ['Cold', 'Spell'], spellOrigin: true }, { finalDamage: 7, typeDetails: [{ damageType: 'Cold', status: 'resistant' }] }],
+    ['immunity to the concrete type wins over spell-origin halving',
+      { immunities: ['Cold'], spellOrigin: true }, { finalDamage: 0, typeDetails: [{ damageType: 'Cold', status: 'immune' }] }],
+  ])('%s', (_label, input, expected) => {
+    const result = computeDamageAfterResistancesWithDetails({
+      rawDamage: 14, damageTypes: ['Cold'], resistances: ['Spell'], immunities: [], ignoreResistance: false, ...input,
+    });
+    expect(result).toEqual(expected);
   });
 });
 
 // ── applyDamageToTarget integration ────────────────────────────
 
 describe('applyDamageToTarget — CLA-324 Spell Resistance halving', () => {
-  it('halves spell-origin damage for a damageResistance:[Spell] holder and logs', async () => {
-    const { getDamageResistances } = await import('../../combat/automation/automationPassives.js');
+  it('halves spell-origin damage for the holder: store HP, flags, and exact log bytes', async () => {
     getDamageResistances.mockReturnValue(['Spell']);
-    const logModule = await import('../../ui/logService.js');
-    logModule.addEntry.mockClear();
-
     const player = createPlayerCreature('DivinationWizard');
-    const cs = makeCombatSummary([player]);
-    stubRuntime(82);
+    stubRuntime({ name: 'DivinationWizard', hp: 82 });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
+    const result = await applyDamageToTarget(
+      { round: 1, creatures: [player] }, 'DivinationWizard', 14, ['Cold'],
+      { campaignName: CAMPAIGN, characters: holderCharacters('DivinationWizard'), isSpellDamage: true, attackerName: 'Gazer 1' },
+    );
 
     expect(result.finalDamage).toBe(7);
     expect(result.damageReduced).toBe(true);
     expect(result.resistanceDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
-    expect(player.currentHp).toBe(82);
+    expect(result.newHp).toBe(75);
+    expect(setRuntimeValue).toHaveBeenCalledWith('DivinationWizard', 'currentHitPoints', 75, CAMPAIGN);
 
-    const resistLog = logModule.addEntry.mock.calls.find(
-      (c) => c[1].type === 'automation' && c[1].name === 'Spell Resistance'
-    );
-    expect(resistLog).toBeDefined();
-    expect(resistLog[1].description).toContain('DivinationWizard');
-    expect(resistLog[1].description).toContain('14 spell damage halved to 7');
+    const logs = spellResistanceLogCalls();
+    expect(logs).toHaveLength(1);
+    expect(logs[0][0]).toBe(CAMPAIGN);
+    expect(logs[0][1]).toEqual(expect.objectContaining({
+      type: 'automation',
+      creatureName: 'DivinationWizard',
+      name: 'Spell Resistance',
+      description: 'DivinationWizard has resistance to damage of spells — 14 spell damage halved to 7.',
+    }));
   });
 
-  it('does NOT halve non-spell-origin damage for the holder', async () => {
-    const { getDamageResistances } = await import('../../combat/automation/automationPassives.js');
+  // Arm census for isSpellOriginDamage (applyDamage.js:933): same Fire 20 spell damage,
+  // no explicit option — only the stamp bytes decide. isSpellDamage:true stamp is the
+  // monster-card save-attack arm never exercised elsewhere.
+  it.each([
+    ['spell-save stamp arms halving', { rollType: 'spell-save', attackerName: 'Archmage', attackName: 'Fireball' }, 10],
+    ['isSpellDamage:true stamp arms halving', { rollType: 'ability', attackerName: 'Archmage', attackName: 'Fireball', isSpellDamage: true }, 10],
+    ['no stamp stays silent', null, 20],
+    ['stale non-spell attack stamp stays silent', { rollType: 'attack', attackerName: 'Knight 1', attackName: 'Greatsword' }, 20],
+  ])('%s', async (_label, lastAttack, expected) => {
     getDamageResistances.mockReturnValue(['Spell']);
-
     const player = createPlayerCreature('DivinationWizard');
-    const cs = makeCombatSummary([player]);
-    stubRuntime(82);
+    stubRuntime({ name: 'DivinationWizard', hp: 82, lastAttack });
 
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Cold'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Thug 1' });
+    const result = await applyDamageToTarget(
+      { round: 1, creatures: [player] }, 'DivinationWizard', 20, ['Fire'],
+      { campaignName: CAMPAIGN, characters: holderCharacters('DivinationWizard'), attackerName: 'Archmage' },
+    );
+
+    expect(result.finalDamage).toBe(expected);
+    expect(result.resistanceDetails).toEqual(expected < 20 ? [{ damageType: 'Spell', status: 'resistant' }] : []);
+    expect(spellResistanceLogCalls()).toHaveLength(expected < 20 ? 1 : 0);
+  });
+
+  it('does NOT halve plain weapon damage for the holder (no spell arm anywhere)', async () => {
+    getDamageResistances.mockReturnValue(['Spell']);
+    const player = createPlayerCreature('DivinationWizard');
+    stubRuntime({ name: 'DivinationWizard', hp: 82 });
+
+    const result = await applyDamageToTarget(
+      { round: 1, creatures: [player] }, 'DivinationWizard', 14, ['Slashing'],
+      { campaignName: CAMPAIGN, characters: holderCharacters('DivinationWizard'), attackerName: 'Thug 1' },
+    );
 
     expect(result.finalDamage).toBe(14);
+    expect(result.newHp).toBe(68);
     expect(result.resistanceDetails).toEqual([]);
+    expect(spellResistanceLogCalls()).toHaveLength(0);
   });
 
-  it('does NOT halve spell-origin damage for a non-holder', async () => {
-    const { getDamageResistances } = await import('../../combat/automation/automationPassives.js');
-    getDamageResistances.mockReturnValue([]);
-
+  it('does NOT halve spell-origin damage for a non-holder (passive absent)', async () => {
     const player = createPlayerCreature('AberrantSorcerer');
-    const cs = makeCombatSummary([player]);
-    stubRuntime(44);
+    stubRuntime({ name: 'AberrantSorcerer', hp: 44 });
 
-    const result = await applyDamageToTarget(cs, 'AberrantSorcerer', 11, ['Cold'], { campaignName: 'test-campaign', characters: [ createNonHolderCharacter('AberrantSorcerer'), ], ignoreResistance: false, attackerName: 'Gazer 1', suppressHpLog: false, ...{ isSpellDamage: true } });
+    const result = await applyDamageToTarget(
+      { round: 1, creatures: [player] }, 'AberrantSorcerer', 11, ['Cold'],
+      { campaignName: CAMPAIGN, characters: nonHolderCharacters('AberrantSorcerer'), isSpellDamage: true, attackerName: 'Gazer 1' },
+    );
 
     expect(result.finalDamage).toBe(11);
+    expect(result.newHp).toBe(33);
     expect(result.resistanceDetails).toEqual([]);
-  });
-
-  it('halves via spell-save lastAttack stamp without an explicit option', async () => {
-    const { getDamageResistances } = await import('../../combat/automation/automationPassives.js');
-    getDamageResistances.mockReturnValue(['Spell']);
-
-    const player = createPlayerCreature('DivinationWizard');
-    const cs = makeCombatSummary([player]);
-    stubRuntime(82, { rollType: 'spell-save', attackerName: 'Archmage', attackName: 'Fireball' });
-
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 20, ['Fire'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Archmage' });
-
-    expect(result.finalDamage).toBe(10);
-    expect(result.resistanceDetails).toEqual([{ damageType: 'Spell', status: 'resistant' }]);
-  });
-
-  it('does NOT halve weapon damage even when a stale spell-save lastAttack lingers (holder, non-spell-origin)', async () => {
-    const { getDamageResistances } = await import('../../combat/automation/automationPassives.js');
-    getDamageResistances.mockReturnValue(['Spell']);
-
-    const player = createPlayerCreature('DivinationWizard');
-    const cs = makeCombatSummary([player]);
-    // Monster melee attack stamp — NOT spell-origin.
-    stubRuntime(82, { rollType: 'attack', attackerName: 'Knight 1', attackName: 'Greatsword' });
-
-    const result = await applyDamageToTarget(cs, 'DivinationWizard', 14, ['Slashing'], { campaignName: 'test-campaign', characters: [ createHolderCharacter('DivinationWizard'), ], ignoreResistance: false, attackerName: 'Knight 1' });
-
-    expect(result.finalDamage).toBe(14);
+    expect(spellResistanceLogCalls()).toHaveLength(0);
   });
 });

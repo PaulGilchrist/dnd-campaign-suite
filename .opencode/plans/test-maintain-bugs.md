@@ -730,3 +730,13 @@ recs #1080/#1081/#1082 vrock ALL APPLIED #1083 (refusal+cycle deleted->framework
 - 📌 rec#1139 dominateRepeat verdict NOT-APPLICABLE verified: domination-end mechanism (:1097-1128) owned only here, distinct from selfBuff enders :322-368 (#1189); dominateRepeat 10→4/12 closed
 - 📌 chooser-pair CLOSED: FT-009 multi-slot owner #1192, CLA-110 stamp-REPLACE owner #1191; choiceStorage.makeKey ignores playerName param (separation via store player-axis, honest note not defect) (#1192)
 - 📌 #1050-class RESOLVED for epitome fold #1193: no latch/no arity defect — only real latch epitomeEmpoweredUsedRound epitomeEmpoweredStrikes.js:15/:31 (different lane, verify ITS pass); store 3rd campaign-arg quirk ignored-by-design (#1193)
+
+## Batch #196 flush (run2#1196-#1210, 2026-10-20)
+- 🔴 applyDamage.js:552-557 frightened+charmed coexist: charmed-filter write resurrects Frightened in activeConditions (both removals filter same single-read snapshot; charmed-write lands last) — found live by falsifier, commented not pinned (#1207)
+- 🗑 applyDamage.js:1189 resolveHpThreshold 'recovering' branch unreachable via applyDamageToTarget (damage never raises HP) — dead-code candidate (#1207)
+- 🗑 boonOfRecoveryHandler isLastStandAvailable/getLastStandUsed grep-zero production callers — dead exports (#1198)
+- 🔴 CONFIRMED still present: applyDamage.js:451 campaignName omission (#1185, re-verified #1207)
+- 📌 applyDamage.test.js :252-262 + :264-274 weak NPC concentration legs REMOVED per #1200 rec, canon npcConcentrationAdvanced :259-303 (#1207 recs consumed)
+- 📌 legacy intercept scaffolding rec #1198 CONSUMED by relentlessEndurance #1201 + undyingSentinel #1209 (monkey-patch/key-only stubs/split legs gone from all three lanes)
+- 📌 saveProcessing.infernal-wound.test.js:51-54 byte-mirrors BOTH compute helpers as mocks — save-full #1203 confirmed sole real-helper driver; keep mirror flagged in case of mock-theater review (#1203)
+- 📌 applyDamage.js:1200 delta-0 hp_change suppression + immunity-entry sole record canon pinned at silence lane (#1204)

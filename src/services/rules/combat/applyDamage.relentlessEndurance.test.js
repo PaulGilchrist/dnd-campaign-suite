@@ -1,7 +1,23 @@
+// @maintained-by-ai
+// Lane: Relentless Endurance (Orc race trait) zero-HP interception through applyDamageToTarget.
+// Owns the relentless-endurance-unique contract: the drop-to-0 intercept return bytes (incl.
+// interceptedFeature identity from the ZERO_HP_INTERCEPTORS dispatch order), the full stamped
+// write-set (HP-floor at 1, once-per-rest latch, death-save stabilise, unconscious-filter),
+// the 'hp_change' log entry, the RE-only damage-sequence latch (_reTriggeredSequenceIds —
+// follow-up hits in the same sequence stay pinned at 1; a new sequence dies), and the loud
+// throw when stored max HP is missing.
+// Generic resistance/save/evasion arithmetic lives in applyDamage.helpers.test.js
+// (computeDamageAfterResistances :53-86, computeDamageAfterSave :88-104,
+// rollSaveForCreature :106-166, hasEvasionForSave :168-182,
+// computeDamageAfterEvasion :184-196) — not re-driven here.
+// Handler-lane coverage lives in automation/handlers/class-cleric-paladin/relentlessEnduranceHandler.test.js — not duplicated here.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
+import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
@@ -42,19 +58,8 @@ vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-// Suppress CustomEvent dispatch in tests — produce a real Event
-const OriginalCustomEvent = window.CustomEvent;
-beforeEach(() => {
-  window.CustomEvent = function (type) { return new Event(type); };
-});
-afterAll(() => {
-  window.CustomEvent = OriginalCustomEvent;
-});
-
 // Prevent unhandled fetch rejections in tests
 globalThis.fetch = vi.fn(() => new Promise(() => {}));
-
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 function makeCreature(name, extra = {}) {
   return {
@@ -71,260 +76,183 @@ function makeCreature(name, extra = {}) {
   };
 }
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
-
-function makeCharacter(name, opts = {}) {
-  const {
-    level = 1,
-    maxHp = 100,
-    features = [],
-    className = 'Rogue',
-    classLevel = 1,
-  } = opts;
+// Player entry in the characters list — the interceptor's playerComputed comes from
+// here (options.characters), NOT from the combat-summary creature's own fields.
+function makeCharacter(name, { maxHp = 78, features = [{ name: 'Relentless Endurance' }] } = {}) {
   return {
     name,
     computedStats: {
       name,
-      level,
+      level: 1,
       hitPoints: { max: maxHp },
-      class: { name: className, class_levels: [{ level: classLevel }] },
+      class: { name: 'Rogue', class_levels: [{ level: 1 }] },
       allFeatures: features,
       equipment: [],
     },
   };
 }
 
-/**
- * Returns a default getRuntimeValue implementation that provides sensible
- * defaults for the keys the tested code paths read.  Each test can layer
- * specific overrides on top by calling the returned function with a map
- * of { key: value } pairs.
- */
-function defaultGetRuntimeValue(overrides = {}) {
-  return vi.fn((charName, key, _campaign) => {
-    const keyOverride = overrides[key];
-    if (keyOverride !== undefined) return keyOverride;
-    if (key === 'activeConditions') return [];
-    if (key === 'activeBuffs') return [];
-    if (key === 'arcaneWardActive') return undefined;
-    if (key === 'undyingSentinelUsed' || key === 'relentlessEnduranceUsed' || key === 'boonOfRecoveryLastStandUsed') return false;
-    if (key === 'currentHitPoints') return 10;
-    if (key === 'hitPoints') return 100;
-    if (key === 'holyAuraSaveDc') return undefined;
-    if (key === 'lastMetamagicDamage') return undefined;
-    if (key === 'targetEffects') return [];
-    if (key === 'tempHp') return 0;
-    if (key === 'resistanceUsedThisTurn') return undefined;
-    if (key === 'stealthAttackCost') return undefined;
-    return undefined;
+const RE_TRAIT = [{ name: 'Relentless Endurance' }, { name: 'Darkvision' }];
+
+// Runtime-store stub keyed by `${name}.${key}` factories — never positional-once-chains.
+// Mutable via set() so a test can simulate state written by a previous apply (latch, HP).
+function store(overrides = {}) {
+  const values = { ...overrides };
+  const defaults = {
+    activeConditions: () => [],
+    activeBuffs: () => [],
+    targetEffects: () => [],
+    tempHp: () => 0,
+  };
+  const impl = (name, key) => {
+    const k = `${name}.${key}`;
+    if (k in values) return values[k];
+    const def = defaults[key];
+    return def ? def() : undefined;
+  };
+  impl.set = (name, key, value) => { values[`${name}.${key}`] = value; };
+  return impl;
+}
+
+function makeSummary(name) {
+  return { round: 1, creatures: [makeCreature(name)] };
+}
+
+function applyLethal(cs, name, { maxHp = 78, features = RE_TRAIT, damage = 10, ...options } = {}) {
+  return applyDamageToTarget(cs, name, damage, ['Slashing'], {
+    campaignName,
+    characters: [makeCharacter(name, { maxHp, features })],
+    ...options,
   });
 }
 
 describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockImplementation(defaultGetRuntimeValue());
   });
 
-  function createOrc(name, opts = {}) {
-    const { maxHp = 100 } = opts;
-    return makeCreature(name, {
-      level: 1,
-      computedStats: {
-        name,
-        level: 1,
-        hitPoints: { max: maxHp },
-        class: { name: 'Rogue', class_levels: [{ level: 1 }] },
-        allFeatures: [{ name: 'Relentless Endurance' }, { name: 'Darkvision' }],
-        equipment: [],
-      },
-    });
-  }
+  it('intercepts drop-to-0: HP floored at 1, stamps latch and stabilise bytes, strips unconscious, logs hp_change', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'Grushnak.currentHitPoints': 10,
+      'Grushnak.hitPoints': 78,
+      'Grushnak.activeConditions': ['unconscious', 'blinded'],
+    }));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-  describe('trigger conditions', () => {
-    it('sets HP to 1 when dropping to 0 HP', async () => {
-      const orc = createOrc('OrcPlayer', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
+    const cs = makeSummary('Grushnak');
+    const result = await applyLethal(cs, 'Grushnak');
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'OrcPlayer', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
-
-      expect(result.intercepted).toBe(true);
-      expect(result.finalDamage).toBe(0);
-      expect(result.newHp).toBe(1);
+    // Return contract: intercepted at the zero-HP seam, attributed to this feature,
+    // damage fully annulled (oldHp retained, 10 damage rolled off).
+    expect(result).toMatchObject({
+      intercepted: true,
+      interceptedFeature: 'Relentless Endurance',
+      finalDamage: 0,
+      damageDealt: 10,
+      oldHp: 10,
+      newHp: 1,
     });
 
-    it('does not trigger if already used this long rest', async () => {
-      const orc = createOrc('OrcPlayer2', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
+    // Stamped bytes: HP floor at 1, once-per-rest latch, death-save stabilise,
+    // unconscious stripped while other conditions are preserved.
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'currentHitPoints', 1, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'relentlessEnduranceUsed', true, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'deathSaves', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'deathFailures', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'isDead', 0, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Grushnak', 'activeConditions', ['blinded'], campaignName);
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-        relentlessEnduranceUsed: true,
-      }));
+    // Combat-summary creature mirror updated so the card renders the revival.
+    expect(cs.creatures[0].currentHp).toBe(1);
 
-      const result = await applyDamageToTarget(cs, 'OrcPlayer2', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer2', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
+    // No death-save prompt — the target never died.
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
 
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
+    // hp_change log entry verbatim.
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'hp_change',
+      targetName: 'Grushnak',
+      delta: 1,
+      currentHp: 1,
+      maxHp: 78,
+      isUnconscious: false,
+      sourceName: 'Relentless Endurance',
     });
-
-    it('does not trigger if character does not have the trait', async () => {
-      const elf = makeCreature('ElfPlayer', {
-        level: 1,
-        computedStats: {
-          name: 'ElfPlayer',
-          level: 1,
-          hitPoints: { max: 80 },
-          class: { name: 'Rogue', class_levels: [{ level: 1 }] },
-          allFeatures: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }],
-          equipment: [],
-        },
-      });
-      const cs = makeCombatSummary([elf]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 80,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'ElfPlayer', 10, ['Slashing'], { campaignName, characters: [makeCharacter('ElfPlayer', { level: 1, maxHp: 80, features: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }], className: 'Rogue', classLevel: 1, })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+    dispatchSpy.mockRestore();
   });
 
-  describe('side effects', () => {
-    it('resets death saves and death failures when triggering', async () => {
-      const orc = createOrc('OrcPlayer3', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
+  it.each([
+    ['the once-per-rest latch is already set', RE_TRAIT, { 'Grushnak.relentlessEnduranceUsed': true }],
+    ['the Relentless Endurance trait is not present', [{ name: 'Darkvision' }], {}],
+    ['allFeatures is null', null, {}],
+  ])('stays silent when %s — damage drops target to 0 and normal death handling takes over', async (_label, features, overrides) => {
+    getRuntimeValue.mockImplementation(store({
+      'Grushnak.currentHitPoints': 10,
+      'Grushnak.hitPoints': 78,
+      ...overrides,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
+    const result = await applyLethal(makeSummary('Grushnak'), 'Grushnak', { features });
 
-      await applyDamageToTarget(cs, 'OrcPlayer3', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer3', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
+    // Guard fires: no interception, damage lands, target falls to 0 with a death-save prompt.
+    expect(result.finalDamage).toBe(10);
+    expect(result.newHp).toBe(0);
+    expect(result.intercepted).toBeUndefined();
+    expect(result.interceptedFeature).toBeUndefined();
+    expect(sendDeathSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'Grushnak' }));
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'OrcPlayer3', 'deathSaves', [false, false, false], campaignName,
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'OrcPlayer3', 'deathFailures', [false, false, false], campaignName,
-      );
-    });
-
-    it('removes unconscious condition when triggering', async () => {
-      const orc = createOrc('OrcPlayer5', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-        activeConditions: ['unconscious', 'blinded'],
-      }));
-
-      await applyDamageToTarget(cs, 'OrcPlayer5', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer5', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'OrcPlayer5', 'activeConditions', ['blinded'], campaignName,
-      );
-    });
-
-    it('marks feature as used when triggering', async () => {
-      const orc = createOrc('OrcPlayer4', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
-
-      await applyDamageToTarget(cs, 'OrcPlayer4', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer4', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'OrcPlayer4', 'relentlessEnduranceUsed', true, campaignName,
-      );
-    });
-
-    it('logs a heal entry when triggering', async () => {
-      const orc = createOrc('OrcPlayer6', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
-
-      await applyDamageToTarget(cs, 'OrcPlayer6', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcPlayer6', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] });
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'hp_change',
-        targetName: 'OrcPlayer6',
-        sourceName: 'Relentless Endurance',
-      }));
-    });
+    // Guard stays silent: no HP-floor write, no latch stamp, no hp_change log from the trait.
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Grushnak', 'currentHitPoints', 1, campaignName);
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Grushnak', 'relentlessEnduranceUsed', true, campaignName);
+    expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Relentless Endurance' }));
   });
 
-  describe('edge cases', () => {
-    it('returns intercepted false when allFeatures is null', async () => {
-      const orc = makeCreature('OrcNullFeatures', {
-        level: 1,
-        computedStats: {
-          name: 'OrcNullFeatures',
-          level: 1,
-          hitPoints: { max: 100 },
-          class: { name: 'Rogue', class_levels: [{ level: 1 }] },
-          allFeatures: null,
-          equipment: [],
-        },
-      });
-      const cs = makeCombatSummary([orc]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'OrcNullFeatures', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcNullFeatures', { level: 1, maxHp: 100, features: null, className: 'Rogue', classLevel: 1, })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
+  it('pins follow-up hits in the same damage sequence at 1 but lets a new sequence kill', async () => {
+    const grushnakStore = store({
+      'Grushnak.currentHitPoints': 10,
+      'Grushnak.hitPoints': 78,
     });
+    getRuntimeValue.mockImplementation(grushnakStore);
+    const cs = makeSummary('Grushnak');
 
-    it('throws when hitPoints is null from runtime', async () => {
-      const orc = createOrc('OrcNoHitPoints', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
+    // First hit of the sequence: trait intercepts and latches.
+    const first = await applyLethal(cs, 'Grushnak', { damageSequenceId: 'seq-re-1' });
+    expect(first).toMatchObject({ intercepted: true, interceptedFeature: 'Relentless Endurance', newHp: 1 });
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: null,
-      }));
+    // Simulate the runtime state the intercept wrote: latch set, 1 HP standing.
+    grushnakStore.set('Grushnak', 'relentlessEnduranceUsed', true);
+    grushnakStore.set('Grushnak', 'currentHitPoints', 1);
 
-      await expect(applyDamageToTarget(cs, 'OrcNoHitPoints', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcNoHitPoints', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })] })).rejects.toThrow('Relentless Endurance: hitPoints not found for OrcNoHitPoints');
-    });
+    // Follow-up hit, same sequence: pinned at 1 even though 50 damage would re-kill.
+    const second = await applyLethal(cs, 'Grushnak', { damage: 50, damageSequenceId: 'seq-re-1' });
+    expect(second).toMatchObject({ oldHp: 1, newHp: 1, finalDamage: 50 });
+    expect(second.intercepted).toBeUndefined();
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
+    // HP stays pinned: the latest persisted HP write lifts the lethal 0 back to 1
+    // (production lands 0 in the store before the sequence guard runs, so scope by last write).
+    const hpWrites = setRuntimeValue.mock.calls
+      .filter(c => c[0] === 'Grushnak' && c[1] === 'currentHitPoints')
+      .map(c => c[2]);
+    expect(hpWrites.at(-1)).toBe(1);
 
-    it('adds damageSequenceId to reTriggeredSequenceIds when Relentless Endurance intercepts', async () => {
-      const orc = createOrc('OrcSeqId', { maxHp: 100 });
-      const cs = makeCombatSummary([orc]);
+    // Different sequence: the latch is sequence-scoped — the new sequence lands and kills.
+    const third = await applyLethal(cs, 'Grushnak', { damage: 50, damageSequenceId: 'seq-re-2' });
+    expect(third).toMatchObject({ oldHp: 1, newHp: 0 });
+    expect(sendDeathSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'Grushnak' }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 100,
-      }));
+    // The latch was stamped exactly once (by the first intercept, never re-stamped).
+    const latchStamps = setRuntimeValue.mock.calls.filter(c => c[1] === 'relentlessEnduranceUsed');
+    expect(latchStamps).toHaveLength(1);
+  });
 
-      const result = await applyDamageToTarget(cs, 'OrcSeqId', 10, ['Slashing'], { campaignName, characters: [makeCharacter('OrcSeqId', { level: 1, maxHp: 100, features: [{ name: 'Relentless Endurance' }], className: 'Rogue', classLevel: 1, })], ignoreResistance: false, attackerName: null, suppressHpLog: false, ...{ damageSequenceId: 'seq-123' } });
+  it('throws loudly (no silent fallback) when stored max HP is missing', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'Grushnak.currentHitPoints': 10,
+      'Grushnak.hitPoints': null,
+    }));
 
-      expect(result.intercepted).toBe(true);
-      expect(result.newHp).toBe(1);
-    });
+    await expect(applyLethal(makeSummary('Grushnak'), 'Grushnak')).rejects.toThrow('Relentless Endurance: hitPoints not found for Grushnak');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('Grushnak', 'relentlessEnduranceUsed', true, campaignName);
   });
 });

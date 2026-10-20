@@ -1,7 +1,25 @@
+// @maintained-by-ai
+// Lane: Undying Sentinel (Paladin feature) zero-HP interception through applyDamageToTarget.
+// Owns the Sentinel-unique contract: the drop-to-0 intercept return bytes (incl. interceptedFeature
+// identity from the ZERO_HP_INTERCEPTORS dispatch order, applyDamage.js :595-614), the heal formula
+// min(1 + 3 x paladin level, runtime-store max HP) (undyingSentinelService.js :26-35), the full
+// stamped write-set (currentHitPoints, once-per-long-rest latch, death-save stabilise, isDead,
+// unconscious-filter), the verbatim 'healing' log entry (undyingSentinelService.js :54-64), and the
+// loud throw when stored max HP is missing.
+// Not re-driven here:
+// - Generic resistance/save/HP arithmetic: applyDamage.helpers.test.js :53-196; entry guards and
+//   player HP bookkeeping: applyDamage.test.js :146-155 / :157-177; DC recalc: :334-366.
+// - Arcane Ward absorption through applyDamageToTarget: applyDamage.buffs.test.js :209 — a
+//   ward-absorbed hit never reaches 0, so the Sentinel silently passes on the same above-zero
+//   guard covered in the falsifier lane below.
+// - Manual-activation handler lane: automation/handlers/class-cleric-paladin/undyingSentinelHandler.test.js.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
 import { addEntry } from '../../ui/logService.js';
+import { sendDeathSavePrompt } from '../../combat/conditions/savePromptService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const campaignName = 'TestCampaign';
 
@@ -42,19 +60,10 @@ vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-// Suppress CustomEvent dispatch in tests — produce a real Event
-const OriginalCustomEvent = window.CustomEvent;
-beforeEach(() => {
-  window.CustomEvent = function (type) { return new Event(type); };
-});
-afterAll(() => {
-  window.CustomEvent = OriginalCustomEvent;
-});
-
 // Prevent unhandled fetch rejections in tests
 globalThis.fetch = vi.fn(() => new Promise(() => {}));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+const SENTINEL = [{ name: 'Undying Sentinel' }, { name: 'Divine Sense' }];
 
 function makeCreature(name, extra = {}) {
   return {
@@ -71,288 +80,164 @@ function makeCreature(name, extra = {}) {
   };
 }
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
-
-function makeCharacter(name, opts = {}) {
-  const {
-    level = 15,
-    maxHp = 150,
-    features = [],
-    className = 'Paladin',
-    classLevel = 15,
-  } = opts;
+// Player entry in the characters list — the interceptor's playerComputed comes from
+// here (options.characters), NOT from the combat-summary creature's own fields.
+function makeCharacter(name, { level = 15, features = SENTINEL } = {}) {
   return {
     name,
     computedStats: {
       name,
       level,
-      hitPoints: { max: maxHp },
-      class: { name: className, class_levels: [{ level: classLevel }] },
+      hitPoints: { max: 150 },
+      class: { name: 'Paladin', class_levels: [{ level }] },
       allFeatures: features,
       equipment: [],
     },
   };
 }
 
-/**
- * Returns a default getRuntimeValue implementation that provides sensible
- * defaults for the keys the tested code paths read.  Each test can layer
- * specific overrides on top by calling the returned function with a map
- * of { key: value } pairs.
- */
-function defaultGetRuntimeValue(overrides = {}) {
-  return vi.fn((charName, key, _campaign) => {
-    const keyOverride = overrides[key];
-    if (keyOverride !== undefined) return keyOverride;
-    if (key === 'activeConditions') return [];
-    if (key === 'activeBuffs') return [];
-    if (key === 'arcaneWardActive') return undefined;
-    if (key === 'undyingSentinelUsed' || key === 'relentlessEnduranceUsed' || key === 'boonOfRecoveryLastStandUsed') return false;
-    if (key === 'currentHitPoints') return 10;
-    if (key === 'hitPoints') return 150;
-    if (key === 'holyAuraSaveDc') return undefined;
-    if (key === 'lastMetamagicDamage') return undefined;
-    if (key === 'targetEffects') return [];
-    if (key === 'tempHp') return 0;
-    if (key === 'resistanceUsedThisTurn') return undefined;
-    if (key === 'stealthAttackCost') return undefined;
-    return undefined;
+// Runtime-store stub keyed by `${name}.${key}` factories — never positional-once-chains.
+function store(overrides = {}) {
+  const values = { ...overrides };
+  const defaults = {
+    activeConditions: () => [],
+    activeBuffs: () => [],
+    targetEffects: () => [],
+    tempHp: () => 0,
+  };
+  const impl = (name, key) => {
+    const k = `${name}.${key}`;
+    if (k in values) return values[k];
+    const def = defaults[key];
+    return def ? def() : undefined;
+  };
+  return impl;
+}
+
+function makeSummary(name) {
+  return { round: 1, creatures: [makeCreature(name)] };
+}
+
+function applyLethal(cs, name, { level = 15, features = SENTINEL, damage = 10 } = {}) {
+  return applyDamageToTarget(cs, name, damage, ['Slashing'], {
+    campaignName,
+    characters: [makeCharacter(name, { level, features })],
   });
 }
 
 describe('applyDamageToTarget — Undying Sentinel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockImplementation(defaultGetRuntimeValue());
   });
 
-  function createPaladin(name, opts = {}) {
-    const { level = 15, maxHp = 150 } = opts;
-    return makeCreature(name, {
-      level,
-      computedStats: {
-        name,
-        level,
-        hitPoints: { max: maxHp },
-        class: { name: 'Paladin', class_levels: [{ level }] },
-        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
-        equipment: [],
-      },
-    });
-  }
+  it('intercepts drop-to-0: heals to 1 + 3x level, stamps latch and stabilise bytes, strips unconscious, logs healing verbatim', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'GloryPaladin.currentHitPoints': 10,
+      'GloryPaladin.hitPoints': 150,
+      'GloryPaladin.activeConditions': ['unconscious', 'blinded'],
+    }));
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-  describe('trigger conditions', () => {
-    it('heals to 1 + (3 x paladin level) when dropping to 0 HP', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15, maxHp: 150 });
-      const cs = makeCombatSummary([paladin]);
+    const cs = makeSummary('GloryPaladin');
+    const result = await applyLethal(cs, 'GloryPaladin', { level: 15 });
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, maxHp: 150, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(result.intercepted).toBe(true);
-      expect(result.finalDamage).toBe(0);
-      expect(result.newHp).toBe(46); // 1 + (3 * 15)
+    // Return contract: intercepted at the zero-HP seam, attributed to this feature,
+    // damage fully annulled (oldHp retained, 10 damage rolled off).
+    expect(result).toMatchObject({
+      intercepted: true,
+      interceptedFeature: 'Undying Sentinel',
+      finalDamage: 0,
+      damageDealt: 10,
+      oldHp: 10,
+      newHp: 46, // 1 + (3 * 15)
     });
 
-    it('caps healing at max HP', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 20, maxHp: 50 });
-      const cs = makeCombatSummary([paladin]);
+    // Stamped bytes: HP lifted to 46 (over the flow's interim 0 write), once-per-long-rest
+    // latch, death-save stabilise, isDead cleared, unconscious stripped while other
+    // conditions are preserved.
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'currentHitPoints', 46, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathSaves', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathFailures', [false, false, false], campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'isDead', 0, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'activeConditions', ['blinded'], campaignName);
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 5,
-        hitPoints: 50,
-      }));
+    // Combat-summary creature mirror updated so the card renders the revival.
+    expect(cs.creatures[0].currentHp).toBe(46);
 
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 5, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 20, maxHp: 50, features: [{ name: 'Undying Sentinel' }] })] });
+    // No death-save prompt — the target never died.
+    expect(sendDeathSavePrompt).not.toHaveBeenCalled();
 
-      expect(result.intercepted).toBe(true);
-      expect(result.newHp).toBe(50); // capped at maxHp, not 61
+    // Healing log entry verbatim (maxHp read from the runtime store, not the creature).
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
+      type: 'healing',
+      targetName: 'GloryPaladin',
+      delta: 46,
+      amount: 46,
+      currentHp: 46,
+      maxHp: 150,
+      isHealing: true,
+      isUnconscious: false,
+      sourceName: 'Undying Sentinel',
     });
-
-    it('does not trigger when HP is still above 0', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 5,
-        hitPoints: 150,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 3, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(result.finalDamage).toBe(3);
-      expect(result.newHp).toBe(2);
-    });
-
-    it('does not trigger when damage is absorbed by Arcane Ward', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-        arcaneWardActive: true,
-        arcaneWardHp: 20,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(10); // HP unchanged, ward absorbed the damage
-    });
-
-    it('does not trigger if feature is not present on the character', async () => {
-      const fighter = makeCreature('Fighter', {
-        level: 15,
-        computedStats: {
-          name: 'Fighter',
-          level: 15,
-          hitPoints: { max: 120 },
-          class: { name: 'Fighter', class_levels: [{ level: 15 }] },
-          allFeatures: [{ name: 'Extra Attack' }],
-          equipment: [],
-        },
-      });
-      const cs = makeCombatSummary([fighter]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 5,
-        hitPoints: 120,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], { campaignName, characters: [makeCharacter('Fighter', { level: 15, maxHp: 120, features: [{ name: 'Extra Attack' }], className: 'Fighter', classLevel: 15 })] });
-
-      expect(result.finalDamage).toBe(5);
-      expect(result.newHp).toBe(0);
-    });
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
+    dispatchSpy.mockRestore();
   });
 
-  describe('per-long-rest tracking', () => {
-    it('does not trigger if already used this long rest', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
+  it.each([
+    ['level 1 heals 1 + 3', 1, 150, 4],
+    ['level 20 heals 1 + 60', 20, 200, 61],
+    ['healing caps at max HP (not 61)', 20, 50, 50],
+  ])('heal formula min(1 + 3xlevel, maxHp): %s', async (_label, level, maxHp, expectedHp) => {
+    getRuntimeValue.mockImplementation(store({
+      'GloryPaladin.currentHitPoints': 10,
+      'GloryPaladin.hitPoints': maxHp,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-        undyingSentinelUsed: true,
-      }));
+    const result = await applyLethal(makeSummary('GloryPaladin'), 'GloryPaladin', { level });
 
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(result.finalDamage).toBe(10);
-      expect(result.newHp).toBe(0);
-    });
-
-    it('marks feature as used when triggering', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-      }));
-
-      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'GloryPaladin', 'undyingSentinelUsed', true, campaignName,
-      );
-    });
+    expect(result).toMatchObject({ intercepted: true, interceptedFeature: 'Undying Sentinel', finalDamage: 0, newHp: expectedHp });
+    expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'currentHitPoints', expectedHp, campaignName);
   });
 
-  describe('side effects', () => {
-    it('resets death saves and death failures when triggering', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
+  it.each([
+    ['the once-per-long-rest latch is already set', SENTINEL, { 'GloryPaladin.undyingSentinelUsed': true }, 10],
+    ['the Undying Sentinel feature is not present', [{ name: 'Extra Attack' }], {}, 10],
+    ['allFeatures is null', null, {}, 10],
+    ['damage leaves HP above 0', SENTINEL, { 'GloryPaladin.currentHitPoints': 5 }, 3],
+  ])('stays silent when %s — no latch stamp, no heal, normal damage handling takes over', async (_label, features, overrides, damage) => {
+    getRuntimeValue.mockImplementation(store({
+      'GloryPaladin.currentHitPoints': 10,
+      'GloryPaladin.hitPoints': 150,
+      ...overrides,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-      }));
+    const expectedHp = Math.max(0, (overrides['GloryPaladin.currentHitPoints'] ?? 10) - damage);
+    const result = await applyLethal(makeSummary('GloryPaladin'), 'GloryPaladin', { features, damage });
 
-      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
+    expect(result).toMatchObject({ finalDamage: damage, newHp: expectedHp });
+    expect(result.intercepted).toBeUndefined();
+    expect(result.interceptedFeature).toBeUndefined();
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'GloryPaladin', 'deathSaves', [false, false, false], campaignName,
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'GloryPaladin', 'deathFailures', [false, false, false], campaignName,
-      );
-    });
+    // Guard stays silent: no latch stamp, no Sentinel healing log.
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, campaignName);
+    expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Undying Sentinel' }));
 
-    it('removes unconscious condition when triggering', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-        activeConditions: ['unconscious', 'blinded'],
-      }));
-
-      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'GloryPaladin', 'activeConditions', ['blinded'], campaignName,
-      );
-    });
-
-    it('logs a heal entry when triggering', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: 150,
-      }));
-
-      await applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'healing',
-        targetName: 'GloryPaladin',
-        sourceName: 'Undying Sentinel',
-        isHealing: true,
-      }));
-    });
+    if (expectedHp === 0) {
+      expect(sendDeathSavePrompt).toHaveBeenCalledWith(campaignName, expect.objectContaining({ targetName: 'GloryPaladin' }));
+    } else {
+      expect(sendDeathSavePrompt).not.toHaveBeenCalled();
+    }
   });
 
-  describe('scaling', () => {
-    it('scales healing with paladin level', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 20, maxHp: 200 });
-      const cs = makeCombatSummary([paladin]);
+  it('throws loudly (no silent fallback) when stored max HP is missing', async () => {
+    getRuntimeValue.mockImplementation(store({
+      'GloryPaladin.currentHitPoints': 10,
+      'GloryPaladin.hitPoints': null,
+    }));
 
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 5,
-        hitPoints: 200,
-      }));
-
-      const result = await applyDamageToTarget(cs, 'GloryPaladin', 5, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 20, maxHp: 200, features: [{ name: 'Undying Sentinel' }] })] });
-
-      expect(result.intercepted).toBe(true);
-      expect(result.newHp).toBe(61); // 1 + (3 * 20)
-      expect(result.finalDamage).toBe(0);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('throws when hitPoints is null from runtime', async () => {
-      const paladin = createPaladin('GloryPaladin', { level: 15 });
-      const cs = makeCombatSummary([paladin]);
-
-      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
-        currentHitPoints: 10,
-        hitPoints: null,
-      }));
-
-      await expect(applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], { campaignName, characters: [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })] })).rejects.toThrow('Undying Sentinel: hitPoints not found for GloryPaladin');
-    });
+    await expect(applyLethal(makeSummary('GloryPaladin'), 'GloryPaladin')).rejects.toThrow('Undying Sentinel: hitPoints not found for GloryPaladin');
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, campaignName);
+    expect(addEntry).not.toHaveBeenCalledWith(campaignName, expect.objectContaining({ sourceName: 'Undying Sentinel' }));
   });
 });

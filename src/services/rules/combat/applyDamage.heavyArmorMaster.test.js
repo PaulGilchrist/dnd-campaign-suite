@@ -1,13 +1,48 @@
-// FT-045 Heavy Armor Master (2024) regression tests.
-// Locks down: B/P/S reduced by PB while wearing Heavy armor (inventory.equipped
-// truth via speedUtils.checkHeavyArmor), clamp >=0, refusal logs for non-B/P/S
-// and no-heavy-armor, zero logs for non-holders.
+// @maintained-by-ai
+// FT-045 Heavy Armor Master (2024) consumer-seam lane: applyDamage feature
+// reduction → HP → log. Owns applyFeatureDamageReduction (applyDamage.js:397-415):
+// worn-armor truth via inventory.equipped names resolved by the REAL
+// speedUtils.checkHeavyArmor (:381-385), flat PB subtraction with :403 floor,
+// applied/refused automation-log gating (:405, :410-412) and its reason ternary.
+//
+// Runs the REAL automationPassives.getDamageReduction end-to-end (no mirror
+// mock) with the verbatim disk automation row — public/data/2024/feats.json
+// Heavy Armor Master → Damage Reduction automation; PB resolves via
+// computedStats.proficiency (disk shape: HexWarlock.json:1512 "proficiency": 5).
+//
+// Owners cited, NOT re-driven here:
+// - reductionApplies B/P/S damageTypes + wearing_heavy_armor condition gate in
+//   both directions → automationPassives.test.js:543-561 (FT-045 unit-lock).
+//   Consumer sees one number; per-type legs live there.
+// - Generic resistance/save arithmetic (halve, floor, immunity priority) →
+//   applyDamage.helpers.test.js:52-84 CANON (next queue entry).
+// - Entry guards (null summary / unusable rawDamage / missing target) →
+//   applyDamage.test.js:157-163.
+// - Feat grant/parsing of the automation row onto computedStats →
+//   computeFeatBuffs.2024.test.js:431 (verbatim disk passthrough).
+// - Crit vs normal: this seam has no crit branch (reduction applies to
+//   post-resistance finalDamage at :401-403) — no crit leg here, honestly.
+//
+// old→new map:
+// - "reduces Slashing by PB (6 → 1)" → strengthened: real gate + real
+//   proficiency_bonus resolution (mock mirror retired), exact applied-log
+//   bytes incl. campaign arg, HP write pinned.
+// - "reduces Bludgeoning and Piercing the same way" → removed: same channel
+//   unit-locked at automationPassives.test.js:548-561; consumer path is
+//   type-agnostic once reduction > 0.
+// - "clamps at 0 (3 → 0)" → kept: falsifies Math.max at :403; zero-is-data
+//   (applied log still honest with appliedDamage 0).
+// - Fire refusal + bare-hand refusal → consolidated into one it.each reason
+//   table (kills both arms of the :411 ternary) plus a light-armor-only leg
+//   (Chain Mail still in equipment) falsifying any-armor-worn detection.
+// - "non-holder zero logs" → kept.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { applyDamageToTarget } from './applyDamage.js';
+import { addEntry } from '../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
-// ── Mocks ──────────────────────────────────────────────────────
+// ── Mocks (family-standard; automationPassives REAL — no mirror) ──
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -15,9 +50,14 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => ({ keys: () => [] })),
 }));
 
+// 'proficiency_bonus' resolves arithmetically to 5 via PB substitution — no
+// dice roll on this seam; canRollExpression must exist for the real
+// automationExpressions import graph.
 vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 10),
   rollExpression: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
+  canRollExpression: vi.fn(() => false),
 }));
 
 vi.mock('../../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
@@ -41,50 +81,34 @@ vi.mock('../../rules/features/silenceService.js', () => ({
   isCreatureInSilenceZone: vi.fn(() => false),
 }));
 
-// Faithful-lite mirror of the verified reductionApplies gate; the real gate is
-// unit-locked in automationPassives.test.js (FT-045 case). Here the gate INPUT
-// (isWearingHeavyArmor from inventory.equipped) is what's under test.
-vi.mock('../../combat/automation/automationPassives.js', () => ({
-  getDamageReduction: vi.fn((playerStats, damageType, isWearingHeavyArmor) => {
-    if (!playerStats?.automation) return null;
-    const all = [...(playerStats.automation.passives || []), ...(playerStats.automation.reactions || [])];
-    let total = 0;
-    for (const a of all) {
-      if (a.type !== 'damage_reduction' || a.reaction) continue;
-      if (a.condition === 'wearing_heavy_armor' && !isWearingHeavyArmor) continue;
-      if (a.damageTypes?.length && !a.damageTypes.some(t => t.toLowerCase() === String(damageType).toLowerCase())) continue;
-      if (a.reductionExpression === 'proficiency_bonus') total += 5;
-      else if (typeof a.reduction === 'number') total += a.reduction;
-    }
-    return total > 0 ? total : null;
-  }),
-  getDamageResistances: vi.fn(() => []),
-}));
-
 vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
+  addEntry: vi.fn(async () => {}),
 }));
 
 global.fetch = vi.fn(() => new Promise(() => {}));
 
-// ── Helpers ─────────────────────────────────────────────────────
+// ── Fixtures (verbatim disk shapes) ──────────────────────────────
 
-const HAM_PASSIVE = {
+// verbatim: public/data/2024/feats.json → Heavy Armor Master → benefits
+// ["Damage Reduction"].automation (no fabricated name/reaction fields).
+const HAM_AUTOMATION = {
   type: 'damage_reduction',
-  name: 'Heavy Armor Master',
   reductionExpression: 'proficiency_bonus',
   damageTypes: ['Bludgeoning', 'Piercing', 'Slashing'],
   condition: 'wearing_heavy_armor',
-  reaction: false,
+  casting_time: '1 reaction',
 };
 
+// verbatim names/categories from public/data/equipment.json.
 const CHAIN_MAIL = { name: 'Chain Mail', equipment_category: 'Armor', armor_category: 'Heavy' };
-const LEATHER = { name: 'Leather Armor', equipment_category: 'Armor', armor_category: 'Light' };
+const LEATHER = { name: 'Leather', equipment_category: 'Armor', armor_category: 'Light' };
 const SCIMITAR = { name: 'Scimitar', equipment_category: 'Weapon' };
 
-function createPlayerCreature(name) {
+const TARGET = 'IronGuard';
+
+function createCreature() {
   return {
-    name,
+    name: TARGET,
     type: 'player',
     maxHp: 112,
     currentHp: 112,
@@ -96,15 +120,16 @@ function createPlayerCreature(name) {
   };
 }
 
-function createHolder(name, { equipped = ['Scimitar', 'Chain Mail'], ham = true } = {}) {
+function createHolder({ equipped = ['Scimitar', 'Chain Mail'], ham = true } = {}) {
   return {
-    name,
+    name: TARGET,
     inventory: { equipped },
     computedStats: {
       resistances: [],
       immunities: [],
+      proficiency: 5,
       equipment: [CHAIN_MAIL, LEATHER, SCIMITAR],
-      automation: { passives: [], reactions: ham ? [HAM_PASSIVE] : [] },
+      automation: { passives: [], reactions: ham ? [HAM_AUTOMATION] : [] },
     },
   };
 }
@@ -124,96 +149,90 @@ function stubRuntime(currentHp) {
   });
 }
 
-function hamLogCalls(module) {
-  return module.addEntry.mock.calls
-    .map(c => c[1])
-    .filter(e => e && String(e.automationType || '').startsWith('heavy_armor_master'));
+function hamLogCalls() {
+  return addEntry.mock.calls.filter(c => c[1] && String(c[1].automationType || '').startsWith('heavy_armor_master'));
 }
 
 async function hit(chars, raw, damageTypes, hp = 112) {
-  const player = createPlayerCreature('EvasiveFighter');
-  const cs = { round: 1, creatures: [player] };
   stubRuntime(hp);
-  const result = await applyDamageToTarget(cs, 'EvasiveFighter', raw, damageTypes, {
-    campaignName: 'test-campaign',
-    characters: chars,
-    ignoreResistance: false,
-    attackerName: 'Bandit 1',
-    suppressHpLog: false,
-  });
-  return { result, player };
+  return applyDamageToTarget(
+    { round: 1, creatures: [createCreature()] },
+    TARGET,
+    raw,
+    damageTypes,
+    {
+      campaignName: 'test-campaign',
+      characters: chars,
+      ignoreResistance: false,
+      attackerName: 'Bandit 1',
+      suppressHpLog: false,
+    }
+  );
 }
 
-// ── Tests ───────────────────────────────────────────────────────
+// ── Tests ─────────────────────────────────────────────────────────
 
-describe('FT-045 Heavy Armor Master damage reduction', () => {
-  beforeEach(async () => {
+describe('FT-045 Heavy Armor Master damage reduction (applyDamage consumer seam)', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    const logModule = await import('../../ui/logService.js');
-    logModule.addEntry.mockResolvedValue();
   });
 
-  it('reduces Slashing by PB while wearing Chain Mail (6 → 1) and logs the applied reduction', async () => {
-    const logModule = await import('../../ui/logService.js');
-    const { result } = await hit([createHolder('EvasiveFighter')], 6, ['Slashing']);
+  it('reduces Slashing by the real resolved PB while Chain Mail is worn — 6 → 1, HP 111, exact applied log', async () => {
+    const result = await hit([createHolder()], 6, ['Slashing']);
 
     expect(result.finalDamage).toBe(1);
     expect(result.damageReducedByFeature).toBe(5);
     const hpWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'currentHitPoints');
     expect(hpWrite[2]).toBe(111);
 
-    const applied = hamLogCalls(logModule).filter(e => e.automationType === 'heavy_armor_master_applied');
+    const applied = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_applied');
     expect(applied).toHaveLength(1);
-    expect(applied[0].reducedBy).toBe(5);
-    expect(applied[0].rawDamage).toBe(6);
-    expect(applied[0].appliedDamage).toBe(1);
-    expect(applied[0].description).toContain('6 reduced to 1');
+    expect(applied[0][0]).toBe('test-campaign');
+    expect(applied[0][1]).toMatchObject({
+      characterName: TARGET,
+      reducedBy: 5,
+      rawDamage: 6,
+      appliedDamage: 1,
+      damageType: 'Slashing',
+    });
+    expect(applied[0][1].description).toContain('6 reduced to 1');
   });
 
-  it('reduces Bludgeoning and Piercing the same way', async () => {
-    const b = await hit([createHolder('EvasiveFighter')], 8, ['Bludgeoning']);
-    expect(b.result.finalDamage).toBe(3);
-    expect(b.result.damageReducedByFeature).toBe(5);
-    const p = await hit([createHolder('EvasiveFighter')], 7, ['Piercing']);
-    expect(p.result.finalDamage).toBe(2);
-    expect(p.result.damageReducedByFeature).toBe(5);
-  });
+  it('floors the reduction at 0 — 3 Slashing → 0 never negative, full 5 still reported, honest appliedDamage 0 log', async () => {
+    const result = await hit([createHolder()], 3, ['Slashing']);
 
-  it('clamps at 0 when the reduction exceeds the damage (3 → 0)', async () => {
-    const { result } = await hit([createHolder('EvasiveFighter')], 3, ['Slashing']);
     expect(result.finalDamage).toBe(0);
     expect(result.damageReducedByFeature).toBe(5);
+
+    const applied = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_applied');
+    expect(applied).toHaveLength(1);
+    expect(applied[0][1].appliedDamage).toBe(0);
+    expect(applied[0][1].description).toContain('3 reduced to 0');
   });
 
-  it('does NOT reduce Fire damage and logs refusal non_bp_s_damage', async () => {
-    const logModule = await import('../../ui/logService.js');
-    const { result } = await hit([createHolder('EvasiveFighter')], 10, ['Fire']);
+  it.each([
+    { raw: 10, damageType: 'Fire', equipped: ['Scimitar', 'Chain Mail'], reason: 'non_bp_s_damage' },
+    { raw: 6, damageType: 'Slashing', equipped: ['Scimitar'], reason: 'not_wearing_heavy_armor' },
+    { raw: 6, damageType: 'Slashing', equipped: ['Scimitar', 'Leather'], reason: 'not_wearing_heavy_armor' },
+  ])('refuses $damageType with $equipped worn — full $raw damage, refusal log reason $reason', async ({ raw, damageType, equipped, reason }) => {
+    const result = await hit([createHolder({ equipped })], raw, [damageType]);
 
-    expect(result.finalDamage).toBe(10);
+    expect(result.finalDamage).toBe(raw);
     expect(result.damageReducedByFeature).toBe(0);
-    const refused = hamLogCalls(logModule).filter(e => e.automationType === 'heavy_armor_master_refused');
+
+    const refused = hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_refused');
     expect(refused).toHaveLength(1);
-    expect(refused[0].reason).toBe('non_bp_s_damage');
-    expect(hamLogCalls(logModule).filter(e => e.automationType === 'heavy_armor_master_applied')).toHaveLength(0);
+    expect(refused[0][1].reason).toBe(reason);
+    expect(refused[0][1].damageType).toBe(damageType);
+    expect(refused[0][1].description).toBe(`Heavy Armor Master does not reduce this ${damageType} damage (${reason}).`);
+    expect(hamLogCalls().filter(c => c[1].automationType === 'heavy_armor_master_applied')).toHaveLength(0);
   });
 
-  it('does NOT reduce without heavy armor equipped and logs refusal not_wearing_heavy_armor', async () => {
-    const logModule = await import('../../ui/logService.js');
-    const { result } = await hit([createHolder('EvasiveFighter', { equipped: ['Scimitar'] })], 6, ['Slashing']);
+  it('non-holder in Heavy armor takes full damage with zero heavy_armor_master logs', async () => {
+    const result = await hit([createHolder({ ham: false })], 6, ['Slashing']);
 
     expect(result.finalDamage).toBe(6);
     expect(result.damageReducedByFeature).toBe(0);
-    const refused = hamLogCalls(logModule).filter(e => e.automationType === 'heavy_armor_master_refused');
-    expect(refused).toHaveLength(1);
-    expect(refused[0].reason).toBe('not_wearing_heavy_armor');
-  });
-
-  it('does NOT reduce or log for a non-holder wearing heavy armor', async () => {
-    const logModule = await import('../../ui/logService.js');
-    const { result } = await hit([createHolder('EvasiveFighter', { ham: false })], 6, ['Slashing']);
-
-    expect(result.finalDamage).toBe(6);
-    expect(result.damageReducedByFeature).toBe(0);
-    expect(hamLogCalls(logModule)).toHaveLength(0);
+    expect(hamLogCalls()).toHaveLength(0);
   });
 });
