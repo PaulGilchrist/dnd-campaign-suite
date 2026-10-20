@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   parseMagicItemName,
@@ -8,32 +9,29 @@ import {
   getAttacks,
 } from './attackCalc.js';
 
+// Lane ownership (base unit lane): parseMagicItemName, findEquippedWeapons
+// magic-prefix matching, buildWeaponAttack magic bonus, buildMonkAttacks /
+// getAttacks monk unarmed, resolveSpellDamageAtLevel, and core getAttacks
+// wiring (incl. magic weapons). Integration branches — Druidic Warrior,
+// Thrown Weapon Fighting, Starry Form, Nick runtime seam — are owned by
+// attackCalc-5e-attacks.test.js; 2024 twins live in attackCalc2024-*.
+
 describe('attackCalc', () => {
   describe('parseMagicItemName', () => {
-    it('should parse +1 magic weapon', () => {
-      const result = parseMagicItemName('+1 Longsword');
-      expect(result).toEqual({ baseName: 'Longsword', magicBonus: 1 });
-    });
-
-    it('should handle non-magic weapon', () => {
-      const result = parseMagicItemName('Longsword');
-      expect(result).toEqual({ baseName: 'Longsword', magicBonus: 0 });
-    });
-
-    it('should handle empty string', () => {
-      const result = parseMagicItemName('');
-      expect(result).toEqual({ baseName: '', magicBonus: 0 });
-    });
-
-    it('should return null/undefined as-is with zero bonus', () => {
-      expect(parseMagicItemName(null)).toEqual({ baseName: null, magicBonus: 0 });
-      expect(parseMagicItemName(undefined)).toEqual({ baseName: undefined, magicBonus: 0 });
-    });
-
-    it('should treat non-digit after + as 0 bonus and strip + prefix', () => {
-      const result = parseMagicItemName('+ Longsword');
-      expect(result.magicBonus).toBe(0);
-      expect(result.baseName).toBe('ongsword');
+    // Canonical magic range is +1..+3; only the first digit is parsed, so
+    // single-digit prefixes are the only well-formed inputs.
+    it.each([
+      { input: '+1 Longsword', baseName: 'Longsword', magicBonus: 1 },
+      { input: '+2 Longsword', baseName: 'Longsword', magicBonus: 2 },
+      { input: '+3 Longsword', baseName: 'Longsword', magicBonus: 3 },
+      { input: 'Longsword', baseName: 'Longsword', magicBonus: 0 },
+      { input: '', baseName: '', magicBonus: 0 },
+      // Quirk pinned as-is: '+ X' strips 3 chars regardless of content.
+      { input: '+ Longsword', baseName: 'ongsword', magicBonus: 0 },
+      { input: null, baseName: null, magicBonus: 0 },
+      { input: undefined, baseName: undefined, magicBonus: 0 },
+    ])('parseMagicItemName($input)', ({ input, baseName, magicBonus }) => {
+      expect(parseMagicItemName(input)).toEqual({ baseName, magicBonus });
     });
   });
 
@@ -44,36 +42,22 @@ describe('attackCalc', () => {
       { name: 'Shield', equipment_category: 'Armor', weapon_range: null },
     ];
 
-    it('should find melee weapons', () => {
-      const result = findEquippedWeapons(allEquipment, ['Longsword', 'Shield'], 'Melee');
-      expect(result).toEqual(['Longsword']);
+    it.each([
+      { label: 'melee filter', equipped: ['Longsword', 'Shield'], range: 'Melee', expected: ['Longsword'] },
+      { label: 'ranged filter', equipped: ['Shortbow', 'Longsword'], range: 'Ranged', expected: ['Shortbow'] },
+      { label: 'magic prefix matches base name (melee)', equipped: ['+1 Longsword'], range: 'Melee', expected: ['+1 Longsword'] },
+      { label: 'magic prefix matches base name (ranged)', equipped: ['+2 Shortbow'], range: 'Ranged', expected: ['+2 Shortbow'] },
+      { label: 'skips non-string entries', equipped: ['Longsword', null, 'Shortbow'], range: 'Melee', expected: ['Longsword'] },
+      { label: 'no match returns empty', equipped: ['Shield'], range: 'Melee', expected: [] },
+    ])('$label', ({ equipped, range, expected }) => {
+      expect(findEquippedWeapons(allEquipment, equipped, range)).toEqual(expected);
     });
 
-    it('should find ranged weapons', () => {
-      const result = findEquippedWeapons(allEquipment, ['Shortbow', 'Longsword'], 'Ranged');
-      expect(result).toEqual(['Shortbow']);
-    });
-
-    it('should match weapons by base name when equipped has magic prefix', () => {
-      const result = findEquippedWeapons(allEquipment, ['+1 Longsword'], 'Melee');
-      expect(result).toEqual(['+1 Longsword']);
-    });
-
-    it('should skip non-string entries in equipped array', () => {
-      const result = findEquippedWeapons(allEquipment, ['Longsword', null, 'Shortbow'], 'Melee');
-      expect(result).toEqual(['Longsword']);
-    });
-
-    it('should throw when equipped is null or undefined', () => {
+    it('throws when equipped is null or undefined', () => {
       expect(() => findEquippedWeapons(allEquipment, null, 'Melee'))
         .toThrow('Expected array, got null');
       expect(() => findEquippedWeapons(allEquipment, undefined, 'Melee'))
         .toThrow('Expected array, got undefined');
-    });
-
-    it('should return empty array when no equipped weapons match', () => {
-      const result = findEquippedWeapons(allEquipment, ['Shield'], 'Melee');
-      expect(result).toEqual([]);
     });
   });
 
@@ -82,131 +66,120 @@ describe('attackCalc', () => {
       damage: { damage_dice: '1d8', damage_type: 'Slashing' },
       range: { normal: 5 },
     };
+    const baseOpts = {
+      weapon,
+      abilityBonus: 3,
+      abilityName: 'Strength',
+      proficiency: 2,
+      actionType: 'Action',
+    };
 
-    it('should build basic melee attack with all fields', () => {
-      const result = buildWeaponAttack({
-        weapon,
-        weaponName: 'Longsword',
-        abilityBonus: 3,
-        abilityName: 'Strength',
-        proficiency: 2,
-        actionType: 'Action',
+    it('builds a basic melee attack with exact verbatim shape', () => {
+      const result = buildWeaponAttack({ ...baseOpts, weaponName: 'Longsword' });
+
+      expect(result).toEqual({
+        name: 'Longsword',
+        damage: '1d8+3',
+        damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+        range: 5,
+        type: 'Action',
+        weaponType: '',
+        mastery: null,
+        properties: [],
       });
-
-      expect(result.name).toBe('Longsword');
-      expect(result.damage).toBe('1d8+3');
-      expect(result.damageType).toBe('Slashing');
-      expect(result.damageFormula).toBe('Damage Formula = Weapon (1d8) + Strength Bonus (3)');
-      expect(result.hitBonus).toBe(5);
-      expect(result.hitBonusFormula).toBe('To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)');
-      expect(result.range).toBe(5);
-      expect(result.type).toBe('Action');
-      expect(result.weaponType).toBe('');
-      expect(result.mastery).toBeNull();
     });
 
-    it('should include magic bonus in damage and to-hit', () => {
-      const result = buildWeaponAttack({
-        weapon,
-        weaponName: '+2 Longsword',
-        abilityBonus: 3,
-        abilityName: 'Strength',
-        proficiency: 2,
-        actionType: 'Action',
-      });
-
-      expect(result.damage).toBe('1d8+5');
-      expect(result.hitBonus).toBe(7);
-      expect(result.damageFormula).toContain('Weapon Magic Bonus (2)');
-      expect(result.hitBonusFormula).toContain('Weapon Magic Bonus (2)');
-    });
-
-    it('should append extra damage and hit bonus from fighting styles', () => {
-      const result = buildWeaponAttack({
-        weapon,
-        weaponName: 'Longsword',
-        abilityBonus: 3,
-        abilityName: 'Strength',
-        proficiency: 2,
-        actionType: 'Action',
-        extraDamage: '+2',
-        extraDamageLabel: 'Dueling Fighting Style (2)',
-        extraHitBonus: 2,
-        extraHitBonusLabel: 'Archery Fighting Style (2)',
-      });
-
-      expect(result.damage).toBe('1d8+5');
-      expect(result.hitBonus).toBe(7);
-      expect(result.damageFormula).toContain('Dueling Fighting Style (2)');
-      expect(result.hitBonusFormula).toContain('Archery Fighting Style (2)');
-    });
-
-    it('should omit ability bonus from off-hand damage', () => {
-      const result = buildWeaponAttack({
-        weapon,
-        weaponName: 'Dagger',
-        abilityBonus: 3,
-        abilityName: 'Strength',
-        proficiency: 2,
-        actionType: 'Bonus Action',
-        includeAbilityBonusInDamage: false,
-      });
-
-      expect(result.damage).toBe('1d8');
-      expect(result.hitBonus).toBe(5);
-    });
-
-    it('should combine magic bonus and extra damage on off-hand attack', () => {
-      const result = buildWeaponAttack({
-        weapon,
-        weaponName: '+1 Dagger',
-        abilityBonus: 3,
-        abilityName: 'Strength',
-        proficiency: 2,
-        actionType: 'Bonus Action',
-        includeAbilityBonusInDamage: false,
-        extraDamage: '+3',
-        extraDamageLabel: 'Two-Weapon Fighting Style (3)',
-      });
-
-      expect(result.damage).toBe('1d8+4');
-      expect(result.hitBonus).toBe(6);
+    // Numeric combination table: magic, fighting-style extras, off-hand
+    // omission, negative modifier sign, trailing-number extraction.
+    it.each([
+      {
+        label: 'magic bonus in damage and to-hit',
+        opts: { weaponName: '+2 Longsword' },
+        damage: '1d8+5', hitBonus: 7,
+        damageFormulaContains: 'Weapon Magic Bonus (2)',
+        hitBonusFormulaContains: 'Weapon Magic Bonus (2)',
+      },
+      {
+        label: 'canonical max +3 bonus',
+        opts: { weaponName: '+3 Longsword' },
+        damage: '1d8+6', hitBonus: 8,
+        damageFormulaContains: 'Weapon Magic Bonus (3)',
+        hitBonusFormulaContains: undefined,
+      },
+      {
+        label: 'fighting style extras append',
+        opts: {
+          weaponName: 'Longsword',
+          extraDamage: '+2', extraDamageLabel: 'Dueling Fighting Style (2)',
+          extraHitBonus: 2, extraHitBonusLabel: 'Archery Fighting Style (2)',
+        },
+        damage: '1d8+5', hitBonus: 7,
+        damageFormulaContains: 'Dueling Fighting Style (2)',
+        hitBonusFormulaContains: 'Archery Fighting Style (2)',
+      },
+      {
+        label: 'off-hand omits ability bonus (no suffix at all)',
+        opts: { weaponName: 'Dagger', includeAbilityBonusInDamage: false },
+        damage: '1d8', hitBonus: 5,
+        damageFormulaContains: undefined,
+        hitBonusFormulaContains: undefined,
+      },
+      {
+        label: 'off-hand combines magic and TWF extras',
+        opts: {
+          weaponName: '+1 Dagger', includeAbilityBonusInDamage: false,
+          extraDamage: '+3', extraDamageLabel: 'Two-Weapon Fighting Style (3)',
+        },
+        damage: '1d8+4', hitBonus: 6,
+        damageFormulaContains: 'Two-Weapon Fighting Style (3)',
+        hitBonusFormulaContains: undefined,
+      },
+      {
+        label: 'negative modifier renders without plus sign',
+        opts: { weaponName: 'Longsword', abilityBonus: -2 },
+        damage: '1d8-2', hitBonus: 0,
+        damageFormulaContains: 'Strength Bonus (-2)',
+        hitBonusFormulaContains: undefined,
+      },
+      {
+        label: 'extraDamage keeps only trailing number ("+1 + +2" → 2)',
+        opts: { weaponName: 'Longsword', extraDamage: '+1 + +2', extraDamageLabel: 'Combined (2)' },
+        damage: '1d8+5', hitBonus: 5,
+        damageFormulaContains: 'Combined (2)',
+        hitBonusFormulaContains: undefined,
+      },
+    ])('$label', ({ opts, damage, hitBonus, damageFormulaContains, hitBonusFormulaContains }) => {
+      const result = buildWeaponAttack({ ...baseOpts, ...opts });
+      expect(result.damage).toBe(damage);
+      expect(result.hitBonus).toBe(hitBonus);
+      if (damageFormulaContains) expect(result.damageFormula).toContain(damageFormulaContains);
+      if (hitBonusFormulaContains) expect(result.hitBonusFormula).toContain(hitBonusFormulaContains);
     });
   });
 
   describe('buildMonkAttacks', () => {
-    it('should build two unarmed strikes with correct properties', () => {
-      const result = buildMonkAttacks({
-        diceStr: '1d6',
-        dexterityBonus: 4,
-        proficiency: 2,
-      });
+    it.each([
+      { diceStr: '1d6', dexterityBonus: 4, expectedDamage: '1d6+4', expectedHit: 6 },
+      { diceStr: '1d4', dexterityBonus: -1, expectedDamage: '1d4-1', expectedHit: 1 },
+    ])('two Unarmed Strikes (dex $dexterityBonus) → $expectedDamage', ({ diceStr, dexterityBonus, expectedDamage, expectedHit }) => {
+      const result = buildMonkAttacks({ diceStr, dexterityBonus, proficiency: 2 });
 
       expect(result).toHaveLength(2);
-
-      // Both should be Unarmed Strike
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[1].name).toBe('Unarmed Strike');
-
-      // Both should have same damage and hit bonus
-      expect(result[0].damage).toBe('1d6+4');
-      expect(result[1].damage).toBe('1d6+4');
-      expect(result[0].hitBonus).toBe(6);
-      expect(result[1].hitBonus).toBe(6);
-      expect(result[0].damageType).toBe('Bludgeoning');
-      expect(result[1].damageType).toBe('Bludgeoning');
-      expect(result[0].range).toBe(5);
-      expect(result[1].range).toBe(5);
-      expect(result[0].weaponType).toBe('unarmed');
-      expect(result[1].weaponType).toBe('unarmed');
-
-      // First is Action, second is Bonus Action
+      for (const attack of result) {
+        expect(attack.name).toBe('Unarmed Strike');
+        expect(attack.damage).toBe(expectedDamage);
+        expect(attack.damageType).toBe('Bludgeoning');
+        expect(attack.hitBonus).toBe(expectedHit);
+        expect(attack.range).toBe(5);
+        expect(attack.weaponType).toBe('unarmed');
+        expect(attack.damageFormula).toContain(`Monk Open Hand (${diceStr})`);
+        expect(attack.hitBonusFormula).toContain(`Dexterity Bonus (${dexterityBonus})`);
+      }
       expect(result[0].type).toBe('Action');
       expect(result[1].type).toBe('Bonus Action');
-
-      // Verify formula fields are present and correct
-      expect(result[0].damageFormula).toContain('1d6');
-      expect(result[0].hitBonusFormula).toContain('Dexterity Bonus (4)');
     });
   });
 
@@ -214,29 +187,20 @@ describe('attackCalc', () => {
     const cantripSpell = { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10', '5': '2d10', '9': '3d10' }, damage_type: 'Fire' }, level: 0 };
     const leveledSpell = { name: 'Magic Missile', damage: { damage_at_slot_level: { '1': '1d4+1' }, damage_type: 'Force' }, level: 1 };
     const spellWithCharLevel = { name: 'Charm Spell', damage: { damage_at_character_level: { '1': '2d6' }, damage_at_slot_level: {} }, damage_type: 'Psychic', level: 1 };
-    const noDamageSpell = { name: 'Mage Hand', damage: null, level: 0 };
 
-    it('should resolve cantrip damage at low character level', () => {
-      expect(resolveSpellDamageAtLevel(cantripSpell, 1)).toBe('1d10');
-    });
-
-    it('should resolve cantrip damage at tier boundaries', () => {
-      expect(resolveSpellDamageAtLevel(cantripSpell, 5)).toBe('2d10');
-      expect(resolveSpellDamageAtLevel(cantripSpell, 9)).toBe('3d10');
-      expect(resolveSpellDamageAtLevel(cantripSpell, 17)).toBe('3d10');
-    });
-
-    it('should resolve leveled spell base damage', () => {
-      expect(resolveSpellDamageAtLevel(leveledSpell, 5)).toBe('1d4+1');
-    });
-
-    it('should use character-level damage when slot-level is empty', () => {
-      expect(resolveSpellDamageAtLevel(spellWithCharLevel, 5)).toBe('2d6');
-    });
-
-    it('should return empty string when spell has no damage or is null', () => {
-      expect(resolveSpellDamageAtLevel(noDamageSpell, 5)).toBe('');
-      expect(resolveSpellDamageAtLevel(null, 5)).toBe('');
+    it.each([
+      { label: 'cantrip low level', spell: cantripSpell, level: 1, expected: '1d10' },
+      { label: 'cantrip mid-tier gap (falls back to highest ≤ level)', spell: cantripSpell, level: 4, expected: '1d10' },
+      { label: 'cantrip tier boundary 5', spell: cantripSpell, level: 5, expected: '2d10' },
+      { label: 'cantrip tier boundary 9', spell: cantripSpell, level: 9, expected: '3d10' },
+      { label: 'cantrip beyond last tier', spell: cantripSpell, level: 17, expected: '3d10' },
+      { label: 'leveled spell uses base tier', spell: leveledSpell, level: 5, expected: '1d4+1' },
+      { label: 'empty slot-level falls back to character-level', spell: spellWithCharLevel, level: 5, expected: '2d6' },
+      { label: 'spell with damage:null', spell: { name: 'Mage Hand', damage: null, level: 0 }, level: 5, expected: '' },
+      { label: 'damage object with no tiers', spell: { name: 'Broken', damage: { damage_at_slot_level: {} }, level: 1 }, level: 5, expected: '' },
+      { label: 'null spell', spell: null, level: 5, expected: '' },
+    ])('$label', ({ spell, level, expected }) => {
+      expect(resolveSpellDamageAtLevel(spell, level)).toBe(expected);
     });
   });
 
@@ -248,10 +212,11 @@ describe('attackCalc', () => {
       { name: 'Shortsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d6', damage_type: 'Piercing' }, range: { normal: 5 }, properties: ['Light', 'Finesse'] },
     ];
 
+    // NOTE: getAttacks derives proficiency from level
+    // (level 5 → floor((5-1)/4+2) = 3); there is no proficiency input.
     const makePlayerStats = (overrides = {}) => ({
       level: 5,
-      proficiency: 3,
-      abilities: [
+      abilities: overrides.abilities || [
         { name: 'Strength', bonus: 3 },
         { name: 'Dexterity', bonus: 2 },
         { name: 'Constitution', bonus: 1 },
@@ -271,167 +236,169 @@ describe('attackCalc', () => {
       activeBuffs: overrides.activeBuffs || [],
     });
 
-    it('should build melee weapon attack with correct fields', () => {
+    it('builds melee main-hand attack on the higher STR with verbatim row', () => {
       const playerStats = makePlayerStats({ equipped: ['Longsword'] });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result).toHaveLength(1);
+      // STR(3) beats DEX(2); proficiency derived from level 5 → 3
       expect(result[0].name).toBe('Longsword');
       expect(result[0].damage).toBe('1d8+3');
+      expect(result[0].damageType).toBe('Slashing');
       expect(result[0].hitBonus).toBe(6);
+      expect(result[0].range).toBe(5);
+      expect(result[0].type).toBe('Action');
       expect(result[0].weaponType).toBe('melee');
     });
 
-    it('should build ranged weapon attack using dexterity', () => {
+    it('builds ranged main-hand attack on DEX', () => {
       const playerStats = makePlayerStats({ equipped: ['Shortbow'] });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Shortbow');
       expect(result[0].damage).toBe('1d6+2');
       expect(result[0].hitBonus).toBe(5);
+      expect(result[0].range).toBe(80);
+      expect(result[0].type).toBe('Action');
+      // Quirk pinned as-is: ranged main-hand builder does not tag weaponType
+      // (only light-ranged off-hand entries get 'ranged').
+      expect(result[0].weaponType).toBe('');
     });
 
-    it('should apply fighting styles to attacks', () => {
+    it('threads magic prefix through findEquippedWeapons into damage and to-hit', () => {
+      const playerStats = makePlayerStats({ equipped: ['+1 Longsword'] });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('+1 Longsword');
+      expect(result[0].damage).toBe('1d8+4');
+      expect(result[0].hitBonus).toBe(7);
+      expect(result[0].damageFormula).toContain('Weapon Magic Bonus (1)');
+      expect(result[0].hitBonusFormula).toContain('Weapon Magic Bonus (1)');
+    });
+
+    it('applies Archery fighting style to ranged to-hit', () => {
       const playerStats = makePlayerStats({
         equipped: ['Shortbow'],
         class: { name: 'Fighter', fightingStyles: ['Archery'] },
       });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result[0].hitBonus).toBe(7);
+      expect(result[0].hitBonusFormula).toContain('Archery Fighting Style (2)');
     });
 
-    it('should apply Blessed Warrior fighting style to hit bonus', () => {
+    it.each([
+      { styles: ['Blessed Warrior'], damage: '1d8+3', damageFormulaContains: undefined },
+      { styles: ['Blessed Warrior', 'Dueling'], damage: '1d8+5', damageFormulaContains: 'Dueling' },
+    ])('Blessed Warrior (+2 hit) with styles $styles', ({ styles, damage, damageFormulaContains }) => {
       const playerStats = makePlayerStats({
         equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: ['Blessed Warrior'] },
+        class: { name: 'Fighter', fightingStyles: styles },
       });
       const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].hitBonus).toBe(8);
+      expect(result[0].hitBonus).toBe(8); // str(3) + prof(3) + blessed(2)
       expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
+      expect(result[0].damage).toBe(damage);
+      if (damageFormulaContains) expect(result[0].damageFormula).toContain(damageFormulaContains);
     });
 
-    it('should apply both Blessed Warrior and Dueling to melee attacks', () => {
-      const playerStats = makePlayerStats({
-        equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: ['Blessed Warrior', 'Dueling'] },
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].hitBonus).toBe(8);
-      expect(result[0].damage).toBe('1d8+5');
-      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
-      expect(result[0].damageFormula).toContain('Dueling');
-    });
-
-    it('should not apply Dueling when two melee weapons or a ranged weapon are equipped', () => {
-      const stats1 = makePlayerStats({
+    it.each([
+      {
+        label: 'two melee weapons disable Dueling; single light stays Action',
         equipped: ['Longsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
-      });
-      const result1 = getAttacks(allEquipment, [], stats1);
-      expect(result1[0].damage).toBe('1d8+3');
-      // Dagger is light, only 1 light weapon → Action with ability bonus (not Bonus Action)
-      expect(result1[1].type).toBe('Action');
-      expect(result1[1].damage).toBe('1d4+3');
-
-      const stats2 = makePlayerStats({
+        expected: [
+          { name: 'Longsword', damage: '1d8+3', type: 'Action' },
+          { name: 'Dagger', damage: '1d4+3', type: 'Action' },
+        ],
+      },
+      {
+        label: 'melee + ranged disables Dueling; both builders emit',
         equipped: ['Longsword', 'Shortbow'],
-        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
-      });
-      const result2 = getAttacks(allEquipment, [], stats2);
-      expect(result2.find(a => a.name === 'Longsword').damage).toBe('1d8+3');
-      expect(result2.find(a => a.name === 'Shortbow').damage).toBe('1d6+2');
-    });
-
-    it('should place non-light melee weapons in CharActions and light melee in Action when <2 light', () => {
+        expected: [
+          { name: 'Shortbow', damage: '1d6+2', type: 'Action' },
+          { name: 'Longsword', damage: '1d8+3', type: 'Action' },
+        ],
+      },
+    ])('$label', ({ equipped, expected }) => {
       const playerStats = makePlayerStats({
-        equipped: ['Longsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: [] },
+        equipped,
+        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
       });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Longsword');
-      expect(result[0].type).toBe('Action');
-      expect(result[1].name).toBe('Dagger');
-      expect(result[1].type).toBe('Action');
+      for (const exp of expected) {
+        const attack = result.find(a => a.name === exp.name);
+        expect(attack.damage).toBe(exp.damage);
+        expect(attack.type).toBe(exp.type);
+      }
     });
 
-    it('should apply Two-Weapon Fighting bonus when both weapons are light and no shield', () => {
-      const playerStats = makePlayerStats({
+    it.each([
+      {
+        label: 'two light weapons enable TWF off-hand bonus',
         equipped: ['Shortsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[1].damage).toBe('1d4+3');
-    });
-
-    it('should not apply Two-Weapon Fighting when main hand is not light or shield is equipped', () => {
-      const stats1 = makePlayerStats({
+        main: { name: 'Shortsword', damage: '1d6+3', type: 'Action' },
+        off: { name: 'Dagger', damage: '1d4+3', type: 'Bonus Action' },
+      },
+      {
+        label: 'non-light main hand: all Actions with ability bonus',
         equipped: ['Longsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      });
-      const result1 = getAttacks(allEquipment, [], stats1);
-      // Longsword non-light → Action, Dagger light but <2 → Action with ability bonus
-      expect(result1[0].name).toBe('Longsword');
-      expect(result1[0].type).toBe('Action');
-      expect(result1[1].name).toBe('Dagger');
-      expect(result1[1].type).toBe('Action');
-      expect(result1[1].damage).toBe('1d4+3');
-
-      const stats2 = makePlayerStats({
-        equipped: ['Shortsword', 'Dagger'],
-        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
-      });
-      stats2.inventory.equipped = ['Shortsword', 'Dagger', 'Shield'];
-      const result2 = getAttacks(allEquipment, [], stats2);
-      // Both light and >= 2 → Shortsword (higher damage) Action, Dagger Bonus Action, no TWF due to shield
-      expect(result2[0].name).toBe('Shortsword');
-      expect(result2[0].type).toBe('Action');
-      expect(result2[1].name).toBe('Dagger');
-      expect(result2[1].type).toBe('Bonus Action');
-      expect(result2[1].damage).toBe('1d4');
-    });
-
-    it('should prefer strength over dexterity for melee when strength is higher', () => {
+        main: { name: 'Longsword', damage: '1d8+3', type: 'Action' },
+        off: { name: 'Dagger', damage: '1d4+3', type: 'Action' },
+      },
+      {
+        label: 'shield blocks TWF bonus on off-hand',
+        equipped: ['Shortsword', 'Dagger', 'Shield'],
+        main: { name: 'Shortsword', damage: '1d6+3', type: 'Action' },
+        off: { name: 'Dagger', damage: '1d4', type: 'Bonus Action' },
+      },
+    ])('Two-Weapon Fighting — $label', ({ equipped, main, off }) => {
       const playerStats = makePlayerStats({
-        equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: [] },
+        equipped,
+        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
       });
       const result = getAttacks(allEquipment, [], playerStats);
-      expect(result[0].damage).toBe('1d8+3');
-      expect(result[0].hitBonus).toBe(6);
+      expect(result.find(a => a.name === main.name).type).toBe(main.type);
+      expect(result.find(a => a.name === main.name).damage).toBe(main.damage);
+      const offAttack = result.find(a => a.name === off.name && a.type === off.type);
+      expect(offAttack).toBeDefined();
+      expect(offAttack.damage).toBe(off.damage);
     });
 
-    it('should use dexterity for melee when dexterity is higher', () => {
+    it('uses Dexterity for non-finesse melee when DEX is higher than STR', () => {
       const playerStats = makePlayerStats({
         equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: [] },
+        abilities: [
+          { name: 'Strength', bonus: 1 },
+          { name: 'Dexterity', bonus: 4 },
+        ],
       });
-      playerStats.abilities[0].bonus = 1;
-      playerStats.abilities[1].bonus = 4;
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result[0].damage).toBe('1d8+4');
       expect(result[0].hitBonus).toBe(7);
+      expect(result[0].hitBonusFormula).toContain('Dexterity Bonus (4)');
     });
 
-    it('should support monk unarmed strikes', () => {
+    it('adds monk martial-arts unarmed strikes (Action + Bonus Action)', () => {
       const playerStats = makePlayerStats({
         class: {
           name: 'Monk',
           fightingStyles: [],
-          class_levels: {},
+          class_levels: {
+            4: { class_specific: { martial_arts: { dice_count: 1, dice_value: 8 } } },
+          },
         },
       });
-      playerStats.class.class_levels[playerStats.level - 1] = {
-        class_specific: { martial_arts: { dice_count: 1, dice_value: 8 } },
-      };
       const result = getAttacks(allEquipment, [], playerStats);
-      const unarmedStrikes = result.filter(a => a.name === 'Unarmed Strike');
-      expect(unarmedStrikes).toHaveLength(2);
-      expect(unarmedStrikes[0].damage).toBe('1d8+2');
-      expect(unarmedStrikes[0].type).toBe('Action');
-      expect(unarmedStrikes[1].type).toBe('Bonus Action');
+      // No weapons equipped → only the two monk strikes.
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Unarmed Strike');
+      expect(result[0].damage).toBe('1d8+2'); // dex(2)
+      expect(result[0].hitBonus).toBe(5);
+      expect(result[0].weaponType).toBe('unarmed');
+      expect(result[0].type).toBe('Action');
+      expect(result[1].type).toBe('Bonus Action');
     });
 
-    it('should not build spell attacks from spellAbilities', () => {
+    it('does not build spell attacks from spellAbilities', () => {
       const allSpells = [
         { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
       ];
@@ -444,60 +411,62 @@ describe('attackCalc', () => {
         },
       });
       const result = getAttacks(allEquipment, allSpells, playerStats);
-      const spellAttacks = result.filter(a => a.name === 'Fire Bolt');
-      expect(spellAttacks).toHaveLength(0);
+      expect(result.filter(a => a.name === 'Fire Bolt')).toHaveLength(0);
     });
 
-    it('should return unarmed strike as fallback when no weapons equipped', () => {
-      const playerStats = makePlayerStats({ equipped: [] });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[0].damage).toBe('1d4+3');
-      expect(result[0].hitBonus).toBe(6);
-      expect(result[0].range).toBe(5);
-      expect(result[0].type).toBe('Action');
-      expect(result[0].weaponType).toBe('unarmed');
-    });
-
-    it('should apply Blessed Warrior +2 to fallback unarmed strike hit bonus', () => {
+    it.each([
+      {
+        label: 'plain fallback strike',
+        styles: [],
+        length: 1,
+        damage: '1d4+3',
+        hitBonus: 6,
+        hitBonusFormulaContains: undefined,
+        secondType: undefined,
+      },
+      {
+        label: 'Blessed Warrior adds +2 to fallback hit bonus',
+        styles: ['Blessed Warrior'],
+        length: 1,
+        damage: '1d4+3',
+        hitBonus: 8, // str(3) + prof(3) + blessed(2)
+        hitBonusFormulaContains: 'Blessed Warrior (2)',
+        secondType: undefined,
+      },
+      {
+        label: 'Two-Weapon Fighting adds Bonus Action fallback strike',
+        styles: ['Two-Weapon Fighting'],
+        length: 2,
+        damage: '1d4+3',
+        hitBonus: 6,
+        hitBonusFormulaContains: undefined,
+        secondType: 'Bonus Action',
+      },
+    ])('fallback unarmed — $label', ({ styles, length, damage, hitBonus, hitBonusFormulaContains, secondType }) => {
       const playerStats = makePlayerStats({
         equipped: [],
-        class: { name: 'Cleric', fightingStyles: ['Blessed Warrior'] },
+        class: { name: 'Fighter', fightingStyles: styles },
       });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result).toHaveLength(length);
+      expect(result[0].name).toBe('Unarmed Strike');
+      expect(result[0].damage).toBe(damage);
+      expect(result[0].hitBonus).toBe(hitBonus);
+      expect(result[0].range).toBe(5);
+      expect(result[0].weaponType).toBe('unarmed');
+      if (hitBonusFormulaContains) expect(result[0].hitBonusFormula).toContain(hitBonusFormulaContains);
+      if (secondType) expect(result[1].type).toBe(secondType);
+    });
+
+    it.each([
+      { label: 'fightingStyles undefined', class: { name: 'Fighter', fightingStyles: undefined } },
+      { label: 'fightingStyles null', class: { name: 'Fighter', fightingStyles: null } },
+    ])('$label still builds attacks gracefully', ({ class: classOverride }) => {
+      const playerStats = makePlayerStats({ equipped: ['Longsword'], class: classOverride });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[0].hitBonus).toBe(8); // strMod(3) + proficiency(3) + blessedWarrior(2)
-      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
-    });
-
-    it('should build both ranged and melee attacks when both equipped', () => {
-      const playerStats = makePlayerStats({
-        equipped: ['Shortbow', 'Longsword'],
-        class: { name: 'Fighter', fightingStyles: [] },
-      });
-      const result = getAttacks(allEquipment, [], playerStats);
-      expect(result).toHaveLength(2);
-      expect(result.find(a => a.name === 'Shortbow')).toBeDefined();
-      expect(result.find(a => a.name === 'Longsword')).toBeDefined();
-    });
-
-    it('should handle null or missing fightingStyles gracefully', () => {
-      const stats1 = makePlayerStats({
-        equipped: ['Longsword'],
-        class: { name: 'Fighter' },
-      });
-      const result1 = getAttacks(allEquipment, [], stats1);
-      expect(result1).toHaveLength(1);
-      expect(result1[0].damage).toBe('1d8+3');
-
-      const stats2 = makePlayerStats({
-        equipped: ['Longsword'],
-        class: { name: 'Fighter', fightingStyles: null },
-      });
-      const result2 = getAttacks(allEquipment, [], stats2);
-      expect(result2).toHaveLength(1);
+      expect(result[0].damage).toBe('1d8+3');
+      expect(result[0].hitBonus).toBe(6);
     });
   });
 });

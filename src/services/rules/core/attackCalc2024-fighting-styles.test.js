@@ -1,361 +1,280 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// 2024 fighting-styles axis of getAttacks: Archery, Dueling, Thrown Weapon
+// Fighting (FS-011). One it.each truth-table pins the FULL builder row for
+// every gate face (style fires / other style / fightingStyles undefined per
+// attackCalc2024.js:545 / property & weapon_range silences / stacking).
+// Real builders end-to-end per the cla225 pattern (#1235/#1236) — the old
+// wholesale attackCalc.js stub echoes are retired: every expectation below is
+// canonical buildWeaponAttack output bytes, so any miswired extraBonus,
+// label, or numeric fold fails a full toEqual. Only combatData is stubbed
+// (SSE-backed, unavoidable; null = Swift Quiver concentration inactive).
+// Lane splits (verified 2026-10-20):
+// - 5e Archery/Dueling/TWF math → attackCalc.test.js (#1234), 5e thrown
+//   integration → attackCalc-5e-attacks.test.js
+// - Clean Shortbow proficiency ladder (PB 2-6, dex +4) + fallback unarmed →
+//   attackCalc2024-edge-cases.test.js (#1236) — this table's no-style
+//   Shortbow rows use dex +3 so no byte collides with that ladder
+// - Light-seam row placement → attackCalc2024-light-melee/-light-ranged
+//   (their stub-echo Archery/Dueling cases → fold-rec into this lane)
+// - Nick / Dual Wielder off-hand → attackCalc2024-nick-dual-wielder.test.js,
+//   attackCalc2024.wm003-nick.test.js (no Nick legs live here)
+// - Blessed/Druidic Warrior & class features → attackCalc2024-class-features.test.js
+import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
-
-// ---------------------------------------------------------------------------
-// Module-level stubs
-// ---------------------------------------------------------------------------
-
-const findEquippedWeaponsStub = vi.fn();
-const buildWeaponAttackStub = vi.fn((opts) => ({
-  name: opts.weaponName,
-  damage: opts.includeAbilityBonusInDamage !== false
-    ? `${opts.weapon.damage.damage_dice}+${opts.abilityBonus}`
-    : opts.weapon.damage.damage_dice,
-  damageType: opts.weapon.damage.damage_type,
-  damageFormula: 'Damage Formula',
-  hitBonus: opts.abilityBonus + opts.proficiency,
-  hitBonusFormula: 'Hit Bonus Formula',
-  range: opts.weapon.range?.normal ?? 5,
-  type: opts.actionType,
-  weaponType: opts.weaponType,
-}));
-const buildMonkAttacksStub = vi.fn((_opts) => [
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Action',
-  },
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Bonus Action',
-  },
-]);
-
-vi.mock('./attackCalc.js', () => ({
-  parseMagicItemName: (name) =>
-    name && name.charAt(0) === '+'
-      ? { baseName: name.substring(3), magicBonus: Number(name.charAt(1)) || 0 }
-      : { baseName: name, magicBonus: 0 },
-  findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
-  buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
-  buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  parseDamageDice: (diceStr) => {
-    const match = String(diceStr).match(/(\d+)d(\d+)/);
-    if (!match) return 0;
-    const [, count, sides] = match;
-    return parseInt(count, 10) * (parseInt(sides, 10) + 1) / 2;
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getMartialArtsDie: vi.fn(() => 8),
-  },
-}));
 
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Fixtures — copied from public/data/equipment.json (Dart, Shortbow,
+// Longsword, Handaxe entries; verified against disk 2026-10-20)
 // ---------------------------------------------------------------------------
 
-const defaultPlayerStats = (overrides = {}) => ({
+const DART = {
+  name: 'Dart',
+  equipment_category: 'Weapon',
+  weapon_category: 'Simple',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d4', damage_type: 'Piercing' },
+  range: { normal: 20, long: 60 },
+  properties: ['Finesse', 'Thrown'],
+  mastery: 'Vex',
+};
+
+const SHORTBOW = {
+  name: 'Shortbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Simple',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+  range: { normal: 80, long: 320 },
+  properties: ['Ammunition', 'Two-Handed'],
+  mastery: 'Vex',
+};
+
+const LONGSWORD = {
+  name: 'Longsword',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Melee',
+  damage: { damage_dice: '1d8', damage_type: 'Slashing' },
+  range: { normal: 5, long: null },
+  properties: ['Versatile'],
+  mastery: 'Sap',
+};
+
+const HANDAXE = {
+  name: 'Handaxe',
+  equipment_category: 'Weapon',
+  weapon_category: 'Simple',
+  weapon_range: 'Melee',
+  damage: { damage_dice: '1d6', damage_type: 'Slashing' },
+  range: { normal: 5, long: null },
+  properties: ['Light', 'Thrown', 'Monk'],
+  mastery: 'Vex',
+};
+
+// lv1 Fighter, PB +2. styles: null omits fightingStyles entirely (exercises
+// the :545 `!= null` guard); array is forwarded verbatim.
+const char = ({ str = 0, dex = 0, styles = [] } = {}) => ({
   level: 1,
   abilities: [
-    { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-    { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+    { name: 'Strength', bonus: str },
+    { name: 'Dexterity', bonus: dex },
   ],
   inventory: { equipped: [] },
   automation: { passives: [], bonusActions: [] },
   activeBuffs: [],
-  class: { name: 'Fighter' },
-  ...overrides,
+  class: { name: 'Fighter', ...(styles === null ? {} : { fightingStyles: styles }) },
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// Truth-table: full getAttacks output per gate face. Ranged rows build first
+// (buildRangedAttacks), then melee (buildMeleeAttacks).
 // ---------------------------------------------------------------------------
 
 describe('attackCalc2024 - fighting styles', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Archery fighting style', () => {
-    it('applies Archery fighting style +2 to ranged weapon attack hit bonus', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce([]);
-
-      const allEquipment = [
+  it.each([
+    {
+      label: 'Archery fires: Shortbow to-hit 5→7 with label',
+      equipment: [SHORTBOW], equipped: ['Shortbow'], styles: ['Archery'], str: 0, dex: 3,
+      rows: [{
+        name: 'Shortbow', damage: '1d6+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+        hitBonus: 7,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2) + Archery Fighting Style (2)',
+        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Ammunition', 'Two-Handed'],
+      }],
+    },
+    {
+      label: 'Archery silent: Defense style → clean Shortbow to-hit 5',
+      equipment: [SHORTBOW], equipped: ['Shortbow'], styles: ['Defense'], str: 0, dex: 3,
+      rows: [{
+        name: 'Shortbow', damage: '1d6+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Ammunition', 'Two-Handed'],
+      }],
+    },
+    {
+      label: 'fightingStyles undefined (:545 guard): clean Longsword, no throw',
+      equipment: [LONGSWORD], equipped: ['Longsword'], styles: null, str: 3, dex: 0,
+      rows: [{
+        name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+        properties: ['Versatile'],
+      }],
+    },
+    {
+      label: 'Dueling fires: lone Longsword damage 1d8+3→1d8+5 with label',
+      equipment: [LONGSWORD], equipped: ['Longsword'], styles: ['Dueling'], str: 3, dex: 0,
+      rows: [{
+        name: 'Longsword', damage: '1d8+5', damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (3) + Dueling Fighting Style (2)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+        properties: ['Versatile'],
+      }],
+    },
+    {
+      label: 'Dueling silent: ranged also equipped → both rows clean',
+      equipment: [SHORTBOW, LONGSWORD], equipped: ['Shortbow', 'Longsword'], styles: ['Dueling'], str: 3, dex: 2,
+      rows: [
         {
-          name: 'Shortbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 80 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Archery'] },
-      });
-
-      getAttacks(allEquipment, [], playerStats);
-
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          extraHitBonus: 2,
-          extraHitBonusLabel: 'Archery Fighting Style (2)',
-        })
-      );
-    });
-  });
-
-  describe('Dueling fighting style', () => {
-    it('applies Dueling fighting style +2 damage to single melee weapon attack', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Longsword']);
-
-      const allEquipment = [
-        {
-          name: 'Longsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
-      });
-
-      getAttacks(allEquipment, [], playerStats);
-
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          extraDamage: '+2',
-          extraDamageLabel: 'Dueling Fighting Style (2)',
-        })
-      );
-    });
-
-    it('does not apply Dueling when a ranged weapon is also equipped', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce(['Longsword']);
-
-      const allEquipment = [
-        {
-          name: 'Shortbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 80 },
+          name: 'Shortbow', damage: '1d6+2', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (2)',
+          hitBonus: 4,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (2) + Proficiency (2)',
+          range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+          properties: ['Ammunition', 'Two-Handed'],
         },
         {
-          name: 'Longsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
-          range: { normal: 5 },
+          name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+          damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+          range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+          properties: ['Versatile'],
         },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
-      });
+      ],
+    },
+    {
+      label: 'Dueling silent: two melee weapons → neither row gets +2',
+      equipment: [LONGSWORD, HANDAXE], equipped: ['Longsword', 'Handaxe'], styles: ['Dueling'], str: 3, dex: 0,
+      rows: [
+        {
+          name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+          damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+          range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+          properties: ['Versatile'],
+        },
+        {
+          name: 'Handaxe', damage: '1d6+3', damageType: 'Slashing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Strength Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+          range: 5, type: 'Action', weaponType: 'melee', mastery: 'Vex',
+          properties: ['Light', 'Thrown', 'Monk'],
+        },
+      ],
+    },
+    {
+      label: 'FS-011 fires: Dart +2 damage; to-hit stays DEX+PB (no 5e double-proficiency port)',
+      equipment: [DART], equipped: ['Dart'], styles: ['Thrown Weapon Fighting'], str: 0, dex: 3,
+      rows: [{
+        name: 'Dart', damage: '1d4+5', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d4) + Dexterity Bonus (3) + Thrown Weapon Fighting (2)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 20, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Finesse', 'Thrown'],
+      }],
+    },
+    {
+      label: 'FS-011 silent: Defense style → clean Dart row',
+      equipment: [DART], equipped: ['Dart'], styles: ['Defense'], str: 0, dex: 3,
+      rows: [{
+        name: 'Dart', damage: '1d4+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d4) + Dexterity Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 20, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Finesse', 'Thrown'],
+      }],
+    },
+    {
+      label: 'FS-011 silent: Shortbow is Ammunition, no Thrown property → clean row',
+      equipment: [SHORTBOW], equipped: ['Shortbow'], styles: ['Thrown Weapon Fighting'], str: 0, dex: 3,
+      rows: [{
+        name: 'Shortbow', damage: '1d6+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Ammunition', 'Two-Handed'],
+      }],
+    },
+    {
+      label: 'FS-011 silent: Handaxe Thrown property but melee lane → no +2',
+      equipment: [HANDAXE], equipped: ['Handaxe'], styles: ['Thrown Weapon Fighting'], str: 3, dex: 0,
+      rows: [{
+        name: 'Handaxe', damage: '1d6+3', damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Strength Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (3) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Vex',
+        properties: ['Light', 'Thrown', 'Monk'],
+      }],
+    },
+    {
+      label: 'FS-011 + Archery stack: separate buckets on one Dart row (+2 dmg, +2 to-hit)',
+      equipment: [DART], equipped: ['Dart'], styles: ['Archery', 'Thrown Weapon Fighting'], str: 0, dex: 3,
+      rows: [{
+        name: 'Dart', damage: '1d4+5', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d4) + Dexterity Bonus (3) + Thrown Weapon Fighting (2)',
+        hitBonus: 7,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2) + Archery Fighting Style (2)',
+        range: 20, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Finesse', 'Thrown'],
+      }],
+    },
+    {
+      label: 'FS-011 applies to every thrown row — two darts both get +2',
+      equipment: [DART], equipped: ['Dart', 'Dart'], styles: ['Thrown Weapon Fighting'], str: 0, dex: 3,
+      rows: [
+        {
+          name: 'Dart', damage: '1d4+5', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d4) + Dexterity Bonus (3) + Thrown Weapon Fighting (2)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 20, type: 'Action', weaponType: '', mastery: 'Vex',
+          properties: ['Finesse', 'Thrown'],
+        },
+        {
+          name: 'Dart', damage: '1d4+5', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d4) + Dexterity Bonus (3) + Thrown Weapon Fighting (2)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 20, type: 'Action', weaponType: '', mastery: 'Vex',
+          properties: ['Finesse', 'Thrown'],
+        },
+      ],
+    },
+  ])('$label', ({ equipment, equipped, styles, str, dex, rows }) => {
+    const playerStats = char({ str, dex, styles });
+    playerStats.inventory.equipped = equipped;
 
-      getAttacks(allEquipment, [], playerStats);
-
-      expect(buildWeaponAttackStub).not.toHaveBeenCalledWith(
-        expect.objectContaining({ extraDamage: '+2' })
-      );
-    });
-  });
-
-  describe('Thrown Weapon Fighting fighting style (FS-011)', () => {
-    const dart = {
-      name: 'Dart',
-      equipment_category: 'Weapon',
-      weapon_range: 'Ranged',
-      properties: ['Finesse', 'Thrown'],
-      damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-      range: { normal: 20, long: 60 },
-    };
-    const shortbow = {
-      name: 'Shortbow',
-      equipment_category: 'Weapon',
-      weapon_range: 'Ranged',
-      properties: ['Ammunition', 'Two-Handed'],
-      damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-      range: { normal: 80, long: 320 },
-    };
-
-    it('applies +2 damage to thrown-property ranged weapon rows (2024 feats.json canonical)', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Dart'])
-        .mockReturnValueOnce([]);
-      const playerStats = defaultPlayerStats({
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      });
-
-      getAttacks([dart], [], playerStats);
-
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          weaponName: 'Dart',
-          extraDamage: '+2',
-          extraDamageLabel: 'Thrown Weapon Fighting (2)',
-        })
-      );
-    });
-
-    it('does NOT double-stack proficiency on thrown ranged attack rolls (no 5e quirk port)', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Dart'])
-        .mockReturnValueOnce([]);
-      const playerStats = defaultPlayerStats({
-        level: 18,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      });
-
-      getAttacks([dart], [], playerStats);
-
-      const thrownCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Dart');
-      expect(thrownCall).toBeTruthy();
-      expect(thrownCall[0].extraHitBonus || 0).toBe(0);
-    });
-
-    it('does not apply to ammunition ranged weapons (Shortbow)', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce([]);
-      const playerStats = defaultPlayerStats({
-        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      });
-
-      getAttacks([shortbow], [], playerStats);
-
-      const bowCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Shortbow');
-      expect(bowCall).toBeTruthy();
-      expect(bowCall[0].extraDamage || '').toBe('');
-    });
-
-    it('does not apply without the fighting style', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Dart'])
-        .mockReturnValueOnce([]);
-      const playerStats = defaultPlayerStats({
-        class: { name: 'Fighter', fightingStyles: ['Defense'] },
-      });
-
-      getAttacks([dart], [], playerStats);
-
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          weaponName: 'Dart',
-          extraDamage: '',
-        })
-      );
-    });
-
-    it('does not apply to thrown melee-range weapons (Handaxe melee row)', () => {
-      const handaxe = {
-        name: 'Handaxe',
-        equipment_category: 'Weapon',
-        weapon_range: 'Melee',
-        properties: ['Light', 'Thrown'],
-        damage: { damage_dice: '1d6', damage_type: 'Slashing' },
-        range: { normal: 5 },
-      };
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Handaxe']);
-      const playerStats = defaultPlayerStats({
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      });
-
-      getAttacks([handaxe], [], playerStats);
-
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          weaponName: 'Handaxe',
-          extraDamage: '',
-          extraDamageLabel: '',
-        })
-      );
-    });
-
-    it('stacks cleanly with Archery (+2 hit, +2 damage — separate buckets)', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Dart'])
-        .mockReturnValueOnce([]);
-      const playerStats = defaultPlayerStats({
-        class: { name: 'Fighter', fightingStyles: ['Archery', 'Thrown Weapon Fighting'] },
-      });
-
-      getAttacks([dart], [], playerStats);
-
-      const thrownCall = buildWeaponAttackStub.mock.calls.find(c => c[0].weaponName === 'Dart');
-      expect(thrownCall[0].extraHitBonus).toBe(2);
-      expect(thrownCall[0].extraDamage).toBe('+2');
-      expect(thrownCall[0].extraDamageLabel).toBe('Thrown Weapon Fighting (2)');
-    });
-
-    it('applies +2 damage to every thrown ranged weapon row when multiple are equipped', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Dart', 'Dart 2'])
-        .mockReturnValueOnce([]);
-      const equipment = [dart, { ...dart, name: 'Dart 2' }];
-      const playerStats = defaultPlayerStats({
-        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
-      });
-
-      getAttacks(equipment, [], playerStats);
-
-      const calls = buildWeaponAttackStub.mock.calls;
-      const allThrown = calls.filter(c => c[0].extraDamage === '+2');
-      expect(allThrown.length).toBe(2);
-    });
+    expect(getAttacks(equipment, [], playerStats)).toEqual(rows);
   });
 });

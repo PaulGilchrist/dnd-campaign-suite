@@ -1,370 +1,179 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// 2024 class-feature axes of getAttacks: Tavern Brawler, College of Dance,
+// Soulknife Psychic Blade, and Blessed Warrior fallback unarmed strikes.
+// Lane splits (verified 2026-10-20, real builders, no stub echoes):
+// - Monk Martial Arts gate/ladder → attackCalc2024.cla225-martial-arts-gate.test.js
+//   ("lv20 Quarterstaff-only: quarterstaff row is 1d12+DEX, MA unarmed rows present",
+//    "non-Monk classes never receive MA rows (Fighter in Leather)")
+// - Swift Quiver / Starry Form → attackCalc2024-special-attacks.test.js
+// - Light melee/ranged weapon seams → attackCalc2024-light-melee/-light-ranged.test.js
+// - Nick / Dual Wielder off-hand lanes → attackCalc2024*.nick / -nick-dual-wielder.test.js
+import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
 
-// ---------------------------------------------------------------------------
-// Module-level stubs
-// ---------------------------------------------------------------------------
-
-const findEquippedWeaponsStub = vi.fn();
-const buildWeaponAttackStub = vi.fn((opts) => ({
-  name: opts.weaponName,
-  damage: opts.includeAbilityBonusInDamage !== false
-    ? `${opts.weapon.damage.damage_dice}+${opts.abilityBonus}`
-    : opts.weapon.damage.damage_dice,
-  damageType: opts.weapon.damage.damage_type,
-  damageFormula: 'Damage Formula',
-  hitBonus: opts.abilityBonus + opts.proficiency,
-  hitBonusFormula: 'Hit Bonus Formula',
-  range: opts.weapon.range?.normal ?? 5,
-  type: opts.actionType,
-  weaponType: opts.weaponType,
-}));
-const buildMonkAttacksStub = vi.fn((_opts) => [
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Action',
-  },
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Bonus Action',
-  },
-]);
-
-vi.mock('./attackCalc.js', () => ({
-  parseMagicItemName: (name) =>
-    name && name.charAt(0) === '+'
-      ? { baseName: name.substring(3), magicBonus: Number(name.charAt(1)) || 0 }
-      : { baseName: name, magicBonus: 0 },
-  findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
-  buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
-  buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  parseDamageDice: (diceStr) => {
-    const match = String(diceStr).match(/(\d+)d(\d+)/);
-    if (!match) return 0;
-    const [, count, sides] = match;
-    return parseInt(count, 10) * (parseInt(sides, 10) + 1) / 2;
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getMartialArtsDie: vi.fn(() => 8),
-  },
-}));
-
+// Only combatData is stubbed — buildWeaponAttack / buildMonkAttacks /
+// buildFallbackUnarmedAttacks / classRules2024 run REAL (cla225-lane pattern),
+// so every expectation below is canonical output, not a stub echo.
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const defaultPlayerStats = (overrides = {}) => ({
-  level: 1,
+// Proficiency ladder floor((level-1)/4)+2: lv2 → +2, lv5/lv6 → +3.
+const char = ({ level = 5, str = 3, dex = 3, int, cls = { name: 'Fighter' }, passives = [] } = {}) => ({
+  level,
   abilities: [
-    { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-    { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+    { name: 'Strength', bonus: str },
+    { name: 'Dexterity', bonus: dex },
+    ...(int != null ? [{ name: 'Intelligence', bonus: int }] : []),
   ],
   inventory: { equipped: [] },
-  automation: { passives: [], bonusActions: [] },
+  automation: { passives, bonusActions: [] },
   activeBuffs: [],
-  class: { name: 'Fighter' },
-  ...overrides,
+  class: cls,
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('attackCalc2024 - class features', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Monk', () => {
-    it('provides two unarmed strike attacks for a Monk', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
-        ],
-        class: { name: 'Monk' },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[1].name).toBe('Unarmed Strike');
-      expect(result[0].type).toBe('Action');
-      expect(result[1].type).toBe('Bonus Action');
-      expect(result[0].damageType).toBe('Bludgeoning');
-      expect(buildMonkAttacksStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          dexterityBonus: 4,
-          proficiency: 3,
-        })
-      );
-    });
-
-    it('does not add monk attacks for non-Monk classes', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const result = getAttacks([], [], defaultPlayerStats({ class: { name: 'Fighter' } }));
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-  });
-
   describe('Tavern Brawler', () => {
-    it('includes tavern brawler unarmed strike for non-Monk characters with the feat', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Fighter' },
-        automation: {
-          passives: [
-            { effect: 'tavern_brawler_push', name: 'Tavern Brawler' },
-          ],
-          bonusActions: [],
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
+    it.each([
+      { label: 'tavern_brawler_push passive', effect: 'tavern_brawler_push', blessed: false, hitBonus: 6 },
+      { label: 'tavern_brawler_reroll_ones passive (second OR branch, attackCalc2024.js:320)', effect: 'tavern_brawler_reroll_ones', blessed: false, hitBonus: 6 },
+      { label: 'Blessed Warrior stacks +2 hit', effect: 'tavern_brawler_push', blessed: true, hitBonus: 8 },
+    ])('unarmed strike row — $label', ({ effect, blessed, hitBonus }) => {
+      const result = getAttacks([], [], char({
+        cls: blessed
+          ? { name: 'Cleric', fightingStyles: ['Blessed Warrior'] }
+          : { name: 'Fighter' },
+        passives: [{ effect, name: 'Tavern Brawler' }],
+      }));
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[0].damage).toBe('1d4+3');
-      expect(result[0].damageType).toBe('Bludgeoning');
-      expect(result[0].type).toBe('Action');
+      const row = result[0];
+      expect(row.name).toBe('Unarmed Strike');
+      expect(row.type).toBe('Action');
+      expect(row.weaponType).toBe('unarmed');
+      expect(row.damage).toBe('1d4+3');
+      expect(row.damageType).toBe('Bludgeoning');
+      expect(row.damageFormula).toContain('Tavern Brawler Unarmed Strike (1d4)');
+      expect(row.hitBonus).toBe(hitBonus); // str(3) + PB(3) [+ BW(2)]
+      expect(row.hitBonusFormula).toContain(blessed ? 'Blessed Warrior (2)' : 'Proficiency (3)');
+      if (!blessed) expect(row.hitBonusFormula).not.toContain('Blessed Warrior');
     });
 
-    it('does not add tavern brawler attack for Monk characters', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+    it('Monks get MA unarmed rows only — Tavern Brawler row suppressed (class guard)', () => {
+      const result = getAttacks([], [], char({
+        dex: 4,
+        cls: { name: 'Monk', class_levels: [{ level: 5, martial_arts_die: 8 }] },
+        passives: [{ effect: 'tavern_brawler_push', name: 'Tavern Brawler' }],
+      }));
 
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        class: { name: 'Monk' },
-        automation: {
-          passives: [
-            { effect: 'tavern_brawler_push', name: 'Tavern Brawler' },
-          ],
-          bonusActions: [],
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      // Monk gets unarmed strikes but not tavern brawler
+      // MA lane owns these two rows (cla225 covers the gate); if the
+      // class-name guard in buildTavernBrawlerAttacks were removed, a third
+      // 1d4+4 "Tavern Brawler" row would appear here.
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-
-    it('applies Blessed Warrior +2 to Tavern Brawler unarmed strike hit bonus', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Cleric', fightingStyles: ['Blessed Warrior'] },
-        automation: {
-          passives: [
-            { effect: 'tavern_brawler_push', name: 'Tavern Brawler' },
-          ],
-          bonusActions: [],
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[0].hitBonus).toBe(8); // strMod(3) + proficiency(3) + blessedWarrior(2)
-      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
+      expect(result.map(a => a.type)).toEqual(['Action', 'Bonus Action']);
+      expect(result.every(a => a.damage === '1d8+4')).toBe(true);
+      expect(result.every(a => !String(a.damageFormula).includes('Tavern Brawler'))).toBe(true);
     });
   });
 
   describe('College of Dance', () => {
-    it('adds College of Dance Dazzling Footwork attacks for Bard level 3+', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
-        ],
-        class: {
+    it.each([
+      { label: 'lv3 d6', level: 3, bardicDie: 6, subclass: 'College of Dance', dice: '1d6', damage: '1d6+4', hitBonus: 6 },
+      { label: 'lv5 d8 — bardic_die interpolation (never hardcoded)', level: 5, bardicDie: 8, subclass: 'College of Dance', dice: '1d8', damage: '1d8+4', hitBonus: 7 },
+      { label: 'lv2 Bard — level<3 gate falsifier', level: 2, bardicDie: null, subclass: 'College of Dance' },
+      { label: 'wrong subclass name falsifier', level: 5, bardicDie: null, subclass: 'College of Whispers' },
+    ])('Dazzling Footwork — $label', ({ level, bardicDie, subclass, dice, damage, hitBonus }) => {
+      const result = getAttacks([], [], char({
+        level,
+        dex: 4,
+        cls: {
           name: 'Bard',
-          subclass: { name: 'College of Dance' },
-          class_levels: [{ level: 5, bardic_die: 6 }],
+          subclass: { name: subclass },
+          ...(bardicDie != null ? { class_levels: [{ level, bardic_die: bardicDie }] } : {}),
         },
-      });
+      }));
 
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Unarmed Strike (Dance)');
-      expect(result[0].type).toBe('Action');
-      expect(result[1].type).toBe('Bonus Action');
-    });
-
-    it('does not add College of Dance attacks for Bard below level 3', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 2,
-        class: {
-          name: 'Bard',
-          subclass: { name: 'College of Dance' },
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
+      const dance = result.filter(a => a.name === 'Unarmed Strike (Dance)');
+      if (bardicDie == null) {
+        expect(dance).toHaveLength(0);
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe('Unarmed Strike');
+        return;
+      }
+      expect(dance).toHaveLength(2);
+      expect(dance.map(a => a.type)).toEqual(['Action', 'Bonus Action']);
+      expect(dance.every(a => a.damage === damage)).toBe(true);
+      expect(dance.every(a => a.hitBonus === hitBonus)).toBe(true);
+      expect(dance[0].damageFormula).toBe(`Damage Formula = Bardic Inspiration Die (${dice}) + Dexterity Bonus (4)`);
+      expect(dance[0].hitBonusFormula).toBe(`To Hit Bonus Formula = Dexterity Bonus (4) + Proficiency (${hitBonus - 4})`);
     });
   });
 
   describe('Soulknife', () => {
-    it('adds Soulknife Psychic Blade attacks for Rogue level 3+', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Intelligence', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: {
-          name: 'Rogue',
-          major: { name: 'Soulknife' },
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
+    it.each([
+      { label: 'DEX 3 ≥ INT 2 → Dexterity', dex: 3, int: 2, ability: 'Dexterity', bonus: 3 },
+      { label: 'INT 5 > DEX 3 → Intelligence (ability-pick falsifier)', dex: 3, int: 5, ability: 'Intelligence', bonus: 5 },
+    ])('Psychic Blade pair — $label', ({ dex, int, ability, bonus }) => {
+      const result = getAttacks([], [], char({
+        dex,
+        int,
+        cls: { name: 'Rogue', major: { name: 'Soulknife' } },
+      }));
 
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Psychic Blade');
-      expect(result[1].name).toBe('Psychic Blade');
-      expect(result[0].damageType).toBe('Psychic');
-      expect(result[0].type).toBe('Action');
-      expect(result[1].type).toBe('Bonus Action');
-      expect(result[0].damage).toBe('1d6+3');
-      expect(result[1].damage).toBe('1d4');
-      expect(result[0].mastery).toBe('Vex');
-      expect(result[1].mastery).toBe('Vex');
-      expect(result[0].properties).toContain('Finesse');
-      expect(result[0].properties).toContain('Thrown (60/120)');
-      expect(result[1].properties).toContain('Finesse');
-      expect(result[1].properties).toContain('Thrown (60/120)');
-      expect(result[0].isPsychicBlade).toBe(true);
-      expect(result[1].isPsychicBlade).toBe(true);
+      const [main, off] = result;
+      expect(main.name).toBe('Psychic Blade');
+      expect(main.type).toBe('Action');
+      expect(main.range).toBe('5 ft');
+      expect(main.damage).toBe(`1d6+${bonus}`);
+      expect(main.damageFormula).toBe(`Damage Formula = 1d6 + ${ability} Modifier (${bonus})`);
+      expect(off.type).toBe('Bonus Action');
+      expect(off.range).toBe('60 ft');
+      expect(off.damage).toBe('1d4'); // off-hand blade: dice only, no ability mod
+      expect(main.hitBonus).toBe(bonus + 3);
+      expect(off.hitBonus).toBe(bonus + 3);
+      expect(main.hitBonusFormula).toBe(`To Hit Bonus = ${ability} Modifier (${bonus}) + Proficiency (3)`);
+      for (const blade of result) {
+        expect(blade.damageType).toBe('Psychic');
+        expect(blade.mastery).toBe('Vex');
+        expect(blade.properties).toEqual(['Finesse', 'Thrown (60/120)']);
+        expect(blade.isPsychicBlade).toBe(true);
+        expect(blade.abilityName).toBe(ability);
+      }
     });
 
-    it('does not add Soulknife attacks for Rogue below level 3', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+    it.each([
+      { label: 'Rogue lv2 — level<3 gate', level: 2, cls: { name: 'Rogue', major: { name: 'Soulknife' } } },
+      { label: 'Fighter lv5 with Soulknife major — class-name gate', level: 5, cls: { name: 'Fighter', major: { name: 'Soulknife' } } },
+      { label: 'Rogue lv5 Thief — major-name falsifier', level: 5, cls: { name: 'Rogue', major: { name: 'Thief' } } },
+    ])('no Psychic Blade — $label', ({ level, cls }) => {
+      const result = getAttacks([], [], char({ level, cls }));
 
-      const playerStats = defaultPlayerStats({
-        level: 2,
-        class: {
-          name: 'Rogue',
-          major: { name: 'Soulknife' },
-        },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-
-    it('does not add Soulknife attacks for non-Rogue classes', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
+      expect(result.filter(a => a.isPsychicBlade)).toHaveLength(0);
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Unarmed Strike');
     });
   });
 
-  describe('Blessed Warrior fighting style on unarmed strikes', () => {
-    it('applies Blessed Warrior +2 to fallback unarmed strike hit bonus when no weapons equipped', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+  describe('Blessed Warrior fighting style on fallback unarmed strikes', () => {
+    // Mirrors the folded fallback table in 5e twin attackCalc.test.js (#1234).
+    it.each([
+      { label: 'solo BW with negative STR', styles: ['Blessed Warrior'], str: -1, length: 1, hitBonus: 4, damage: '1d4-1' },
+      { label: 'BW + Two-Weapon Fighting', styles: ['Blessed Warrior', 'Two-Weapon Fighting'], str: 3, length: 2, hitBonus: 8, damage: '1d4+3' },
+    ])('$label', ({ styles, str, length, hitBonus, damage }) => {
+      const result = getAttacks([], [], char({ level: 6, str, cls: { name: 'Cleric', fightingStyles: styles } }));
 
-      const playerStats = defaultPlayerStats({
-        level: 6,
-        abilities: [
-          { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0, bonus: -1 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Cleric', fightingStyles: ['Blessed Warrior'] },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-      expect(result[0].hitBonus).toBe(4); // strMod(-1) + proficiency(3) + blessedWarrior(2)
-      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
-    });
-
-    it('applies Blessed Warrior +2 to both unarmed strikes when Two-Weapon Fighting is active', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 6,
-        abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Cleric', fightingStyles: ['Blessed Warrior', 'Two-Weapon Fighting'] },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(length);
       expect(result[0].name).toBe('Unarmed Strike');
       expect(result[0].type).toBe('Action');
-      expect(result[0].hitBonus).toBe(8); // strMod(3) + proficiency(3) + blessedWarrior(2)
-      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
-      expect(result[1].name).toBe('Unarmed Strike');
-      expect(result[1].type).toBe('Bonus Action');
-      expect(result[1].hitBonus).toBe(8);
-      expect(result[1].hitBonusFormula).toContain('Blessed Warrior (2)');
+      expect(result[0].weaponType).toBe('unarmed');
+      for (const row of result) {
+        expect(row.damage).toBe(damage);
+        expect(row.hitBonus).toBe(hitBonus); // str + PB(3) + BW(2)
+        expect(row.hitBonusFormula).toContain('Blessed Warrior (2)');
+      }
+      if (length === 2) expect(result[1].type).toBe('Bonus Action');
     });
   });
 });

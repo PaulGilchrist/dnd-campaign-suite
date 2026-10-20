@@ -1,3 +1,14 @@
+// @maintained-by-ai
+// MA-0016 heal-block owner lane: healingBlock.js gate truth table + the REAL
+// refusal shapes of both consumer helpers (applyHealingToTarget +
+// applyHealingDirectly — the only place these run the un-mocked gate).
+// Keyed `${name}.${key}` store stubs (#1057/#1186); guard-falsifier
+// discipline (#1187): every miss passes before the guard fires.
+// Unblocked heals + delta>0 infernal-wound/death-save wiring → applyHealing.test.js (#1210);
+// applyHealingDirectly unblocked arithmetic → healingRoll.test.js (gate mocked there).
+// Registry golden census (no_healing label/group bytes) → targetEffectDefinitions.test.js
+// (#820); Defensive label sort is delegated HERE by that file's header.
+// Aberrant Spirit (Slaad) Claw data row → handlePlainDamage.hitClause.test.js:226.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -9,7 +20,6 @@ vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-import monsters from '../../../../public/data/monsters.json';
 import { TARGET_EFFECT_DEFINITIONS, getEffectDefinition } from '../../combat/conditions/targetEffectDefinitions.js';
 import { getHealingBlockEffect, isHealingBlocked } from './healingBlock.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -17,90 +27,87 @@ import { addEntry } from '../../ui/logService.js';
 import { applyHealingToTarget } from './applyHealing.js';
 import { applyHealingDirectly } from '../../automation/common/healingRoll.js';
 
-const SLAAD = monsters.find(m => m.index === 'aberrant-spirit-slaad');
-const CLAW = SLAAD.actions.find(a => a.name === 'Claw');
+const CAMPAIGN = 'test-campaign';
+const TARGET = 'AasimarTest';
+const OTHER = 'FeyRanger';
+const SOURCE = 'Aberrant Spirit (Slaad) 1';
+// Production te shape as the hit-clause lane grants it (handlePlainDamage.hitClause.test.js:340-342).
+const HEAL_BLOCK_TE = { target: TARGET, effect: 'no_healing', source: SOURCE, duration: 'until_start_of_next_turn' };
 
-describe('MA-0016 no_healing te registration (registry rule)', () => {
-    it('registers no_healing in targetEffectDefinitions', () => {
-        const def = getEffectDefinition('no_healing');
-        expect(def).toBeTruthy();
-        expect(def.label).toBe("Can't Regain Hit Points");
-        expect(def.group).toBe('Defensive');
-        const labels = TARGET_EFFECT_DEFINITIONS.filter(d => d.group === 'Defensive').map(d => d.label);
-        expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
-    });
+let store;
 
-    it('authors no_healing on the Aberrant Spirit (Slaad) Claw row', () => {
-        expect(CLAW.hit_target_effect).toBe('no_healing');
-        expect(CLAW.attack_bonus).toBeNull();
-    });
+beforeEach(() => {
+    vi.clearAllMocks();
+    store = {};
+    getRuntimeValue.mockImplementation((key, prop) => store[`${key}.${prop}`] ?? null);
 });
 
 describe('MA-0016 healingBlock gate', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
-    });
+    it('refuses >0 heals for the named target with one refusal log; every miss passes silently', () => {
+        // Falsifier arms first (all null, zero logs, zero writes):
+        expect(getHealingBlockEffect(TARGET, CAMPAIGN)).toBeNull(); // no te at all
+        store['campaign.targetEffects'] = 'not-an-array';
+        expect(getHealingBlockEffect(TARGET, CAMPAIGN)).toBeNull(); // non-array store guard
+        store['campaign.targetEffects'] = [{ ...HEAL_BLOCK_TE, target: OTHER }];
+        expect(isHealingBlocked(TARGET, CAMPAIGN, 9)).toBeNull(); // te names another target
+        expect(isHealingBlocked(TARGET, CAMPAIGN, 0)).toBeNull(); // zero heal never spams refusal
+        expect(isHealingBlocked(TARGET, CAMPAIGN, -3)).toBeNull(); // negative never refuses
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
 
-    it('finds the te naming the target', () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'campaign' && prop === 'targetEffects') {
-                return [{ target: 'AasimarTest', effect: 'no_healing', source: 'Aberrant Spirit (Slaad) 1' }];
-            }
-            return null;
-        });
-        expect(getHealingBlockEffect('AasimarTest', 'test-campaign')).toMatchObject({ effect: 'no_healing' });
-        expect(getHealingBlockEffect('FeyRanger', 'test-campaign')).toBeNull();
-    });
-
-    it('isHealingBlocked logs a refusal and returns the te', () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'campaign' && prop === 'targetEffects') {
-                return [{ target: 'AasimarTest', effect: 'no_healing', source: 'Aberrant Spirit (Slaad) 1' }];
-            }
-            return null;
-        });
-        expect(isHealingBlocked('AasimarTest', 'test-campaign', 9)).toMatchObject({ effect: 'no_healing' });
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        // Guard fires: te names the target, amount > 0 → refusal returned + logged once, no writes.
+        store['campaign.targetEffects'] = [HEAL_BLOCK_TE];
+        expect(getHealingBlockEffect(TARGET, CAMPAIGN)).toMatchObject({ effect: 'no_healing', source: SOURCE });
+        expect(getHealingBlockEffect(OTHER, CAMPAIGN)).toBeNull(); // keyed lookup: other target untouched
+        expect(isHealingBlocked(TARGET, CAMPAIGN, 9)).toMatchObject({ effect: 'no_healing' });
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
             type: 'automation',
             automationType: 'healing_blocked',
-            characterName: 'AasimarTest',
-            description: expect.stringContaining('can\'t regain Hit Points'),
+            characterName: TARGET,
+            abilityName: 'no_healing',
+            description: expect.stringMatching(/can't regain Hit Points.*9 healing refused.*Aberrant Spirit \(Slaad\)/),
         }));
-    });
-
-    it('passes through when no te or zero amount, no log', () => {
-        expect(isHealingBlocked('AasimarTest', 'test-campaign', 9)).toBeNull();
-        expect(isHealingBlocked('AasimarTest', 'test-campaign', 0)).toBeNull();
-        expect(addEntry).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 });
 
-describe('MA-0016 consumer: canonical heal helpers refuse', () => {
+describe('MA-0016 registry contract (census owned by targetEffectDefinitions.test.js)', () => {
+    it('no_healing stays registered and Defensive labels stay sorted (sort delegated here)', () => {
+        expect(getEffectDefinition('no_healing')).toBeTruthy();
+        const labels = TARGET_EFFECT_DEFINITIONS.filter(d => d.group === 'Defensive').map(d => d.label);
+        expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+    });
+});
+
+describe('MA-0016 consumers refuse at the heal choke point', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (key === 'campaign' && prop === 'targetEffects') {
-                return [{ target: 'AasimarTest', effect: 'no_healing', source: 'Aberrant Spirit (Slaad) 1', duration: 'until_start_of_next_turn' }];
-            }
-            if (prop === 'currentHitPoints') return 100;
-            if (prop === 'hitPoints') return 143;
-            return null;
+        store['campaign.targetEffects'] = [HEAL_BLOCK_TE];
+        store[`${TARGET}.currentHitPoints`] = 100;
+    });
+
+    it('applyHealingToTarget refuses: golden zero-heal shape, no HP write, one refusal log', () => {
+        const cs = { creatures: [{ name: TARGET, type: 'player', maxHp: 143 }] };
+        expect(applyHealingToTarget(cs, TARGET, 20, CAMPAIGN)).toEqual({
+            actualHeal: 0, oldHp: 100, newHp: 100, maxHp: 143,
         });
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            automationType: 'healing_blocked',
+            characterName: TARGET,
+        }));
     });
 
-    it('applyHealingToTarget refuses with zero actualHeal and never writes HP', () => {
-        const cs = { creatures: [{ name: 'AasimarTest', type: 'player', maxHp: 143 }] };
-        const result = applyHealingToTarget(cs, 'AasimarTest', 20, 'test-campaign');
-        expect(result).toMatchObject({ actualHeal: 0, oldHp: 100, newHp: 100, maxHp: 143 });
-        expect(setRuntimeValue.mock.calls.some(c => c[1] === 'currentHitPoints')).toBe(false);
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: 'healing_blocked' }));
-    });
-
-    it('applyHealingDirectly refuses (Second Wind / hit dice path)', () => {
-        const result = applyHealingDirectly({ name: 'AasimarTest', hitPoints: 143 }, 'AasimarTest', 15, 'test-campaign');
-        expect(result).toMatchObject({ actualHeal: 0, newHp: 100, maxHp: 143 });
-        expect(setRuntimeValue.mock.calls.some(c => c[1] === 'currentHitPoints')).toBe(false);
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: 'healing_blocked' }));
+    it('applyHealingDirectly refuses (Second Wind / hit dice): golden zero-heal shape, no HP write, one refusal log', () => {
+        expect(applyHealingDirectly({ name: TARGET, hitPoints: 143 }, TARGET, 15, CAMPAIGN)).toEqual({
+            maxHp: 143, newHp: 100, actualHeal: 0,
+        });
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+            automationType: 'healing_blocked',
+            characterName: TARGET,
+        }));
     });
 });

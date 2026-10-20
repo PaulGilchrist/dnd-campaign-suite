@@ -1,3 +1,4 @@
+// @maintained-by-ai
 // MA-1460: Shambling Mound "Engulf" (actions[2], DC 15 Strength, shapeless
 // "" range → inline auto-save, 3d6 Lightning) RAW success = unaffected — the
 // 3d6 is recurring-only (start of victim's turns, §70 sustained-grapple
@@ -12,50 +13,48 @@
 // §959), full raw on failure. Conditions ride the FAIL branch regardless
 // (applyFailedSaveConditions early-returns on saveSuccess only, §63 trap rows
 // N/A here — no non-damage success clause to discriminate).
+// Generic half/none arithmetic at this seam is owned verbatim by
+// applyDamage.helpers.test.js (:88-104 save half/none, :184-196 evasion); this
+// lane pins only the Engulf row and its disk dc_success wired through the seam.
 import { describe, it, expect } from 'vitest';
 import { computeDamageAfterEvasion, computeDamageAfterSave } from './applyDamage.js';
 import { extractConditionsFromSaveEffect } from '../../../components/encounter/MonsterCardHelpers.js';
 import monsters from '../../../../public/data/monsters.json';
 
-const mound = () => monsters.find(m => m.index === 'shambling-mound');
-const engulf = () => mound().actions[2];
+const engulf = () => monsters.find(m => m.index === 'shambling-mound').actions[2];
 
-describe('MA-1460 monsters.json data lock: Shambling Mound Engulf row', () => {
-  const row = engulf();
-
-  it('is the Engulf block-save row', () => {
+describe('MA-1460 Shambling Mound Engulf: honest dc_success canon on disk', () => {
+  it('disk row carries RAW block-save shape with dc_success "none" after damage_type_primary (#1086 disk read, no transcription)', () => {
+    const row = engulf();
     expect(row.name).toBe('Engulf');
     expect(row.save_dc).toBe(15);
     expect(row.save_type).toBe('Strength');
+    expect(row.range).toBe(''); // shapeless → inline auto-save lane
     expect(row.damage_dice_primary).toBe('3d6');
     expect(row.damage_type_primary).toBe('Lightning');
-  });
-
-  it('canonical prose carries NO half-on-success clause (RAW success = unaffected)', () => {
-    expect(row.description).not.toMatch(/half/i);
-    expect(row.save_effect).not.toMatch(/half/i);
+    // Prose is failure-only: positive anchors so the half-clause absence is not vacuous.
+    expect(row.description).toMatch(/Failure:\s*The target is pulled/);
     expect(row.description).toMatch(/takes 10 \(3d6\) Lightning damage at the start of each of its turns/);
     expect(row.save_effect).toMatch(/Grappled.*escape DC 14/i);
-  });
-
-  it('dc_success authored "none" (half-default leak guard)', () => {
+    expect(row.description).not.toMatch(/half/i);
+    expect(row.save_effect).not.toMatch(/half/i);
+    // Byte-twin family placement (constrictor/salamander): dc_success authored last, right after the damage type.
+    const keys = Object.keys(row);
     expect(row.dc_success).toBe('none');
-  });
-
-  it('fail-branch conditions half stays byte-intact beside the field add', () => {
+    expect(keys.indexOf('dc_success')).toBe(keys.indexOf('damage_type_primary') + 1);
+    // Fail-branch conditions byte-intact beside the field add (§52).
     expect(extractConditionsFromSaveEffect(row.save_effect)).toEqual(['blinded', 'grappled', 'restrained']);
   });
 });
 
-describe('MA-1460 save seam pays full on fail, ZERO on success with dc_success "none"', () => {
-  const dcSuccess = engulf().dc_success;
-
-  it('computeDamageAfterSave: raw 14 full on fail, zero on success', () => {
+describe('MA-1460 save seam paid through the Engulf row: full on fail, ZERO on success', () => {
+  it('disk dc_success wired live: raw 14 (live leak — half-paid 7, hp 986→979) and raw 10 (prose example) pay full on fail, zero on success — never half (#1187 falsifier: regress disk dc_success to "half" pays 7/5 on success, fails here; key absence fails the disk lock above)', () => {
+    const dcSuccess = engulf().dc_success;
     expect(computeDamageAfterSave(14, false, dcSuccess)).toBe(14);
     expect(computeDamageAfterSave(14, true, dcSuccess)).toBe(0);
-  });
-
-  it('computeDamageAfterEvasion (no evasion): zero on success, full on fail', () => {
+    expect(computeDamageAfterSave(10, false, dcSuccess)).toBe(10);
+    expect(computeDamageAfterSave(10, true, dcSuccess)).toBe(0);
+    // Live inline auto-save path (MonsterCardModal), evasion inactive: same contract.
     expect(computeDamageAfterEvasion(14, false, dcSuccess, false)).toBe(14);
     expect(computeDamageAfterEvasion(14, true, dcSuccess, false)).toBe(0);
   });

@@ -1,11 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Base unit lane for damageUtils.js: damage-type extraction/formatting, resistance
+// notices, change-data envelope handling (falsy campaign / URL encoding / not-ok /
+// missing summary), creature+target lookup, and AC math.
+// The LIVE-vs-baked activeCreatureName precedence is owned by
+// damageUtils.live-active-boundary.test.js — deliberately not re-driven here.
+// Legendary-uses economy truth-table lives in monsterLegendaryUses.test.js.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
-  clearDataCache: vi.fn(),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
 }));
 
 vi.mock('../core/attackCalc.js', () => ({
@@ -26,68 +31,64 @@ import {
   computeAcEstimate,
 } from './damageUtils.js';
 
-import { loadEquipment, clearDataCache } from '../../ui/dataLoader.js';
+import { loadEquipment } from '../../ui/dataLoader.js';
 import { parseMagicItemName } from '../core/attackCalc.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-function makeCreature(name, extra = {}) {
-  return { name, ...extra };
-}
+const armor = (name, base, dex = {}) => ({
+  name,
+  equipment_category: 'Armor',
+  armor_class: { base, ...dex },
+});
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
-}
+const shield = (name = 'Shield') => ({ name, equipment_category: 'Shield' });
 
-function makeCharacter(abilities) {
-  return { abilities };
+const cs = (...creatures) => ({ round: 1, creatures });
+
+const dexChar = (dex, equipped) => ({
+  abilities: [dex],
+  ...(equipped ? { inventory: { equipped } } : {}),
+});
+
+function stubFetch(payload) {
+  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve(payload),
+  })));
 }
 
 // ── extractDamageTypes ────────────────────────────────────────
 
 describe('extractDamageTypes', () => {
-  const allDamageTypes = [
-    'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Force', 'Lightning',
-    'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder',
-  ];
-
-  it('returns empty array for null, undefined, and non-string types', () => {
-    expect(extractDamageTypes(null)).toEqual([]);
-    expect(extractDamageTypes(undefined)).toEqual([]);
-    expect(extractDamageTypes(42)).toEqual([]);
-    expect(extractDamageTypes({})).toEqual([]);
-    expect(extractDamageTypes([])).toEqual([]);
+  it('returns [] for missing, non-string, or type-free descriptions', () => {
+    for (const input of [null, undefined, 42, {}, [], 'The monster roars aggressively', 'The target takes no damage']) {
+      expect(extractDamageTypes(input)).toEqual([]);
+    }
   });
 
-  it('finds damage types in descriptions (single, multiple, case-insensitive)', () => {
+  it('finds one or more damage types in a description, case-insensitively', () => {
     expect(extractDamageTypes('The blade deals 1d8 slashing damage')).toEqual(['Slashing']);
     expect(extractDamageTypes('necrotic blast')).toEqual(['Necrotic']);
     expect(extractDamageTypes('COLD DAMAGE')).toEqual(['Cold']);
-
-    const multi = extractDamageTypes('Deals 2d6 fire and lightning damage');
-    expect(multi).toContain('Fire');
-    expect(multi).toContain('Lightning');
-    expect(multi).toHaveLength(2);
-
-    expect(extractDamageTypes('slashing attack')).toEqual(['Slashing']);
+    expect(extractDamageTypes('Deals 2d6 fire and lightning damage')).toEqual(['Fire', 'Lightning']);
+    // Output order is the fixed rules-table order, not mention order.
     expect(extractDamageTypes('fire damage and cold damage')).toEqual(['Cold', 'Fire']);
   });
 
-  it('uses word boundaries to avoid partial matches', () => {
+  it('respects word boundaries so longer words are not partial matches', () => {
     expect(extractDamageTypes('Thundering noise')).toEqual([]);
     expect(extractDamageTypes('Acidic')).toEqual([]);
     expect(extractDamageTypes('Fireball')).toEqual([]);
   });
 
-  it('returns empty array when no damage type words are present', () => {
-    expect(extractDamageTypes('The monster roars aggressively')).toEqual([]);
-    expect(extractDamageTypes('The target takes no damage')).toEqual([]);
-  });
-
-  it('matches all known damage types from the rules', () => {
+  it('recognises every published damage type', () => {
+    const allDamageTypes = [
+      'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Force', 'Lightning',
+      'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder',
+    ];
     for (const dt of allDamageTypes) {
-      const result = extractDamageTypes(`${dt} damage`);
-      expect(result).toContain(dt);
+      expect(extractDamageTypes(`${dt} damage`)).toEqual([dt]);
     }
   });
 });
@@ -95,13 +96,10 @@ describe('extractDamageTypes', () => {
 // ── formatDamageTypes ──────────────────────────────────────────
 
 describe('formatDamageTypes', () => {
-  it('returns null for null, undefined, and empty array', () => {
+  it('joins types with / and returns null when there is nothing to join', () => {
     expect(formatDamageTypes(null)).toBeNull();
     expect(formatDamageTypes(undefined)).toBeNull();
     expect(formatDamageTypes([])).toBeNull();
-  });
-
-  it('joins types with / separator (single, multiple, three+)', () => {
     expect(formatDamageTypes(['Fire'])).toBe('Fire');
     expect(formatDamageTypes(['Fire', 'Necrotic'])).toBe('Fire/Necrotic');
     expect(formatDamageTypes(['Cold', 'Thunder', 'Force'])).toBe('Cold/Thunder/Force');
@@ -111,92 +109,66 @@ describe('formatDamageTypes', () => {
 // ── getResistanceNotice ────────────────────────────────────────
 
 describe('getResistanceNotice', () => {
-  it('returns null for null, undefined, and empty damageTypes', () => {
+  it('returns null when nothing matches or there is nothing to match', () => {
     expect(getResistanceNotice(null, [], [], 'Orc')).toBeNull();
     expect(getResistanceNotice(undefined, [], [], 'Orc')).toBeNull();
     expect(getResistanceNotice([], [], [], 'Orc')).toBeNull();
-  });
-
-  it('skips undefined or empty damage type entries', () => {
     expect(getResistanceNotice([undefined], ['Fire'], [], 'Dragon')).toBeNull();
     expect(getResistanceNotice([''], ['Fire'], [], 'Dragon')).toBeNull();
-    expect(getResistanceNotice([undefined, 'Fire'], [], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
-  });
-
-  it('reports immunity or resistance correctly, prioritizes immunity over resistance', () => {
-    expect(getResistanceNotice(['Fire'], [], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
-    expect(getResistanceNotice(['Cold'], ['Cold'], [], 'Ice Golem')).toBe('Ice Golem resists Cold');
-    expect(getResistanceNotice(['Fire'], ['fire'], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
-  });
-
-  it('returns null when no immunity or resistance matches', () => {
+    expect(getResistanceNotice(['Fire'], undefined, undefined, 'Goblin')).toBeNull();
     expect(getResistanceNotice(['Fire'], ['cold'], ['lightning'], 'Orc')).toBeNull();
   });
 
-  it('matches case-insensitively but preserves original casing in output', () => {
+  it('reports IMMUNE / resists case-insensitively, preserving input casing and joining matches', () => {
+    expect(getResistanceNotice(['Fire'], [], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
+    expect(getResistanceNotice(['Cold'], ['Cold'], [], 'Ice Golem')).toBe('Ice Golem resists Cold');
     expect(getResistanceNotice(['NECROTIC'], [], ['necrotic'], 'Skeleton')).toBe('Skeleton is IMMUNE to NECROTIC');
-  });
-
-  it('reports multiple damage types when several match immunities or resistances', () => {
     expect(getResistanceNotice(['Fire', 'Cold'], [], ['fire', 'cold'], 'Dragon')).toBe('Dragon is IMMUNE to Fire, Cold');
     expect(getResistanceNotice(['Fire', 'Cold'], ['fire', 'cold'], [], 'Orc')).toBe('Orc resists Fire, Cold');
   });
 
-  it('handles undefined resistances/immunities and empty string targetName', () => {
-    expect(getResistanceNotice(['Fire'], undefined, undefined, 'Goblin')).toBeNull();
-    expect(getResistanceNotice(['Fire'], [], ['fire'], '')).toBe(' is IMMUNE to Fire');
-  });
-
-  it('reports only the first matching type (immune types take precedence)', () => {
+  it('immunity beats resistance per type, and any immunity suppresses the resist line', () => {
+    expect(getResistanceNotice(['Fire'], ['fire'], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
+    // Mixed lists: immune types reported, resisted types dropped entirely.
     expect(getResistanceNotice(['Fire', 'Cold'], ['cold'], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
+    // [undefined, 'Fire'] skips the empty entry and still notices the immunity.
+    expect(getResistanceNotice([undefined, 'Fire'], [], ['fire'], 'Dragon')).toBe('Dragon is IMMUNE to Fire');
   });
 });
 
 // ── getCombatContext ────────────────────────────────────────────
 
 describe('getCombatContext', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('returns null when campaignName is falsy', async () => {
-    expect(await getCombatContext(null)).toBeNull();
-    expect(await getCombatContext(undefined)).toBeNull();
-    expect(await getCombatContext('')).toBeNull();
+  it('returns null without fetching when campaignName is falsy', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    for (const name of [null, undefined, '']) {
+      expect(await getCombatContext(name)).toBeNull();
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('fetches from the correct URL with encoded campaign name', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ combatSummary: { creatures: [] } }),
-    });
-
+  it('fetches change-data from the URL-encoded campaign path', async () => {
+    stubFetch({ combatSummary: { creatures: [] } });
     await getCombatContext('My Campaign 2024');
-    expect(global.fetch).toHaveBeenCalledWith('/api/campaigns/My%20Campaign%202024/change-data');
+    expect(fetch).toHaveBeenCalledWith('/api/campaigns/My%20Campaign%202024/change-data');
   });
 
-  it('returns combatSummary from response body', async () => {
+  it('returns the combatSummary verbatim on ok, null on not-ok / missing summary / fetch error', async () => {
     const summary = { creatures: [{ name: 'Goblin' }] };
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ combatSummary: summary }),
-    });
+    stubFetch({ combatSummary: summary });
+    expect(await getCombatContext('test')).toBe(summary);
 
-    const result = await getCombatContext('test');
-    expect(result).toBe(summary);
-  });
-
-  it('returns null when response is not ok, combatSummary is missing, or fetch errors', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' }));
     expect(await getCombatContext('test')).toBeNull();
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ otherField: 'data' }),
-    });
+    stubFetch({ otherField: 'data' });
     expect(await getCombatContext('test')).toBeNull();
 
-    global.fetch.mockRejectedValue(new Error('network error'));
+    fetch.mockRejectedValueOnce(new Error('network error'));
     expect(await getCombatContext('test')).toBeNull();
   });
 });
@@ -204,284 +176,169 @@ describe('getCombatContext', () => {
 // ── findCreatureByName ─────────────────────────────────────────
 
 describe('findCreatureByName', () => {
-  it('returns null when combatSummary or name is falsy', () => {
+  it('returns null when combatSummary has no creatures list or name is falsy', () => {
     expect(findCreatureByName(null, 'Goblin')).toBeNull();
-    expect(findCreatureByName(undefined, 'Goblin')).toBeNull();
     expect(findCreatureByName({}, 'Goblin')).toBeNull();
-    const cs = makeCombatSummary([makeCreature('Goblin')]);
-    expect(findCreatureByName(cs, null)).toBeNull();
-    expect(findCreatureByName(cs, undefined)).toBeNull();
-    expect(findCreatureByName(cs, '')).toBeNull();
+    const summary = cs({ name: 'Goblin' });
+    expect(findCreatureByName(summary, null)).toBeNull();
+    expect(findCreatureByName(summary, '')).toBeNull();
   });
 
-  it('returns exact match, prefix match, or null', () => {
-    const cs = makeCombatSummary([
-      makeCreature('Goblin Grunt'),
-      makeCreature('Goblin'),
-    ]);
+  it('prefers an exact match (even listed after a prefix candidate), then the first prefix match', () => {
+    // Prefix candidate is listed FIRST; exact must still win.
+    const summary = cs({ name: 'Goblin Grunt' }, { name: 'Goblin' });
+    expect(findCreatureByName(summary, 'Goblin').name).toBe('Goblin');
+    expect(findCreatureByName(summary, 'Goblin Grunt').name).toBe('Goblin Grunt');
 
-    // exact match
-    const exact = findCreatureByName(cs, 'Goblin');
-    expect(exact.name).toBe('Goblin');
+    // No exact — first prefix match wins.
+    const prefixOnly = cs({ name: 'Goblin Grunt' }, { name: 'Goblin Boss' });
+    expect(findCreatureByName(prefixOnly, 'Goblin').name).toBe('Goblin Grunt');
 
-    // prefix match
-    const prefix = findCreatureByName(cs, 'Goblin Grunt');
-    expect(prefix.name).toBe('Goblin Grunt');
-
-    // no match
-    expect(findCreatureByName(cs, 'Orc')).toBeFalsy();
+    // No match at all: raw Array#find miss → falsy (undefined, not guarded to null).
+    expect(findCreatureByName(summary, 'Orc')).toBeFalsy();
   });
 
-  it('prefers exact match over prefix match', () => {
-    const cs = makeCombatSummary([
-      makeCreature('Goblin'),
-      makeCreature('Goblin Grunt'),
-    ]);
-    expect(findCreatureByName(cs, 'Goblin').name).toBe('Goblin');
-  });
-
-  it('does not match substrings without a trailing space word boundary', () => {
-    const cs = makeCombatSummary([makeCreature('Dungeon Master')]);
-    expect(findCreatureByName(cs, 'Dune')).toBeFalsy();
-    expect(findCreatureByName(cs, 'Master')).toBeFalsy();
-    expect(findCreatureByName(cs, 'Dun')).toBeFalsy();
+  it('requires a word boundary after the prefix', () => {
+    const summary = cs({ name: 'Dungeon Master' });
+    expect(findCreatureByName(summary, 'Dune')).toBeFalsy();
+    expect(findCreatureByName(summary, 'Master')).toBeFalsy();
+    expect(findCreatureByName(summary, 'Dun')).toBeFalsy();
   });
 });
 
-// ── getTargetFromAttacker ──────────────────────────────────────
+// ── getTargetFromAttacker / getAttackerTargetName ─────────────
 
 describe('getTargetFromAttacker', () => {
-  it('returns null when combatSummary is falsy, attacker not found, or attacker has no targetName', () => {
+  it('returns null when the attacker is unresolvable or has no resolvable target', () => {
     expect(getTargetFromAttacker(null, 'Goblin')).toBeNull();
-    const cs = makeCombatSummary([makeCreature('Orc')]);
-    expect(getTargetFromAttacker(cs, 'Ghost')).toBeNull();
-    expect(getTargetFromAttacker(cs, 'Orc')).toBeNull();
+    const summary = cs({ name: 'Orc' }, { name: 'Goblin', targetName: 'MissingTarget' });
+    expect(getTargetFromAttacker(summary, 'Ghost')).toBeNull();  // attacker absent
+    expect(getTargetFromAttacker(summary, 'Orc')).toBeNull();    // no targetName
+    expect(getTargetFromAttacker(summary, 'Goblin')).toBeNull(); // target not in initiative
   });
 
-  it('returns the target creature found by attacker targetName, or null when target not found', () => {
-    const cs = makeCombatSummary([
-      makeCreature('Goblin'),
-      makeCreature('Fighter'),
-    ]);
-    cs.creatures[0].targetName = 'Fighter';
-    expect(getTargetFromAttacker(cs, 'Goblin').name).toBe('Fighter');
-
-    const cs2 = makeCombatSummary([
-      makeCreature('Goblin', { targetName: 'MissingTarget' }),
-    ]);
-    expect(getTargetFromAttacker(cs2, 'Goblin')).toBeNull();
+  it('resolves the attacker targetName to the target creature object', () => {
+    const fighter = { name: 'Fighter' };
+    const summary = cs({ name: 'Goblin', targetName: 'Fighter' }, fighter);
+    expect(getTargetFromAttacker(summary, 'Goblin')).toBe(fighter);
   });
 });
-
-// ── getAttackerTargetName ──────────────────────────────────────
 
 describe('getAttackerTargetName', () => {
-  it('returns null when combatSummary is null or attacker not found', () => {
+  it('returns the attacker targetName when present, null otherwise', () => {
+    expect(getAttackerTargetName(cs({ name: 'Goblin', targetName: 'Fighter' }), 'Goblin')).toBe('Fighter');
     expect(getAttackerTargetName(null, 'Goblin')).toBeNull();
-    expect(getAttackerTargetName(makeCombatSummary([makeCreature('Orc')]), 'Ghost')).toBeNull();
-  });
-
-  it('returns targetName when attacker has one, null otherwise', () => {
-    expect(getAttackerTargetName(makeCombatSummary([makeCreature('Goblin', { targetName: 'Fighter' })]), 'Goblin')).toBe('Fighter');
-    expect(getAttackerTargetName(makeCombatSummary([makeCreature('Goblin')]), 'Goblin')).toBeNull();
-    expect(getAttackerTargetName(makeCombatSummary([makeCreature('Goblin', { targetName: undefined })]), 'Goblin')).toBeNull();
-    expect(getAttackerTargetName(makeCombatSummary([makeCreature('Goblin', { targetName: '' })]), 'Goblin')).toBeNull();
+    expect(getAttackerTargetName(cs({ name: 'Orc' }), 'Ghost')).toBeNull();
+    expect(getAttackerTargetName(cs({ name: 'Goblin' }), 'Goblin')).toBeNull();
+    expect(getAttackerTargetName(cs({ name: 'Goblin', targetName: undefined }), 'Goblin')).toBeNull();
+    expect(getAttackerTargetName(cs({ name: 'Goblin', targetName: '' }), 'Goblin')).toBeNull();
   });
 });
 
-// ── computePlayerAc (async, uses loadEquipment + parseMagicItemName) ────
+// ── computePlayerAc (loadEquipment + parseMagicItemName stubs) ────
 
 describe('computePlayerAc', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDataCache();
+    // Contract stub for the OTHER module: strip "+N " magic prefixes.
+    parseMagicItemName.mockImplementation(name => ({
+      baseName: String(name).replace(/^\+\d+\s/, ''),
+    }));
   });
 
-  it('returns 10 when character is null or has no abilities/equipment', async () => {
+  it('returns 10 for a null character WITHOUT loading equipment; 10 + Dex when equipment list is empty', async () => {
     expect(await computePlayerAc(null)).toBe(10);
+    expect(loadEquipment).not.toHaveBeenCalled();
+
     loadEquipment.mockResolvedValueOnce([]);
     expect(await computePlayerAc({})).toBe(10);
-  });
-
-  it('returns 10 + dex bonus when no armor equipped', async () => {
-    loadEquipment.mockResolvedValueOnce([]);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', baseScore: 16 }]))).toBe(13);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', baseScore: 14 }]))).toBe(12);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', bonus: 4 }]))).toBe(14);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', bonus: 3 }]))).toBe(13);
-  });
-
-  it('handles negative dex bonus with and without armor', async () => {
-    loadEquipment.mockResolvedValueOnce([]);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', baseScore: 7 }]))).toBe(8);
-
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Leather Armor' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: -2 }],
-      inventory: { equipped: ['Leather Armor'] },
-    })).toBe(9);
-  });
-
-  it('computes AC with armor (base only, dex bonus, capped dex bonus)', async () => {
-    // armor base only (no dex)
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Chain Mail', equipment_category: 'Armor', armor_class: { base: 16 } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Chain Mail' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', baseScore: 20 }],
-      inventory: { equipped: ['Chain Mail'] },
-    })).toBe(16);
-
-    // armor + full dex bonus
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Leather Armor' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', baseScore: 18 }],
-      inventory: { equipped: ['Leather Armor'] },
-    })).toBe(15);
-
-    // armor + capped dex bonus
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Studded Leather', equipment_category: 'Armor', armor_class: { base: 12, dex_bonus: true, max_bonus: 2 } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Studded Leather' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 5 }],
-      inventory: { equipped: ['Studded Leather'] },
-    })).toBe(14);
-  });
-
-  it('adds shield bonus on top of armor AC', async () => {
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Scale Mail', equipment_category: 'Armor', armor_class: { base: 14 } },
-      { name: 'Shield', equipment_category: 'Shield' },
-    ]);
-    parseMagicItemName
-      .mockReturnValueOnce({ baseName: 'Scale Mail' })
-      .mockReturnValueOnce({ baseName: 'Shield' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', baseScore: 10 }],
-      inventory: { equipped: ['Scale Mail', 'Shield'] },
-    })).toBe(16);
-  });
-
-  it('strips magic prefixes via parseMagicItemName, ignores unknown items, and ignores non-armor/shield items', async () => {
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Plate Armor', equipment_category: 'Armor', armor_class: { base: 18 } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Plate Armor' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', baseScore: 10 }],
-      inventory: { equipped: ['+2 Plate Armor'] },
-    })).toBe(18);
 
     loadEquipment.mockResolvedValueOnce([]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Ghost Armor' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 3 }],
-      inventory: { equipped: ['Ghost Armor'] },
-    })).toBe(13);
-
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Chain Shirt', equipment_category: 'Armor', armor_class: { base: 13, dex_bonus: true, max_bonus: 2 } },
-      { name: 'Potion', equipment_category: 'Other' },
-    ]);
-    parseMagicItemName
-      .mockReturnValueOnce({ baseName: 'Chain Shirt' })
-      .mockReturnValueOnce({ baseName: 'Potion' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 5 }],
-      inventory: { equipped: ['Chain Shirt', 'Potion'] },
-    })).toBe(15);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 16 }))).toBe(13);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 4 }))).toBe(14);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: -2 }))).toBe(8);
   });
 
-  it('handles edge cases: zero/negative dex, max_bonus 0, null max_bonus, missing inventory', async () => {
-    // zero dex
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Chain Mail', equipment_category: 'Armor', armor_class: { base: 16 } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Chain Mail' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', baseScore: 10 }],
-      inventory: { equipped: ['Chain Mail'] },
-    })).toBe(16);
+  it('applies armor_class: base only, +dex, max_bonus cap, negative dex, missing fields', async () => {
+    // No dex_bonus flag → Dex ignored entirely (even +5).
+    loadEquipment.mockResolvedValueOnce([armor('Chain Mail', 16)]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 20 }, ['Chain Mail']))).toBe(16);
 
-    // max_bonus 0
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Heavy Plate', equipment_category: 'Armor', armor_class: { base: 18, dex_bonus: true, max_bonus: 0 } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Heavy Plate' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 5 }],
-      inventory: { equipped: ['Heavy Plate'] },
-    })).toBe(18);
+    // dex_bonus:true → full dex.
+    loadEquipment.mockResolvedValueOnce([armor('Leather Armor', 11, { dex_bonus: true })]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 18 }, ['Leather Armor']))).toBe(15);
 
-    // null max_bonus (defaults to 99, no effective cap)
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Armor' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 5 }],
-      inventory: { equipped: ['Armor'] },
-    })).toBe(16);
+    // Capped dex.
+    loadEquipment.mockResolvedValueOnce([armor('Studded Leather', 12, { dex_bonus: true, max_bonus: 2 })]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 5 }, ['Studded Leather']))).toBe(14);
 
-    // missing inventory.equipped
+    // max_bonus 0 blocks dex without disabling the armor itself.
+    loadEquipment.mockResolvedValueOnce([armor('Heavy Plate', 18, { dex_bonus: true, max_bonus: 0 })]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 5 }, ['Heavy Plate']))).toBe(18);
+
+    // null max_bonus means no effective cap (defaults to 99).
+    loadEquipment.mockResolvedValueOnce([armor('Armor', 11, { dex_bonus: true, max_bonus: null })]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 5 }, ['Armor']))).toBe(16);
+
+    // Negative dex applies through armor.
+    loadEquipment.mockResolvedValueOnce([armor('Leather Armor', 11, { dex_bonus: true })]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: -2 }, ['Leather Armor']))).toBe(9);
+
+    // Wearing two armors: the LAST one in the equipped list wins (current behavior).
     loadEquipment.mockResolvedValueOnce([
-      { name: 'Chain Mail', equipment_category: 'Armor', armor_class: { base: 16 } },
+      armor('Leather Armor', 11, { dex_bonus: true }),
+      armor('Chain Mail', 16),
     ]);
-    expect(await computePlayerAc(makeCharacter([{ name: 'Dexterity', bonus: 2 }]))).toBe(12);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Leather Armor', 'Chain Mail']))).toBe(16);
   });
 
-  it('falls back to 10+dex when only shield equipped, and handles undefined armor_class', async () => {
-    // only shield
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Shield', equipment_category: 'Shield' },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Shield' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 3 }],
-      inventory: { equipped: ['Shield'] },
-    })).toBe(13);
+  it('adds the +2 shield with armor, but drops it when no armor is worn (pins current behavior)', async () => {
+    loadEquipment.mockResolvedValueOnce([armor('Scale Mail', 14), shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 10 }, ['Scale Mail', 'Shield']))).toBe(16);
 
-    // undefined armor_class on Armor item
-    loadEquipment.mockResolvedValueOnce([
-      { name: 'Magic Sword', equipment_category: 'Armor' },
-    ]);
-    parseMagicItemName.mockReturnValue({ baseName: 'Magic Sword' });
-    expect(await computePlayerAc({
-      abilities: [{ name: 'Dexterity', bonus: 3 }],
-      inventory: { equipped: ['Magic Sword'] },
-    })).toBe(0);
+    // Shield with no armor: hasArmor fallback recomputes 10+dex, losing the shield bonus.
+    loadEquipment.mockResolvedValueOnce([shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Shield']))).toBe(13);
+  });
+
+  it('resolves magic-prefixed names, ignores unknown items, non-armor categories, and missing armor_class', async () => {
+    // "+2 Plate Armor" resolves via stripped baseName; its own +2 is not double-counted here.
+    loadEquipment.mockResolvedValueOnce([armor('Plate Armor', 18)]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 10 }, ['+2 Plate Armor']))).toBe(18);
+
+    // Unknown equipment name → unarmored fallback.
+    loadEquipment.mockResolvedValueOnce([]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Ghost Armor']))).toBe(13);
+
+    // Non-armor category (Potion) is skipped; armor still counts.
+    loadEquipment.mockResolvedValueOnce([armor('Chain Shirt', 13, { dex_bonus: true, max_bonus: 2 }), { name: 'Potion', equipment_category: 'Other' }]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 5 }, ['Chain Shirt', 'Potion']))).toBe(15);
+
+    // Mis-tagged Armor item with no armor_class: base falls to 0 and hasArmor suppresses the 10+dex fallback (current, honest pin).
+    loadEquipment.mockResolvedValueOnce([{ name: 'Magic Sword', equipment_category: 'Armor' }]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Magic Sword']))).toBe(0);
+  });
+
+  it('falls back to 10 + Dex when inventory.equipped is missing', async () => {
+    loadEquipment.mockResolvedValueOnce([armor('Chain Mail', 16)]);
+    expect(await computePlayerAc({ abilities: [{ name: 'Dexterity', bonus: 2 }] })).toBe(12);
   });
 });
 
 // ── computeAcEstimate (sync, no IO) ────────────────────────────
 
 describe('computeAcEstimate', () => {
-  it('returns 10 when character is null or has no abilities', () => {
+  it('returns 10 with no character, no abilities, or no Dexterity entry', () => {
     expect(computeAcEstimate(null)).toBe(10);
     expect(computeAcEstimate({})).toBe(10);
+    expect(computeAcEstimate({ abilities: [{ name: 'Strength', bonus: 5 }] })).toBe(10);
   });
 
-  it('returns 10 + dex bonus from ab.bonus or computed from baseScore', () => {
-    expect(computeAcEstimate(makeCharacter([{ name: 'Dexterity', bonus: 3 }]))).toBe(13);
-    expect(computeAcEstimate(makeCharacter([{ name: 'Dexterity', baseScore: 18 }]))).toBe(14);
-  });
-
-  it('returns 10 when Dexterity not found, handles negative and zero dex', () => {
-    expect(computeAcEstimate(makeCharacter([{ name: 'Strength', bonus: 5 }]))).toBe(10);
-    expect(computeAcEstimate(makeCharacter([{ name: 'Dexterity', bonus: -2 }]))).toBe(8);
-    expect(computeAcEstimate(makeCharacter([{ name: 'Dexterity', baseScore: 10 }]))).toBe(10);
-  });
-
-  it('prefers ab.bonus over computing from baseScore', () => {
-    expect(computeAcEstimate(makeCharacter([{ name: 'Dexterity', bonus: 3, baseScore: 20 }]))).toBe(13);
+  it('returns 10 + Dex: explicit bonus preferred, else derived from baseScore, negatives included', () => {
+    expect(computeAcEstimate({ abilities: [{ name: 'Dexterity', bonus: 3 }] })).toBe(13);
+    expect(computeAcEstimate({ abilities: [{ name: 'Dexterity', bonus: 3, baseScore: 20 }] })).toBe(13);
+    expect(computeAcEstimate({ abilities: [{ name: 'Dexterity', baseScore: 18 }] })).toBe(14);
+    expect(computeAcEstimate({ abilities: [{ name: 'Dexterity', baseScore: 10 }] })).toBe(10);
+    expect(computeAcEstimate({ abilities: [{ name: 'Dexterity', baseScore: 7 }] })).toBe(8);
   });
 });
