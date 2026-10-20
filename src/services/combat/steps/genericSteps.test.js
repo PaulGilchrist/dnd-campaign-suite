@@ -1,194 +1,112 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildGenericSteps } from './genericSteps.js';
 
+// Deterministic diceRoller stub (sibling convention #829/#815: NdM → each die floor(M/2)+1).
+// Unparseable formulas return null, mirroring the real rollExpression contract (diceRoller.js:110),
+// so the wrong formula fails loudly via the exact-data assertions instead of silently matching.
 vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => {
-    if (!formula || formula === '0') return null;
-    const numeric = parseInt(formula.replace(/\D/g, ''), 10);
-    if (isNaN(numeric)) return null;
-    return { total: numeric, rolls: [numeric], modifier: 0 };
+    const m = /^(\d*)d(\d+)([+-]\d+)?$/i.exec(formula || '');
+    if (!m) return null;
+    const count = Number(m[1] || 1);
+    const sides = Number(m[2]);
+    const modifier = Number(m[3] || 0);
+    const rolls = Array(count).fill(Math.floor(sides / 2) + 1);
+    return { total: rolls.reduce((a, b) => a + b, 0) + modifier, rolls, modifier, formula };
   }),
 }));
 
-const { rollExpression } = await import('../../dice/diceRoller.js');
-
-function makeCtx(overrides = {}) {
-  return {
-    attack: {},
-    proceedWithDamage: vi.fn(),
-    ...overrides,
-  };
-}
+const makeCtx = (overrides = {}) => ({
+  attack: {},
+  proceedWithDamage: vi.fn(),
+  ...overrides,
+});
 
 describe('buildGenericSteps', () => {
-  let steps;
+  let steps, housekeeping, rollDamage, proceed;
 
   beforeEach(() => {
     vi.clearAllMocks();
     steps = buildGenericSteps();
+    [housekeeping, rollDamage, proceed] = steps;
   });
 
-  it('returns an array of 3 steps', () => {
-    expect(steps).toHaveLength(3);
+  it('builds the 3-step event chain generic:do → generic:ready → generic:applied → pipeline:complete', () => {
+    expect(steps.map(({ name, subscribe, emit }) => ({ name, subscribe, emit }))).toEqual([
+      { name: 'genericHousekeeping', subscribe: 'generic:do', emit: 'generic:ready' },
+      { name: 'genericRollDamage', subscribe: 'generic:ready', emit: 'generic:applied' },
+      { name: 'genericProceed', subscribe: 'generic:applied', emit: 'pipeline:complete' },
+    ]);
   });
 
-  it('has steps with correct names in order', () => {
-    const names = steps.map((s) => s.name);
-    expect(names).toEqual(['genericHousekeeping', 'genericRollDamage', 'genericProceed']);
+  it('genericHousekeeping is unconditional and initializes empty data', async () => {
+    expect(housekeeping.condition({})).toBe(true);
+    expect(housekeeping.condition({ attack: null })).toBe(true);
+    expect(await housekeeping.handler(makeCtx())).toEqual({ data: {} });
   });
 
-  it('has correct subscribe/emit chain', () => {
-    expect(steps[0].subscribe).toBe('generic:do');
-    expect(steps[0].emit).toBe('generic:ready');
-    expect(steps[1].subscribe).toBe('generic:ready');
-    expect(steps[1].emit).toBe('generic:applied');
-    expect(steps[2].subscribe).toBe('generic:applied');
-    expect(steps[2].emit).toBe('pipeline:complete');
-  });
-
-  describe('genericHousekeeping step', () => {
-    it('always returns true for condition', () => {
-      expect(steps[0].condition({})).toBe(true);
-      expect(steps[0].condition({ attack: null })).toBe(true);
-      expect(steps[0].condition({ attack: { name: 'Test' } })).toBe(true);
+  describe('genericRollDamage', () => {
+    it('gates on attack.damage or autoFormulaOverride (truth table)', () => {
+      const truthy = [
+        { attack: { damage: '1d6+2' } },
+        { attack: {}, autoFormulaOverride: '2d4' },
+        { attack: null, autoFormulaOverride: '1d4' },
+      ];
+      const falsy = [
+        { attack: {} },
+        { attack: { damage: '' } },
+        { attack: { damage: null } },
+        { attack: null },
+        { attack: {}, autoFormulaOverride: null },
+      ];
+      for (const ctx of truthy) expect(rollDamage.condition(makeCtx(ctx))).toBe(true);
+      for (const ctx of falsy) expect(rollDamage.condition(makeCtx(ctx))).toBe(false);
     });
 
-    it('returns { data: {} } from handler', async () => {
-      const result = await steps[0].handler({});
-      expect(result).toEqual({ data: {} });
-    });
-  });
-
-  describe('genericRollDamage step', () => {
-    describe('condition', () => {
-      it('returns true when ctx.attack has damage', () => {
-        const ctx = makeCtx({ attack: { damage: '1d6+2' } });
-        expect(steps[1].condition(ctx)).toBe(true);
-      });
-
-      it('returns true when ctx has autoFormulaOverride', () => {
-        const ctx = makeCtx({ autoFormulaOverride: '2d4' });
-        expect(steps[1].condition(ctx)).toBe(true);
-      });
-
-      it('returns false when neither attack.damage nor autoFormulaOverride exists', () => {
-        const ctx = makeCtx({ attack: {} });
-        expect(steps[1].condition(ctx)).toBe(false);
-      });
-
-      it('returns false when attack.damage is empty string', () => {
-        const ctx = makeCtx({ attack: { damage: '' } });
-        expect(steps[1].condition(ctx)).toBe(false);
-      });
-
-      it('returns false when attack.damage is null', () => {
-        const ctx = makeCtx({ attack: { damage: null } });
-        expect(steps[1].condition(ctx)).toBe(false);
-      });
-
-      it('returns false when autoFormulaOverride is falsy and no damage', () => {
-        const ctx = makeCtx({ autoFormulaOverride: null });
-        expect(steps[1].condition(ctx)).toBe(false);
+    it('prefers autoFormulaOverride over attack.damage and passes formula, total, rolls, modifier through', async () => {
+      const ctx = makeCtx({ attack: { damage: '1d6+2' }, autoFormulaOverride: '2d8+4' });
+      expect(await rollDamage.handler(ctx)).toEqual({
+        data: { formula: '2d8+4', total: 14, rolls: [5, 5], modifier: 4 },
       });
     });
 
-    describe('handler', () => {
-      it('uses autoFormulaOverride when both it and attack.damage exist', async () => {
-        const ctx = makeCtx({
-          attack: { damage: '1d6' },
-          autoFormulaOverride: '2d8+4',
-        });
-        const result = await steps[1].handler(ctx);
-        expect(result).not.toBeNull();
-        expect(result.data.formula).toBe('2d8+4');
-        expect(rollExpression).toHaveBeenCalledWith('2d8+4');
+    it('falls back to attack.damage when no override', async () => {
+      const ctx = makeCtx({ attack: { damage: '1d6+2' } });
+      expect(await rollDamage.handler(ctx)).toEqual({
+        data: { formula: '1d6+2', total: 6, rolls: [4], modifier: 2 },
       });
+    });
 
-      it('uses attack.damage when no autoFormulaOverride', async () => {
-        const ctx = makeCtx({ attack: { damage: '1d6+2' } });
-        const result = await steps[1].handler(ctx);
-        expect(result).not.toBeNull();
-        expect(result.data.formula).toBe('1d6+2');
-        expect(rollExpression).toHaveBeenCalledWith('1d6+2');
-      });
-
-      it('returns null when rollExpression returns null (formula "0")', async () => {
-        const ctx = makeCtx({ attack: { damage: '0' } });
-        const result = await steps[1].handler(ctx);
-        expect(result).toBeNull();
-      });
-
-      it('returns data with formula, total, rolls, and modifier', async () => {
-        const ctx = makeCtx({ attack: { damage: '1d6' } });
-        const result = await steps[1].handler(ctx);
-        expect(result).not.toBeNull();
-        expect(result.data).toHaveProperty('formula');
-        expect(result.data).toHaveProperty('total');
-        expect(result.data).toHaveProperty('rolls');
-        expect(result.data).toHaveProperty('modifier');
-      });
+    it('returns null when the roll fails (unparseable formula)', async () => {
+      const ctx = makeCtx({ attack: { damage: 'not-a-formula' } });
+      expect(await rollDamage.handler(ctx)).toBeNull();
     });
   });
 
-  describe('genericProceed step', () => {
-    describe('condition', () => {
-      it('returns true when ctx.formula is a number', () => {
-        const ctx = makeCtx({ formula: 10 });
-        expect(steps[2].condition(ctx)).toBe(true);
-      });
-
-      it('returns true when ctx.formula is 0', () => {
-        const ctx = makeCtx({ formula: 0 });
-        expect(steps[2].condition(ctx)).toBe(true);
-      });
-
-      it('returns true when ctx.formula is a string', () => {
-        const ctx = makeCtx({ formula: '1d6' });
-        expect(steps[2].condition(ctx)).toBe(true);
-      });
-
-      it('returns false when ctx.formula is undefined', () => {
-        const ctx = makeCtx();
-        expect(steps[2].condition(ctx)).toBe(false);
-      });
-
-      it('returns false when ctx.formula is null', () => {
-        const ctx = makeCtx({ formula: null });
-        expect(steps[2].condition(ctx)).toBe(false);
-      });
+  describe('genericProceed', () => {
+    it('gates on formula != null — 0 and empty string run, null/undefined are blocked', () => {
+      for (const formula of [0, '0', '1d6', '']) expect(proceed.condition(makeCtx({ formula }))).toBe(true);
+      for (const formula of [null, undefined]) expect(proceed.condition(makeCtx({ formula }))).toBe(false);
     });
 
-    describe('handler', () => {
-      it('calls proceedWithDamage with attack, formula, total, rolls, and modifier', async () => {
-        const ctx = makeCtx({
-          attack: { name: 'Test' },
-          formula: '1d6+2',
-          total: 8,
-          rolls: [6],
-          modifier: 2,
-        });
-        const result = await steps[2].handler(ctx);
-        expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
-          attack: { name: 'Test' },
-          formula: '1d6+2',
-          total: 8,
-          rolls: [6],
-          modifier: 2,
-        });
-        expect(result).toEqual({ data: { _done: true } });
+    it('hands attack, formula, total, rolls, modifier to proceedWithDamage and marks done', async () => {
+      const ctx = makeCtx({
+        attack: { name: 'Test' },
+        formula: '1d6+2',
+        total: 8,
+        rolls: [6],
+        modifier: 2,
       });
-
-      it('returns _done: true in result', async () => {
-        const ctx = makeCtx({
-          attack: {},
-          formula: '1d4',
-          total: 4,
-          rolls: [4],
-          modifier: 0,
-        });
-        const result = await steps[2].handler(ctx);
-        expect(result.data._done).toBe(true);
+      const result = await proceed.handler(ctx);
+      expect(ctx.proceedWithDamage).toHaveBeenCalledWith({
+        attack: { name: 'Test' },
+        formula: '1d6+2',
+        total: 8,
+        rolls: [6],
+        modifier: 2,
       });
+      expect(result).toEqual({ data: { _done: true } });
     });
   });
 });

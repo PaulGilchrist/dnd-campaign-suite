@@ -1,6 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// --- mocks ---
+// @maintained-by-ai
+// Lane: combatLoggingService.js — service-side log entry PRODUCTION bytes only.
+// UI consumers (initiative handlers, CharConditions, LogEntryRendering #885, LogRoll #887)
+// own call-site args + rendering and mock this service; exact entry bytes live ONLY here.
+// Cites: #829/#1007 exact full-object entries, #934 campaign pinned every write,
+// #951 one-write-exact, #1010 exact transport tuple, #903 it.each tables,
+// #1065 interpolation-defect honesty, #1007 afterEach re-arm, zero-network (addEntry fully mocked).
+//
+// Old -> new:
+//   - 7 describes / 20 tests -> 2 it.each tables (13 exact-byte rows + 6 rejection rows)
+//   - campaign arg was never asserted -> every row pins the exact (campaign, entry) tuple, once
+//   - duplicate logConcentrationSave rejection test inside its own describe (leaked a permanent
+//     mockRejectedValue onto the mock) -> removed; covered by the rejection table
+//   - initiative nat20/nat1 chain test -> two full-byte rows (roll 20 / roll 1)
+//   - CLA-209 advantage row pins total=max via [8, 14] -> 14 (kills take-first/last/min impls)
+//   - logHpChange heal row + unconscious row kept (they cover disjoint field semantics);
+//     plain-damage row folded into the unconscious row
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const mockGuid = 'test-guid-1234';
 vi.mock('../ui/utils.js', () => ({
@@ -9,15 +24,11 @@ vi.mock('../ui/utils.js', () => ({
     },
 }));
 
-const mockAddEntry = vi.fn(() => Promise.resolve());
-function makeMockPostLogEntry() {
-    return vi.fn((campaignName, entry) => mockAddEntry(campaignName, entry));
-}
+const mockAddEntry = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock('../ui/logService.js', () => ({
-    addEntry: makeMockPostLogEntry(),
+    addEntry: mockAddEntry,
 }));
 
-import { addEntry } from '../ui/logService.js';
 import {
     logInitiativeRoll,
     logConditionEvent,
@@ -27,284 +38,264 @@ import {
     logNpcThreshold,
 } from './combatLoggingService.js';
 
-// --- shared helpers ---
-
-function clearMocks() {
-    vi.clearAllMocks();
-}
-
-function capturedEntry() {
-    return addEntry.mock.calls[0][1];
-}
-
 const campaignName = 'Dragonfall';
 
-// --- tests ---
+afterEach(() => {
+    vi.clearAllMocks(); // preserves addEntry's default resolve; clears calls + expired Once queues
+});
 
-describe('logInitiativeRoll', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
+// Every write must be exactly ONE addEntry(campaignName, exactEntry) call (#934/#951/#1010).
+function postedCall() {
+    expect(mockAddEntry).toHaveBeenCalledTimes(1);
+    return mockAddEntry.mock.calls[0];
+}
 
-    it('posts a roll entry with correct initiative fields', () => {
-        logInitiativeRoll(campaignName, 'Gortha', 15, 3);
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'roll',
-            characterName: 'Gortha',
-            rollType: 'initiative',
-            name: 'Initiative',
-            rolls: [15],
-            total: 15,
-            bonus: 3,
-            mode: 'normal',
-            isNatural20: false,
-            isNatural1: false,
-            timestamp: expect.any(Number),
-            id: expect.any(String),
-        });
-    });
-
-    it('marks isNatural20 when the die roll is 20 and isNatural1 when the die roll is 1', () => {
-        logInitiativeRoll(campaignName, 'Gortha', 20, 3);
-        expect(capturedEntry().isNatural20).toBe(true);
-
-        clearMocks();
-        logInitiativeRoll(campaignName, 'Gortha', 1, -2);
-        expect(capturedEntry().isNatural1).toBe(true);
+describe('entry production', () => {
+    it.each([
+        {
+            title: 'logInitiativeRoll (mid roll)',
+            invoke: () => logInitiativeRoll(campaignName, 'Gortha', 15, 3),
+            expected: {
+                type: 'roll',
+                characterName: 'Gortha',
+                rollType: 'initiative',
+                name: 'Initiative',
+                rolls: [15],
+                total: 15,
+                bonus: 3,
+                mode: 'normal',
+                isNatural20: false,
+                isNatural1: false,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logInitiativeRoll (natural 20)',
+            invoke: () => logInitiativeRoll(campaignName, 'Gortha', 20, 3),
+            expected: {
+                type: 'roll',
+                characterName: 'Gortha',
+                rollType: 'initiative',
+                name: 'Initiative',
+                rolls: [20],
+                total: 20,
+                bonus: 3,
+                mode: 'normal',
+                isNatural20: true,
+                isNatural1: false,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logInitiativeRoll (natural 1, negative bonus)',
+            invoke: () => logInitiativeRoll(campaignName, 'Gortha', 1, -2),
+            expected: {
+                type: 'roll',
+                characterName: 'Gortha',
+                rollType: 'initiative',
+                name: 'Initiative',
+                rolls: [1],
+                total: 1,
+                bonus: -2,
+                mode: 'normal',
+                isNatural20: false,
+                isNatural1: true,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logConditionEvent (add with dc/ability)',
+            invoke: () => logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' }),
+            expected: {
+                type: 'condition',
+                action: 'add',
+                characterName: 'Orc',
+                condition: 'charmed',
+                dc: 12,
+                ability: 'CHA',
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logConditionEvent (remove without dc/ability)',
+            invoke: () => logConditionEvent({ campaignName, action: 'remove', creatureName: 'Goblin', conditionLabel: 'stunned' }),
+            expected: {
+                type: 'condition',
+                action: 'remove',
+                characterName: 'Goblin',
+                condition: 'stunned',
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logConcentrationSave (success, default mode)',
+            invoke: () => logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 DEX', spellName: 'Fireball', dc: 15, success: true }),
+            expected: {
+                type: 'roll',
+                rollType: 'concentration-save',
+                characterName: 'Gortha',
+                name: 'Constitution',
+                rolls: [14],
+                mode: 'normal',
+                total: 14,
+                bonus: 2,
+                bonusDetail: '+2 DEX',
+                condition: 'Concentration: Fireball',
+                dc: 15,
+                success: true,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logConcentrationSave (failure, custom mode)',
+            invoke: () => logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 5, bonus: 3, bonusDetail: '+3 CON', spellName: 'Bless', dc: 12, success: false, mode: 'disadvantage' }),
+            expected: {
+                type: 'roll',
+                rollType: 'concentration-save',
+                characterName: 'Gortha',
+                name: 'Constitution',
+                rolls: [5],
+                mode: 'disadvantage',
+                total: 5,
+                bonus: 3,
+                bonusDetail: '+3 CON',
+                condition: 'Concentration: Bless',
+                dc: 12,
+                success: false,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            // Defect pin (#1065 class): source interpolates `Concentration: ${spellName}` with no
+            // fallback, so a missing spellName ships literal 'undefined' prose into the log.
+            title: 'logConcentrationSave (missing spellName -> "Concentration: undefined")',
+            invoke: () => logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 10, bonus: 2, bonusDetail: '+2 CON', dc: 15, success: true }),
+            expected: {
+                type: 'roll',
+                rollType: 'concentration-save',
+                characterName: 'Gortha',
+                name: 'Constitution',
+                rolls: [10],
+                mode: 'normal',
+                total: 10,
+                bonus: 2,
+                bonusDetail: '+2 CON',
+                condition: 'Concentration: undefined',
+                dc: 15,
+                success: true,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logConditionSave (scalar roll, normal mode)',
+            invoke: () => logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true }),
+            expected: {
+                type: 'roll',
+                rollType: 'condition-save',
+                characterName: 'Gortha',
+                name: 'Wisdom',
+                rolls: [13],
+                mode: 'normal',
+                total: 13,
+                bonus: 3,
+                bonusDetail: '+3 WIS',
+                condition: 'poisoned',
+                dc: 14,
+                success: true,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            // CLA-209: multi-dice array logs BOTH dice, mode 'advantage', total = max.
+            // [8, 14] -> 14 also kills take-first / take-last / take-min implementations.
+            title: 'logConditionSave (advantage multi-dice array, CLA-209)',
+            invoke: () => logConditionSave({ campaignName, creatureName: 'Gortha', roll: [8, 14], bonus: 3, bonusDetail: '+3 STR', conditionLabel: 'grappled', abilityLabel: 'Strength', dc: 13, success: true }),
+            expected: {
+                type: 'roll',
+                rollType: 'condition-save',
+                characterName: 'Gortha',
+                name: 'Strength',
+                rolls: [8, 14],
+                mode: 'advantage',
+                total: 14,
+                bonus: 3,
+                bonusDetail: '+3 STR',
+                condition: 'grappled',
+                dc: 13,
+                success: true,
+                timestamp: expect.any(Number),
+                id: mockGuid,
+            },
+        },
+        {
+            title: 'logHpChange (damage to unconscious)',
+            invoke: () => logHpChange({ campaignName, targetName: 'Orc', delta: -15, currentHp: 0, maxHp: 30, isHealing: false, isUnconscious: true }),
+            expected: {
+                type: 'hp_change',
+                targetName: 'Orc',
+                delta: -15,
+                currentHp: 0,
+                maxHp: 30,
+                isHealing: false,
+                isUnconscious: true,
+            },
+        },
+        {
+            title: 'logHpChange (healing)',
+            invoke: () => logHpChange({ campaignName, targetName: 'Ally', delta: 10, currentHp: 25, maxHp: 30, isHealing: true, isUnconscious: false }),
+            expected: {
+                type: 'hp_change',
+                targetName: 'Ally',
+                delta: 10,
+                currentHp: 25,
+                maxHp: 30,
+                isHealing: true,
+                isUnconscious: false,
+            },
+        },
+        {
+            title: 'logNpcThreshold',
+            invoke: () => logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10),
+            expected: {
+                type: 'hp_change',
+                targetName: 'Bandit Leader',
+                delta: -10,
+                threshold: 5,
+                maxHp: 10,
+            },
+        },
+    ])('$title posts one campaign-pinned entry with exact bytes', ({ invoke, expected }) => {
+        invoke();
+        expect(postedCall()).toEqual([campaignName, expected]);
     });
 });
 
-describe('logConditionEvent', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('posts a condition entry for add action', () => {
-        logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' });
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'condition',
-            action: 'add',
-            characterName: 'Orc',
-            condition: 'charmed',
-            dc: 12,
-            ability: 'CHA',
-            timestamp: expect.any(Number),
-            id: expect.any(String),
-        });
-    });
-
-    it('posts a condition entry for remove action without dc/ability', () => {
-        logConditionEvent({ campaignName, action: 'remove', creatureName: 'Goblin', conditionLabel: 'stunned' });
-
-        const entry = capturedEntry();
-        expect(entry.type).toBe('condition');
-        expect(entry.action).toBe('remove');
-        expect(entry.characterName).toBe('Goblin');
-        expect(entry.condition).toBe('stunned');
-        expect(entry.dc).toBeUndefined();
-        expect(entry.ability).toBeUndefined();
-    });
-});
-
-describe('logConcentrationSave', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('posts a roll entry with concentration-save details', () => {
-        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 DEX', spellName: 'Fireball', dc: 15, success: true });
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'roll',
-            rollType: 'concentration-save',
-            characterName: 'Gortha',
-            name: 'Constitution',
-            rolls: [14],
-            mode: 'normal',
-            total: 14,
-            bonus: 2,
-            bonusDetail: '+2 DEX',
-            condition: 'Concentration: Fireball',
-            dc: 15,
-            success: true,
-            timestamp: expect.any(Number),
-            id: expect.any(String),
-        });
-    });
-
-    it('uses custom mode when provided', () => {
-        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 DEX', spellName: 'Fireball', dc: 15, success: true, mode: 'disadvantage' });
-
-        const entry = capturedEntry();
-        expect(entry.mode).toBe('disadvantage');
-    });
-
-    it('posts a failed concentration save entry', () => {
-        logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 5, bonus: 3, bonusDetail: '+3 CON', spellName: 'Bless', dc: 12, success: false });
-
-        const entry = capturedEntry();
-        expect(entry.success).toBe(false);
-        expect(entry.condition).toBe('Concentration: Bless');
-    });
-
-    it('logConcentrationSave does not throw when addEntry rejects', async () => {
-        vi.mocked(addEntry).mockRejectedValue(new Error('fail'));
-        await expect(logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2', spellName: 'Fireball', dc: 15, success: true })).resolves.toBeUndefined();
-    });
-
-});
-
-describe('logConditionSave', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('posts a roll entry with condition-save details', () => {
-        logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true });
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'roll',
-            rollType: 'condition-save',
-            characterName: 'Gortha',
-            name: 'Wisdom',
-            rolls: [13],
-            mode: 'normal',
-            total: 13,
-            bonus: 3,
-            bonusDetail: '+3 WIS',
-            condition: 'poisoned',
-            dc: 14,
-            success: true,
-            timestamp: expect.any(Number),
-            id: expect.any(String),
-        });
-    });
-
-    it('posts a failed condition save entry', () => {
-        logConditionSave({ campaignName, creatureName: 'Gortha', roll: 8, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: false });
-
-        const entry = capturedEntry();
-        expect(entry.success).toBe(false);
-        expect(entry.rollType).toBe('condition-save');
-        expect(entry.condition).toBe('poisoned');
-    });
-
-    // CLA-209: multi-dice roll array (advantage) must log both dice + mode 'advantage'
-    it('logs both dice with mode advantage when roll is passed as a multi-dice array (CLA-209)', () => {
-        logConditionSave({ campaignName, creatureName: 'Gortha', roll: [8, 14], bonus: 3, bonusDetail: '+3 STR', conditionLabel: 'grappled', abilityLabel: 'Strength', dc: 13, success: true });
-
-        const entry = capturedEntry();
-        expect(entry.rolls).toEqual([8, 14]);
-        expect(entry.mode).toBe('advantage');
-        expect(entry.total).toBe(14);
-        expect(entry.success).toBe(true);
-    });
-
-});
-
-describe('logHpChange', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('posts an hp_change entry with correct fields', () => {
-        logHpChange({ campaignName, targetName: 'Orc', delta: -5, currentHp: 20, maxHp: 30, isHealing: false, isUnconscious: false });
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'hp_change',
-            targetName: 'Orc',
-            delta: -5,
-            currentHp: 20,
-            maxHp: 30,
-            isHealing: false,
-            isUnconscious: false,
-        });
-    });
-
-    it('posts an hp_change entry for healing', () => {
-        logHpChange({ campaignName, targetName: 'Ally', delta: 10, currentHp: 25, maxHp: 30, isHealing: true, isUnconscious: false });
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'hp_change',
-            targetName: 'Ally',
-            delta: 10,
-            currentHp: 25,
-            maxHp: 30,
-            isHealing: true,
-            isUnconscious: false,
-        });
-    });
-
-    it('posts an hp_change entry with isUnconscious flag', () => {
-        logHpChange({ campaignName, targetName: 'Orc', delta: -15, currentHp: 0, maxHp: 30, isHealing: false, isUnconscious: true });
-
-        const entry = capturedEntry();
-        expect(entry.isUnconscious).toBe(true);
-        expect(entry.currentHp).toBe(0);
-        expect(entry.isHealing).toBe(false);
-    });
-
-});
-
-describe('logNpcThreshold', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('posts an hp_change entry with threshold field', () => {
-        logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-
-        const entry = capturedEntry();
-        expect(entry).toEqual({
-            type: 'hp_change',
-            targetName: 'Bandit Leader',
-            delta: -10,
-            threshold: 5,
-            maxHp: 10,
-        });
-    });
-});
-
-describe('error handling', () => {
-    beforeEach(() => {
-        clearMocks();
-    });
-
-    it('logInitiativeRoll does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logInitiativeRoll(campaignName, 'Gortha', 15, 3)).resolves.toBeUndefined();
-    });
-
-    it('logConditionEvent does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' })).resolves.toBeUndefined();
-    });
-
-    it('logConcentrationSave does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2', spellName: 'Fireball', dc: 15, success: true })).resolves.toBeUndefined();
-    });
-
-    it('logConditionSave does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true })).resolves.toBeUndefined();
-    });
-
-    it('logHpChange does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logHpChange({ campaignName, targetName: 'Orc', delta: -5, currentHp: 20, maxHp: 30, isHealing: false, isUnconscious: false })).resolves.toBeUndefined();
-    });
-
-    it('logNpcThreshold does not throw when addEntry rejects', async () => {
-        mockAddEntry.mockRejectedValueOnce(new Error('network error'));
-        await expect(logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10)).resolves.toBeUndefined();
+describe('rejection guards', () => {
+    it.each([
+        { name: 'logInitiativeRoll', invoke: () => logInitiativeRoll(campaignName, 'Gortha', 15, 3) },
+        { name: 'logConditionEvent', invoke: () => logConditionEvent({ campaignName, action: 'add', creatureName: 'Orc', conditionLabel: 'charmed', dc: 12, ability: 'CHA' }) },
+        { name: 'logConcentrationSave', invoke: () => logConcentrationSave({ campaignName, creatureName: 'Gortha', roll: 14, bonus: 2, bonusDetail: '+2 CON', spellName: 'Fireball', dc: 15, success: true }) },
+        { name: 'logConditionSave', invoke: () => logConditionSave({ campaignName, creatureName: 'Gortha', roll: 13, bonus: 3, bonusDetail: '+3 WIS', conditionLabel: 'poisoned', abilityLabel: 'Wisdom', dc: 14, success: true }) },
+        { name: 'logHpChange', invoke: () => logHpChange({ campaignName, targetName: 'Orc', delta: -5, currentHp: 20, maxHp: 30, isHealing: false, isUnconscious: false }) },
+        { name: 'logNpcThreshold', invoke: () => logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10) },
+    ])('$name resolves (never throws) and logs to console.error when addEntry rejects', async ({ invoke }) => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockAddEntry.mockRejectedValueOnce(new Error('network down'));
+        try {
+            await expect(invoke()).resolves.toBeUndefined();
+            expect(mockAddEntry).toHaveBeenCalledTimes(1); // attempt happened, no retry storm
+            expect(consoleError).toHaveBeenCalledTimes(1); // swallowed loudly, not silently
+        } finally {
+            consoleError.mockRestore();
+        }
     });
 });

@@ -1,4 +1,28 @@
-import { describe, it, expect } from 'vitest';
+// @maintained-by-ai
+// ── diceRoller ENGINE lane ───────────────────────────────────────────
+// This file owns the real dice engine: grammar, RNG consumption counts,
+// keep-highest/lowest selection core (#938: rollAdvantage/rollDisadvantage
+// exact pairs), and reroll semantics. Consumer lanes (fallDamage, attack
+// steps, automation handlers, etc.) MOCK this module — they pin their own
+// applied bytes (#1032), never engine math, so nothing here duplicates them.
+// Stub-convention fidelity (#1026): consumer stubs roll NdM → ⌊M/2⌋+1;
+// that mirrors this engine's real rollDie exactly at Math.random()=0.5 —
+// pinned in the rollDie table below. If that pin ever fails, the stub
+// convention has drifted: forward the correction to the consumer lanes.
+//
+// RNG is the only external seam: every total is exact from a pinned random
+// sequence, consumed-exactly pins on every roll (#973: no range assertions).
+// No keep-highest dice grammar (kh/kl) is authored — such formulas honestly
+// parse to null (#945). No huge-count cap is authored — not tested.
+//
+// old→new map: 45 range-leaning its → 15 exact tables.
+//   rollD20/rollDie/rollDice range loops → exact-face tables + consumed pins
+//   8 parseExpression its → 2 it.each tables (valid / null)
+//   12 rollExpression its → grammar table + invalid table + rerollOnes pair
+//   5 doubled / 2 maximized its → 1 it.each each
+//   10 formatDamageFormula + 5 applyHealingRerollOnes its → tables
+// ──────────────────────────────────────────────────────────────────────
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   rollD20,
   rollDie,
@@ -6,6 +30,7 @@ import {
   rollAdvantage,
   rollDisadvantage,
   parseExpression,
+  canRollExpression,
   rollExpression,
   rollExpressionDoubled,
   rollExpressionMaximized,
@@ -13,509 +38,271 @@ import {
   applyHealingRerollOnes,
 } from './diceRoller.js';
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function seededRandom(values) {
-  const original = Math.random;
-  let i = 0;
-  Math.random = () => values[i++] ?? 0.5;
-  return {
-    restore: () => { Math.random = original; },
-  };
+// Pin Math.random to an exact byte sequence; over-consumption fails loudly
+// and every test asserts the full sequence was consumed (consumed-exactly).
+function pinRandom(seq) {
+  const spy = vi.spyOn(Math, 'random').mockImplementation(() => {
+    const i = spy.mock.calls.length - 1;
+    if (i >= seq.length) {
+      throw new Error(`RNG over-consumed: call ${i + 1} exceeds pinned sequence of ${seq.length}`);
+    }
+    return seq[i];
+  });
+  return spy;
 }
 
-// ── rollD20 ──────────────────────────────────────────────────────────
+afterEach(() => {
+  vi.restoreAllMocks(); // re-arms real Math.random (#1007/#1057)
+});
+
+// ── primitive dice: exact faces from pinned sequences ────────────────
 
 describe('rollD20', () => {
-  it('returns an integer between 1 and 20 inclusive', () => {
-    const { restore } = seededRandom([0]);
-    try {
-      const result = rollD20();
-      expect(Number.isInteger(result)).toBe(true);
-      expect(result).toBeGreaterThanOrEqual(1);
-      expect(result).toBeLessThanOrEqual(20);
-    } finally {
-      restore();
-    }
+  it.each([
+    { label: 'min face', seq: [0], expected: 1 },
+    { label: 'max face', seq: [0.999999], expected: 20 },
+  ])('rolls exactly $expected ($label), consuming one random', ({ seq, expected }) => {
+    const rng = pinRandom(seq);
+    expect(rollD20()).toBe(expected);
+    expect(rng).toHaveReturnedTimes(1);
   });
 });
-
-// ── rollDie ──────────────────────────────────────────────────────────
 
 describe('rollDie', () => {
-  it('returns an integer between 1 and sides for standard dice', () => {
-    for (const sides of [4, 6, 8, 10, 12, 20]) {
-      const result = rollDie(sides);
-      expect(Number.isInteger(result)).toBe(true);
-      expect(result).toBeGreaterThanOrEqual(1);
-      expect(result).toBeLessThanOrEqual(sides);
-    }
+  // At Math.random()=0.5 the engine yields ⌊sides/2⌋+1 — the exact value
+  // the #1026 consumer stub convention promises. Pin keeps stub faithful.
+  it.each([4, 6, 8, 10, 12, 20])('d%i at random=0.5 rolls %i (stub-convention mirror)', (sides) => {
+    const rng = pinRandom([0.5]);
+    expect(rollDie(sides)).toBe(Math.floor(sides / 2) + 1);
+    expect(rng).toHaveReturnedTimes(1);
   });
 });
-
-// ── rollDice ─────────────────────────────────────────────────────────
 
 describe('rollDice', () => {
-  it('returns correct number of rolls and sum for valid input', () => {
-    const { restore } = seededRandom([0.1, 0.9]);
-    try {
-      const result = rollDice(2, 6);
-      expect(result.rolls).toHaveLength(2);
-      expect(result.rolls[0]).toBeGreaterThanOrEqual(1);
-      expect(result.rolls[0]).toBeLessThanOrEqual(6);
-      expect(result.rolls[1]).toBeGreaterThanOrEqual(1);
-      expect(result.rolls[1]).toBeLessThanOrEqual(6);
-      expect(result.total).toBe(result.rolls[0] + result.rolls[1]);
-    } finally {
-      restore();
-    }
-  });
-
-  it('returns empty rolls and zero total when count is 0 or negative', () => {
-    expect(rollDice(0, 6)).toEqual({ rolls: [], total: 0 });
-    expect(rollDice(-1, 6)).toEqual({ rolls: [], total: 0 });
+  it.each([
+    { count: 2, sides: 6, seq: [0.1, 0.9], rolls: [1, 6], total: 7 },
+    { count: 3, sides: 6, seq: [0, 0, 0], rolls: [1, 1, 1], total: 3 },
+    { count: 3, sides: 20, seq: [0.999999, 0.999999, 0.999999], rolls: [20, 20, 20], total: 60 },
+    { count: 0, sides: 6, seq: [], rolls: [], total: 0 },
+    { count: -1, sides: 6, seq: [], rolls: [], total: 0 },
+  ])('rollDice($count, d$sides) → total $total, consuming exactly $seq.length randoms', ({ count, sides, seq, rolls, total }) => {
+    const rng = pinRandom(seq);
+    expect(rollDice(count, sides)).toEqual({ rolls, total });
+    expect(rng).toHaveReturnedTimes(seq.length);
   });
 });
 
-// ── rollAdvantage ────────────────────────────────────────────────────
+// ── selection core (#938): keep-highest / keep-lowest pairs ─────────
 
 describe('rollAdvantage', () => {
-  it('returns max of two d20 rolls with label "advantage"', () => {
-    const { restore } = seededRandom([0.1, 0.8]);
-    try {
-      const result = rollAdvantage();
-      expect(result.rolls).toEqual([3, 17]);
-      expect(result.total).toBe(17);
-      expect(result.label).toBe('advantage');
-    } finally {
-      restore();
-    }
+  it.each([
+    { seq: [0.999999, 0.1], rolls: [20, 3], kept: 20 },
+    { seq: [0.1, 0.999999], rolls: [3, 20], kept: 20 },
+    { seq: [0.5, 0.5], rolls: [11, 11], kept: 11 },
+  ])('keeps highest of $rolls, consuming exactly 2', ({ seq, rolls, kept }) => {
+    const rng = pinRandom(seq);
+    expect(rollAdvantage()).toEqual({ total: kept, rolls, label: 'advantage' });
+    expect(rng).toHaveReturnedTimes(2);
   });
 });
-
-// ── rollDisadvantage ─────────────────────────────────────────────────
 
 describe('rollDisadvantage', () => {
-  it('returns min of two d20 rolls with label "disadvantage"', () => {
-    const { restore } = seededRandom([0.8, 0.1]);
-    try {
-      const result = rollDisadvantage();
-      expect(result.rolls).toEqual([17, 3]);
-      expect(result.total).toBe(3);
-      expect(result.label).toBe('disadvantage');
-    } finally {
-      restore();
-    }
+  it.each([
+    { seq: [0.999999, 0.1], rolls: [20, 3], kept: 3 },
+    { seq: [0.1, 0.999999], rolls: [3, 20], kept: 3 },
+  ])('keeps lowest of $rolls, consuming exactly 2', ({ seq, rolls, kept }) => {
+    const rng = pinRandom(seq);
+    expect(rollDisadvantage()).toEqual({ total: kept, rolls, label: 'disadvantage' });
+    expect(rng).toHaveReturnedTimes(2);
   });
 });
 
-// ── parseExpression ──────────────────────────────────────────────────
+// ── grammar: parseExpression (pure, consumes 0 RNG) ─────────────────
 
 describe('parseExpression', () => {
-  it('parses minimal d20 without count', () => {
-    expect(parseExpression('d20')).toEqual({ count: 1, sides: 20, modifier: 0 });
+  it.each([
+    { formula: 'd20', count: 1, sides: 20, modifier: 0 },
+    { formula: '2d6', count: 2, sides: 6, modifier: 0 },
+    { formula: '1d8+3', count: 1, sides: 8, modifier: 3 },
+    { formula: '1d10-2', count: 1, sides: 10, modifier: -2 },
+    { formula: '1d8+4+2', count: 1, sides: 8, modifier: 6 },
+    { formula: '1d10+5-3', count: 1, sides: 10, modifier: 2 },
+    { formula: '2d6[fire]', count: 2, sides: 6, modifier: 0 },
+    { formula: '[Damage] 1d8+3', count: 1, sides: 8, modifier: 3 },
+    { formula: '1d8 [tag] +3', count: 1, sides: 8, modifier: 3 },
+    { formula: '2D6', count: 2, sides: 6, modifier: 0 },
+    { formula: '1D8+3', count: 1, sides: 8, modifier: 3 },
+    { formula: '2 d 6', count: 2, sides: 6, modifier: 0 },
+    { formula: '0d6', count: 0, sides: 6, modifier: 0 },
+    { formula: '1d8 + 3 or 2d6', count: 1, sides: 8, modifier: 3 },
+    { formula: 'invalid or 2d6', count: 2, sides: 6, modifier: 0 },
+  ])('parses $formula', ({ formula, count, sides, modifier }) => {
+    expect(parseExpression(formula)).toEqual({ count, sides, modifier });
   });
 
-  it('parses count and sides without modifier', () => {
-    expect(parseExpression('2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
-  });
-
-  it('parses positive and negative modifiers', () => {
-    expect(parseExpression('1d8+3')).toEqual({ count: 1, sides: 8, modifier: 3 });
-    expect(parseExpression('1d10-2')).toEqual({ count: 1, sides: 10, modifier: -2 });
-  });
-
-  it('parses multiple modifier segments', () => {
-    expect(parseExpression('1d8+4+2')).toEqual({ count: 1, sides: 8, modifier: 6 });
-    expect(parseExpression('1d10+5-3')).toEqual({ count: 1, sides: 10, modifier: 2 });
-  });
-
-  it('strips square-bracket tags before parsing', () => {
-    expect(parseExpression('2d6[fire]')).toEqual({ count: 2, sides: 6, modifier: 0 });
-    expect(parseExpression('[Damage] 1d8+3')).toEqual({ count: 1, sides: 8, modifier: 3 });
-    expect(parseExpression('1d8 [tag] +3')).toEqual({ count: 1, sides: 8, modifier: 3 });
-  });
-
-  it('returns null for empty, whitespace, tag-only, or unrecognised input', () => {
-    expect(parseExpression('')).toBeNull();
-    expect(parseExpression('   ')).toBeNull();
-    expect(parseExpression('[tag]')).toBeNull();
-    expect(parseExpression('[a] [b]')).toBeNull();
-    expect(parseExpression('not a formula')).toBeNull();
-    expect(parseExpression('abc')).toBeNull();
-    expect(parseExpression('2d')).toBeNull();
-    expect(parseExpression('d')).toBeNull();
-  });
-
-  it('selects the first valid " or " option', () => {
-    expect(parseExpression('1d8 + 3 or 2d6')).toEqual({ count: 1, sides: 8, modifier: 3 });
-    expect(parseExpression('invalid or 2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
-    expect(parseExpression('invalid or nonsense')).toBeNull();
-  });
-
-  it('handles uppercase dice notation', () => {
-    expect(parseExpression('2D6')).toEqual({ count: 2, sides: 6, modifier: 0 });
-    expect(parseExpression('1D8+3')).toEqual({ count: 1, sides: 8, modifier: 3 });
+  // Junk fails honestly (null), never a fabricated roll (#945).
+  // kh/kl keep notation is NOT authored here — selection core lives in
+  // rollAdvantage/rollDisadvantage; junk keep-formulas parse to null.
+  it.each([
+    '', '   ', '[tag]', '[a] [b]', 'not a formula', 'abc',
+    '2d', 'd', '4', '0', '-2d6', '2d6kh1', 'd6kl1', 'invalid or nonsense',
+  ])('returns null for $formula', (formula) => {
+    expect(parseExpression(formula)).toBeNull();
   });
 });
 
-// ── rollExpression ───────────────────────────────────────────────────
+describe('canRollExpression', () => {
+  it.each([
+    ['2d6', true],
+    ['d20', true],
+    ['1d8+3[damage]', true],
+    ['1d8 plus 2', true],
+    ['2d6 or junk', true],
+    [' 2d6 ', true],
+    ['', false],
+    ['   ', false],
+    ['junk', false],
+    ['4', false],
+    ['2d', false],
+    ['2d6kh1', false],
+    ['[tag]', false],
+  ])('canRollExpression($formula) === $expected', (formula, expected) => {
+    expect(canRollExpression(formula)).toBe(expected);
+  });
+});
+
+// ── rollExpression: grammar + exact totals + RNG consumption ─────────
 
 describe('rollExpression', () => {
-  it('rolls a plain d20 expression', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpression('d20');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(1);
-      expect(result.total).toBeGreaterThanOrEqual(1);
-      expect(result.total).toBeLessThanOrEqual(20);
-      expect(result.formula).toBe('d20');
-      expect(result.modifier).toBe(0);
-    } finally {
-      restore();
-    }
+  it.each([
+    { formula: 'd20', seq: [0.5], rolls: [11], modifier: 0, total: 11, echo: 'd20' },
+    { formula: '2d6+3', seq: [0.1, 0.9], rolls: [1, 6], modifier: 3, total: 10, echo: '2d6+3' },
+    { formula: '1d8-2', seq: [0.5], rolls: [5], modifier: -2, total: 3, echo: '1d8-2' },
+    { formula: '1d8+4+2', seq: [0], rolls: [1], modifier: 6, total: 7, echo: '1d8+4+2' },
+    { formula: '2 d 6', seq: [0.5, 0.5], rolls: [4, 4], modifier: 0, total: 8, echo: '2 d 6' },
+    { formula: '2d6[fire]', seq: [0.5, 0.5], rolls: [4, 4], modifier: 0, total: 8, echo: '2d6[fire]' },
+    { formula: '2D20', seq: [0.999999, 0], rolls: [20, 1], modifier: 0, total: 21, echo: '2D20' },
+    { formula: '0d6+2', seq: [], rolls: [], modifier: 2, total: 2, echo: '0d6+2' },
+    { formula: '1d8+7 plus 4', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4' },
+    { formula: '1d8+7 plus 4 [bludgeoning]', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4 [bludgeoning]' },
+    { formula: '1d8 plus 2d6', seq: [0.5, 0.5, 0.5], rolls: [5, 4, 4], modifier: 0, total: 13, echo: '1d8 plus 2d6' },
+    { formula: '1d8+3 or 2d6', seq: [0.5], rolls: [5], modifier: 3, total: 8, echo: '1d8+3' },
+    { formula: 'invalid or 2d6', seq: [0.5, 0.5], rolls: [4, 4], modifier: 0, total: 8, echo: '2d6' },
+    { formula: '4 plus 3', seq: [], rolls: [], modifier: 7, total: 7, echo: '4 plus 3' },
+  ])('rolls $formula → total $total from pinned bytes, consuming exactly $seq.length', ({ formula, seq, rolls, modifier, total, echo }) => {
+    const rng = pinRandom(seq);
+    // "or" results echo the selected part's formula, "plus" results the full input.
+    expect(rollExpression(formula)).toEqual({ total, rolls, modifier, formula: echo });
+    expect(rng).toHaveReturnedTimes(seq.length);
   });
 
-  it('applies positive and negative modifiers to the total', () => {
-    const { restore } = seededRandom([0.5, 0.5]);
-    try {
-      const pos = rollExpression('1d8+3');
-      expect(pos.total).toBe(pos.rolls[0] + 3);
-      expect(pos.modifier).toBe(3);
-      expect(pos.formula).toBe('1d8+3');
-
-      const neg = rollExpression('1d6-2');
-      expect(neg.total).toBe(neg.rolls[0] - 2);
-      expect(neg.modifier).toBe(-2);
-    } finally {
-      restore();
-    }
+  // Flat constants alone never roll (#1063); junk and unauthored kh notation
+  // fail honestly to null with 0 RNG consumed (#945).
+  it.each(['', '   ', 'xyz', '[tag]', 'junk or nonsense', '4', '0', '-2d6', '2d', '2d6kh1'])('returns null for $formula (consuming 0)', (formula) => {
+    const rng = pinRandom([]);
+    expect(rollExpression(formula)).toBeNull();
+    expect(rng).toHaveReturnedTimes(0);
   });
 
-  it('rolls multiple dice and sums them', () => {
-    const { restore } = seededRandom([0.5, 0.5]);
-    try {
-      const result = rollExpression('2d6');
-      expect(result.rolls).toHaveLength(2);
-      expect(result.total).toBe(result.rolls[0] + result.rolls[1]);
-    } finally {
-      restore();
-    }
-  });
-
-  it('returns null for invalid or empty expressions', () => {
-    expect(rollExpression('xyz')).toBeNull();
-    expect(rollExpression('')).toBeNull();
-    expect(rollExpression('   ')).toBeNull();
-    expect(rollExpression('[tag]')).toBeNull();
-  });
-
-  it('selects first valid " or " option and handles invalid alternatives', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpression('1d8 + 3 or 2d6');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(1);
-      expect(result.modifier).toBe(3);
-      expect(result.formula).toBe('1d8 + 3');
-    } finally {
-      restore();
-    }
-    expect(rollExpression('invalid or nonsense')).toBeNull();
-  });
-
-  it('combines " plus " segments by summing dice and modifiers', () => {
-    const { restore } = seededRandom([0.5, 0.5]);
-    try {
-      const result = rollExpression('1d8+3 plus 2d6');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(3);
-      expect(result.modifier).toBe(3);
-      expect(result.formula).toBe('1d8+3 plus 2d6');
-    } finally {
-      restore();
-    }
-  });
-
-  it('strips brackets before evaluating', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpression('1d8+3[damage]');
-      expect(result).not.toBeNull();
-      expect(result.modifier).toBe(3);
-    } finally {
-      restore();
-    }
-  });
-
-  it('includes constant-only " plus N" parts in total and modifier (CLA-281)', () => {
-    const { restore } = seededRandom([0]);
-    try {
-      const result = rollExpression('1d8+7 plus 4');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toEqual([1]);
-      expect(result.modifier).toBe(11);
-      expect(result.total).toBe(result.rolls[0] + 7 + 4);
-      expect(result.formula).toBe('1d8+7 plus 4');
-    } finally {
-      restore();
-    }
-  });
-
-  it('keeps dice-only " plus " behavior unchanged (CLA-281 regression)', () => {
-    const { restore } = seededRandom([0.5, 0.5]);
-    try {
-      const result = rollExpression('1d8+3 plus 2d6');
-      expect(result.rolls).toHaveLength(3);
-      expect(result.modifier).toBe(3);
-      expect(result.total).toBe(result.rolls.reduce((s, r) => s + r, 0) + 3);
-    } finally {
-      restore();
-    }
-  });
-
-  it('adds bracket-tagged constant " plus 4 [bludgeoning]" part to total', () => {
-    const { restore } = seededRandom([0]);
-    try {
-      const result = rollExpression('1d8+7 plus 4 [bludgeoning]');
-      expect(result).not.toBeNull();
-      expect(result.modifier).toBe(11);
-      expect(result.total).toBe(1 + 7 + 4);
-    } finally {
-      restore();
-    }
-  });
-
-  it('still returns null for unparseable plus parts and standalone constants', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpression('1d8 plus nonsense');
-      expect(result.total).toBe(result.rolls[0]);
-      expect(result.modifier).toBe(0);
-    } finally {
-      restore();
-    }
-    expect(rollExpression('4')).toBeNull();
-  });
-
-  it('respects rerollOnes option to reroll 1s', () => {
-    const { restore } = seededRandom([0, 0.5, 0.5]);
-    try {
-      const result = rollExpression('3d6', { rerollOnes: true });
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(3);
-      for (const r of result.rolls) {
-        expect(r).toBeGreaterThanOrEqual(2);
-        expect(r).toBeLessThanOrEqual(6);
-      }
-    } finally {
-      restore();
-    }
+  // rerollOnes: only 1s consume a reroll; consumed counts are exact.
+  it.each([
+    { formula: '1d6', label: 'no ones', seq: [0.5], rolls: [4], total: 4 },
+    { formula: '3d6', label: 'one reroll', seq: [0, 0.5, 0.9, 0.7], rolls: [5, 4, 6], total: 15 },
+    { formula: '2d6', label: 'all rerolled', seq: [0, 0, 0.999999, 0.5], rolls: [6, 4], total: 10 },
+    { formula: '1d6', label: 'reroll stays a 1', seq: [0, 0], rolls: [1], total: 1 },
+  ])('rerollOnes $formula ($label) → rolls $rolls, consuming exactly $seq.length', ({ formula, seq, rolls, total }) => {
+    const rng = pinRandom(seq);
+    expect(rollExpression(formula, { rerollOnes: true })).toEqual({ total, rolls, modifier: 0, formula });
+    expect(rng).toHaveReturnedTimes(seq.length);
   });
 });
 
-// ── rollExpressionDoubled ────────────────────────────────────────────
+// ── crit doubling: dice double, modifiers and constants do not ──────
 
 describe('rollExpressionDoubled', () => {
-  it('doubles dice rolls and keeps modifier', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpressionDoubled('1d8+3');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(1);
-      expect(result.doubledRolls).toHaveLength(2);
-      expect(result.modifier).toBe(3);
-      expect(result.total).toBe(result.doubledRolls.reduce((s, r) => s + r, 0) + 3);
-    } finally {
-      restore();
-    }
+  it.each([
+    { formula: '1d8+3', seq: [0.5], rolls: [5], doubledRolls: [5, 5], modifier: 3, total: 13, echo: '1d8+3' },
+    { formula: '1d8+7 plus 4', seq: [0.5], rolls: [5], doubledRolls: [5, 5], modifier: 11, total: 21, echo: '1d8+7 plus 4' },
+    { formula: '1d8 plus 2d6', seq: [0.5, 0.5, 0.5], rolls: [5, 4, 4], doubledRolls: [5, 5, 4, 4, 4, 4], modifier: 0, total: 26, echo: '1d8 plus 2d6' },
+    { formula: '1d8+3 or 2d6', seq: [0.5], rolls: [5], doubledRolls: [5, 5], modifier: 3, total: 13, echo: '1d8+3' },
+  ])('doubles $formula → total $total (modifier flat), consuming exactly $seq.length', ({ formula, seq, rolls, doubledRolls, modifier, total, echo }) => {
+    const rng = pinRandom(seq);
+    expect(rollExpressionDoubled(formula)).toEqual({ total, rolls, doubledRolls, modifier, formula: echo });
+    expect(rng).toHaveReturnedTimes(seq.length);
   });
 
-  it('doubles combined damage dice from " plus " segments', () => {
-    const { restore } = seededRandom([0.5, 0.5, 0.5]);
-    try {
-      const result = rollExpressionDoubled('1d8+3 plus 2d6');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(3);
-      expect(result.doubledRolls).toHaveLength(6);
-      expect(result.modifier).toBe(3);
-    } finally {
-      restore();
-    }
-  });
-
-  it('returns null for invalid or empty expressions', () => {
-    expect(rollExpressionDoubled('xyz')).toBeNull();
-    expect(rollExpressionDoubled('')).toBeNull();
-    expect(rollExpressionDoubled('[tag]')).toBeNull();
-  });
-
-  it('keeps constant " plus N" part flat (not doubled) on crits (CLA-281)', () => {
-    const { restore } = seededRandom([0]);
-    try {
-      const result = rollExpressionDoubled('1d8+7 plus 4');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toEqual([1]);
-      expect(result.doubledRolls).toEqual([1, 1]);
-      expect(result.modifier).toBe(11);
-      expect(result.total).toBe(2 + 7 + 4);
-    } finally {
-      restore();
-    }
-  });
-
-  it('selects first valid " or " option and handles invalid alternatives', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = rollExpressionDoubled('1d8+3 or 2d6');
-      expect(result).not.toBeNull();
-      expect(result.rolls).toHaveLength(1);
-      expect(result.doubledRolls).toHaveLength(2);
-      expect(result.modifier).toBe(3);
-    } finally {
-      restore();
-    }
-    const result2 = rollExpressionDoubled('invalid or nonsense');
-    expect(result2).toBeNull();
+  it.each(['xyz', '', '[tag]'])('returns null for $formula (consuming 0)', (formula) => {
+    const rng = pinRandom([]);
+    expect(rollExpressionDoubled(formula)).toBeNull();
+    expect(rng).toHaveReturnedTimes(0);
   });
 });
 
-// ── rollExpressionMaximized ──────────────────────────────────────────
+// ── maximize: no RNG at all ──────────────────────────────────────────
 
 describe('rollExpressionMaximized', () => {
-  it('fills all dice with maximum value and adds modifier', () => {
-    const basic = rollExpressionMaximized('2d6');
-    expect(basic).not.toBeNull();
-    expect(basic.rolls).toHaveLength(2);
-    expect(basic.rolls[0]).toBe(6);
-    expect(basic.rolls[1]).toBe(6);
-    expect(basic.total).toBe(12);
-    expect(basic.maximized).toBe(true);
-
-    const withMod = rollExpressionMaximized('1d8+5');
-    expect(withMod.total).toBe(8 + 5);
-    expect(withMod.modifier).toBe(5);
-
-    const negMod = rollExpressionMaximized('3d10-2');
-    expect(negMod.total).toBe(30 - 2);
-    expect(negMod.modifier).toBe(-2);
+  it.each([
+    { formula: '2d6', rolls: [6, 6], modifier: 0, total: 12 },
+    { formula: '1d8+5', rolls: [8], modifier: 5, total: 13 },
+    { formula: '3d10-2', rolls: [10, 10, 10], modifier: -2, total: 28 },
+  ])('maximizes $formula → total $total without touching Math.random', ({ formula, rolls, modifier, total }) => {
+    const rng = pinRandom([]);
+    expect(rollExpressionMaximized(formula)).toEqual({ total, rolls, modifier, formula, maximized: true });
+    expect(rng).toHaveReturnedTimes(0);
   });
 
-  it('returns null for invalid or empty expressions', () => {
-    expect(rollExpressionMaximized('xyz')).toBeNull();
-    expect(rollExpressionMaximized('')).toBeNull();
-    expect(rollExpressionMaximized('[tag]')).toBeNull();
+  it.each(['xyz', '', '[tag]'])('returns null for $formula', (formula) => {
+    expect(rollExpressionMaximized(formula)).toBeNull();
   });
 });
 
-// ── formatDamageFormula ──────────────────────────────────────────────
+// ── display formatting (pure strings) ───────────────────────────────
 
 describe('formatDamageFormula', () => {
-  it('returns input formula when formula is null or undefined', () => {
-    expect(formatDamageFormula(null, [1, 2], false)).toBeNull();
-    expect(formatDamageFormula(undefined, [1, 2], false)).toBeUndefined();
-  });
-
-  it('returns empty string when formula is empty', () => {
-    expect(formatDamageFormula('', [1, 2], false)).toBe('');
-  });
-
-  it('returns original formula when stripped formula is empty or parsing fails', () => {
-    const result = formatDamageFormula('[tag]', [1, 2], false);
-    expect(result).toBe('[tag]');
-    const result2 = formatDamageFormula('not a formula', [1, 2], false);
-    expect(result2).toBe('not a formula');
-  });
-
-  it('formats a basic damage formula with rolls but no modifier or crit', () => {
-    expect(formatDamageFormula('1d8', [5], false)).toBe('1d8 (5)');
-  });
-
-  it('formats with positive and negative modifiers', () => {
-    expect(formatDamageFormula('1d8+3', [5], false)).toBe('1d8+3 (5)');
-    expect(formatDamageFormula('1d8-2', [5], false)).toBe('1d8-2 (5)');
-  });
-
-  it('omits roll suffix when rolls is null, undefined, or empty', () => {
-    expect(formatDamageFormula('1d8+3', null, false)).toBe('1d8+3');
-    expect(formatDamageFormula('1d8+3', undefined, false)).toBe('1d8+3');
-    expect(formatDamageFormula('1d8+3', [], false)).toBe('1d8+3');
-  });
-
-  it('includes crit suffix "*2" when isCrit is true', () => {
-    expect(formatDamageFormula('1d8+3', [5, 6], true)).toBe('1d8*2+3 (5, 6)');
-  });
-
-  it('does not include crit suffix when isCrit is false', () => {
-    expect(formatDamageFormula('1d8+3', [5, 6], false)).toBe('1d8+3 (5, 6)');
-  });
-
-  it('strips brackets before formatting', () => {
-    expect(formatDamageFormula('1d8+3[fire]', [5], false)).toBe('1d8+3 (5)');
-  });
-
-  it('formats multiple rolls separated by commas', () => {
-    expect(formatDamageFormula('2d6', [3, 4], false)).toBe('2d6 (3, 4)');
+  it.each([
+    { formula: '1d8', rolls: [5], isCrit: false, expected: '1d8 (5)' },
+    { formula: '1d8+3', rolls: [5], isCrit: false, expected: '1d8+3 (5)' },
+    { formula: '1d8-2', rolls: [5], isCrit: false, expected: '1d8-2 (5)' },
+    { formula: '1d8+3', rolls: [5, 6], isCrit: false, expected: '1d8+3 (5, 6)' },
+    { formula: '1d8+3', rolls: [5, 6], isCrit: true, expected: '1d8*2+3 (5, 6)' },
+    { formula: '2d6', rolls: [3, 4], isCrit: false, expected: '2d6 (3, 4)' },
+    { formula: '1d8+3[fire]', rolls: [5], isCrit: false, expected: '1d8+3 (5)' },
+    { formula: '1d8+4+2', rolls: [3], isCrit: false, expected: '1d8+6 (3)' },
+    { formula: '1d8+3', rolls: null, isCrit: false, expected: '1d8+3' },
+    { formula: '1d8+3', rolls: [], isCrit: false, expected: '1d8+3' },
+    { formula: '[tag]', rolls: [5], isCrit: false, expected: '[tag]' },
+    { formula: 'not a formula', rolls: [5], isCrit: false, expected: 'not a formula' },
+    { formula: '', rolls: [5], isCrit: false, expected: '' },
+    { formula: null, rolls: [5], isCrit: false, expected: null },
+    { formula: undefined, rolls: [5], isCrit: false, expected: undefined },
+  ])('formats $formula rolls=$rolls crit=$isCrit → $expected', ({ formula, rolls, isCrit, expected }) => {
+    expect(formatDamageFormula(formula, rolls, isCrit)).toBe(expected);
   });
 });
 
-// ── applyHealingRerollOnes ───────────────────────────────────────────
+// ── healing reroll of 1s (Lucky / healing reroll UI) ────────────────
 
 describe('applyHealingRerollOnes', () => {
-  it('returns displayRolls as-is when rolls is null or not an array', () => {
-    const result1 = applyHealingRerollOnes(null, '1d8+3');
-    expect(result1).toEqual({ displayRolls: null, originalRolls: null });
-    const result2 = applyHealingRerollOnes('not an array', '1d8+3');
-    expect(result2).toEqual({ displayRolls: 'not an array', originalRolls: null });
+  it.each([
+    { label: 'two of three are 1s', formula: '3d6', seq: [0.5, 0.9], rolls: [1, 4, 1], displayRolls: [4, 4, 6], originalRolls: [1, 4, 1] },
+    { label: 'single die', formula: '1d6', seq: [0.9], rolls: [1], displayRolls: [6], originalRolls: [1] },
+    // Reroll consumed the RNG but landed on a 1 again — honest pass-through.
+    { label: 'reroll stays 1', formula: '2d6', seq: [0, 0], rolls: [1, 1], displayRolls: [1, 1], originalRolls: null },
+  ])('rerolls 1s in $rolls for $formula ($label), consuming exactly $seq.length', ({ formula, seq, rolls, displayRolls, originalRolls }) => {
+    const rng = pinRandom(seq);
+    expect(applyHealingRerollOnes(rolls, formula)).toEqual({ displayRolls, originalRolls });
+    expect(rng).toHaveReturnedTimes(seq.length);
   });
 
-  it('returns displayRolls as-is when parsing expression fails or no 1s are present', () => {
-    const result1 = applyHealingRerollOnes([1, 2, 3], 'invalid');
-    expect(result1).toEqual({ displayRolls: [1, 2, 3], originalRolls: null });
-    const result2 = applyHealingRerollOnes([3, 4, 5], '3d6');
-    expect(result2).toEqual({ displayRolls: [3, 4, 5], originalRolls: null });
-  });
-
-  it('rerolls 1s and preserves original rolls when rerolls occur', () => {
-    const { restore } = seededRandom([0.5, 0.5, 0.5]);
-    try {
-      const result = applyHealingRerollOnes([1, 4, 1], '3d6');
-      expect(result.displayRolls).toHaveLength(3);
-      expect(result.displayRolls[0]).toBeGreaterThanOrEqual(2);
-      expect(result.displayRolls[0]).toBeLessThanOrEqual(6);
-      expect(result.displayRolls[1]).toBe(4);
-      expect(result.displayRolls[2]).toBeGreaterThanOrEqual(2);
-      expect(result.displayRolls[2]).toBeLessThanOrEqual(6);
-      expect(result.originalRolls).toEqual([1, 4, 1]);
-    } finally {
-      restore();
-    }
-  });
-
-  it('handles a single die roll that is a 1', () => {
-    const { restore } = seededRandom([0.5]);
-    try {
-      const result = applyHealingRerollOnes([1], '1d6');
-      expect(result.displayRolls).toEqual([Math.floor(0.5 * 6) + 1]);
-      expect(result.originalRolls).toEqual([1]);
-    } finally {
-      restore();
-    }
-  });
-
-  it('handles all 1s being rerolled', () => {
-    const { restore } = seededRandom([0.5, 0.5, 0.5]);
-    try {
-      const result = applyHealingRerollOnes([1, 1, 1], '2d6');
-      expect(result.displayRolls).toHaveLength(3);
-      expect(result.originalRolls).toEqual([1, 1, 1]);
-      for (const r of result.displayRolls) {
-        expect(r).toBeGreaterThanOrEqual(2);
-        expect(r).toBeLessThanOrEqual(6);
-      }
-    } finally {
-      restore();
-    }
+  // Pass-through cases never touch the RNG.
+  it.each([
+    { rolls: null, formula: '1d8+3', expected: { displayRolls: null, originalRolls: null } },
+    { rolls: 'not an array', formula: '1d8+3', expected: { displayRolls: 'not an array', originalRolls: null } },
+    { rolls: [3, 4, 5], formula: '3d6', expected: { displayRolls: [3, 4, 5], originalRolls: null } },
+    { rolls: [1, 2, 3], formula: 'invalid', expected: { displayRolls: [1, 2, 3], originalRolls: null } },
+  ])('passes through $rolls / $formula without consuming RNG', ({ rolls, formula, expected }) => {
+    const rng = pinRandom([]);
+    expect(applyHealingRerollOnes(rolls, formula)).toEqual(expected);
+    expect(rng).toHaveReturnedTimes(0);
   });
 });

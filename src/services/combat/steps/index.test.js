@@ -1,99 +1,163 @@
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// Lane: ROUTING DECISIONS of buildPipelineForAction (index.js) ONLY — which builder is
+// assembled for which action shape, and the campaignName gate on SSE observer registration.
+// Step internals are CITED, never re-pinned here: attack census lives in
+// attackRollDamageSteps.test.js (#1039 template), spell census in
+// directSpellDamageSteps-structure.test.js (#1039/#1048 golden), generic chain golden in
+// genericSteps.test.js (#1063), observer bodies in observers.test.js / sseObservers.test.js.
+//
+// Mock discipline (#744/#786): the three step-builders and both observer factories are
+// inert spies returning distinguishable sentinel lanes (two chained steps each, unique
+// recorder names). No real step body ever executes here; routing is falsifiable because
+// the RIGHT spy must be called once (zero args — builders take none, exact-bytes #993),
+// the WRONG spies never, and the executed recorder must byte-equal the lane's sentinel
+// sequence (pins which pipeline was assembled #1022 + step registration count/order).
+//
+// Routing table census (every reachable branch of selectStepBuilders):
+//   attack : type==='weapon_attack' | weaponType | (damage|damageExpression|hasDamage
+//            when not spell) — attack wins precedence even when spellType also present
+//   spell  : type==='spell' | spellType | autoDamageSchool (also when damage present —
+//            the :39 non-spell guard keeps spell damage out of the attack lane)
+//   generic: UNREACHABLE dead branch (index.js:47) — any bare damage is claimed by the
+//            attack lane at :39, and spell-flagged damage by the spell lane. Honest note
+//            (#945); reported as a source bug, not pinned as live behavior.
+//   none   : no damage, no spell/weapon flags (and degenerate undefined action) → zero
+//            steps, log observers still registered.
+//
+// old→new map (old 9 tests → new 3):
+//   :5-11 toHaveProperty smoke + :13-16/:18-21/:23-26/:75-81 expect(run).toBeDefined()
+//   (assert nothing about registration #1048) + :28-31/:83-90/:92-98 (toBeDefined proves
+//   nothing) → routing table test below (each old weapon-shape fixture is a distinct
+//   falsifiable row) + campaignName gate tests below.
+//   :33-36 spell fixture → spell row of the routing table.
+//   :38-47 'spell pipeline includes featureRiders step' weak toContain + one lessThan →
+//   REMOVED per applied rec #1048: strictly subsumed by the golden census in
+//   directSpellDamageSteps-structure.test.js (exact ordered [name, subscribe, emit] for
+//   all 6 spell steps, spellFeatureRiders idx 3 before spellOverchannel idx 4).
+//   :67-73 'runs through weapon damage steps without error' → REMOVED: it executed REAL
+//   step bodies (illegal here #744); the sentinel-chain run below proves wiring instead.
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const S = vi.hoisted(() => {
+  const executed = [];
+  const lane = (prefix) => [
+    {
+      name: `${prefix}-1`,
+      subscribe: 'chain:start',
+      emit: 'chain:mid',
+      handler: vi.fn(() => { executed.push(`${prefix}-1`); return { data: {} }; }),
+    },
+    {
+      name: `${prefix}-2`,
+      subscribe: 'chain:mid',
+      emit: 'chain:end',
+      handler: vi.fn(() => { executed.push(`${prefix}-2`); return { data: {} }; }),
+    },
+  ];
+  const logObserverHandler = vi.fn();
+  const sseObserverHandler = vi.fn();
+  return {
+    executed,
+    attackBuilder: vi.fn(() => lane('attack')),
+    spellBuilder: vi.fn(() => lane('spell')),
+    genericBuilder: vi.fn(() => lane('generic')),
+    logObserverHandler,
+    sseObserverHandler,
+    createObservers: vi.fn(() => [{ event: '*', handler: logObserverHandler }]),
+    createSseObservers: vi.fn(() => [{ event: '*', handler: sseObserverHandler }]),
+  };
+});
+
 import { buildPipelineForAction } from './index.js';
 
-describe('buildPipelineForAction', () => {
-  it('returns a pipeline object with run, step, observe, resume', () => {
-    const pipeline = buildPipelineForAction({ name: 'Greataxe', damage: '1d12' }, {});
-    expect(pipeline).toHaveProperty('run');
-    expect(pipeline).toHaveProperty('step');
-    expect(pipeline).toHaveProperty('observe');
-    expect(pipeline).toHaveProperty('resume');
+vi.mock('./attackRollDamageSteps.js', () => ({ buildAttackRollDamageSteps: S.attackBuilder }));
+vi.mock('./directSpellDamageSteps.js', () => ({ buildDirectSpellDamageSteps: S.spellBuilder }));
+vi.mock('./genericSteps.js', () => ({ buildGenericSteps: S.genericBuilder }));
+vi.mock('./observers.js', () => ({ createObservers: S.createObservers }));
+vi.mock('./sseObservers.js', () => ({ createSseObservers: S.createSseObservers }));
+
+const BUILDERS = {
+  attack: S.attackBuilder,
+  spell: S.spellBuilder,
+  generic: S.genericBuilder,
+};
+
+// Distinguishable fixtures (#1022): each row pins ONE router branch, verbatim.
+const ROUTING_ROWS = [
+  ['weapon_attack type alone (no damage) → attack', { name: 'Greataxe', type: 'weapon_attack' }, 'attack'],
+  ['weaponType alone (no damage) → attack', { name: 'Longsword', weaponType: 'one-handed' }, 'attack'],
+  ['bare damage → attack', { name: 'Greataxe', damage: '1d12' }, 'attack'],
+  ['damageExpression → attack', { name: 'Shortsword', damageExpression: '1d6+3' }, 'attack'],
+  ['hasDamage flag → attack', { name: 'Unarmed Strike', hasDamage: true }, 'attack'],
+  ['weapon+spell flags → attack wins precedence', { name: 'Shadow Blade', weaponType: 'longsword', spellType: 'spell' }, 'attack'],
+  ['type spell → spell', { name: 'Magic Missile', type: 'spell' }, 'spell'],
+  ['spellType alone → spell', { name: 'Fireball', spellType: 'spell' }, 'spell'],
+  ['autoDamageSchool alone → spell', { name: 'Sacred Flame', autoDamageSchool: 'radiant' }, 'spell'],
+  ['spell damage stays out of attack lane → spell', { name: 'Green-Flame Blade', damage: '2d8', autoDamageSchool: 'fire' }, 'spell'],
+  ['non-damage action → no builder, no steps', { name: 'Dash' }, 'none'],
+  ['degenerate undefined action → no builder, no steps', undefined, 'none'],
+];
+
+function reArm() {
+  // determinism re-arm (#1057): mockClear() wipes call history but preserves the
+  // sentinel implementations (clearAllMocks would destroy the builder factories).
+  [
+    S.attackBuilder, S.spellBuilder, S.genericBuilder,
+    S.createObservers, S.createSseObservers,
+    S.logObserverHandler, S.sseObserverHandler,
+  ].forEach((spy) => spy.mockClear());
+  S.executed.length = 0;
+}
+
+beforeEach(reArm);
+
+describe('buildPipelineForAction — router: which pipeline is assembled', () => {
+  it('routes every action shape to exactly one builder and registers its steps in order (full routing table)', async () => {
+    for (const [label, action, lane] of ROUTING_ROWS) {
+      reArm();
+
+      const pipeline = buildPipelineForAction(action, {});
+      await pipeline.run('chain:start', {}, { current: null });
+
+      for (const [name, spy] of Object.entries(BUILDERS)) {
+        if (name === lane) {
+          expect(spy, label).toHaveBeenCalledTimes(1);
+          expect(spy.mock.calls[0], label).toEqual([]); // builders take zero args — exact bytes
+        } else {
+          expect(spy, `${label} (wrong builder ${name})`).not.toHaveBeenCalled();
+        }
+      }
+      // Which pipeline ran, proven by executed sentinel identity; [] pins zero-step assembly.
+      expect(S.executed, label).toEqual(lane === 'none' ? [] : [`${lane}-1`, `${lane}-2`]);
+    }
+  });
+});
+
+describe('buildPipelineForAction — observer registration gate', () => {
+  const ATTACK = { name: 'Greataxe', damage: '1d12' };
+
+  it('registers log AND SSE observers when campaignName present — exact campaignName bytes and ctx identity passthrough', async () => {
+    const ctx = { attack: ATTACK, setPopupHtml: vi.fn() };
+    const pipeline = buildPipelineForAction(ATTACK, { name: 'Gimli', campaignName: 'test-campaign' });
+    await pipeline.run('chain:start', ctx, { current: null });
+
+    expect(S.createObservers).toHaveBeenCalledTimes(1);
+    expect(S.createObservers.mock.calls[0]).toEqual([]);
+    expect(S.createSseObservers).toHaveBeenCalledTimes(1);
+    expect(S.createSseObservers).toHaveBeenCalledWith('test-campaign'); // exact bytes #993
+    expect(S.logObserverHandler).toHaveBeenCalledWith(ctx, expect.anything(), 'chain:start');
+    expect(S.sseObserverHandler).toHaveBeenCalledWith(ctx, expect.anything(), 'chain:start');
   });
 
-  it('registers weapon damage steps for a weapon attack', () => {
-    const pipeline = buildPipelineForAction({ name: 'Greataxe', damage: '1d12', weaponType: 'heavy' }, {});
-    expect(pipeline.run).toBeDefined();
-  });
+  it('without campaignName registers log observers only — createSseObservers never invoked', async () => {
+    const ctx = { attack: ATTACK };
+    const pipeline = buildPipelineForAction(ATTACK, { name: 'Gimli' });
+    await pipeline.run('chain:start', ctx, { current: null });
 
-  it('registers weapon damage steps when damage expression present', () => {
-    const pipeline = buildPipelineForAction({ name: 'Greataxe', damageExpression: '1d12+3' }, {});
-    expect(pipeline.run).toBeDefined();
-  });
-
-  it('registers steps for action with hasDamage flag', () => {
-    const pipeline = buildPipelineForAction({ name: 'Unarmed Strike', hasDamage: true }, {});
-    expect(pipeline.run).toBeDefined();
-  });
-
-  it('returns a pipeline without weapon steps for non-weapon actions', () => {
-    const pipeline = buildPipelineForAction({ name: 'Dash' }, {});
-    expect(pipeline.run).toBeDefined();
-  });
-
-  it('registers spell damage steps for a spell action', () => {
-    const pipeline = buildPipelineForAction({ name: 'Fireball', spellType: 'spell', autoDamageSchool: 'evocation' }, {});
-    expect(pipeline.run).toBeDefined();
-  });
-
-  it('spell pipeline includes featureRiders step', async () => {
-    const { buildDirectSpellDamageSteps } = await import('./directSpellDamageSteps.js');
-    const steps = buildDirectSpellDamageSteps();
-    const stepNames = steps.map(s => s.name);
-    expect(stepNames).toContain('spellFeatureRiders');
-    expect(stepNames).toContain('spellRollDamage');
-    expect(stepNames).toContain('spellOverchannel');
-    const ridersIdx = stepNames.indexOf('spellFeatureRiders');
-    const overchannelIdx = stepNames.indexOf('spellOverchannel');
-    expect(ridersIdx).toBeLessThan(overchannelIdx);
-  });
-
-  function makeCtx() {
-    return {
-      playerStats: {
-        name: 'Gimli',
-        abilities: { str: 18 },
-        modifiers: { str: 4, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
-      },
-      attack: { name: 'Greataxe', damage: '1d12' },
-      campaignName: 'test',
-      targetName: 'Orc',
-      setPopupHtml: vi.fn(),
-      proceedWithDamage: vi.fn(),
-      setAttackRiderManeuverPrompt: vi.fn(),
-      setAttackRiderModal: vi.fn(),
-    };
-  }
-
-  it('runs through weapon damage steps without error', async () => {
-    const pipeline = buildPipelineForAction({ name: 'Greataxe', damage: '1d12' }, {});
-    const ctx = makeCtx();
-    const resumeRef = { current: null };
-
-    await expect(pipeline.run('housekeeping:do', ctx, resumeRef)).resolves.toBeUndefined();
-  });
-
-  it('registers pipeline with both steps and observers', () => {
-    const pipeline = buildPipelineForAction({ name: 'Greataxe', damage: '1d12' }, {});
-    expect(pipeline.run).toBeDefined();
-    expect(pipeline.observe).toBeDefined();
-    expect(pipeline.step).toBeDefined();
-    expect(pipeline.resume).toBeDefined();
-  });
-
-  it('registers SSE observers when playerStats has campaignName', () => {
-    const pipeline = buildPipelineForAction(
-      { name: 'Greataxe', damage: '1d12' },
-      { campaignName: 'test-campaign' }
-    );
-    expect(pipeline.run).toBeDefined();
-    expect(pipeline.observe).toBeDefined();
-  });
-
-  it('does not register SSE observers when playerStats has no campaignName', () => {
-    const pipeline = buildPipelineForAction(
-      { name: 'Greataxe', damage: '1d12' },
-      { name: 'Gimli' }
-    );
-    expect(pipeline.run).toBeDefined();
+    expect(S.createObservers).toHaveBeenCalledTimes(1);
+    expect(S.createSseObservers).not.toHaveBeenCalled();
+    expect(S.logObserverHandler).toHaveBeenCalled();
+    expect(S.sseObserverHandler).not.toHaveBeenCalled();
   });
 });

@@ -648,3 +648,18 @@ rec #1029 APPLIED #1035 (1d6 byte-identical fold verified :374-385, guards trimm
 - 🔴 colossusSlayer step + dispatcher attackRollPostDamage.js:35-45 never addEntry/log — app logging mandate violated on trigger, 11 siblings self-log (#1050)
 - 🔴 epitomeEmpoweredStrikes.js:14 no-arg getCurrentCombatRound ESCALATED: getCombatSummary(undefined)->null->round const 1 (combatData.js:48/:81) — latch stamps 1, feature once-per-rest NEVER re-arms; old re-arm test was mock-fiction, pinned false (#1052 vs #1050 class)
 - ⚠ sacredWeapon.js:11/:16/:18 leftover [sw-debug] console.log noise in prod step (app logging mandate); :7 ctx.playerStats unguarded deref TypeError when weapon-byte passes w/ null stats — both pinned honest tests (#1056)
+- 📌 REC cross-file: superiorHuntersPrey.test.js condition block 4->2 fold + round-0-latch case dupes same-round byte-path — fold at ITS turn (#1059)
+- ⚠ tavernBrawler.js:42 dead ternary 'showing'/'showing' identical branches + 'damage die' never pluralizes multi-reroll — cosmetic log text, tests pin current bytes (#1061)
+- 📌 REC cross-file: tavernBrawlerPush.test.js:111 weak find(includes)+any(Object) strengthen exact; :105 campaignName-threaded subsumed by te-write tests removable (#1061)
+- 📌 REC cross-file: useAttackDamageResolution.feats.test.js:533-541 seam latch-tuples soften to presence (byte-exactness @tavernBrawlerPush #1062) at ITS turn; ⚠ tavernBrawlerPush.js:11 null-playerStats TypeError unguarded pinned honest (#1062)
+- 🔴 steps/index.js:47 buildGenericSteps DEAD via router (:39 routes all non-spell damage->attack, :45 captures spell-first); generic lane #1063 unreachable producer from this router (#1064)
+- 📌 REC cross-file: sseObservers.test.js 'array of observer objects'+'wildcard observer' subsumed by 'two wildcard observers' census — trim ITS turn (#1064); rec #1048 APPLIED #1064 ✓
+- 🔴 observers.js:40/:57 raw ${ctx.playerStats?.name} interpolation no 'unknown' fallback — "undefined applied Sneak Attack" log text for anonymous ctx; pinned honest (#1065); sseObservers 13->~8 census-fold rec reaffirmed (#1065/#1064)
+- 🗑 summonedCreatureService.js:8-10 isSpellSummon DEAD export zero callers repo-wide (service uses inline checks) — delete source+test describe coordinated source pass (#1067)
+- 📌 REC cross-file: psychicTeleportationHandler.test.js:159-186 + tempTeleportHandler.test.js:620-633 semantics re-derivation via mocked applyTeleportTokenMove soften to toHaveBeenCalledWith+prose at ITS turns (#1068)
+- 📌 turnState.js:58-61 defense-in-depth: negative numeric *Used passes unclamped (Number(-5)||0=-5) forged-store over-grant vector — Math.max(0,..) close on source pass; deliberately unpinned (#1070)
+- 🔴 diceRoller.js:42 regex accepts d0/0dN -> parse('d0')={count:1,sides:0} phantom die always rolls 1 (#1072)
+- 🔴 diceRoller.js:88 vs :73 case mismatch: canRollExpression('1d8 PLUS 2d6') true (case-insensitive split) but rollExpression case-sensitive includes(' plus ') -> null (#1072)
+- 📌 REC cross-file: six duplicate NdM stub parses (bonuses-basic/featureDamage/weaponHitBonuses/automationBonuses/frenzy/genericSteps) -> shared diceStub.js helper at their turns; fidelity pinned @diceRoller #1072
+- 🔴 combatData.js:29/:59 passes campaignName 3rd arg to getRuntimeValue (signature arity-2 useRuntimeState.js:63) — campaign ignored, runtime fallback reads current-context store cross-campaign; root of #1052 chain, decoy-pinned here (#1074)
+- 🔴 combatLoggingService.js:45 Concentration log `Concentration: ${spellName}` no fallback — literal 'Concentration: undefined' on callers omitting spellName (#1075)

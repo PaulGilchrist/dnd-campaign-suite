@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+// Lane: summonedCreatureService — summoned-creature roster/effects store utilities (SP-114).
+// Family map: sole owner lane — concentrationService, createCreatureHandlers,
+// createConcentrationHandlers, useLoggedDiceRollEventHandlers, applyDamage and the
+// expirations lanes all vi.mock() this module. stripSummonedFromCombatSummary's spell
+// happy-path payload is exercised in createConcentrationHandlers-2.test.jsx; only the
+// true_polymorph / guard / orphan-te branches live here (no duplication).
+// Concentration lifecycle bytes belong to concentrationService (#994) — not verified here.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -24,75 +32,91 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js'
 import storage from '../../ui/storage.js'
 import { addEntry } from '../../ui/logService.js'
-import { isSpellSummon, removeSummonedCreatures, vanishSummonAtZeroHp } from './summonedCreatureService.js'
+import {
+    isSpellSummon,
+    removeSummonedCreatures,
+    stripSummonedFromCombatSummary,
+    vanishSummonAtZeroHp,
+} from './summonedCreatureService.js'
+
+const realDispatchEvent = window.dispatchEvent
+
+beforeEach(() => {
+    vi.clearAllMocks()
+    window.dispatchEvent = vi.fn()
+})
+
+afterEach(() => {
+    window.dispatchEvent = realDispatchEvent
+})
+
+const expectNoWrites = (label = '') => {
+    expect(storage.set, `${label}: storage`).not.toHaveBeenCalled()
+    expect(setCombatSummaryCache, `${label}: cache`).not.toHaveBeenCalled()
+    expect(setRuntimeValue, `${label}: runtime`).not.toHaveBeenCalled()
+    expect(window.dispatchEvent, `${label}: dispatch`).not.toHaveBeenCalled()
+}
 
 describe('isSpellSummon', () => {
-    it('returns true when creature has summonSource === "spell"', () => {
+    it('flags only summonSource === "spell"', () => {
         expect(isSpellSummon({ name: 'Imp', summonSource: 'spell' })).toBe(true)
-    })
-
-    it('returns false when creature has summonSource === "true_polymorph"', () => {
         expect(isSpellSummon({ name: 'Dragon', summonSource: 'true_polymorph' })).toBe(false)
-    })
-
-    it('returns false when creature has no summonSource', () => {
         expect(isSpellSummon({ name: 'Goblin' })).toBe(false)
-    })
-
-    it('returns false when creature is null', () => {
-        expect(isSpellSummon(null)).toBe(false)
-    })
-
-    it('returns false when creature is undefined', () => {
-        expect(isSpellSummon(undefined)).toBe(false)
-    })
-
-    it('returns false when creature is an empty object', () => {
         expect(isSpellSummon({})).toBe(false)
+        expect(isSpellSummon(null)).toBe(false)
+        expect(isSpellSummon(undefined)).toBe(false)
     })
 })
 
 describe('removeSummonedCreatures', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        // Reset the CustomEvent mock so we can track dispatches
-        delete window.CustomEvent
-        window.CustomEvent = class {
-            constructor(type, opts) {
-                this.type = type
-                this.bubbles = opts?.bubbles || false
-            }
+    it('guards invalid args before touching any store, and survives degenerate store shapes', () => {
+        // Stores primed with MATCHING data so a skipped guard is loud (#1035).
+        getCombatSummary.mockReturnValue({
+            round: 1,
+            creatures: [{ name: 'Imp', summonSource: 'spell', summonedBy: 'Summoner' }],
+        })
+        getRuntimeValue.mockReturnValue([
+            { effect: 'summoned', source: 'Summoner', summonSource: 'spell' },
+        ])
+
+        for (const [label, sourceName, campaignName] of [
+            ['missing sourceName', null, 'test-campaign'],
+            ['missing campaignName', 'Summoner', null],
+            ['both missing', null, null],
+        ]) {
+            removeSummonedCreatures(sourceName, campaignName)
+            expect(getCombatSummary, `${label}: no store read`).not.toHaveBeenCalled()
+            expect(getRuntimeValue, `${label}: no store read`).not.toHaveBeenCalled()
+            expectNoWrites(label)
         }
-        window.dispatchEvent = vi.fn()
+
+        // Degenerate store shapes with valid args (#945): reads happen, writes must not.
+        for (const [cs, te] of [
+            [null, []],
+            [{ round: 1 }, []],
+            [{ round: 1, creatures: [] }, null],
+            [{ round: 1, creatures: [] }, undefined],
+        ]) {
+            vi.clearAllMocks()
+            getCombatSummary.mockReturnValue(cs)
+            getRuntimeValue.mockReturnValue(te)
+            removeSummonedCreatures('Summoner', 'test-campaign')
+            expectNoWrites(JSON.stringify(cs ?? 'null-cs'))
+        }
     })
 
-    it('returns early without side effects when sourceName is missing', () => {
-        removeSummonedCreatures(null, 'test-campaign')
-        expect(getCombatSummary).not.toHaveBeenCalled()
-        expect(getRuntimeValue).not.toHaveBeenCalled()
-        expect(storage.set).not.toHaveBeenCalled()
-    })
-
-    it('returns early without side effects when campaignName is missing', () => {
-        removeSummonedCreatures('Summoner', null)
-        expect(getCombatSummary).not.toHaveBeenCalled()
-        expect(getRuntimeValue).not.toHaveBeenCalled()
-        expect(storage.set).not.toHaveBeenCalled()
-    })
-
-    it('returns early when both sourceName and campaignName are missing', () => {
-        removeSummonedCreatures(null, null)
-        expect(getCombatSummary).not.toHaveBeenCalled()
-    })
-
-    it('removes creatures from combatSummary when they match sourceName and summonSource spell', () => {
+    it('persists the exact surviving roster (spell + true_polymorph removed, co-tenants survive) and broadcasts', () => {
+        const goblin = { name: 'Goblin', type: 'npc' }
+        const wraith = { name: 'Wraith', type: 'npc', summonedBy: 'Other' } // other summoner survives (#948)
+        const untagged = { name: 'Mimic', summonedBy: 'Summoner' } // no summonSource — near-miss survives (#1051)
         const cs = {
             round: 2,
             creatures: [
-                { name: 'Goblin', type: 'npc' },
+                goblin,
                 { name: 'Imp', summonSource: 'spell', summonedBy: 'Summoner' },
-                { name: 'Skeleton', summonSource: 'true_polymorph', summonedBy: 'Summoner' },
-                { name: 'Wraith', type: 'npc', summonedBy: 'Other' },
+                { name: 'Dragon', summonSource: 'true_polymorph', summonedBy: 'Summoner' },
+                wraith,
+                untagged,
             ],
         }
         getCombatSummary.mockReturnValue(cs)
@@ -100,209 +124,104 @@ describe('removeSummonedCreatures', () => {
 
         removeSummonedCreatures('Summoner', 'test-campaign')
 
+        expect(getCombatSummary).toHaveBeenCalledWith('test-campaign') // campaign-pinned read (#1019)
+        expect(storage.set).toHaveBeenCalledTimes(1)
         expect(storage.set).toHaveBeenCalledWith(
             'combatSummary',
-            expect.objectContaining({
-                round: 2,
-                creatures: expect.arrayContaining([
-                    expect.objectContaining({ name: 'Goblin' }),
-                    expect.objectContaining({ name: 'Wraith' }),
-                ]),
-            }),
+            { round: 2, creatures: [goblin, wraith, untagged] }, // exact full array (#932)
             'test-campaign'
         )
-        expect(setCombatSummaryCache).toHaveBeenCalledWith(
-            expect.objectContaining({
-                creatures: expect.arrayContaining([
-                    expect.objectContaining({ name: 'Goblin' }),
-                    expect.objectContaining({ name: 'Wraith' }),
-                ]),
-            }),
-            'test-campaign'
-        )
-        expect(window.dispatchEvent).toHaveBeenCalledWith(expect.any(CustomEvent))
+        const updated = storage.set.mock.calls[0][1]
+        expect(updated.creatures[0]).toBe(goblin) // survivors carry original references (#993)
+        expect(setCombatSummaryCache).toHaveBeenCalledWith(updated, 'test-campaign') // cache mirrors the write
+        expect(cs.creatures).toHaveLength(5) // copy-out contract: caller's summary untouched
+        expect(window.dispatchEvent).toHaveBeenCalledTimes(1)
+        expect(window.dispatchEvent.mock.calls[0][0].type).toBe('combat-summary-updated')
     })
 
-    it('removes creatures with summonSource true_polymorph as well as spell', () => {
-        const cs = {
-            round: 1,
-            creatures: [
-                { name: 'Dragon', summonSource: 'true_polymorph', summonedBy: 'Wizard' },
-            ],
-        }
-        getCombatSummary.mockReturnValue(cs)
-        getRuntimeValue.mockReturnValue([])
-
-        removeSummonedCreatures('Wizard', 'test-campaign')
-
-        expect(storage.set).toHaveBeenCalledWith(
-            'combatSummary',
-            expect.objectContaining({ creatures: [] }),
-            'test-campaign'
-        )
-    })
-
-    it('does not update storage when no creatures match', () => {
-        const cs = {
-            round: 1,
-            creatures: [
-                { name: 'Goblin', type: 'npc' },
-                { name: 'Wraith', type: 'npc', summonedBy: 'Other' },
-            ],
-        }
-        getCombatSummary.mockReturnValue(cs)
-        getRuntimeValue.mockReturnValue([])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(storage.set).not.toHaveBeenCalled()
-        expect(setCombatSummaryCache).not.toHaveBeenCalled()
-        expect(window.dispatchEvent).not.toHaveBeenCalled()
-    })
-
-    it('handles combatSummary with no creatures array', () => {
-        getCombatSummary.mockReturnValue({ round: 1 })
-        getRuntimeValue.mockReturnValue([])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(storage.set).not.toHaveBeenCalled()
-    })
-
-    it('handles combatSummary being null', () => {
+    it('strips the source\'s summoned targetEffects as the exact surviving array with skipSync=true', () => {
+        const otherSummon = { effect: 'summoned', source: 'Other', summonSource: 'spell' }
+        const buff = { effect: 'buff', source: 'Summoner' }
+        const rogueSource = { effect: 'summoned', source: 'Summoner', summonSource: 'other' } // invalid summonSource survives (#1051)
         getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue([])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(storage.set).not.toHaveBeenCalled()
-    })
-
-    it('removes matching targetEffects and calls setRuntimeValue when filtered differs', () => {
-        const targetEffects = [
+        getRuntimeValue.mockReturnValue([
             { effect: 'summoned', source: 'Summoner', summonSource: 'spell' },
             { effect: 'summoned', source: 'Summoner', summonSource: 'true_polymorph' },
-            { effect: 'summoned', source: 'Other', summonSource: 'spell' },
-            { effect: 'buff', source: 'Summoner' },
-        ]
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue(targetEffects)
+            otherSummon,
+            buff,
+            rogueSource,
+        ])
 
         removeSummonedCreatures('Summoner', 'test-campaign')
 
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects')
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1)
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'campaign',
             'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ effect: 'summoned', source: 'Other' }),
-                expect.objectContaining({ effect: 'buff', source: 'Summoner' }),
-            ]),
+            [otherSummon, buff, rogueSource], // exact survivors, order preserved (#932)
             'test-campaign',
-            true
+            true // skipSync — SSE-echo guard
         )
+        expect(storage.set).not.toHaveBeenCalled() // cs store untouched when nothing matched
     })
 
-    it('does not call setRuntimeValue when no targetEffects match', () => {
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue([
-            { effect: 'buff', source: 'Summoner' },
-            { effect: 'debuff', source: 'Other' },
-        ])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does not remove targetEffects from different sources', () => {
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue([
-            { effect: 'summoned', source: 'Other', summonSource: 'spell' },
-        ])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does not remove targetEffects without matching summonSource', () => {
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue([
-            { effect: 'summoned', source: 'Summoner', summonSource: 'other' },
-        ])
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('handles targetEffects being null', () => {
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue(null)
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('handles targetEffects being undefined', () => {
-        getCombatSummary.mockReturnValue(null)
-        getRuntimeValue.mockReturnValue(undefined)
-
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('handles both combatSummary creatures and targetEffects removal together', () => {
-        const cs = {
-            round: 3,
+    it('writes nothing when no summons match (owner and summonSource near-misses)', () => {
+        getCombatSummary.mockReturnValue({
+            round: 1,
             creatures: [
-                { name: 'Imp', summonSource: 'spell', summonedBy: 'Summoner' },
+                { name: 'Goblin' },
+                { name: 'Wraith', summonedBy: 'Other', summonSource: 'spell' }, // wrong owner
+            ],
+        })
+        getRuntimeValue.mockReturnValue([
+            { effect: 'summoned', source: 'Other', summonSource: 'spell' }, // wrong owner
+            { effect: 'summoned', source: 'Summoner', summonSource: 'other' }, // wrong summonSource
+            { effect: 'buff', source: 'Summoner' },
+        ])
+
+        removeSummonedCreatures('Summoner', 'test-campaign')
+
+        expectNoWrites('no-match')
+    })
+})
+
+describe('stripSummonedFromCombatSummary', () => {
+    it('mutates the caller\'s roster in place, removing only the source\'s spell + true_polymorph creatures', () => {
+        const goblin = { name: 'Goblin' }
+        const otherBeast = { name: 'Other Beast', summonedBy: 'Bob', summonSource: 'spell' } // wrong owner survives
+        const untagged = { name: 'Alice', summonedBy: 'Alice' } // no summonSource survives (#1051)
+        const cs = {
+            round: 4,
+            creatures: [
+                goblin,
+                { name: 'Familiar', summonedBy: 'Alice', summonSource: 'spell' },
+                { name: 'Doppelganger', summonedBy: 'Alice', summonSource: 'true_polymorph' },
+                otherBeast,
+                untagged,
             ],
         }
-        const targetEffects = [
-            { effect: 'summoned', source: 'Summoner', summonSource: 'spell' },
-        ]
-        getCombatSummary.mockReturnValue(cs)
-        getRuntimeValue.mockReturnValue(targetEffects)
 
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(storage.set).toHaveBeenCalled()
-        expect(setCombatSummaryCache).toHaveBeenCalled()
-        expect(setRuntimeValue).toHaveBeenCalled()
-        expect(window.dispatchEvent).toHaveBeenCalled()
+        expect(stripSummonedFromCombatSummary(cs, 'Alice')).toBe(true)
+        expect(cs.creatures).toEqual([goblin, otherBeast, untagged]) // exact survivors (#932)
+        expect(cs.creatures[0]).toBe(goblin) // in-place, original references carried (#993)
+        expect(cs.round).toBe(4) // only creatures replaced
     })
 
-    it('does not dispatch event when combatSummary unchanged and targetEffects unchanged', () => {
-        const cs = {
-            round: 1,
-            creatures: [{ name: 'Goblin' }],
-        }
-        getCombatSummary.mockReturnValue(cs)
-        getRuntimeValue.mockReturnValue([{ effect: 'buff', source: 'Other' }])
+    it('returns false without mutating anything on invalid input or no match', () => {
+        expect(stripSummonedFromCombatSummary(null, 'Alice')).toBe(false)
+        expect(stripSummonedFromCombatSummary({ round: 1 }, 'Alice')).toBe(false) // no creatures array (#945)
+        expect(stripSummonedFromCombatSummary({ creatures: [] }, null)).toBe(false) // no sourceName
 
-        removeSummonedCreatures('Summoner', 'test-campaign')
-
-        expect(window.dispatchEvent).not.toHaveBeenCalled()
+        const cs = { creatures: [{ name: 'Goblin' }, { name: 'Familiar', summonedBy: 'Bob', summonSource: 'spell' }] }
+        const before = cs.creatures
+        expect(stripSummonedFromCombatSummary(cs, 'Alice')).toBe(false)
+        expect(cs.creatures).toBe(before) // unchanged array, no replacement write-back
     })
 })
 
 describe('vanishSummonAtZeroHp (SP-114)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        delete window.CustomEvent
-        window.CustomEvent = class {
-            constructor(type, opts) {
-                this.type = type
-                this.bubbles = opts?.bubbles || false
-            }
-        }
-        window.dispatchEvent = vi.fn()
-    })
-
-    it('removes the summoned combatant from combatSummary in place, strips its te, and logs', () => {
+    it('removes the summoned combatant in place, strips its te, persists the same object, and logs exactly', () => {
         const spirit = { name: 'Aberrant Spirit (Mind Flayer)', summonedBy: 'Wizard', summonSource: 'spell', currentHp: 0 }
         const cs = { round: 1, creatures: [{ name: 'Thug 1' }, spirit] }
         getRuntimeValue.mockReturnValue([
@@ -310,34 +229,69 @@ describe('vanishSummonAtZeroHp (SP-114)', () => {
             { effect: 'bless_bonus', target: 'Thug 1', source: 'Cleric' },
         ])
 
-        const removed = vanishSummonAtZeroHp(spirit, cs, 'test-campaign')
-
-        expect(removed).toBe(true)
-        expect(cs.creatures.map(c => c.name)).toEqual(['Thug 1'])
+        expect(vanishSummonAtZeroHp(spirit, cs, 'test-campaign')).toBe(true)
+        expect(cs.creatures).toEqual([{ name: 'Thug 1' }]) // mutated in place — caller's persist carries it
         expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'test-campaign')
+        expect(storage.set.mock.calls[0][1]).toBe(cs) // same reference, not a copy (#993)
         expect(setCombatSummaryCache).toHaveBeenCalledWith(cs, 'test-campaign')
-        const teWrite = setRuntimeValue.mock.calls.find(c => c[1] === 'targetEffects')
-        expect(teWrite[2]).toEqual([{ effect: 'bless_bonus', target: 'Thug 1', source: 'Cleric' }])
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'targetEffects',
+            [{ effect: 'bless_bonus', target: 'Thug 1', source: 'Cleric' }], // exact survivors (#932)
+            'test-campaign'
+        )
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
             type: 'summons',
             characterName: 'Wizard',
-            description: expect.stringContaining('disappears at 0 Hit Points'),
-        }))
-        expect(window.dispatchEvent).toHaveBeenCalled()
+            summonName: spirit.name,
+            description: `${spirit.name} disappears at 0 Hit Points — Summon ends.`, // exact log text (#app)
+            summonedCreatures: [spirit.name],
+            timestamp: expect.any(Number),
+        })
+        expect(window.dispatchEvent).toHaveBeenCalledTimes(1)
+        expect(window.dispatchEvent.mock.calls[0][0].type).toBe('combat-summary-updated')
     })
 
-    it('does nothing for non-summoned creatures', () => {
-        const thug = { name: 'Thug 1', currentHp: 0 }
-        const cs = { round: 1, creatures: [thug] }
-        getRuntimeValue.mockReturnValue([])
+    it('returns false, short-circuiting before any store touch, for non-summons or missing context', () => {
+        // Stores primed with MATCHING data so a skipped guard is loud (#1035).
+        const cs = { round: 1, creatures: [{ name: 'X', summonedBy: 'Wizard', summonSource: 'spell' }] }
+        getRuntimeValue.mockReturnValue([
+            { effect: 'summoned', target: 'X', source: 'Wizard', summonSource: 'spell' },
+        ])
 
-        expect(vanishSummonAtZeroHp(thug, cs, 'test-campaign')).toBe(false)
-        expect(cs.creatures).toHaveLength(1)
+        for (const [label, creature, campaignName] of [
+            ['null creature', null, 'test-campaign'],
+            ['no summonedBy', { name: 'X', summonSource: 'spell' }, 'test-campaign'],
+            ['non-spell source', { name: 'X', summonedBy: 'Wizard', summonSource: 'true_polymorph' }, 'test-campaign'],
+            ['no campaignName', { name: 'X', summonedBy: 'Wizard', summonSource: 'spell' }, null],
+        ]) {
+            expect(vanishSummonAtZeroHp(creature, cs, campaignName), label).toBe(false)
+        }
+
+        expect(getRuntimeValue, 'guards run before te read').not.toHaveBeenCalled()
+        expect(cs.creatures).toHaveLength(1) // roster untouched
+        expectNoWrites('guards')
         expect(addEntry).not.toHaveBeenCalled()
     })
 
-    it('does nothing without summonedBy or campaignName', () => {
-        expect(vanishSummonAtZeroHp({ name: 'X', summonSource: 'spell' }, { creatures: [] }, null)).toBe(false)
-        expect(vanishSummonAtZeroHp({ name: 'X', summonSource: 'spell' }, { creatures: [] }, 'test-campaign')).toBe(false)
+    it('does not strike a same-named creature under a different owner, yet still cleans orphaned te', () => {
+        const otherImp = { name: 'Imp', summonedBy: 'Other', summonSource: 'spell' }
+        const cs = { round: 2, creatures: [otherImp] }
+        getRuntimeValue.mockReturnValue([
+            { effect: 'summoned', target: 'Imp', source: 'Wizard', summonSource: 'spell' }, // orphan te — cleaned anyway
+            { effect: 'summoned', target: 'Imp', source: 'Other', summonSource: 'spell' },
+        ])
+
+        const wizardImp = { name: 'Imp', summonedBy: 'Wizard', summonSource: 'spell' }
+        expect(vanishSummonAtZeroHp(wizardImp, cs, 'test-campaign')).toBe(false)
+        expect(cs.creatures).toEqual([otherImp]) // owner pinned alongside name (#1051)
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'campaign',
+            'targetEffects',
+            [{ effect: 'summoned', target: 'Imp', source: 'Other', summonSource: 'spell' }], // te cleanup independent of roster
+            'test-campaign'
+        )
+        expect(storage.set).not.toHaveBeenCalled() // no roster change, no persist
+        expect(addEntry).not.toHaveBeenCalled()
     })
 })

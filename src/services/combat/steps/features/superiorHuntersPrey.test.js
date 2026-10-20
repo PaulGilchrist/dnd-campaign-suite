@@ -1,3 +1,45 @@
+// @maintained-by-ai
+/**
+ * Unit lane — superiorHuntersPrey.js decision bytes with MOCKED collaborators.
+ *
+ * Family map (hunter-prey domain, #1050): hunterPreyHandler.test.js owns the
+ * "_Hunter's_Prey_choice" prompt; colossusSlayer.test.js:21 cites THIS lane as
+ * the upgrade owner — the 1d6→1d10 Foe-Slayer ladder (source :49-50) lives here,
+ * hand-derived once (#815), PRESERVED. Integration sibling (just closed #1059)
+ * owns the REAL-module proofs: real-store round-4 selection chain, real grid
+ * map-filter, POST persistence, denial/re-fire, exact popup bytes, full offer
+ * bytes (title/confirmLabel/description/targets+HP ladder). Per #1038 dup-map,
+ * legs byte-matching that lane are CUT here; only mocked-collaborator call
+ * bytes the integration lane deliberately doesn't spy stay (getCurrentCombatRound
+ * campaignName passthrough, campaign-keyed latch READ/WRITE bytes, characters
+ * read byte, exact applyDamage/addEntry call bytes through mock seams, and the
+ * no-mapName → rangeCheck-never-consulted gate).
+ *
+ * Applied-recs verdicts (#1059 ×2):
+ *  ✔ condition false-shapes (missing automation, {}, passives null, [], other
+ *    types) folded to one table test; round-0 latch folded into the strict-===
+ *    suite as the 0-byte falsifier (0===0 blocks; a truthiness guard would
+ *    wrongly re-fire — integration cannot run round 0, so this stays unit-owned).
+ *  ✔ unit-vs-integration split honored: popup test cut (integration pins
+ *    setPopupHtml updater exactly); dedicated offer test cut (integration pins
+ *    offer bytes exactly); ladder gains the lvl-19 just-below boundary leg.
+ *
+ * Old→new: condition ×6→2; early-returns ×8→3 (context-null; attacker/conc
+ * gate table — wrong-spell and wrong-target legs carry a Goblin1 mark + Orc1
+ * decoy so a dropped guard would OPEN a modal, honest distinguishers #1022;
+ * marked/candidate table folds no-target-unrestricted :47 and only-player :54);
+ * used-round ×2 + CLA-346 refire ×2→1 latch suite; campaign-thread + stamp ×2
+ * folded into chain; modal ×7→ladder ×1 + skip + falsy-select ×2→1; damage ×9
+ *→chain ×1 (expect.anything()→exact summary, objectContaining→exact log #829)
+ * + roll-null + cs-null. 37→12 tests.
+ *
+ * Mock hygiene (#1049/#1051/#1057): every import is asserted (isWithinRange as
+ * the never-consulted falsifier); faithful campaign-keyed store mock, no
+ * call-scanning; rt map + default collaborator answers re-armed each
+ * beforeEach for determinism; dice table deterministic (#1026); latch key
+ * '_Superior_Hunters_Prey_UsedRound' (no apostrophe — #1050) verbatim;
+ * zero-side-effect gates on every denial path (#936); no wall-clock timers.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────────
@@ -46,749 +88,259 @@ import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function makeCtx(overrides = {}) {
-  return {
-    campaignName: 'test-campaign',
+const CAMPAIGN = 'test-campaign';
+const LATCH = '_Superior_Hunters_Prey_UsedRound'; // no apostrophe — verbatim (#1050)
+const PREV = { formula: '1d8+3', total: 11, rolls: [8, 3] };
+
+// Faithful campaign-keyed store shape — value lookup by key, never call-scanning (#1051).
+let rt;
+
+const ranger = (extra = {}) => ({
+  name: 'Ranger1',
+  concentration: { spell: "Hunter's Mark", target: 'Orc1' },
+  ...extra,
+});
+
+// Arm the happy-path collaborators; returns the combat summary loadCombatSummary
+// will resolve so the chain can pin applyDamage's first-arg identity.
+function armOffer({ round = 1, creatures = [ranger(), { name: 'Orc1' }, { name: 'Goblin1', currentHp: 5, maxHp: 10 }] } = {}) {
+  const summary = { round, creatures };
+  getCombatContext.mockResolvedValue({ creatures });
+  getCurrentCombatRound.mockReturnValue(round);
+  loadCombatSummary.mockResolvedValue(summary);
+  return summary;
+}
+
+async function open(overrides = {}) {
+  const setSecondaryTargetModal = vi.fn();
+  const ctx = {
+    campaignName: CAMPAIGN,
     playerStats: { name: 'Ranger1', level: 1, class: { name: 'Ranger' } },
     targetName: 'Orc1',
+    setSecondaryTargetModal,
     ...overrides,
   };
+  const result = await superiorHuntersPrey.handler(ctx, PREV);
+  return { ctx, result, setSecondaryTargetModal };
 }
+
+const denied = (result, modal, name) => {
+  expect(result, name).toEqual({ data: PREV });
+  expect(modal, name).not.toHaveBeenCalled();
+};
 
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('superiorHuntersPrey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    rt = new Map();
+    getRuntimeValue.mockImplementation((name, key) => rt.get(`${name}.${key}`) ?? null);
+    // Deterministic dice table (#1026): 1d6→4, 1d10→9.
+    rollExpression.mockImplementation((formula) =>
+      formula === '1d10' ? { total: 9, rolls: [9], modifier: 0, formula: '1d10' }
+        : { total: 4, rolls: [4], modifier: 0, formula: '1d6' });
+    applyDamageToTarget.mockImplementation((_cs, _name, amount) => ({ finalDamage: amount, newHp: 1 }));
+    addEntry.mockResolvedValue(undefined);
+    loadCombatSummary.mockResolvedValue({ creatures: [] });
   });
 
   describe('condition', () => {
-    it('returns true when player has superior_hunter_prey passive', () => {
-      const ctx = makeCtx({
-        playerStats: {
-          name: 'Ranger1',
-          automation: {
-            passives: [{ type: 'superior_hunter_prey' }],
-          },
-        },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(true);
+    it('true only for the superior_hunter_prey passive byte', () => {
+      expect(superiorHuntersPrey.condition({
+        playerStats: { automation: { passives: [{ type: 'superior_hunter_prey' }] } },
+      })).toBe(true);
     });
 
-    it('returns false when passives array is missing', () => {
-      const ctx = makeCtx({
-        playerStats: {
-          name: 'Ranger1',
-          automation: {},
-        },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when passives array is empty', () => {
-      const ctx = makeCtx({
-        playerStats: {
-          name: 'Ranger1',
-          automation: { passives: [] },
-        },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when passives has other types', () => {
-      const ctx = makeCtx({
-        playerStats: {
-          name: 'Ranger1',
-          automation: { passives: [{ type: 'hex' }, { type: 'divine_favor' }] },
-        },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when automation is missing', () => {
-      const ctx = makeCtx({
-        playerStats: { name: 'Ranger1' },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(false);
-    });
-
-    it('returns false when automation.passives is null', () => {
-      const ctx = makeCtx({
-        playerStats: {
-          name: 'Ranger1',
-          automation: { passives: null },
-        },
-      });
-
-      expect(superiorHuntersPrey.condition(ctx)).toBe(false);
+    // #1059 fold: all four false-shapes hit the `(automation?.passives || []).some` byte.
+    it.each([
+      ['automation missing', {}],
+      ['automation empty', { automation: {} }],
+      ['passives null', { automation: { passives: null } }],
+      ['passives empty', { automation: { passives: [] } }],
+      ['other passives only', { automation: { passives: [{ type: 'hex' }, { type: 'divine_favor' }] } }],
+    ])('false when %s', (_label, playerStats) => {
+      expect(superiorHuntersPrey.condition({ playerStats })).toBe(false);
     });
   });
 
-  describe('handler — early returns', () => {
-    it('returns prevData when getCombatContext returns null', async () => {
+  describe('handler — gates deny with zero side effects', () => {
+    it('null combat context returns prevData before any round or latch read', async () => {
       getCombatContext.mockResolvedValue(null);
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
+      const { result, setSecondaryTargetModal } = await open();
 
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when attacker not found in creatures', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'OtherCreature' }],
-      });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when creatures is undefined', async () => {
-      getCombatContext.mockResolvedValue({});
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when creatures is null', async () => {
-      getCombatContext.mockResolvedValue({ creatures: null });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when concentration is null', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Ranger1', concentration: null }],
-      });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when concentration spell is not Hunter\'s Mark', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: 'Concentration Spell' },
-        }],
-      });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when concentration target differs from ctx.targetName', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark", target: 'OtherTarget' },
-        }],
-      });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
-
-    it('returns prevData when concentration has no target (unrestricted)', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark" },
-        }],
-      });
-
-      // When concentration.target is undefined/null, the condition
-      // `atk.concentration.target && atk.concentration.target !== ctx.targetName`
-      // evaluates to false, so it does NOT return early.
-      // It proceeds to find the marked target.
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      // Should NOT return early — it will try to find a marked target
-      // Since there's no marked target in creatures, it returns early
-      expect(result).toEqual({ data: prevData });
-    });
-  });
-
-  describe('handler — already used this round', () => {
-    it('returns prevData when already used in current round', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark", target: 'Orc1' },
-        }],
-      });
-      getCurrentCombatRound.mockReturnValue(3);
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === '_Superior_Hunters_Prey_UsedRound') return 3;
-        return null;
-      });
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-      expect(isWithinRange).not.toHaveBeenCalled();
-      expect(rollExpression).not.toHaveBeenCalled();
+      expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+      denied(result, setSecondaryTargetModal, 'null context');
+      expect(getCurrentCombatRound).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns prevData when round is 0 and already used in round 0', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark", target: 'Orc1' },
-        }],
-      });
-      getCurrentCombatRound.mockReturnValue(0);
-      getRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === '_Superior_Hunters_Prey_UsedRound') return 0;
-        return null;
-      });
+    // Attacker/concentration gates (source :25-26). Wrong-spell and wrong-target
+    // legs carry a hit-able Goblin1 mark + Orc1 decoy so a dropped guard would
+    // OPEN a modal — each leg distinguishes its own byte (#1022).
+    it.each([
+      ['attacker absent', [{ name: 'SomeoneElse' }, { name: 'Orc1' }]],
+      ['creatures undefined', undefined],
+      ['creatures null', null],
+      ['concentration null', [{ name: 'Ranger1', concentration: null }, { name: 'Orc1' }]],
+      ['concentration on another spell', [{ name: 'Ranger1', concentration: { spell: 'Hex', target: 'Orc1' } }, { name: 'Orc1' }]],
+      ['mark on a different target', [{ name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Goblin1' } }, { name: 'Orc1' }, { name: 'Goblin1' }]],
+    ])('%s returns prevData with no round read, modal, or latch write', async (_label, creatures) => {
+      getCombatContext.mockResolvedValue({ creatures });
+      getCurrentCombatRound.mockReturnValue(1);
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
+      const { result, setSecondaryTargetModal } = await open();
 
-      expect(result).toEqual({ data: prevData });
+      denied(result, setSecondaryTargetModal, _label);
+      expect(getCurrentCombatRound).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    // Post-gate denials (:47, :54): unresolvable mark OR no valid candidate.
+    it.each([
+      ['marked target absent from creatures', [{ name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Ghost1' } }, { name: 'Orc1' }]],
+      ['concentration with no target (unrestricted)', [{ name: 'Ranger1', concentration: { spell: "Hunter's Mark" } }, { name: 'Orc1' }]],
+      ['only attacker and mark remain (no candidate)', [{ name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } }, { name: 'Orc1' }]],
+    ])('%s returns prevData with no modal or roll', async (_label, creatures) => {
+      armOffer({ creatures });
+
+      const { result, setSecondaryTargetModal } = await open();
+
+      denied(result, setSecondaryTargetModal, _label);
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
-  describe('handler — marked target not found', () => {
-    it('returns prevData when marked target not in creatures', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark", target: 'NonexistentTarget' },
-        }],
-      });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
+  it('once-per-round latch is strict ===: same-round blocks incl the 0-byte, stale latch re-offers without burning', async () => {
+    // Round 3 with latch 3 → blocked.
+    armOffer({ round: 3 });
+    rt.set(`Ranger1.${LATCH}`, 3);
+    let opened = await open();
+    denied(opened.result, opened.setSecondaryTargetModal, 'same-round 3/3');
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
+    // Round 0 with latch 0 → still blocked: strict === pins the 0-byte; a
+    // truthiness guard would wrongly re-fire (integration cannot run round 0).
+    armOffer({ round: 0 });
+    rt.set(`Ranger1.${LATCH}`, 0);
+    opened = await open();
+    denied(opened.result, opened.setSecondaryTargetModal, 'round-0 0-byte');
 
-      expect(result).toEqual({ data: prevData });
-    });
+    // Stale latch 4 vs round 5 → offer re-fires, latch burns nothing (#1059 fold).
+    armOffer({ round: 5 });
+    rt.set(`Ranger1.${LATCH}`, 4);
+    opened = await open();
+    expect(opened.setSecondaryTargetModal).toHaveBeenCalledTimes(1);
+    expect(opened.setSecondaryTargetModal.mock.calls[0][0].title).toBe("Superior Hunter's Prey — Choose Second Target");
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(rollExpression).not.toHaveBeenCalled();
   });
 
-  describe('handler — no targets available', () => {
-    it('returns prevData when only player and marked target exist', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
-          { name: 'Orc1' },
-        ],
-      });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
+  // Upgrade ladder — owner of the bytes colossusSlayer.test.js:21 cites (#1050).
+  // Hand-derived once (#815): Foe Slayer is the Ranger level-20 capstone
+  // (PHB Ranger, Foe Slayer) → 1d10; everything else (incl. level 19 boundary
+  // and non-Ranger classes) stays 1d6.
+  it.each([
+    ['Ranger lvl 1', 1, 'Ranger', '1d6'],
+    ['Ranger lvl 19 — just below the ladder', 19, 'Ranger', '1d6'],
+    ['Ranger lvl 20 — Foe Slayer', 20, 'Ranger', '1d10'],
+    ['Fighter lvl 20 — class gate', 20, 'Fighter', '1d6'],
+  ])('%s offers and rolls %s', async (_label, level, className, die) => {
+    armOffer();
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
+    const { setSecondaryTargetModal } = await open({
+      playerStats: { name: 'Ranger1', level, class: { name: className } },
     });
+    expect(setSecondaryTargetModal.mock.calls[0][0].featureDescription).toContain(`${die} Force`);
 
-    it('returns prevData when creatures array has only the player', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [{
-          name: 'Ranger1',
-          concentration: { spell: "Hunter's Mark", target: 'Orc1' },
-        }],
-      });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const result = await superiorHuntersPrey.handler(makeCtx(), prevData);
-
-      expect(result).toEqual({ data: prevData });
-    });
+    await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
+    expect(rollExpression).toHaveBeenCalledTimes(1);
+    expect(rollExpression).toHaveBeenCalledWith(die);
   });
 
-  describe('handler — modal with targets (no map)', () => {
-    function setupBaseModalMocks() {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
-          { name: 'Orc1' },
-          { name: 'Goblin1' },
-          { name: 'Skeleton1' },
-        ],
+  describe('handler — selection resolution', () => {
+    it('full chain at round 4: campaign-scoped reads, exact damage/log/latch bytes, closes modal', async () => {
+      const summary = armOffer({ round: 4 });
+      rt.set('characters.characters', [{ name: 'Ranger1' }]);
+
+      const { setSecondaryTargetModal } = await open();
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
+
+      // Mocked-collaborator call bytes the integration lane never spies.
+      expect(getCurrentCombatRound).toHaveBeenCalledWith(CAMPAIGN); // CLA-346: not pinned to 1
+      expect(getRuntimeValue).toHaveBeenCalledWith('Ranger1', LATCH, CAMPAIGN);
+      expect(getRuntimeValue).toHaveBeenCalledWith('characters', 'characters', CAMPAIGN);
+      expect(loadCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
+      expect(applyDamageToTarget).toHaveBeenCalledWith(summary, 'Goblin1', 4, ['Force'], {
+        campaignName: CAMPAIGN, characters: [{ name: 'Ranger1' }], ignoreResistance: false, attackerName: 'Ranger1',
       });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
-    }
-
-    it('opens modal with correct targets when no map positions', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      const result = await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      expect(result).toEqual({ data: prevData });
-      expect(setSecondaryTargetModal).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Superior Hunter's Prey — Choose Second Target",
-          confirmLabel: 'Deal Damage',
-          featureDescription: expect.stringContaining('1d6 Force'),
-        }),
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      expect(modalArgs.targets).toHaveLength(2);
-      expect(modalArgs.targets.map(t => t.name)).toEqual(expect.arrayContaining(['Goblin1', 'Skeleton1']));
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+        type: 'roll', characterName: 'Ranger1', rollType: 'damage', name: "Superior Hunter's Prey",
+        formula: '1d6 [Superior Hunters Prey]', rolls: [4], total: 4, modifier: 0, damageType: 'Force',
+        targetName: 'Goblin1', finalDamage: 4,
+      });
+      expect(setRuntimeValue).toHaveBeenCalledWith('Ranger1', LATCH, 4, CAMPAIGN);
+      expect(setSecondaryTargetModal).toHaveBeenLastCalledWith(null);
+      // Mapless campaign never consults rangeCheck (:97 branch skipped).
+      expect(isWithinRange).not.toHaveBeenCalled();
+      // Popup updater bytes are owned verbatim by the integration lane (#1059);
+      // this chain runs without setPopupHtml, exercising the guard-false path.
     });
 
-    it('uses 1d6 die for non-20th level ranger', async () => {
-      setupBaseModalMocks();
+    it.each([[null], ['']])('falsy selection %s is ignored — no roll, no close', async (selection) => {
+      armOffer();
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
+      const { setSecondaryTargetModal } = await open();
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected(selection);
 
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      expect(modalArgs.featureDescription).toContain('1d6 Force');
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(applyDamageToTarget).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(setSecondaryTargetModal).not.toHaveBeenCalledWith(null); // only the open call
     });
 
-    it('uses 1d10 die for 20th level ranger (Foe Slayer)', async () => {
-      setupBaseModalMocks();
+    it('onSkip closes the modal with zero roll, damage, log, or latch write', async () => {
+      armOffer();
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({
-          setSecondaryTargetModal,
-          playerStats: { name: 'Ranger1', level: 20, class: { name: 'Ranger' } },
-        }),
-        prevData,
-      );
+      const { setSecondaryTargetModal } = await open();
+      setSecondaryTargetModal.mock.calls[0][0].onSkip();
 
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      expect(modalArgs.featureDescription).toContain('1d10 Force');
-    });
-
-    it('uses 1d6 die for non-ranger class even at level 20', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({
-          setSecondaryTargetModal,
-          playerStats: { name: 'Ranger1', level: 20, class: { name: 'Fighter' } },
-        }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      expect(modalArgs.featureDescription).toContain('1d6 Force');
-    });
-
-    it('excludes player and marked target from modal targets', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      const targetNames = modalArgs.targets.map(t => t.name);
-      expect(targetNames).not.toContain('Ranger1');
-      expect(targetNames).not.toContain('Orc1');
-    });
-
-    it('calls onSkip to close modal without damage', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      modalArgs.onSkip();
-
-      expect(setSecondaryTargetModal).toHaveBeenCalledWith(null);
+      expect(setSecondaryTargetModal).toHaveBeenLastCalledWith(null);
       expect(rollExpression).not.toHaveBeenCalled();
       expect(applyDamageToTarget).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('returns early without closing modal when onTargetSelected is called with null', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      modalArgs.onTargetSelected(null);
-
-      // The handler returns early without calling setSecondaryTargetModal(null)
-      // because there is no explicit close-on-null behavior in the code
-      expect(setSecondaryTargetModal).not.toHaveBeenCalledWith(null);
-      expect(rollExpression).not.toHaveBeenCalled();
-      expect(applyDamageToTarget).not.toHaveBeenCalled();
-    });
-
-    it('returns early without closing modal when onTargetSelected is called with empty string', async () => {
-      setupBaseModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      modalArgs.onTargetSelected('');
-
-      expect(setSecondaryTargetModal).not.toHaveBeenCalledWith(null);
-      expect(rollExpression).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handler — once-per-turn round pinning (CLA-346)', () => {
-    function setupOncePerTurnMocks(round) {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
-          { name: 'Orc1' },
-          { name: 'Goblin1', currentHp: 5, maxHp: 10 },
-        ],
-      });
-      getCurrentCombatRound.mockReturnValue(round);
-      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
-      applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 1 });
-      loadCombatSummary.mockResolvedValue({ creatures: [] });
-      addEntry.mockResolvedValue(undefined);
-    }
-
-    it('threads campaignName into getCurrentCombatRound so the round is not pinned to 1', async () => {
-      setupOncePerTurnMocks(4);
-      getRuntimeValue.mockReturnValue(null);
-
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
-
-      expect(getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
-    });
-
-    it('stamps the latch with the CURRENT round after dealing spread damage', async () => {
-      setupOncePerTurnMocks(4);
-      getRuntimeValue.mockReturnValue(null);
-
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
-      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ranger1',
-        '_Superior_Hunters_Prey_UsedRound',
-        4,
-        'test-campaign',
-      );
-    });
-
-    it('re-fires the offer on a later-round marked hit after firing once', async () => {
-      // Round 4: rider fires, latch stamps 4.
-      setupOncePerTurnMocks(4);
-      getRuntimeValue.mockReturnValue(null);
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
-      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ranger1',
-        '_Superior_Hunters_Prey_UsedRound',
-        4,
-        'test-campaign',
-      );
-
-      // Round 5 (latch cleared at round wrap): latch is null → offer re-fires.
-      setSecondaryTargetModal.mockClear();
-      setRuntimeValue.mockClear();
-      getCurrentCombatRound.mockReturnValue(5);
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === '_Superior_Hunters_Prey_UsedRound') return null;
-        return null;
-      });
-      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
-      expect(setSecondaryTargetModal).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Superior Hunter's Prey — Choose Second Target",
-        }),
-      );
-
-      // Same-round second press with stale latch 4 vs round 5 still blocked.
-      setSecondaryTargetModal.mockClear();
-      getRuntimeValue.mockImplementation((_name, key) => {
-        if (key === '_Superior_Hunters_Prey_UsedRound') return 5;
-        return null;
-      });
-      await superiorHuntersPrey.handler(makeCtx({ setSecondaryTargetModal }), {});
-      expect(setSecondaryTargetModal).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handler — onTargetSelected with damage application', () => {
-    function setupDamageModalMocks() {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
-          { name: 'Orc1' },
-          { name: 'Goblin1', currentHp: 5, maxHp: 10 },
-        ],
-      });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
-      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
-      applyDamageToTarget.mockReturnValue({ finalDamage: 4, newHp: 1 });
-      loadCombatSummary.mockResolvedValue({ creatures: [] });
-      addEntry.mockResolvedValue(undefined);
-    }
-
-    it('rolls damage and applies it when a target is selected', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      const setPopupHtml = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal, setPopupHtml }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(rollExpression).toHaveBeenCalledWith('1d6');
-      expect(applyDamageToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin1', 4, ['Force'], { campaignName: 'test-campaign', characters: [], ignoreResistance: false, attackerName: 'Ranger1' });
-    });
-
-    it('logs a damage entry when target is selected', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(addEntry).toHaveBeenCalledWith(
-        'test-campaign',
-        expect.objectContaining({
-          type: 'roll',
-          characterName: 'Ranger1',
-          rollType: 'damage',
-          name: "Superior Hunter's Prey",
-          formula: '1d6 [Superior Hunters Prey]',
-          total: 4,
-          damageType: 'Force',
-          targetName: 'Goblin1',
-        }),
-      );
-    });
-
-    it('sets the used round flag after damage application', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ranger1',
-        '_Superior_Hunters_Prey_UsedRound',
-        1,
-        'test-campaign',
-      );
-    });
-
-    it('closes the modal after damage application', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(setSecondaryTargetModal).toHaveBeenCalledWith(null);
-    });
-
-    it('rolls 1d10 for 20th level ranger (Foe Slayer)', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({
-          setSecondaryTargetModal,
-          playerStats: { name: 'Ranger1', level: 20, class: { name: 'Ranger' } },
-        }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(rollExpression).toHaveBeenCalledWith('1d10');
-    });
-
-    it('updates popup with spread damage info', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      const setPopupHtml = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal, setPopupHtml }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(setPopupHtml).toHaveBeenCalledWith(
-        expect.any(Function),
-      );
-
-      // Verify the function passed to setPopupHtml
-      const popupFn = setPopupHtml.mock.calls[0][0];
-      const result = popupFn(null);
-      expect(result.spreadTargetName).toBe('Goblin1');
-      expect(result.spreadFinalDamage).toBe(4);
-      expect(result.spreadTargetCurrentHp).toBe(1);
-      expect(result.spreadTargetMaxHp).toBe(10);
-    });
-
-    it('does not update popup when setPopupHtml is not provided', async () => {
-      setupDamageModalMocks();
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(addEntry).toHaveBeenCalled();
-      expect(setRuntimeValue).toHaveBeenCalled();
-    });
-
-    it('handles null combat summary from loadCombatSummary', async () => {
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'Ranger1', concentration: { spell: "Hunter's Mark", target: 'Orc1' } },
-          { name: 'Orc1' },
-          { name: 'Goblin1', currentHp: 5, maxHp: 10 },
-        ],
-      });
-      getRuntimeValue.mockReturnValue(null);
-      getCurrentCombatRound.mockReturnValue(1);
-      rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0, formula: '1d6' });
-      loadCombatSummary.mockResolvedValue(null);
-      addEntry.mockResolvedValue(undefined);
-
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
-
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(applyDamageToTarget).not.toHaveBeenCalled();
-      expect(addEntry).toHaveBeenCalledWith(
-        'test-campaign',
-        expect.objectContaining({
-          targetName: 'Goblin1',
-          finalDamage: undefined,
-        }),
-      );
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Ranger1',
-        '_Superior_Hunters_Prey_UsedRound',
-        1,
-        'test-campaign',
-      );
-    });
-
-    it('handles rollExpression returning null (closes modal)', async () => {
-      setupDamageModalMocks();
+    it('null dice closes the modal and burns nothing', async () => {
+      armOffer();
       rollExpression.mockReturnValue(null);
 
-      const prevData = { formula: '1d8+3', total: 11, rolls: [8, 3] };
-      const setSecondaryTargetModal = vi.fn();
-      await superiorHuntersPrey.handler(
-        makeCtx({ setSecondaryTargetModal }),
-        prevData,
-      );
+      const { setSecondaryTargetModal } = await open();
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
 
-      const modalArgs = setSecondaryTargetModal.mock.calls[0][0];
-      await modalArgs.onTargetSelected('Goblin1');
-
-      expect(setSecondaryTargetModal).toHaveBeenCalledWith(null);
+      expect(setSecondaryTargetModal).toHaveBeenLastCalledWith(null);
       expect(applyDamageToTarget).not.toHaveBeenCalled();
       expect(addEntry).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('null combat summary skips applyDamage but still logs, stamps the latch, and closes', async () => {
+      armOffer({ round: 4 });
+      loadCombatSummary.mockResolvedValue(null);
+
+      const { setSecondaryTargetModal } = await open();
+      await setSecondaryTargetModal.mock.calls[0][0].onTargetSelected('Goblin1');
+
+      expect(applyDamageToTarget).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+        type: 'roll', characterName: 'Ranger1', rollType: 'damage', name: "Superior Hunter's Prey",
+        formula: '1d6 [Superior Hunters Prey]', rolls: [4], total: 4, modifier: 0, damageType: 'Force',
+        targetName: 'Goblin1', finalDamage: undefined,
+      });
+      expect(setRuntimeValue).toHaveBeenCalledWith('Ranger1', LATCH, 4, CAMPAIGN);
+      expect(setSecondaryTargetModal).toHaveBeenLastCalledWith(null);
     });
   });
 });

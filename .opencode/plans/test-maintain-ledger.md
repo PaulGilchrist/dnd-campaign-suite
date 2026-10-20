@@ -1951,3 +1951,21 @@ run2#1058: features/stalkersFlurry -> maintained (5->15/23 EXPANSION): no-data-k
 ## Batch #189 GREEN — run2#1050-#1058 (10 files, features/ subdomain milestone flush)
 ## Batch #189 — PROGRESS: completed 2194 / remaining 490 (total 2684)
 - Suite: lint clean; 2752 files, 32,103 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 18th consecutive; evidence /tmp/batch189.log). 32,167->32,103 (-64 net: features/ sweep folds 34->21/33-condensed/20->14/28->7/18->6/12->3 minus stalkersFlurry 5->23 + shieldBash 33->37 targeted falsifier expansions).
+run2#1059: superiorHuntersPrey.integration -> maintained (6->4): MISLABELED all-mock lane made GENUINE integration (real store/combatData/grid; mocks only true seams #791); center-of-spread falsifier proves marked-target radiation; round-4 real + cross-campaign decoy; POST persist exact
+run2#1060: superiorHuntersPrey unit -> maintained (37->12/27): recs #1059 x2 APPLIED; strict-=== latch 0-byte unit-exclusive (integration can't run round 0); lvl-19 boundary NEW; offer/popup cut byte-matching integration :144-153/:223-225
+run2#1061: tavernBrawler reroll-core -> maintained (7->6): multi-die partial branch NEW ([8,3,5] distinguishable, random consumed exactly twice); Math.random never-consumed tripwire; near-miss passive w/ zero side effects
+run2#1062: tavernBrawlerPush -> maintained (16->8/18): recs #1061 x2 resolved; 2 DISHONEST titles fixed (:81 claimed-no-passive asserted true); Goblin7!=Bandit1 source-provability; strict-=== latch + target-res tables NEW
+run2#1063: genericSteps -> maintained (20->8): full event-chain exact contract; stub convention sibling-aligned; formula selection proven by distinct rolled outputs; '!= null' semantics pinned (0/'' run)
+run2#1064: steps/index routing -> maintained (9->3): rec #1048 APPLIED (+caught body-exec violation); 12-fixture routing table sentinel-recorder falsifiable; campaignName gate pair; 🔴 :47 buildGenericSteps DEAD via router LOGGED
+run2#1065: observers -> maintained (9->7): golden registration census; catch-paths x3 console exact; bare-ctx exact fallback bytes + foreign-campaign decoy; 🔴🔴 :40/:57 raw playerStats?.name 'undefined applied...' text LOGGED
+run2#1066: sseObservers -> maintained (13->6): recs x2 applied membership->golden census ['*','*','pipeline:resumed']; exact fetch tuples URL-encoded; dishonest 'silently' fixed 3 catch paths; transport canon clean no EventSource bypass
+run2#1067: summons/summonedCreatureService -> maintained (23->10): stripSummonedFromCombatSummary FIRST repo coverage; loud guard primed-stores; same-name-different-owner + orphan-te branch; skipSync pinned. 🗑 isSpellSummon dead export logged
+run2#1068: teleportService -> maintained (10->9): Euclidean-vs-walk budget bypass falsifier; BFS-tie-byte brittleness removed citing reachability owner; honest-degrade zero-partial-write table; test-side rejection-leak FIXED
+run2#1069: thiefsReflexes -> maintained (9/14): 2024 second-turn grant recharacterized; ''-guard triple (Number('')===0 trap); latch table string-coercion + zero-applied-no-burn; predicate discriminates real non-matching extra_action
+run2#1070: turnState ECONOMY CANON -> maintained (24->12/30): openTurn FIRST owner; deepFreeze x9 producers; lifecycle seam-flow bystander isolation; over-spend honest-full-clamped-view; 📌 negative-*Used hardening note
+run2#1071: weaponMasteryUtils -> maintained (6->2/9): guard falsifiability w/ falsy-fallback; exact identity call-pins per row; dead extraMasteries purged
+run2#1072: diceRoller ENGINE CANON -> maintained (45->15/123): ZERO range assertions engine-wide; stub-fidelity #1026 verified no drift; RNG over-consume now throws; grammar edges d0/whitespace/junk-kl. 🔴🔴 d0-phantom-die + canRollExpression-case-mismatch LOGGED
+
+## Batch #190 GREEN — run2#1059-#1072 (14 files)
+## Batch #190 — PROGRESS: completed 2208 / remaining 476 (total 2684)
+- Suite: lint clean; 2752 files, 32,131 passed, 2 canon FIXME fails (exact known pair) + 3 expected = GREEN canon. No flake (clean 19th consecutive; evidence /tmp/batch190.log). 32,103->32,131 (+28 net: diceRoller engine census +123 exact-cases, turnState lifecycle +6, teleport/thiefs tables minus steps/index 9->3, genericSteps 20->8, sseObservers 13->6, observers 9->7, hunterPrey pair 43->16, tavernBrawler pair 23->14 folds).
