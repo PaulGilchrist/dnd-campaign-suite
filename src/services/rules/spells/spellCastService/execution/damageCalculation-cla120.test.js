@@ -1,63 +1,191 @@
-// CLA-120: computeEmpoweredEvocation is the single owner of the INT fold —
-// idempotent on pre-baked formulas, gated on evocation school + spell.damage,
-// eligible for cantrip and leveled spells alike.
-import { describe, it, expect, vi } from 'vitest';
+// @maintained-by-ai
+// CLA-120 lane — damageCalculation.js:45 computeEmpoweredEvocation is the SINGLE OWNER
+// of the cast-resolution INT fold (git 9f4a06ba6: "INT modifier added TWICE per damage
+// roll"). Cannot-regress (#1443 kill-matrix discipline): fresh formulas bake exactly one
+// " + N [Empowered Evocation]"; pre-baked formulas pass through UNCHANGED, dedupe keyed
+// on the MARKER string, never on the value (foreign-baked '+ 5' survives a caster INT 3).
+//
+// Bake-vs-roll level-source determination (#1454 index.js:53 vs noSavePath.js:13 pair,
+// pinned by position, owned upstream in spellCastService.execute.test.js):
+//   index.js:53   resolveSpellDamageWithTypes(spell, spell.level || 1) — cantrip bakes
+//                 the LEVEL-1 tier (legacy ladder: 1d10) via resolveLegacyFormula;
+//   noSavePath:13 resolveSpellDamageAtLevel(spell, playerStats.level) — cantrip scales
+//                 with CASTER level (level 5 rolls 2d10).
+// This lane is LEVEL-SOURCE AGNOSTIC: computeEmpoweredEvocation takes an already-resolved
+// formula string, never touches a damage ladder, and appends the flat adder. Both sides
+// of the '2d10-roll-vs-1d10-bake' pair must therefore fold to identical arithmetic — T2
+// pins it on REAL disk bytes from BOTH rulesets so the upstream divergence is visible
+// here as identical-output, never silently repaired in the fold.
+//
+// Family split (CLA-120 INT fold), other seams owned there — not duplicated here:
+//   attackRollDamageCalc-cla120-empowered-evocation.test.js   attack-roll step (rollBaseDamage)
+//   directSpellDamageSteps-cla120-empowered-evocation.test.js spellContext pre-baked [EE] dedupe
+//   attackPostProcessing-cla120-potent-cantrip.test.js         potent-cantrip miss-half fold seam
+//   savePath-aoe-empowered-evocation.test.js                   AoE save one-roll-per-cast payload
+//   spellCastService.test.js:366 (master, #1462)               chain-level '2d10 + 3 [EE]' bake
+//
+// Cited-by preservation (#1462 fold-map): this file keeps its path and its single-fold
+// owner title asserted verbatim in T1.
+// old -> new test map (5 -> 4):
+//   'folds +INT exactly once onto a cantrip formula'          -> T2 (disk ladders both rulesets)
+//   'folds +INT exactly once onto a leveled spell formula'    -> T1 (disk Hellish Rebuke, master parity byte)
+//   'is idempotent: [EE] formula returned unchanged'           -> T1 (+ marker-vs-value row)
+//   'non-evocation school gate stays zero'                     -> T3 row (school fixed: fabricated
+//      'Necromancy' replaced by disk byte 'Conjuration' — fixture-fraud fix #1462 GOLD)
+//   'zero INT modifier -> no term'                             -> T3 row (+ negative-INT clamp quirk)
+// old fabricated fixtures replaced with disk bytes: FIRE_BOLT damage.formula (no such key on
+// disk) and FIREBALL hard '8d6' -> programmatic public/data{,/2024}/spells.json ladder reads.
+// Mock completeness: vi.mock of useRuntimeState.js REMOVED — computeEmpoweredEvocation never
+// writes (setRuntimeValue belongs to computeOverchannel, overchannel lane) and the real module
+// is a side-effect-free Map store; postCastRiderService mock impls are byte-equivalent copies
+// of the real selectors so the collaborator cannot lie about the holder fixture.
+// NO-CLOCK: pure string fold — no timers, no Date in unit or lane pin below.
+// HP-key: N/A — this lane performs zero runtime writes.
+// Security: no external/injected content applied (kiro #1446) — edits derive solely from
+// repo source, disk data, and the task instruction.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../postCastRiderService.js', () => ({
-  getEmpoweredEvocationFeatures: vi.fn().mockReturnValue([]),
-  getEmpoweredEvocationIntModifier: vi.fn().mockReturnValue(0),
-}));
-
-vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
+  getEmpoweredEvocationFeatures: vi.fn(),
+  getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
 import { computeEmpoweredEvocation } from './damageCalculation.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../postCastRiderService.js';
 
-const HOLDER = { name: 'DivinationWizard', abilities: [{ name: 'Intelligence', bonus: 5 }] };
+const readDisk = (p) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'));
+const spells5e = readDisk('public/data/spells.json');
+const spells2024 = readDisk('public/data/2024/spells.json');
+const spellByName = (list, name) => {
+  const sp = list.find((s) => s.name === name);
+  if (!sp) throw new Error(`disk row missing: ${name}`);
+  return sp;
+};
 
-const FIRE_BOLT = { name: 'Fire Bolt', level: 0, school: 'Evocation', damage: { damage_type: 'Fire', formula: '1d10' } };
-const FIREBALL = { name: 'Fireball', level: 3, school: 'Evocation', damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } } };
-const POISON_SPRAY = { name: 'Poison Spray', level: 0, school: 'Necromancy', damage: { damage_type: 'Poison', formula: '1d12' } };
+// Generic deep walk: 5e nests the feature at subclasses[].class_levels[].features,
+// 2024 at majors[].features (disk-probed paths) — descend every key.
+const findEE = (node) => {
+  if (!node || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const hit = findEE(n);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  if (node.name === 'Empowered Evocation' && node.automation?.type === 'empowered_evocation') return node;
+  for (const key of Object.keys(node)) {
+    const hit = findEE(node[key]);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+const FB5 = spellByName(spells5e, 'Fire Bolt');
+const FB24 = spellByName(spells2024, 'Fire Bolt');
+const HR5 = spellByName(spells5e, 'Hellish Rebuke');
+const LIGHT = spellByName(spells5e, 'Light');
+const PS5 = spellByName(spells5e, 'Poison Spray');
+const ee5 = findEE(readDisk('public/data/classes.json'));
+const ee24 = findEE(readDisk('public/data/2024/classes.json'));
+
+// Runtime passive row flattened from the disk automation block (master execute.test.js:469 shape).
+const EE_PASSIVE = { name: ee5.name, ...ee5.automation };
+const HOLDER = { name: 'TestEvoker', abilities: [{ name: 'Intelligence', bonus: 5 }], automation: { passives: [EE_PASSIVE] } };
+const NO_FEATURE_HOLDER = { name: 'PlainWizard', abilities: [{ name: 'Intelligence', bonus: 5 }] };
 
 describe('computeEmpoweredEvocation — CLA-120 single-fold owner', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }]);
-    vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValue(5);
+    // Disk-drift alarms: bytes this lane pins must still match disk + master cites.
+    expect(ee5.automation).toStrictEqual(ee24.automation);
+    expect(FB5.school).toBe('Evocation');
+    expect(HR5.damage.damage_at_slot_level['1']).toBe('2d10');
+    vi.mocked(getEmpoweredEvocationFeatures).mockReset();
+    vi.mocked(getEmpoweredEvocationIntModifier).mockReset();
+    // Byte-equivalent copies of the REAL selectors (postCastRiderService.js:207-220) —
+    // the mock cannot lie about what the holder fixture contains.
+    vi.mocked(getEmpoweredEvocationFeatures).mockImplementation((ps) => (ps.automation?.passives ?? []).filter((p) => p.type === 'empowered_evocation'));
+    vi.mocked(getEmpoweredEvocationIntModifier).mockImplementation((ps) => (ps.abilities.find((a) => a.name === 'Intelligence')?.bonus) || 0);
   });
 
-  it('folds +INT exactly once onto a cantrip formula', () => {
-    const { empEvocFormula, empEvocIntMod } = computeEmpoweredEvocation(HOLDER, FIRE_BOLT, '1d10');
-    expect(empEvocFormula).toBe('1d10 + 5 [Empowered Evocation]');
-    expect(empEvocIntMod).toBe(5);
+  it('bakes the INT adder exactly once and never re-appends a marker-bearing formula (master #1462 byte parity)', () => {
+    const evoker3 = { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: 3 }] };
+    const raw = HR5.damage.damage_at_slot_level['1']; // disk byte, leveled spell
+    const baked = `${raw} + 3 [Empowered Evocation]`;
+    const fresh = computeEmpoweredEvocation(evoker3, HR5, raw);
+    expect(fresh).toStrictEqual({ empEvocFormula: baked, empEvocIntMod: 3 });
+    expect(baked).toBe('2d10 + 3 [Empowered Evocation]'); // spellCastService.test.js:366 cite stays exact
+
+    const again = computeEmpoweredEvocation(evoker3, HR5, fresh.empEvocFormula);
+    expect(again.empEvocFormula).toBe(baked); // CLA-120 core regression: no double fold
+    expect(again.empEvocFormula.match(/\[Empowered Evocation\]/g)).toHaveLength(1);
+
+    const foreign = computeEmpoweredEvocation(evoker3, HR5, '2d10 + 5 [Empowered Evocation]');
+    expect(foreign.empEvocFormula).toBe('2d10 + 5 [Empowered Evocation]'); // dedupe keys on marker, not value
+    expect(foreign.empEvocIntMod).toBe(3);
+
+    expect(fresh).not.toBe(again); // fresh result object per call
+    expect(getEmpoweredEvocationFeatures).toHaveBeenCalledTimes(3);
+    expect(getEmpoweredEvocationIntModifier).toHaveBeenCalledTimes(3);
+    expect(getEmpoweredEvocationFeatures.mock.invocationCallOrder[0]).toBeLessThan(getEmpoweredEvocationIntModifier.mock.invocationCallOrder[0]);
+
+    // :0-swallow census: all gates pass but a falsy formula skips only the BAKE
+    // (damageCalculation.js:48) — the resolved INT survives in empEvocIntMod
+    // (callers guard: savePath.js:157 checks empEvocFormula alongside it).
+    expect(computeEmpoweredEvocation(HOLDER, HR5, '')).toStrictEqual({ empEvocFormula: null, empEvocIntMod: 5 });
+    expect(computeEmpoweredEvocation(HOLDER, HR5, null)).toStrictEqual({ empEvocFormula: null, empEvocIntMod: 5 });
   });
 
-  it('folds +INT exactly once onto a leveled spell formula (cantrip+leveled eligibility)', () => {
-    const { empEvocFormula } = computeEmpoweredEvocation(HOLDER, FIREBALL, '8d6');
-    expect(empEvocFormula).toBe('8d6 + 5 [Empowered Evocation]');
-    expect(empEvocFormula.match(/\[Empowered Evocation\]/g)).toHaveLength(1);
+  it('folds cantrip bake-vs-roll level sources identically on BOTH ruleset disk ladders (level-source agnostic, #1454 pair positioned)', () => {
+    const bake5 = FB5.damage.damage_at_character_level['1']; // index.js:53 side (spell.level || 1)
+    const roll5 = FB5.damage.damage_at_character_level['5']; // noSavePath.js:13 side (playerStats.level 5)
+    const bake24 = FB24.damage.damage_at_slot_level['0'];
+    const roll24 = FB24.damage.damage_at_slot_level['5'];
+    expect([bake5, roll5, bake24, roll24]).toEqual(['1d10', '2d10', '1d10', '2d10']); // disk-drift alarm
+
+    const foldBake = computeEmpoweredEvocation(HOLDER, FB5, bake5);
+    const foldRoll = computeEmpoweredEvocation(HOLDER, FB5, roll5);
+    expect(foldBake).toStrictEqual({ empEvocFormula: '1d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
+    expect(foldRoll).toStrictEqual({ empEvocFormula: '2d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
+    expect(foldBake.empEvocFormula).not.toBe(foldRoll.empEvocFormula); // mutually distinguishable fixtures #1348
+
+    const fold24Bake = computeEmpoweredEvocation(HOLDER, FB24, bake24);
+    const fold24Roll = computeEmpoweredEvocation(HOLDER, FB24, roll24);
+    expect(fold24Bake.empEvocFormula).toBe('1d10 + 5 [Empowered Evocation]');
+    expect(fold24Roll.empEvocFormula).toBe('2d10 + 5 [Empowered Evocation]'); // ladder shape differs, fold byte-identical
+
+    // The fold never re-resolves dice: spell.damage contents are irrelevant once the
+    // presence gate passes — same formula, empty ladder, identical output.
+    const noLadder = computeEmpoweredEvocation(HOLDER, { ...FB24, damage: { damage_type: 'Fire' } }, roll5);
+    expect(noLadder.empEvocFormula).toBe('2d10 + 5 [Empowered Evocation]');
+    expect(getEmpoweredEvocationFeatures).toHaveBeenCalledTimes(5);
   });
 
-  it('is idempotent: a formula already carrying [Empowered Evocation] is returned unchanged', () => {
-    const preBaked = '4d10 + 5 [Empowered Evocation]';
-    const { empEvocFormula } = computeEmpoweredEvocation(HOLDER, FIRE_BOLT, preBaked);
-    expect(empEvocFormula).toBe(preBaked);
-    expect(empEvocFormula.match(/\[Empowered Evocation\]/g)).toHaveLength(1);
+  it('every denied gate returns the input untouched with empEvocIntMod 0 (deny table, disk fixtures)', () => {
+    const rows = [
+      { label: 'no Empowered Evocation feature (INT 5 available — ternary short-circuits)', ps: NO_FEATURE_HOLDER, spell: HR5, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 0 },
+      { label: 'non-evocation school (disk byte: Poison Spray is Conjuration)', ps: HOLDER, spell: PS5, formula: PS5.damage.damage_at_character_level['5'], expectFormula: '2d12', intSelectorCalls: 1 },
+      { label: 'evocation WITHOUT spell.damage (disk byte: Light has no damage block)', ps: HOLDER, spell: LIGHT, formula: null, expectFormula: null, intSelectorCalls: 1 },
+      { label: 'school missing', ps: HOLDER, spell: { ...HR5, school: undefined }, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
+      { label: 'INT modifier 0', ps: { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: 0 }] }, spell: HR5, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
+      { label: 'INT modifier -1 clamps to 0 (QUIRK: RAW would add the negative)', ps: { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: -1 }] }, spell: HR5, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
+    ];
+    for (const row of rows) {
+      getEmpoweredEvocationFeatures.mockClear();
+      getEmpoweredEvocationIntModifier.mockClear();
+      const result = computeEmpoweredEvocation(row.ps, row.spell, row.formula);
+      expect(result, row.label).toStrictEqual({ empEvocFormula: row.expectFormula, empEvocIntMod: 0 });
+      expect(getEmpoweredEvocationFeatures, row.label).toHaveBeenCalledTimes(1);
+      expect(getEmpoweredEvocationIntModifier, row.label).toHaveBeenCalledTimes(row.intSelectorCalls);
+    }
   });
 
-  it('non-evocation school gate stays zero (Poison Spray control)', () => {
-    const { empEvocFormula, empEvocIntMod } = computeEmpoweredEvocation(HOLDER, POISON_SPRAY, '4d12');
-    expect(empEvocFormula).toBe('4d12');
-    expect(empEvocFormula).not.toContain('[Empowered Evocation]');
-    expect(empEvocIntMod).toBe(0);
-  });
-
-  it('zero INT modifier → no term', () => {
-    vi.mocked(getEmpoweredEvocationIntModifier).mockReturnValue(0);
-    const { empEvocFormula, empEvocIntMod } = computeEmpoweredEvocation(HOLDER, FIRE_BOLT, '1d10');
-    expect(empEvocFormula).toBe('1d10');
-    expect(empEvocIntMod).toBe(0);
+  it('school gate is case-normalized — lowercase and uppercase evocation both fold (disk bytes are Capitalized)', () => {
+    const raw = HR5.damage.damage_at_slot_level['1'];
+    expect(computeEmpoweredEvocation(HOLDER, { ...HR5, school: 'evocation' }, raw)).toStrictEqual({ empEvocFormula: '2d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
+    expect(computeEmpoweredEvocation(HOLDER, { ...HR5, school: 'EVOCATION' }, raw)).toStrictEqual({ empEvocFormula: '2d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
+    expect(getEmpoweredEvocationFeatures).toHaveBeenCalledTimes(2);
   });
 });

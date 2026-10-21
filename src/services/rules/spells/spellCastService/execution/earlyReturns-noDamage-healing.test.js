@@ -1,4 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/* ------------------------------------------------------------------ */
+/*  noDamage-chain HEAL/special face of executeSpellCast (index.js)  */
+/*                                                                     */
+/*  Chain arms enumerated from index.js REAL bytes:                    */
+/*   - first-chain passThrough tail arms: :316 Heroism,               */
+/*     :318 Longstrider, :319 Spare the Dying, :320 Enhance Ability  */
+/*     (:317 Holy Aura swallow sits between — asserted as neighbor)  */
+/*   - mass-heal swallow chain :328-332: Mass Cure Wounds (:329),    */
+/*     Mass Healing Word (:330), Prayer of Healing (:331),            */
+/*     False Life (:332); consumed at :334 — BEFORE the generic-heal */
+/*     gate :337 and the :341 Healing-Word fire-and-forget           */
+/*   - tail swallow arms after :341: Protection From Energy (:346),  */
+/*     Protection from Poison (:347), Remove Curse (:351, with the   */
+/*     REAL inline :267 dispel-name gate), Resistance (:359)         */
+/*   - rider seam: every lane here returns via runPostCastTriggers-  */
+/*     Merged (:716 -> :720, CLA-389) — riders RUN post-payment on  */
+/*     this face, unlike the :710/:712 generic-automation bypass     */
+/*     (owned by earlyReturns-generic.test.js:274 census, #1455).   */
+/*                                                                     */
+/*  Hijack disposition (#1458 dead-twin class, #1463 hijack census): */
+/*     SERVICE_HANDLED_SPELLS (triggerSpells.js:42-57) contains NO  */
+/*     heal-family names, so handleGenericAutomation (:710) consumes */
+/*     every REAL disk row of Mass Healing Word, Prayer of Healing,  */
+/*     both Protections, Remove Curse, Resistance, Heroism (both      */
+/*     rulesets) and Mass Cure Wounds / Spare the Dying / Enhance    */
+/*     Ability (2024 only) — their dedicated arms are reachable in   */
+/*     production ONLY via automation-free lightweight payloads, the */
+/*     exact second-caller shape of useActionSpellMetamagic.js:163  */
+/*     ({name, level, baseLevel}). Rows below use REAL disk rows     */
+/*     where disk automation is null (Mass Cure Wounds 5e, False     */
+/*     Life both, Longstrider both, Spare the Dying 5e, Enhance      */
+/*     Ability 5e) and documented lightweight rows otherwise.        */
+/*  Heal-domain owners (cite): producers #1372/#1384/85/#1393/94/    */
+/*  #1371, riders #1452, materials #1450, hub-compute #1455,         */
+/*  special :328-332 #1463.                                           */
+/*                                                                     */
+/*  Kill-matrix: M1 arm removed -> lane falls to generic-heal gate   */
+/*  (:337 — swallow rows carry REAL heal_at_slot_level bytes, so     */
+/*  rollExpression/applyHealingToTarget would fire: caught by the     */
+/*  :337-inert assertion); M2 chain reorder -> invocationCallOrder   */
+/*  ascension fails; M3 swallow<->passThrough swap -> envelope        */
+/*  undefined vs popup-identity flips; M4 CLA-389 merge skip -> the  */
+/*  per-row surge-called-exactly-once-after-intercept pin fails;     */
+/*  M5 short-circuit removal -> nextArms-count assertions fail.      */
+/*  Name-gate case-fold lives inside REAL triggerSpells handlers     */
+/*  (properly mocked here — the unit under test is the index.js      */
+/*  chain); disk name bytes are pinned via diskRow() for both        */
+/*  rulesets (#1362/#1365).                                          */
+/* ------------------------------------------------------------------ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import spells5e from '../../../../../../public/data/spells.json';
+import spells2024 from '../../../../../../public/data/2024/spells.json';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks — all dependencies of execution/index.js                     */
@@ -81,15 +135,17 @@ vi.mock('../../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
+// Null formula is the premise of the whole no-damage lane (:715) — set once,
+// deterministically, in resetAllMocks and here.
 vi.mock('../../../core/spellDamageUtils.js', () => ({
-  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: '1d8', primaryType: 'Fire' })),
+  resolveSpellDamageWithTypes: vi.fn(() => null),
 }));
 
 vi.mock('../../../features/confusionService.js', () => ({
   triggerConfusion: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../combat/automation/automationService.js', () => ({
+vi.mock('../../../../combat/automation/automationService.js', () => ({
   markFortifiedHealthUsedIfGranted: vi.fn(),
   resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
   hasHealingMaximizationForTarget: vi.fn(() => false),
@@ -119,7 +175,6 @@ vi.mock('./blockChecks.js', () => ({
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
   checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
-
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
@@ -204,7 +259,7 @@ vi.mock('./damageCalculation.js', () => ({
 }));
 
 vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
+  getActiveBuffs: vi.fn(() => [],),
 }));
 
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
@@ -218,11 +273,21 @@ vi.mock('../../../../../services/encounters/combatData.js', () => ({
 import { executeSpellCast } from './index.js';
 
 /* ------------------------------------------------------------------ */
-/*  Mock references                                                    */
+/*  Mock references (asserted seams)                                   */
 /* ------------------------------------------------------------------ */
 
 const { resolveSpellDamageWithTypes } = await import('../../../core/spellDamageUtils.js');
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
+const { executeHandler } = await import('../../../../automation/index.js');
+const { triggerHealingWord } = await import('../../../features/healingWordService.js');
+const { triggerWildMagicSurge } = await import('../../../features/wildMagicSurgeService.js');
+const { rollExpression } = await import('../../../../dice/diceRoller.js');
+const { resolveHealingBonusesWithDetails, markFortifiedHealthUsedIfGranted } = await import('../../../../combat/automation/automationService.js');
+const { applyHealingToTarget } = await import('../../../combat/applyHealing.js');
+const { computeRange } = await import('./damageCalculation.js');
+const { handleSavePath } = await import('./savePath.js');
+const { handleNoSavePath } = await import('./noSavePath.js');
+const { triggerDispelMagic } = await import('./helpers.js');
 const {
   handleMassCureWounds: mockMassCureWounds,
   handleMassHealingWord: mockMassHealingWord,
@@ -233,32 +298,35 @@ const {
   handleProtectionFromPoison: mockProtectionFromPoison,
   handleResistance: mockResistance,
   handleHeroism: mockHeroism,
+  handleHolyAura: mockHolyAura,
   handleLongstrider: mockLongstrider,
   handleSpareTheDying: mockSpareTheDying,
   handleEnhanceAbility: mockEnhanceAbility,
+  handleGenericAutomation: mockGenericAutomation,
 } = await import('./triggerSpells.js');
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Test-data — REAL disk bytes (#1362) + documented lightweight    */
+/*  rows mirroring useActionSpellMetamagic.js:163 ({name, level,    */
+/*  baseLevel}) for the :710-hijacked names.                         */
 /* ------------------------------------------------------------------ */
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball',
-    level: 3,
-    school: 'Evocation',
-    casting_time: '1 action',
-    components: ['V', 'S'],
-    range: '150 feet',
-    damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } },
-    dc: { dc_type: 'dex', dc_success: 'half' },
-    ...overrides,
-  };
+const CAMPAIGN = 'test-campaign';
+
+function diskRow(list, name) {
+  const row = list.find((s) => (s.name || '').toLowerCase() === name.toLowerCase());
+  if (!row) throw new Error(`REAL disk row missing: ${name}`);
+  return row;
 }
 
-function makePlayerStats(overrides = {}) {
+function lightweight(row) {
+  return { name: row.name, level: row.level, baseLevel: 0 };
+}
+
+function makePlayerStats(rules = '5e') {
   return {
     name: 'TestWizard',
+    rules,
     abilities: [{ name: 'Intelligence', bonus: 5 }],
     proficiency: 4,
     spellAbilities: {
@@ -270,279 +338,317 @@ function makePlayerStats(overrides = {}) {
     automation: { passives: [] },
     hitPoints: 100,
     level: 10,
-    ...overrides,
   };
 }
 
-function makeMetaCtx(overrides = {}) {
+function makeServices(playerStats) {
   return {
-    targetName: 'Goblin',
-    ...overrides,
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    playerStats,
+    getTargetInfo: async () => ({ name: 'TestWizard' }),
+    campaignName: CAMPAIGN,
   };
 }
 
-/* ------------------------------------------------------------------ */
-/*  Helper — reset all mock implementations to safe defaults           */
-/* ------------------------------------------------------------------ */
+// The :680-stamped metaCtx every downstream tuple must carry (exact key set).
+const stampedMeta = (slotLevel) => ({ targetName: 'TestWizard', slotLevel, metamagicHeighten: false });
+
+const LANE_POPUP = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'lane' } } };
+
+function expectAscending(mocks) {
+  const orders = mocks.map((m) => m.mock.invocationCallOrder[0]);
+  expect(orders).toEqual([...orders].sort((a, b) => a - b));
+  expect(new Set(orders).size).toBe(orders.length);
+}
+
+const FIRST_TAIL = [mockHeroism, mockHolyAura, mockLongstrider, mockSpareTheDying, mockEnhanceAbility];
+const MASS_ARMS = [mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife];
+const TAIL_ARMS = [mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse, mockResistance];
+// Lanes that every handled no-damage arm must bypass (index.js :337/:341/:724/:730/:754).
+const HEAL_LANE_INERT = [rollExpression, resolveHealingBonusesWithDetails, applyHealingToTarget, markFortifiedHealthUsedIfGranted];
+const DAMAGE_LANE_INERT = [computeRange, handleSavePath, handleNoSavePath];
 
 function resetAllMocks() {
   vi.clearAllMocks();
   getRuntimeValue.mockReturnValue([]);
-  resolveSpellDamageWithTypes.mockReturnValue({ formula: '1d8', primaryType: 'Fire' });
-  mockMassCureWounds.mockResolvedValue({ handled: false });
-  mockMassHealingWord.mockResolvedValue({ handled: false });
-  mockPrayerOfHealing.mockResolvedValue({ handled: false });
-  mockFalseLife.mockResolvedValue({ handled: false });
-  mockRemoveCurse.mockResolvedValue({ handled: false });
-  mockProtectionFromEnergy.mockResolvedValue({ handled: false });
-  mockProtectionFromPoison.mockResolvedValue({ handled: false });
-  mockResistance.mockResolvedValue({ handled: false });
-  mockHeroism.mockResolvedValue({ handled: false });
-  mockLongstrider.mockResolvedValue({ handled: false });
-  mockSpareTheDying.mockResolvedValue({ handled: false });
-  mockEnhanceAbility.mockResolvedValue({ handled: false });
+  resolveSpellDamageWithTypes.mockReturnValue(null);
+  for (const arm of [...FIRST_TAIL, ...MASS_ARMS, ...TAIL_ARMS, mockGenericAutomation]) {
+    arm.mockResolvedValue({ handled: false });
+  }
+  triggerWildMagicSurge.mockResolvedValue(null);
+  triggerHealingWord.mockResolvedValue(undefined);
 }
 
-describe('executeSpellCast — early returns (no damage path — healing/special)', () => {
+async function runRow(row) {
+  const playerStats = makePlayerStats(row.rules);
+  const services = makeServices(playerStats);
+  const metaCtx = { targetName: 'TestWizard', slotLevel: row.spell.level };
+  const puritySnapshot = { ...row.spell };
+  if (row.lane === 'passThrough') {
+    row.arm.mockResolvedValueOnce({ handled: true, result: LANE_POPUP });
+  } else {
+    row.arm.mockResolvedValueOnce({ handled: true });
+  }
+
+  const result = await executeSpellCast(row.spell, metaCtx, services);
+
+  // Envelope: swallow lanes resolve undefined (index.js:75/:334);
+  // passThrough lanes forward the handler result VERBATIM (:74) and the
+  // CLA-389 merge keeps them ahead of the surge popup (:599-:600).
+  if (row.lane === 'passThrough') {
+    expect(result).toBe(LANE_POPUP);
+  } else {
+    expect(result).toBeUndefined();
+  }
+
+  // The intercepting arm ran exactly once with the exact positional/object
+  // tuple against REAL signatures (triggerSpells.js:413-:574).
+  expect(row.arm).toHaveBeenCalledTimes(1);
+  expect(row.arm).toHaveBeenCalledWith(...row.tuple(row.spell, stampedMeta(row.spell.level), playerStats));
+
+  // :710 generic automation dispatched and missed (payloads here are
+  // automation-free or disk automation-null — hijack census owned by
+  // earlyReturns-generic.test.js:274).
+  expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
+
+  for (const m of row.before) expect(m).toHaveBeenCalledTimes(1);
+  for (const m of row.after) expect(m).toHaveBeenCalledTimes(0);
+  expectAscending(row.order);
+
+  // :341 Healing-Word fire-and-forget: skipped by :322/:334 returns on the
+  // first-chain and mass-heal rows; MUST precede every tail-arm intercept.
+  if (row.wordBefore) {
+    expect(triggerHealingWord).toHaveBeenCalledTimes(1);
+    expect(triggerHealingWord).toHaveBeenCalledWith(row.spell, stampedMeta(row.spell.level), playerStats, CAMPAIGN, undefined);
+  } else {
+    expect(triggerHealingWord).toHaveBeenCalledTimes(0);
+  }
+
+  for (const m of [...HEAL_LANE_INERT, ...DAMAGE_LANE_INERT]) expect(m).toHaveBeenCalledTimes(0);
+  expect(services.rollDamage).toHaveBeenCalledTimes(0);
+
+  // CLA-389 seam: the post-cast rider block runs exactly once, AFTER the
+  // lane intercept (this segment sits before the :720 rider merge, unlike
+  // the :712 bypass).
+  expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+
+  // Golden-path purity: healthy lane emits no console.error, no caller
+  // payload mutation.
+  expect(consoleError).toHaveBeenCalledTimes(0);
+  expect(row.spell).toEqual(puritySnapshot);
+}
+
+let consoleError;
+
+describe('executeSpellCast — noDamage heal chain: swallow arms consume before the generic-heal gate (:328-334)', () => {
   beforeEach(resetAllMocks);
-
-  /* ---------------------------------------------------------------- */
-  /*  No damage path — healing spells                                 */
-  /* ---------------------------------------------------------------- */
-
-  describe('no damage path — healing spells', () => {
-    it('returns early when Mass Cure Wounds is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockMassCureWounds.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Mass Cure Wounds' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Mass Healing Word is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockMassHealingWord.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Mass Healing Word' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Prayer of Healing is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockPrayerOfHealing.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Prayer of Healing' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when False Life is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockFalseLife.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'False Life' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Remove Curse is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockRemoveCurse.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Remove Curse' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Protection From Energy is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockProtectionFromEnergy.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Protection from Energy' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Protection From Poison is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockProtectionFromPoison.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Protection from Poison' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
-
-    it('returns early when Resistance is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockResistance.mockResolvedValue({ handled: true });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Resistance' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-    });
+  beforeEach(() => {
+    // #1454 URL-aware fetch stub: REAL lookupFullSpell resolves both catalog
+    // tiers deterministically (no live :80 dependency).
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('/2024/') ? spells2024 : spells5e),
+    })));
+    consoleError = vi.spyOn(console, 'error');
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    consoleError.mockRestore();
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  No damage path — Heroism, Longstrider, Spare the Dying, Enhance */
-  /* ---------------------------------------------------------------- */
+  const posHeal = (spell, meta, stats) => [spell, meta, stats, CAMPAIGN, undefined];
 
-  describe('no damage path — special spells', () => {
-    it('returns early when Heroism is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockHeroism.mockResolvedValue({ handled: true, result: { automationPopup: { type: 'popup' } } });
+  const rows = [
+    // REAL 5e disk row: automation null on disk, so :710 misses for real and
+    // the :329 arm intercepts LIVE; row carries heal_at_slot_level 5-9, so
+    // it has teeth against M5 (:337 leak).
+    {
+      spell: diskRow(spells5e, 'Mass Cure Wounds'), lane: 'swallow', arm: mockMassCureWounds, tuple: posHeal,
+      before: FIRST_TAIL,
+      after: [mockMassHealingWord, mockPrayerOfHealing, mockFalseLife, ...TAIL_ARMS],
+      order: [mockGenericAutomation, ...FIRST_TAIL, mockMassCureWounds, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    // :710-hijacked disk names -> documented lightweight payload (real
+    // second-caller shape) is the ONLY production route to these arms.
+    {
+      spell: lightweight(diskRow(spells5e, 'Mass Healing Word')), lane: 'swallow', arm: mockMassHealingWord, tuple: posHeal,
+      before: [...FIRST_TAIL, mockMassCureWounds],
+      after: [mockPrayerOfHealing, mockFalseLife, ...TAIL_ARMS],
+      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    {
+      spell: lightweight(diskRow(spells5e, 'Prayer of Healing')), lane: 'swallow', arm: mockPrayerOfHealing, tuple: posHeal,
+      before: [...FIRST_TAIL, mockMassCureWounds, mockMassHealingWord],
+      after: [mockFalseLife, ...TAIL_ARMS],
+      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    // REAL disk bytes, both rulesets (False Life stores automation null).
+    {
+      spell: diskRow(spells5e, 'False Life'), lane: 'swallow', arm: mockFalseLife, tuple: posHeal,
+      before: [...FIRST_TAIL, ...MASS_ARMS.slice(0, 3)],
+      after: [...TAIL_ARMS],
+      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    {
+      spell: diskRow(spells2024, 'False Life'), rules: '2024', lane: 'swallow', arm: mockFalseLife, tuple: posHeal,
+      before: [...FIRST_TAIL, ...MASS_ARMS.slice(0, 3)],
+      after: [...TAIL_ARMS],
+      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+  ];
 
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Heroism' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toEqual({ automationPopup: { type: 'popup' } });
+  for (const row of rows) {
+    it(`:328-334 swallow lane — ${row.rules ?? '5e'} "${row.spell.name}" intercepts at its chain position, skips :337/:341, resolves undefined, riders run post-payment`, async () => {
+      await runRow(row);
     });
+  }
+});
 
-    it('returns early when Longstrider is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockLongstrider.mockResolvedValue({ handled: true, result: { automationPopup: { type: 'popup' } } });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Longstrider' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toEqual({ automationPopup: { type: 'popup' } });
-    });
-
-    it('returns early when Spare the Dying is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockSpareTheDying.mockResolvedValue({ handled: true, result: { automationPopup: { type: 'popup' } } });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Spare the Dying' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toEqual({ automationPopup: { type: 'popup' } });
-    });
-
-    it('returns early when Enhance Ability is handled', async () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-      mockEnhanceAbility.mockResolvedValue({ handled: true, result: { automationPopup: { type: 'popup' } } });
-
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Enhance Ability' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toEqual({ automationPopup: { type: 'popup' } });
-    });
+describe('executeSpellCast — noDamage first-chain tail (:316-320): passThrough arms forward the lane popup verbatim and outrank the surge (:599/:720)', () => {
+  beforeEach(resetAllMocks);
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('/2024/') ? spells2024 : spells5e),
+    })));
+    consoleError = vi.spyOn(console, 'error');
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    consoleError.mockRestore();
+  });
+
+  const objTuple = (keys) => (spell, meta, stats) => [{
+    ...(keys.includes('metaCtx') ? { metaCtx: meta } : {}),
+    spell,
+    playerStats: stats,
+    campaignName: CAMPAIGN,
+    mapName: undefined,
+    characters: undefined,
+    executeHandler,
+  }];
+  const posBuff = (spell, _meta, stats) => [spell, stats, CAMPAIGN, undefined, executeHandler];
+
+  const ALL_DOWNSTREAM = [...MASS_ARMS, ...TAIL_ARMS];
+
+  const rows = [
+    // Heroism stores automation.type='heroism' on BOTH rulesets -> :710
+    // consumes disk-byte casts (census-owned); the :316 arm is reachable
+    // only via the documented lightweight shape.
+    {
+      spell: lightweight(diskRow(spells5e, 'Heroism')), lane: 'passThrough', arm: mockHeroism, tuple: objTuple([]),
+      before: [],
+      after: [mockHolyAura, mockLongstrider, mockSpareTheDying, mockEnhanceAbility, ...ALL_DOWNSTREAM],
+      order: [mockGenericAutomation, mockHeroism, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    // REAL disk rows, both rulesets (Longstrider automation null).
+    {
+      spell: diskRow(spells5e, 'Longstrider'), lane: 'passThrough', arm: mockLongstrider, tuple: posBuff,
+      before: [mockHeroism, mockHolyAura],
+      after: [mockSpareTheDying, mockEnhanceAbility, ...ALL_DOWNSTREAM],
+      order: [mockHeroism, mockHolyAura, mockLongstrider, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    {
+      spell: diskRow(spells2024, 'Longstrider'), rules: '2024', lane: 'passThrough', arm: mockLongstrider, tuple: posBuff,
+      before: [mockHeroism, mockHolyAura],
+      after: [mockSpareTheDying, mockEnhanceAbility, ...ALL_DOWNSTREAM],
+      order: [mockHeroism, mockHolyAura, mockLongstrider, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    // Spare the Dying automation-null 5e only (2024 hijacked — reported).
+    {
+      spell: diskRow(spells5e, 'Spare the Dying'), lane: 'passThrough', arm: mockSpareTheDying, tuple: objTuple([]),
+      before: [mockHeroism, mockHolyAura, mockLongstrider],
+      after: [mockEnhanceAbility, ...ALL_DOWNSTREAM],
+      order: [mockHeroism, mockHolyAura, mockLongstrider, mockSpareTheDying, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+    // Enhance Ability automation-null 5e only (2024 hijacked — reported).
+    {
+      spell: diskRow(spells5e, 'Enhance Ability'), lane: 'passThrough', arm: mockEnhanceAbility, tuple: objTuple(['metaCtx']),
+      before: [mockHeroism, mockHolyAura, mockLongstrider, mockSpareTheDying],
+      after: [...ALL_DOWNSTREAM],
+      order: [mockHeroism, mockHolyAura, mockLongstrider, mockSpareTheDying, mockEnhanceAbility, triggerWildMagicSurge],
+      wordBefore: false,
+    },
+  ];
+
+  for (const row of rows) {
+    it(`:316-320 passThrough lane — ${row.rules ?? '5e'} "${row.spell.name}" forwards result identity verbatim, outranks surge, never reaches :328+/:337/:341`, async () => {
+      await runRow(row);
+    });
+  }
+});
+
+describe('executeSpellCast — noDamage tail arms after the :341 Healing-Word fire: protections (:345-347), Remove Curse (:351-355), Resistance (:359) swallow undefined and never reach the damage lane', () => {
+  beforeEach(resetAllMocks);
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('/2024/') ? spells2024 : spells5e),
+    })));
+    consoleError = vi.spyOn(console, 'error');
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    consoleError.mockRestore();
+  });
+
+  const posBuff = (spell, _meta, stats) => [spell, stats, CAMPAIGN, undefined, executeHandler];
+  const posHeal = (spell, meta, stats) => [spell, meta, stats, CAMPAIGN, undefined];
+  const objRes = (spell, meta, stats) => [{ spell, playerStats: stats, campaignName: CAMPAIGN, mapName: undefined, characters: undefined, executeHandler, metaCtx: meta }];
+
+  const rows = [
+    // Disk name bytes differ per ruleset (5e "Protection From Energy"); the
+    // 5e byte-exact row is used. Disk automation non-null -> lightweight.
+    {
+      spell: lightweight(diskRow(spells5e, 'Protection From Energy')), lane: 'swallow', arm: mockProtectionFromEnergy, tuple: posBuff,
+      before: [mockGenericAutomation, ...FIRST_TAIL, ...MASS_ARMS],
+      after: [mockProtectionFromPoison, mockRemoveCurse, mockResistance],
+      order: [...MASS_ARMS, triggerHealingWord, mockProtectionFromEnergy, triggerWildMagicSurge],
+      wordBefore: true,
+    },
+    {
+      spell: lightweight(diskRow(spells5e, 'Protection from Poison')), lane: 'swallow', arm: mockProtectionFromPoison, tuple: posBuff,
+      before: [mockGenericAutomation, ...FIRST_TAIL, ...MASS_ARMS, mockProtectionFromEnergy],
+      after: [mockRemoveCurse, mockResistance],
+      order: [...MASS_ARMS, triggerHealingWord, mockProtectionFromEnergy, mockProtectionFromPoison, triggerWildMagicSurge],
+      wordBefore: true,
+    },
+    {
+      spell: lightweight(diskRow(spells5e, 'Remove Curse')), lane: 'swallow', arm: mockRemoveCurse, tuple: posHeal,
+      before: [mockGenericAutomation, ...FIRST_TAIL, ...MASS_ARMS, mockProtectionFromEnergy, mockProtectionFromPoison],
+      after: [mockResistance],
+      order: [...MASS_ARMS, triggerHealingWord, mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse, triggerWildMagicSurge],
+      wordBefore: true,
+      extra: () => {
+        // REAL inline gate index.js:267-268 (not mocked — local function):
+        // the :353 dispel fallback runs but its name gate declines
+        // "Remove Curse", so triggerDispelMagic stays untouched.
+        expect(triggerDispelMagic).toHaveBeenCalledTimes(0);
+      },
+    },
+    {
+      spell: lightweight(diskRow(spells5e, 'Resistance')), lane: 'swallow', arm: mockResistance, tuple: objRes,
+      before: [mockGenericAutomation, ...FIRST_TAIL, ...MASS_ARMS, mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse],
+      after: [],
+      order: [...MASS_ARMS, triggerHealingWord, mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse, mockResistance, triggerWildMagicSurge],
+      wordBefore: true,
+    },
+  ];
+
+  for (const row of rows) {
+    it(`:345-359 tail lane — lightweight "${row.spell.name}" intercepts after the :341 word fire, swallows undefined, short-circuits ${row.after.length ? `and skips [${row.after.length} later arm(s)}]` : 'as the final arm'}`, async () => {
+      await runRow(row);
+      if (row.extra) row.extra();
+    });
+  }
 });

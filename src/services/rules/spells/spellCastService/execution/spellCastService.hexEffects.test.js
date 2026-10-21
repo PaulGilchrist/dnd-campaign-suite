@@ -1,17 +1,53 @@
+// @maintained-by-ai
+/* ------------------------------------------------------------------ */
+/*  spellCastService.hexEffects — hub-routed Hex EFFECT application   */
+/*                                                                     */
+/*  Lane span (execution/index.js :492-501 castHex + REAL helpers.js */
+/*  :17-73 applyHexEffects): what executeSpellCast('Hex') STORES.    */
+/*  Owner split (cited by neighbors — preserved):                     */
+/*   - #1475 execution-early-resolutions owns the hex cast LOG        */
+/*     full shape and the single applyHexEffects call-tuple census    */
+/*     (helpers mocked there; :514 CLA-389 skip pinned there).       */
+/*   - helpers.test.js owns applyHexEffects DIRECT unit bytes          */
+/*     (guards, stamps, merged expiry legs).                          */
+/*   - hexDamage.test.js #1054 owns HIT-time +1d6 necrotic;           */
+/*     eldritchStrikes #1051 owns strike consumption. NOT here.       */
+/*   - execution-early-resolutions:18 hands 'applyHexEffects writes   */
+/*     / CLA-107' to THIS lane: end-to-end hub→REAL-helper store     */
+/*     bytes, CLA-107 exact console byte, and expiry-arm censuses     */
+/*     that a mocked-helper lane and a helper-direct lane cannot see. */
+/*  Registry: te keys hex_ability_check_disadvantage (:450) and       */
+/*  hex_save_disadvantage (:476) in targetEffectDefinitions.js; the  */
+/*  ability rides UPPERCASE chooser bytes ('DEX') per registry note   */
+/*  :1526-1527 (CLA-107). Disk provenance: public/data/2024/spells.  */
+/*  json Hex row — 5e spells.json has NO Hex row (ruleset            */
+/*  divergence: only the 2024 dataset supplies it).                    */
+/*  Old->new map: 6 tests -> 3 (both Eldritch arms table-driven in   */
+/*  test 1; log-shape rows folded out — owned by #1475; unit-bytes   */
+/*  rows folded out — owned by helpers.test.js).                      */
+/* ------------------------------------------------------------------ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { cloneDeep } from 'lodash'
+import spells2024 from '../../../../../../public/data/2024/spells.json'
+import { getEffectDefinition, TARGET_EFFECT_DEFINITIONS } from '../../../../combat/conditions/targetEffectDefinitions.js'
+
+/* Fixture provenance: the REAL 2024 disk row, existence-censused at  */
+/* load (CLA-107 #1475-window drift guard).                           */
+const HEX_DISK = spells2024.find(s => s.name === 'Hex')
+if (!HEX_DISK) throw new Error('disk census: Hex row missing from public/data/2024/spells.json')
 
 /* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
+/*  Mocks — dependencies of execution/index.js + helpers.js reachable */
+/*  from the Hex cast lane. fearService/heroismService mocks PURGED: */
+/*  dead-module hunt — nothing in the live graph imports them (the    */
+/*  only consumers, automation/index.js barrel and concentration       */
+/*  Service, are fully replaced / unreachable from spellCastService). */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn((_, key) => {
-    if (key === 'activeConditions' || key === 'targetEffects') return []
-    if (key === 'hitPoints') return 100
-    if (key === 'currentHitPoints') return 30
-    return undefined
-  }),
+  getRuntimeValue: vi.fn(),
 }))
 
 vi.mock('../../../../ui/logService.js', () => ({
@@ -23,23 +59,22 @@ vi.mock('../../../../automation/index.js', () => ({
 }))
 
 vi.mock('../../../../rules/spells/postCastRiderService.js', () => ({
-  triggerPostCastRiderSaves: vi.fn(),
-  triggerSpellThief: vi.fn(),
-  triggerBewitchingMagic: vi.fn(),
-  triggerSoulstitchSpells: vi.fn(),
+  triggerPostCastRiderSaves: vi.fn(async () => null),
+  triggerSpellThief: vi.fn(async () => null),
+  triggerBewitchingMagic: vi.fn(async () => null),
+  triggerSoulstitchSpells: vi.fn(async () => null),
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
 vi.mock('../../../../rules/spells/postCastHealService.js', () => ({
-  triggerPostCastSelfHeals: vi.fn(),
-  triggerPostCastAllyHeals: vi.fn(),
+  triggerPostCastSelfHeals: vi.fn(async () => {}),
+  triggerPostCastAllyHeals: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/silenceService.js', () => ({
   getSilenceSource: vi.fn(() => null),
   isCreatureInSilenceZone: vi.fn(() => false),
-  triggerSilence: vi.fn(),
 }))
 
 vi.mock('../../../../rules/features/invisibilityService.js', () => ({
@@ -48,27 +83,22 @@ vi.mock('../../../../rules/features/invisibilityService.js', () => ({
 
 vi.mock('../../../../rules/features/friendsService.js', () => ({
   endFriendsOnHostileAction: vi.fn(),
-  triggerFriends: vi.fn(),
 }))
 
 vi.mock('../../../../rules/features/smiteOfProtectionService.js', () => ({
-  triggerSmiteOfProtection: vi.fn(),
+  triggerSmiteOfProtection: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/inspiringSmiteService.js', () => ({
-  triggerInspiringSmite: vi.fn(),
+  triggerInspiringSmite: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/primalCompanionSpellShareService.js', () => ({
-  triggerPrimalCompanionSpellShare: vi.fn(),
+  triggerPrimalCompanionSpellShare: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/wildMagicSurgeService.js', () => ({
-  triggerWildMagicSurge: vi.fn(),
-}))
-
-vi.mock('../../../../rules/features/fearService.js', () => ({
-  triggerFear: vi.fn(async () => {}),
+  triggerWildMagicSurge: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/falseLifeService.js', () => ({
@@ -125,12 +155,6 @@ vi.mock('../../../../rules/features/forcecageService.js', () => ({
 
 vi.mock('../../../../automation/handlers/spells/forcecageHandler.js', () => ({
   isForcecageBlocked: vi.fn(() => false),
-}))
-
-vi.mock('../../../../rules/features/heroismService.js', () => ({
-  handle: vi.fn(),
-  applyHeroism: vi.fn(),
-  isHeroismActive: vi.fn(),
 }))
 
 vi.mock('../../../../rules/features/holyAuraService.js', () => ({
@@ -195,33 +219,33 @@ vi.mock('../../../../automation/handlers/class-wizard/arcaneWardHandler.js', () 
 
 import { executeSpellCast } from './index.js'
 import * as runtimeState from '../../../../../hooks/runtime/useRuntimeState.js'
+import { addEntry } from '../../../../ui/logService.js'
+import { addExpiration } from '../../../../rules/effects/expirations.js'
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball', level: 3, school: 'Evocation',
-    casting_time: '1 action', components: ['V', 'S'], range: '150 feet',
-    damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } },
-    dc: { dc_type: 'dex', dc_success: 'half' },
-    ...overrides,
-  }
-}
+const CAMPAIGN = 'test-campaign'
+const CASTER = 'TestWarlock'
+const CAST_HEX_ABILITY_ERR =
+  '[spellCast] castHex: hexAbility is missing from metaCtx — chooser selection was dropped; applying zero hex effects'
 
-function makePlayerStats(overrides = {}) {
+/* lookupFullSpell transport stub: serve the same REAL disk dataset the */
+/* fixture was cut from; pins the 2024 dual-ruleset path byte.          */
+const fetchMock = vi.fn(async (_url) => ({
+  ok: true,
+  json: async () => spells2024,
+}))
+vi.stubGlobal('fetch', fetchMock)
+
+function makePlayerStats(passives = []) {
   return {
-    name: 'TestWizard',
-    abilities: [{ name: 'Intelligence', bonus: 5 }],
+    name: CASTER,
+    rules: '2024',
+    abilities: [{ name: 'Charisma', bonus: 5 }],
     proficiency: 4,
     spellAbilities: {
-      spellCastingAbility: 'Intelligence', toHit: 9, saveDc: 17, modifier: 5,
+      spellCastingAbility: 'Charisma', toHit: 9, saveDc: 17, modifier: 5,
     },
-    automation: { passives: [] },
-    hitPoints: 100,
-    ...overrides,
+    automation: { passives },
   }
-}
-
-function makeMetaCtx(overrides = {}) {
-  return { slotLevel: 3, ...overrides }
 }
 
 function makeServices(overrides = {}) {
@@ -229,331 +253,153 @@ function makeServices(overrides = {}) {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
     playerStats: makePlayerStats(),
-    getTargetInfo: vi.fn(),
+    getTargetInfo: vi.fn(async () => undefined),
     attackerPos: null, targetPos: null,
     featEffects: {},
-    campaignName: 'testCampaign',
+    campaignName: CAMPAIGN,
     mapName: 'testMap',
+    characters: [],
     ...overrides,
   }
 }
 
-function mockGetRuntimeValue(fn) {
-  vi.mocked(runtimeState.getRuntimeValue).mockImplementation(fn)
+function hexWrites() {
+  return runtimeState.setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects')
 }
 
-async function resetMockImplementations() {
-  const m = async (path, fnMap) => {
-    const mod = await import(path)
-    for (const [key, value] of Object.entries(fnMap)) {
-      mod[key].mockImplementation(value)
-    }
-  }
-
-  await m('../../../../../hooks/runtime/useRuntimeState.js', {
-    getRuntimeValue: (_, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return []
-      return undefined
-    },
-    setRuntimeValue: () => {},
-  })
-  await m('../../../../rules/spells/postCastRiderService.js', {
-    triggerPostCastRiderSaves: async () => null,
-    triggerSpellThief: async () => null,
-    triggerBewitchingMagic: async () => null,
-    triggerSoulstitchSpells: async () => null,
-    getEmpoweredEvocationFeatures: () => [],
-    getEmpoweredEvocationIntModifier: () => 0,
-  })
-  await m('../../../../rules/spells/postCastHealService.js', {
-    triggerPostCastSelfHeals: async () => {},
-    triggerPostCastAllyHeals: async () => {},
-  })
-  await m('../../../../rules/features/smiteOfProtectionService.js', {
-    triggerSmiteOfProtection: async () => {},
-  })
-  await m('../../../../rules/features/inspiringSmiteService.js', {
-    triggerInspiringSmite: async () => {},
-  })
-  await m('../../../../rules/features/primalCompanionSpellShareService.js', {
-    triggerPrimalCompanionSpellShare: async () => {},
-  })
-  await m('../../../../rules/features/wildMagicSurgeService.js', {
-    triggerWildMagicSurge: async () => {},
-  })
-  await m('../../../../rules/features/fearService.js', {
-    triggerFear: async () => {},
-  })
-  await m('../../../../rules/features/falseLifeService.js', {
-    triggerFalseLife: async () => {},
-  })
-  await m('../../../../rules/features/healingWordService.js', {
-    triggerHealingWord: async () => {},
-  })
-  await m('../../../../rules/features/fleshToStoneService.js', {
-    triggerFleshToStone: async () => {},
-  })
-  await m('../../../../rules/features/holdMonsterService.js', {
-    triggerHoldMonster: async () => {},
-  })
-  await m('../../../../rules/features/hypnoticPatternService.js', {
-    triggerHypnoticPattern: async () => {},
-  })
-  await m('../../../../rules/features/massSuggestionService.js', {
-    triggerMassSuggestion: async () => {},
-  })
-  await m('../../../../rules/features/suggestionService.js', {
-    triggerSuggestion: async () => {},
-  })
-  await m('../../../../rules/features/ottoDanceService.js', {
-    triggerOttoDance: async () => {},
-  })
-  await m('../../../../rules/features/resilientSphereService.js', {
-    triggerResilientSphere: async () => {},
-  })
-  await m('../../../../rules/features/foresightService.js', {
-    triggerForesight: async () => {},
-  })
-  await m('../../../../rules/features/rayOfEnfeeblementService.js', {
-    triggerRayOfEnfeeblement: async () => {},
-  })
-  await m('../../../../rules/features/globeOfInvulnerabilityService.js', {
-    triggerGlobeOfInvulnerability: async () => {},
-  })
-  await m('../../../../rules/features/forcecageService.js', {
-    triggerForcecage: async () => {},
-  })
-  await m('../../../../automation/handlers/spells/forcecageHandler.js', {
-    isForcecageBlocked: () => false,
-  })
-  await m('../../../../rules/features/heroismService.js', {
-    handle: async () => {},
-    applyHeroism: async () => {},
-  })
-  await m('../../../../rules/features/holyAuraService.js', {
-    triggerHolyAura: async () => {},
-  })
-  await m('../../../../rules/features/powerWordStunService.js', {
-    triggerPowerWordStun: async () => {},
-  })
-  await m('../../../../rules/features/seeInvisibilityService.js', {
-    triggerSeeInvisibility: async () => {},
-  })
-  await m('../../../../rules/features/sleepService.js', {
-    triggerSleep: async () => {},
-  })
-  await m('../../../../rules/features/stinkingCloudService.js', {
-    triggerStinkingCloud: async () => {},
-  })
-  await m('../../../../rules/features/tashasHideousLaughterService.js', {
-    triggerTashasHideousLaughter: async () => {},
-  })
-  await m('../../../../rules/features/removeCurseService.js', {
-    triggerRemoveCurse: async () => {},
-  })
-  await m('../../../../rules/features/slowService.js', {
-    triggerSlow: async () => {},
-  })
-  await m('../../../../rules/features/silenceService.js', {
-    getSilenceSource: () => null,
-    isCreatureInSilenceZone: () => false,
-  })
-  await m('../../../../rules/features/invisibilityService.js', {
-    endInvisibilityOnHostileAction: () => {},
-  })
-  await m('../../../../rules/features/friendsService.js', {
-    endFriendsOnHostileAction: () => {},
-  })
-  await m('../../../../combat/buffs/buffService.js', {
-    isInnateSorceryActive: () => false,
-    getActiveBuffs: () => [],
-  })
+async function castHex(services, metaCtx = { slotLevel: 1 }) {
+  // Fresh clone per cast: the hub may decorate the spell
+  // (applyPsychicComponentReduction) — disk row must stay pristine.
+  return executeSpellCast(cloneDeep(HEX_DISK), metaCtx, services)
 }
 
-describe('executeSpellCast - Hex spell edge cases', () => {
-  beforeEach(async () => {
+describe('executeSpellCast - Hex targetEffects application (hub to REAL applyHexEffects)', () => {
+  beforeEach(() => {
     vi.clearAllMocks()
-    await resetMockImplementations()
-    mockGetRuntimeValue((_, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return []
-      if (key === 'hitPoints') return 100
-      if (key === 'currentHitPoints') return 30
-      return undefined
-    })
+    runtimeState.getRuntimeValue.mockImplementation(() => undefined)
   })
 
-  describe('applyHexEffects', () => {
-    it('applies hex_ability_check_disadvantage and hex_save_disadvantage when Eldritch Hex passive exists', async () => {
-      mockGetRuntimeValue((_, key) => {
-        if (key === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
-        if (key === 'activeConditions') return []
+  /* Two arms, full-set equality: the Eldritch row also kills the    */
+  /* 'always add save te' mutant this lane would not see if only the  */
+  /* Eldritch arm ran (helpers.test.js kills it at the direct unit —  */
+  /* this lane proves it survives the hub threading).                  */
+  it('threads the uppercase chooser ability through castHex into the stored store: stale hex legs replaced in place, bystander tes preserved positionally, and ONE merged expiry armed', async () => {
+    const bystander = { target: 'Other', effect: 'sanctuary', source: 'Cleric One' }
+    const arms = [
+      {
+        label: 'base Hex (no Eldritch Hex passive)',
+        passives: [],
+        seed: [
+          { target: 'Goblin', effect: 'hex_ability_check_disadvantage', source: CASTER, ability: 'STR', duration: 'stale' },
+          bystander,
+        ],
+        expectedStored: [
+          { target: 'Goblin', effect: 'hex_ability_check_disadvantage', source: CASTER, ability: 'DEX', duration: 'hex_duration' },
+          bystander,
+        ],
+        expectedExpiryKeys: ['hex_ability_check_disadvantage'],
+      },
+      {
+        label: 'Hex with Eldritch Hex passive',
+        passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
+        seed: [
+          { target: 'Goblin', effect: 'hex_ability_check_disadvantage', source: CASTER, ability: 'STR', duration: 'stale' },
+          bystander,
+          { target: 'Goblin', effect: 'hex_save_disadvantage', source: CASTER, ability: 'STR', duration: 'stale' },
+        ],
+        expectedStored: [
+          { target: 'Goblin', effect: 'hex_ability_check_disadvantage', source: CASTER, ability: 'DEX', duration: 'hex_duration' },
+          bystander,
+          { target: 'Goblin', effect: 'hex_save_disadvantage', source: CASTER, ability: 'DEX', duration: 'hex_duration' },
+        ],
+        expectedExpiryKeys: ['hex_ability_check_disadvantage', 'hex_save_disadvantage'],
+      },
+    ]
+
+    for (const { label, passives, seed, expectedStored, expectedExpiryKeys } of arms) {
+      vi.clearAllMocks()
+      runtimeState.getRuntimeValue.mockImplementation((_, key) => {
+        if (key === 'targetEffects') return [...seed]
         return undefined
       })
 
       const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
+        playerStats: makePlayerStats(passives),
+        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
       })
 
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
+      await castHex(services, { slotLevel: 1, hexAbility: 'DEX' })
 
-      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'STR' }), services)
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'hex_ability_check_disadvantage', target: 'Target', source: 'TestWizard', ability: 'STR' }),
-          expect.objectContaining({ effect: 'hex_save_disadvantage', target: 'Target', source: 'TestWizard', ability: 'STR' }),
-        ]),
-        'testCampaign'
-      )
-    })
-
-    it('applies only hex_ability_check_disadvantage when Eldritch Hex passive is absent', async () => {
-      mockGetRuntimeValue((_, key) => {
-        if (key === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
-        if (key === 'activeConditions') return []
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'DEX' }), services)
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'campaign',
-        'targetEffects',
-        expect.arrayContaining([
-          expect.objectContaining({ effect: 'hex_ability_check_disadvantage', target: 'Target', source: 'TestWizard', ability: 'DEX' }),
-        ]),
-        'testCampaign'
-      )
-    })
-
-    it('updates existing hex effects instead of adding duplicates', async () => {
-      mockGetRuntimeValue((_, key) => {
-        if (key === 'targetEffects') return [
-          { target: 'Target', effect: 'hex_ability_check_disadvantage', source: 'TestWizard', duration: 'old', ability: 'STR' },
-          { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'old', ability: 'STR' },
-        ]
-        if (key === 'activeConditions') return []
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'STR' }), services)
-
-      const hexCalls = vi.mocked(runtimeState.setRuntimeValue).mock.calls.filter(
-        c => c[1] === 'targetEffects'
-      )
-      expect(hexCalls.length).toBe(1)
-      expect(hexCalls[0][2]).toEqual([
-        { target: 'Target', effect: 'hex_ability_check_disadvantage', source: 'TestWizard', ability: 'STR', duration: 'hex_duration' },
-        { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', ability: 'STR', duration: 'hex_duration' },
+      // Arity-pinned exact tuple, full-set equality: exactly ONE
+      // targetEffects write; in-place replacement (positional equality
+      // kills push-instead-of-replace and reorder mutants).
+      expect(hexWrites(), label).toEqual([
+        ['campaign', 'targetEffects', expectedStored, CAMPAIGN],
       ])
+
+      // Registry mandate: every stamped te.effect exists in
+      // targetEffectDefinitions.js; the hex legs are ability-scoped.
+      const registryKeys = TARGET_EFFECT_DEFINITIONS.map(d => d.effect)
+      for (const te of expectedStored) {
+        expect(registryKeys, label).toContain(te.effect)
+        if (te.effect.startsWith('hex_')) {
+          expect(getEffectDefinition(te.effect).fields, label).toContain('ability')
+        }
+      }
+
+      // CLA-107 merged expiry armed once with this caster/target and the
+      // stamped legs (rounds byte itself owned by helpers.test.js :233).
+      expect(addExpiration.mock.calls.length, label).toBe(1)
+      const expiry = addExpiration.mock.calls[0][0]
+      expect(expiry.attackerName, label).toBe(CASTER)
+      expect(expiry.targetName, label).toBe('Goblin')
+      expect(expiry.campaignName, label).toBe(CAMPAIGN)
+      expect(expiry.effects.map(e => e.effectKey), label).toEqual(expectedExpiryKeys)
+
+      // Dual-ruleset transport byte: rules '2024' resolves the 2024 disk.
+      expect(fetchMock, label).toHaveBeenCalledWith('/data/2024/spells.json')
+    }
+  })
+
+  // CLA-107: chooser selection dropped upstream (index.js:495-497) —
+  // exact console byte is castHex's own and pinned nowhere else.
+  it('CLA-107: missing hexAbility console.errors the exact castHex byte, stores zero hex effects, and arms zero expiry clocks (no STR coercion)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    runtimeState.getRuntimeValue.mockImplementation((_, key) => {
+      if (key === 'targetEffects') return []
+      return undefined
     })
 
-    it('does not apply hex when target name is missing', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => undefined),
-      })
-
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
-      )
+    const services = makeServices({
+      playerStats: makePlayerStats([{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }]),
+      getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
     })
 
-    // CLA-107: the STR silent default pinned every cast — the chooser lane now
-    // threads hexAbility; a missing choice must console.error and stamp ZERO
-    // hex effects (never coerce to STR).
-    it('CLA-107: missing hexAbility console.errors and applies zero hex effects (no STR coercion)', async () => {
-      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
+    await castHex(services)
 
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
+    expect(errSpy).toHaveBeenCalledTimes(1)
+    expect(errSpy).toHaveBeenCalledWith(CAST_HEX_ABILITY_ERR)
+    expect(hexWrites()).toEqual([])
+    expect(addExpiration.mock.calls).toEqual([])
+    // The paid cast still logs its Hex entry (shape owned by #1475 —
+    // only the dropped-ability byte is checked here).
+    expect(addEntry.mock.calls.length).toBe(1)
+    expect(addEntry.mock.calls[0][1].hexAbility).toBeNull()
+    errSpy.mockRestore()
+  })
 
-      await executeSpellCast(spell, makeMetaCtx(), services)
-
-      expect(errSpy).toHaveBeenCalled()
-      const hexWrite = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
-        c => c[1] === 'targetEffects'
-      )
-      expect(hexWrite).toBeUndefined()
-      errSpy.mockRestore()
+  it('an unresolvable target stores zero hex effects and arms zero expiry clocks', async () => {
+    runtimeState.getRuntimeValue.mockImplementation((_, key) => {
+      if (key === 'targetEffects') return []
+      return undefined
     })
 
-    it('CLA-107: chosen DEX threads into the cast log entry hexAbility', async () => {
-      const { addEntry } = await import('../../../../ui/logService.js')
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: {
-            passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
-          },
-        }),
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
+    // No metaCtx.targetName AND getTargetInfo resolves nothing:
+    // castHex :494 fallback chain must yield an undefined target that
+    // applyHexEffects :20 guards before any write.
+    await castHex(makeServices())
 
-      const spell = { ...makeSpell(), name: 'Hex' }
-      delete spell.damage
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ hexAbility: 'DEX' }), services)
-
-      const hexLog = vi.mocked(addEntry).mock.calls
-        .map(c => c[1])
-        .find(e => e && e.spellName === 'Hex' && e.hexAbility !== undefined)
-      expect(hexLog).toBeDefined()
-      expect(hexLog.hexAbility).toBe('DEX')
-    })
+    expect(hexWrites()).toEqual([])
+    expect(addExpiration.mock.calls).toEqual([])
   })
 })

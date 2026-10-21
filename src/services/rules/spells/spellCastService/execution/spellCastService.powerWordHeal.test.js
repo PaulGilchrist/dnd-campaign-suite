@@ -1,17 +1,130 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+/* ------------------------------------------------------------------ */
+/*  PWH HUB-EDGE LANE (#1481/#1487 family) — executeSpellCast hub    */
+/*  (execution/index.js:669) routed LIVE past :702 into the CLA-392  */
+/*  spread gate (modalSpells.js:9-:23) and the helpers chain          */
+/*  (helpers.js:190-:275), which stay REAL here.                      */
+/*                                                                    */
+/*  DEDUPE ADJUDICATION VERDICT (this turn, #1487 verbatim):          */
+/*  :17/:33 read REAL — `if (metaCtx?.multiTarget && metaCtx          */
+/*  .multiTarget !== firstTargetName)` spreads the SECOND apply only  */
+/*  when it differs from the resolved first target. Masking confirmed:*/
+/*  a same-name cast with a MUTATING snapshot yields healAmount 0 on  */
+/*  the second leg (helpers.js:192 silent return), conditions equal    */
+/*  length (no :232 write), stand-permission already set (:249 skips) */
+/*  -> a dedupe mutant is byte-identical through a stateful hub. So: */
+/*  - branch bytes face: modalSpells.powerWordSpread #1487 Row E owns */
+/*    multiTarget===first dedupe (injected fake apply, times(1),      */
+/*    un-maskable there); useSpellMetamagicGates.powerWordKillSlots   */
+/*    :8-9 delegation STANDS.                                          */
+/*  - hub face (THIS file, #1481 verbatim 'owns hub edge cases incl.  */
+/*    multiTarget-equals-first dedup + strip'): pinned NON-maskably   */
+/*    via the lane-canonic PURE RECORDER applyHealing mock (#1481     */
+/*    :167 form, byte-faithful from args, non-mutating) + gap>0       */
+/*    fixture (Thug currentHp 12 < maxHp 32, delta-0 never reachable) */
+/*    + FULL censuses: a dedupe mutant doubles applyHealing,           */
+/*    addEntry and setRuntimeValue censuses exactly.                   */
+/*                                                                    */
+/*  FAMILY BOUNDARY TABLE (cited, never re-grown):                    */
+/*   - index.js :702 early-arm + popup dispatch + PW-:10-unguarded-   */
+/*     asymmetry -> earlyReturns-modal #1471.                         */
+/*   - helpers chain apply/strip/census bytes + ghost-log quirk +     */
+/*     full-HP delta-0 skip + abort guards + heal-before-write tap -> */
+/*     helpers-powerWordHeal #1481.                                   */
+/*   - spread gate CLA-392 shared-summary + injected fake + Row E     */
+/*     dedupe -> modalSpells.powerWordSpread #1487.                   */
+/*   - hub traversal first+distinct-multiTarget spread + runtime-HP-  */
+/*     beats-snapshot + popup consume-trail #1392 + producer-null     */
+/*     fold-back + post-cast-rider bypass -> spellCastService.heal.   */
+/*     test.js #1454.                                                 */
+/*   - THIS face: PW-heal-specific hub edge routing — same-name       */
+/*     dedupe census + strip (cited), null-first-target edge +        */
+/*     rules:'2024' transport bytes (disk-2024-only existence, the    */
+/*     spell is ABSENT from the 5e disk #1450), and the 5e-transport  */
+/*     asymmetry golden (name gate has NO rules guard — cast still     */
+/*     consumed at :702, console tuple exact).                        */
+/*                                                                    */
+/*  LIVE-vs-HIJACKED CENSUS: all three rows cast the REAL 2024 disk   */
+/*  name 'Power Word Heal' and are HIJACKED at :702 (first arm of     */
+/*  runTriggerChain). LIVE past :702: nothing — :703 kill arm, :710   */
+/*  handleGenericAutomation (executeHandler times(0) censused R1) and */
+/*  the :715 no-damage path never run; riders bypass is #1454-owned. */
+/*  getTargetInfo-declined path = R2 (undefined result survives ?.    */
+/*  :12, falsy-triple collapse cited #1352/#1487 row C); modal-       */
+/*  resolved first target = R1/R3.                                    */
+/*                                                                    */
+/*  QUIRK SCAN (byte evidence): golden unguarded-deref :10 -> cited   */
+/*  #1360/#1487 row Q, skipped here. :0-swallow / delta-0 family ->  */
+/*  DESIGN choice: gap-20 fixture dodges the mask (#1481 owns the     */
+/*  skip-vs-log contrast :311). 'null + N' #1469: popup concat lives  */
+/*  helpers :215 — popup BYTE owned #1454/#1392; counts pinned here. */
+/*  Case trails #1457 -> cited #1487 row F (disk canonical case used  */
+/*  here). Dead twins #1495 precedence form -> LIVE-vs-hijack table    */
+/*  above. Chokepoint inline-dup #1357/58: the CLA-399                */
+/*  lastActionSpellCast stamp (index.js:68) appears ONCE in every     */
+/*  full setRuntimeValue census, FIRST in order. invocationCallOrder    */
+/*  #1490/#1481: heal-before-write tap censused R1. Arity pins       */
+/*  #1488: applyHealing tuples are length-4 exact; getTargetInfo is   */
+/*  arity-0 times(3) (blockChecks :655 + log :234 + gate :11).        */
+/*  NO-CLOCK: heal instantaneous; Date.now fixed only for census      */
+/*  determinism, no timers, persistence seam-owned.                   */
+/*                                                                    */
+/*  MOCK ROSTER (#1440 line-by-line vs REAL index.js import list +   */
+/*  graph-transitive of loaded REAL files helpers/modalSpells/         */
+/*  triggerSpells/blockChecks/spellResolution): every *Service mock    */
+/*  has a live consumer. DEAD-MODULE MOCKS REMOVED (#1484-97 hunt):   */
+/*  fearService, foresightService, heroismService, sleepService —      */
+/*  handleFear/handleSleep (modalSpells :122/:184) and handleHeroism   */
+/*  (triggerSpells :471) are self-contained; grep of the whole loaded */
+/*  graph: zero importers. Unit under test (index.js + helpers +      */
+/*  modalSpells) never mocked.                                         */
+/*                                                                    */
+/*  FIXTURE PROVENANCE: spell rows are REAL cloneDeep bytes from     */
+/*  public/data/2024/spells.json (existence census throws at load if   */
+/*  the disks drift, #1494/#1497 form — incl. the #1450 ABSENCE       */
+/*  census on the 5e disk). Thug hit_points 32 = monsters.json REAL;  */
+/*  currentHp 12 = documented synthetic in-combat probe (non-           */
+/*  impersonating, gap 20). 'Thug 1' instance + caster 'HeroesFeast-  */
+/*  Bard' REAL test-campaign names per #1487 precedent. Campaign       */
+/*  locked 'test-campaign'.                                            */
+/*                                                                    */
+/*  KILL MATRIX (live cp-backup mutants ONLY, never git checkout):    */
+/*  M1 dedupe `!==` removed :17 -> R1 censuses double (apply/addEntry */
+/*  /setRuntimeValue lengths). M2 first-target branch :14 removed ->   */
+/*  R1 zero applies. M3 multiTarget branch :17 dropped -> R2 zero      */
+/*  applies. M4 URL tier flip :175 -> R2 fetch byte. M5 rules guard    */
+/*  added :10 -> R3 dies (console tuple + apply census). M6 stamp       */
+/*  moved after gate :68 -> R1 census ORDER. M7 reroute via :710 ->    */
+/*  executeHandler times(0). M8 producer-foldback :195 canned -> hp    */
+/*  delta byte (recorder computes from args, never baked). M9 silent-   */
+/*  return on null summary removed -> #1481 abort guards own.          */
+/* ------------------------------------------------------------------ */
 
-/* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
-/* ------------------------------------------------------------------ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { cloneDeep } from 'lodash'
+
+import spells5e from '../../../../../../public/data/spells.json'
+import spells2024 from '../../../../../../public/data/2024/spells.json'
+
+/* Existence-census drift-throw (#1494/#1497 form, preflight catch):
+   Power Word Heal is 2024-only on disk (#1450); its automation byte
+   block carries exactly the five lowercase strip candidates. */
+const PWH_ROW = spells2024.find(s => s.name === 'Power Word Heal')
+if (!PWH_ROW) throw new Error('Power Word Heal missing from 2024 disk — fixtures must be REAL rows')
+if (spells5e.some(s => s.name === 'Power Word Heal')) throw new Error('Power Word Heal unexpectedly present on 5e disk — #1450 absence census drifted')
+if (JSON.stringify(PWH_ROW.automation.conditions) !== JSON.stringify(['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'])) throw new Error('PWH automation.conditions bytes drifted from the five strip candidates')
+
+const CAMPAIGN = 'test-campaign'
+const CASTER = 'HeroesFeastBard' /* REAL test-campaign character (#1487 precedent); Bard lv-caster — disk classes ['Bard','Cleric'] */
+const THUG = 'Thug 1' /* instance name = test-campaign maps/test-map.json (#1487 precedent) */
+const TS = 1700000000000
+const GAP = 20 /* maxHp 32 (monsters.json Thug REAL) - currentHp 12 (documented synthetic in-combat probe) */
+
+/* ---------------- Mocks — live dependency roster of index.js ---------------- */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn((_, key) => {
-    if (key === 'activeConditions' || key === 'targetEffects') return []
-    if (key === 'hitPoints') return 100
-    if (key === 'currentHitPoints') return 30
-    return undefined
-  }),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+  getRuntimeValue: vi.fn(() => undefined),
 }))
 
 vi.mock('../../../../ui/logService.js', () => ({
@@ -67,10 +180,6 @@ vi.mock('../../../../rules/features/wildMagicSurgeService.js', () => ({
   triggerWildMagicSurge: vi.fn(),
 }))
 
-vi.mock('../../../../rules/features/fearService.js', () => ({
-  triggerFear: vi.fn(async () => {}),
-}))
-
 vi.mock('../../../../rules/features/falseLifeService.js', () => ({
   triggerFalseLife: vi.fn(async () => {}),
 }))
@@ -107,10 +216,6 @@ vi.mock('../../../../rules/features/resilientSphereService.js', () => ({
   triggerResilientSphere: vi.fn(async () => {}),
 }))
 
-vi.mock('../../../../rules/features/foresightService.js', () => ({
-  triggerForesight: vi.fn(async () => {}),
-}))
-
 vi.mock('../../../../rules/features/rayOfEnfeeblementService.js', () => ({
   triggerRayOfEnfeeblement: vi.fn(async () => {}),
 }))
@@ -127,12 +232,6 @@ vi.mock('../../../../automation/handlers/spells/forcecageHandler.js', () => ({
   isForcecageBlocked: vi.fn(() => false),
 }))
 
-vi.mock('../../../../rules/features/heroismService.js', () => ({
-  handle: vi.fn(),
-  applyHeroism: vi.fn(),
-  isHeroismActive: vi.fn(),
-}))
-
 vi.mock('../../../../rules/features/holyAuraService.js', () => ({
   triggerHolyAura: vi.fn(async () => {}),
 }))
@@ -143,10 +242,6 @@ vi.mock('../../../../rules/features/powerWordStunService.js', () => ({
 
 vi.mock('../../../../rules/features/seeInvisibilityService.js', () => ({
   triggerSeeInvisibility: vi.fn(async () => {}),
-}))
-
-vi.mock('../../../../rules/features/sleepService.js', () => ({
-  triggerSleep: vi.fn(async () => {}),
 }))
 
 vi.mock('../../../../rules/features/stinkingCloudService.js', () => ({
@@ -170,22 +265,22 @@ vi.mock('../../../../combat/buffs/buffService.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }))
 
-vi.mock('../../../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
   computeEffectiveSpellRange: vi.fn(() => 60),
   getDistanceFeet: vi.fn(() => 30),
   rangeToFeet: vi.fn((r) => typeof r === 'number' ? r : 60),
 }))
 
-vi.mock('../../../../rules/combat/applyHealing.js', () => ({
+vi.mock('../../../combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }))
 
-vi.mock('../../../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }))
 
-vi.mock('../../../../rules/effects/expirations.js', () => ({
+vi.mock('../../../effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }))
 
@@ -195,285 +290,236 @@ vi.mock('../../../../automation/handlers/class-wizard/arcaneWardHandler.js', () 
 
 import { executeSpellCast } from './index.js'
 import * as runtimeState from '../../../../../hooks/runtime/useRuntimeState.js'
-import * as applyHealing from '../../../../rules/combat/applyHealing.js'
-import * as damageUtils from '../../../../rules/combat/damageUtils.js'
+import { addEntry } from '../../../../ui/logService.js'
+import { executeHandler } from '../../../../automation/index.js'
+import { applyHealingToTarget } from '../../../../rules/combat/applyHealing.js'
+import { getCombatContext } from '../../../../rules/combat/damageUtils.js'
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Fireball', level: 3, school: 'Evocation',
-    casting_time: '1 action', components: ['V', 'S'], range: '150 feet',
-    damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } },
-    dc: { dc_type: 'dex', dc_success: 'half' },
-    ...overrides,
-  }
-}
+/* ---------------- Fixtures & helpers ---------------- */
 
-function makePlayerStats(overrides = {}) {
+/* Snapshot authority: monster row (type absent -> helpers.js:268-:271
+   take maxHp/currentHp from the snapshot, no runtime HP override). */
+const SUMMARY = { creatures: [{ name: THUG, maxHp: 32, currentHp: 12 }] }
+
+const ALL_FIVE = PWH_ROW.automation.conditions /* REAL lowercase disk bytes */
+
+function makeCaster(rules) {
   return {
-    name: 'TestWizard',
-    abilities: [{ name: 'Intelligence', bonus: 5 }],
+    name: CASTER,
+    rules,
+    abilities: [{ name: 'Charisma', bonus: 5 }],
     proficiency: 4,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence', toHit: 9, saveDc: 17, modifier: 5,
-    },
+    spellAbilities: { spellCastingAbility: 'Charisma', toHit: 9, saveDc: 17, modifier: 5 },
     automation: { passives: [] },
-    hitPoints: 100,
-    ...overrides,
   }
 }
 
-function makeMetaCtx(overrides = {}) {
-  return { slotLevel: 3, ...overrides }
-}
-
-function makeServices(overrides = {}) {
+function makeServices(playerStats, getTargetInfo) {
   return {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
-    playerStats: makePlayerStats(),
-    getTargetInfo: vi.fn(),
-    attackerPos: null, targetPos: null,
+    playerStats,
+    getTargetInfo,
+    attackerPos: null,
+    targetPos: null,
     featEffects: {},
-    campaignName: 'testCampaign',
-    mapName: 'testMap',
-    ...overrides,
+    campaignName: CAMPAIGN,
+    mapName: 'test-map',
+    characters: [{ name: THUG }],
   }
 }
 
-function mockGetRuntimeValue(fn) {
-  vi.mocked(runtimeState.getRuntimeValue).mockImplementation(fn)
+const spellLogEntry = (targetName) => ({
+  type: 'spell',
+  characterName: CASTER,
+  targetName,
+  spellName: PWH_ROW.name,
+  spellLevel: 9,
+  castingTime: 'Action',
+  damageType: null,
+  damageFormula: null,
+  saveDC: null,
+  concentration: false, /* REAL disk byte: PWH is instantaneous, non-concentration */
+  description: PWH_ROW.description.join(' '),
+  timestamp: TS,
+})
+
+const hpEntry = {
+  type: 'hp_change',
+  targetName: THUG,
+  delta: GAP,
+  currentHp: 32,
+  maxHp: 32,
+  isHealing: true,
+  sourceName: CASTER,
+  note: 'Power Word Heal',
+  timestamp: TS,
 }
 
-async function resetMockImplementations() {
-  const m = async (path, fnMap) => {
-    const mod = await import(path)
-    for (const [key, value] of Object.entries(fnMap)) {
-      mod[key].mockImplementation(value)
-    }
-  }
+const condTuple = (Name) => [CAMPAIGN, {
+  type: 'condition',
+  action: 'removed',
+  characterName: THUG,
+  condition: Name,
+  reason: 'Power Word Heal',
+  timestamp: TS,
+}]
 
-  await m('../../../../../hooks/runtime/useRuntimeState.js', {
-    getRuntimeValue: (_, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return []
-      return undefined
-    },
-    setRuntimeValue: () => {},
-  })
-  await m('../../../../rules/spells/postCastRiderService.js', {
-    triggerPostCastRiderSaves: async () => null,
-    triggerSpellThief: async () => null,
-    triggerBewitchingMagic: async () => null,
-    triggerSoulstitchSpells: async () => null,
-    getEmpoweredEvocationFeatures: () => [],
-    getEmpoweredEvocationIntModifier: () => 0,
-  })
-  await m('../../../../rules/spells/postCastHealService.js', {
-    triggerPostCastSelfHeals: async () => {},
-    triggerPostCastAllyHeals: async () => {},
-  })
-  await m('../../../../rules/features/smiteOfProtectionService.js', {
-    triggerSmiteOfProtection: async () => {},
-  })
-  await m('../../../../rules/features/inspiringSmiteService.js', {
-    triggerInspiringSmite: async () => {},
-  })
-  await m('../../../../rules/features/primalCompanionSpellShareService.js', {
-    triggerPrimalCompanionSpellShare: async () => {},
-  })
-  await m('../../../../rules/features/wildMagicSurgeService.js', {
-    triggerWildMagicSurge: async () => {},
-  })
-  await m('../../../../rules/features/fearService.js', {
-    triggerFear: async () => {},
-  })
-  await m('../../../../rules/features/falseLifeService.js', {
-    triggerFalseLife: async () => {},
-  })
-  await m('../../../../rules/features/healingWordService.js', {
-    triggerHealingWord: async () => {},
-  })
-  await m('../../../../rules/features/fleshToStoneService.js', {
-    triggerFleshToStone: async () => {},
-  })
-  await m('../../../../rules/features/holdMonsterService.js', {
-    triggerHoldMonster: async () => {},
-  })
-  await m('../../../../rules/features/hypnoticPatternService.js', {
-    triggerHypnoticPattern: async () => {},
-  })
-  await m('../../../../rules/features/massSuggestionService.js', {
-    triggerMassSuggestion: async () => {},
-  })
-  await m('../../../../rules/features/suggestionService.js', {
-    triggerSuggestion: async () => {},
-  })
-  await m('../../../../rules/features/ottoDanceService.js', {
-    triggerOttoDance: async () => {},
-  })
-  await m('../../../../rules/features/resilientSphereService.js', {
-    triggerResilientSphere: async () => {},
-  })
-  await m('../../../../rules/features/foresightService.js', {
-    triggerForesight: async () => {},
-  })
-  await m('../../../../rules/features/rayOfEnfeeblementService.js', {
-    triggerRayOfEnfeeblement: async () => {},
-  })
-  await m('../../../../rules/features/globeOfInvulnerabilityService.js', {
-    triggerGlobeOfInvulnerability: async () => {},
-  })
-  await m('../../../../rules/features/forcecageService.js', {
-    triggerForcecage: async () => {},
-  })
-  await m('../../../../automation/handlers/spells/forcecageHandler.js', {
-    isForcecageBlocked: () => false,
-  })
-  await m('../../../../rules/features/heroismService.js', {
-    handle: async () => {},
-    applyHeroism: async () => {},
-  })
-  await m('../../../../rules/features/holyAuraService.js', {
-    triggerHolyAura: async () => {},
-  })
-  await m('../../../../rules/features/powerWordStunService.js', {
-    triggerPowerWordStun: async () => {},
-  })
-  await m('../../../../rules/features/seeInvisibilityService.js', {
-    triggerSeeInvisibility: async () => {},
-  })
-  await m('../../../../rules/features/sleepService.js', {
-    triggerSleep: async () => {},
-  })
-  await m('../../../../rules/features/stinkingCloudService.js', {
-    triggerStinkingCloud: async () => {},
-  })
-  await m('../../../../rules/features/tashasHideousLaughterService.js', {
-    triggerTashasHideousLaughter: async () => {},
-  })
-  await m('../../../../rules/features/removeCurseService.js', {
-    triggerRemoveCurse: async () => {},
-  })
-  await m('../../../../rules/features/slowService.js', {
-    triggerSlow: async () => {},
-  })
-  await m('../../../../rules/features/silenceService.js', {
-    getSilenceSource: () => null,
-    isCreatureInSilenceZone: () => false,
-  })
-  await m('../../../../rules/features/invisibilityService.js', {
-    endInvisibilityOnHostileAction: () => {},
-  })
-  await m('../../../../rules/features/friendsService.js', {
-    endFriendsOnHostileAction: () => {},
-  })
-  await m('../../../../combat/buffs/buffService.js', {
-    isInnateSorceryActive: () => false,
-    getActiveBuffs: () => [],
-  })
-}
+const popupDetail = (name) => ({
+  targetName: name,
+  sourceName: CASTER,
+  healingName: 'Power Word Heal',
+  rollInfo: '',
+  maximizeHealingDice: false,
+  popupText: `Power Word Heal on ${name}: Regained ${GAP} HP`,
+})
 
-describe('executeSpellCast - Power Word Heal edge cases', () => {
-  beforeEach(async () => {
+let consoleError
+let consoleWarn
+let popups
+const onPopup = (e) => popups.push(e.detail)
+
+describe('executeSpellCast — Power Word Heal hub edge routing (index.js:702 early arm)', () => {
+  beforeEach(() => {
     vi.clearAllMocks()
-    await resetMockImplementations()
-    mockGetRuntimeValue((_, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return []
-      if (key === 'hitPoints') return 100
-      if (key === 'currentHitPoints') return 30
-      return undefined
-    })
+    /* URL-aware fetch stub (#1454 canon): REAL disk bytes on BOTH tiers so
+       lookupFullSpell (:170-:189) resolves on 2024 and honestly MISSES on
+       5e — no unmocked-fetch noise, no canned outcome. */
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('/2024/') ? spells2024 : spells5e),
+    })))
+    getCombatContext.mockResolvedValue(SUMMARY)
+    /* PURE RECORDER boundary (#1481 :167 canon): return shape faithful to
+       the REAL producer, computed FROM ARGS — never baked, never mutating
+       the snapshot. This is what makes the :17 dedupe hub pin un-maskable:
+       every apply leg leaves an exact census entry. */
+    applyHealingToTarget.mockImplementation((summary, name, amount) =>
+      ({ actualHeal: amount, oldHp: summary.creatures.find(c => c.name === name).currentHp, newHp: 32 }))
+    vi.spyOn(Date, 'now').mockReturnValue(TS)
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    popups = []
+    window.addEventListener('healing-popup', onPopup)
   })
 
-  describe('applyPowerWordHealToTarget', () => {
-    it('removes specified conditions and logs removal', async () => {
-      mockGetRuntimeValue((char, key) => {
-        if (key === 'activeConditions') return ['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned', 'Prone']
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 50, oldHp: 50, newHp: 100 })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: 100, currentHp: 50 }],
-      })
+  afterEach(() => {
+    window.removeEventListener('healing-popup', onPopup)
+    vi.unstubAllGlobals()
+    consoleError.mockRestore()
+    consoleWarn.mockRestore()
+    vi.restoreAllMocks()
+  })
 
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Power Word Heal' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Target', 'activeConditions', ['Prone'], 'testCampaign'
-      )
+  it('multiTarget EQUALS the resolved first target: the :17 !== gate dedupes to exactly ONE full-apply leg through the whole hub — heal forward, five-condition strip census, stand-permission, popup — censused against the delta-0 mask', async () => {
+    runtimeState.getRuntimeValue.mockImplementation((char, key) => {
+      if (key === 'activeConditions') return char === THUG ? [...ALL_FIVE, 'prone'] : []
+      if (key === 'targetEffects') return []
+      return undefined
     })
+    const services = makeServices(makeCaster('2024'), vi.fn(async () => ({ name: THUG })))
 
-    it('sets powerWordHealStandPermission when target is Prone', async () => {
-      mockGetRuntimeValue((char, key) => {
-        if (key === 'activeConditions') return ['Prone']
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 50, oldHp: 50, newHp: 100 })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: 100, currentHp: 50 }],
-      })
+    const result = await executeSpellCast(cloneDeep(PWH_ROW), { slotLevel: 9, multiTarget: THUG }, services)
 
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
+    expect(result).toBeUndefined() /* { handled: true } envelope -> passThrough value undefined (:712) */
+    /* Un-maskable dedupe census (M1/M2): EXACTLY one forward tuple, arity 4,
+       shared snapshot BY IDENTITY (M4-CLA-392 via hub), gap-to-max computed. */
+    expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
+    expect(getCombatContext).toHaveBeenCalledTimes(1)
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN)
+    expect(getTargetInfoCalls(services)).toBe(3) /* blockChecks :655 + log :234 + gate :11 — arity 0 */
+    /* Full write census, exact order: CLA-399 stamp once FIRST (M6), then the
+       survivor strip ['prone'], then stand-permission (M1 doubles all three). */
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      [CASTER, 'lastActionSpellCast', 1, CAMPAIGN],
+      [THUG, 'activeConditions', ['prone'], CAMPAIGN],
+      [THUG, 'powerWordHealStandPermission', true, CAMPAIGN],
+    ])
+    /* Full log census: spell log -> hp_change -> five condition removals
+       (REAL automation.conditions bytes, capitalized at helpers :239). */
+    expect(addEntry.mock.calls).toEqual([
+      [CAMPAIGN, spellLogEntry(THUG)],
+      [CAMPAIGN, hpEntry],
+      condTuple('Charmed'), condTuple('Frightened'), condTuple('Paralyzed'),
+      condTuple('Poisoned'), condTuple('Stunned'),
+    ])
+    expect(popups).toEqual([popupDetail(THUG)])
+    /* Hijack census: consumed at :702 — generic automation (:710) never runs (M7). */
+    expect(executeHandler).toHaveBeenCalledTimes(0)
+    /* Heal-before-write tap (#1490/#1481). */
+    expect(applyHealingToTarget.mock.invocationCallOrder[0])
+      .toBeLessThan(runtimeState.setRuntimeValue.mock.invocationCallOrder[1])
+    expect(consoleError).toHaveBeenCalledTimes(0)
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
+  })
 
-      const spell = makeSpell({ name: 'Power Word Heal' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
-
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Target', 'powerWordHealStandPermission', true, 'testCampaign'
-      )
+  it('NULL-FIRST edge on rules 2024 transport: undefined getTargetInfo result survives ?.(:12), fetches the 2024 disk tier once, heals only the chooser multiTarget, spell-log targetName folds null', async () => {
+    runtimeState.getRuntimeValue.mockImplementation((_, key) => {
+      if (key === 'activeConditions') return []
+      if (key === 'targetEffects') return []
+      return undefined
     })
+    const services = makeServices(makeCaster('2024'), vi.fn(async () => undefined))
 
-    it('does not set powerWordHealStandPermission when already set', async () => {
-      mockGetRuntimeValue((char, key) => {
-        if (key === 'activeConditions') return ['Prone']
-        if (key === 'powerWordHealStandPermission') return true
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 50, oldHp: 50, newHp: 100 })
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Target', maxHp: 100, currentHp: 50 }],
-      })
+    const result = await executeSpellCast(cloneDeep(PWH_ROW), { slotLevel: 9, multiTarget: THUG }, services)
 
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
+    expect(result).toBeUndefined()
+    /* Transport byte (M4): rules:'2024' routes lookupFullSpell to '/data/
+       2024/spells.json' — the ONLY tier where this spell exists (#1450). */
+    expect(globalThis.fetch.mock.calls).toEqual([['/data/2024/spells.json']])
+    /* M3: the :17 multiTarget leg is the only apply when first folds null;
+       falsy-triple collapse (undefined result) cited #1352/#1487 row C. */
+    expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
+    expect(getTargetInfoCalls(services)).toBe(3)
+    /* No conditions stored -> zero strip writes/logs (strip bytes R1 + #1481). */
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      [CASTER, 'lastActionSpellCast', 1, CAMPAIGN],
+    ])
+    expect(addEntry.mock.calls).toEqual([
+      [CAMPAIGN, spellLogEntry(null)],
+      [CAMPAIGN, hpEntry],
+    ])
+    expect(popups).toEqual([popupDetail(THUG)])
+    expect(executeHandler).toHaveBeenCalledTimes(0)
+    expect(consoleError).toHaveBeenCalledTimes(0)
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
+  })
 
-      const spell = makeSpell({ name: 'Power Word Heal' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
-
-      const permCalls = vi.mocked(runtimeState.setRuntimeValue).mock.calls.filter(
-        c => c[1] === 'powerWordHealStandPermission'
-      )
-      expect(permCalls.length).toBe(0)
+  it('5e-transport asymmetry golden: the :10/:702 gate is NAME-based with NO rules guard — a cast whose transport points at the 5e disk (where Power Word Heal is absent) logs the exact not-found console tuple once and still heals via the hub', async () => {
+    runtimeState.getRuntimeValue.mockImplementation((char, key) => {
+      if (key === 'activeConditions') return char === THUG ? ['prone'] : []
+      if (key === 'targetEffects') return []
+      return undefined
     })
+    const services = makeServices(makeCaster('5e'), vi.fn(async () => ({ name: THUG })))
 
-    it('does nothing when combat context is null', async () => {
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null)
+    const result = await executeSpellCast(cloneDeep(PWH_ROW), { slotLevel: 9 }, services)
 
-      const services = makeServices({
-        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
-      })
-
-      const spell = makeSpell({ name: 'Power Word Heal' })
-      delete spell.damage
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
-    })
+    expect(result).toBeUndefined()
+    expect(globalThis.fetch.mock.calls).toEqual([['/data/spells.json']])
+    /* Exact-console-tuple (#1494-97 form): index.js:183 fires ONCE; the
+       lookup miss does NOT abort the already-routed cast (M5: adding any
+       rules guard at the gate kills this row AND the apply census). */
+    expect(consoleError.mock.calls).toEqual([['[spellCast] Spell not found in spells.json:', PWH_ROW.name]])
+    expect(consoleWarn).toHaveBeenCalledTimes(0)
+    expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
+    expect(getTargetInfoCalls(services)).toBe(3)
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
+      [CASTER, 'lastActionSpellCast', 1, CAMPAIGN],
+      [THUG, 'powerWordHealStandPermission', true, CAMPAIGN],
+    ])
+    /* Prone survives the empty-strip-candidate set -> no conditions write
+       (:231 equal length) and no condition removals logged; the complete
+       addEntry census is spell log + hp_change only. */
+    expect(addEntry.mock.calls).toEqual([
+      [CAMPAIGN, spellLogEntry(THUG)],
+      [CAMPAIGN, hpEntry],
+    ])
+    expect(popups).toEqual([popupDetail(THUG)])
+    expect(executeHandler).toHaveBeenCalledTimes(0)
   })
 })
+
+function getTargetInfoCalls(services) {
+  return services.getTargetInfo.mock.calls.length
+}

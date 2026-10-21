@@ -1,7 +1,45 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
+/*  HUB block-check integration lane (execution/index.js)              */
+/*                                                                     */
+/*  runCastBlockChecks (:651-667) REAL gate order:                     */
+/*   1. checkBlockedBySpellcastingBuff(spell, playerStats, campaign)  */
+/*      :652 — short-circuits :653 BEFORE getTargetInfo resolves.     */
+/*   2. globeTargetName = (await getTargetInfo())?.name || null :655   */
+/*   3. blockers array :657-661, first truthy returns :664:             */
+/*      a. checkGlobeOfInvulnerability(spell, target, stats, camp)     */
+/*      b. checkForcecageBlocked(spell, target, stats, camp)  :659     */
+/*      c. checkAntimagicField(spell, stats, target, camp) :660        */
+/*         — INLINE in index.js :90-113 (not a blockChecks export),    */
+/*         so its hub payload/log bytes are owned HERE.                */
+/*   4. null -> executeSpellCast continues :673; refusal bubbles the   */
+/*      gate object IDENTICAL (:672 return block).                      */
+/*                                                                     */
+/*  Boundary reconciliation (do not duplicate):                          */
+/*   - spellCastService.execute.test.js #1454: REAL blockChecks.js    */
+/*     gate internals — buff refusal (:281) + silence ordering (:341).*/
+/*   - execution/blockChecks.test.js #1466: module-direct gate bodies  */
+/*     (globe/forcecage/buff payload bytes).                           */
+/*   - HERE: gates MOCKED to pin hub->gate invocation tuples, exact    */
+/*     invocationCallOrder, three-state short-circuit (block / pass /  */
+/*     never-reached), identical-object bubbling, and the inline       */
+/*     antimagic caster/target/precedence bytes (:90-113).             */
+/*   - Cited by spellCastService.special.test.js:41 + #1461/:1466 as  */
+/*     hub checkForcecageBlocked integration owner — face preserved    */
+/*     as the Forcecage refusal row (see shift map in PR summary).    */
+/*                                                                     */
+/*  Kill matrix: gate reordered, short-circuit skipped, refusal swallowed */
+/*  or cloned (identity), gate tuple wrong, wrong-arity store read,     */
+/*  target branch firing with null target, caster/target precedence      */
+/*  flipped, continuation halting at :672.                              */
+/*  No clocks: all gates instantaneous; stored durations owned elsewhere. */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Mocks — every hub import (index.js:1-40) stubbed so no real        */
+/*  service or disk lane loads; castingTimeUtils stays REAL (pure).    */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -15,6 +53,10 @@ vi.mock('../../../../ui/logService.js', () => ({
 
 vi.mock('../../../../automation/index.js', () => ({
   executeHandler: vi.fn(),
+}));
+
+// index.js:6 imports this DIRECT edge (barrel mock does not cover it).
+vi.mock('../../../../automation/handlers/spells/compelledDuelHandler.js', () => ({
   checkCompelledDuelAttackExpiry: vi.fn(),
 }));
 
@@ -31,7 +73,8 @@ vi.mock('../../../features/smiteOfProtectionService.js', () => ({
   triggerSmiteOfProtection: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../features/inspiringSmiteService.js', () => ({
+vi.mock('../../../features/inspiringSmiteService.js'
+  , () => ({
   triggerInspiringSmite: vi.fn(() => Promise.resolve()),
 }));
 
@@ -47,9 +90,6 @@ vi.mock('../../../../rules/spells/postCastRiderService.js', () => ({
   triggerBewitchingMagic: vi.fn(() => Promise.resolve()),
   triggerPostCastRiderSaves: vi.fn(() => Promise.resolve()),
   triggerSpellThief: vi.fn(() => Promise.resolve()),
-  triggerSoulstitchSpells: vi.fn(() => Promise.resolve()),
-  getEmpoweredEvocationFeatures: vi.fn(() => []),
-  getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }));
 
 vi.mock('../../../../automation/handlers/spells/sanctuaryHandler.js', () => ({
@@ -75,6 +115,11 @@ vi.mock('../../../features/friendsService.js', () => ({
 
 vi.mock('../../../features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
+}));
+
+// index.js:20 direct edge — never reached on any block/refusal row.
+vi.mock('../../../../automation/handlers/class-warlock/psychicSpellsHandler.js', () => ({
+  getPsychicSpellsConfig: vi.fn(() => null),
 }));
 
 vi.mock('../../../../combat/buffs/buffService.js', () => ({
@@ -111,7 +156,6 @@ vi.mock('./helpers.js', () => ({
   triggerDispelMagic: vi.fn(() => Promise.resolve()),
   triggerExpertDivination: vi.fn(() => Promise.resolve(null)),
   applyRegenerateSpell: vi.fn(),
-  executeMagicMissile: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('./blockChecks.js', () => ({
@@ -119,7 +163,6 @@ vi.mock('./blockChecks.js', () => ({
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
   checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
-
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
@@ -203,10 +246,6 @@ vi.mock('./damageCalculation.js', () => ({
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
 }));
 
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
@@ -221,13 +260,23 @@ import { executeSpellCast } from './index.js';
 /*  Mock references                                                    */
 /* ------------------------------------------------------------------ */
 
-const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
-const { checkGlobeOfInvulnerability: mockCheckGlobe } = await import('./blockChecks.js');
-const { checkForcecageBlocked: mockCheckForcecage } = await import('./blockChecks.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
+const { addEntry } = await import('../../../../ui/logService.js');
+const { getSilenceSource, isCreatureInSilenceZone } = await import('../../../features/silenceService.js');
+const { endFriendsOnHostileAction } = await import('../../../features/friendsService.js');
+const { endInvisibilityOnHostileAction } = await import('../../../features/invisibilityService.js');
+const { isInnateSorceryActive } = await import('../../../../combat/buffs/buffService.js');
+const { checkBlockedBySpellcastingBuff: mockBuffGate, checkGlobeOfInvulnerability: mockGlobeGate, checkForcecageBlocked: mockForcecageGate } = await import('./blockChecks.js');
+const { handleSleep, handleShapechange } = await import('./modalSpells.js');
+const { handleGenericAutomation: mockGenericAutomation } = await import('./triggerSpells.js');
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Test-data factories (lightweight payloads matching REAL hub       */
+/*  field reads: te.effect/te.target per                       */
+/*  src/services/combat/conditions/targetEffectDefinitions.js:636)   */
 /* ------------------------------------------------------------------ */
+
+const CAMPAIGN = 'test-campaign';
 
 function makeSpell(overrides = {}) {
   return {
@@ -261,164 +310,277 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeMetaCtx(overrides = {}) {
+function makeOpts(playerStats = makePlayerStats()) {
   return {
-    targetName: 'Goblin',
-    ...overrides,
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    playerStats,
+    getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
+    campaignName: CAMPAIGN,
   };
 }
 
+const orderOf = (fn) => fn.mock.invocationCallOrder[0];
+
 /* ------------------------------------------------------------------ */
-/*  beforeEach — reset all mock implementations to safe defaults       */
+/*  beforeEach — reset EVERY gate to explicit pass-through so no       */
+/*  mockResolvedValue leaks across rows (vi.clearAllMocks keeps        */
+/*  implementations).                                                    */
 /* ------------------------------------------------------------------ */
 
-describe('executeSpellCast — block checks', () => {
+describe('executeSpellCast — hub block-gate integration (index.js:651-672)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockBuffGate.mockResolvedValue(null);
+    mockGlobeGate.mockResolvedValue(null);
+    mockForcecageGate.mockResolvedValue(null);
     getRuntimeValue.mockReturnValue([]);
+    getSilenceSource.mockReturnValue(null);
+    isCreatureInSilenceZone.mockReturnValue(false);
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  Block checks — Antimagic Field (caster affected)                */
-  /* ---------------------------------------------------------------- */
+  /* Gate 1 first: buff refusal bubbles identical, nothing after runs. */
+  it('returns the buff-gate refusal object untouched and never resolves the target, reads the antimagic store, checks silence, logs or rolls', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Shape', description: 'Fireball cannot be cast while TestWizard is under Wild Shape — no Spellcasting is allowed.' } } };
+    mockBuffGate.mockResolvedValue(blockResult);
 
-  describe('Antimagic Field (caster)', () => {
-    it('returns popup when caster is affected by antimagic field', async () => {
-      getRuntimeValue.mockImplementation((key, prop, _cn) => {
-        if (key === 'campaign' && prop === 'targetEffects') {
-          return [{ effect: 'antimagic_field', target: 'TestWizard' }];
-        }
-        return undefined;
-      });
+    const result = await executeSpellCast(spell, {}, opts);
 
-      const result = await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
+    expect(result).toBe(blockResult);
+    expect(mockBuffGate).toHaveBeenCalledTimes(1);
+    expect(mockBuffGate).toHaveBeenCalledWith(spell, playerStats, CAMPAIGN);
+    expect(opts.getTargetInfo).not.toHaveBeenCalled();
+    expect(mockGlobeGate).not.toHaveBeenCalled();
+    expect(mockForcecageGate).not.toHaveBeenCalled();
+    expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(getSilenceSource).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(opts.rollAttack).not.toHaveBeenCalled();
+    expect(opts.rollDamage).not.toHaveBeenCalled();
+  });
+
+  /* Gate 2 (globe) after target resolution; gate 3 never reached. */
+  it('resolves the target once, refuses at the globe gate with the full (spell, targetName, playerStats, campaign) tuple, and never reaches the forcecage or antimagic gates', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Globe of Invulnerability', description: 'Fireball is blocked' } } };
+    mockGlobeGate.mockResolvedValue(blockResult);
+
+    const result = await executeSpellCast(spell, {}, opts);
+
+    expect(result).toBe(blockResult);
+    expect(mockBuffGate).toHaveBeenCalledTimes(1);
+    expect(opts.getTargetInfo).toHaveBeenCalledTimes(1);
+    expect(mockGlobeGate).toHaveBeenCalledTimes(1);
+    expect(mockGlobeGate).toHaveBeenCalledWith(spell, 'Goblin', playerStats, CAMPAIGN);
+    expect(orderOf(mockBuffGate)).toBeLessThan(orderOf(mockGlobeGate));
+    expect(mockForcecageGate).not.toHaveBeenCalled();
+    expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(getSilenceSource).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+    expect(opts.rollDamage).not.toHaveBeenCalled();
+  });
+
+  /* Cited hub face (#1461/#1466): forcecage refusal runs third. */
+  it('refuses at the forcecage gate after the globe gate passed once, with the same resolved target tuple, before any antimagic store read', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Forcecage', description: 'Fireball is blocked' } } };
+    mockForcecageGate.mockResolvedValue(blockResult);
+
+    const result = await executeSpellCast(spell, {}, opts);
+
+    expect(result).toBe(blockResult);
+    expect(mockGlobeGate).toHaveBeenCalledTimes(1);
+    expect(mockGlobeGate).toHaveBeenCalledWith(spell, 'Goblin', playerStats, CAMPAIGN);
+    expect(mockForcecageGate).toHaveBeenCalledTimes(1);
+    expect(mockForcecageGate).toHaveBeenCalledWith(spell, 'Goblin', playerStats, CAMPAIGN);
+    expect(orderOf(mockGlobeGate)).toBeLessThan(orderOf(mockForcecageGate));
+    // antimagic inline gate (:660) never ran — campaign store never read:
+    expect(getRuntimeValue).not.toHaveBeenCalled();
+    // and nothing past the block phase (:673+) ran:
+    expect(getSilenceSource).not.toHaveBeenCalled();
+    expect(handleSleep).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(opts.rollAttack).not.toHaveBeenCalled();
+    expect(opts.rollDamage).not.toHaveBeenCalled();
+  });
+
+  /* Inline antimagic hub bytes (:90-113) — caster branch, runs third,   */
+  /* caster precedence over a same-store target match.                      */
+  it('blocks on the inline antimagic gate third with exact caster popup and refusal log bytes, and the caster branch wins even when the target also matches', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [{ effect: 'antimagic_field', target: 'TestWizard', source: 'Sorcerer' }];
+      }
+      return [];
+    });
+
+    const result = await executeSpellCast(spell, {}, opts);
+
+    expect(result).toEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Antimagic Field',
+          description: 'Fireball is blocked by Antimagic Field affecting TestWizard.',
         },
-      );
+      },
+    });
+    expect(getRuntimeValue.mock.calls).toEqual([['campaign', 'targetEffects']]);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const [logCampaign, entry] = addEntry.mock.calls[0];
+    expect(logCampaign).toBe(CAMPAIGN);
+    expect({ ...entry, timestamp: undefined }).toEqual({
+      type: 'automation',
+      creatureName: 'TestWizard',
+      name: 'Antimagic Field',
+      description: 'Fireball blocked — caster is within Antimagic Field.',
+      timestamp: undefined,
+    });
+    expect(typeof entry.timestamp).toBe('number');
+    // globe and forcecage ran (null) BEFORE antimagic logged:
+    expect(mockGlobeGate).toHaveBeenCalledTimes(1);
+    expect(mockForcecageGate).toHaveBeenCalledTimes(1);
+    expect(orderOf(mockGlobeGate)).toBeLessThan(orderOf(mockForcecageGate));
+    expect(orderOf(mockForcecageGate)).toBeLessThan(orderOf(addEntry));
+    expect(getSilenceSource).not.toHaveBeenCalled();
+    expect(opts.rollDamage).not.toHaveBeenCalled();
 
-      expect(result).toBeDefined();
-      expect(result.automationPopup).toBeDefined();
-      expect(result.automationPopup.payload.description).toContain('Antimagic Field');
+    // Precedence: caster + Goblin both in the field -> still the caster popup.
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [
+          { effect: 'antimagic_field', target: 'Goblin', source: 'Cleric' },
+          { effect: 'antimagic_field', target: 'TestWizard', source: 'Sorcerer' },
+        ];
+      }
+      return [];
+    });
+
+    const result2 = await executeSpellCast(spell, {}, opts);
+
+    expect(result2).toEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Antimagic Field',
+          description: 'Fireball is blocked by Antimagic Field affecting TestWizard.',
+        },
+      },
+    });
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    const [, entry2] = addEntry.mock.calls[1];
+    expect({ ...entry2, timestamp: undefined }).toEqual({
+      type: 'automation',
+      creatureName: 'TestWizard',
+      name: 'Antimagic Field',
+      description: 'Fireball blocked — caster is within Antimagic Field.',
+      timestamp: undefined,
     });
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  Block checks — Antimagic Field (target affected)                */
-  /* ---------------------------------------------------------------- */
-
-  describe('Antimagic Field (target)', () => {
-    it('returns popup when target is affected by antimagic field', async () => {
-      getRuntimeValue.mockImplementation((key, prop, _cn) => {
-        if (key === 'campaign' && prop === 'targetEffects') {
-          return [{ effect: 'antimagic_field', target: 'Goblin' }];
-        }
-        return undefined;
-      });
-
-      const result = await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeDefined();
-      expect(result.automationPopup.payload.description).toContain('Antimagic Field');
-      expect(result.automationPopup.payload.description).toContain('Goblin');
+  /* Inline antimagic hub bytes — target branch (:104-110). */
+  it('blocks on the inline antimagic gate with exact target popup and log bytes when only the resolved target is inside the field', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [
+          { effect: 'antimagic_field', target: 'Nobody', source: 'Druid' },
+          { effect: 'antimagic_field', target: 'Goblin', source: 'Cleric' },
+        ];
+      }
+      return [];
     });
+
+    const result = await executeSpellCast(spell, {}, opts);
+
+    expect(result).toEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Antimagic Field',
+          description: 'Fireball is blocked by Antimagic Field protecting Goblin.',
+        },
+      },
+    });
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const [logCampaign, entry] = addEntry.mock.calls[0];
+    expect(logCampaign).toBe(CAMPAIGN);
+    expect({ ...entry, timestamp: undefined }).toEqual({
+      type: 'automation',
+      creatureName: 'TestWizard',
+      name: 'Antimagic Field',
+      description: 'Fireball blocked — Goblin is within Antimagic Field.',
+      timestamp: undefined,
+    });
+    expect(typeof entry.timestamp).toBe('number');
+    expect(getSilenceSource).not.toHaveBeenCalled();
+    expect(opts.rollAttack).not.toHaveBeenCalled();
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  Block checks — Globe of Invulnerability                         */
-  /* ---------------------------------------------------------------- */
-
-  describe('Globe of Invulnerability', () => {
-    it('returns the globe block result when globe blocks the spell', async () => {
-      const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Globe of Invulnerability', description: 'Fireball is blocked' } } };
-      mockCheckGlobe.mockResolvedValue(blockResult);
-
-      const result = await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBe(blockResult);
+  /* Three-state "pass": all four gates null -> hub continues and exits   */
+  /* at the silence gate (:682), proving null is not a block (:672).      */
+  it('continues past four passing block gates and exits at the Silence gate before the cast log, hostile side effects, trigger chain or dice', async () => {
+    const spell = makeSpell();
+    const playerStats = makePlayerStats();
+    const opts = makeOpts(playerStats);
+    getRuntimeValue.mockImplementation((key, prop) => {
+      if (key === 'campaign' && prop === 'targetEffects') {
+        return [{ effect: 'faerie_fire', target: 'Goblin', source: 'Druid' }];
+      }
+      return [];
     });
-  });
+    getSilenceSource.mockReturnValue('SilenceCaster');
+    isCreatureInSilenceZone.mockReturnValue(true);
 
-  /* ---------------------------------------------------------------- */
-  /*  Block checks — Forcecage                                        */
-  /* ---------------------------------------------------------------- */
+    const result = await executeSpellCast(spell, {}, opts);
 
-  describe('Forcecage', () => {
-    it('returns the forcecage block result when forcecage blocks the spell', async () => {
-      const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Forcecage', description: 'Fireball is blocked' } } };
-      mockCheckGlobe.mockResolvedValue(null);
-      mockCheckForcecage.mockResolvedValue(blockResult);
-
-      const result = await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBe(blockResult);
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /*  Block checks — shape_shift blocksSpellcasting (CLA-391)         */
-  /* ---------------------------------------------------------------- */
-
-  describe('blocksSpellcasting buff (Wild Shape)', () => {
-    it('returns the refusal popup produced by checkBlockedBySpellcastingBuff (CLA-391)', async () => {
-      const { checkBlockedBySpellcastingBuff } = await import('./blockChecks.js');
-      const blockResult = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Shape', description: 'Fireball cannot be cast while TestWizard is under Wild Shape — no Spellcasting is allowed.' } } };
-      checkBlockedBySpellcastingBuff.mockResolvedValue(blockResult);
-
-      const result = await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: vi.fn(() => Promise.resolve({ name: 'Goblin' })),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBe(blockResult);
-      expect(checkBlockedBySpellcastingBuff).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Fireball' }),
-        expect.objectContaining({ name: 'TestWizard' }),
-        'test-campaign',
-      );
-    });
+    // Exited via the Silence gate — payload bytes owned by
+    // spellCastService.noformula-modals.test.js; only identity of the
+    // exit point pinned here.
+    expect(result.automationPopup.type).toBe('popup');
+    expect(result.automationPopup.payload.name).toBe('Silence');
+    // Full hub gate order: buff -> getTargetInfo -> globe -> forcecage ->
+    // antimagic store read -> (magical ambush read) -> silence lookup.
+    expect(orderOf(mockBuffGate)).toBeLessThan(orderOf(opts.getTargetInfo));
+    expect(orderOf(opts.getTargetInfo)).toBeLessThan(orderOf(mockGlobeGate));
+    expect(orderOf(mockGlobeGate)).toBeLessThan(orderOf(mockForcecageGate));
+    expect(getRuntimeValue.mock.calls).toEqual([
+      ['campaign', 'targetEffects'],
+      ['TestWizard', 'activeConditions', CAMPAIGN],
+    ]);
+    expect(getSilenceSource).toHaveBeenCalledTimes(1);
+    expect(orderOf(mockForcecageGate)).toBeLessThan(orderOf(getSilenceSource));
+    // Only the silence gate's own refusal log fired (:138 — payload bytes
+    // owned by spellCastService.execute.test.js ORDER 2); nothing past :683
+    // ran: no cast log (:698), no side effects, no chain, no dice.
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry.mock.calls[0][0]).toBe(CAMPAIGN);
+    expect(addEntry.mock.calls[0][1].name).toBe('Silence');
+    expect(addEntry.mock.calls[0][1].creatureName).toBe('TestWizard');
+    expect(endFriendsOnHostileAction).not.toHaveBeenCalled();
+    expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(isInnateSorceryActive).not.toHaveBeenCalled();
+    expect(handleSleep).not.toHaveBeenCalled();
+    expect(handleShapechange).not.toHaveBeenCalled();
+    expect(mockGenericAutomation).not.toHaveBeenCalled();
+    expect(opts.rollAttack).not.toHaveBeenCalled();
+    expect(opts.rollDamage).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,83 @@
-// FT-012: generic spell-cast heal lane must mark the Fortified Health
-// once-per-turn latch on the passive OWNER's store when the bonus fires.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/* ------------------------------------------------------------------ */
+/*  executeSpellCast GENERIC-HEAL lane (:337 gate) — FT-012 face      */
+/*  (span :336-:486 + rider merge :716-:720; fix commit 676a4c8ae)   */
+/*                                                                     */
+/*  Unit under test is ./index.js REAL: resolveGenericHeal,            */
+/*  runGenericHealPath, applyRolledHeal, applyMaxHeal,                 */
+/*  resolveHealExpression, resolveTargetHpBounds, applyHealToCombat,  */
+/*  runPostCastTriggers(+Merged), runNoDamagePath. Only leaves are    */
+/*  mocked (#1350): dice, automationService bonus oracle, rider        */
+/*  services, trigger/modal arms, log, runtime store.                   */
+/*                                                                     */
+/*  LIVE-vs-HIJACKED census at :337 (post-#1472 mass-swallow,         */
+/*  post-#1483 regenerate pin; automation bytes disk-verified):        */
+/*   - LIVE disk rows used here: Cure Wounds, Healing Word (5e),      */
+/*     Cure Wounds, Resurrection {7:'max'} (2024) — automation is     */
+/*     undefined on disk, SERVICE_HANDLED_SPELLS (:42-57) carries no  */
+/*     heal name, so :710 handleGenericAutomation misses for real and */
+/*     these rows reach :337 with disk bytes. No lightweight shim     */
+/*     needed (#1472 documented-route applies only to hijacked names: */
+/*     Power Word Heal :702, Regenerate :278, mass four :328-332 —    */
+/*     owned by earlyReturns-modal/helpers/noDamage-healing lanes).   */
+/*   - :337 return precedes the :341 triggerHealingWord fire-and-     */
+/*     forget: every row pins triggerHealingWord times(0), incl. the  */
+/*     Healing Word row — the hub consumes it generically. (#1470)     */
+/*                                                                     */
+/*  FORTIFIED HEALTH MOCK AUTHENTICITY (3rd-instance audit of the     */
+/*  #1478/#1479 dead-mock-key pattern): index.js:24 imports            */
+/*  markFortifiedHealthUsedIfGranted and calls it at :457 — ALIVE.    */
+/*  Unlike the dispel/expertDivination lanes, this is not a fake       */
+/*  mock key. Bonus FOLDING is owned by automationPassives.fortified   */
+/*  Health.test.js; this lane owns only the hub tuple/identity/gate.   */
+/*                                                                     */
+/*  RIDER REACH: consumed heals return via :720 runPostCastTriggers-  */
+/*  Merged (CLA-389) — riders RUN post-payment (surge times(1) every   */
+/*  row), unlike the :710/:712 generic-automation bypass (#1470/#1455 */
+/*  standing). runGenericHealPath fires self/ally heal riders at       */
+/*  :472/:475 and runPostCastTriggers re-fires at :519/:522 —          */
+/*  times(2) merge-not-dedupe, pinned verbatim (#1476 form).           */
+/*                                                                     */
+/*  QUIRKS pinned as documented behavior (byte evidence in rows):     */
+/*   - :376 player-target maxHp `|| playerStats.hitPoints` falls back */
+/*     to the CASTER's max HP for a different-player target (quirk;   */
+/*     reported upstream). No other lane exposes this arm.             */
+/*   - :394 'max' branch records bonusHeal but never lands it         */
+/*     (cosmetic fold byte).                                           */
+/*   - delta-0 log-vs-skip: :428 addEntry fires at delta 0 while      */
+/*     :383 applyHealToCombat skips the combat write (#1483 contrast;  */
+/*     reroll-ones machinery :413 consumes owner applyHealingRerollOnes */
+/*     #1480 — display-only bytes in the reroll row).                  */
+/*   - :378 currentHitPoints `?? maxHp` silent-full-HP arm (guarded    */
+/*     by the runtimeReads pinning every read tuple).                   */
+/*   - NO-CLOCK: latch stamp is a bare forward; no duration bytes here */
+/*     (#1483). fetch is URL-aware stubbed (#1454) — deterministic.    */
+/*                                                                     */
+/*  OUT OF SPAN (covered elsewhere — not duplicated): :440 slot guard, */
+/*  :444 spell.level fallback, :365 highestBelow, weak 'max' branch — */
+/*  spellCastService.healingEdgeCases.test.js (bare toHaveBeenCalled,  */
+/*  cross-file hardening report-only).                                 */
+/*                                                                     */
+/*  KILL MATRIX: M1 :456 latch removed -> all landed rows fail;        */
+/*  M2 latch gate `>0` -> `>=0` -> full-HP row fails times(0);        */
+/*  M3 latch arg swap caster<->target -> toBe identity fails;          */
+/*  M4 bonusHeal folded-drop :419 -> rawTotal bytes fail;              */
+/*  M5 MOD replace :406 drop -> rollExpression tuple '... + MOD'      */
+/*  fails; M6 :409 maximize XOR flip -> plain/maximized times fail;   */
+/*  M7 :412 !maximize guard drop -> maximize row reroll times(1)      */
+/*  fails; M8 :383 clamp drop -> full-HP row getCombatContext fail;   */
+/*  M9 :420 cap drop -> cross-name row healAmount 62 vs 38 fail;      */
+/*  M10 :337 gate fall-through -> triggerHealingWord times(0) fails   */
+/*  incl. Healing Word row; M11 :479 chalice drop -> modal envelope    */
+/*  fails; M12 :467 target guard drop -> resolve times(0) fails;       */
+/*  M13 :720 merge skip -> surge times(1) fails on every row;          */
+/*  M14 :394/'max' formula flip -> envelope toStrictEqual fails.       */
+/*  Campaign lockdown: 'test-campaign' only.                            */
+/* ------------------------------------------------------------------ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cloneDeep } from 'lodash';
+import spells5e from '../../../../../../public/data/spells.json';
+import spells2024 from '../../../../../../public/data/2024/spells.json';
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -75,7 +152,7 @@ vi.mock('../../../features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
 }));
 
-vi.mock('../../../../combat/buffs/buffService.js', () => ({
+vi.mock('../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
@@ -95,8 +172,8 @@ vi.mock('../../../../combat/automation/automationService.js', () => ({
 }));
 
 vi.mock('../../../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 8, rolls: [8] })),
+  rollExpression: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
   applyHealingRerollOnes: vi.fn(() => ({ displayRolls: [5], originalRolls: [5] })),
 }));
 
@@ -200,10 +277,6 @@ vi.mock('./damageCalculation.js', () => ({
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
 }));
 
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
@@ -211,25 +284,48 @@ vi.mock('../../../../../services/encounters/combatData.js', () => ({
 import { executeSpellCast } from './index.js';
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
-const { resolveHealingBonusesWithDetails, markFortifiedHealthUsedIfGranted } = await import('../../../../combat/automation/automationService.js');
+const { addEntry } = await import('../../../../ui/logService.js');
+const { executeHandler } = await import('../../../../automation/index.js');
+const { triggerHealingWord } = await import('../../../features/healingWordService.js');
+const { triggerPostCastSelfHeals, triggerPostCastAllyHeals } = await import('../../../../rules/spells/postCastHealService.js');
+const { triggerWildMagicSurge } = await import('../../../features/wildMagicSurgeService.js');
+const { getCombatContext } = await import('../../../combat/damageUtils.js');
+const { applyHealingToTarget } = await import('../../../combat/applyHealing.js');
+const { endFriendsOnHostileAction } = await import('../../../features/friendsService.js');
+const { endInvisibilityOnHostileAction } = await import('../../../features/invisibilityService.js');
+const { resolveHealingBonusesWithDetails, hasHealingMaximizationForTarget, hasRerollHealingOnes, markFortifiedHealthUsedIfGranted } = await import('../../../../combat/automation/automationService.js');
+const { rollExpression, rollExpressionMaximized, applyHealingRerollOnes } = await import('../../../../dice/diceRoller.js');
+const { handlePowerWordHeal } = await import('./modalSpells.js');
+const {
+  handleMassCureWounds: massCureArm,
+  handleMassHealingWord: massWordArm,
+  handlePrayerOfHealing: prayerArm,
+  handleFalseLife: falseLifeArm,
+  handleGenericAutomation,
+} = await import('./triggerSpells.js');
+const { computeRange } = await import('./damageCalculation.js');
+const { handleSavePath } = await import('./savePath.js');
+const { handleNoSavePath } = await import('./noSavePath.js');
 
 const CAMPAIGN = 'test-campaign';
+const CASTER = 'Wild_Sage_Druid';
+const TARGET = 'Disciplined_Monk';
+const COMBAT_CTX = { round: 3 };
+const SURGE_POPUP = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Magic Surge' } } };
+const MASS_ARMS = [massCureArm, massWordArm, prayerArm, falseLifeArm];
 
-function casterStats() {
-  return {
-    name: 'Wild_Sage_Druid',
-    abilities: [{ name: 'Wisdom', bonus: 3 }],
-    proficiency: 6,
-    spellAbilities: { spellCastingAbility: 'Wisdom', toHit: 9, saveDc: 17, modifier: 3 },
-    automation: { passives: [] },
-    hitPoints: 138,
-    level: 20,
-  };
+function diskRow(list, name) {
+  const row = list.find((s) => (s.name || '').toLowerCase() === name.toLowerCase());
+  if (!row) throw new Error(`REAL disk row missing: ${name}`);
+  return row;
 }
 
+// 2024 Epic Boon Fortified Health host (FT-012): the passive OWNER lives on
+// the target; folding/ownership adjudication is automationPassives' unit —
+// here it only has to travel inside the forwarded tuple.
 function targetStats() {
   return {
-    name: 'Disciplined_Monk',
+    name: TARGET,
     abilities: [{ name: 'Constitution', bonus: 2 }],
     proficiency: 6,
     automation: {
@@ -246,78 +342,375 @@ function targetStats() {
   };
 }
 
-const cureWounds = {
-  name: 'Cure Wounds',
-  level: 1,
-  school: 'Evocation',
-  casting_time: '1 action',
-  components: ['V', 'S'],
-  range: '30 feet',
-  heal_at_slot_level: { 1: '2d8 + MOD' },
-};
+function casterStats(rules = '5e') {
+  return {
+    name: CASTER,
+    rules,
+    abilities: [{ name: 'Wisdom', bonus: 3 }],
+    proficiency: 6,
+    spellAbilities: { spellCastingAbility: 'Wisdom', toHit: 9, saveDc: 17, modifier: 3 },
+    automation: { passives: [] },
+    hitPoints: 138,
+    level: 20,
+  };
+}
 
-function makeServices(overrides = {}) {
+function makeServices(caster, characters) {
   return {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
-    playerStats: casterStats(),
-    getTargetInfo: async () => ({ name: 'Disciplined_Monk' }),
+    playerStats: caster,
+    getTargetInfo: async () => ({ name: TARGET }),
     attackerPos: null,
     targetPos: null,
     featEffects: {},
     campaignName: CAMPAIGN,
     mapName: 'testMap',
-    characters: [{ name: 'Disciplined_Monk', type: 'player', computedStats: targetStats() }],
-    ...overrides,
+    characters,
   };
 }
 
-describe('executeSpellCast generic heal - Fortified Health latch (FT-012)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getRuntimeValue.mockImplementation((_char, key) => {
+function runtimeReads({ maxHp = 183, currentHp = 100 } = {}) {
+  return (_who, key) => {
+    if (key === 'activeConditions' || key === 'targetEffects') return [];
+    if (key === 'hitPoints') return maxHp;
+    if (key === 'currentHitPoints') return currentHp;
+    return undefined;
+  };
+}
+
+// Strips the nondeterministic timestamp but pins its presence; every log
+// call must be scoped to CAMPAIGN.
+function loggedEntries() {
+  return addEntry.mock.calls.map(([campaign, entry]) => {
+    expect(campaign).toBe(CAMPAIGN);
+    expect(Number.isFinite(entry.timestamp)).toBe(true);
+    const rest = { ...entry };
+    delete rest.timestamp;
+    return rest;
+  });
+}
+
+function expectAscending(mocks) {
+  const orders = mocks.map((m) => m.mock.invocationCallOrder[0]);
+  expect(orders).toEqual([...orders].sort((a, b) => a - b));
+  expect(new Set(orders).size).toBe(orders.length);
+}
+
+const castLogOf = (spell) => ({
+  type: 'spell',
+  characterName: CASTER,
+  targetName: TARGET,
+  spellName: spell.name,
+  spellLevel: spell.level || 0,
+  castingTime: spell.casting_time,
+  damageType: null,
+  damageFormula: null,
+  saveDC: null,
+  concentration: !!spell.concentration,
+  description: (spell.description || []).join(' ') || null,
+});
+
+const diceEnvelope = (formula, rolls, healAmount, rawTotal, bonusHeal, bonusDetails) => ({
+  targetName: TARGET,
+  healAmount,
+  formula,
+  rolls,
+  rawTotal,
+  bonusHeal,
+  bonusDetails,
+  healingRerollOriginalRolls: null,
+  healingRerollDisplayRolls: rolls,
+});
+
+let consoleError;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  // #1454 URL-aware fetch stub: REAL lookupFullSpell resolves both catalog
+  // tiers deterministically (no live :80 dependency).
+  vi.stubGlobal('fetch', vi.fn(async (url) => ({
+    ok: true,
+    json: async () => (String(url).includes('/2024/') ? spells2024 : spells5e),
+  })));
+  consoleError = vi.spyOn(console, 'error');
+  getRuntimeValue.mockImplementation(runtimeReads());
+  resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
+  markFortifiedHealthUsedIfGranted.mockResolvedValue(undefined);
+  rollExpression.mockReturnValue({ total: 5, rolls: [5] });
+  rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [8] });
+  applyHealingRerollOnes.mockReturnValue({ displayRolls: [5], originalRolls: [5] });
+  hasHealingMaximizationForTarget.mockReturnValue(false);
+  hasRerollHealingOnes.mockReturnValue(false);
+  getCombatContext.mockResolvedValue(COMBAT_CTX);
+  triggerWildMagicSurge.mockResolvedValue(null);
+  triggerPostCastAllyHeals.mockResolvedValue({});
+  triggerPostCastSelfHeals.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  consoleError.mockRestore();
+});
+
+describe('executeSpellCast generic-heal lane (:337) — disk-live consumed casts, FT-012 latch on the owner, CLA-389 riders merged once (:720)', () => {
+  // rows: dice branch 'plain' | 'maximized' | 'reroll' | 'max'
+  const consumeRows = [
+    {
+      name: '5e disk Cure Wounds slot 1 folds Fortified +2 onto the rolled heal',
+      spell: diskRow(spells5e, 'Cure Wounds'), rules: '5e', slotLevel: 1, dice: 'plain',
+      roll: { total: 5, rolls: [5] },
+      envelope: diceEnvelope('1d8 + 3', [5], 7, 7, 2, [{ name: 'Fortified Health', amount: 2 }]),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 7, currentHp: 107, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+    {
+      name: '2024 disk Cure Wounds upcast slot 2 rolls the REAL scaled {2:"4d8 + MOD"} byte',
+      spell: diskRow(spells2024, 'Cure Wounds'), rules: '2024', slotLevel: 2, dice: 'plain',
+      roll: { total: 12, rolls: [4, 4, 4] },
+      envelope: diceEnvelope('4d8 + 3', [4, 4, 4], 14, 14, 2, [{ name: 'Fortified Health', amount: 2 }]),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 14, currentHp: 114, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '4d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+    {
+      name: '5e disk Healing Word is consumed generically at :337 — the :341 Healing-Word fire never reaches it',
+      spell: diskRow(spells5e, 'Healing Word'), rules: '5e', slotLevel: 1, dice: 'plain',
+      roll: { total: 3, rolls: [3] },
+      envelope: diceEnvelope('1d4 + 3', [3], 5, 5, 2, [{ name: 'Fortified Health', amount: 2 }]),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 5, currentHp: 105, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Healing Word', formula: '1d4 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+    {
+      name: "2024 disk Resurrection {7:'max'} heals to full via applyMaxHeal — bonusHeal recorded (:394) but cosmetic, and the latch still stamps",
+      spell: diskRow(spells2024, 'Resurrection'), rules: '2024', slotLevel: 7, dice: 'max',
+      envelope: { targetName: TARGET, healAmount: 83, formula: 'max', rolls: [], rawTotal: 83, bonusHeal: 2, bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 83, currentHp: 183, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Resurrection' },
+    },
+    {
+      name: 'target at full HP: heal clamps to 0 — combat write skipped (:383), delta-0 log STILL emitted (:428), latch NOT stamped (:456)',
+      spell: diskRow(spells5e, 'Cure Wounds'), rules: '5e', slotLevel: 1, dice: 'plain',
+      roll: { total: 5, rolls: [5] }, currentHp: 183, landed: false,
+      envelope: diceEnvelope('1d8 + 3', [5], 0, 7, 2, [{ name: 'Fortified Health', amount: 2 }]),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 0, currentHp: 183, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+    {
+      name: 'no Fortified bonus folded: hub does NOT gate on details.length (:456) — latch forwards [] for the real service to judge',
+      spell: diskRow(spells5e, 'Cure Wounds'), rules: '5e', slotLevel: 1, dice: 'plain',
+      roll: { total: 5, rolls: [5] }, bonus: { totalBonus: 0, details: [] },
+      envelope: diceEnvelope('1d8 + 3', [5], 5, 5, 0, []),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 5, currentHp: 105, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3', bonusDetails: undefined },
+    },
+    {
+      name: 'maximize seam (:407-:409): maximized dice only, plain roll inert, reroll suppressed by !maximize guard (:412)',
+      spell: diskRow(spells5e, 'Cure Wounds'), rules: '5e', slotLevel: 1, dice: 'maximized',
+      maximize: true, rerollArmed: true,
+      envelope: diceEnvelope('1d8 + 3', [8], 10, 10, 2, [{ name: 'Fortified Health', amount: 2 }]),
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 10, currentHp: 110, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+    {
+      name: 'reroll-ones seam (:413) is display-only — healAmount/rawTotal keep the ORIGINAL total (owner applyHealingRerollOnes #1480)',
+      spell: diskRow(spells5e, 'Cure Wounds'), rules: '5e', slotLevel: 1, dice: 'reroll',
+      rerollArmed: true, rerollReturn: { displayRolls: [6], originalRolls: [5] },
+      envelope: { targetName: TARGET, healAmount: 7, formula: '1d8 + 3', rolls: [6], rawTotal: 7, bonusHeal: 2, bonusDetails: [{ name: 'Fortified Health', amount: 2 }], healingRerollOriginalRolls: [5], healingRerollDisplayRolls: [6] },
+      hpLog: { type: 'hp_change', targetName: TARGET, delta: 7, currentHp: 107, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] },
+    },
+  ];
+
+  for (const row of consumeRows) {
+    it(row.name, async () => {
+      if (row.bonus) resolveHealingBonusesWithDetails.mockReturnValue(row.bonus);
+      if (row.currentHp != null) getRuntimeValue.mockImplementation(runtimeReads({ currentHp: row.currentHp }));
+      if (row.maximize) hasHealingMaximizationForTarget.mockReturnValue(true);
+      if (row.rerollArmed) hasRerollHealingOnes.mockReturnValue(true);
+      if (row.rerollReturn) applyHealingRerollOnes.mockReturnValue(row.rerollReturn);
+      if (row.roll) rollExpression.mockReturnValue(row.roll);
+      // CLA-389 precedence: a surge popup must never displace the heal payload (:599).
+      triggerWildMagicSurge.mockResolvedValue(SURGE_POPUP);
+
+      const caster = casterStats(row.rules);
+      const computed = targetStats();
+      const services = makeServices(caster, [{ name: TARGET, type: 'player', computedStats: computed }]);
+      const spellSnap = cloneDeep(row.spell);
+      const metaCtx = { slotLevel: row.slotLevel, targetName: TARGET };
+      const metaSnap = { ...metaCtx };
+
+      const result = await executeSpellCast(row.spell, metaCtx, services);
+
+      // Exact envelope key-set per branch (#1448 arity/keys; dice branch
+      // carries the reroll pair, :394 'max' branch does not).
+      expect(result).toStrictEqual(row.envelope);
+
+      // :175 ruleset-routed disk URL, exactly one lookup.
+      expect(fetch.mock.calls.map((c) => c[0])).toEqual([row.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json']);
+
+      // :449 fold tuple against the REAL signature, targetStats threaded.
+      expect(resolveHealingBonusesWithDetails).toHaveBeenCalledTimes(1);
+      expect(resolveHealingBonusesWithDetails).toHaveBeenCalledWith(caster, { prof: 6, level: 20, slotLevel: row.slotLevel, campaignName: CAMPAIGN, targetStats: computed });
+
+      // dice seam bytes per branch
+      const plainCount = row.dice === 'plain' || row.dice === 'reroll' ? 1 : 0;
+      expect(rollExpression).toHaveBeenCalledTimes(plainCount);
+      expect(rollExpressionMaximized).toHaveBeenCalledTimes(row.dice === 'maximized' ? 1 : 0);
+      if (row.dice !== 'max') {
+        expect(hasHealingMaximizationForTarget).toHaveBeenCalledTimes(1);
+        expect(hasHealingMaximizationForTarget).toHaveBeenCalledWith(caster, TARGET, CAMPAIGN);
+        expect(hasRerollHealingOnes).toHaveBeenCalledWith(caster);
+        expect((row.dice === 'maximized' ? rollExpressionMaximized : rollExpression).mock.calls[0]).toEqual([row.envelope.formula]);
+      } else {
+        expect(hasHealingMaximizationForTarget).toHaveBeenCalledTimes(0);
+        expect(hasRerollHealingOnes).toHaveBeenCalledTimes(0);
+      }
+      expect(applyHealingRerollOnes).toHaveBeenCalledTimes(row.dice === 'reroll' ? 1 : 0);
+      if (row.dice === 'reroll') expect(applyHealingRerollOnes).toHaveBeenCalledWith([5], row.envelope.formula);
+
+      // combat write + hp_change log bytes
+      const landed = row.landed !== false;
+      expect(getCombatContext).toHaveBeenCalledTimes(landed ? 1 : 0);
+      expect(applyHealingToTarget).toHaveBeenCalledTimes(landed ? 1 : 0);
+      if (landed) expect(applyHealingToTarget).toHaveBeenCalledWith(COMBAT_CTX, TARGET, row.envelope.healAmount, CAMPAIGN);
+      const entries = loggedEntries();
+      expect(entries).toHaveLength(2);
+      expect(entries[0]).toStrictEqual(castLogOf(row.spell));
+      expect(entries[1]).toStrictEqual(row.hpLog);
+
+      // FT-012 latch: stamp iff healAmount > 0, forwarding the rolled-in
+      // details and the OWNER's resolved computedStats (:447-:457) by identity.
+      const latchCount = row.envelope.healAmount > 0 ? 1 : 0;
+      expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(latchCount);
+      if (latchCount) {
+        const call = markFortifiedHealthUsedIfGranted.mock.calls[0];
+        expect(call[0]).toBe(resolveHealingBonusesWithDetails.mock.results[0].value.details);
+        expect(call[1]).toBe(caster);
+        expect(call[2]).toBe(computed);
+        expect(call[3]).toBe(CAMPAIGN);
+      }
+
+      // :337 consumed BEFORE :341 — the Healing-Word fire-and-forget is
+      // unreachable for any spell carrying heal_at_slot_level (#1470 census).
+      expect(triggerHealingWord).toHaveBeenCalledTimes(0);
+      // Early/modal arms dispatched and missed honestly (:701-:711, :328-332).
+      expect(handleGenericAutomation).toHaveBeenCalledTimes(1);
+      expect(handlePowerWordHeal).toHaveBeenCalledTimes(1);
+      for (const arm of MASS_ARMS) expect(arm).toHaveBeenCalledTimes(1);
+      expect(endFriendsOnHostileAction).toHaveBeenCalledWith(CASTER, CAMPAIGN);
+      expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(CASTER, CAMPAIGN);
+
+      // CLA-389 rider merge at :720: riders run post-payment; the
+      // self/ally heal riders fire TWICE — runGenericHealPath :472/:475
+      // and runPostCastTriggers :519/:522 — merge-not-dedupe (#1476 form).
+      const stampedCtx = { slotLevel: row.slotLevel, targetName: TARGET, metamagicHeighten: false };
+      expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+      expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
+      expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(row.spell, { ...stampedCtx, targetNames: [TARGET] }, caster, CAMPAIGN, 'testMap');
+      expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+      expect(triggerPostCastAllyHeals).toHaveBeenCalledWith(row.spell, stampedCtx, caster, CAMPAIGN, 'testMap');
+
+      // damage-lane inert — the noDamage return at :717-:720 outranks it.
+      expect(services.rollDamage).toHaveBeenCalledTimes(0);
+      expect(services.rollAttack).toHaveBeenCalledTimes(0);
+      expect(computeRange).toHaveBeenCalledTimes(0);
+      expect(handleSavePath).toHaveBeenCalledTimes(0);
+      expect(handleNoSavePath).toHaveBeenCalledTimes(0);
+      expect(executeHandler).toHaveBeenCalledTimes(0);
+
+      // HP-bound reads: exactly one pair, campaign arg omitted at :376-:378
+      // (documented quirk — the ?? arm silently treats missing currentHp as full).
+      expect(getRuntimeValue.mock.calls.filter((c) => c[0] === TARGET && c[1] !== 'activeConditions')).toEqual([
+        [TARGET, 'hitPoints'],
+        [TARGET, 'currentHitPoints'],
+      ]);
+
+      // invocation order (#1480 canon): roll -> combat write -> latch ->
+      // generic riders -> surge (heal resolves before the merge at :720).
+      const seq = [];
+      if (row.dice === 'plain' || row.dice === 'reroll') seq.push(rollExpression);
+      if (row.dice === 'maximized') seq.push(rollExpressionMaximized);
+      if (landed) seq.push(applyHealingToTarget);
+      if (latchCount) seq.push(markFortifiedHealthUsedIfGranted);
+      seq.push(triggerPostCastSelfHeals, triggerPostCastAllyHeals, triggerWildMagicSurge);
+      expectAscending(seq);
+
+      // purity: disk row and caller metaCtx untouched
+      expect(row.spell).toEqual(spellSnap);
+      expect(metaCtx).toEqual(metaSnap);
+      expect(consoleError).toHaveBeenCalledTimes(0);
+    });
+  }
+});
+
+describe('executeSpellCast generic-heal lane guards and payload precedence', () => {
+  it('QUIRK (:376): player target with unstamped hitPoints falls back to the CASTER max HP — clamps the heal at 138, not the target 183', async () => {
+    // :375-:376 `getRuntimeValue(target,'hitPoints') || playerStats.hitPoints`
+    // — for a DIFFERENT-player target this silently adopts the caster's max.
+    // Pinned as documented behavior; reported upstream. latch still fires
+    // (heal landed).
+    // Explicit impl: 'hitPoints' key returns undefined (DEFAULT parameters
+    // would resurrect a 183 default here).
+    getRuntimeValue.mockImplementation((_who, key) => {
       if (key === 'activeConditions' || key === 'targetEffects') return [];
-      if (key === 'hitPoints') return 183;
       if (key === 'currentHitPoints') return 100;
       return undefined;
     });
-    markFortifiedHealthUsedIfGranted.mockResolvedValue(undefined);
-  });
+    rollExpression.mockReturnValue({ total: 60, rolls: [60] });
+    const caster = casterStats('5e');
+    const computed = targetStats();
+    const services = makeServices(caster, [{ name: TARGET, type: 'player', computedStats: computed }]);
 
-  it('marks the latch when the Fortified Health bonus fired with actualHeal > 0', async () => {
-    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
+    const result = await executeSpellCast(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1, targetName: TARGET }, services);
 
-    const services = makeServices();
-    const result = await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, services);
-
-    expect(result.healAmount).toBeGreaterThan(0);
+    expect(result).toStrictEqual(diceEnvelope('1d8 + 3', [60], 38, 62, 2, [{ name: 'Fortified Health', amount: 2 }]));
+    const healLog = loggedEntries()[1];
+    expect(healLog).toStrictEqual({ type: 'hp_change', targetName: TARGET, delta: 38, currentHp: 138, maxHp: 138, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] });
     expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
-    const [details, caster, target] = markFortifiedHealthUsedIfGranted.mock.calls[0];
-    expect(details[0].name).toBe('Fortified Health');
-    expect(caster.name).toBe('Wild_Sage_Druid');
-    expect(target.name).toBe('Disciplined_Monk');
+    expect(markFortifiedHealthUsedIfGranted.mock.calls[0][2]).toBe(computed);
+    expect(consoleError).toHaveBeenCalledTimes(0);
   });
 
-  it('does not mark the latch when no Fortified Health bonus was folded', async () => {
-    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
+  it('no target (picker cancelled): :467 skips the whole resolve — no bonus oracle, no dice, no latch — yet CLA-389 riders still run and the surge popup becomes the lane value', async () => {
+    const caster = casterStats('5e');
+    const services = makeServices(caster, [{ name: TARGET, type: 'player', computedStats: targetStats() }]);
+    services.getTargetInfo = vi.fn(async () => null);
+    triggerWildMagicSurge.mockResolvedValue(SURGE_POPUP);
 
-    await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, makeServices());
+    const result = await executeSpellCast(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1 }, services);
 
-    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
-    expect(markFortifiedHealthUsedIfGranted.mock.calls[0][0]).toEqual([]);
+    // lane null -> :599 keeps the surge popup; picker consulted at log, lane, rider.
+    expect(result).toBe(SURGE_POPUP);
+    expect(getRuntimeValue.mock.calls.filter((c) => c[0] === TARGET && c[1] !== 'activeConditions')).toEqual([]);
+    expect(resolveHealingBonusesWithDetails).toHaveBeenCalledTimes(0);
+    expect(rollExpression).toHaveBeenCalledTimes(0);
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(0);
+    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(0);
+    expect(triggerHealingWord).toHaveBeenCalledTimes(0);
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1, metamagicHeighten: false, targetNames: undefined }, caster, CAMPAIGN, 'testMap');
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+    expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(loggedEntries()[0]).toStrictEqual({ ...castLogOf(diskRow(spells5e, 'Cure Wounds')), targetName: null });
+    expect(consoleError).toHaveBeenCalledTimes(0);
   });
 
-  it('does not mark the latch when the heal lands zero (target at full HP)', async () => {
-    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
-    getRuntimeValue.mockImplementation((_char, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return [];
-      if (key === 'hitPoints') return 183;
-      if (key === 'currentHitPoints') return 183;
-      return undefined;
+  it('Starry Chalice needsModal (:479) REPLACES the envelope with the modal — yet the landed heal write and the FT-012 latch already happened inside (:421/:457)', async () => {
+    const caster = casterStats('5e');
+    const computed = targetStats();
+    const services = makeServices(caster, [{ name: TARGET, type: 'player', computedStats: computed }]);
+    const spell = diskRow(spells5e, 'Cure Wounds');
+    triggerPostCastAllyHeals.mockResolvedValue({ needsModal: true, amount: 20 });
+    triggerWildMagicSurge.mockResolvedValue(SURGE_POPUP);
+
+    const result = await executeSpellCast(spell, { slotLevel: 1, targetName: TARGET }, services);
+
+    // modal envelope exact bytes; pending chalice runtime is unset -> caster fallback (:483)
+    expect(result).toStrictEqual({
+      type: 'modal',
+      modalName: 'starryChaliceHeal',
+      payload: { casterName: CASTER, campaignName: CAMPAIGN, amount: 20, targetNames: [CASTER] },
     });
-
-    await executeSpellCast(cureWounds, { slotLevel: 1, targetName: 'Disciplined_Monk' }, makeServices());
-
-    expect(markFortifiedHealthUsedIfGranted).not.toHaveBeenCalled();
+    // the underlying Cure Wounds heal still landed and latched (hasVisibleCastPayload :586 keeps the modal)
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+    expect(applyHealingToTarget).toHaveBeenCalledWith(COMBAT_CTX, TARGET, 7, CAMPAIGN);
+    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
+    expect(markFortifiedHealthUsedIfGranted.mock.calls[0][2]).toBe(computed);
+    expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledTimes(2);
+    expect(consoleError).toHaveBeenCalledTimes(0);
   });
 });

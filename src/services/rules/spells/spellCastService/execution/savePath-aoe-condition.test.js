@@ -1,7 +1,20 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
-/*  SUT — imported after mocks in main file                            */
+/*  SUT + collaborator mocks (census vs savePath.js REAL exports)    */
+/*  savePath.js imports: diceRoller, postCastRiderService,             */
+/*  rangeValidation, damageUtils, ./damageCalculation (REAL leaf —     */
+/*  computeEmpoweredEvocation is in-memory, returns 0 without the     */
+/*  empowered passives, zero network),                                 */
+/*  ../../maps/spellOverlayService (REAL leaf — getCombatContext is   */
+/*  stubbed null here, so overlayTargetId(null) returns null and no   */
+/*  fetch ever fires; overlay lanes owned by savePath-aoe-damage).    */
+/*  useRuntimeState is mocked for transitive load-safety only          */
+/*  (damageCalculation → setRuntimeValue, spellOverlayService/combat  */
+/*  Data → getRuntimeValue).                                           */
+/*  DEAD mocks removed (reported): logService, viciousMockeryService  */
+/*  — neither is in this span's import graph.                         */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -9,13 +22,9 @@ vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-}));
-
 vi.mock('../../../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 8, rolls: [8] })),
+  rollExpression: vi.fn(),
+  rollExpressionMaximized: vi.fn(),
 }));
 
 vi.mock('../../postCastRiderService.js', () => ({
@@ -36,26 +45,71 @@ vi.mock('../../../combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => null),
 }));
 
-vi.mock('../../../features/viciousMockeryService.js', () => ({
-  triggerViciousMockeryForGeneric: vi.fn(() => Promise.resolve()),
-}));
-
 const { handleSavePath } = await import('./savePath.js');
+const { triggerSoulstitchSpells } = await import('../../postCastRiderService.js');
+const { rangeToFeet } = await import('../../../combat/rangeValidation.js');
+const { getCombatContext } = await import('../../../combat/damageUtils.js');
+const { rollExpression } = await import('../../../../dice/diceRoller.js');
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  DISK ROWS — copied verbatim from public/data/2024/spells.json    */
+/*  (provenance audit #1488: every area/DC/duration/automation byte  */
+/*  below matches disk; dc_type is UPPERCASE on disk — 'DEX'/'STR',  */
+/*  durations are TEXT bytes, never timestamps; condition-fail        */
+/*  entries are {type:X,condition:X} mirrors, NOT {type:'condition'})*/
+/*  Both are LIVE names on this gate: neither 'grease' nor            */
+/*  'entangle' is hijacked by an upstream name gate in index.js /    */
+/*  modalSpells.js (those intercept calm-emotions, confusion,         */
+/*  conjure-volley, dispel-magic, fear, hypnotic-pattern, mass-      */
+/*  suggestion, power-word-heal/kill, shapechange, silence, sleep).   */
 /* ------------------------------------------------------------------ */
 
-function makeSpell(overrides = {}) {
+const DISK_GREASE_2024 = {
+  name: 'Grease',
+  level: 1,
+  school: 'Conjuration',
+  range: '60 feet',
+  duration: '1 minute',
+  concentration: false,
+  damage: null,
+  dc: { dc_type: 'DEX', dc_success: 'none' },
+  area_of_effect: { shape: 'square', size: '10-foot' },
+  status_effects: ['Prone'],
+  automation: {
+    type: 'save_only',
+    saveType: 'DEX',
+    effects: { fail: [{ type: 'prone', condition: 'prone' }] },
+  },
+};
+
+const DISK_ENTANGLE_2024 = {
+  name: 'Entangle',
+  level: 1,
+  school: 'Conjuration',
+  range: '90 feet',
+  duration: 'Concentration, up to 1 minute',
+  concentration: true,
+  damage: null,
+  dc: { dc_type: 'STR', dc_success: 'none' },
+  area_of_effect: { shape: 'square', size: '20-foot' },
+  status_effects: ['Restrained'],
+  automation: {
+    type: 'save_only',
+    saveType: 'STR',
+    effects: { fail: [{ type: 'restrained', condition: 'restrained' }] },
+  },
+};
+
+/* Cast-row mirror (what execution/index.js threads beside fullSpell):
+   deliberately range-mismatched vs fullSpell so payload.range proves the
+   fullSpell.range || spell.range precedence on savePath.js:182. */
+function makeCastSpell(overrides = {}) {
   return {
-    name: 'Fireball',
-    level: 3,
-    school: 'Evocation',
-    casting_time: '1 action',
-    components: ['V', 'S'],
-    range: '150 feet',
-    damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } },
-    dc: { dc_type: 'dex', dc_success: 'half' },
+    name: DISK_GREASE_2024.name,
+    level: 1,
+    school: 'Conjuration',
+    range: '90 feet',
+    dc: { dc_type: 'DEX', dc_success: 'none' },
     ...overrides,
   };
 }
@@ -80,8 +134,8 @@ function makePlayerStats(overrides = {}) {
 
 function makeSavePathArgs(overrides = {}) {
   return {
-    spell: makeSpell(),
-    fullSpell: makeSpell(),
+    spell: makeCastSpell(),
+    fullSpell: DISK_GREASE_2024,
     metaCtx: { targetName: 'Goblin' },
     playerStats: makePlayerStats(),
     campaignName: 'test-campaign',
@@ -90,7 +144,7 @@ function makeSavePathArgs(overrides = {}) {
     getTargetInfo: async () => ({ name: 'Goblin' }),
     getRuntimeValue: vi.fn(),
     innateSorceryActive: false,
-    effectiveDamageType: 'Fire',
+    effectiveDamageType: '',
     spellSaveDc: 17,
     overchannelFormula: null,
     overchannelActive: false,
@@ -104,201 +158,163 @@ function makeSavePathArgs(overrides = {}) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  beforeEach — reset all mocks                                       */
+/*  Suite                                                              */
 /* ------------------------------------------------------------------ */
 
-describe('savePath.js — handleAoE condition-only path', () => {
+describe('savePath.js — condition-only AoE save path → aoeCondition modal payload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  handleAoE — condition-only AoE (grease)                          */
-  /* ---------------------------------------------------------------- */
-
-  describe('condition-only AoE', () => {
-    it('returns aoeCondition modal for grease with fail effects', async () => {
-      const args = makeSavePathArgs();
-      args.fullSpell = {
-        name: 'Grease',
-        area_of_effect: { type: 'square', size: 10 },
-        damage: { damage_type: 'Bludgeoning', damage_at_slot_level: {} },
-        dc: { dc_type: 'dex' },
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'prone' }],
-          },
-        },
-      };
-      args.effectiveDamageType = '';
-
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.modalName).toBe('aoeCondition');
-      expect(result.automationPopup.payload.includeCaster).toBe(true);
-      expect(result.automationPopup.payload.shape).toBe('square');
-      expect(result.automationPopup.payload.saveType).toBe('dex');
-      expect(result.automationPopup.payload.conditionLabel).toBe('prone');
+  it('ships the full aoeCondition popup for the live disk Grease row: CLA-321 soulstitch tuple first, disk shape/range/uppercase saveType bytes, SP-024 text duration, innate-sorcery +1, grease-only includeCaster, raw fail-array identity, and no dice rolled', async () => {
+    const args = makeSavePathArgs({
+      innateSorceryActive: true,
+      hasInvisible: true,
     });
 
-    it('does not include caster for non-grease condition-only AoE', async () => {
-      const args = makeSavePathArgs();
-      args.fullSpell = {
-        name: 'Slow',
-        area_of_effect: { type: 'cube', size: 40 },
-        damage: { damage_type: '', damage_at_slot_level: {} },
-        dc: { dc_type: 'wis' },
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'slowed' }],
-          },
+    const result = await handleSavePath(args);
+
+    // Whole-popup strict pin: exact key set, no fabricated keys
+    // (no dcSuccess/damage keys — those live only on saveAttackAoe),
+    // and no clock/timestamp keys — expiry is the modal's job
+    // (AOEConditionModal.jsx resolveConditionClock reads the TEXT duration).
+    expect(result).toStrictEqual({
+      automationPopup: {
+        type: 'modal',
+        modalName: 'aoeCondition',
+        payload: {
+          action: { name: 'Grease', automation: DISK_GREASE_2024.automation },
+          playerStats: args.playerStats,
+          campaignName: 'test-campaign',
+          shape: 'square',
+          range: 60,
+          duration: '1 minute',
+          saveType: 'DEX',
+          saveDc: 18,
+          effects: DISK_GREASE_2024.automation.effects.fail,
+          conditionLabel: 'prone',
+          activeOverlay: null,
+          metamagicCareful: false,
+          metamagicHeighten: true,
+          includeCaster: true,
         },
-      };
-      args.effectiveDamageType = '';
-
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.modalName).toBe('aoeCondition');
-      expect(result.automationPopup.payload.includeCaster).toBe(false);
+      },
     });
 
-    it('uses fullSpell.dc.dc_type when present', async () => {
-      const args = makeSavePathArgs();
-      args.fullSpell = {
-        name: 'Grease',
-        area_of_effect: { type: 'square', size: 10 },
-        damage: { damage_at_slot_level: {} },
-        dc: { dc_type: 'str' },
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'prone' }],
-          },
-        },
-      };
-      args.effectiveDamageType = '';
+    // References ride through unwrapped (identity, not copies).
+    expect(result.automationPopup.payload.playerStats).toBe(args.playerStats);
+    expect(result.automationPopup.payload.effects).toBe(DISK_GREASE_2024.automation.effects.fail);
 
-      const result = await handleSavePath(args);
+    // CLA-321: soulstitch fires exactly once, 5-arg positional tuple by
+    // identity, BEFORE the combat-context read that precedes the modal.
+    expect(triggerSoulstitchSpells.mock.calls[0]).toHaveLength(5);
+    expect(triggerSoulstitchSpells).toHaveBeenCalledWith(
+      args.fullSpell, args.metaCtx, args.playerStats, 'test-campaign', null,
+    );
+    expect(triggerSoulstitchSpells.mock.invocationCallOrder[0])
+      .toBeLessThan(getCombatContext.mock.invocationCallOrder[0]);
+    expect(getCombatContext).toHaveBeenCalledTimes(1);
+    expect(getCombatContext).toHaveBeenCalledWith('test-campaign');
 
-      expect(result.automationPopup.payload.saveType).toBe('str');
-    });
+    // fullSpell.range wins over the mismatched cast-row range.
+    expect(rangeToFeet).toHaveBeenCalledTimes(1);
+    expect(rangeToFeet).toHaveBeenCalledWith('60 feet');
 
-    it('falls back to spell.dc.dc_type when fullSpell.dc is missing', async () => {
-      const args = makeSavePathArgs();
-      args.fullSpell = {
-        name: 'Grease',
-        area_of_effect: { type: 'square', size: 10 },
-        damage: { damage_at_slot_level: {} },
-        dc: null,
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'prone' }],
-          },
-        },
-      };
-      args.spell = { dc: { dc_type: 'con' } };
-      args.effectiveDamageType = '';
-
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.payload.saveType).toBe('con');
-    });
-
-    it('defaults saveType to CON when no dc is defined', async () => {
-      const args = makeSavePathArgs();
-      args.fullSpell = {
-        name: 'Grease',
-        area_of_effect: { type: 'square', size: 10 },
-        damage: { damage_at_slot_level: {} },
-        dc: null,
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'prone' }],
-          },
-        },
-      };
-      args.spell = { dc: {} };
-      args.effectiveDamageType = '';
-
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.payload.saveType).toBe('CON');
-    });
+    // Condition-only lane never rolls dice.
+    expect(rollExpression).not.toHaveBeenCalled();
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  handleAoE — innate sorcery DC bonus (condition-only)             */
-  /* ---------------------------------------------------------------- */
-
-  describe('innate sorcery DC bonus', () => {
-    it('adds +1 to saveDc when innateSorceryActive is true for condition-only AoE', async () => {
-      const args = makeSavePathArgs({ innateSorceryActive: true });
-      args.fullSpell = {
-        name: 'Grease',
-        area_of_effect: { type: 'square', size: 10 },
-        damage: { damage_at_slot_level: {} },
-        dc: { dc_type: 'dex' },
-        automation: {
-          effects: {
-            fail: [{ type: 'condition', condition: 'prone' }],
-          },
-        },
-      };
-      args.effectiveDamageType = '';
-
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.payload.saveDc).toBe(18);
+  it('ships the full aoeCondition popup for the live disk Entangle row: includeCaster stays false off-grease, concentration duration rides as text, metamagic values pass through metaCtx, saveDc untouched without innate sorcery', async () => {
+    const args = makeSavePathArgs({
+      fullSpell: DISK_ENTANGLE_2024,
+      spell: makeCastSpell({ name: 'Entangle' }),
+      metaCtx: { targetName: 'Goblin', metamagicCareful: ['Goblin'], metamagicHeighten: 'Heightened' },
     });
+
+    const result = await handleSavePath(args);
+
+    expect(result).toStrictEqual({
+      automationPopup: {
+        type: 'modal',
+        modalName: 'aoeCondition',
+        payload: {
+          action: { name: 'Entangle', automation: DISK_ENTANGLE_2024.automation },
+          playerStats: args.playerStats,
+          campaignName: 'test-campaign',
+          shape: 'square',
+          range: 90,
+          duration: 'Concentration, up to 1 minute',
+          saveType: 'STR',
+          saveDc: 17,
+          effects: DISK_ENTANGLE_2024.automation.effects.fail,
+          conditionLabel: 'restrained',
+          activeOverlay: null,
+          metamagicCareful: ['Goblin'],
+          metamagicHeighten: 'Heightened',
+          includeCaster: false,
+        },
+      },
+    });
+    expect(result.automationPopup.payload.effects).toBe(DISK_ENTANGLE_2024.automation.effects.fail);
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  handleAoE — automationEffects fail conditions                    */
-  /* ---------------------------------------------------------------- */
+  it('falls back down the saveType chain when fullSpell.dc is null: cast-row dc_type first, then the uppercase CON default byte', async () => {
+    // Arm 1: spell.dc.dc_type (savePath.js:80 middle term).
+    const midFallback = await handleSavePath(makeSavePathArgs({
+      fullSpell: { ...DISK_GREASE_2024, dc: null },
+      spell: makeCastSpell({ dc: { dc_type: 'CON' } }),
+    }));
+    expect(midFallback.automationPopup.modalName).toBe('aoeCondition');
+    expect(midFallback.automationPopup.payload.saveType).toBe('CON');
 
-  describe('automationEffects fail conditions', () => {
-    it('extracts condition names from fail effects', async () => {
-      const args = makeSavePathArgs({ effectiveDamageType: '' });
-      args.fullSpell = {
-        name: 'Frightful Presence',
-        area_of_effect: { type: 'cone', size: 60 },
-        damage: { damage_at_slot_level: {} },
-        dc: { dc_type: 'wis' },
-        automation: {
-          effects: {
-            fail: [
-              { type: 'condition', condition: 'frightened' },
-              { type: 'condition', condition: 'incapacitated' },
-            ],
-          },
-        },
-      };
+    // Arm 2: no dc_type anywhere → the 'CON' literal fallback
+    // (savePath.js:106 — note the asymmetry with the damage lane's 'DEX'
+    // default, pinned in savePath-aoe-damage.test.js).
+    const tail = await handleSavePath(makeSavePathArgs({
+      fullSpell: { ...DISK_GREASE_2024, dc: null },
+      spell: makeCastSpell({ dc: {} }),
+    }));
+    expect(tail.automationPopup.modalName).toBe('aoeCondition');
+    expect(tail.automationPopup.payload.saveType).toBe('CON');
+  });
 
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.payload.conditionLabel).toBe('frightened, incapacitated');
+  it('joins only condition-or-type bytes into conditionLabel while the raw fail array rides through untouched', async () => {
+    // Synthetic multi-fail probe (no disk spell reaching this gate ships
+    // >1 fail entry): entries keep the disk {type:X,condition:X} mirror
+    // shape; one entry lacks type, one is pure junk.
+    const probeName = 'Multi Fail Probe';
+    const fail = [
+      { type: 'blinded', condition: 'blinded' },
+      { condition: 'restrained' },
+      { someOtherField: 'value' },
+    ];
+    const args = makeSavePathArgs({
+      fullSpell: {
+        name: probeName,
+        level: 1,
+        school: 'Enchantment',
+        range: '90 feet',
+        duration: 'Instantaneous',
+        damage: null,
+        dc: { dc_type: 'CON', dc_success: 'none' },
+        area_of_effect: { shape: 'cone', size: '15-foot' },
+        automation: { type: 'save_only', saveType: 'CON', effects: { fail } },
+      },
+      spell: makeCastSpell({ name: probeName, dc: { dc_type: 'CON', dc_success: 'none' } }),
     });
 
-    it('filters out effects without condition/type', async () => {
-      const args = makeSavePathArgs({ effectiveDamageType: '' });
-      args.fullSpell = {
-        name: 'TestSpell',
-        area_of_effect: { type: 'cone', size: 60 },
-        damage: { damage_at_slot_level: {} },
-        dc: { dc_type: 'dex' },
-        automation: {
-          effects: {
-            fail: [
-              { type: 'condition', condition: 'prone' },
-              { someOtherField: 'value' },
-              { condition: 'blinded' },
-            ],
-          },
-        },
-      };
+    const result = await handleSavePath(args);
 
-      const result = await handleSavePath(args);
-
-      expect(result.automationPopup.payload.conditionLabel).toBe('prone, blinded');
-    });
+    expect(result.automationPopup.modalName).toBe('aoeCondition');
+    expect(result.automationPopup.payload.conditionLabel).toBe('blinded, restrained');
+    expect(result.automationPopup.payload.duration).toBe('Instantaneous');
+    // No pre-filtering: junk entry survives inside effects verbatim.
+    expect(result.automationPopup.payload.effects).toBe(fail);
+    expect(result.automationPopup.payload.effects).toStrictEqual([
+      { type: 'blinded', condition: 'blinded' },
+      { condition: 'restrained' },
+      { someOtherField: 'value' },
+    ]);
+    expect(result.automationPopup.payload.includeCaster).toBe(false);
   });
 });

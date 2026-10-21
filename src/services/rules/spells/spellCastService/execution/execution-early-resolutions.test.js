@@ -1,8 +1,34 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
-/* ------------------------------------------------------------------ */
+/* OWNER MAP — execution/index.js pre-chain lane (#1382/#1458/#1461/ */
+/* #1462/#1470/#1474). OWNED HERE: ambush throw family (:117-120),   */
+/* SP-002 null-activeConditions CONTINUE (:124-129, cited :331-350), */
+/* lastActionSpellCast casings (:67) + endFriends/endInvisibility     */
+/* transport (:60-63) (#1382), cast-log bytes (:225-244), Hunter's    */
+/* Mark/Hex consumption exits + CLA-389 single-write (:514/:629-636). */
+/* FOLDED OUT (owners cited, never re-grown): silence popup/log bytes */
+/* + no-V guard -> spellCastService.execute.test.js:341-377 +         */
+/* noformula-modals.test.js:484-531 (SP-106); corrupt activeConditions */
+/* ABORT bytes -> spellCastService.test.js:452-470; :701-709 modal    */
+/* arms + :707 Promise quirk -> earlyReturns-modal (#1471); :710/712  */
+/* generic bypass -> earlyReturns-generic (#1470); hub gate order ->  */
+/* execution-block-checks (#1474); CLA-219 :680 fold ->                */
+/* index.magicalAmbushTransport; CLA-134 stamp -> aoeSpells:375;      */
+/* applyHexEffects writes / CLA-107 -> spellCastService.hexEffects.   */
+/* FIXTURE TRUTH: lightweight payloads (#1472) — area_of_effect makes */
+/* needsLookup false (:172) so fetch NEVER fires; fullSpell === spell. */
+/* normalizeCastingTime + psychicSpellsHandler run REAL (pure guards). */
+/* No clocks. Campaign lockdown: test-campaign. Kill matrix: guard     */
+/* removed -> throw row; == null -> corrupt-row absent-here (parent   */
+/* owns bytes); normalize skipped -> 'Action' arm; === inverted ->    */
+/* Friends arm; includes('action') -> '1 reaction' arm; Hex skip and  */
+/* :514 guard removed -> addEntry/applyHexEffects singleton censuses. */
+
+/* Mocks — every dependency of execution/index.js. The barrel edge is */
+/* mocked at the REAL import path (compelledDuelHandler, index.js:6 — */
+/* SP-026); the triggerSpells table is exhaustive because :710's       */
+/* handleGenericAutomation consults it on every pass-through row.      */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((_playerName, _key, _campaignName) => undefined),
@@ -15,7 +41,10 @@ vi.mock('../../../../ui/logService.js', () => ({
 
 vi.mock('../../../../automation/index.js', () => ({
   executeHandler: vi.fn(),
-  checkCompelledDuelAttackExpiry: vi.fn(),
+}));
+
+vi.mock('../../../../automation/handlers/spells/compelledDuelHandler.js', () => ({
+  checkCompelledDuelAttackExpiry: vi.fn(() => null),
 }));
 
 vi.mock('../../../features/healingWordService.js', () => ({
@@ -120,7 +149,6 @@ vi.mock('./blockChecks.js', () => ({
   checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
 
-
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
   handlePowerWordKill: vi.fn(() => Promise.resolve({ handled: false })),
@@ -203,10 +231,6 @@ vi.mock('./damageCalculation.js', () => ({
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
 }));
 
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
@@ -228,11 +252,19 @@ const { endInvisibilityOnHostileAction } = await import('../../../features/invis
 const { isInnateSorceryActive } = await import('../../../../combat/buffs/buffService.js');
 const { resolveSpellDamageWithTypes } = await import('../../../core/spellDamageUtils.js');
 const { getSilenceSource, isCreatureInSilenceZone } = await import('../../../features/silenceService.js');
-const { triggerDispelMagic: mockTriggerDispelMagic } = await import('./helpers.js');
+const { applyHexEffects, triggerDispelMagic } = await import('./helpers.js');
+const { handleSavePath } = await import('./savePath.js');
+const { checkCompelledDuelAttackExpiry } = await import('../../../../automation/handlers/spells/compelledDuelHandler.js');
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Fixtures — lightweight payloads (#1472 form). area_of_effect is  */
+/*  present so lookupFullSpell's needsLookup (:172) is FALSE and no  */
+/*  fetch fires; fullSpell stays the spell itself (identity).        */
 /* ------------------------------------------------------------------ */
+
+const CAMPAIGN = 'test-campaign';
+const HOSTILE_TUPLE = ['TestWizard', CAMPAIGN];
+const STAMP_TUPLE = ['TestWizard', 'lastActionSpellCast', 1, CAMPAIGN];
 
 function makeSpell(overrides = {}) {
   return {
@@ -242,6 +274,7 @@ function makeSpell(overrides = {}) {
     casting_time: '1 action',
     components: ['V', 'S'],
     range: '150 feet',
+    area_of_effect: { type: 'sphere', size: 20 },
     damage: { damage_type: 'Fire', damage_at_slot_level: { 3: '8d6' } },
     dc: { dc_type: 'dex', dc_success: 'half' },
     ...overrides,
@@ -266,15 +299,47 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeMetaCtx(overrides = {}) {
-  return {
-    targetName: 'Goblin',
-    ...overrides,
-  };
+const rollAttack = vi.fn();
+const rollDamage = vi.fn();
+
+function runCast(spell, playerStats = makePlayerStats()) {
+  return executeSpellCast(spell, { targetName: 'Goblin' }, {
+    rollAttack,
+    rollDamage,
+    playerStats,
+    getTargetInfo: async () => ({ name: 'Goblin' }),
+    campaignName: CAMPAIGN,
+  });
+}
+
+/* Exact refusal bytes (index.js :142/:151) — identity of the exit
+   point is pinned here; the silence lane's own ownership of these
+   bytes lives in execute.test.js:341-377 / noformula-modals:484-531. */
+const SILENCE_POPUP = {
+  automationPopup: {
+    type: 'popup',
+    payload: {
+      type: 'automation_info',
+      name: 'Silence',
+      description: 'Fireball cannot be cast — TestWizard is inside a Silence zone and Verbal spell components are impossible there.',
+    },
+  },
+};
+const SILENCE_LOG_REST = {
+  type: 'automation',
+  creatureName: 'TestWizard',
+  name: 'Silence',
+  description: 'Fireball blocked — TestWizard is inside SilenceCaster\'s Silence zone; Verbal components are impossible there.',
+};
+
+function withoutTimestamp(campaign, entry) {
+  const { timestamp, ...rest } = entry;
+  expect(Number.isInteger(timestamp)).toBe(true);
+  return [campaign, rest];
 }
 
 /* ------------------------------------------------------------------ */
-/*  beforeEach — reset all mock implementations to safe defaults       */
+/*  beforeEach — reset all mock implementations to safe defaults     */
 /* ------------------------------------------------------------------ */
 
 describe('executeSpellCast — early resolutions', () => {
@@ -290,375 +355,240 @@ describe('executeSpellCast — early resolutions', () => {
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Spell resolution — missing passives                             */
+  /*  Magical-ambush resolution — throw family (#1470, index.js:117) */
   /* ---------------------------------------------------------------- */
 
-  describe('missing passives', () => {
-    it('throws when passives is null', async () => {
-      const playerStats = makePlayerStats({ automation: { passives: null } });
+  describe('magical-ambush passives guard', () => {
+    it('throws the exact guard error for null or missing passives, before the silence lookup and with zero side effects', async () => {
+      const arms = [
+        ['passives: null', makePlayerStats({ automation: { passives: null } })],
+        ['passives key absent', makePlayerStats({ automation: {} })],
+      ];
 
-      await expect(
-        executeSpellCast(makeSpell(), makeMetaCtx(), {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats,
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        }),
-      ).rejects.toThrow('playerStats.automation.passives is required for magical ambush check');
-    });
+      for (const [label, playerStats] of arms) {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue([]);
 
-    it('throws when passives is undefined', async () => {
-      const playerStats = makePlayerStats({ automation: {} });
+        const err = await runCast(makeSpell(), playerStats).catch((e) => e);
 
-      await expect(
-        executeSpellCast(makeSpell(), makeMetaCtx(), {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats,
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        }),
-      ).rejects.toThrow('playerStats.automation.passives is required for magical ambush check');
+        expect(err, label).toBeInstanceOf(Error);
+        expect(err.message, label).toBe('playerStats.automation.passives is required for magical ambush check');
+        // Only the block hub ran before the throw (:671-665, :91): one
+        // antimagic store read, one target resolution — nothing past :675.
+        expect(getRuntimeValue.mock.calls, label).toEqual([['campaign', 'targetEffects']]);
+        expect(getSilenceSource.mock.calls, label).toEqual([]);
+        expect(addEntry.mock.calls, label).toEqual([]);
+        expect(setRuntimeValue.mock.calls, label).toEqual([]);
+        expect(endFriendsOnHostileAction.mock.calls, label).toEqual([]);
+        expect(endInvisibilityOnHostileAction.mock.calls, label).toEqual([]);
+      }
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Spell resolution — missing activeConditions                     */
+  /*  SP-002 — null caster activeConditions continues (:124-129)     */
   /* ---------------------------------------------------------------- */
 
-  describe('missing activeConditions', () => {
+  describe('SP-002 null caster activeConditions', () => {
     it('SP-002: does not abort the cast when caster activeConditions is null', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _cn) => {
-        if (key === 'activeConditions') return null;
-        return undefined;
-      });
-      // Keep the cast flowing to a benign early return after the ambush check.
+      getRuntimeValue.mockImplementation((_character, key) => (
+        key === 'activeConditions' ? null : []
+      ));
+      // Exit at the next gate (:682) so the continue is observable without
+      // walking the damage chain (chain arms owned by earlyReturns-* lanes).
       getSilenceSource.mockReturnValue('SilenceCaster');
       isCreatureInSilenceZone.mockReturnValue(true);
 
-      const result = await executeSpellCast(makeSpell({ components: ['V'] }), makeMetaCtx(), {
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        playerStats: makePlayerStats(),
-        getTargetInfo: async () => ({ name: 'Goblin' }),
-        campaignName: 'test-campaign',
-      });
+      const result = await runCast(makeSpell());
 
-      // Must NOT reject; treated as empty caster conditions, cast proceeds
-      // (silence early-return proves the ambush check no longer aborts).
-      expect(result).toBeDefined();
-    });
-
-    it('throws when activeConditions is not an array (corrupt non-null value)', async () => {
-      getRuntimeValue.mockImplementation((playerName, key, _cn) => {
-        if (key === 'activeConditions') return 'not-an-array';
-        return undefined;
-      });
-
-      await expect(
-        executeSpellCast(makeSpell(), makeMetaCtx(), {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        }),
-      ).rejects.toThrow('activeConditions must be an array for caster');
+      // A pre-chain abort would have rejected; instead the cast reached the
+      // silence gate and returned its refusal with empty caster conditions.
+      expect(result).toStrictEqual(SILENCE_POPUP);
+      expect(getRuntimeValue.mock.calls).toEqual([
+        ['campaign', 'targetEffects'],
+        ['TestWizard', 'activeConditions', CAMPAIGN],
+      ]);
+      const [logCampaign, logRest] = withoutTimestamp(...addEntry.mock.calls[0]);
+      expect(addEntry.mock.calls.length).toBe(1);
+      expect(logCampaign).toBe(CAMPAIGN);
+      expect(logRest).toEqual(SILENCE_LOG_REST);
+      // Refusal precedes :687 — the cast never paid its hostile side effects.
+      expect(endFriendsOnHostileAction.mock.calls).toEqual([]);
+      expect(endInvisibilityOnHostileAction.mock.calls).toEqual([]);
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Spell resolution — silence blocking                             */
-  /* ---------------------------------------------------------------- */
-
-  describe('silence blocking', () => {
-    it('refuses with popup and log when caster is silenced with verbal component', async () => {
-      getSilenceSource.mockReturnValue('SilenceCaster');
-      isCreatureInSilenceZone.mockReturnValue(true);
-      addEntry.mockClear();
-
-      const result = await executeSpellCast(
-        makeSpell({ components: ['V', 'S'] }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toEqual({
-        automationPopup: {
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            name: 'Silence',
-          }),
-        },
-      });
-      const blockLog = addEntry.mock.calls.find(
-        (c) => c[1].type === 'automation' && c[1].name === 'Silence'
-      );
-      expect(blockLog).toBeDefined();
-      expect(blockLog[1].description).toContain('blocked');
-    });
-
-    it('does not block when spell has no verbal component', async () => {
-      getSilenceSource.mockReturnValue(null);
-
-      const result = await executeSpellCast(
-        makeSpell({ components: ['S'] }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeNull();
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /*  Spell resolution — lastActionSpellCast                          */
+  /*  lastActionSpellCast casing table (#1382, index.js:67 CLA-399) */
   /* ---------------------------------------------------------------- */
 
   describe('lastActionSpellCast', () => {
-    it('sets lastActionSpellCast when casting_time is 1 action', async () => {
-      await executeSpellCast(
-        makeSpell({ casting_time: '1 action' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+    it('arms exactly for 5e "1 action" and 2024 "Action" casings and never for any other casting_time — full setRuntimeValue census per arm', async () => {
+      const arms = [
+        ['1 action', true],
+        ['Action', true], // CLA-399: 2024 casing via REAL normalizeCastingTime
+        ['Bonus Action', false], // CLA-399 negative
+        ['1 bonus action', false],
+        ['1 reaction', false], // kills an includes('action') shortcut at :67
+      ];
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
-    });
+      for (const [castingTime, armsFlag] of arms) {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue([]);
+        setRuntimeValue.mockResolvedValue(undefined);
+        addEntry.mockResolvedValue(undefined);
 
-    it('CLA-399: sets lastActionSpellCast for 2024 "Action" casing', async () => {
-      await executeSpellCast(
-        makeSpell({ casting_time: 'Action' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+        const result = await runCast(makeSpell({ casting_time: castingTime }));
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
-    });
-
-    it('CLA-399: does not set lastActionSpellCast for 2024 "Bonus Action" casing', async () => {
-      await executeSpellCast(
-        makeSpell({ casting_time: 'Bonus Action' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
-    });
-
-    it('does not set lastActionSpellCast for non-action spells', async () => {
-      await executeSpellCast(
-        makeSpell({ casting_time: '1 bonus action' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'test-campaign');
+        // Every arm traverses the hostile lane to its null exit (:771).
+        expect(result, castingTime).toBeNull();
+        if (armsFlag) {
+          expect(setRuntimeValue.mock.calls, castingTime).toEqual([STAMP_TUPLE]);
+        } else {
+          // Full census: ANY spurious stamp (wrong casing or extra call) fails.
+          expect(setRuntimeValue.mock.calls, castingTime).toEqual([]);
+          // Positive trail proves :60-63 executed — the skip is the :67 gate,
+          // not an aborted lane (which would make the negative vacuous).
+          expect(endFriendsOnHostileAction.mock.calls, castingTime).toEqual([HOSTILE_TUPLE]);
+          expect(endInvisibilityOnHostileAction.mock.calls, castingTime).toEqual([HOSTILE_TUPLE]);
+        }
+      }
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Spell resolution — endFriends / endInvisibility                 */
+  /*  endFriends / endInvisibility transport (#1382, index.js:60-63) */
   /* ---------------------------------------------------------------- */
 
   describe('endFriends / endInvisibility', () => {
-    it('calls endFriendsOnHostileAction for non-Friends spells', async () => {
-      await executeSpellCast(
-        makeSpell({ name: 'Fireball' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+    it('ends Friends and Invisibility exactly once each, with exact tuples, on a hostile non-Friends cast', async () => {
+      const result = await runCast(makeSpell({ name: 'Fireball' }));
 
-      expect(endFriendsOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
+      expect(result).toBeNull();
+      expect(endFriendsOnHostileAction.mock.calls).toEqual([HOSTILE_TUPLE]);
+      expect(endInvisibilityOnHostileAction.mock.calls).toEqual([HOSTILE_TUPLE]);
     });
 
-    it('does not call endFriendsOnHostileAction for Friends spell', async () => {
-      await executeSpellCast(
-        makeSpell({ name: 'Friends' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+    it('never ends Friends for the Friends spell in any casing, yet still ends Invisibility once per cast', async () => {
+      for (const name of ['Friends', 'friends', 'FRIENDS']) {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue([]);
+        addEntry.mockResolvedValue(undefined);
 
-      expect(endFriendsOnHostileAction).not.toHaveBeenCalled();
-    });
+        const result = await runCast(makeSpell({ name }));
 
-    it('calls endInvisibilityOnHostileAction for all spells', async () => {
-      await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
+        expect(result, name).toBeNull();
+        expect(endFriendsOnHostileAction.mock.calls, name).toEqual([]);
+        expect(endInvisibilityOnHostileAction.mock.calls, name).toEqual([HOSTILE_TUPLE]);
+      }
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Spell resolution — logGenericSpellCast                          */
+  /*  Generic cast log (:225-244) — full key-set bytes               */
   /* ---------------------------------------------------------------- */
 
   describe('spell cast log', () => {
-    it('logs a spell entry when spell is not Hex', async () => {
-      await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+    it('writes exactly one generic spell-log entry with the full key-set, resolved target and computed saveDC', async () => {
+      await runCast(makeSpell());
 
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      expect(addEntry.mock.calls.length).toBe(1);
+      const [logCampaign, entryRest] = withoutTimestamp(...addEntry.mock.calls[0]);
+      expect(logCampaign).toBe(CAMPAIGN);
+      expect(entryRest).toEqual({
         type: 'spell',
         characterName: 'TestWizard',
+        targetName: 'Goblin',
         spellName: 'Fireball',
-      }));
-    });
-
-    it('does not log the generic spell entry when spell name is Hex', async () => {
-      await executeSpellCast(
-        makeSpell({ name: 'Hex' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        spellName: 'Hex',
-        type: 'spell',
-      }));
+        spellLevel: 3,
+        castingTime: '1 action',
+        damageType: 'Fire',
+        damageFormula: '1d8',
+        saveDC: 17,
+        concentration: false,
+        description: null,
+      });
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Hunter's Mark / Hex                                             */
+  /*  Hunter's Mark / Hex consumption (:629-636, CLA-389 single-write)*/
   /* ---------------------------------------------------------------- */
 
-  describe("Hunter's Mark / Hex", () => {
-    it('returns early for Hunter\'s Mark', async () => {
-      const result = await executeSpellCast(
-        makeSpell({ name: "Hunter's Mark" }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+  describe('Hunter\'s Mark / Hex', () => {
+    it('consumes Hunter\'s Mark at the marked-target gate: undefined exit, its own generic log, zero hex writes, zero duel expiry', async () => {
+      const result = await runCast(makeSpell({ name: 'Hunter\'s Mark' }));
 
       expect(result).toBeUndefined();
-      expect(mockTriggerDispelMagic).not.toHaveBeenCalled();
-    });
-
-    it('returns early for Hex and applies hex effects', async () => {
-      const result = await executeSpellCast(
-        makeSpell({ name: 'Hex' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats: makePlayerStats(),
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
-
-      expect(result).toBeUndefined();
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        spellName: 'Hex',
-      }));
-    });
-
-    it('Hex with Eldritch Hex passive logs both disadvantages', async () => {
-      const playerStats = makePlayerStats({
-        automation: {
-          passives: [
-            { name: 'Eldritch Hex', type: 'conditional_disadvantage' },
-          ],
-        },
+      // Consumed at :725 BEFORE the duel-expiry (:731) and save-path (:754) seam.
+      expect(checkCompelledDuelAttackExpiry.mock.calls).toEqual([]);
+      expect(handleSavePath.mock.calls).toEqual([]);
+      // CLA-389 double-write guard (:514): marked-target spells never re-apply hex.
+      expect(applyHexEffects.mock.calls).toEqual([]);
+      expect(triggerDispelMagic.mock.calls).toEqual([]);
+      // Generic log ran for Hunter's Mark (only Hex is skipped at :226).
+      expect(addEntry.mock.calls.length).toBe(1);
+      const [logCampaign, entryRest] = withoutTimestamp(...addEntry.mock.calls[0]);
+      expect(logCampaign).toBe(CAMPAIGN);
+      expect(entryRest).toEqual({
+        type: 'spell',
+        characterName: 'TestWizard',
+        targetName: 'Goblin',
+        spellName: 'Hunter\'s Mark',
+        spellLevel: 3,
+        castingTime: '1 action',
+        damageType: 'Fire',
+        damageFormula: '1d8',
+        saveDC: 17,
+        concentration: false,
+        description: null,
       });
+    });
 
-      await executeSpellCast(
-        makeSpell({ name: 'Hex' }),
-        makeMetaCtx(),
-        {
-          rollAttack: vi.fn(),
-          rollDamage: vi.fn(),
-          playerStats,
-          getTargetInfo: async () => ({ name: 'Goblin' }),
-          campaignName: 'test-campaign',
-        },
-      );
+    it('Hex exit is owned by castHex: undefined result, one applyHexEffects call, and a single hex-shaped log — generic log skipped, base vs Eldritch bytes', async () => {
+      const arms = [
+        ['Hex', undefined, 'ability check disadvantage'],
+        ['Hex with Eldritch Hex', [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
+          'ability check disadvantage + saving throw disadvantage'],
+      ];
 
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-        effectsApplied: 'ability check disadvantage + saving throw disadvantage',
-      }));
+      for (const [label, passives, effectsApplied] of arms) {
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue([]);
+        addEntry.mockResolvedValue(undefined);
+
+        const spell = makeSpell({ name: 'Hex' });
+        const playerStats = makePlayerStats(passives ? { automation: { passives } } : {});
+        const result = await runCast(spell, playerStats);
+
+        expect(result, label).toBeUndefined();
+        // Single-write census: castHex (:498) is the ONLY hex write — the
+        // CLA-389 post-cast guard (:514) skips its own applyHexEffects.
+        expect(applyHexEffects.mock.calls, label).toEqual([
+          [spell, playerStats, CAMPAIGN, 'Goblin', null],
+        ]);
+        expect(applyHexEffects.mock.calls[0][0], label).toBe(spell);
+        // Consumed before the dispel fallback (:353/:357), duel expiry (:731)
+        // and save path (:754).
+        expect(triggerDispelMagic.mock.calls, label).toEqual([]);
+        expect(checkCompelledDuelAttackExpiry.mock.calls, label).toEqual([]);
+        expect(handleSavePath.mock.calls, label).toEqual([]);
+        // Exactly ONE log: castHex's own entry — the generic log (:226) is skipped
+        // for Hex. Full shape (no timestamp key) proves the generic shape is absent.
+        expect(addEntry.mock.calls.length, label).toBe(1);
+        const [logCampaign, hexEntry] = addEntry.mock.calls[0];
+        expect(logCampaign, label).toBe(CAMPAIGN);
+        expect(hexEntry, label).toEqual({
+          type: 'spell',
+          characterName: 'TestWizard',
+          targetName: 'Goblin',
+          spellName: 'Hex',
+          spellLevel: 1,
+          castingTime: '1 bonus action',
+          hexAbility: null,
+          effectsApplied,
+        });
+      }
     });
   });
 });

@@ -1,4 +1,39 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+/* ------------------------------------------------------------------ */
+/*  helpers.js PWH span (:190-:275) — module-direct execution face. */
+/*                                                                    */
+/*  Mocks: the canonical 13-module helpers-dependency roster, byte- */
+/*  for-byte with sibling helpers lanes (#1478/79/80 family canon — */
+/*  consumers mock ./helpers.js wholesale, this lane runs it REAL). */
+/*                                                                    */
+/*  Boundary (cited, never re-grown):                               */
+/*  - earlyReturns-modal #1471 owns the index.js:702 EARLY arm —   */
+/*    name-gate, declined/passThrough envelopes, :702-before-:703   */
+/*    arm order. This lane owns what executes AFTER that arm        */
+/*    routes here: applyPowerWordHealToTarget -> powerWordHealDamage*/
+/*    -> powerWordHealConditions.                                   */
+/*  - spellCastService.heal.test.js #1454 owns hub traversal:      */
+/*    CLA-392 shared snapshot (:259 short-circuit pinned there as  */
+/*    getCombatContext-times-1), runtime-HP-beats-snapshot via the */
+/*    chain, healing-popup consume-trail payload (#1392), producer- */
+/*    null fold-back (:195) via hub. Hub generic delta-0 log       */
+/*    contrast (heal.test.js:290) vs this helper's silent-0 skip is */
+/*    pinned below on the direct face.                             */
+/*  - spellCastService.powerWordHeal.test.js owns hub edge cases   */
+/*    incl. multiTarget-equals-first dedup; modalSpells.powerWord   */
+/*    Spread owns the CLA-392 spread gate with an injected fake.   */
+/*  - Kill-side tiers are helpers-powerWordKill #1478 lane. This   */
+/*    heal span has NO HP-threshold tiers and rolls NO dice:       */
+/*    REAL 2024 disk row (absent from 5e disk, #1450) reads "the   */
+/*    target regains all its Hit Points" + ends Charmed/Frightened/*/
+/*    Paralyzed/Poisoned/Stunned + Prone stand-by-Reaction — the   */
+/*    gap-to-max + strip + permission bytes pinned here. Hub       */
+/*    compute/clamp family #1455 cited.                            */
+/*  - No-clock: heal is instantaneous; sinks carry only the fixed- */
+/*    Date.now timestamp (spied below for determinism).             */
+/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
 /*  Mocks — dependencies of helpers.js                                */
@@ -72,207 +107,238 @@ import { addEntry } from '../../../../ui/logService.js';
 import { applyHealingToTarget } from '../../../combat/applyHealing.js';
 import { getCombatContext } from '../../../combat/damageUtils.js';
 
-// Reference mock modules for vi.mocked() usage in tests
-void addEntry;
-void applyHealingToTarget;
-void getCombatContext;
-
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Determinism + fixtures                                             */
 /* ------------------------------------------------------------------ */
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestWizard',
-    abilities: [{ name: 'Intelligence', bonus: 5 }],
-    proficiency: 4,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence',
-      toHit: 9,
-      saveDc: 17,
-      modifier: 5,
-    },
-    automation: { passives: [] },
-    hitPoints: 100,
-    level: 10,
-    ...overrides,
-  };
+const CAMPAIGN = 'test-campaign';
+const TS = 1700000000000;
+
+// The span consumes playerStats.name only (:204, :211) — documented
+// lightweight route (#1472); no fabricated PlayerStats keys.
+const caster = { name: 'TestWizard' };
+
+const makeSummary = (creature) => ({ creatures: [creature] });
+const GOBLIN_50 = { name: 'Goblin', maxHp: 100, currentHp: 50 };
+
+let consoleError;
+let popups;
+const onPopup = (e) => popups.push(e.detail);
+
+/** addEntry calls of one type, as full [campaign, entry] tuples. */
+function logTuples(type) {
+  return vi.mocked(addEntry).mock.calls.filter(([, e]) => e.type === type);
+}
+
+/** The exact condition-removed log payload (helpers.js:235-242). */
+const condTuple = (Name) => [CAMPAIGN, {
+  type: 'condition',
+  action: 'removed',
+  characterName: 'Goblin',
+  condition: Name,
+  reason: 'Power Word Heal',
+  timestamp: TS,
+}];
+
+/** Per-key runtime store stub; conditions default to []. Explicit
+ *  undefined/null values are honored via hasOwnProperty (SP-002 arm). */
+function stubRuntime(overrides = {}) {
+  getRuntimeValue.mockImplementation((char, key) => {
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+    if (key === 'activeConditions') return [];
+    return undefined;
+  });
 }
 
 /* ------------------------------------------------------------------ */
-/*  Tests                                                              */
+/*  Tests                                                            */
 /* ------------------------------------------------------------------ */
 
-describe('helpers.js — applyPowerWordHealToTarget', () => {
+describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190-:275)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockReturnValue([]);
+    vi.spyOn(Date, 'now').mockReturnValue(TS);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    popups = [];
+    window.addEventListener('healing-popup', onPopup);
     setRuntimeValue.mockResolvedValue(undefined);
+    stubRuntime();
+    getCombatContext.mockResolvedValue(makeSummary(GOBLIN_50));
     applyHealingToTarget.mockReturnValue({ actualHeal: 50, oldHp: 50, newHp: 100 });
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', maxHp: 100, currentHp: 50 }],
-    });
   });
 
-  it('heals target to full HP and removes conditions', async () => {
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'activeConditions') return ['charmed', 'frightened', 'poisoned'];
-      return undefined;
-    });
-
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
-
-    expect(applyHealingToTarget).toHaveBeenCalled();
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'activeConditions',
-      [],
-      'test-campaign',
-    );
-    expect(addEntry).toHaveBeenCalledWith(
-      'test-campaign',
-      expect.objectContaining({
-        type: 'condition',
-        action: 'removed',
-        condition: 'Charmed',
-        reason: 'Power Word Heal',
-      }),
-    );
+  afterEach(() => {
+    window.removeEventListener('healing-popup', onPopup);
+    consoleError.mockRestore();
+    vi.restoreAllMocks();
   });
 
-  it('does not set powerWordHealStandPermission when target is not prone', async () => {
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'activeConditions') return ['charmed'];
-      return undefined;
-    });
+  it('snapshot-HP target: exact 4-arg forward tuple; producer actualHeal folds into clamped hp_change log and popup; quiet console', async () => {
+    const summary = makeSummary(GOBLIN_50);
+    getCombatContext.mockResolvedValue(summary);
+    // Producer over-reports vs the 50 gap — pins the :196 defensive
+    // clamp-to-maxHp doc arm (dead-only-in-practice; #1455 hub clamp cited).
+    applyHealingToTarget.mockReturnValue({ actualHeal: 80, oldHp: 50, newHp: 130 });
 
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
 
-    expect(setRuntimeValue).not.toHaveBeenCalledWith(
-      'Goblin',
-      'powerWordHealStandPermission',
-      true,
-      'test-campaign',
-    );
+    // Forward: fetched snapshot identity + computed gap-to-max (no tiers,
+    // no dice — disk-row bytes above), arity 4 vs REAL signature.
+    expect(vi.mocked(applyHealingToTarget).mock.calls).toEqual([[summary, 'Goblin', 50, CAMPAIGN]]);
+    // Fold-back (:195) + clamp (:196) into the exact hp_change byte census.
+    expect(logTuples('hp_change')).toEqual([[CAMPAIGN, {
+      type: 'hp_change', targetName: 'Goblin', delta: 80, currentHp: 100, maxHp: 100,
+      isHealing: true, sourceName: 'TestWizard', note: 'Power Word Heal', timestamp: TS,
+    }]]);
+    // Empty stored conditions -> zero condition writes/logs; no prone -> no permission.
+    expect(vi.mocked(addEntry).mock.calls).toHaveLength(1);
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([]);
+    // Popup payload also owned via hub by #1454/#1392 — direct-face fold-back sink pin.
+    expect(popups).toEqual([{
+      targetName: 'Goblin', sourceName: 'TestWizard', healingName: 'Power Word Heal',
+      rollInfo: '', maximizeHealingDice: false, popupText: 'Power Word Heal on Goblin: Regained 80 HP',
+    }]);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('sets powerWordHealStandPermission when target is prone', async () => {
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'activeConditions') return ['prone'];
-      if (key === 'powerWordHealStandPermission') return false;
-      return undefined;
-    });
+  it('player-type target: runtime hitPoints/currentHitPoints beat snapshot HP; null producer return folds to computed gap (:195, :267-:270)', async () => {
+    const summary = makeSummary({ name: 'TestWizard', type: 'player', maxHp: 99, currentHp: 99 });
+    getCombatContext.mockResolvedValue(summary);
+    // hitPoints 110 BEATS snapshot max 99 (:267); currentHitPoints 30 beats
+    // snapshot 99 (:270). Forward = gap 80; log clamps to runtime max.
+    stubRuntime({ currentHitPoints: 30, hitPoints: 110 });
+    applyHealingToTarget.mockReturnValue(null); // fold-back to computed 80 (#1454 hub-face twin)
 
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
+    await applyPowerWordHealToTarget('TestWizard', caster, CAMPAIGN);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      'powerWordHealStandPermission',
-      true,
-      'test-campaign',
-    );
+    expect(vi.mocked(applyHealingToTarget).mock.calls).toEqual([[summary, 'TestWizard', 80, CAMPAIGN]]);
+    expect(logTuples('hp_change')).toEqual([[CAMPAIGN, {
+      type: 'hp_change', targetName: 'TestWizard', delta: 80, currentHp: 110, maxHp: 110,
+      isHealing: true, sourceName: 'TestWizard', note: 'Power Word Heal', timestamp: TS,
+    }]]);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('does not set powerWordHealStandPermission when already set', async () => {
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'activeConditions') return ['prone'];
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
+  it('case-insensitive strip leaves PRONE; exact full addEntry census exposes QUIRK: all five removal candidates are logged whenever any strip occurs; heal precedes condition writes', async () => {
+    stubRuntime({ activeConditions: ['CHARMED', 'Frightened', 'PARALYZED', 'Poisoned', 'Stunned', 'PRONE'] });
 
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
 
-    const permCalls = vi.mocked(setRuntimeValue).mock.calls.filter(
-      (c) => c[1] === 'powerWordHealStandPermission',
-    );
-    expect(permCalls.length).toBe(0);
+    // Survivor tuple + permission write are the COMPLETE store census, in chain order.
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([
+      ['Goblin', 'activeConditions', ['PRONE'], CAMPAIGN],
+      ['Goblin', 'powerWordHealStandPermission', true, CAMPAIGN],
+    ]);
+    // QUIRK pin (reported as source bug): :233-:243 logs every removal
+    // candidate absent from newConditions — here all five, even though all
+    // five were present in mixed case; the census is exact and ordered.
+    expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
+    expect(logTuples('condition')).toEqual([
+      condTuple('Charmed'), condTuple('Frightened'), condTuple('Paralyzed'),
+      condTuple('Poisoned'), condTuple('Stunned'),
+    ]);
+    // Faithful order tap (#1480 canon): damage (:194) before condition write (:232).
+    expect(vi.mocked(applyHealingToTarget).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(setRuntimeValue).mock.invocationCallOrder[0]);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('returns early when combat context is null', async () => {
+  it('stand-permission arms: non-prone never reads the key; prone-and-already-set reads once and writes nothing', async () => {
+    // Arm A — no prone: key never read, never written. SINGLE-removal
+    // strip (mutant-proof :231 boundary — one stripped condition must still
+    // write the survivor tuple).
+    stubRuntime({ activeConditions: ['charmed'] });
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
+    expect(vi.mocked(getRuntimeValue).mock.calls.filter(([, key]) => key === 'powerWordHealStandPermission')).toEqual([]);
+    expect(vi.mocked(setRuntimeValue).mock.calls.filter(([, key]) => key === 'powerWordHealStandPermission')).toEqual([]);
+    // Ghost census (QUIRK mutant-killer): only charmed was present yet all
+    // five candidates are logged — exact ordered set.
+    expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([['Goblin', 'activeConditions', [], CAMPAIGN]]);
+
+    // Arm B — prone already permitted: read once; prone survives the strip at
+    // equal length so NO activeConditions write either — complete census empty.
+    vi.clearAllMocks();
+    stubRuntime({ activeConditions: ['prone'], powerWordHealStandPermission: true });
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
+    expect(vi.mocked(getRuntimeValue).mock.calls.filter(([, key]) => key === 'powerWordHealStandPermission'))
+      .toEqual([['Goblin', 'powerWordHealStandPermission', CAMPAIGN]]);
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([]);
+  });
+
+  it('SP-002: storedConditions null, undefined, and [] all mean nothing-to-strip — heal proceeds, zero condition writes or logs', async () => {
+    for (const value of [null, undefined, []]) {
+      vi.clearAllMocks();
+      stubRuntime({ activeConditions: value });
+
+      await expect(applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN)).resolves.toBeUndefined();
+
+      expect(vi.mocked(applyHealingToTarget).mock.calls).toEqual([[makeSummary(GOBLIN_50), 'Goblin', 50, CAMPAIGN]]);
+      expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([]);
+      expect(logTuples('condition')).toEqual([]);
+    }
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it('non-array storedConditions throws AFTER the heal has landed — validation-order quirk (heal + popup execute at :194-:217 before :224 aborts)', async () => {
+    stubRuntime({ activeConditions: 'not-an-array' });
+
+    await expect(applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN))
+      .rejects.toThrow('activeConditions must be an array');
+
+    expect(consoleError).toHaveBeenCalledWith('[spellCast] applyPowerWordHealToTarget: activeConditions is not an array');
+    // HP already restored and popup already dispatched when the guard fires.
+    expect(vi.mocked(applyHealingToTarget).mock.calls).toHaveLength(1);
+    expect(popups).toHaveLength(1);
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([]);
+  });
+
+  it('abort guards: null combat context or missing target row produce an identical full no-op (zero reads, writes, logs, popups)', async () => {
+    // Guard 1 — :260 combat context null.
     getCombatContext.mockResolvedValue(null);
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
+    expect(vi.mocked(getCombatContext).mock.calls).toEqual([[CAMPAIGN]]);
+    expectFullNoOp();
 
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
-
-    expect(applyHealingToTarget).not.toHaveBeenCalled();
+    // Guard 2 — :262-:263 creature absent from a healthy snapshot.
+    vi.clearAllMocks();
+    getCombatContext.mockResolvedValue(makeSummary({ name: 'Ogre', maxHp: 7, currentHp: 7 }));
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
+    expect(vi.mocked(getCombatContext).mock.calls).toEqual([[CAMPAIGN]]);
+    expectFullNoOp();
   });
 
-  it('does not heal when target is already at full HP', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'Goblin', maxHp: 100, currentHp: 100 }],
-    });
+  it('full-HP target skips the heal block entirely — no forward, no hp_change, no popup (contrast hub generic delta-0 log, heal.test.js:290) — while condition/permission handling still runs', async () => {
+    getCombatContext.mockResolvedValue(makeSummary({ name: 'Goblin', maxHp: 100, currentHp: 100 }));
+    stubRuntime({ activeConditions: ['prone'] });
 
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
 
-    expect(applyHealingToTarget).not.toHaveBeenCalled();
-  });
-
-  it('handles player-type creature using runtime HP values', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'TestWizard', maxHp: 100, currentHp: 50, type: 'player' }],
-    });
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'currentHitPoints') return 30;
-      if (key === 'activeConditions') return [];
-      return undefined;
-    });
-
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('TestWizard', playerStats, 'test-campaign');
-
-    // Should heal from 30 (runtime) to 100 (max) = 70 HP
-    expect(applyHealingToTarget).toHaveBeenCalled();
-  });
-
-  it('throws when activeConditions is not an array', async () => {
-    getRuntimeValue.mockReturnValue('not-an-array');
-
-    const playerStats = makePlayerStats();
-
-    await expect(
-      applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign'),
-    ).rejects.toThrow('activeConditions must be an array');
-  });
-
-  it('SP-002: null activeConditions key is empty conditions, not an abort', async () => {
-    getCombatContext.mockResolvedValue({
-      creatures: [{ name: 'TestWizard', maxHp: 100, currentHp: 50, type: 'player' }],
-    });
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'currentHitPoints') return 30;
-      if (key === 'activeConditions') return null;
-      return undefined;
-    });
-
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('TestWizard', playerStats, 'test-campaign');
-
-    expect(applyHealingToTarget).toHaveBeenCalled();
-    expect(setRuntimeValue).not.toHaveBeenCalledWith(
-      'TestWizard',
-      'activeConditions',
-      expect.anything(),
-      'test-campaign',
-    );
-  });
-
-  it('disables conditions case-insensitively', async () => {
-    getRuntimeValue.mockImplementation((char, key) => {
-      if (key === 'activeConditions') return ['CHARMED', 'Frightened', 'PARALYZED', 'Poisoned', 'Stunned', 'PRONE'];
-      return undefined;
-    });
-
-    const playerStats = makePlayerStats();
-    await applyPowerWordHealToTarget('Goblin', playerStats, 'test-campaign');
-
-    const newConditions = vi.mocked(setRuntimeValue).mock.calls.find(
-      (c) => c[1] === 'activeConditions',
-    )?.[2];
-    expect(newConditions).toEqual(['PRONE']);
+    expect(vi.mocked(applyHealingToTarget)).not.toHaveBeenCalled();
+    expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
+    expect(popups).toEqual([]);
+    // Strip/permission are HP-independent (:273 early-return is damage-only):
+    // prone survives (not a removal candidate -> no conditions write) but the
+    // stand permission is still granted.
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([
+      ['Goblin', 'powerWordHealStandPermission', true, CAMPAIGN],
+    ]);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 });
+
+/** Complete no-op census shared by both abort guards. */
+function expectFullNoOp() {
+  expect(vi.mocked(getRuntimeValue).mock.calls).toEqual([]);
+  expect(vi.mocked(applyHealingToTarget)).not.toHaveBeenCalled();
+  expect(vi.mocked(setRuntimeValue)).not.toHaveBeenCalled();
+  expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
+  expect(popups).toEqual([]);
+}
+
+/** Condition-log names in dispatch order (quirk census helper). */
+function addEntryLogConditionNames() {
+  return vi.mocked(addEntry).mock.calls
+    .filter(([, e]) => e.type === 'condition')
+    .map(([, e]) => e.condition);
+}

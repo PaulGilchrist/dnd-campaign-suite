@@ -1,7 +1,39 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
-/*  Mocks — the surface area that spellResolution.js imports           */
+/*  Lane: spellResolution.js RESOLVE face — numeric & damage-type      */
+/*  resolution guard-bits.                                               */
+/*                                                                      */
+/*  ORPHAN-LIVE-BY-TESTS (re-verified 2026-10-21):                    */
+/*   resolveSpellResolution (:129-189) has ZERO production importers  */
+/*   (grep 'resolveSpellResolution' src, excl *.test.* -> only the    */
+/*   export line :216). Consumers: this file + spellResolution.test.js */
+/*   + spellResolution-log.test.js (cites this file at its :18 —       */
+/*   PRESERVED). Kept as guard-bits against resurrection drift while   */
+/*   the export stays on disk (CLA-391 byte-shape mirror mandate).     */
+/*   getActiveBuffs re-export (:216) is LIVE via blockChecks.js:27    */
+/*   dynamic import — its buff-blocking BEHAVIOR is pinned by the     */
+/*   base sibling + blockChecks pair; this lane only rides past it.    */
+/*   isInnateSorceryActive re-export (:216) is DEAD — REPORTED.        */
+/*                                                                      */
+/*  Split vs base spellResolution.test.js: base owns control flow     */
+/*  (buff/silence block, ambush, globe target, psychic component        */
+/*  reduction, Friends/Invisibility end, CLA-212 cantrip recompute,    */
+/*  needsLookup, default key values). THIS file owns the numeric /    */
+/*  damage-type arithmetic branches: damageInfo precedence, psychic     */
+/*  effectiveDamageType override + no-damage guard, resolveSaveDc       */
+/*  compute/throw, resolveCastingMod branch reachability incl the      */
+/*  documented dead else-if quirk (:99-103).                          */
+/*                                                                      */
+/*  Mocks: full import census of spellResolution.js:1-9, line-by-line */
+/*  complete — getRuntimeValue+setRuntimeValue (:1), addEntry (:2),    */
+/*  isInnateSorceryActive+getActiveBuffs (:3), silence pair (:4),      */
+/*  getPsychicSpellsConfig (:5), friends (:6), invisibility (:7),     */
+/*  resolveSpellDamageWithTypes (:8). castingTimeUtils (:9) stays      */
+/*  REAL — pure string util gating the :174 placeholder call.          */
+/*  Fixtures are synthetic non-impersonating (generic Fireball shape,  */
+/*  TestWizard); campaign lockdown 'test-campaign'.                     */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -39,20 +71,12 @@ vi.mock('../../../core/spellDamageUtils.js', () => ({
   resolveSpellDamageWithTypes: vi.fn(() => null),
 }));
 
-/* ------------------------------------------------------------------ */
-/*  SUT imports after mocks are established                            */
-/* ------------------------------------------------------------------ */
-
 import { resolveSpellResolution } from './spellResolution.js';
 import { getActiveBuffs, isInnateSorceryActive } from '../../../../combat/buffs/buffService.js';
 import { getRuntimeValue } from '../../../../../hooks/runtime/useRuntimeState.js';
 import { getPsychicSpellsConfig } from '../../../../automation/handlers/class-warlock/psychicSpellsHandler.js';
 import { getSilenceSource, isCreatureInSilenceZone } from '../../../features/silenceService.js';
 import { resolveSpellDamageWithTypes } from '../../../core/spellDamageUtils.js';
-
-/* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
-/* ------------------------------------------------------------------ */
 
 function makeSpell(overrides = {}) {
   return {
@@ -80,20 +104,17 @@ function makePlayerStats(overrides = {}) {
       modifier: 5,
     },
     automation: { passives: [] },
-    hitPoints: 100,
-    level: 10,
     ...overrides,
   };
 }
 
-/* ------------------------------------------------------------------ */
-/*  beforeEach — reset all mock implementations to safe defaults       */
-/* ------------------------------------------------------------------ */
+function resolve(spell, playerStats) {
+  return resolveSpellResolution(spell, {}, playerStats, 'test-campaign', null);
+}
 
-describe('spellResolution (complex scenarios)', () => {
+describe('spellResolution.complex — numeric & damage-type resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
     getActiveBuffs.mockReturnValue([]);
     isInnateSorceryActive.mockReturnValue(false);
     getSilenceSource.mockReturnValue(null);
@@ -103,401 +124,157 @@ describe('spellResolution (complex scenarios)', () => {
     resolveSpellDamageWithTypes.mockReturnValue(null);
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — damage resolution                       */
-  /* ---------------------------------------------------------------- */
+  describe('result shape & damageInfo precedence', () => {
+    it('returns the exact 17-key result with damageInfo values beating spell bytes', () => {
+      // arity pin: resurrected callers must pass all five params (metaCtx unused)
+      expect(resolveSpellResolution.length).toBe(5);
 
-  describe('resolveSpellResolution — damage resolution', () => {
-    it('resolves damageInfo from resolveSpellDamageWithTypes', () => {
-      const damageInfo = { formula: '8d6', primaryType: 'Fire' };
+      const damageInfo = { formula: '8d6', primaryType: 'Cold' };
       resolveSpellDamageWithTypes.mockReturnValue(damageInfo);
+      isInnateSorceryActive.mockReturnValue(true);
+      const spell = makeSpell(); // spell.damage.damage_type is 'Fire' — must LOSE to primaryType
 
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
+      const result = resolve(spell, makePlayerStats());
 
-      expect(result.damageInfo).toEqual(damageInfo);
-      expect(result.formula).toBe('8d6');
-      expect(result.damageType).toBe('Fire');
+      expect(result).toStrictEqual({
+        globeTargetName: null,
+        magicalAmbush: false,
+        casterConditions: [],
+        hasInvisible: false,
+        psychicSpellsConfig: null,
+        spellLevel: 3,
+        innateSorceryActive: true,
+        damageInfo: { formula: '8d6', primaryType: 'Cold' },
+        formula: '8d6',
+        damageType: 'Cold',
+        effectiveDamageType: 'Cold',
+        cantripSpellAbility: 'Intelligence',
+        spellToHit: 9, // recomputed: Int +5 + PB +4
+        spellSaveDc: 17, // 8 + 5 + 4
+        spellCastingMod: 5,
+        fullSpell: spell,
+        needsLookup: true,
+      });
+      expect(result.fullSpell).toBe(spell);
+      expect(result.damageInfo).toBe(damageInfo);
     });
+  });
 
-    it('defaults formula/damageType when resolveSpellDamageWithTypes returns null', () => {
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.damageInfo).toBeNull();
-      expect(result.formula).toBeNull();
-      expect(result.damageType).toBe('Fire');
-    });
-
-    it('falls back to spell.damage.damage_type when resolveSpellDamageWithTypes returns null', () => {
+  describe('damage-type fallback and psychic override', () => {
+    it('null damageInfo falls back to spell.damage.damage_type passthrough', () => {
       resolveSpellDamageWithTypes.mockReturnValue(null);
       const spell = makeSpell({ damage: { damage_type: 'Lightning' } });
 
-      const result = resolveSpellResolution(
-        spell,
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
+      const result = resolve(spell, makePlayerStats());
+
+      expect(result.damageInfo).toBeNull();
+      expect(result.formula).toBeNull();
+      expect(result.damageType).toBe('Lightning');
+      expect(result.effectiveDamageType).toBe('Lightning');
+    });
+
+    it('psychicSpellsConfig overrides effectiveDamageType only — damageType keeps the resolved primary', () => {
+      getPsychicSpellsConfig.mockReturnValue({ damageType: 'Psychic' });
+      resolveSpellDamageWithTypes.mockReturnValue({ formula: '2d8', primaryType: 'Lightning' });
+
+      const result = resolve(makeSpell(), makePlayerStats());
 
       expect(result.damageType).toBe('Lightning');
-    });
-
-    it('sets effectiveDamageType from damageType by default', () => {
-      resolveSpellDamageWithTypes.mockReturnValue({ formula: '1d8', primaryType: 'Cold' });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.effectiveDamageType).toBe('Cold');
-    });
-
-    it('overrides effectiveDamageType with psychicSpellsConfig.damageType', () => {
-      getPsychicSpellsConfig.mockReturnValue({ damageType: 'Psychic' });
-      resolveSpellDamageWithTypes.mockReturnValue({ formula: '1d8', primaryType: 'Fire' });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
       expect(result.effectiveDamageType).toBe('Psychic');
     });
 
-    it('does not override effectiveDamageType when psychicSpellsConfig exists but spell has no damage', () => {
+    it('psychic override cannot fabricate a type when the spell carries no damage — both falsy shapes stay empty', () => {
       getPsychicSpellsConfig.mockReturnValue({ damageType: 'Psychic' });
-      resolveSpellDamageWithTypes.mockReturnValue(null);
+      const absent = resolve(makeSpell({ damage: undefined }), makePlayerStats());
+      const empty = resolve(makeSpell({ damage: {} }), makePlayerStats());
 
-      const spell = makeSpell({ damage: undefined });
-      const result = resolveSpellResolution(
-        spell,
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.effectiveDamageType).toBe('');
-    });
-
-    it('does not override effectiveDamageType when psychicSpellsConfig exists but damageType is empty', () => {
-      getPsychicSpellsConfig.mockReturnValue({ damageType: 'Psychic' });
-      resolveSpellDamageWithTypes.mockReturnValue(null);
-
-      const spell = makeSpell({ damage: {} });
-      const result = resolveSpellResolution(
-        spell,
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.effectiveDamageType).toBe('');
+      expect([absent.damageType, absent.effectiveDamageType]).toStrictEqual(['', '']);
+      expect([empty.damageType, empty.effectiveDamageType]).toStrictEqual(['', '']);
     });
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — spell stats (ability, toHit, saveDc)   */
-  /* ---------------------------------------------------------------- */
+  describe('save DC resolution', () => {
+    it('computes 8 + proficiency when spellAbilities exists but saveDc is absent', () => {
+      const playerStats = makePlayerStats({ spellAbilities: { toHit: 9, modifier: 5 } });
 
-  describe('resolveSpellResolution — spell stats', () => {
-    it('uses spell.spellCastingAbility when present', () => {
-      const spell = makeSpell({ spellCastingAbility: 'Wisdom' });
+      const result = resolve(makeSpell(), playerStats);
 
-      const result = resolveSpellResolution(
-        spell,
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.cantripSpellAbility).toBe('Wisdom');
+      // cantripSpellAbility stays undefined (no spell or class override) — no recompute
+      expect(result.cantripSpellAbility).toBeUndefined();
+      expect(result.spellSaveDc).toBe(12);
     });
 
-    it('falls back to playerStats.spellAbilities.spellCastingAbility', () => {
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.cantripSpellAbility).toBe('Intelligence');
-    });
-
-    it('sets spellToHit from playerStats.spellAbilities.toHit', () => {
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellToHit).toBe(9);
-    });
-
-    it('defaults spellToHit to 0 when spellAbilities is missing', () => {
-      const playerStats = makePlayerStats({ spellAbilities: null });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellToHit).toBe(0);
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — save DC resolution                      */
-  /* ---------------------------------------------------------------- */
-
-  describe('resolveSpellResolution — save DC', () => {
-    it('uses playerStats.spellAbilities.saveDc when present', () => {
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellSaveDc).toBe(17);
-    });
-
-    it('calculates save DC from proficiency when saveDc is missing', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: { toHit: 9, modifier: 5 },
-      });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellSaveDc).toBe(12); // 8 + 4
-    });
-
-    it('throws when saveDc is missing and proficiency is also missing', () => {
+    it('throws the exact message when saveDc and proficiency are both missing', () => {
       const playerStats = makePlayerStats({
         spellAbilities: { toHit: 9, modifier: 5 },
         proficiency: null,
       });
 
-      expect(() =>
-        resolveSpellResolution(makeSpell(), {}, playerStats, 'test-campaign', null),
-      ).toThrow('playerStats.proficiency is required for spell save DC calculation');
+      expect(() => resolve(makeSpell(), playerStats)).toThrow(
+        'playerStats.proficiency is required for spell save DC calculation'
+      );
     });
   });
 
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — cantrip ability path                    */
-  /* ---------------------------------------------------------------- */
+  describe('spellToHit / spellCastingMod branch reachability', () => {
+    it('missing spellAbilities resolves to toHit 0, computed DC 12, mod 0', () => {
+      const playerStats = makePlayerStats({ spellAbilities: null });
 
-  describe('resolveSpellResolution — cantrip ability path', () => {
-    it('calculates spellToHit and spellSaveDc from ability when cantripSpellAbility matches', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: {
-          spellCastingAbility: 'Intelligence',
-          toHit: 99,
-          saveDc: 99,
-          modifier: 5,
-        },
-      });
+      const result = resolve(makeSpell(), playerStats);
 
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      // ability.bonus(5) + proficiency(4) = 9
-      expect(result.spellToHit).toBe(9);
-      // 8 + ability.bonus(5) + proficiency(4) = 17
-      expect(result.spellSaveDc).toBe(17);
-      expect(result.spellCastingMod).toBe(5);
+      expect({
+        ability: result.cantripSpellAbility,
+        toHit: result.spellToHit,
+        dc: result.spellSaveDc,
+        mod: result.spellCastingMod,
+      }).toStrictEqual({ ability: undefined, toHit: 0, dc: 12, mod: 0 });
     });
 
-    it('does not override when cantripSpellAbility does not match any ability', () => {
+    it('unmatched ability override keeps spellAbilities numbers and pins the dead else-if quirk at mod 0', () => {
+      // cantripSpellAbility='Charisma' && abilities truthy enters the FIRST
+      // casting-mod branch; find(Charisma) misses so mod becomes 0 — the
+      // spellAbilities.modifier else-if (:101-102) is UNREACHABLE here.
       const playerStats = makePlayerStats({
-        spellAbilities: {
-          spellCastingAbility: 'Charisma',
-          toHit: 99,
-          saveDc: 99,
-          modifier: 7,
-        },
+        spellAbilities: { spellCastingAbility: 'Charisma', toHit: 99, saveDc: 99, modifier: 7 },
         abilities: [{ name: 'Intelligence', bonus: 5 }],
       });
 
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
+      const result = resolve(makeSpell(), playerStats);
 
-      // No matching ability — spellCastingMod stays at default 0 because
-      // the else-if branch is unreachable when cantripSpellAbility && abilities are both truthy
-      expect(result.spellToHit).toBe(99);
-      expect(result.spellSaveDc).toBe(99);
-      expect(result.spellCastingMod).toBe(0);
+      expect({
+        toHit: result.spellToHit,
+        dc: result.spellSaveDc,
+        mod: result.spellCastingMod,
+      }).toStrictEqual({ toHit: 99, dc: 99, mod: 0 });
     });
 
-    it('does not override when playerStats.abilities is missing', () => {
+    it('null abilities makes the spellAbilities.modifier else-if reachable', () => {
       const playerStats = makePlayerStats({
-        spellAbilities: {
-          spellCastingAbility: 'Intelligence',
-          toHit: 99,
-          saveDc: 99,
-          modifier: 7,
-        },
+        spellAbilities: { spellCastingAbility: 'Intelligence', toHit: 99, saveDc: 99, modifier: 7 },
         abilities: null,
       });
 
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
+      const result = resolve(makeSpell(), playerStats);
 
-      expect(result.spellToHit).toBe(99);
-      expect(result.spellSaveDc).toBe(99);
-      expect(result.spellCastingMod).toBe(7);
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — spellCastingMod fallback                */
-  /* ---------------------------------------------------------------- */
-
-  describe('resolveSpellResolution — spellCastingMod fallback', () => {
-    it('uses ability.bonus when cantripSpellAbility matches and ability exists', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: null,
-      });
-
-      const result = resolveSpellResolution(
-        makeSpell({ spellCastingAbility: 'Intelligence' }),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellCastingMod).toBe(5);
+      expect({
+        toHit: result.spellToHit,
+        dc: result.spellSaveDc,
+        mod: result.spellCastingMod,
+      }).toStrictEqual({ toHit: 99, dc: 99, mod: 7 });
     });
 
-    it('does not fall through to spellAbilities.modifier when cantripSpellAbility is set but ability not found', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: {
-          spellCastingAbility: 'Charisma',
-          modifier: 3,
-        },
-        abilities: [{ name: 'Intelligence', bonus: 5 }],
-      });
-
-      const result = resolveSpellResolution(
+    it('spellCastingMod falls to 0 via "|| 0" on absent modifier and via default when spellAbilities is null', () => {
+      const noModifier = resolve(
         makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
+        makePlayerStats({ spellAbilities: { toHit: 5 }, abilities: null })
+      );
+      const noSpellAbilities = resolve(
+        makeSpell(),
+        makePlayerStats({ spellAbilities: null, abilities: null })
       );
 
-      // cantripSpellAbility='Charisma' && abilities exists => enters first if,
-      // but find(Charisma) returns undefined, so spellCastingMod stays at default 0
-      // The else-if is unreachable in this case
-      expect(result.spellCastingMod).toBe(0);
-    });
-
-    it('defaults to 0 when cantripSpellAbility is missing and spellAbilities has no modifier', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: { toHit: 5 },
-        abilities: null,
-      });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellCastingMod).toBe(0);
-    });
-
-    it('defaults to 0 when cantripSpellAbility is missing and spellAbilities is null', () => {
-      const playerStats = makePlayerStats({
-        spellAbilities: null,
-        abilities: null,
-      });
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        playerStats,
-        'test-campaign',
-        null,
-      );
-
-      expect(result.spellCastingMod).toBe(0);
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /*  resolveSpellResolution — innate sorcery                          */
-  /* ---------------------------------------------------------------- */
-
-  describe('resolveSpellResolution — innate sorcery', () => {
-    it('sets innateSorceryActive from isInnateSorceryActive', () => {
-      isInnateSorceryActive.mockReturnValue(true);
-
-      const result = resolveSpellResolution(
-        makeSpell(),
-        {},
-        makePlayerStats(),
-        'test-campaign',
-        null,
-      );
-
-      expect(result.innateSorceryActive).toBe(true);
+      expect(noModifier.spellCastingMod).toBe(0);
+      expect(noSpellAbilities.spellCastingMod).toBe(0);
     });
   });
 });
