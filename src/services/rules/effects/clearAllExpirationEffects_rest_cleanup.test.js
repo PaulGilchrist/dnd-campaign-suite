@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -95,8 +96,10 @@ vi.mock('../../../hooks/useAllySelection.js', () => ({
 import { clearAllExpirationEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
-import { getCombatSummary } from '../../encounters/combatData.js';
+import storage from '../../ui/storage.js';
+import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
+import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
 
 const KEY = 'pendingExpirations';
 
@@ -110,6 +113,18 @@ function stubUtilsNameIdentity() {
   utils.getName.mockImplementation((v) => String(v));
 }
 
+// Empty-store baseline: every read misses, every store scan is empty, no
+// combat summary. Each test opts into exactly the state it asserts on, so
+// negative paths prove the guard (not a leaked mock value) did the skipping.
+function emptyRuntime() {
+  getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+  getAllStoreKeys.mockReturnValue([]);
+  getCombatSummary.mockReturnValue(null);
+}
+
+const writesTo = (name, key) =>
+  setRuntimeValue.mock.calls.filter((c) => c[0] === name && c[1] === key);
+
 // ---------------------------------------------------------------------------
 // clearAllExpirationEffects — Flesh to Stone cleanup
 // ---------------------------------------------------------------------------
@@ -117,14 +132,12 @@ describe('clearAllExpirationEffects — Flesh to Stone cleanup', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('clears fleshToStone tracking and conditions on rest', () => {
-    const myList = [];
     getAllStoreKeys.mockReturnValue(['_fleshToStone_Orc']);
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
       if (key === KEY) return [];
       if (key === '_fleshToStone_Orc') return { casterName: 'Caster' };
       if (name === 'Orc' && key === 'activeConditions') return ['restrained', 'poisoned'];
@@ -143,12 +156,10 @@ describe('clearAllExpirationEffects — Flesh to Stone cleanup', () => {
       ['poisoned'],
       'MyCampaign',
     );
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign',
-      'targetEffects',
-      [{ effect: 'slow', target: 'Orc' }],
-      'MyCampaign',
-    );
+    // The flesh_to_stone badge is gone, the unrelated slow badge survives.
+    const effectWrites = writesTo('campaign', 'targetEffects');
+    expect(effectWrites.length).toBe(1);
+    expect(effectWrites[0][2]).toEqual([{ effect: 'slow', target: 'Orc' }]);
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'campaign',
       '_fleshToStone_Orc',
@@ -158,22 +169,20 @@ describe('clearAllExpirationEffects — Flesh to Stone cleanup', () => {
   });
 
   it('skips fleshToStone entries from other casters', () => {
-    const myList = [];
+    getAllStoreKeys.mockReturnValue(['_fleshToStone_Orc']);
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
       if (key === KEY) return [];
       if (key === '_fleshToStone_Orc') return { casterName: 'OtherCaster' };
-      if (key === 'activeConditions') return [];
+      if (name === 'Orc' && key === 'activeConditions') return ['restrained'];
       return null;
     });
 
     clearAllExpirationEffects('Caster', 'MyCampaign');
 
-    // Should not have modified Orc's conditions since the caster is different
-    const orcCondCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Orc' && c[1] === 'activeConditions',
-    );
-    expect(orcCondCalls.length).toBe(0);
+    // Caster mismatch: conditions, targetEffects and the tracking key all survive.
+    expect(writesTo('Orc', 'activeConditions').length).toBe(0);
+    expect(writesTo('campaign', 'targetEffects').length).toBe(0);
+    expect(writesTo('campaign', '_fleshToStone_Orc').length).toBe(0);
   });
 });
 
@@ -184,14 +193,12 @@ describe('clearAllExpirationEffects — Prismatic Spray cleanup', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('clears indigo and violet prismatic spray effects on rest', () => {
-    const myList = [];
     getAllStoreKeys.mockReturnValue(['_prismaticSprayIndigo_Orc', '_prismaticSprayViolet_Human']);
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
       if (key === KEY) return [];
       if (key === '_prismaticSprayIndigo_Orc') return { casterName: 'Caster' };
       if (key === '_prismaticSprayViolet_Human') return { casterName: 'Caster' };
@@ -207,6 +214,7 @@ describe('clearAllExpirationEffects — Prismatic Spray cleanup', () => {
 
     clearAllExpirationEffects('Caster', 'MyCampaign');
 
+    // Indigo removes only restrained; violet removes only blinded.
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Orc',
       'activeConditions',
@@ -231,35 +239,42 @@ describe('clearAllExpirationEffects — Prismatic Spray cleanup', () => {
       null,
       'MyCampaign',
     );
+    // Each ray pass purges its own badge: some write no longer contains
+    // indigo, some write no longer contains violet, and every write is a
+    // subset of the original store (nothing foreign is introduced).
+    const effectWrites = writesTo('campaign', 'targetEffects');
+    expect(effectWrites.length).toBeGreaterThan(0);
+    expect(effectWrites.some((c) => !c[2].some((te) => te.effect === 'prismatic_spray_indigo'))).toBe(true);
+    expect(effectWrites.some((c) => !c[2].some((te) => te.effect === 'prismatic_spray_violet'))).toBe(true);
   });
 
   it('skips prismatic spray entries from other casters', () => {
-    const myList = [];
+    getAllStoreKeys.mockReturnValue(['_prismaticSprayIndigo_Orc']);
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
       if (key === KEY) return [];
       if (key === '_prismaticSprayIndigo_Orc') return { casterName: 'OtherCaster' };
-      if (key === 'activeConditions') return ['restrained'];
+      if (name === 'Orc' && key === 'activeConditions') return ['restrained'];
       return null;
     });
 
     clearAllExpirationEffects('Caster', 'MyCampaign');
 
-    const orcCondCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Orc' && c[1] === 'activeConditions',
-    );
-    expect(orcCondCalls.length).toBe(0);
+    // Caster mismatch: nothing is cleared and the tracking key survives.
+    expect(writesTo('Orc', 'activeConditions').length).toBe(0);
+    expect(writesTo('campaign', '_prismaticSprayIndigo_Orc').length).toBe(0);
+    expect(writesTo('campaign', 'targetEffects').length).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
 // clearAllExpirationEffects — Otto's Irresistible Dance cleanup
+// (designated owner per #1285 — folded in from the _additional lane; preserve exact)
 // ---------------------------------------------------------------------------
 describe('clearAllExpirationEffects — Otto\'s Irresistible Dance cleanup', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('removes all otto_irresistible_dance targetEffects where character is source or target', () => {
@@ -296,17 +311,15 @@ describe('clearAllExpirationEffects — Sanctuary cleanup', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
-  it('removes all sanctuary targetEffects on rest', () => {
-    const myList = [];
+  it('removes every sanctuary targetEffect on rest, from any source or target', () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Cleric') return myList;
       if (key === KEY) return [];
       if (name === 'campaign' && key === 'targetEffects') return [
         { effect: 'sanctuary', source: 'Cleric', target: 'Orc' },
-        { effect: 'sanctuary', source: 'Cleric', target: 'Human' },
+        { effect: 'sanctuary', source: 'Other', target: 'Goblin' },
         { effect: 'slow', target: 'Orc' },
       ];
       return null;
@@ -314,13 +327,11 @@ describe('clearAllExpirationEffects — Sanctuary cleanup', () => {
 
     clearAllExpirationEffects('Cleric', 'MyCampaign');
 
-    const effectCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'campaign' && c[1] === 'targetEffects',
-    );
-    expect(effectCalls.length).toBeGreaterThan(0);
-    expect(effectCalls[effectCalls.length - 1][2]).toEqual([
-      { effect: 'slow', target: 'Orc' },
-    ]);
+    // One exact write; even a foreign caster's sanctuary on an unrelated
+    // target is purged (rest clears sanctuary app-wide), slow survives.
+    const effectWrites = writesTo('campaign', 'targetEffects');
+    expect(effectWrites.length).toBe(1);
+    expect(effectWrites[0][2]).toEqual([{ effect: 'slow', target: 'Orc' }]);
   });
 });
 
@@ -331,21 +342,14 @@ describe('clearAllExpirationEffects — removeSummonedCreatures', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
-  it('calls removeSummonedCreatures for the character', () => {
-    const myList = [];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Summoner') return myList;
-      if (key === KEY) return [];
-      return null;
-    });
-
+  it('removes the resting character\'s summons with exact store args', () => {
     clearAllExpirationEffects('Summoner', 'MyCampaign');
 
-    // The removeSummonedCreatures is mocked, so we just verify no error
-    expect(setRuntimeValue).toHaveBeenCalled();
+    expect(removeSummonedCreatures).toHaveBeenCalledTimes(1);
+    expect(removeSummonedCreatures).toHaveBeenCalledWith('Summoner', 'MyCampaign');
   });
 });
 
@@ -356,22 +360,20 @@ describe('clearAllExpirationEffects — object_transform cleanup', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('reverts polymorphed creatures and clears object_transform targetEffects', () => {
-    const myList = [];
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Polymorpher') return myList;
       if (key === KEY) return [];
       if (name === 'campaign' && key === 'targetEffects') return [
         { effect: 'object_transform', source: 'Polymorpher', target: 'Orc' },
         { effect: 'slow', target: 'Orc' },
       ];
-      if (key === 'activeConditions') return ['incapacitated'];
+      if (name === 'Orc' && key === 'activeConditions') return ['incapacitated'];
       return null;
     });
-    getCombatSummary.mockReturnValue({
+    const summary = {
       creatures: [
         {
           name: 'Orc',
@@ -383,39 +385,54 @@ describe('clearAllExpirationEffects — object_transform cleanup', () => {
           speed: 40,
         },
       ],
-    });
+    };
+    getCombatSummary.mockReturnValue(summary);
 
     clearAllExpirationEffects('Polymorpher', 'MyCampaign');
 
-    // Should have reverted the creature's stats
+    // Original stats restored in the persisted summary and object flags gone.
+    expect(summary.creatures[0]).toMatchObject({ maxHp: 15, ac: 13, speed: 30 });
+    expect(summary.creatures[0].polymorphObject).toBeUndefined();
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', summary, 'MyCampaign');
+    expect(setCombatSummaryCache).toHaveBeenCalledWith(summary, 'MyCampaign');
+
+    // Incapacitated dropped and the object_transform badge purged in one write.
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Orc',
       'activeConditions',
       [],
       'MyCampaign',
     );
-    const effectCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'campaign' && c[1] === 'targetEffects',
-    );
-    expect(effectCalls.length).toBeGreaterThan(0);
+    const effectWrites = writesTo('campaign', 'targetEffects');
+    expect(effectWrites.length).toBe(1);
+    expect(effectWrites[0][2]).toEqual([{ effect: 'slow', target: 'Orc' }]);
   });
 
-  it('skips when no object creatures found', () => {
-    const myList = [];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Polymorpher') return myList;
-      if (key === KEY) return [];
-      return null;
-    });
+  it('persists nothing when no object creature belongs to the caster', () => {
+    // Covers both guard clauses of the object filter: a plain creature
+    // (no polymorphObject) and another caster's object creature.
+    const foreign = {
+      name: 'Orc',
+      polymorphObject: { type: 'boulder' },
+      polymorphSource: 'OtherCaster',
+      polymorphOriginal: { maxHp: 15, ac: 13, speed: 30 },
+      maxHp: 20,
+      ac: 15,
+      speed: 40,
+    };
     getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Orc' },
-      ],
+      creatures: [{ name: 'Human' }, foreign],
     });
 
     clearAllExpirationEffects('Polymorpher', 'MyCampaign');
 
-    expect(setRuntimeValue).toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(setCombatSummaryCache).not.toHaveBeenCalled();
+    expect(writesTo('campaign', 'targetEffects').length).toBe(0);
+    expect(writesTo('Orc', 'activeConditions').length).toBe(0);
+    // Foreign transform survives untouched.
+    expect(foreign).toMatchObject({ maxHp: 20, ac: 15, speed: 40 });
+    expect(foreign.polymorphObject).toEqual({ type: 'boulder' });
   });
 });
 
@@ -426,13 +443,11 @@ describe('clearAllExpirationEffects — coverRefresh increment', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('increments coverRefresh to force badge refresh', () => {
-    const myList = [];
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
       if (key === KEY) return [];
       if (name === 'campaign' && key === 'coverRefresh') return 5;
       return null;
@@ -456,33 +471,31 @@ describe('clearAllExpirationEffects — early returns', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
+    emptyRuntime();
   });
 
-  it('returns early when characterName is null', () => {
+  it('touches nothing when characterName or campaignName is missing', () => {
     clearAllExpirationEffects(null, 'MyCampaign');
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns early when campaignName is null', () => {
     clearAllExpirationEffects('Goblin', null);
+
     expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
 // clearAllExpirationEffects — activeBuffs preservation for 8-hour buffs
+// (owner cited by clearAllExpirationEffects_additional.test.js header)
 // ---------------------------------------------------------------------------
 describe('clearAllExpirationEffects — activeBuffs preservation', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
+    emptyRuntime();
   });
 
   it('preserves Mage Armor and Death Ward buffs', () => {
-    const myList = [];
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Wizard') return myList;
       if (key === KEY) return [];
       if (name === 'Wizard' && key === 'activeBuffs') return [
         { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours' },
@@ -518,9 +531,7 @@ describe('clearAllExpirationEffects — SP-012 rest purge log names the spell', 
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-    getAllStoreKeys.mockReturnValue([]);
-    getCombatSummary.mockReturnValue(null);
+    emptyRuntime();
   });
 
   it('names the concentrated spell (Banishment) when the caster rests while concentrating', () => {

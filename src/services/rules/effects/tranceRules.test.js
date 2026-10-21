@@ -1,69 +1,58 @@
+// @maintained-by-ai
 import { describe, it, expect } from 'vitest'
+import races5e from '../../../../public/data/races.json'
+import races2024 from '../../../../public/data/2024/races.json'
 import { hasTranceTrait } from './tranceRules.js'
 
+// Standalone pure predicate: playerStats.race?.traits.some(t => t.name === 'Trance').
+// NOT part of the applyLongRest pipeline — consumed by LongRestButton.jsx (elf UI)
+// and sleepService.js:37 (trance => sleep immunity). No runtime-store keys, no timers.
+// Consumer behavior is covered by sleepService.test.js / LongRestButton tests, which
+// mock this module; this file pins the predicate's own truth table and disk contract.
+
 describe('hasTranceTrait', () => {
-  it('returns true when race has a Trance trait', () => {
-    const stats = {
-      race: {
-        traits: [{ name: 'Trance' }],
-      },
+  it('returns true for the Elf races straight off disk (5e and 2024 canon)', () => {
+    // Disk anchor: both races.json ship an Elf whose trait list carries 'Trance'
+    // verbatim among other traits — the exact-name contract both consumers rely on.
+    for (const races of [races5e, races2024]) {
+      const elf = races.find(r => r.name === 'Elf')
+      expect(elf.traits.map(t => t.name)).toContain('Trance')
+      expect(hasTranceTrait({ race: elf })).toBe(true)
     }
-    expect(hasTranceTrait(stats)).toBe(true)
   })
 
-  it('returns false when race has no traits', () => {
-    const stats = { race: { traits: [] } }
-    expect(hasTranceTrait(stats)).toBe(false)
-  })
-
-  it('returns false when race has traits but none named Trance', () => {
-    const stats = {
-      race: {
-        traits: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }],
-      },
-    }
-    expect(hasTranceTrait(stats)).toBe(false)
-  })
-
-  it('returns false when race is null', () => {
-    const stats = { race: null }
-    expect(hasTranceTrait(stats)).toBe(false)
-  })
-
-  it('returns false when race is undefined', () => {
-    const stats = { race: undefined }
-    expect(hasTranceTrait(stats)).toBe(false)
-  })
-
-  it('throws when playerStats is null', () => {
-    expect(() => hasTranceTrait(null)).toThrow(TypeError)
-  })
-
-  it('throws when playerStats is undefined', () => {
-    expect(() => hasTranceTrait(undefined)).toThrow(TypeError)
-  })
-
-  it('returns false when playerStats has no race property', () => {
-    const stats = {}
-    expect(hasTranceTrait(stats)).toBe(false)
-  })
-
-  it('returns true when Trance trait appears among other traits', () => {
+  it('matches only the exact trait name "Trance" — near-miss bait names are false', () => {
     const stats = {
       race: {
         traits: [
           { name: 'Darkvision' },
           { name: 'Fey Ancestry' },
-          { name: 'Trance' },
-          { name: 'Sleepless' },
+          { name: 'trance' },
+          { name: 'Elven Trance' },
+          { name: 'Trance of Order' },
         ],
       },
     }
-    expect(hasTranceTrait(stats)).toBe(true)
+    expect(hasTranceTrait(stats)).toBe(false)
   })
 
-  it('returns false when race.traits is undefined', () => {
-    const stats = { race: {} }
-    expect(hasTranceTrait(stats)).toBe(false)
+  it('returns false for every missing structure that the race?.traits guard covers', () => {
+    const shapes = [
+      {},
+      { race: undefined },
+      { race: null },
+      { race: {} },
+      { race: { traits: undefined } },
+      { race: { traits: [] } },
+    ]
+    for (const stats of shapes) {
+      expect(hasTranceTrait(stats)).toBe(false)
+    }
+  })
+
+  it('throws TypeError when playerStats itself is nullish (guard is on .race, not on stats)', () => {
+    // Callers guarantee a non-null object first: sleepService guards `if (!stats)` at :36.
+    expect(() => hasTranceTrait(null)).toThrow(TypeError)
+    expect(() => hasTranceTrait(undefined)).toThrow(TypeError)
   })
 })

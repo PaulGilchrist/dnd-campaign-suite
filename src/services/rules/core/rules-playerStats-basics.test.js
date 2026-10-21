@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../ui/dataLoader.js', () => ({
@@ -245,7 +246,9 @@ const setupDefaults = (overrides = {}) => {
 
   abilityCalc.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
   abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
+  // NOTE: no getCarryingCapacity stub — the rules.js:394-399 facade dispatches to
+  // abilityCalc.getHitPoints (defect pinned by rules-core.test.js:96-114), so stubbing
+  // it here would fake coverage of a call that never happens.
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
 };
 
@@ -269,11 +272,26 @@ describe('rules.getPlayerStats - 5e basics', () => {
       ${1}   | ${2}
       ${5}   | ${3}
       ${9}   | ${4}
+      ${13}  | ${5}
       ${17}  | ${6}
     `('should compute proficiency from level $level', async ({ level, expectedProficiency }) => {
       const playerSummary = makePlayerSummary({ level });
       const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
       expect(result.proficiency).toBe(expectedProficiency);
+    });
+  });
+
+  describe('basic assembly passthrough', () => {
+    // Exact values only — sub-calculator math is owned by abilityCalc.test.js /
+    // abilityCalc2024.test.js; rules-playerStats-advanced.test.js:207-222 owns the
+    // cloneDeep input isolation; rules-playerStats-senses-speed.test.js owns speed/senses.
+    it('should place sub-calculated abilities and hit points on the result verbatim', async () => {
+      const playerSummary = makePlayerSummary();
+      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
+      expect(result.abilities).toEqual(defaultAbilities);
+      expect(result.hitPoints).toBe(12);
+      // carryingCapacity intentionally not asserted here — rules.getCarryingCapacity
+      // currently returns HP (defect pin: rules-core.test.js:96-114).
     });
   });
 });

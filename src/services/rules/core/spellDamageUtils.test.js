@@ -1,337 +1,198 @@
+// @maintained-by-ai
+// Damage-formula resolution lane owner (cited by spellCalc2024-circle-of-land.test.js and
+// useSpellUpcastFlow.cla050-fixed-level.test.js): this file is the ONLY unmocked coverage of
+// spellDamageUtils.js — CharActions/CharReactions/CharBonusActions and the spellCastService
+// execution suites all vi.mock this module, so the four exported resolvers must be pinned here.
+// Damage canon: dice are never rolled — formula STRINGS are pinned byte-exact. Spell rows are
+// read from disk (public/data/spells.json + 2024/spells.json) and deep-cloned before any
+// mutation; synthetic rows are labeled as such (no disk spell carries both damage ladders, and
+// no cantrip heal row exists on disk).
 import { describe, it, expect } from 'vitest';
-import { resolveSpellDamageAtLevel, isAutoHitSpell } from './spellDamageUtils.js';
+import { cloneDeep } from 'lodash';
+import {
+  resolveSpellDamageAtLevel,
+  isAutoHitSpell,
+  resolveSpellDamageWithTypes,
+  resolveHealExpression,
+} from './spellDamageUtils.js';
+import spells5e from '../../../../public/data/spells.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
+
+const disk5e = (name) => {
+  const spell = spells5e.find((s) => s.name === name);
+  if (!spell) throw new Error(`spell missing from disk: ${name}`);
+  return spell;
+};
+const disk2024 = (name) => {
+  const spell = spells2024.find((s) => s.name === name);
+  if (!spell) throw new Error(`spell missing from 2024 disk: ${name}`);
+  return spell;
+};
 
 describe('spellDamageUtils', () => {
   describe('resolveSpellDamageAtLevel', () => {
-    describe('null/empty handling', () => {
-      it('returns empty string for null, undefined, missing damage, or empty damage objects', () => {
-        expect(resolveSpellDamageAtLevel(null, 5)).toBe('');
-        expect(resolveSpellDamageAtLevel(undefined, 5)).toBe('');
-        expect(resolveSpellDamageAtLevel({ name: 'Mage Hand' }, 5)).toBe('');
-        expect(resolveSpellDamageAtLevel({ damage: null }, 5)).toBe('');
-        expect(resolveSpellDamageAtLevel({ damage: { damage_at_slot_level: {}, damage_at_character_level: null } }, 5)).toBe('');
-        expect(resolveSpellDamageAtLevel({ damage: {} }, 5)).toBe('');
-      });
+    it('returns empty string when spell or damage data is absent', () => {
+      expect(resolveSpellDamageAtLevel(null, 5)).toBe('');
+      expect(resolveSpellDamageAtLevel(undefined, 5)).toBe('');
+      expect(resolveSpellDamageAtLevel({ name: 'Mage Hand' }, 5)).toBe('');
+      expect(resolveSpellDamageAtLevel({ level: 1, damage: null }, 5)).toBe('');
+      expect(
+        resolveSpellDamageAtLevel({ level: 1, damage: { damage_at_slot_level: {}, damage_at_character_level: null } }, 5)
+      ).toBe('');
+      expect(resolveSpellDamageAtLevel({ level: 1, damage: {} }, 5)).toBe('');
     });
 
-    describe('cantrips scale at tier boundaries', () => {
-      it('selects highest applicable tier from damage_at_slot_level (5e format)', () => {
-        const fireBolt = {
-          name: 'Fire Bolt',
-          level: 0,
-          damage: {
-            damage_type: 'Fire',
-            damage_at_slot_level: {
-              '1': '1d10',
-              '5': '2d10',
-              '11': '3d10',
-              '17': '4d6',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(fireBolt, 1)).toBe('1d10');
-        expect(resolveSpellDamageAtLevel(fireBolt, 5)).toBe('2d10');
-        expect(resolveSpellDamageAtLevel(fireBolt, 11)).toBe('3d10');
-        expect(resolveSpellDamageAtLevel(fireBolt, 17)).toBe('4d6');
-      });
+    it('scales cantrips across the published ladders of both rulesets', () => {
+      // 5e disk Fire Bolt: damage_at_character_level ladder {1,5,11,17}.
+      const fireBolt5e = disk5e('Fire Bolt');
+      expect([1, 5, 11, 17, 20].map((lv) => resolveSpellDamageAtLevel(fireBolt5e, lv)))
+        .toEqual(['1d10', '2d10', '3d10', '4d10', '4d10']);
 
-      it('selects highest applicable tier from damage_at_character_level (5e Acid Splash format)', () => {
-        const acidSplash = {
-          name: 'Acid Splash',
-          level: 0,
-          damage: {
-            damage_type: 'Acid',
-            damage_at_character_level: {
-              '1': '1d6',
-              '5': '2d6',
-              '11': '3d6',
-              '17': '4d6',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(acidSplash, 1)).toBe('1d6');
-        expect(resolveSpellDamageAtLevel(acidSplash, 5)).toBe('2d6');
-        expect(resolveSpellDamageAtLevel(acidSplash, 11)).toBe('3d6');
-        expect(resolveSpellDamageAtLevel(acidSplash, 17)).toBe('4d6');
-      });
-
-      it('falls back to first available tier when below all tiers (2024 format)', () => {
-        const acidSplash2024 = {
-          name: 'Acid Splash',
-          level: 0,
-          damage: {
-            damage_type: 'Acid',
-            damage_at_slot_level: {
-              '5': '2d6',
-              '11': '3d6',
-              '17': '4d6',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(acidSplash2024, 1)).toBe('2d6');
-        expect(resolveSpellDamageAtLevel(acidSplash2024, 5)).toBe('2d6');
-        expect(resolveSpellDamageAtLevel(acidSplash2024, 11)).toBe('3d6');
-      });
+      // 2024 disk Fire Bolt: damage_at_slot_level ladder starting at rung '0', which also
+      // covers the below-all-tiers fallback (lv 1 has no '1' key; '0' is the first key).
+      const fireBolt2024 = disk2024('Fire Bolt');
+      expect([1, 5, 12, 17].map((lv) => resolveSpellDamageAtLevel(fireBolt2024, lv)))
+        .toEqual(['1d10', '2d10', '3d10', '4d10']);
     });
 
-    describe('leveled spells return base tier regardless of character level', () => {
-      it('returns base tier for constant damage across all slot levels', () => {
-        const magicMissile = {
-          name: 'Magic Missile',
-          level: 1,
-          damage: {
-            damage_type: 'Force',
-            damage_at_slot_level: {
-              '1': '1d4 + 1',
-              '2': '1d4 + 1',
-              '3': '1d4 + 1',
-              '4': '1d4 + 1',
-              '5': '1d4 + 1',
-              '6': '1d4 + 1',
-              '7': '1d4 + 1',
-              '8': '1d4 + 1',
-              '9': '1d4 + 1',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(magicMissile, 1)).toBe('1d4 + 1');
-        expect(resolveSpellDamageAtLevel(magicMissile, 5)).toBe('1d4 + 1');
-        expect(resolveSpellDamageAtLevel(magicMissile, 20)).toBe('1d4 + 1');
-      });
-
-      it('returns base tier for varying damage across slot levels', () => {
-        const acidArrow = {
-          name: 'Acid Arrow',
-          level: 2,
-          damage: {
-            damage_type: 'Acid',
-            damage_at_slot_level: {
-              '2': '4d4',
-              '3': '5d4',
-              '4': '6d4',
-              '5': '7d4',
-              '6': '8d4',
-              '7': '9d4',
-              '8': '10d4',
-              '9': '11d4',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(acidArrow, 2)).toBe('4d4');
-        expect(resolveSpellDamageAtLevel(acidArrow, 5)).toBe('4d4');
-        expect(resolveSpellDamageAtLevel(acidArrow, 20)).toBe('4d4');
-      });
+    it('pins leveled spells to the base slot tier regardless of character level', () => {
+      const acidArrow = disk5e('Acid Arrow'); // slot ladder {2:'4d4'...9:'11d4'}
+      expect([2, 5, 20].map((lv) => resolveSpellDamageAtLevel(acidArrow, lv)))
+        .toEqual(['4d4', '4d4', '4d4']);
     });
 
-    describe('fallback to damage_at_character_level', () => {
-      it('uses damage_at_character_level when damage_at_slot_level is empty', () => {
-        const charLevelSpell = {
-          name: 'Charm Spell',
-          level: 1,
-          damage: {
-            damage_type: 'Psychic',
-            damage_at_character_level: {
-              '1': '2d6',
-              '5': '3d6',
-              '11': '4d6',
-              '17': '5d6',
-            },
-            damage_at_slot_level: {},
-          },
-        };
-        expect(resolveSpellDamageAtLevel(charLevelSpell, 1)).toBe('2d6');
-        expect(resolveSpellDamageAtLevel(charLevelSpell, 20)).toBe('2d6');
-      });
-
-      it('scales cantrip from damage_at_character_level when damage_at_slot_level is empty', () => {
-        const cantrip = {
-          name: 'Cantrip Charm',
-          level: 0,
-          damage: {
-            damage_type: 'Psychic',
-            damage_at_character_level: {
-              '1': '2d6',
-              '5': '3d6',
-              '11': '4d6',
-              '17': '5d6',
-            },
-            damage_at_slot_level: {},
-          },
-        };
-        expect(resolveSpellDamageAtLevel(cantrip, 1)).toBe('2d6');
-        expect(resolveSpellDamageAtLevel(cantrip, 5)).toBe('3d6');
-        expect(resolveSpellDamageAtLevel(cantrip, 11)).toBe('4d6');
-        expect(resolveSpellDamageAtLevel(cantrip, 20)).toBe('5d6');
-      });
-    });
-
-    describe('damage_at_slot_level takes priority over damage_at_character_level', () => {
-      it('prefers damage_at_slot_level for leveled spells (always base tier)', () => {
-        const bothPresent = {
-          name: 'Both Present',
-          level: 1,
-          damage: {
-            damage_type: 'Fire',
-            damage_at_slot_level: {
-              '1': '3d6',
-              '5': '4d6',
-            },
-            damage_at_character_level: {
-              '1': '1d6',
-              '5': '2d6',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(bothPresent, 1)).toBe('3d6');
-        expect(resolveSpellDamageAtLevel(bothPresent, 5)).toBe('3d6');
-      });
-
-      it('prefers damage_at_slot_level for cantrips with both present (scales)', () => {
-        const cantrip = {
-          name: 'Both Cantrip',
-          level: 0,
-          damage: {
-            damage_type: 'Fire',
-            damage_at_slot_level: {
-              '1': '3d6',
-              '5': '4d6',
-            },
-            damage_at_character_level: {
-              '1': '1d6',
-              '5': '2d6',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(cantrip, 1)).toBe('3d6');
-        expect(resolveSpellDamageAtLevel(cantrip, 5)).toBe('4d6');
-      });
-    });
-
-    describe('edge cases', () => {
-      it('returns base tier when character level is 0', () => {
-        const spell = {
-          name: 'Test Spell',
-          level: 1,
-          damage: {
-            damage_type: 'Fire',
-            damage_at_slot_level: {
-              '1': '1d8',
-              '5': '2d8',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(spell, 0)).toBe('1d8');
-      });
-
-      it('handles single-tier damage_at_slot_level', () => {
-        const spell = {
-          name: 'Single Tier',
-          level: 1,
-          damage: {
-            damage_type: 'Cold',
-            damage_at_slot_level: {
-              '1': '5',
-            },
-          },
-        };
-        expect(resolveSpellDamageAtLevel(spell, 1)).toBe('5');
-        expect(resolveSpellDamageAtLevel(spell, 20)).toBe('5');
-      });
-    });
-  });
-
-  describe('isAutoHitSpell', () => {
-    describe('null/empty handling', () => {
-      it('returns false when spell is null, undefined, or empty', () => {
-        expect(isAutoHitSpell(null)).toBe(false);
-        expect(isAutoHitSpell(undefined)).toBe(false);
-        expect(isAutoHitSpell({})).toBe(false);
-      });
-    });
-
-    describe('healing spells', () => {
-      it('returns true when spell has heal_at_slot_level (with data, empty, or multiple tiers)', () => {
-        expect(isAutoHitSpell({ heal_at_slot_level: { '1': '1d4' } })).toBe(true);
-        expect(isAutoHitSpell({ heal_at_slot_level: {} })).toBe(true);
-        const healSpell = {
-          heal_at_slot_level: {
-            '1': '5',
-            '2': '10',
-            '3': '15',
-          },
-        };
-        expect(isAutoHitSpell(healSpell)).toBe(true);
-      });
-    });
-
-    describe('Magic Missile', () => {
-      it('returns true for case-insensitive exact name match', () => {
-        expect(isAutoHitSpell({ name: 'magic missile' })).toBe(true);
-        expect(isAutoHitSpell({ name: 'MAGIC MISSILE' })).toBe(true);
-        expect(isAutoHitSpell({ name: 'Magic Missile' })).toBe(true);
-      });
-
-      it('returns true for Magic Missile even with other properties', () => {
-        expect(isAutoHitSpell({
-          name: 'Magic Missile',
-          level: 1,
-          damage: { damage_type: 'Force', damage_at_slot_level: { '1': '1d4 + 1' } },
-        })).toBe(true);
-      });
-    });
-
-    describe('non-auto-hit spells', () => {
-      it('returns false for normal damage spells', () => {
-        expect(isAutoHitSpell({
-          name: 'Fire Bolt',
-          level: 0,
-          damage: { damage_type: 'Fire', damage_at_slot_level: { '1': '1d10' } },
-        })).toBe(false);
-        expect(isAutoHitSpell({
-          name: 'Thunderwave',
-          damage: { damage_type: 'Thunder', damage_at_slot_level: { '1': '2d8' } },
-        })).toBe(false);
-      });
-
-      it('returns false when heal_at_slot_level is null', () => {
-        expect(isAutoHitSpell({ heal_at_slot_level: null })).toBe(false);
-      });
-
-      it('returns false when name contains "missile" or "heal" but is not an exact match', () => {
-        expect(isAutoHitSpell({ name: 'Big Missile' })).toBe(false);
-        expect(isAutoHitSpell({ name: 'Missile Spell' })).toBe(false);
-        expect(isAutoHitSpell({ name: 'Healing Word', damage: { damage_at_slot_level: {} } })).toBe(false);
-      });
+    it('prefers damage_at_slot_level when both ladders are present (synthetic row)', () => {
+      // No disk spell carries both ladders — synthetic shape pinning the selection branch.
+      // If char-level were chosen instead, lv 5 would return '2d10' and lv 1 '1d6'.
+      const both = {
+        name: 'Both Ladders',
+        level: 0,
+        damage: {
+          damage_type: 'Fire',
+          damage_at_slot_level: { '0': '1d10', '5': '2d10' },
+          damage_at_character_level: { '1': '1d6', '5': '2d6' },
+        },
+      };
+      expect(resolveSpellDamageAtLevel(both, 1)).toBe('1d10');
+      expect(resolveSpellDamageAtLevel(both, 5)).toBe('2d10');
     });
   });
 
   // CLA-050: Circle of the Land fixed-level rows resolve their damage formula
   // at the stamped level, not the spells-DB base level.
   describe('resolveSpellDamageAtLevel — CLA-050 fixed-level rows', () => {
-    const burningHands = (level, fixed) => ({
-      name: 'Burning Hands',
-      level,
-      ...(fixed != null ? { _circleOfTheLandFixedLevel: fixed } : {}),
-      damage: { damage_type: 'Fire', damage_at_slot_level: { '1': '3d8', '2': '4d8', '3': '5d8' } },
-    });
-
     it('resolves the formula at the fixed level for stamped rows', () => {
-      expect(resolveSpellDamageAtLevel(burningHands(3, 3), 20)).toBe('5d8');
+      const burningHands = { ...cloneDeep(disk5e('Burning Hands')), _circleOfTheLandFixedLevel: 3 };
+      expect(resolveSpellDamageAtLevel(burningHands, 20)).toBe('5d6');
     });
 
     it('keeps character-level scaling for a fixed-level cantrip-tier ladder (Fire Bolt)', () => {
-      const fireBolt = {
-        name: 'Fire Bolt',
-        level: 3,
-        _circleOfTheLandFixedLevel: 3,
-        damage: { damage_type: 'Fire', damage_at_slot_level: { '0': '1d10', '5': '2d10', '11': '3d10', '17': '4d10' } },
-      };
+      // Stamped as a level 3 row (not a cantrip); the '0/5/11/17' ladder has no '3' rung,
+      // so resolution falls back to character-level scaling.
+      const fireBolt = { ...cloneDeep(disk2024('Fire Bolt')), level: 3, _circleOfTheLandFixedLevel: 3 };
       expect(resolveSpellDamageAtLevel(fireBolt, 20)).toBe('4d10');
       expect(resolveSpellDamageAtLevel(fireBolt, 4)).toBe('1d10');
     });
 
-    it('leaves unstamped rows at the base tier (byte-identical legacy)', () => {
-      expect(resolveSpellDamageAtLevel(burningHands(1, null), 20)).toBe('3d8');
+    it('leaves unstamped rows at the base tier (paired control)', () => {
+      expect(resolveSpellDamageAtLevel(disk5e('Burning Hands'), 20)).toBe('3d6');
+    });
+  });
+
+  describe('isAutoHitSpell', () => {
+    it('auto-hits healing spells and Magic Missile in any casing', () => {
+      expect(isAutoHitSpell(disk5e('Magic Missile'))).toBe(true);
+      expect(isAutoHitSpell({ name: 'magic missile' })).toBe(true);
+      expect(isAutoHitSpell({ name: 'MAGIC MISSILE' })).toBe(true);
+      expect(isAutoHitSpell(disk5e('Cure Wounds'))).toBe(true);
+      expect(isAutoHitSpell(disk5e('Healing Word'))).toBe(true);
+    });
+
+    it('does not auto-hit attack-roll spells, lookalike names, or empty input', () => {
+      expect(isAutoHitSpell(null)).toBe(false);
+      expect(isAutoHitSpell(undefined)).toBe(false);
+      expect(isAutoHitSpell({})).toBe(false);
+      expect(isAutoHitSpell(disk5e('Fire Bolt'))).toBe(false);
+      expect(isAutoHitSpell(disk5e('Thunderwave'))).toBe(false);
+      expect(isAutoHitSpell({ name: 'Big Missile' })).toBe(false);
+      expect(isAutoHitSpell({ name: 'Healing Word', damage: { damage_at_slot_level: {} } })).toBe(false);
+      expect(isAutoHitSpell({ name: 'Cure Wounds', heal_at_slot_level: null })).toBe(false);
+    });
+  });
+
+  describe('resolveSpellDamageWithTypes', () => {
+    it('splits monster-style dual damage and scales the secondary die per slot level', () => {
+      // Disk Ice Knife ladder: {1:'1d10 plus 1d6'...9:'1d10 plus 9d6'} — the secondary die is
+      // re-parsed from the slot formula, overriding the stored damage_dice_secondary ('1d6').
+      const iceKnife = disk5e('Ice Knife');
+      expect([1, 3, 9].map((lv) => resolveSpellDamageWithTypes(iceKnife, lv))).toEqual([
+        { formula: '1d10 plus 1d6', primaryDice: '1d10', primaryType: 'Piercing', secondaryDice: '1d6', secondaryType: 'Cold' },
+        { formula: '1d10 plus 3d6', primaryDice: '1d10', primaryType: 'Piercing', secondaryDice: '3d6', secondaryType: 'Cold' },
+        { formula: '1d10 plus 9d6', primaryDice: '1d10', primaryType: 'Piercing', secondaryDice: '9d6', secondaryType: 'Cold' },
+      ]);
+
+      // Disk Ice Storm: ladder starts at slot 4 — casting below the minimum falls back to the
+      // first ladder rung (still dual-dice, still scaled at '4').
+      const iceStorm = disk5e('Ice Storm');
+      expect(resolveSpellDamageWithTypes(iceStorm, 3)).toEqual({
+        formula: '2d8 plus 4d6', primaryDice: '2d8', primaryType: 'Bludgeoning', secondaryDice: '4d6', secondaryType: 'Cold',
+      });
+    });
+
+    it('uses the slot formula directly when it has no secondary die (synthetic row)', () => {
+      // No disk spell has damage_dice_primary plus a single-dice ladder; synthetic shape pin.
+      const spell = {
+        level: 6,
+        damage: {
+          damage_dice_primary: '2d6',
+          damage_type_primary: 'Fire',
+          damage_at_slot_level: { '6': '6d6' },
+        },
+      };
+      const resolved = resolveSpellDamageWithTypes(spell, 6);
+      expect(resolved).toMatchObject({ formula: '6d6', primaryDice: '6d6', primaryType: 'Fire' });
+      expect(resolved.secondaryDice).toBeUndefined();
+      expect(resolved.secondaryType).toBeUndefined();
+    });
+
+    it('falls back to legacy formula resolution and upcasts leveled spells by slot', () => {
+      // Cantrip (no dice_primary): scales with the spellLevel argument over the char ladder.
+      expect(resolveSpellDamageWithTypes(disk5e('Fire Bolt'), 5)).toEqual({
+        formula: '2d10', primaryDice: '2d10', primaryType: 'Fire', secondaryDice: null, secondaryType: null,
+      });
+      // Leveled legacy upcast table — unlike resolveSpellDamageAtLevel, this resolver honors
+      // the slot level: Acid Arrow {2:'4d4'...5:'7d4'}.
+      const acidArrow = disk5e('Acid Arrow');
+      expect([2, 5].map((lv) => resolveSpellDamageWithTypes(acidArrow, lv).formula)).toEqual(['4d4', '7d4']);
+      expect(resolveSpellDamageWithTypes(acidArrow, 2).primaryType).toBe('Acid');
+      expect(resolveSpellDamageWithTypes(null, 1)).toBeNull();
+      expect(resolveSpellDamageWithTypes({ name: 'Shield' }, 1)).toBeNull();
+    });
+  });
+
+  describe('resolveHealExpression', () => {
+    it('resolves leveled heals to the base tier with MOD replaced and spaces collapsed', () => {
+      // Disk Cure Wounds: {1:'1d8 + MOD'...9:'9d8 + MOD'} — leveled spells take the FIRST key
+      // regardless of character level, and byte spacing of the source is normalized.
+      const cureWounds = disk5e('Cure Wounds');
+      expect(resolveHealExpression(cureWounds, 5, 3)).toBe('1d8+3');
+      expect(resolveHealExpression(cureWounds, 20, 3)).toBe('1d8+3');
+      expect(resolveHealExpression(disk5e('Healing Word'), 1, 5)).toBe('1d4+5');
+      // No modifier provided: the literal MOD token survives untouched.
+      expect(resolveHealExpression(cureWounds, 5, null)).toBe('1d8+MOD');
+    });
+
+    it('returns empty string for spells without a usable heal_at_slot_level', () => {
+      expect(resolveHealExpression(disk5e('Fire Bolt'), 5, 3)).toBe('');
+      expect(resolveHealExpression({ level: 1, heal_at_slot_level: '1d8' }, 1, 1)).toBe('');
+      expect(resolveHealExpression({ level: 1, heal_at_slot_level: {} }, 1, 1)).toBe('');
+    });
+
+    it('scales a cantrip heal ladder by player level and substitutes MOD (synthetic row)', () => {
+      // Defensive branch: no level-0 heal row exists on disk today.
+      const cantrip = { level: 0, heal_at_slot_level: { '0': '1d4 + MOD', '5': '2d4 + MOD' } };
+      expect(resolveHealExpression(cantrip, 4, 2)).toBe('1d4+2');
+      expect(resolveHealExpression(cantrip, 5, 2)).toBe('2d4+2');
     });
   });
 });

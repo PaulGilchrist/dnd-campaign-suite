@@ -1,315 +1,259 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { triggerBlur } from './blurService.js';
+// @maintained-by-ai
+// blurService lane contract — triggerBlur is an ENVELOPE PRODUCER, not a
+// miss-chance calculator: the disadvantage mechanic is consumed elsewhere
+// (contextBuilder-sync.js:492 te.effect === 'blur lookup, ConditionEffectBadges.jsx
+// badges, restRules-short/longRest clears, useInitiativeEffects.js:35 expiry).
+// This file pins the two storage writes, the log row, and the popup the
+// service owns — disk-derived fixtures (#1339) against the Blur disk rows
+// (no save, concentration: true, 2024 duration literal "Concentration, up to
+// 1 minute"). invisibilityService.test.js owns the REMOVE side of the
+// invisibility-adjacent family; blur has no removal export, so no overlap.
+// spellCastService.noformula-* specs mock triggerBlur away (dispatch only).
+// Signatures pinned exactly: both setRuntimeValue writes are 4-arg positional
+// (NO skipSync 5th arg — user-initiated cast, not an SSE echo); the campaign
+// targetEffects READ omits campaignName (#1340 exact-envelope discipline).
+// Metamagic audit (#1340 class): blur has NO useSimpleSpellHandlers confirm
+// spec; triggerSpells.js handleBlur (:225-231) forwards the full spell +
+// metaCtx. But blurService hardcodes spellLevel: 2 in its log row instead of
+// reading metaCtx?.slotLevel || spell.level like baneService.js:10 — pinned
+// here to DISK_BLUR.level (canon-correct today; reported omission, not fixed).
+// Disk range is Self; the service still honors metaCtx.targetName (forwarder
+// preserves pipeline value) — both lanes pinned below.
 
-const mockGetRuntimeValue = vi.fn();
-const mockSetRuntimeValue = vi.fn();
-const mockAddEntry = vi.fn();
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells5e from '../../../../public/data/spells.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
+import { getEffectDefinition } from '../../combat/conditions/targetEffectDefinitions.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: (...args) => mockGetRuntimeValue(...args),
-    setRuntimeValue: (...args) => mockSetRuntimeValue(...args),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
-    addEntry: (...args) => {
-        mockAddEntry(...args);
-        return { catch: (fn) => ({ catch: fn }) };
-    },
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-describe('blurService', () => {
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
+import { triggerBlur } from './blurService.js';
+
+const CAMPAIGN = 'TestCampaign';
+const MAP = 'testMap';
+const CASTER = { name: 'Wizard' };
+
+// Disk-derived fixtures — never hand-transcribed (#1339).
+const DISK_BLUR = spells5e.find(s => s.name === 'Blur');
+const DISK_BLUR_2024 = spells2024.find(s => s.name === 'Blur');
+const BLUR_TE = getEffectDefinition('blur');
+// Registry-read key: the stamped effect key must come from the registry.
+const BLUR_KEY = BLUR_TE.effect;
+// The buff duration literal mirrors the 2024 disk row verbatim.
+const BUFF_DURATION = DISK_BLUR_2024.duration;
+
+const buffRow = (target, source = CASTER.name) => ({
+    name: 'Blur',
+    effect: 'blur',
+    duration: BUFF_DURATION,
+    source,
+});
+const teRow = (target, source = CASTER.name) => ({
+    target,
+    source,
+    effect: BLUR_KEY,
+    duration: 'concentration',
+});
+
+const POPUP = (target) => ({
+    type: 'popup',
+    payload: {
+        type: 'automation_info',
+        name: 'Blur',
+        automationType: 'blur',
+        description: `<b>Blur</b><br/>${target} has <b>Disadvantage on attack rolls against them</b> for 1 minute (concentration). Creatures with Blindsight or Truesight are immune to this effect.`,
+    },
+});
+
+function emptyStores() {
+    getRuntimeValue.mockReturnValue([]);
+}
+
+async function cast(metaCtx = {}, stats = CASTER, spell = { name: DISK_BLUR.name }) {
+    return triggerBlur(spell, metaCtx, stats, CAMPAIGN, MAP);
+}
+
+describe('triggerBlur — gate', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'testMap';
-    const playerStats = { name: 'Wizard' };
+    // Real-disk near-misses (invisibility-adjacent self-buffs) + substring
+    // and nameless spells: nothing is read, written, or logged.
+    it.each([
+        ['Fire Bolt', { name: 'Fire Bolt' }],
+        ['Mirror Image', { name: spells5e.find(s => s.name === 'Mirror Image').name }],
+        ['Sanctuary', { name: spells5e.find(s => s.name === 'Sanctuary').name }],
+        ['Blur Edge (substring, not equal)', { name: 'Blur Edge' }],
+        ['empty name', { name: '' }],
+        ['nameless spell', {}],
+    ])('returns null with zero side effects for "%s"', async (_label, spell) => {
+        const result = await cast({}, CASTER, spell);
 
-    function mockEmptyThen(value) {
-        mockGetRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce(value ?? []);
-    }
+        expect(result).toBeNull();
+        expect(getRuntimeValue).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+    });
 
-    function callTrigger(spell = { name: 'Blur' }, metaCtx = {}, stats = playerStats) {
-        return triggerBlur(spell, metaCtx, stats, campaignName, mapName);
-    }
+    it.each(['blur', 'BLUR', 'BlUr'])('matches "%s" case-insensitively and stamps canonical rows', async (name) => {
+        emptyStores();
 
-    describe('triggerBlur', () => {
-        describe('non-Blur spells', () => {
-            it.each([
-                ['Fire Bolt', {}],
-                ['lesser restoration', {}],
-                ['not blur', {}],
-            ])('returns null for non-Blur spell "%s"', async (spellName, metaCtx) => {
-                const result = await triggerBlur(
-                    { name: spellName },
-                    metaCtx,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        const result = await cast({}, CASTER, { name });
 
-                expect(result).toBeNull();
-                expect(mockGetRuntimeValue).not.toHaveBeenCalled();
-                expect(mockSetRuntimeValue).not.toHaveBeenCalled();
-            });
+        expect(result).toEqual(POPUP(CASTER.name));
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', [buffRow(CASTER.name)], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [teRow(CASTER.name)], CAMPAIGN);
+    });
+});
+
+describe('triggerBlur — self cast pins the full write/log/popup envelopes', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('reads both stores, writes buff + targetEffect positionally, logs, returns popup', async () => {
+        emptyStores();
+
+        const result = await cast();
+
+        // READ signatures: buff read is target-scoped with campaign; the
+        // campaign targetEffects read omits campaignName (exact arity pin).
+        expect(getRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', CAMPAIGN);
+        expect(getRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects');
+
+        // WRITE signatures: 4-arg positional, no skipSync 5th arg.
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', [buffRow(CASTER.name)], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [teRow(CASTER.name)], CAMPAIGN);
+
+        // Disk justifies the literals: level 2, concentration, 2024 duration.
+        expect(DISK_BLUR.level).toBe(2);
+        expect(DISK_BLUR.concentration).toBe(true);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+            type: 'spell',
+            characterName: CASTER.name,
+            targetName: CASTER.name,
+            spellName: 'Blur',
+            spellLevel: DISK_BLUR.level,
+            description: 'Wizard casts Blur on themself. Creatures without Blindsight or Truesight have Disadvantage on attack rolls against them for 1 minute.',
+            timestamp: expect.any(Number),
         });
 
-        describe('activeBuffs management', () => {
-            it('adds Blur buff to target activeBuffs', async () => {
-                mockEmptyThen([]);
+        expect(result).toEqual(POPUP(CASTER.name));
+    });
 
-                await callTrigger();
+    it('casts on another target: both writes and log resolve metaCtx.targetName, source stays caster', async () => {
+        emptyStores();
 
-                expect(mockSetRuntimeValue).toHaveBeenCalledWith(
-                    playerStats.name,
-                    'activeBuffs',
-                    [{
-                        name: 'Blur',
-                        effect: 'blur',
-                        duration: 'Concentration, up to 1 minute',
-                        source: playerStats.name,
-                    }],
-                    campaignName,
-                );
-            });
+        const result = await cast({ targetName: 'Fighter' });
 
-            it('resolves target from metaCtx.targetName over playerStats.name', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Blur' }, { targetName: 'Fighter' });
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    'Fighter',
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-
-            it('preserves existing non-Blur buffs', async () => {
-                const existingBuffs = [
-                    { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours', source: 'Wizard' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(existingBuffs)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs).toHaveLength(2);
-                expect(newBuffs[0]).toEqual(existingBuffs[0]);
-                expect(newBuffs[1].name).toBe('Blur');
-            });
-
-            it('deduplicates Blur buffs from different casters', async () => {
-                const existingBuffs = [
-                    { name: 'Blur', effect: 'blur', duration: 'Concentration, up to 1 minute', source: 'Sorcerer' },
-                    { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours', source: 'Wizard' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(existingBuffs)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs.filter(b => b.name === 'Blur')).toHaveLength(1);
-                expect(newBuffs[1].source).toBe('Wizard');
-            });
-
-            it('treats non-array activeBuffs as empty array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(null)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs).toHaveLength(1);
-                expect(newBuffs[0].name).toBe('Blur');
-            });
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'Fighter', 'activeBuffs', [buffRow('Fighter')], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [teRow('Fighter')], CAMPAIGN);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+            type: 'spell',
+            characterName: CASTER.name,
+            targetName: 'Fighter',
+            spellName: 'Blur',
+            spellLevel: DISK_BLUR.level,
+            description: 'Wizard casts Blur on Fighter. Creatures without Blindsight or Truesight have Disadvantage on attack rolls against them for 1 minute.',
+            timestamp: expect.any(Number),
         });
 
-        describe('targetEffects management', () => {
-            it('adds blur effect at campaign level', async () => {
-                mockEmptyThen([]);
+        expect(result).toEqual(POPUP('Fighter'));
+    });
 
-                await callTrigger({ name: 'Blur' }, { targetName: 'Fighter' });
+    it.each([
+        ['null metaCtx', null],
+        ['undefined metaCtx', undefined],
+    ])('defaults target to playerStats.name when %s', async (_label, metaCtx) => {
+        emptyStores();
 
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    2,
-                    'campaign',
-                    'targetEffects',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
+        await cast(metaCtx);
 
-            it('removes old blur effect from same caster before adding new one', async () => {
-                const existingEffects = [
-                    { target: 'OldTarget', source: 'Wizard', effect: 'blur', duration: 'concentration' },
-                    { target: 'OtherTarget', source: 'AnotherCaster', effect: 'blur', duration: 'concentration' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(existingEffects);
+        expect(getRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', [buffRow(CASTER.name)], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [teRow(CASTER.name)], CAMPAIGN);
+    });
+});
 
-                await callTrigger({ name: 'Blur' }, { targetName: 'Fighter' });
+describe('triggerBlur — replace semantics (one Blur row per spell)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(2);
-                expect(newEffects[0]).toEqual(existingEffects[1]);
-                expect(newEffects[1].target).toBe('Fighter');
-                expect(newEffects[1].source).toBe('Wizard');
-            });
+    it('drops every prior Blur buff (any caster) and own-targetEffect rows (any target), preserving all other rows by identity', async () => {
+        const mageArmor = { name: 'Mage Armor', effect: 'mage_armor', duration: '8 hours', source: CASTER.name };
+        const otherCasterBlur = { name: 'Blur', effect: 'blur', duration: BUFF_DURATION, source: 'Sorcerer' };
+        getRuntimeValue.mockImplementationOnce(() => [otherCasterBlur, mageArmor]);
 
-            it('preserves unrelated targetEffects', async () => {
-                const existingEffects = [
-                    { target: 'Fighter', source: 'Wizard', effect: 'some_other_effect', duration: '1_hour' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(existingEffects);
+        const otherBlur = teRow('OtherTarget', 'Sorcerer');
+        const unrelated = { target: 'Fighter', source: 'Druid', effect: 'some_other_effect', duration: '1_hour' };
+        // Own stale row on a DIFFERENT target: re-casting moves the caster's Blur.
+        getRuntimeValue.mockImplementationOnce(() => [teRow('OldTarget'), otherBlur, unrelated]);
 
-                await callTrigger({ name: 'Blur' }, { targetName: 'Fighter' });
+        await cast({ targetName: 'Fighter' });
 
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(2);
-                expect(newEffects[0]).toEqual(existingEffects[0]);
-                expect(newEffects[1].target).toBe('Fighter');
-            });
+        const buffs = setRuntimeValue.mock.calls[0][2];
+        expect(buffs).toHaveLength(2);
+        expect(buffs[0]).toBe(mageArmor); // unrelated buff preserved by identity
+        expect(buffs[1]).toEqual(buffRow('Fighter')); // other caster's Blur dropped by name
 
-            it('treats non-array targetEffects as empty array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce({ not: 'an-array' });
+        const tes = setRuntimeValue.mock.calls[1][2];
+        expect(tes).toHaveLength(3);
+        expect(tes[0]).toBe(otherBlur); // other caster's blur preserved by identity
+        expect(tes[1]).toBe(unrelated); // unrelated effect preserved by identity
+        expect(tes[2]).toEqual(teRow('Fighter')); // own stale OldTarget row replaced
+    });
+});
 
-                await callTrigger();
+describe('triggerBlur — non-array storage is treated as empty', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(1);
-                expect(newEffects[0].target).toBe('Wizard');
-            });
+    // SP-019 (clean change-data nulls) included as the null row.
+    it.each([
+        ['null', null],
+        ['undefined', undefined],
+        ['string', 'oops'],
+        ['object', { not: 'an-array' }],
+    ])('writes exactly one buff and one targetEffect when both stores hold %s', async (_label, stored) => {
+        getRuntimeValue.mockReturnValue(stored);
 
-            it('does not throw when campaign targetEffects is null (clean change-data)', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(null);
+        const result = await cast();
 
-                await expect(callTrigger()).resolves.toMatchObject({ type: 'popup' });
-            });
+        expect(result).toEqual(POPUP(CASTER.name));
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CASTER.name, 'activeBuffs', [buffRow(CASTER.name)], CAMPAIGN);
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [teRow(CASTER.name)], CAMPAIGN);
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({ spellName: 'Blur' }));
+    });
+});
 
-            it('writes blur targetEffect when campaign targetEffects is null (SP-019)', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(null);
+describe('triggerBlur — log failure is swallowed, not propagated', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-                await callTrigger();
+    it('still writes state and returns popup when addEntry rejects, logging the exact console.error', async () => {
+        emptyStores();
+        const err = new Error('log down');
+        addEntry.mockRejectedValueOnce(err);
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    2,
-                    'campaign',
-                    'targetEffects',
-                    [{ target: 'Wizard', source: 'Wizard', effect: 'blur', duration: 'concentration' }],
-                    campaignName,
-                );
-            });
+        const result = await cast();
 
-            it('logs the cast when campaign targetEffects is null (SP-019)', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(null);
-
-                await callTrigger();
-
-                expect(mockAddEntry).toHaveBeenCalledWith(
-                    campaignName,
-                    expect.objectContaining({ spellName: 'Blur' }),
-                );
-            });
-        });
-
-        describe('return value', () => {
-            it('returns popup with automation_info on success', async () => {
-                mockEmptyThen([]);
-
-                const result = await callTrigger({ name: 'Blur' }, { targetName: 'Fighter' });
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Blur',
-                        automationType: 'blur',
-                        description: '<b>Blur</b><br/>Fighter has <b>Disadvantage on attack rolls against them</b> for 1 minute (concentration). Creatures with Blindsight or Truesight are immune to this effect.',
-                    },
-                });
-            });
-
-            it('uses playerStats.name as target in description when no targetName provided', async () => {
-                mockEmptyThen([]);
-
-                const result = await callTrigger();
-
-                expect(result.payload.description).toContain('Wizard');
-            });
-
-            it('says "themself" when targeting self', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger();
-
-                expect(mockAddEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    description: expect.stringContaining('casts Blur on themself'),
-                }));
-            });
-        });
-
-        describe('case-insensitive matching', () => {
-            it.each([
-                'blur',
-                'Blur',
-                'BLUR',
-                'BlUr',
-            ])('matches spell name "%s"', async (spellName) => {
-                mockEmptyThen([]);
-
-                const result = await triggerBlur(
-                    { name: spellName },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).not.toBeNull();
-                expect(result.type).toBe('popup');
-            });
-        });
-
-        describe('metaCtx handling', () => {
-            it.each([
-                ['null metaCtx', null],
-                ['undefined metaCtx', undefined],
-                ['missing targetName', {}],
-            ])('uses playerStats.name when %s', async (_, metaCtx) => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Blur' }, metaCtx);
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    playerStats.name,
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-        });
+        expect(result).toEqual(POPUP(CASTER.name));
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(spy).toHaveBeenCalledWith('[blur] Error logging:', err);
+        spy.mockRestore();
     });
 });

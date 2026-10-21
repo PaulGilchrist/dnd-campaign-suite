@@ -1,7 +1,14 @@
-// MA-1842 seam lock: applyTurnStartEffects invokes the Constrict grapple
-// ongoing-damage tick for the ACTIVE creature's turn start BEFORE the
-// playerStats guard, so it fires for monster victims (EB) as well as PCs —
-// the same pre-guard shape as MA-0367 infernal wound / MA-0610 whirlwind.
+// @maintained-by-ai
+// MA-1842 seam lock: applyTurnStartEffects dispatches the Constrict grapple
+// ongoing-damage tick (constrictGrappleService) at the ACTIVE creature's turn
+// start BEFORE the playerStats guard, so it fires for monster victims (EB) as
+// well as PCs — the same pre-guard shape as MA-0367 infernal wound /
+// MA-0610 whirlwind. This lane pins ONLY the dispatcher seam (fires for any
+// active creature, exactly once per invocation, exact args, never latched by
+// the dispatcher). Service internals (te gating, 4d8 dice, victim HP paths,
+// release/death strips) are owned by constrictGrappleService.test.js; the
+// post-guard grapple_damage (Unarmed Fighting) handler is a DISTINCT
+// turnStartEffects type owned by turnStartEffects_additional.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const applyConstrictGrappleTurnStart = vi.fn(async () => {});
@@ -37,22 +44,27 @@ const CAMPAIGN = 'test-campaign';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    applyConstrictGrappleTurnStart.mockClear();
 });
 
 describe('MA-1842 turn-start constrict grapple tick seam', () => {
-    it('fires for a MONSTER active creature with NO playerStats (pre-guard)', async () => {
+    it.each([
+        // [label, activeName, playerStats, expectedDispatches]
+        ['MONSTER active creature with NO playerStats (pre-guard)', 'ElderPaladin', null, 1],
+        ['PC active creature', 'Wild_Sage_Druid', { turnStartEffects: [] }, 1],
+        ['no active creature', null, null, 0],
+    ])('dispatches %s — exactly the expected number of ticks with exact args', async (_label, activeName, playerStats, expected) => {
+        await applyTurnStartEffects(activeName, playerStats, CAMPAIGN, []);
+        if (expected === 0) {
+            expect(applyConstrictGrappleTurnStart).not.toHaveBeenCalled();
+        } else {
+            expect(applyConstrictGrappleTurnStart).toHaveBeenCalledTimes(1);
+            expect(applyConstrictGrappleTurnStart).toHaveBeenCalledWith(activeName, CAMPAIGN);
+        }
+    });
+
+    it('re-ticks on every consecutive turn start (dispatcher never latches the recurring damage)', async () => {
         await applyTurnStartEffects('ElderPaladin', null, CAMPAIGN, []);
-        expect(applyConstrictGrappleTurnStart).toHaveBeenCalledWith('ElderPaladin', CAMPAIGN);
-    });
-
-    it('fires for a PC active creature too', async () => {
-        await applyTurnStartEffects('Wild_Sage_Druid', { turnStartEffects: [] }, CAMPAIGN, []);
-        expect(applyConstrictGrappleTurnStart).toHaveBeenCalledWith('Wild_Sage_Druid', CAMPAIGN);
-    });
-
-    it('does not fire without an active creature', async () => {
-        await applyTurnStartEffects(null, null, CAMPAIGN, []);
-        expect(applyConstrictGrappleTurnStart).not.toHaveBeenCalled();
+        await applyTurnStartEffects('ElderPaladin', null, CAMPAIGN, []);
+        expect(applyConstrictGrappleTurnStart).toHaveBeenCalledTimes(2);
     });
 });

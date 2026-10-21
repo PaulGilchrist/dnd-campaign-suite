@@ -1,12 +1,28 @@
+// @maintained-by-ai
+// LONG-REST BASE LANE: atomic batch reset (HP/slots/hit dice + the generic
+// null-everything batch over every registered LONG_REST_RESOURCES key — this file's
+// full-set proof subsumes all single-key echo lanes, #1301/#1306/#1311), exhaustion
+// step-down, per-feature flag resets, Portent/Arcane Ward/Bastion/Stonecunning/
+// Adrenaline/Overchannel, Signature Spells, Magic Initiate + FT-070 Shadow Magic
+// per-spell bytes, Vow of Enmity, Spell Thief batch tracking + caster-null branch,
+// campaign targetEffects stateful survivors, Wild Shape cleanup, regenerateActive
+// clearing (cited owner: restRules-longRest-special.test.js:8-10), invisibility end,
+// and Celestial Resilience self/allies/error paths.
+// NOT re-run here (owned by gated special lanes): FT-035 Fey Magic latch bytes
+// (restRules-constants.ft035-fey-touched.test.js), CLA-308 _Shadow_Arts_ per-spell
+// (restRules-longRest.shadowArts.test.js), FT-068 quickRitual
+// (restRules-longRest.ritualMaster.test.js), SP-091 prayerOfHealingAffected
+// (restRules-longRest.sp091-prayer-latch.test.js), FT-015 boonOfRecovery latches
+// (restRules-longRest.boonOfRecoveryFT015.test.js), CLA-388 _Wild_Companion_freeCast
+// (restRules-longRest.wildCompanion.test.js), campaign-row full-residue + chef log
+// lines + caster-block prune (restRules-longRest-special.test.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { applyLongRest } from './restRules.js'
+import { getLongRestResources } from './restRules-constants.js'
 
 // Mock dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_name, key, _campaign) => {
-    if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-    return undefined;
-  }),
+  getRuntimeValue: vi.fn(() => undefined),
   setRuntimeBatch: vi.fn(),
   setRuntimeValue: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
@@ -83,520 +99,168 @@ function makeStats(overrides = {}) {
   }
 }
 
-function getBatchUpdates() {
-  return vi.mocked(setRuntimeBatch).mock.calls[0][1]
+function celestialStats(overrides = {}) {
+  return makeStats({
+    class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
+    level: 6,
+    abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
+    specialActions: [{ name: 'Celestial Resilience' }],
+    ...overrides,
+  })
+}
+
+// The atomic batch for `name` — arity contract (name, charData, campaign) included.
+function batchFor(name) {
+  const call = vi.mocked(setRuntimeBatch).mock.calls.find(c => c[0] === name)
+  expect(call, `${name} long rest must fire one atomic batch`).toBeTruthy()
+  return call[1]
+}
+
+// Arity-safe writer-set: every standalone setRuntimeValue key written for `name`.
+function writeKeys(filter) {
+  return vi.mocked(setRuntimeValue).mock.calls.filter(filter).map(c => c[1]).sort()
 }
 
 describe('applyLongRest', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-      if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-      return undefined;
-    })
+    // Canonical baseline: every lane re-seeds what it needs, nothing leaks between runs.
+    vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+    vi.mocked(getCombatSummary).mockReturnValue(null)
+    vi.mocked(rollD20).mockReturnValue(10)
+    vi.mocked(addEntry).mockReturnValue(Promise.resolve({}))
+    vi.mocked(grantCelestialResilience).mockReturnValue(null)
   })
 
-  describe('basic reset', () => {
-    it('fully restores HP, spell slots, hit dice, and clears long rest resources', async () => {
+  describe('atomic batch reset', () => {
+    it('fully restores HP, spell slots and hit dice and null-re-arms every registered LONG_REST_RESOURCES key in one batch', async () => {
+      // CLA-050 _circleOfTheLandType, CLA-293 _RendMind_Used, psychicveilUses,
+      // wardingflareUses, naturalRecovery*, channelDivinityCharges, focusPoints,
+      // ragePoints, sorceryPoints, illusorySelfUses... all rest on this one
+      // registration-membership proof: buildLongRestCharData nulls EVERY
+      // LONG_REST_RESOURCES key, so single-key echo tests add nothing (#1301).
       const stats = makeStats({
+        specialActions: [{ name: 'Resourceful' }],
         spellAbilities: {
           spell_slots_level_1: 4,
           spell_slots_level_2: 3,
           spell_slots_level_3: 3,
         },
       })
-      await applyLongRest(stats, CAMPAIGN)
-
-      expect(setRuntimeBatch).toHaveBeenCalledWith('Test Hero', expect.any(Object), CAMPAIGN)
+      const result = await applyLongRest(stats, CAMPAIGN)
+      expect(result).toEqual({ celestialResilienceAllies: null })
       expect(clearAllExpirationEffects).toHaveBeenCalledWith('Test Hero', CAMPAIGN)
 
-      const data = getBatchUpdates()
+      const data = batchFor('Test Hero')
       expect(data.currentHitPoints).toBe(50)
       expect(data.tempHp).toBeNull()
       expect(data.shortRestHitDice).toBe(5)
       expect(data.spell_slots_level_1).toBe(4)
       expect(data.spell_slots_level_2).toBe(3)
       expect(data.spell_slots_level_3).toBe(3)
-      expect(data.channelDivinityCharges).toBeNull()
-      expect(data.focusPoints).toBeNull()
-      expect(data.ragePoints).toBeNull()
-      expect(data.sorceryPoints).toBeNull()
-      expect(data.illusorySelfUses).toBeNull()
-      // CLA-293: Rend Mind latch re-arms via LONG_REST_RESOURCES
-      expect(data._RendMind_Used).toBeNull()
+      // Unset slot levels are skipped, not fabricated
+      expect(data).not.toHaveProperty('spell_slots_level_4')
+      // Full-set registration membership: every LONG_REST_RESOURCES key -> null
+      for (const key of getLongRestResources()) {
+        expect(data, `${key} must be null-re-armed in the batch`).toHaveProperty(key, null)
+      }
+      // Badges/conditions cleared inside the SAME atomic write (SSE echo correctness)
       expect(data.activeBuffs).toEqual([])
       expect(data.activeConditions).toEqual([])
-    })
+      expect(data.activeConditionMeta).toEqual({})
+      // Resourceful (Human 2024) re-grants Heroic Inspiration via the batch
+      expect(data.hasInspiration).toBe(true)
+      // Not exhausted (undefined) -> exhaustion key absent
+      expect(data).not.toHaveProperty('exhaustionLevel')
 
-    it('restores hit dice equal to character level', async () => {
-      const stats = makeStats({ level: 15 })
-      await applyLongRest(stats, CAMPAIGN)
-      expect(getBatchUpdates().shortRestHitDice).toBe(15)
+      // Level-scaled hit dice (guards a hardcoded count) without Resourceful
+      await applyLongRest(makeStats({ name: 'Veteran', level: 15, specialActions: [] }), CAMPAIGN)
+      const vet = batchFor('Veteran')
+      expect(vet.shortRestHitDice).toBe(15)
+      expect(vet.currentHitPoints).toBe(50)
+      expect(vet).not.toHaveProperty('hasInspiration')
+      expect(vet).not.toHaveProperty('spell_slots_level_1')
     })
   })
 
   describe('exhaustion handling', () => {
-    it('reduces exhaustion level by 1 on long rest', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'exhaustionLevel') return 2
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(getBatchUpdates().exhaustionLevel).toBe(1)
-    })
-
-    it('does not modify exhaustion when level is 0 or undefined', async () => {
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'exhaustionLevel') return 0
-        return undefined
-      })
+    it('steps exhaustion down by 1 when exhausted and leaves level 0 untouched', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'exhaustionLevel' ? 2 : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(getBatchUpdates().exhaustionLevel).toBeUndefined()
+      expect(batchFor('Test Hero').exhaustionLevel).toBe(1)
 
       vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, _key) => undefined)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'exhaustionLevel' ? 0 : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(getBatchUpdates().exhaustionLevel).toBeUndefined()
+      expect(batchFor('Test Hero')).not.toHaveProperty('exhaustionLevel')
     })
   })
 
-  describe('feature-specific benefits', () => {
-    it('grants feature-specific benefits on long rest', async () => {
-      // Heroic Inspiration from Resourceful
-      const stats1 = makeStats({ specialActions: [{ name: 'Resourceful' }] })
-      await applyLongRest(stats1, CAMPAIGN)
-      expect(getBatchUpdates().hasInspiration).toBe(true)
-
-      // Chef Bolstering Treats
-      vi.clearAllMocks()
-      const chefStats = makeStats({
+  describe('Chef Bolstering Treats (cited by restRules-longRest-special.test.js)', () => {
+    it('re-arms the craft count to proficiency for holders only', async () => {
+      await applyLongRest(makeStats({
         proficiency: 4,
         automation: { specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-      })
-      await applyLongRest(chefStats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'chefBolsteringTreats', 4, CAMPAIGN, true,
-      )
+      }), CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'chefBolsteringTreats', 4, CAMPAIGN, true)
 
-      // Celestial Resilience temp HP
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'tempHp') return 3
-        return undefined
-      })
-      const celestialStats = makeStats({
-        class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
-        level: 6,
-        abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-        specialActions: [{ name: 'Celestial Resilience' }],
-      })
-      await applyLongRest(celestialStats, CAMPAIGN)
-      expect(setTempHp).toHaveBeenCalledWith('Test Hero', 10, CAMPAIGN)
-
-      // Celestial Resilience logs ability_use on long rest
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'tempHp') return 3
-        return undefined
-      })
-      await applyLongRest(celestialStats, CAMPAIGN)
-      expect(addEntry).toHaveBeenCalledWith(
-        CAMPAIGN,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'Test Hero',
-          abilityName: 'Celestial Resilience',
-          description: expect.stringContaining('10 temporary hit points'),
-        }),
-      )
-
-      // Improved Warding Flare
-      vi.clearAllMocks()
-      const flareStats = makeStats({ specialActions: [{ name: 'Improved Warding Flare' }] })
-      await applyLongRest(flareStats, CAMPAIGN)
-      expect(getBatchUpdates().wardingflareUses).toBeNull()
-    })
-
-    it('resets psychicveilUses (Psychic Veil once-per-long-rest) to null on long rest', async () => {
       vi.clearAllMocks()
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(getBatchUpdates().psychicveilUses).toBeNull()
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Test Hero', 'chefBolsteringTreats', expect.anything(), CAMPAIGN, expect.anything(),
+      )
     })
   })
 
   describe('Divine Intervention Wish cooldown', () => {
-    it('handles Divine Intervention Wish cooldown on long rest', async () => {
-      // decrements cooldown and resets uses when cooldown > 1
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_divineInterventionWishCooldown') return 3
-        return undefined
-      })
+    it('decrements a live cooldown, refunds uses only while cooldown remains, and never touches inactive cooldowns', async () => {
+      // cooldown 3 -> 2, and the once-per-cooldown divineInterventionUses refund (-1)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === '_divineInterventionWishCooldown' ? 3 : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_divineInterventionWishCooldown', 2, CAMPAIGN, true,
-      )
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'divineInterventionUses', -1, CAMPAIGN, true,
-      )
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_divineInterventionWishCooldown', 2, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'divineInterventionUses', -1, CAMPAIGN, true)
 
       vi.clearAllMocks()
-
-      // clears cooldown when it reaches 0
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_divineInterventionWishCooldown') return 1
-        return undefined
-      })
+      // final rest: cooldown 1 -> 0, NO uses refund
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === '_divineInterventionWishCooldown' ? 1 : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_divineInterventionWishCooldown', 0, CAMPAIGN, true,
-      )
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', 'divineInterventionUses', expect.anything(), CAMPAIGN, true,
-      )
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_divineInterventionWishCooldown', 0, CAMPAIGN, true)
+      expect(writeKeys(c => c[1] === 'divineInterventionUses')).toHaveLength(0)
 
       vi.clearAllMocks()
-
-      // does not touch cooldown when it is 0 or null
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_divineInterventionWishCooldown') return 0
-        return undefined
-      })
+      // inactive cooldown 0 -> no writes at all (null/undefined baseline covered by every other run)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === '_divineInterventionWishCooldown' ? 0 : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', '_divineInterventionWishCooldown', expect.anything(), CAMPAIGN, true,
-      )
-
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_divineInterventionWishCooldown') return null
-        return undefined
-      })
-      await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', '_divineInterventionWishCooldown', expect.anything(), CAMPAIGN, true,
-      )
+      expect(writeKeys(c => c[1] === '_divineInterventionWishCooldown')).toHaveLength(0)
     })
   })
 
-  describe('per-spell and per-feature tracking reset', () => {
-    it('resets per-spell and per-feature tracking on long rest', async () => {
-      // Signature Spells
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'SignatureSpells_selection') return ['Fireball']
-        return undefined
-      })
+  describe('per-spell and per-feature free-cast reset', () => {
+    it('resets Signature Spells only when a selection exists', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'SignatureSpells_selection' ? ['Fireball'] : undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'SignatureSpells_Fireball_used', null, CAMPAIGN, true,
-      )
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'SignatureSpells_Fireball_used', null, CAMPAIGN, true)
 
       vi.clearAllMocks()
-
-      // No selection — no changes
+      // clearAllMocks keeps mockImplementation — re-seed the empty-store baseline
+      vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
       await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', expect.stringContaining('SignatureSpells'), expect.anything(), CAMPAIGN, true,
-      )
-
-      vi.clearAllMocks()
-
-      // Natural Recovery free cast tracking
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'SignatureSpells_selection') return []
-        return undefined
-      })
-      const nrStats = makeStats({
-        automation: { passives: [{ type: 'natural_recovery' }] },
-      })
-      await applyLongRest(nrStats, CAMPAIGN)
-      expect(getBatchUpdates().naturalRecoveryFreeCast).toBeNull()
-      expect(getBatchUpdates().naturalRecoveryFreeCastUsed).toBeNull()
-      expect(getBatchUpdates().naturalRecoverySlots).toBeNull()
-
-      vi.clearAllMocks()
-
-      // Phantasmal Creatures
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'SignatureSpells_selection') return []
-        return undefined
-      })
-      // CLA-252: per-spell free-cast counters re-arm (null = available) on long rest
-      const phantasmalStats = makeStats({
-        automation: {
-          passives: [{
-            type: 'phantasmal_creatures',
-            name: 'Phantasmal Creatures',
-            freeCastSpells: ['Summon Beast', 'Summon Fey'],
-            usesMax: 1,
-            recharge: 'long_rest',
-            halvesHp: true,
-          }],
-        },
-      })
-      await applyLongRest(phantasmalStats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Phantasmal_Creatures_Summon_Beast_freeCastCount', null, CAMPAIGN, true,
-      )
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Phantasmal_Creatures_Summon_Fey_freeCastCount', null, CAMPAIGN, true,
-      )
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_phantasmalCreatures_list', [], CAMPAIGN, true,
-      )
-    })
-  })
-
-  describe('Portent dice', () => {
-    it('refreshes Portent dice (2 dice below level 14, 3 at level 14+)', async () => {
-      const stats = makeStats({ automation: { specialActions: [{ type: 'portent' }] } })
-      await applyLongRest(stats, CAMPAIGN)
-
-      expect(rollD20).toHaveBeenCalledTimes(2)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'portentDice', JSON.stringify([10, 10]), CAMPAIGN, true,
-      )
-
-      vi.clearAllMocks()
-
-      const stats14 = makeStats({
-        level: 14,
-        automation: { specialActions: [{ type: 'portent', name: 'Portent' }] },
-      })
-      await applyLongRest(stats14, CAMPAIGN)
-
-      expect(rollD20).toHaveBeenCalledTimes(3)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'portentDice', JSON.stringify([10, 10, 10]), CAMPAIGN, true,
-      )
+      expect(writeKeys(c => String(c[1]).includes('SignatureSpells'))).toHaveLength(0)
     })
 
-    it('does not refresh Portent dice when feature is absent', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-      expect(rollD20).not.toHaveBeenCalled()
-    })
-
-    it('refreshes Portent dice when feature is in passives (5e ruleset)', async () => {
-      const stats = makeStats({ automation: { passives: [{ type: 'passive_buff', name: 'Portent', effect: 'portent_d20_pool' }] } })
-      await applyLongRest(stats, CAMPAIGN)
-
-      expect(rollD20).toHaveBeenCalledTimes(2)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'portentDice', JSON.stringify([10, 10]), CAMPAIGN, true,
-      )
-    })
-
-    it('refreshes 3 Portent dice at level 14+ when feature is in passives (5e ruleset)', async () => {
-      const stats14 = makeStats({
-        level: 14,
-        automation: { passives: [{ type: 'passive_buff', name: 'Portent', effect: 'portent_d20_pool' }] },
-      })
-      await applyLongRest(stats14, CAMPAIGN)
-
-      expect(rollD20).toHaveBeenCalledTimes(3)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', 'portentDice', JSON.stringify([10, 10, 10]), CAMPAIGN, true,
-      )
-    })
-  })
-
-  describe('Arcane Ward', () => {
-    it('restores Arcane Ward HP to full for Abjurer on long rest', async () => {
-      const abjurerStats = makeStats({
-        class: { name: 'Wizard', subclass: { name: 'Abjuration' }, class_levels: [{ level: 5 }] },
-        abilities: [{ name: 'Intelligence', bonus: 3 }],
-        automation: { passives: [{ type: 'arcane_ward', name: 'Arcane Ward' }] },
-      })
-      await applyLongRest(abjurerStats, CAMPAIGN)
-
-      const wardMax = (2 * 5) + 3
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardHp', wardMax, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardMax', wardMax, CAMPAIGN, true)
-    })
-
-    it('does not reset Arcane Ward for non-Abjurer wizard', async () => {
-      const evokerStats = makeStats({
-        class: { name: 'Wizard', subclass: { name: 'Evocation' }, class_levels: [{ level: 5 }] },
-        abilities: [{ name: 'Intelligence', bonus: 3 }],
-      })
-      await applyLongRest(evokerStats, CAMPAIGN)
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
-    })
-  })
-
-  describe('system features reset', () => {
-    it('resets system features on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-
-      // Bastion of Law
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardDice', [], CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardTarget', null, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawActive', false, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardDice', [], CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardSource', null, CAMPAIGN, true)
-
-      // Arcane Ward - should NOT be called for non-Abjurer
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
-
-      // Stonecunning
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningUses', null, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningRestTimestamp', null, CAMPAIGN, true)
-
-      // Adrenaline Rush
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushUses', null, CAMPAIGN, true)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushRestTimestamp', null, CAMPAIGN, true)
-
-      // Overchannel
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'Overchannel_useCount', 0, CAMPAIGN, true)
-    })
-
-    it('handles post-cast rider uses on long rest', async () => {
-      vi.clearAllMocks()
+    it('re-arms Magic Initiate, CLA-252 Phantasmal Creatures and FT-070 Shadow Magic counters with no surplus writes', async () => {
+      // FT-035 Fey Magic latch bytes are owned by restRules-constants.ft035-fey-touched
+      // .test.js (#1306); _Shadow_Arts_ per-spell by the shadowArts lane (#1310).
+      // This run pins the remaining consumer keys of resetPerSpellFreeCastCounters and
+      // resetMagicInitiateFreeCasts, incl. the _phantasmalCreatures_list clear.
       const stats = makeStats({
         automation: {
-          passives: [
-            { type: 'post_cast_rider', riderSave: { recharge: 'long_rest' }, name: 'Beguiling Magic' },
-            { type: 'passive_rule', riderSave: { recharge: 'long_rest' }, name: 'SomeRider' },
-          ],
-        },
-      })
-      await applyLongRest(stats, CAMPAIGN)
-      const updates = getBatchUpdates()
-      expect(updates.postCastRider_Beguiling_Magic).toBeNull()
-      expect(updates.postCastRider_SomeRider).toBeNull()
-    })
-  })
-
-  describe('Vow of Enmity', () => {
-    it('handles Vow of Enmity target buff filtering on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'vowOfEnmityTarget') return 'Enemy2'
-        if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }, { effect: 'haste' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Enemy2', 'activeBuffs', [{ effect: 'haste' }], CAMPAIGN,
-      )
-    })
-  })
-
-  describe('Spell Thief', () => {
-    it('handles Spell Thief on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Caster1', spellName: 'Fireball' }])
-        if (key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Caster2', spellName: 'Witch Bolt' }])
-        if (key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'Test Hero', spellName: 'Fireball' }])
-        return undefined
-      })
-      const stats = makeStats({
-        automation: { reactions: [{ type: 'spell_thief' }] },
-      })
-      await applyLongRest(stats, CAMPAIGN)
-      const updates = getBatchUpdates()
-      expect(updates.spellthiefUses).toBe(1)
-      expect(updates.spellThiefBlocked_Caster1_Fireball).toBeNull()
-      expect(updates['spellThiefStolen_Caster2_Witch Bolt']).toBeNull()
-      expect(updates._spellThiefBlockedList).toBeNull()
-      expect(updates._spellThiefStolenList).toBeNull()
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster1', '_spellThiefCasterBlock', null, CAMPAIGN,
-      )
-    })
-  })
-
-  describe('targetEffects clearing on long rest', () => {
-    it('handles targetEffects clearing on long rest when effects exist', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'clairvoyant_combatant' }, { effect: 'blur' }, { effect: 'foresight' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalled()
-    })
-  })
-
-  describe('Wild Shape cleanup', () => {
-    it('handles Wild Shape cleanup on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'wild_shape', source: 'Druid1' }]
-        if (key === 'activeBuffs') return [{ effect: 'shape_shift' }]
-        return undefined
-      })
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [
-          { name: 'Druid1', type: 'player', wildShapeSource: 'Druid1', beastName: 'Bear' },
-          { name: 'Normal1', type: 'npc' },
-        ],
-      })
-      const stats = makeStats({ class: { name: 'Druid' } })
-      await applyLongRest(stats, CAMPAIGN)
-      expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), CAMPAIGN)
-    })
-  })
-
-  describe('regenerateActive clearing', () => {
-    it('handles regenerateActive clearing on long rest with store keys', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'regenerateActive') return true
-        if (key === 'hitPoints') return 50
-        return undefined
-      })
-      vi.mocked(getAllStoreKeys).mockReturnValue(['Char1', 'Char2'])
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'regenerateActive', false, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'currentHitPoints', 50, CAMPAIGN)
-    })
-  })
-
-  describe('invisibility clearing', () => {
-    it('clears Invisibility on long rest when active', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_activeInvisibility_Test Hero') return 'Caster1'
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(endInvisibility).toHaveBeenCalledWith('Test Hero', CAMPAIGN, 'target finished a rest')
-    })
-
-    it('clears Greater Invisibility on long rest when active', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_activeGreaterInvisibility_Test Hero') return 'Caster1'
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(endGreaterInvisibility).toHaveBeenCalledWith('Test Hero', CAMPAIGN, 'target finished a rest')
-    })
-  })
-
-  describe('Magic Initiate/Fey Touched/Shadow Touched', () => {
-    it('handles Magic Initiate/Fey Touched/Shadow Touched on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_magicInitiateInstances') return [{ spellName: 'Firebolt' }, { spellName: 'Light' }]
-        return undefined
-      })
-      const stats = makeStats({
-        feyTouchedSpell: 'Misty Step',
-        shadowTouchedSpell: 'Shadow of Moil',
-        automation: {
-          actions: [],
-          bonusActions: [],
           specialActions: [{
             type: 'free_spell',
             name: 'Shadow Magic',
@@ -605,36 +269,326 @@ describe('applyLongRest', () => {
             recharge: 'long_rest',
             perSpellTracking: true,
           }],
-          passives: [],
+          passives: [
+            {
+              type: 'phantasmal_creatures',
+              name: 'Phantasmal Creatures',
+              freeCastSpells: ['Summon Beast', 'Summon Fey'],
+              usesMax: 1,
+              recharge: 'long_rest',
+              halvesHp: true,
+            },
+            { type: 'natural_recovery' },
+          ],
         },
       })
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_magicInitiateInstances') return [{ spellName: 'Firebolt' }, { spellName: 'Light' }]
+        return undefined
+      })
       await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Level_1_Spell_[Instance_1]_freeCastCount', null, CAMPAIGN, true,
-      )
-      // FT-035: LIVE writer key is feature-named `_Fey_Magic_freeCastCount`
-      // (spellPreparationService) — the old `_feyTouchedSpell_freeCastCount`
-      // reset was a dead key with zero writers.
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Fey_Magic_freeCastCount', null, CAMPAIGN, true,
-      )
-      // FT-070: per-spell Shadow Magic counters reset to null (fresh) on long rest
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Shadow_Magic_Shadow_of_Moil_freeCastCount', null, CAMPAIGN, true,
-      )
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Shadow_Magic_Invisibility_freeCastCount', null, CAMPAIGN, true,
+
+      // CLA-252 / #1311 pins: per-spell free-cast counters re-arm to null (available)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Phantasmal_Creatures_Summon_Beast_freeCastCount', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Phantasmal_Creatures_Summon_Fey_freeCastCount', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_phantasmalCreatures_list', [], CAMPAIGN, true)
+      // FT-070 pins (cited by restRules-longRest.shadowArts.test.js bait fixture)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Shadow_Magic_Shadow_of_Moil_freeCastCount', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Shadow_Magic_Invisibility_freeCastCount', null, CAMPAIGN, true)
+      // Magic Initiate: one latch per instance, keyed by synthesized feature name
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Level_1_Spell_[Instance_1]_freeCastCount', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', '_Level_1_Spell_[Instance_2]_freeCastCount', null, CAMPAIGN, true)
+      // Full writer-set: the free-cast keys above + the unconditional Favored Enemy
+      // and FT-035 shared-latch writes (:689 fires every rest; its byte contract is
+      // owned by the ft035 lane) — proves no spell-name drift, no surplus writes.
+      expect(writeKeys(c =>
+        c[0] === 'Test Hero' && String(c[1]).endsWith('_freeCastCount') && c[2] === null && c[4] === true,
+      )).toEqual([
+        '_Favored_Enemy_freeCastCount',
+        '_Fey_Magic_freeCastCount',
+        '_Level_1_Spell_[Instance_1]_freeCastCount',
+        '_Level_1_Spell_[Instance_2]_freeCastCount',
+        '_Phantasmal_Creatures_Summon_Beast_freeCastCount',
+        '_Phantasmal_Creatures_Summon_Fey_freeCastCount',
+        '_Shadow_Magic_Invisibility_freeCastCount',
+        '_Shadow_Magic_Shadow_of_Moil_freeCastCount',
+      ])
+      // Natural Recovery's only LR observable at this seam is its log line
+      // (the batch keys come from registration, covered by the base batch test)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'long_rest',
+          message: expect.stringContaining('Natural Recovery (spell slots)'),
+        }),
       )
     })
   })
 
-  describe('Celestial Resilience with allies', () => {
-    it('handles Celestial Resilience with combatSummary and allies on long rest', async () => {
+  describe('Portent dice', () => {
+    it('refreshes 2 dice below level 14 and 3 at 14+ for specialActions holders', async () => {
+      const stats = makeStats({ automation: { specialActions: [{ type: 'portent' }] } })
+      await applyLongRest(stats, CAMPAIGN)
+      expect(rollD20).toHaveBeenCalledTimes(2)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'portentDice', JSON.stringify([10, 10]), CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'portentUsedThisTurn', null, CAMPAIGN, true)
+
       vi.clearAllMocks()
+      await applyLongRest(makeStats({
+        level: 14,
+        automation: { specialActions: [{ type: 'portent', name: 'Portent' }] },
+      }), CAMPAIGN)
+      expect(rollD20).toHaveBeenCalledTimes(3)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'portentDice', JSON.stringify([10, 10, 10]), CAMPAIGN, true)
+    })
+
+    it('detects Portent via 5e passives and never rolls for non-holders', async () => {
+      await applyLongRest(makeStats({
+        automation: { passives: [{ type: 'passive_buff', name: 'Portent', effect: 'portent_d20_pool' }] },
+      }), CAMPAIGN)
+      expect(rollD20).toHaveBeenCalledTimes(2)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'portentDice', JSON.stringify([10, 10]), CAMPAIGN, true)
+
+      vi.clearAllMocks()
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(rollD20).not.toHaveBeenCalled()
+      expect(writeKeys(c => c[1] === 'portentDice')).toHaveLength(0)
+    })
+  })
+
+  describe('Arcane Ward', () => {
+    it('restores the ward to full (2*level + INT) for Abjurers and writes nothing for other wizards', async () => {
+      await applyLongRest(makeStats({
+        class: { name: 'Wizard', subclass: { name: 'Abjuration' }, class_levels: [{ level: 5 }] },
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+        automation: { passives: [{ type: 'arcane_ward', name: 'Arcane Ward' }] },
+      }), CAMPAIGN)
+      const wardMax = 13
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardActive', false, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardHp', wardMax, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'arcaneWardMax', wardMax, CAMPAIGN, true)
+
+      vi.clearAllMocks()
+      await applyLongRest(makeStats({
+        class: { name: 'Wizard', subclass: { name: 'Evocation' }, class_levels: [{ level: 5 }] },
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+      }), CAMPAIGN)
+      expect(writeKeys(c => String(c[1]).startsWith('arcaneWard'))).toHaveLength(0)
+    })
+  })
+
+  describe('system features reset', () => {
+    it('resets Bastion of Law (caster and ward target), Stonecunning, Adrenaline Rush and Overchannel', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'bastionOfLawWardTarget' ? 'WardTarget' : undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+
+      // Bastion of Law — caster side
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardDice', [], CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawWardTarget', null, CAMPAIGN, true)
+      // Bastion of Law — ward target side
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawActive', false, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardDice', [], CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardSource', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawWardUsed', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('WardTarget', 'bastionOfLawLastAttackDamage', null, CAMPAIGN, true)
+
+      // Stonecunning / Adrenaline Rush / Overchannel
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningUses', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'stonecunningRestTimestamp', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushUses', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'adrenalineRushRestTimestamp', null, CAMPAIGN, true)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'Overchannel_useCount', 0, CAMPAIGN, true)
+
+      // No ward target -> no WardTarget writes, caster reset still fires
+      vi.clearAllMocks()
+      vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bastionOfLawActive', false, CAMPAIGN, true)
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'WardTarget')).toHaveLength(0)
+    })
+
+    it('nulls long-rest post-cast rider keys and leaves short-rest/unsaved riders out of the batch', async () => {
+      await applyLongRest(makeStats({
+        automation: {
+          passives: [
+            { type: 'post_cast_rider', riderSave: { recharge: 'long_rest' }, name: 'Beguiling Magic' },
+            { type: 'passive_rule', riderSave: { recharge: 'long_rest' }, name: 'SomeRider' },
+            // bait negatives: wrong recharge and missing riderSave
+            { type: 'post_cast_rider', riderSave: { recharge: 'short_rest' }, name: 'Shorty' },
+            { type: 'passive_rule', name: 'NoSave' },
+          ],
+        },
+      }), CAMPAIGN)
+      const updates = batchFor('Test Hero')
+      expect(updates.postCastRider_Beguiling_Magic).toBeNull()
+      expect(updates.postCastRider_SomeRider).toBeNull()
+      expect(updates).not.toHaveProperty('postCastRider_Shorty')
+      expect(updates).not.toHaveProperty('postCastRider_NoSave')
+    })
+  })
+
+  describe('Vow of Enmity', () => {
+    it('strips the vow buff from the marked enemy — nothing else written to it', async () => {
       vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'tempHp') return 3
+        if (key === 'vowOfEnmityTarget') return 'Enemy2'
+        if (key === 'activeBuffs') return [{ effect: 'vow_of_enmity' }, { effect: 'haste' }]
         return undefined
       })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      // Exact full writer-set for the marked enemy: only the filtered buff list.
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Enemy2'))
+        .toEqual([['Enemy2', 'activeBuffs', [{ effect: 'haste' }], CAMPAIGN]])
+    })
+  })
+
+  describe('Spell Thief (cited by restRules-longRest-special.test.js)', () => {
+    it('re-arms uses to 1, clears blocked/stolen tracking in the batch, and nulls the caster block', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_spellThiefBlockedList') return JSON.stringify([{ casterName: 'Caster1', spellName: 'Fireball' }])
+        if (key === '_spellThiefStolenList') return JSON.stringify([{ casterName: 'Caster2', spellName: 'Witch Bolt' }])
+        if (key === '_spellThiefCasterBlock') return JSON.stringify([{ thiefName: 'Test Hero', spellName: 'Fireball' }])
+        return undefined
+      })
+      await applyLongRest(makeStats({ automation: { reactions: [{ type: 'spell_thief' }] } }), CAMPAIGN)
+      const updates = batchFor('Test Hero')
+      // Override beats the generic registration null: thief starts fresh at 1 use.
+      expect(updates.spellthiefUses).toBe(1)
+      expect(updates.spellThiefBlocked_Caster1_Fireball).toBeNull()
+      expect(updates['spellThiefStolen_Caster2_Witch Bolt']).toBeNull()
+      expect(updates._spellThiefBlockedList).toBeNull()
+      expect(updates._spellThiefStolenList).toBeNull()
+      // Last thief entry pruned -> caster block goes fully null
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster1', '_spellThiefCasterBlock', null, CAMPAIGN)
+    })
+  })
+
+  describe('campaign targetEffects survivors', () => {
+    it('drops every summon and long-rest row down to only unrelated effects', async () => {
+      // Stateful campaign store (longRest-special precedent): each read/filter/write
+      // advances the store, so final residue proves BOTH the unconditional
+      // summon-row filter (:90-93, unique to this lane) and the row-clear loop.
+      let tes = [
+        { effect: 'globe_barrier' },
+        { effect: 'antimagic_field' },
+        { effect: 'protection_from_evil_and_good' },
+        { effect: 'forcecage' },
+        { effect: 'polymorph' },
+        { effect: 'animal_shapes' },
+        { effect: 'true_polymorph' },
+        { effect: 'object_transform' },
+        { effect: 'shapechange' },
+        { effect: 'clairvoyant_combatant' },
+        { effect: 'bless' },
+      ]
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) =>
+        (name === 'campaign' && key === 'targetEffects') ? tes : undefined)
+      vi.mocked(setRuntimeValue).mockImplementation((name, key, value) => {
+        if (name === 'campaign' && key === 'targetEffects') tes = value
+      })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(tes).toEqual([{ effect: 'bless' }])
+    })
+  })
+
+  describe('Wild Shape cleanup', () => {
+    it('de-transforms the druid, keeps unrelated creatures, and re-arms its latches with exact payloads', async () => {
+      let tes = [{ effect: 'wild_shape', source: 'Druid1' }]
+      const cs = {
+        creatures: [
+          { name: 'Druid1', type: 'player', wildShapeSource: 'Druid1', beastIndex: 2, beastName: 'Bear' },
+          { name: 'Normal1', type: 'npc' },
+          // bait: another druid's beast form must survive this rest
+          { name: 'OtherBear', type: 'npc', wildShapeSource: 'OtherDruid' },
+        ],
+      }
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (name === 'campaign' && key === 'targetEffects') return tes
+        if (name === 'Druid1' && key === 'activeBuffs') return [{ effect: 'shape_shift' }, { effect: 'bless' }]
+        return undefined
+      })
+      vi.mocked(setRuntimeValue).mockImplementation((name, key, value) => {
+        if (name === 'campaign' && key === 'targetEffects') tes = value
+      })
+      vi.mocked(getCombatSummary).mockReturnValue(cs)
+      // Cleanup is driven by the campaign wild_shape rows, not the resting hero's class
+      await applyLongRest(makeStats(), CAMPAIGN)
+
+      // Exact persisted combat summary: druid flags stripped, own beasts removed,
+      // unrelated creatures (and another druid's bear) untouched
+      expect(storageService.default.set).toHaveBeenCalledWith(
+        'combatSummary',
+        { creatures: [
+          { name: 'Druid1', type: 'player' },
+          { name: 'Normal1', type: 'npc' },
+          { name: 'OtherBear', type: 'npc', wildShapeSource: 'OtherDruid' },
+        ] },
+        CAMPAIGN,
+      )
+      expect(tes).toEqual([])
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], CAMPAIGN, true)
+      // shape_shift stripped, unrelated bless buff preserved
+      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'activeBuffs', [{ effect: 'bless' }], CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'circleFormsAC', null, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Druid1', 'tempHp', 0, CAMPAIGN)
+    })
+  })
+
+  describe('regenerateActive clearing (cited by restRules-longRest-special.test.js)', () => {
+    it('clears regen and refills HP only for regenerating string-keyed stores', async () => {
+      vi.mocked(getAllStoreKeys).mockReturnValue(['Char1', 'Char2', 'Char3', 42])
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (name === 'Char1' && key === 'regenerateActive') return true
+        if (name === 'Char1' && key === 'hitPoints') return 60
+        if (name === 'Char3' && key === 'regenerateActive') return true
+        return undefined
+      })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      // Char1: regen off + HP refilled to stored max
+      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'regenerateActive', false, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'currentHitPoints', 60, CAMPAIGN)
+      // Char3: regen cleared but no HP write without a stored maximum
+      expect(setRuntimeValue).toHaveBeenCalledWith('Char3', 'regenerateActive', false, CAMPAIGN)
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Char3' && c[1] === 'currentHitPoints')).toHaveLength(0)
+      // Char2 (not regenerating) is never written
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[0] === 'Char2')).toHaveLength(0)
+    })
+  })
+
+  describe('invisibility clearing', () => {
+    it('ends active Invisibility and Greater Invisibility and clears their campaign keys', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === '_activeInvisibility_Test Hero') return 'Caster1'
+        if (key === '_activeGreaterInvisibility_Test Hero') return 'Caster1'
+        return undefined
+      })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(endInvisibility).toHaveBeenCalledWith('Test Hero', CAMPAIGN, 'target finished a rest')
+      expect(endGreaterInvisibility).toHaveBeenCalledWith('Test Hero', CAMPAIGN, 'target finished a rest')
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_activeInvisibility_Test Hero', null, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_activeGreaterInvisibility_Test Hero', null, CAMPAIGN)
+    })
+  })
+
+  describe('Celestial Resilience', () => {
+    it('grants self temp HP and logs the ability use without combat, and returns the ally modal payload when granted with allies', async () => {
+      const stats = celestialStats()
+      // Self-only: combat summary absent -> no ally grant round trip
+      await applyLongRest(stats, CAMPAIGN)
+      expect(setTempHp).toHaveBeenCalledWith('Test Hero', 10, CAMPAIGN)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'Test Hero',
+          abilityName: 'Celestial Resilience',
+          description: 'Test Hero gains 10 temporary hit points from Celestial Resilience (long rest).',
+        }),
+      )
+      expect(grantCelestialResilience).not.toHaveBeenCalled()
+
+      vi.clearAllMocks()
       vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] })
       vi.mocked(grantCelestialResilience).mockResolvedValue({
         allyTempHp: 5,
@@ -642,59 +596,35 @@ describe('applyLongRest', () => {
         selfTempHp: 10,
         maxAllies: 5,
       })
-      const celestialStats = makeStats({
-        class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
-        level: 6,
-        abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-        specialActions: [{ name: 'Celestial Resilience' }],
-      })
-      await applyLongRest(celestialStats, CAMPAIGN)
+      const result = await applyLongRest(stats, CAMPAIGN)
       expect(setTempHp).toHaveBeenCalledWith('Test Hero', 10, CAMPAIGN)
-      expect(grantCelestialResilience).toHaveBeenCalledWith(celestialStats, CAMPAIGN, 'long_rest')
-      expect(addEntry).toHaveBeenCalledWith(
-        CAMPAIGN,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'Test Hero',
-          abilityName: 'Celestial Resilience',
-          description: expect.stringContaining('10 temporary hit points'),
-        }),
-      )
+      expect(grantCelestialResilience).toHaveBeenCalledWith(stats, CAMPAIGN, 'long_rest')
+      // Modal payload mapped exactly for the ally-target picker
+      expect(result).toEqual({
+        celestialResilienceAllies: {
+          creatureTargets: [{ name: 'Ally2', type: 'player' }],
+          allyTempHp: 5,
+          selfTempHp: 10,
+          maxTargets: 5,
+        },
+      })
     })
 
-    it('handles addEntry catch on long rest celestial resilience', async () => {
+    it('survives a rejected log write and refuses a patron rest with missing level', async () => {
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const err = new Error('Log failed')
+      vi.mocked(addEntry).mockReturnValue(Promise.reject(err))
+      await expect(applyLongRest(celestialStats(), CAMPAIGN))
+        .resolves.toEqual({ celestialResilienceAllies: null })
+      expect(mockConsoleError).toHaveBeenCalledWith('[celestialResilience] Error:', err)
+      mockConsoleError.mockRestore()
+
       vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'tempHp') return 3
-        return undefined
-      })
-      vi.mocked(addEntry).mockReturnValue(Promise.reject(new Error('Log failed')))
-      const celestialStats = makeStats({
-        class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
-        level: 6,
-        abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Charisma', bonus: 4 }],
-        specialActions: [{ name: 'Celestial Resilience' }],
-      })
-      await applyLongRest(celestialStats, CAMPAIGN)
-    })
-
-    it('throws when level is missing for Celestial Resilience on long rest', async () => {
-      const celestialStats = makeStats({
-        class: { name: 'Warlock', subclass: { name: 'Celestial Patron' }, major: { name: 'Celestial Patron' } },
-        level: null,
-        specialActions: [{ name: 'Celestial Resilience' }],
-      })
-      await expect(applyLongRest(celestialStats, CAMPAIGN)).rejects.toThrow('playerStats.level is required')
-    })
-  })
-
-  describe('CLA-050 Circle of the Land rechoice cadence', () => {
-    it('clears _circleOfTheLandType in the atomic long-rest batch so the land must be re-chosen', async () => {
-      vi.clearAllMocks()
-      await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeBatch).toHaveBeenCalled()
-      expect(getBatchUpdates()).toHaveProperty('_circleOfTheLandType')
-      expect(getBatchUpdates()._circleOfTheLandType).toBeNull()
+      // clearAllMocks keeps implementations — restore the resolving-log baseline
+      vi.mocked(addEntry).mockReturnValue(Promise.resolve({}))
+      // Level is required for the warlock level + CHA temp HP math — honest throw
+      await expect(applyLongRest(celestialStats({ level: null }), CAMPAIGN))
+        .rejects.toThrow('playerStats.level is required')
     })
   })
 })

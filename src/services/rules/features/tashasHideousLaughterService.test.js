@@ -1,4 +1,57 @@
+// @maintained-by-ai
+// tashasHideousLaughterService lane — lv2 enchantment MODAL-FRONT (Tasha's Hideous Laughter).
+// IDENTITY (#1360/88 method): source is 18 lines, exports exactly ONE symbol
+// triggerTashasHideousLaughter (source :1); live-caller evidence: triggerSpells.js:388 is the ONLY
+// production caller (spread `{ ...metaCtx, spellSaveDc }` where spellSaveDc comes from computeSpellStats
+// execution/index.js:193-221 — ALWAYS a resolved number on the live seam, so the metaCtx.spellSaveDc
+// tier is LIVE and card/floor tiers below are DEFENSIVE-only, #1386 caller-boundary method).
+// No dead exports (#1370). This copy performs NO name gate — gating is fully owned by the caller at
+// triggerSpells.js:387 (`spell.name && spell.name.toLowerCase() === "tasha's hideous laughter"`);
+// the service name-echoes bytes verbatim (T2), never lowercasing, never stripping the apostrophe.
+//
+// REPEAT-SAVE DETERMINATION: BESPOKE, NOT the generic #1405 repeatSaveService engine. The service
+// stamps NO te and NO te.repeatSave descriptor — its envelope is consumed by useSpellCastExecutor.js:137
+// ('tashasLaughter' → 'tashasLaughterModal') and rendered by TashasLaughterModal.jsx (saveType/saveDc/
+// spellSlotLevel:91 maxTargets/metamagicHeighten:82 are the LIVE consumers of every payload key pinned
+// here). Downstream automation lanes: automationRouter.js:192 → automation/index.js:590
+// tashas_laughter → tashasLaughterHandler.js which stamps te effect 'tashas_hideous_laughter'
+// (registered: targetEffectDefinitions.js:555 — #1373 clean) + prone/incapacitated activeConditionMeta
+// with {dc, ability:'wis'} repeatability metadata, NOT the generic {saveType, dc, condition}
+// repeatSave shape. 'ENDS on ends-its-turn-or-takes-damage' is modeled by the bespoke damage-trigger
+// lane: tashas_laughter_<target>_damageTrigger runtime key, cleared by clearExpirationEffects.js:454
+// via 'tashas_laughter_expiration'. All of that is covered by OWNED SIBLING SUITES
+// (tashasLaughterHandler.test.js, TashasLaughterModal.player/npc-saves.test.jsx,
+// clearExpirationEffects.test.js:428-440) — this file owns ONLY the envelope bytes it stamps.
+//
+// DISK/NAME FIDELITY (#1362, both rulesets read programmatically): 2024 spells.json name
+// "Tasha's Hideous Laughter" (straight apostrophe U+0027) with mangled index 'tashas-hIDEOUS-LAUGHTER';
+// 5e spells.json name 'Hideous Laughter' lv1 — its bytes FAIL the caller gate at triggerSpells.js:387
+// even though SERVICE_HANDLED_SPELLS :53 lists 'hideous laughter' (source-side report, this lane pins
+// the echo only, T2). dc_type WIS on disk in BOTH — saveType:'WIS' byte pin is disk-faithful (T1).
+//
+// COERCION CENSUS (#1374 six-way): '||'-COERCION member, identical family to suggestion #1422:
+// :2 `metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2)`
+// and :3 `metaCtx?.slotLevel || spell.level || 1`. 0/NaN coerced down at every tier (0 spellSaveDc,
+// 0 slotLevel, 0 proficiency all fall through — pinned T3/T4); missing proficiency silently floors at
+// 8+2=10 instead of throwing. metamagicHeighten (:15) is the ONE non-coerced field: `metaCtx?.x`
+// passes false through as false (T5) — the sole field where 0/false survives.
+// UNGUARDED-DEREF QUIRK (#1360 class): playerStats is NOT optional-chained (:2) and spell is not
+// (:3 spell.level, :9 spell.name). Golden behavior pinned T6: undefined playerStats THROWS unless
+// metaCtx.spellSaveDc short-circuits the :2 deref (truthy tier skips playerStats entirely).
+//
+// STANDARDS: zero-store/zero-dice/zero-log/zero-clock copy — grep evidence: the service file has NO
+// import statements at all (`grep -c 'import ' tashasHideousLaughterService.js` = 0; no
+// getRuntimeValue/addEntry/Math.random/Date.now/setTimeout/setInterval/localStorage), so stateful-store
+// fakes, dice stubs, log-byte pins and NO-CLOCK policy scans are N/A here (policy PASS by absence —
+// minutes×N countdown for the disk 'Concentration, up to 1 minute' lives downstream, combat-scoped).
+// No mocks in this file → vi.resetAllMocks N/A. Full-set toEqual + exact key-set arrays + playerStats
+// toBe identity (T1); no objectContaining/expect.any/toHaveBeenCalled anywhere below. Input purity
+// (#1395) folded into T1. Argument-keyed arity: service takes (spell, metaCtx, playerStats,
+// campaignName, _mapName) — _mapName is inert passthrough (never read in source), pinned by value
+// variation in T1.
+
 import { describe, it, expect } from 'vitest';
+import { cloneDeep } from 'lodash';
 import { triggerTashasHideousLaughter } from './tashasHideousLaughterService.js';
 
 describe('tashasHideousLaughterService', () => {
@@ -10,344 +63,129 @@ describe('tashasHideousLaughterService', () => {
         proficiency: 4,
     };
 
-    describe('triggerTashasHideousLaughter', () => {
-        describe('spell name matching', () => {
-            it.each([
-                "tasha's hideous laughter",
-                "TASHA'S HIDEOUS LAUGHTER",
-                "TaShA'S HiDeOuS LaUgHtEr",
-            ])('returns modal structure for "%s" spell name (case-insensitive match)', async (inputName) => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: inputName, level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+    describe('full-set envelope bytes', () => {
+        it('stamps the exact envelope key-sets and byte values, leaving every input pristine (#1395)', async () => {
+            const spell = { name: "Tasha's Hideous Laughter", level: 2, school: 'Enchantment' };
+            const metaCtx = { spellSaveDc: 17 };
+            const inputs = { spell, metaCtx, playerStats };
+            const pristine = cloneDeep(inputs);
 
-                expect(result).toEqual({
-                    type: 'modal',
-                    modalName: 'tashasLaughter',
-                    payload: expect.objectContaining({
-                        action: expect.objectContaining({ name: inputName }),
-                        campaignName,
-                        saveType: 'WIS',
-                        saveDc: 15,
-                        spellSlotLevel: 1,
-                    }),
-                });
-            });
+            const result = await triggerTashasHideousLaughter(spell, metaCtx, playerStats, campaignName, mapName);
 
-            it.each([
-                'Fire Bolt',
-                'Sleep',
-                'Hypnotic Pattern',
-                "tasha's hideous laughters",
-                "tasha's",
-                'hideous laughter',
-            ])('returns modal for non-match: "%s"', async (spellName) => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: spellName, level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({
-                    type: 'modal',
-                    modalName: 'tashasLaughter',
-                    payload: expect.objectContaining({
-                        action: expect.objectContaining({ name: spellName }),
-                    }),
-                });
-            });
-
-            it.each([undefined, null, ''])(
-                'returns modal when spell name is %s',
-                async (spellName) => {
-                    const result = await triggerTashasHideousLaughter(
-                        { name: spellName, level: 1 },
-                        {},
-                        playerStats,
-                        campaignName,
-                        mapName,
-                    );
-
-                    expect(result).toEqual({
-                        type: 'modal',
-                        modalName: 'tashasLaughter',
-                        payload: expect.objectContaining({
-                            action: expect.objectContaining({ name: spellName }),
-                        }),
-                    });
-                },
-            );
-        });
-
-        describe('save DC resolution', () => {
-            it('uses metaCtx spellSaveDc when provided', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    { spellSaveDc: 18 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(18);
-            });
-
-            it('prefers metaCtx spellSaveDc over playerStats.saveDc', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    { spellSaveDc: 20 },
-                    { ...playerStats, spellAbilities: { saveDc: 15 } },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(20);
-            });
-
-            it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(15);
-            });
-
-            it('computes saveDc as 8 + proficiency when no spellAbilities.saveDc', async () => {
-                const stats = { name: 'Wizard', proficiency: 3 };
-
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(11);
-            });
-
-            it('uses default proficiency of 2 when proficiency is missing, null, or undefined', async () => {
-                for (const stats of [
-                    { name: 'Wizard' },
-                    { name: 'Wizard', proficiency: null },
-                    { name: 'Wizard', proficiency: undefined },
-                ]) {
-                    const result = await triggerTashasHideousLaughter(
-                        { name: "tasha's hideous laughter", level: 1 },
-                        {},
-                        stats,
-                        campaignName,
-                        mapName,
-                    );
-
-                    expect(result.payload.saveDc).toBe(10);
-                }
-            });
-
-            it('uses default saveDc base of 8 when playerStats is empty', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    {},
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(10);
-            });
-
-            it('computes saveDc when spellAbilities is undefined', async () => {
-                const stats = { name: 'Wizard', proficiency: 4 };
-
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(12);
-            });
-
-            it('uses proficiency when spellAbilities.saveDc is null', async () => {
-                const stats = { name: 'Wizard', spellAbilities: { saveDc: null, modifier: 4 }, proficiency: 5 };
-
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(13);
-            });
-        });
-
-        describe('slot level resolution', () => {
-            it('uses metaCtx slotLevel when provided', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 3 },
-                    { slotLevel: 5 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.spellSlotLevel).toBe(5);
-            });
-
-            it('prefers metaCtx slotLevel over spell.level', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    { spellSaveDc: 17, slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.spellSlotLevel).toBe(6);
-            });
-
-            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 3 },
-                    { spellSaveDc: 17 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.spellSlotLevel).toBe(3);
-            });
-
-            it.each([null, undefined])(
-                'defaults slotLevel to 1 when spell.level is %s',
-                async (level) => {
-                    const result = await triggerTashasHideousLaughter(
-                        { name: "tasha's hideous laughter", level },
-                        {},
-                        playerStats,
-                        campaignName,
-                        mapName,
-                    );
-
-                    expect(result.payload.spellSlotLevel).toBe(1);
-                },
-            );
-
-            it('defaults slotLevel to 1 when neither metaCtx nor spell has level', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter" },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.spellSlotLevel).toBe(1);
-            });
-        });
-
-        describe('action structure', () => {
-            it('passes the original spell name into the action', async () => {
-                const spell = { name: "tasha's hideous laughter", level: 3, school: 'Enchantment' };
-
-                const result = await triggerTashasHideousLaughter(spell, {}, playerStats, campaignName, mapName);
-
-                expect(result.payload.action.name).toBe("tasha's hideous laughter");
-                expect(result.payload.action.automation).toEqual({ type: 'tashas_laughter' });
-            });
-
-            it('includes campaignName in payload', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    playerStats,
-                    'MyCampaign',
-                    'DungeonMap1',
-                );
-
-                expect(result.payload.campaignName).toBe('MyCampaign');
-            });
-        });
-
-        describe('return value', () => {
-            it('returns modal structure with correct type and modalName', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.type).toBe('modal');
-                expect(result.modalName).toBe('tashasLaughter');
-                expect(result.payload).toEqual(expect.objectContaining({
-                    action: expect.any(Object),
+            // toEqual ignores undefined-valued keys, so the exact key-set arrays below pin
+            // metamagicHeighten's presence-with-undefined and the inert mapName passthrough.
+            expect(result).toEqual({
+                type: 'modal',
+                modalName: 'tashasLaughter',
+                payload: {
+                    action: { name: "Tasha's Hideous Laughter", automation: { type: 'tashas_laughter' } },
                     playerStats,
                     campaignName,
                     saveType: 'WIS',
-                    saveDc: 15,
-                    spellSlotLevel: 1,
-                }));
+                    saveDc: 17,
+                    spellSlotLevel: 2,
+                    metamagicHeighten: undefined,
+                },
             });
+            expect(Object.keys(result)).toEqual(['type', 'modalName', 'payload']);
+            expect(Object.keys(result.payload)).toEqual([
+                'action', 'playerStats', 'campaignName', 'saveType', 'saveDc', 'spellSlotLevel', 'metamagicHeighten',
+            ]);
+            expect(Object.keys(result.payload.action)).toEqual(['name', 'automation']);
+            expect(result.payload.playerStats).toBe(playerStats);
+            expect(spell).toEqual(pristine.spell);
+            expect(metaCtx).toEqual(pristine.metaCtx);
+            expect(playerStats).toEqual(pristine.playerStats);
+        });
+    });
+
+    describe('name echo (no gate here — gate owner is triggerSpells.js:387)', () => {
+        it.each([
+            ["Tasha's Hideous Laughter", 'real 2024 disk name, straight apostrophe'],
+            ['Hideous Laughter', 'real 5e disk name — would FAIL the caller gate; this copy still echoes'],
+            ['tasha’s hideous laughter', 'curly-apostrophe variant — punctuation class survives untouched'],
+        ])('echoes "%s" into action.name byte-identical with the automation stamp constant (%s)', async (inputName) => {
+            const result = await triggerTashasHideousLaughter({ name: inputName, level: 1 }, {}, playerStats, campaignName, mapName);
+
+            expect(result.payload.action.name).toBe(inputName);
+            expect(result.payload.action.automation).toEqual({ type: 'tashas_laughter' });
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('tashasLaughter');
+        });
+    });
+
+    describe('saveDc || tier chain (source :2, #1374 coercion member)', () => {
+        it.each([
+            // [metaCtx, stats, expected, why]
+            [{ spellSaveDc: 18 }, playerStats, 18, 'LIVE tier: caller-computed spellSaveDc beats card DC'],
+            [{}, playerStats, 15, 'defensive: card spellAbilities.saveDc'],
+            [{ spellSaveDc: 0 }, playerStats, 15, 'quirk: metaCtx.spellSaveDc 0 is falsy-coerced down'],
+            [{}, { ...playerStats, spellAbilities: { saveDc: null } }, 12, 'card saveDc null falls to 8 + proficiency(4)'],
+            [{}, { name: 'Wizard', proficiency: 3 }, 11, 'no spellAbilities: 8 + proficiency'],
+            [{}, { name: 'Wizard' }, 10, 'missing proficiency silently floors at 8 + 2 (no throw)'],
+            [{}, { name: 'Wizard', proficiency: 0 }, 10, 'quirk: proficiency 0 coerced to 2 by ||'],
+            [undefined, playerStats, 15, 'undefined metaCtx via ?. falls to card tier'],
+        ])('saveDc tier: metaCtx=%j stats=%j → %i (%s)', async (metaCtx, stats, expected) => {
+            const result = await triggerTashasHideousLaughter(
+                { name: "tasha's hideous laughter", level: 1 }, metaCtx, stats, campaignName, mapName,
+            );
+            expect(result.payload.saveDc).toBe(expected);
+        });
+    });
+
+    describe('spellSlotLevel || tier chain (source :3; live consumer TashasLaughterModal.jsx:91 maxTargets)', () => {
+        it.each([
+            [{ slotLevel: 5 }, 3, 5, 'metaCtx.slotLevel beats spell.level'],
+            [{}, 3, 3, 'falls back to spell.level'],
+            [{ slotLevel: 0 }, 3, 3, 'quirk: slotLevel 0 falsy-coerced to spell.level'],
+            [{}, 0, 1, 'quirk: spell.level 0 coerced to literal 1 (equals disk lv1 bytes)'],
+            [undefined, 2, 2, 'undefined metaCtx via ?. falls to spell.level'],
+        ])('metaCtx=%j spell.level=%s → spellSlotLevel=%i (%s)', async (metaCtx, level, expected) => {
+            const result = await triggerTashasHideousLaughter(
+                { name: "tasha's hideous laughter", level }, metaCtx, playerStats, campaignName, mapName,
+            );
+            expect(result.payload.spellSlotLevel).toBe(expected);
+        });
+    });
+
+    describe('metamagicHeighten passthrough (source :15 — the only non-coerced field)', () => {
+        it.each([true, false])(
+            'passes metamagicHeighten=%s through untouched (false survives, not coerced)',
+            async (heighten) => {
+                const result = await triggerTashasHideousLaughter(
+                    { name: "tasha's hideous laughter", level: 1 },
+                    { metamagicHeighten: heighten },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result.payload.metamagicHeighten).toBe(heighten);
+                expect(Object.keys(result.payload)).toContain('metamagicHeighten');
+            },
+        );
+    });
+
+    describe('unguarded derefs (#1360 class, source :2/:3/:9)', () => {
+        it('undefined playerStats throws TypeError when the || chain reaches its deref at :2', async () => {
+            await expect(triggerTashasHideousLaughter(
+                { name: "tasha's hideous laughter", level: 1 }, {}, undefined, campaignName, mapName,
+            )).rejects.toThrow(TypeError);
         });
 
-        describe('metaCtx handling', () => {
-            it.each([null, undefined])(
-                'handles %s metaCtx gracefully using playerStats fallbacks',
-                async (metaCtx) => {
-                    const result = await triggerTashasHideousLaughter(
-                        { name: "tasha's hideous laughter", level: 1 },
-                        metaCtx,
-                        playerStats,
-                        campaignName,
-                        mapName,
-                    );
+        it('undefined spell throws TypeError at spell.name/:3 (no spell?. guard exists)', async () => {
+            await expect(triggerTashasHideousLaughter(
+                undefined, { spellSaveDc: 18 }, playerStats, campaignName, mapName,
+            )).rejects.toThrow(TypeError);
+        });
 
-                    expect(result.payload.saveDc).toBe(15);
-                    expect(result.payload.spellSlotLevel).toBe(1);
-                },
+        it('truthy metaCtx.spellSaveDc short-circuits the chain so undefined playerStats never derefs', async () => {
+            const result = await triggerTashasHideousLaughter(
+                { name: "tasha's hideous laughter", level: 1 }, { spellSaveDc: 18 }, undefined, campaignName, mapName,
             );
 
-            it('handles partial metaCtx with only spellSaveDc', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    { spellSaveDc: 20 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(20);
-                expect(result.payload.spellSlotLevel).toBe(1);
-            });
-
-            it('handles partial metaCtx with only slotLevel', async () => {
-                const result = await triggerTashasHideousLaughter(
-                    { name: "tasha's hideous laughter", level: 1 },
-                    { slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result.payload.saveDc).toBe(15);
-                expect(result.payload.spellSlotLevel).toBe(6);
-            });
+            expect(result.payload.saveDc).toBe(18);
+            expect(result.payload.playerStats).toBeUndefined();
         });
     });
 });

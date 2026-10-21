@@ -1,4 +1,84 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * heroismService lane — PRODUCER of the cast-time stamps for 'Heroism'
+ * (Concentration, up to 1 minute); per-turn grant, expiry dispatch and
+ * concentration internals are delegated (table + citations below).
+ *
+ * LIVE-vs-DEAD (#1370 method): all four exports have production callers —
+ * handle via automation/index.js:529 (type dispatch), applyHeroism +
+ * isHeroismActive via automation/index.js:650-651, removeHeroismBuff via
+ * concentrationService.js:13 (concentration break). No dead exports.
+ * Spell lanes that vi.mock this module (spellCastService.*) never cover the
+ * body — this file is its only behavioral owner.
+ *
+ * PRODUCER verdict (#1335 discipline): disk 'Heroism' rows, both rulesets,
+ * read programmatically: temp HP = spellcasting ability modifier and
+ * automation.tempHpExpression === 'spellcasting_ability_modifier' on both.
+ * heroismService.js:106-110 is the PRODUCER of the numeric stamp — its own
+ * ladder: known expression → modifier, unknown expression → 0 (never-executed
+ * else branch pinned honestly in row 'expr 2d4'), missing modifier → 0 via
+ * the || coercion class (#1359/:1360/:1372), negative modifier stamped
+ * faithfully (downstream clamps). resolveHealExpression (#1278) is never
+ * called here and owns nothing in this lane.
+ *
+ * DELEGATIONS (owned elsewhere — not re-pinned here):
+ *  - Per-turn grant + replace-bigger temp-HP math, VERBATIM from
+ *    turnStartEffects_additional.test.js (#1324):
+ *    'heroism_temp_hp: Heroism 5 replaces tempHp 3' /
+ *    'no Heroism buff — zero writes' /
+ *    'Heroism without a positive amount — zero writes'
+ *    (applyHeroismTempHp lives at turnStartEffects.js:173-181).
+ *  - remove_heroism_buff queue dispatch and expiry, VERBATIM from
+ *    clearAllExpirationEffects_additional.test.js (#1285):
+ *    'remove_heroism_buff strips the matching heroism targetEffect in one
+ *    exact write' — self-buff keys and applied-round bookkeeping owned there.
+ *    This lane pins only its own addExpiration call tuple.
+ *  - Concentration internals: concentrationService.js:111 lane (#1290
+ *    boundary precedent). Only the addConcentration call tuple is pinned.
+ *
+ * STORE: strict argument-keyed fake — unknown composite reads and
+ * wrong-campaign reads THROW (machine proof of read scoping, of zero reads
+ * in handle/guards, and of the service NEVER reading 'turnStartEffects'
+ * from the store — it dedups from the passed playerStats only; pinned in
+ * the turnStart quirk table). Call-shape quirk pinned: activeBuffs reads
+ * carry campaignName (ignored — useRuntimeState.js:63 takes 2 args) while
+ * 'campaign','targetEffects' reads omit it.
+ * skipSync audit: only 4-tuple setRuntimeValue writes
+ * (useRuntimeState.js:78 has no skipSync param; no setRuntimeObject and no
+ * SSE-echo path in this lane — cast writes legitimately broadcast).
+ *
+ * CLOCK POLICY: clean. 'Concentration, up to 1 minute' is combat-scoped per
+ * repo MANDATE: no round/minute countdowns stamped here, no scheduled
+ * callbacks, expiry flows as one queue entry (owner #1285); Date.now()
+ * appears only in the log payload timestamp — fake timers freeze it at TS.
+ *
+ * SOURCE BUGS REPORTED (not fixed here):
+ *  - heroismService.js:48-60 pushes the fresh te pair onto the UNFILTERED
+ *    `effects` array after writing `filteredEffects` at :45 — a re-cast's
+ *    final targetEffects write resurrects the stale pair, leaving TWO
+ *    identical 'heroism' te and TWO 'wisdom_save_advantage' te in store
+ *    (pinned in the re-cast budget).
+ *  - The re-cast-only duplication also flows from the dedup filter at :43
+ *    matching effect === 'heroism' only; both removers
+ *    (heroismService.js:158, clearExpirationEffects.js handleRemoveHeroismBuff)
+ *    likewise never strip 'wisdom_save_advantage' — that te LEAKS for the
+ *    whole campaign (pinned in the remove budget).
+ *  - 'wisdom_save_advantage' is absent from targetEffectDefinitions.js
+ *    (registry holds 'heroism' at :772) — violates the te registry rule;
+ *    GM EffectAdder UI cannot ever add it manually.
+ *  - heroismService.js:28-38 addHeroismTurnStartEffect dedups against the
+ *    CASTER's passed playerStats.turnStartEffects (never the target's stored
+ *    value) and writes that caster-local array onto the TARGET key — any
+ *    other caster-local entries clobber/land in the target's stored list
+ *    (pinned in the turnStart quirk table).
+ *
+ * PRESERVED-CITED-BY: none — no src file cites heroismService.test.js
+ * (grep for 'heroismService.test' across the repo returns zero hits).
+ * Mock hygiene: legacy tempHpService module mock deleted — heroismService.js
+ * does not import tempHpService (grants live in turnStartEffects.js, #1324).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cloneDeep } from 'lodash';
 import { handle, applyHeroism, removeHeroismBuff, isHeroismActive } from './heroismService.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -11,19 +91,15 @@ vi.mock('../effects/expirations.js', () => ({
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
-    getCombatSummary: vi.fn(() => null),
+    getCombatSummary: vi.fn(),
 }));
 
 vi.mock('../../../services/combat/concentration/concentrationService.js', () => ({
     addConcentration: vi.fn(),
-}));
-
-vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
-    setTempHp: vi.fn(),
 }));
 
 import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -32,395 +108,400 @@ import { addEntry } from '../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { addConcentration } from '../../../services/combat/concentration/concentrationService.js';
 
-const CAMPAIGN_NAME = 'TestCampaign';
-const MAP_NAME = 'testMap';
+const CAM = 'test-campaign';
+const MAP = 'testMap';
+const TS = Date.UTC(2026, 9, 20, 12, 0, 0);
+const DUR = 'Concentration, up to 1 minute';
 
-const PLAYER_STATS = {
+// ── Strict store fake: throws on unknown reads and wrong-campaign reads;
+// clones on every read/write so recorded call-payloads never alias later
+// mutations (faithful round-trip between targets, stable assertions). ──
+function strictStore(seed = {}) {
+    const state = {};
+    for (const [k, v] of Object.entries(seed)) state[k] = cloneDeep(v);
+    getRuntimeValue.mockImplementation((characterKey, propertyName, campaignName) => {
+        if (campaignName !== undefined && campaignName !== CAM) {
+            throw new Error(`wrong-campaign read: ${String(campaignName)}`);
+        }
+        const composite = `${characterKey}.${propertyName}`;
+        if (!(composite in state)) {
+            throw new Error(`unexpected read: ${composite}`);
+        }
+        return cloneDeep(state[composite]);
+    });
+    setRuntimeValue.mockImplementation((characterKey, propertyName, value) => {
+        state[`${characterKey}.${propertyName}`] = cloneDeep(value);
+    });
+}
+
+const STATS = (over = {}) => ({
     name: 'Bard',
     spellAbilities: { modifier: 3, saveDc: 13 },
     proficiency: 3,
     turnStartEffects: [],
-};
+    ...over,
+});
 
-const makeSpell = (overrides = {}) => ({
+const action = (spellOver = {}, name = 'Heroism') => ({
+    name,
+    spell: {
+        name: 'Heroism',
+        level: 1,
+        casting_time: 'Action',
+        range: 'Touch',
+        automation: { type: 'heroism', tempHpExpression: 'spellcasting_ability_modifier', duration: DUR, ...spellOver },
+    },
+});
+
+const buffStamp = amount => ({
     name: 'Heroism',
-    level: 1,
-    casting_time: 'Action',
-    range: 'Touch',
-    automation: { type: 'heroism', tempHpExpression: 'spellcasting_ability_modifier', duration: 'Concentration, up to 1 minute', ...overrides },
+    effect: 'heroism',
+    duration: DUR,
+    sourceCharacter: 'Bard',
+    tempHpAmount: amount,
+    conditionImmunity: ['Frightened'],
+});
+const tsStamp = amount => ({ type: 'heroism_temp_hp', name: 'Heroism', tempHpAmount: amount });
+const teHeroism = target => ({ target, effect: 'heroism', source: 'Heroism', duration: 'concentration' });
+const teWisdom = target => ({ target, effect: 'wisdom_save_advantage', source: 'Heroism', duration: 'concentration' });
+const logEntry = (target, amount) => ({
+    type: 'ability_use',
+    characterName: 'Bard',
+    abilityName: 'Heroism',
+    description: `Bard cast Heroism on ${target}. Target is immune to Frightened and gains ${amount} temp HP per turn.`,
+    timestamp: TS,
 });
 
 describe('heroismService', () => {
+    let dispatchSpy;
+
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.clearAllMocks(); // vitest 4: RETAINS implementations — re-seed everything explicitly
+        vi.useFakeTimers();
+        vi.setSystemTime(TS);
+        strictStore({}); // deny-by-default
+        getCombatSummary.mockReturnValue(null);
+        addEntry.mockImplementation(() => Promise.resolve());
+        dispatchSpy = vi.spyOn(window, 'dispatchEvent').mockReturnValue(true);
     });
 
-    describe('handle', () => {
-        it('returns target selection popup with creature targets', () => {
-            getCombatSummary.mockReturnValue({
-                creatures: [
-                    { name: 'Bard' },
-                    { name: 'Fighter' },
-                    { name: 'Rogue' },
-                ],
-            });
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
 
-            const result = handle({ name: 'Heroism', spell: makeSpell() }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
+    describe('handle — target-selection popup (pure builder)', () => {
+        it.each([
+            {
+                label: 'full spell + 3-creature summary',
+                summary: { creatures: [{ name: 'Bard' }, { name: 'Fighter' }, { name: 'Rogue' }] },
+                act: action(),
+                payload: {
                     type: 'heroism_target_selection',
                     name: 'Heroism',
                     creatureTargets: ['Bard', 'Fighter', 'Rogue'],
                     range: 'Touch',
-                    duration: 'Concentration, up to 1 minute',
-                }),
-            });
-        });
+                    duration: DUR,
+                },
+            },
+            {
+                label: 'no combat summary — empty creatureTargets',
+                summary: null,
+                act: action(),
+                payload: {
+                    type: 'heroism_target_selection',
+                    name: 'Heroism',
+                    creatureTargets: [],
+                    range: 'Touch',
+                    duration: DUR,
+                },
+            },
+            {
+                label: 'bare action {} — name/range/duration defaults (never-executed guard pins)',
+                summary: null,
+                act: {},
+                payload: {
+                    type: 'heroism_target_selection',
+                    name: 'Heroism',
+                    creatureTargets: [],
+                    range: 'Touch',
+                    duration: DUR,
+                },
+            },
+        ])('handle: $label', ({ summary, act, payload }) => {
+            getCombatSummary.mockReturnValue(summary);
 
-        it('returns empty creature targets when no combat summary', () => {
-            getCombatSummary.mockReturnValue(null);
+            const result = handle(act, STATS(), CAM, MAP);
 
-            const result = handle({ name: 'Heroism', spell: makeSpell() }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-            expect(result.payload.creatureTargets).toEqual([]);
+            expect(result).toEqual({ type: 'popup', payload });
+            expect(getCombatSummary.mock.calls).toEqual([[CAM]]);
+            // machine proof: handle touches no store, no queue, no log
+            expect(getRuntimeValue.mock.calls).toEqual([]);
+            expect(setRuntimeValue.mock.calls).toEqual([]);
+            expect(addExpiration.mock.calls).toEqual([]);
+            expect(addEntry.mock.calls).toEqual([]);
         });
     });
 
     describe('applyHeroism', () => {
-        it('applies heroism to a single target with correct buff', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('Fighter', 'activeBuffs', CAMPAIGN_NAME);
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
-            expect(buffCalls.length).toBe(1);
-            expect(buffCalls[0][2]).toEqual([
-                expect.objectContaining({
-                    name: 'Heroism',
-                    effect: 'heroism',
-                    duration: 'Concentration, up to 1 minute',
-                    sourceCharacter: 'Bard',
-                    tempHpAmount: 3,
-                    conditionImmunity: ['Frightened'],
-                }),
-            ]);
-
-            expect(addExpiration).toHaveBeenCalledWith({ attackerName: 'Bard', targetName: 'Fighter', effects: expect.arrayContaining([
-                    expect.objectContaining({ type: 'remove_heroism_buff' }),
-                ]), campaignName: CAMPAIGN_NAME });
-
-            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Bard',
-                abilityName: 'Heroism',
-                description: expect.stringContaining('Bard cast Heroism on Fighter'),
-            }));
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: expect.objectContaining({
-                    type: 'automation_info',
-                    name: 'Heroism',
-                    description: expect.stringContaining('Fighter gained Heroism'),
-                }),
-            });
-        });
-
-        it('registers targetEffect for the heroism effect', async () => {
-            getRuntimeValue.mockReturnValue([]);
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThanOrEqual(1);
-            const lastEffectCall = effectCalls[effectCalls.length - 1];
-            const effects = lastEffectCall[2];
-            expect(effects).toContainEqual({
-                target: 'Fighter',
-                effect: 'heroism',
-                source: 'Heroism',
-                duration: 'concentration',
-            });
-        });
-
-        it('registers wisdom_save_advantage targetEffect for WIS save advantage', async () => {
-            getRuntimeValue.mockReturnValue([]);
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
-            expect(effectCalls.length).toBeGreaterThanOrEqual(1);
-            const lastEffectCall = effectCalls[effectCalls.length - 1];
-            const effects = lastEffectCall[2];
-            expect(effects).toContainEqual({
-                target: 'Fighter',
-                effect: 'wisdom_save_advantage',
-                source: 'Heroism',
-                duration: 'concentration',
-            });
-        });
-
-        it('adds turnStartEffects for heroism temp HP', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'turnStartEffects');
-            expect(effectCalls.length).toBe(1);
-            expect(effectCalls[0][2]).toEqual([
-                expect.objectContaining({
-                    type: 'heroism_temp_hp',
-                    name: 'Heroism',
-                    tempHpAmount: 3,
-                }),
-            ]);
-        });
-
-        it('registers concentration when combatSummary is available', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Bard' }] });
-            window.dispatchEvent = vi.fn();
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            expect(addConcentration).toHaveBeenCalledWith(
-                expect.objectContaining({ creatures: [{ name: 'Bard' }] }),
-                'Bard',
-                'Heroism',
-                13,
-                'Fighter'
-            );
-            expect(window.dispatchEvent).toHaveBeenCalledWith(new CustomEvent('combat-summary-updated'));
-        });
-
-        it('handles multiple targets', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter', 'Rogue']
-            );
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
-            expect(buffCalls.length).toBe(2);
-
-            expect(result.payload.description).toContain('2 targets');
-            expect(result.payload.description).toContain('Fighter, Rogue');
-        });
-
-        it('replaces existing heroism buff on re-cast', async () => {
-            const existingBuffs = [
-                { name: 'Heroism', effect: 'heroism', tempHpAmount: 2 },
-                { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
-            ];
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return existingBuffs;
-                return [];
-            });
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell({ tempHpExpression: 'spellcasting_ability_modifier' }) },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
-            expect(buffCalls.length).toBe(1);
-            expect(buffCalls[0][2]).toEqual([
-                { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
-                expect.objectContaining({
-                    name: 'Heroism',
-                    tempHpAmount: 3,
-                }),
-            ]);
-        });
-
-        it('returns null when no targets provided', async () => {
-            const result = await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                PLAYER_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                []
-            );
+        it.each([[[]], [null], [undefined]])('invalid targets %s — null, zero side effects', async targets => {
+            const result = await applyHeroism(action(), STATS(), CAM, MAP, targets);
 
             expect(result).toBeNull();
+            expect(getCombatSummary.mock.calls).toEqual([]);
+            expect(getRuntimeValue.mock.calls).toEqual([]); // strict fake would throw on any read
+            expect(setRuntimeValue.mock.calls).toEqual([]);
+            expect(addExpiration.mock.calls).toEqual([]);
+            expect(addEntry.mock.calls).toEqual([]);
         });
 
-        it('uses 0 temp HP when spellcasting ability modifier is 0', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            const zeroModStats = { ...PLAYER_STATS, spellAbilities: { modifier: 0, saveDc: 10 } };
-
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                zeroModStats,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
-            expect(buffCalls[0][2][0].tempHpAmount).toBe(0);
-        });
-
-        it('skips turnStartEffects when already present', async () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return [];
-                return null;
+        it('single target — exact read order, full write budget, stamps, queue, log, popup', async () => {
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'campaign.targetEffects': [],
             });
 
-            const statsWithEffect = {
-                ...PLAYER_STATS,
-                turnStartEffects: [{ type: 'heroism_temp_hp', name: 'Heroism', tempHpAmount: 3 }],
-            };
+            const result = await applyHeroism(action(), STATS(), CAM, MAP, ['Fighter']);
 
-            await applyHeroism(
-                { name: 'Heroism', spell: makeSpell() },
-                statsWithEffect,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-                ['Fighter']
-            );
+            expect(getCombatSummary.mock.calls).toEqual([[CAM]]);
+            // campaign te read omits campaignName while activeBuffs read carries it (quirk pinned)
+            expect(getRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', CAM],
+                ['campaign', 'targetEffects'],
+            ]);
+            // full write budget in exact source order: buffs -> turnStart -> te
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+            ]);
+            expect(addExpiration.mock.calls).toEqual([
+                [{ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], campaignName: CAM }],
+            ]);
+            expect(addEntry.mock.calls).toEqual([[CAM, logEntry('Fighter', 3)]]);
+            expect(addConcentration.mock.calls).toEqual([]); // summary null — concentration skipped
+            expect(dispatchSpy.mock.calls.map(c => c[0].type)).toEqual([]);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Heroism',
+                    description: "Fighter gained Heroism from Bard's cast: immune to Frightened, 3 temp HP at start of each turn.",
+                    automation: {},
+                },
+            });
+        });
 
-            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'turnStartEffects');
-            expect(effectCalls.length).toBe(0);
+        it.each([
+            { label: 'saveDc 13 passthrough', spellAbilities: { modifier: 3, saveDc: 13 }, proficiency: 3, dc: 13 },
+            { label: 'no saveDc — 8 + proficiency (||0 coercion class)', spellAbilities: { modifier: 3 }, proficiency: 3, dc: 11 },
+            { label: 'no saveDc, no proficiency — floor 8', spellAbilities: { modifier: 3 }, proficiency: undefined, dc: 8 },
+        ])('concentration: $label', async ({ spellAbilities, proficiency, dc }) => {
+            const summary = { creatures: [{ name: 'Bard' }] };
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'campaign.targetEffects': [],
+            });
+            getCombatSummary.mockReturnValue(summary);
+
+            await applyHeroism(action(), STATS({ spellAbilities, proficiency }), CAM, MAP, ['Fighter']);
+
+            expect(addConcentration.mock.calls).toEqual([[summary, 'Bard', 'Heroism', dc, 'Fighter']]);
+            expect(dispatchSpy.mock.calls.map(c => c[0].type)).toEqual(['combat-summary-updated']);
+        });
+
+        it.each([
+            { label: 'mod 0 via || coercion — stamps 0', stats: STATS({ spellAbilities: { modifier: 0, saveDc: 10 } }), act: action(), amount: 0 },
+            { label: 'mod -1 stamped faithfully — downstream clamps (#1324)', stats: STATS({ spellAbilities: { modifier: -1, saveDc: 8 } }), act: action(), amount: -1 },
+            { label: 'spellAbilities absent — ?. || 0 coercion', stats: STATS({ spellAbilities: undefined }), act: action(), amount: 0 },
+            { label: 'expr 2d4 — unknown-expression else branch, 0, no dice rolled', stats: STATS(), act: action({ tempHpExpression: '2d4' }), amount: 0 },
+            { label: 'automation absent — default expression resolves mod', stats: STATS(), act: (() => { const a = action(); delete a.spell.automation; return a; })(), amount: 3 },
+        ])('temp-HP producer ladder: $label', async ({ stats, act, amount }) => {
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'campaign.targetEffects': [],
+            });
+
+            await applyHeroism(act, stats, CAM, MAP, ['Fighter']);
+
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [buffStamp(amount)], CAM],
+                ['Fighter', 'turnStartEffects', [tsStamp(amount)], CAM],
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+            ]);
+            expect(addEntry.mock.calls).toEqual([[CAM, logEntry('Fighter', amount)]]);
+        });
+
+        it('multiple targets — per-target writes in order, cumulative te, batch popup', async () => {
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'Rogue.activeBuffs': [],
+                'campaign.targetEffects': [],
+            });
+
+            const result = await applyHeroism(action(), STATS(), CAM, MAP, ['Fighter', 'Rogue']);
+
+            expect(getRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', CAM],
+                ['campaign', 'targetEffects'],
+                ['Rogue', 'activeBuffs', CAM],
+                ['campaign', 'targetEffects'],
+            ]);
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+                ['Rogue', 'activeBuffs', [buffStamp(3)], CAM],
+                ['Rogue', 'turnStartEffects', [tsStamp(3)], CAM],
+                // store round-trip: Rogue's sync re-reads Fighter's pair (no Rogue match →
+                // no dedup write) and appends, overwriting with the cumulative list
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter'), teHeroism('Rogue'), teWisdom('Rogue')], CAM],
+            ]);
+            expect(addExpiration.mock.calls).toEqual([
+                [{ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], campaignName: CAM }],
+                [{ attackerName: 'Bard', targetName: 'Rogue', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], campaignName: CAM }],
+            ]);
+            expect(addEntry.mock.calls).toEqual([
+                [CAM, logEntry('Fighter', 3)],
+                [CAM, logEntry('Rogue', 3)],
+            ]);
+            expect(result.payload.description).toBe('2 targets gained Heroism: Fighter, Rogue.');
+        });
+
+        it('re-cast replaces buff but final te write resurrects the stale pair (SOURCE BUG #48-60)', async () => {
+            const staleHeroismTe = teHeroism('Fighter');
+            const staleWisdomTe = teWisdom('Fighter');
+            strictStore({
+                'Fighter.activeBuffs': [
+                    { name: 'Heroism', effect: 'heroism', tempHpAmount: 2 },
+                    { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
+                ],
+                'campaign.targetEffects': [staleHeroismTe, staleWisdomTe],
+            });
+
+            await applyHeroism(action(), STATS(), CAM, MAP, ['Fighter']);
+
+            // buffs: old Heroism spliced out, fresh appended after the neighbor
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }, buffStamp(3)], CAM],
+                ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
+                // intermediate write is correctly filtered...
+                ['campaign', 'targetEffects', [staleWisdomTe], CAM],
+                // ...but the final write pushes onto the UNFILTERED array:
+                // stale pair resurrected + fresh pair appended = te duplication. Pinned honestly.
+                ['campaign', 'targetEffects', [staleHeroismTe, staleWisdomTe, teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+            ]);
+            expect(addExpiration.mock.calls).toEqual([
+                [{ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], campaignName: CAM }],
+            ]);
+        });
+
+        it.each([
+            {
+                label: 'caster-local non-heroism entry is copied onto the TARGET key (clobber quirk)',
+                tsLocal: [{ type: 'mage_hand_legerdemain', name: 'Mage Hand Legerdemain' }],
+                writes: [
+                    ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                    ['Fighter', 'turnStartEffects', [{ type: 'mage_hand_legerdemain', name: 'Mage Hand Legerdemain' }, tsStamp(3)], CAM],
+                    ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+                ],
+            },
+            {
+                label: 'heroism_temp_hp already in caster stats — guard hits, zero turnStartEffects writes',
+                tsLocal: [tsStamp(3)],
+                writes: [
+                    ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                    ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+                ],
+            },
+        ])('turnStart dedup reads CASTER stats, never the target store: $label', async ({ tsLocal, writes }) => {
+            // strict fake: no 'Fighter.turnStartEffects' key seeded — any store read would THROW
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'campaign.targetEffects': [],
+            });
+
+            await applyHeroism(action(), STATS({ turnStartEffects: tsLocal }), CAM, MAP, ['Fighter']);
+
+            expect(setRuntimeValue.mock.calls).toEqual(writes);
+        });
+
+        it('log rejection is caught — buffs unaffected, identical Error + exact prefix to console.error', async () => {
+            strictStore({
+                'Fighter.activeBuffs': [],
+                'campaign.targetEffects': [],
+            });
+            const err = new Error('log down');
+            addEntry.mockImplementation(() => Promise.reject(err));
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const result = await applyHeroism(action(), STATS(), CAM, MAP, ['Fighter']);
+
+            expect(errorSpy.mock.calls).toEqual([['[heroism] Error logging:', err]]);
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+            ]);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Heroism',
+                    description: "Fighter gained Heroism from Bard's cast: immune to Frightened, 3 temp HP at start of each turn.",
+                    automation: {},
+                },
+            });
         });
     });
 
-    describe('removeHeroismBuff', () => {
-        it('removes heroism buffs while preserving other buffs', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return [
+    describe('removeHeroismBuff (concentration-break lane, live caller concentrationService.js:13)', () => {
+        it('strips heroism buff and heroism te, keeps neighbors — wisdom te LEAKS (source bug, pinned)', () => {
+            strictStore({
+                'Fighter.activeBuffs': [
                     { name: 'Heroism', effect: 'heroism' },
                     { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
-                ];
-                if (key === 'campaign' && prop === 'targetEffects') return [];
-                return null;
+                ],
+                'campaign.targetEffects': [
+                    teHeroism('Fighter'),
+                    teWisdom('Fighter'),
+                    { target: 'Fighter', effect: 'bless_bonus', source: 'Bard', duration: 'concentration' },
+                ],
             });
 
-            removeHeroismBuff('Fighter', CAMPAIGN_NAME);
+            removeHeroismBuff('Fighter', CAM);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter',
-                'activeBuffs',
-                [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }],
-                CAMPAIGN_NAME,
-            );
+            expect(setRuntimeValue.mock.calls).toEqual([
+                ['Fighter', 'activeBuffs', [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }], CAM],
+                // filter matches effect === 'heroism' only — wisdom_save_advantage survives removal forever
+                ['campaign', 'targetEffects', [teWisdom('Fighter'), { target: 'Fighter', effect: 'bless_bonus', source: 'Bard', duration: 'concentration' }], CAM],
+            ]);
+            expect(addEntry.mock.calls).toEqual([]); // silent remover — no log by design
         });
 
-        it('removes heroism target effects', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return [];
-                if (key === 'campaign' && prop === 'targetEffects') return [
-                    { effect: 'heroism', source: 'Heroism', target: 'Fighter' },
-                    { effect: 'bless_bonus', source: 'Bard', target: 'Fighter' },
-                ];
-                return null;
+        it('nothing to remove — zero writes (guarded conditional writes)', () => {
+            strictStore({
+                'Fighter.activeBuffs': [{ name: 'Bless', effect: 'bless' }],
+                'campaign.targetEffects': [{ target: 'Fighter', effect: 'bless_bonus', source: 'Bard', duration: 'concentration' }],
             });
 
-            removeHeroismBuff('Fighter', CAMPAIGN_NAME);
+            removeHeroismBuff('Fighter', CAM);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'campaign',
-                'targetEffects',
-                [{ effect: 'bless_bonus', source: 'Bard', target: 'Fighter' }],
-                CAMPAIGN_NAME,
-            );
-        });
-
-        it('removes both buff and effects in one call', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return [{ name: 'Heroism', effect: 'heroism' }];
-                if (key === 'campaign' && prop === 'targetEffects') return [
-                    { effect: 'heroism', source: 'Heroism', target: 'Fighter' },
-                ];
-                return null;
-            });
-
-            removeHeroismBuff('Fighter', CAMPAIGN_NAME);
-
-            const setCalls = setRuntimeValue.mock.calls;
-            expect(setCalls.length).toBe(2);
-            expect(setCalls[0][1]).toBe('activeBuffs');
-            expect(setCalls[1][1]).toBe('targetEffects');
-        });
-
-        it('skips setRuntimeValue when nothing to remove', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Fighter' && prop === 'activeBuffs') return [{ name: 'Bardic Inspiration' }];
-                if (key === 'campaign' && prop === 'targetEffects') return [{ effect: 'bless_bonus' }];
-                return null;
-            });
-
-            removeHeroismBuff('Fighter', CAMPAIGN_NAME);
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
-            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
-            expect(buffCalls.length).toBe(0);
-            expect(effectCalls.length).toBe(0);
+            expect(setRuntimeValue.mock.calls).toEqual([]);
         });
     });
 
     describe('isHeroismActive', () => {
-        it('returns true when heroism buff exists', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Heroism', effect: 'heroism' },
-            ]);
+        it.each([
+            { label: 'exact name+effect match', buffs: [{ name: 'Heroism', effect: 'heroism' }], expected: true },
+            { label: 'different name — false', buffs: [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }], expected: false },
+            { label: 'right name wrong effect — false', buffs: [{ name: 'Heroism', effect: 'concentration_sustenance' }], expected: false },
+            { label: 'empty list — false', buffs: [], expected: false },
+            { label: 'null store — false (Array.isArray guard)', buffs: null, expected: false },
+        ])('$label -> $expected', ({ buffs, expected }) => {
+            strictStore({ 'Fighter.activeBuffs': buffs });
 
-            expect(isHeroismActive('Fighter', CAMPAIGN_NAME)).toBe(true);
-        });
-
-        it('returns false when heroism buff does not exist', () => {
-            getRuntimeValue.mockReturnValue([
-                { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
-            ]);
-
-            expect(isHeroismActive('Fighter', CAMPAIGN_NAME)).toBe(false);
-        });
-
-        it('returns false when no buffs exist', () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            expect(isHeroismActive('Fighter', CAMPAIGN_NAME)).toBe(false);
+            expect(isHeroismActive('Fighter', CAM)).toBe(expected);
         });
     });
 });

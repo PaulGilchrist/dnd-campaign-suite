@@ -1,3 +1,20 @@
+// @maintained-by-ai
+// Lane: direct-module + barrel-import entry-point face of expireStaleEffects
+// with the CLEAR side LIVE (real expireForCreature/expireForTarget/
+// clearExpirationEffects run — no mock on the clear path). Maturity truth
+// table, dispatch-arg routing and rewrite payloads are owned by the twin
+// expirations_expireStaleEffects.test.js (#1298) which mocks the clear side
+// to pin the sweep; here the sweep is proven end-to-end against the real
+// handlers. Early exits are owned here (cited by expirations_applyAuraDamage
+// .test.js:15 and the twin header). Phase 3 sleet seam: sleetStormHandler
+// .areaSave.test.js + twin. Phase 5 web: expireStaleEffects.web.test.js.
+// Cited BY: stinkingCloudHandler.areaSave.test.js ("expireStaleEffects.test
+// .js:344-386" — the SP-111 block, preserved at the bottom of this file;
+// range shifted to :292-334 after this pass), clearExpirationEffects.test.js
+// (real-clear consequence face), naturesVeilHandler.test.js (self-targeted
+// Phase 2 face — the :251-280 real invisible-clear owner, preserved).
+// No-timers policy: the round is read ONLY through the getCurrentCombatRound
+// seam; store fixtures use the exact-payload seedStore pattern (#1294).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -42,329 +59,259 @@ import {
 
 const KEY = 'pendingExpirations';
 
+// mockClear keeps implementations — explicitly reset the mutable seams so a
+// seeded store or normalizer from a previous test can never leak into the
+// next, then restore the neutral defaults the sweep expects.
 function resetMocks() {
   vi.clearAllMocks();
-  localStorage.clear();
-  window.dispatchEvent = vi.fn();
+  getAllStoreKeys.mockReset().mockReturnValue([]);
+  getRuntimeValue.mockReset().mockReturnValue(null);
+  getCombatSummary.mockReset().mockReturnValue(null);
+  getCurrentCombatRound.mockReset().mockReturnValue(2);
+  getActiveCreatureName.mockReset().mockReturnValue('Goblin');
+  utils.getName.mockReset().mockImplementation((v) => v);
 }
 
-function stubUtilsNameIdentity() {
-  utils.getName.mockImplementation((v) => v);
+function seedStore(values) {
+  getRuntimeValue.mockImplementation((name, prop) => {
+    const key = `${name}.${prop}`;
+    return key in values ? values[key] : null;
+  });
+}
+
+function seedActiveCombat(activeName, currentRound, creatures) {
+  getCurrentCombatRound.mockReturnValue(currentRound);
+  getActiveCreatureName.mockReturnValue(activeName);
+  getCombatSummary.mockReturnValue({ creatures });
 }
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — early exits
+// Early exits — owned here (cited by expirations_applyAuraDamage.test.js
+// and the twin header). Nothing may read or write the store before the
+// combat guards pass.
 // ---------------------------------------------------------------------------
 describe('expireStaleEffects — early exits', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(2);
-    getActiveCreatureName.mockReturnValue('Goblin');
-  });
+  beforeEach(resetMocks);
 
   it.each([
     { name: 'null', value: null },
     { name: 'empty string', value: '' },
-  ])('returns early without side effects when active creature name is $name', ({ value }) => {
+  ])('bails before any combat read when active creature name is $name', async ({ value }) => {
     getActiveCreatureName.mockReturnValue(value);
 
-    expireStaleEffects('MyCampaign');
+    await expireStaleEffects('MyCampaign');
 
+    expect(getCombatSummary).not.toHaveBeenCalled();
     expect(getRuntimeValue).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(getCombatSummary).not.toHaveBeenCalled();
   });
 
   it.each([
-    { name: 'null', value: null },
-    { name: 'non-object', value: 'not-an-object' },
-  ])('returns early when combat summary is $name', ({ value }) => {
-    getCombatSummary.mockReturnValue(value);
+    { name: 'null', summary: null },
+    { name: 'not-an-object', summary: 'not-an-object' },
+  ])('bails before any store read when combat summary is $name', async ({ summary }) => {
+    getCombatSummary.mockReturnValue(summary);
 
-    expireStaleEffects('MyCampaign');
+    await expireStaleEffects('MyCampaign');
 
     expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('returns early when creatures array is missing', () => {
-    getCombatSummary.mockReturnValue({});
+  it.each([
+    { name: 'missing', summary: {} },
+    { name: 'not an array', summary: { creatures: 'not-an-array' } },
+  ])('bails before any store read when combat summary creatures is $name', async ({ summary }) => {
+    getCombatSummary.mockReturnValue(summary);
 
-    expireStaleEffects('MyCampaign');
-
-    expect(getRuntimeValue).not.toHaveBeenCalled();
-  });
-
-  it('returns early when creatures is not an array', () => {
-    getCombatSummary.mockReturnValue({ creatures: 'not-an-array' });
-
-    expireStaleEffects('MyCampaign');
+    await expireStaleEffects('MyCampaign');
 
     expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — creature matching
+// Phase 1 — creature matching, with the CLEAR side LIVE: normalized names
+// gate the sweep, raw names address the store, and the real
+// clearExpirationEffects runs against the matured entry.
 // ---------------------------------------------------------------------------
-describe('expireStaleEffects — creature matching', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(2);
-    getActiveCreatureName.mockReturnValue('Goblin');
-  });
+describe('expireStaleEffects — creature matching (real clear)', () => {
+  beforeEach(resetMocks);
 
-  it('only processes creatures whose name matches the active creature after getName normalization', () => {
-    getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Orc' },
-        { name: 'Goblin' },
-      ],
-    });
-    getRuntimeValue.mockReturnValueOnce([
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1, expiryRounds: 1 },
-    ]);
-
-    expireStaleEffects('MyCampaign');
-
-    expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', KEY);
-  });
-
-  it('applies utils.getName normalization to creature names for matching but uses raw name for runtime lookup', () => {
+  it('matches via getName but reads, clears and rewrites the queue under the raw name, skipping non-matching creatures', async () => {
     utils.getName.mockImplementation((v) => (v === 'goblin' ? 'Goblin' : v));
-    getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Orc' },
-        { name: 'goblin' },
-      ],
-    });
-    getRuntimeValue.mockReturnValueOnce([
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1, expiryRounds: 1 },
-    ]);
+    seedActiveCombat('Goblin', 2, [{ name: 'Orc' }, { name: 'goblin' }]);
+    const stale = {
+      target: 'Human',
+      effects: [{ type: 'stunned', condition: 'speed_halved' }],
+      appliedRound: 1,
+      expiryRounds: 1,
+    };
+    seedStore({ 'goblin.pendingExpirations': [stale] });
 
-    expireStaleEffects('MyCampaign');
+    await expireStaleEffects('MyCampaign');
 
+    // raw-name store access; the non-matching Orc store is never touched
     expect(getRuntimeValue).toHaveBeenCalledWith('goblin', KEY);
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('Orc', KEY);
+    // real clearExpirationEffects ran for the matured entry's target...
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'stunned_speedHalved', null, 'MyCampaign');
+    // ...and the queue was rewritten empty under the raw name
+    expect(setRuntimeValue).toHaveBeenCalledWith('goblin', KEY, [], 'MyCampaign');
   });
 
-  it('skips all creatures when none match the active name', () => {
-    getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Orc' },
-        { name: 'Dragon' },
-      ],
-    });
+  it('touches no stores at all when no creature matches the active name', async () => {
+    seedActiveCombat('Goblin', 2, [{ name: 'Orc' }, { name: 'Dragon' }]);
 
-    expireStaleEffects('MyCampaign');
+    await expireStaleEffects('MyCampaign');
 
     expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — stale vs fresh entries
+// Stale vs fresh sweep — real clear side, exact payloads. The mixed batch
+// here proves the LIVE handlers keep fresh entries inert while the queue is
+// rewritten with only the survivors; pure rewrite arithmetic is the twin's.
 // ---------------------------------------------------------------------------
-describe('expireStaleEffects — stale vs fresh entries', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(2);
-    getActiveCreatureName.mockReturnValue('Goblin');
-  });
+describe('expireStaleEffects — stale vs fresh entries (real clear)', () => {
+  beforeEach(resetMocks);
 
-  it('filters mixed stale and fresh entries, keeping only fresh ones', () => {
-    const staleEntry = {
+  it('clears only the matured entry via the real handlers and rewrites the queue with the exact survivor list', async () => {
+    const stale = {
       target: 'Human',
       effects: [{ type: 'stunned', condition: 'speed_halved' }],
       appliedRound: 0,
       expiryRounds: 1,
     };
-    const freshEntry = {
+    const fresh = {
       target: 'Orc',
       effects: [{ type: 'advantage_on_target' }],
       appliedRound: 2,
       expiryRounds: 1,
     };
+    seedActiveCombat('Goblin', 2, [{ name: 'Goblin' }]);
+    seedStore({ 'Goblin.pendingExpirations': [stale, fresh] });
 
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce([staleEntry, freshEntry]);
+    await expireStaleEffects('MyCampaign');
 
-    expireStaleEffects('MyCampaign');
-
-    const pendingCalls = setRuntimeValue.mock.calls.filter(
+    // matured entry cleared for real...
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'stunned_speedHalved', null, 'MyCampaign');
+    // ...while the fresh entry's clear leg never ran
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('Goblin', '_advantageOn_Orc');
+    // exactly one queue rewrite, carrying only the survivor
+    const pendingWrites = setRuntimeValue.mock.calls.filter(
       (c) => c[0] === 'Goblin' && c[1] === KEY,
     );
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([freshEntry]);
-  });
-
-  it('clears all entries when every entry is stale', () => {
-    const list = [
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
-      { target: 'Orc', effects: [{ type: 'blinded' }], appliedRound: 1, expiryRounds: 1 },
-    ];
-
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getCurrentCombatRound.mockReturnValue(5);
-    getRuntimeValue.mockReturnValueOnce(list);
-
-    expireStaleEffects('MyCampaign');
-
-    const pendingCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Goblin' && c[1] === KEY,
-    );
-    expect(pendingCalls.length).toBe(1);
-    expect(pendingCalls[0][2]).toEqual([]);
+    expect(pendingWrites).toEqual([['Goblin', KEY, [fresh], 'MyCampaign']]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — error recovery
+// Self-targeted expirations — scan other stores / own-store expiry with
+// the real condition clear running. Cited owner: the :251 pre-rewrite test
+// (now :224) — real invisible-clear end-to-end, preserved verbatim.
 // ---------------------------------------------------------------------------
-describe('expireStaleEffects — error recovery', () => {
+describe('expireStaleEffects — self-targeted expirations', () => {
   beforeEach(() => {
     resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(5);
-    getActiveCreatureName.mockReturnValue('Goblin');
+    getCurrentCombatRound.mockReturnValue(4);
+    getActiveCreatureName.mockReturnValue('RangerGirl');
   });
 
-  it('does not throw when getRuntimeValue returns a non-array for pendingExpirations', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getRuntimeValue.mockReturnValueOnce('not-an-array');
-
-    expect(() => expireStaleEffects('MyCampaign')).not.toThrow();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Self-targeted expirations (Phase 2: scan all stores for entries targeting active)
-
-  describe('self-targeted expirations', () => {
-    beforeEach(() => {
-      resetMocks();
-      getCurrentCombatRound.mockReturnValue(4);
-      getActiveCreatureName.mockReturnValue('RangerGirl');
-      stubUtilsNameIdentity();
-    });
-
-    it('expires invisible condition when target matches active creature and round is met', () => {
-      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
-      getAllStoreKeys.mockReturnValue(['RangerGirl', 'Goblin']);
-
-      // RangerGirl has a self-targeted entry for invisible
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'RangerGirl' && prop === KEY) return [
-          { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 1 }
-        ];
-        if (key === 'RangerGirl' && prop === 'activeConditions') return ['invisible'];
-        if (key === 'Goblin' && prop === KEY) return [];
-        return null;
-      });
-
-      expireStaleEffects('test-campaign');
-
-      // Should have removed the invisible condition from activeConditions
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'RangerGirl',
-        'activeConditions',
-        [],
-        'test-campaign'
-      );
-      // Should have cleared the expired entry
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'RangerGirl',
-        KEY,
-        [],
-        'test-campaign'
-      );
-    });
-
-    it('keeps self-targeted expiration when round not yet met', () => {
-      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
-      getAllStoreKeys.mockReturnValue(['RangerGirl']);
-
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'RangerGirl' && prop === KEY) return [
-          { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 2 }
-        ];
-        if (key === 'RangerGirl' && prop === 'activeConditions') return ['invisible'];
-        return null;
-      });
-
-      expireStaleEffects('test-campaign');
-
-      // Should NOT have removed the invisible condition
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'RangerGirl',
-        'activeConditions',
-        [],
-        'test-campaign'
-      );
-    });
-
-    it('does not expire entries targeting a different creature when round not met', () => {
-      getCombatSummary.mockReturnValue({ creatures: [{ name: 'RangerGirl' }] });
-      getAllStoreKeys.mockReturnValue(['Goblin']);
-
-      // Goblin has an entry targeting someone else, not yet expired by round
-      getRuntimeValue.mockImplementation((key, prop) => {
-        if (key === 'Goblin' && prop === KEY) return [
-          { target: 'Orc', effects: [{ type: 'condition', condition: 'blinded' }], appliedRound: 3, expiryRounds: 2 }
-        ];
-        return null;
-      });
-
-      expireStaleEffects('test-campaign');
-
-      // Should NOT have called activeConditions (no conditions removed)
-      const conditionCalls = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
-      expect(conditionCalls.length).toBe(0);
-      // The KEY call that exists is just from Phase 1 initializing RangerGirl's empty pendingExpirations
-      // The Goblin store should NOT have been modified
-      const goblinKeyCalls = setRuntimeValue.mock.calls.filter(
-        c => c[1] === KEY && c[0] === 'Goblin'
-      );
-      expect(goblinKeyCalls.length).toBe(0);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// expireStaleEffects — SP-111 Stinking Cloud turn-start saves (Phase 4)
-// ---------------------------------------------------------------------------
-describe('expireStaleEffects — SP-111 Stinking Cloud turn-start saves', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(2);
-    getActiveCreatureName.mockReturnValue('Thug 1');
-  });
-
-  it('forces a CON area save when the active creature has a live stinking_cloud te', async () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
-      }
-      if (key === 'TestWizard' && prop === '_stinkingCloud_TestWizard') {
-        return { saveDc: 18, saveType: 'CON', radius: 20, mapName: 'Cave' };
-      }
-      return null;
+  it('expires invisible condition when target matches active creature and round is met', async () => {
+    seedActiveCombat('RangerGirl', 4, [{ name: 'RangerGirl' }]);
+    getAllStoreKeys.mockReturnValue(['RangerGirl', 'Goblin']);
+    seedStore({
+      'RangerGirl.pendingExpirations': [
+        { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 1 },
+      ],
+      'RangerGirl.activeConditions': ['invisible'],
     });
 
     await expireStaleEffects('test-campaign');
 
+    // Should have removed the invisible condition from activeConditions
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'RangerGirl',
+      'activeConditions',
+      [],
+      'test-campaign'
+    );
+    // Should have cleared the expired entry
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'RangerGirl',
+      KEY,
+      [],
+      'test-campaign'
+    );
+  });
+
+  it('keeps self-targeted expiration when round not yet met (zero writes)', async () => {
+    seedActiveCombat('RangerGirl', 4, [{ name: 'RangerGirl' }]);
+    getAllStoreKeys.mockReturnValue(['RangerGirl']);
+    seedStore({
+      'RangerGirl.pendingExpirations': [
+        { target: 'RangerGirl', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 2 },
+      ],
+      'RangerGirl.activeConditions': ['invisible'],
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    // entry survives at round 4 < 3 + 2 — nothing at all is written
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('normalizes the own corrupt store to [] without touching another creature\'s live store', async () => {
+    seedActiveCombat('RangerGirl', 4, [{ name: 'RangerGirl' }]);
+    getAllStoreKeys.mockReturnValue(['Goblin']);
+    seedStore({
+      // own store holds garbage — expireForCreature must rewrite it to []
+      'RangerGirl.pendingExpirations': 'not-an-array',
+      // Goblin owns a live entry targeting a third party — must survive
+      'Goblin.pendingExpirations': [
+        { target: 'Orc', effects: [{ type: 'condition', condition: 'blinded' }], appliedRound: 3, expiryRounds: 2 },
+      ],
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    // the ONLY write in the whole sweep is the own-store [] normalization
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('RangerGirl', KEY, [], 'test-campaign');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SP-111 Stinking Cloud turn-start CON saves (Phase 4) — CITED BY
+// stinkingCloudHandler.areaSave.test.js (was :344-386, now :233-270).
+// ---------------------------------------------------------------------------
+describe('expireStaleEffects — SP-111 Stinking Cloud turn-start saves', () => {
+  beforeEach(() => {
+    resetMocks();
+    getActiveCreatureName.mockReturnValue('Thug 1');
+  });
+
+  it('forces a CON area save when the active creature has a live stinking_cloud te', async () => {
+    seedActiveCombat('Thug 1', 2, [{ name: 'Thug 1' }]);
+    seedStore({
+      'campaign.targetEffects': [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }],
+      'TestWizard._stinkingCloud_TestWizard': { saveDc: 18, saveType: 'CON', radius: 20, mapName: 'Cave' },
+    });
+
+    await expireStaleEffects('test-campaign');
+
+    expect(processStinkingCloudAreaSave).toHaveBeenCalledTimes(1);
     expect(processStinkingCloudAreaSave).toHaveBeenCalledWith('TestWizard', 'Thug 1', 'test-campaign', 'Cave');
   });
 
   it('skips the save when the caster zone tracking is gone (cloud ended)', async () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
-      }
-      return null;
+    seedActiveCombat('Thug 1', 2, [{ name: 'Thug 1' }]);
+    seedStore({
+      'campaign.targetEffects': [{ target: 'Thug 1', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }],
     });
 
     await expireStaleEffects('test-campaign');
@@ -373,16 +320,15 @@ describe('expireStaleEffects — SP-111 Stinking Cloud turn-start saves', () => 
   });
 
   it('does not force saves for creatures without a stinking_cloud te', async () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Thug 1' }] });
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'campaign' && prop === 'targetEffects') {
-        return [{ target: 'Rug', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }];
-      }
-      return null;
+    seedActiveCombat('Thug 1', 2, [{ name: 'Thug 1' }]);
+    seedStore({
+      // the te sits on Rug, not on the active creature
+      'campaign.targetEffects': [{ target: 'Rug', effect: 'stinking_cloud', source: 'TestWizard', duration: 'concentration', dc: 18 }],
     });
 
     await expireStaleEffects('test-campaign');
 
     expect(processStinkingCloudAreaSave).not.toHaveBeenCalled();
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('TestWizard', '_stinkingCloud_TestWizard', 'test-campaign');
   });
 });

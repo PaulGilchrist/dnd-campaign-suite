@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../ui/dataLoader.js', () => ({
@@ -59,7 +60,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getStore: vi.fn(() => new Map()),
   useSyncedState: vi.fn(() => [null, vi.fn()]),
   listeners: new Map(),
-getRuntimeValue: vi.fn(() => undefined) }));
+  getRuntimeValue: vi.fn(() => undefined) }));
 
 vi.mock('../../combat/automation/automationService.js', () => ({
   collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),
@@ -148,70 +149,79 @@ const setupDefaults = (overrides = {}) => {
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
 };
 
-describe('rules.getPlayerStats - speed', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
-
-  it('should set speed from playerStats with no bonuses', async () => {
-    const playerSummary = makePlayerSummary({ speed: 30 });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.speed).toBe(30);
-  });
+const getStats = (playerSummary) => rules.getPlayerStats({
+  allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary,
 });
 
-describe('rules.getPlayerStats - racial traits', () => {
+// Speed passthrough/bonuses: owned by rules-playerStats-senses-speed.test.js.
+// Powerful Build sizeMultiplier + grapple save modifier: owned by
+// rules.getPlayerStats.test.js (CLA-209). carryingCapacity=HP defect pin:
+// owned by rules-core.test.js (#1251). Not re-pinned here.
+
+describe('rules.getPlayerStats - racial movement traits', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should set sizeMultiplier to 2 when Powerful Build trait exists', async () => {
-    setupDefaults({ race: { name: 'Hill Giant', languages: ['Common'], traits: [{ name: 'Powerful Build' }] } });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.sizeMultiplier).toBe(2);
-  });
-
-  it('should set canMoveThroughCreatureSpace when Halfling Nimbleness trait exists', async () => {
+  it('sets canMoveThroughCreatureSpace only for the Halfling Nimbleness trait', async () => {
     setupDefaults({ race: { name: 'Lightfoot Halfling', languages: ['Common'], traits: [{ name: 'Halfling Nimbleness' }] } });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.canMoveThroughCreatureSpace).toBe(true);
+    const nimble = await getStats(makePlayerSummary());
+    expect(nimble.canMoveThroughCreatureSpace).toBe(true);
+
+    // A similarly named but different trait must not set the flag.
+    setupDefaults({ race: { name: 'Wood Elf', languages: ['Common'], traits: [{ name: 'Fleet of Foot' }] } });
+    const notNimble = await getStats(makePlayerSummary());
+    expect(notNimble.canMoveThroughCreatureSpace).toBeUndefined();
   });
 });
 
-describe('rules.getPlayerStats - feat features', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupDefaults();
-    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      features: [],
-    });
-  });
+describe('rules.getPlayerStats - feat feature casting_time routing', () => {
+  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should add feat features to the correct action array based on casting_time', async () => {
+  it('routes each feat feature to exactly one action array by automation.casting_time, sourced as feat', async () => {
+    // featureCategories is mocked empty, so a 'passive' casting_time not listed in
+    // characterAdvancement must fall through to specialActions (rules.js :154-157).
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [], proficiencies: [],
       features: [
-        { name: 'War Caster', description: 'Advantage on con saves', type: 'passive', automation: { casting_time: '1 reaction' } },
-        { name: 'Inspiring Leader', description: 'Buff allies', type: 'passive', automation: { casting_time: '1 action' } },
-        { name: 'Heal Word', description: 'Restore HP', type: 'passive', automation: { casting_time: '1 bonus action' } },
+        { name: 'War Caster', description: 'Advantage on con saves', type: 'passive', automation: { casting_time: '1 reaction' }, featName: 'War Caster' },
+        { name: 'Inspiring Leader', description: 'Buff allies', type: 'passive', automation: { casting_time: '1 action' }, featName: 'Inspiring Leader' },
+        { name: 'Heal Word', description: 'Restore HP', type: 'passive', automation: { casting_time: '1 bonus action' }, featName: 'Healer' },
+        { name: 'Lucky', description: 'Reroll dice', type: 'passive', automation: { casting_time: 'passive' }, featName: 'Lucky' },
       ],
     });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.reactions.find((f) => f.name === 'War Caster')).toBeDefined();
-    expect(result.actions.find((f) => f.name === 'Inspiring Leader')).toBeDefined();
-    expect(result.bonusActions.find((f) => f.name === 'Heal Word')).toBeDefined();
-    expect(result.reactions.find((f) => f.name === 'War Caster').source).toBe('feat');
+    const result = await getStats(makePlayerSummary());
+
+    const inArray = (arr, name) => arr.filter((f) => f.name === name);
+    expect(inArray(result.actions, 'Inspiring Leader')).toHaveLength(1);
+    expect(inArray(result.bonusActions, 'Heal Word')).toHaveLength(1);
+    expect(inArray(result.reactions, 'War Caster')).toHaveLength(1);
+    expect(inArray(result.specialActions, 'Lucky')).toHaveLength(1);
+
+    // No leakage into the wrong arrays, and rows carry feat provenance.
+    expect(inArray(result.reactions, 'Inspiring Leader')).toHaveLength(0);
+    expect(inArray(result.actions, 'War Caster')).toHaveLength(0);
+    expect(inArray(result.bonusActions, 'Lucky')).toHaveLength(0);
+    expect(inArray(result.actions, 'Inspiring Leader')[0]).toMatchObject({ source: 'feat', featName: 'Inspiring Leader' });
   });
 });
 
-describe('rules.getPlayerStats - cloning', () => {
+describe('rules.getPlayerStats - input isolation', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should not mutate the original playerSummary', async () => {
-    const playerSummary = makePlayerSummary({ actions: [{ name: 'Attack' }] });
-    const originalActions = JSON.stringify(playerSummary.actions);
-    await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(JSON.stringify(playerSummary.actions)).toBe(originalActions);
+  it('returns a clone: pushed feat rows appear on the result, never on the original playerSummary', async () => {
+    const playerSummary = makePlayerSummary({ actions: [{ name: 'Attack', description: 'raw', type: 'action' }] });
+    const snapshot = JSON.stringify(playerSummary);
+    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
+      abilityScoreIncreases: [], proficiencies: [],
+      features: [
+        { name: 'Inspiring Leader', description: 'Buff allies', type: 'passive', automation: { casting_time: '1 action' }, featName: 'Inspiring Leader' },
+      ],
+    });
+    const result = await getStats(playerSummary);
+
+    expect(result).not.toBe(playerSummary);
+    // Assembly (rules.js:432 cloneDeep) mutated only the clone: the caller's
+    // summary is byte-for-byte intact even though the result gained a feat row.
+    expect(JSON.stringify(playerSummary)).toBe(snapshot);
+    expect(result.actions.some((f) => f.name === 'Inspiring Leader')).toBe(true);
   });
 });

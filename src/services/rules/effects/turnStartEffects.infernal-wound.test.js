@@ -1,7 +1,12 @@
+// @maintained-by-ai
 // MA-0367 seam lock: applyTurnStartEffects invokes the Infernal Wound bleed
 // tick for the ACTIVE creature's turn start BEFORE the playerStats guard, so it
 // fires for monster victims (EB) as well as PCs — the same pre-guard shape as
-// applyHolyNimbusDamage / regainLegendaryUses.
+// applyHolyNimbusDamage / regainLegendaryUses. Gate logic (te scan, 1d10 roll,
+// HP loss, heal-close) is owned by infernalWoundService.test.js; effect-handler
+// order/dispatch by applyTurnStartEffects.test.js — this file pins only the
+// pre-guard bleed seam: exactly one (activeName, campaignName) dispatch per
+// turn start for ANY active creature, silence when there is none.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const applyInfernalWoundBleedTurnStart = vi.fn(async () => {});
@@ -22,6 +27,11 @@ vi.mock('../../encounters/monsterRecharge.js', () => ({ rollMonsterRecharges: vi
 vi.mock('../../rules/features/infernalWoundService.js', () => ({
     applyInfernalWoundBleedTurnStart: (...args) => applyInfernalWoundBleedTurnStart(...args),
 }));
+// Pre-guard siblings (turnStartEffects.js:216/:222) run on EVERY dispatch
+// with a truthy activeName — stubbed 1:1 so this seam file never executes
+// their real bodies (constrictGrapple/whirlwind lane owns them).
+vi.mock('../features/whirlwindService.js', () => ({ applyWhirlwindTurnStart: vi.fn(async () => {}) }));
+vi.mock('../features/constrictGrappleService.js', () => ({ applyConstrictGrappleTurnStart: vi.fn(async () => {}) }));
 vi.mock('../../ui/utils.js', () => ({ default: { getName: (n) => n } }));
 vi.mock('../../ui/storage.js', () => ({ default: { set: vi.fn(), get: vi.fn() } }));
 
@@ -31,18 +41,17 @@ const CAMPAIGN = 'test-campaign';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    applyInfernalWoundBleedTurnStart.mockClear();
 });
 
 describe('MA-0367 turn-start bleed tick seam', () => {
-    it('fires for a MONSTER active creature with NO playerStats (pre-guard)', async () => {
-        await applyTurnStartEffects('Hero', null, CAMPAIGN, []);
-        expect(applyInfernalWoundBleedTurnStart).toHaveBeenCalledWith('Hero', CAMPAIGN);
-    });
-
-    it('fires for a PC active creature too', async () => {
-        await applyTurnStartEffects('Wild_Sage_Druid', { turnStartEffects: [] }, CAMPAIGN, []);
-        expect(applyInfernalWoundBleedTurnStart).toHaveBeenCalledWith('Wild_Sage_Druid', CAMPAIGN);
+    it.each([
+        // playerStats null proves the call sits BEFORE the guard (EB monster turn)
+        { name: 'BEARDED_DEVIL', stats: null, label: 'monster active creature with no playerStats' },
+        { name: 'Wild_Sage_Druid', stats: { turnStartEffects: [] }, label: 'PC active creature' },
+    ])('dispatches the bleed tick exactly once for a $label', async ({ name, stats }) => {
+        await applyTurnStartEffects(name, stats, CAMPAIGN, []);
+        expect(applyInfernalWoundBleedTurnStart).toHaveBeenCalledTimes(1);
+        expect(applyInfernalWoundBleedTurnStart).toHaveBeenCalledWith(name, CAMPAIGN);
     });
 
     it('does not fire without an active creature', async () => {

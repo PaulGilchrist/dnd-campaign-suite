@@ -1,24 +1,42 @@
-# test-maintain state (updated 2026-10-20, run2 batch #198 flush — USER-REQUESTED pause point)
-- Cursor: run2#1238 DONE (marker-verified). Batch check RUNNING (evidence /tmp/batch198.log) — record `## Batch #198 GREEN/RED` + PROGRESS on completion, adjudicate vs CANON, then PAUSE (user asked to pause after full run).
-- NEXT dispatch after resume: run2#1239 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory. (Queue head at flush: attackCalc2024-light-ranged.test.js — carry #1237 rec: stub-echo Archery :174-206 retire + cla225 real-builder conversion.)
-- Batch discipline: anchor run2#1238 (early flush, precedent #188/#189/#193/#195); NEXT flush after run2#1253 (Batch #199) unless user requests earlier.
-- Counters at #198: completed 2382 / remaining 311 / total 2693 (verified ✓; strict drop 324→311 since #197; both queue copies synced).
-- CANON: exactly 2 FIXME fails (steps-config languageWarnings + Players dragging) + 3 expected = GREEN. Flake-watch: WizardStepSpells.feature-touched (silent since #183) — stabilize on 2nd.
-- CENSUS RULE: `find src -name '*.test.*' | sort > /tmp/all_tests.txt; find src -name '*.test.*' -print0 | xargs -0 grep -l '@maintained-by-ai' | sort > /tmp/maintained.txt; comm -13`. Queue head verbatim `sed -n '1p'` (#1125 hardening). Exact-path guard in every prompt.
+# test-maintain state (updated 2026-10-21, run2 batch #212 flush)
+- Cursor: run2#1439 DONE (marker 14/14 canonical line-1). Batch #212 GREEN — 30,635 pass, exact canon pair + 3 expected, WATCH #3 SILENT (39th clean, /tmp/batch212.log) (exactly 2 FIXME: steps-config languageWarnings + Players dragging :41; + 3 expected; WATCH #3 = ElementalAttunementModal.phase-flow DC-11 phase-race registered batch#211, stable 4/4 isolated, untouched-window — if it recurs: REAL, stabilize before proceeding; watches #1 WizardStepSpells silent since #183, #2 NPCs.duplicate-name silent since #200).
+- NEXT dispatch after adjudication: run2#1440 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory (#1383 phantom rule). (Queue head at flush: rules-proficiencies.implementsOfMercy.test.js — proficiencies rules lane; rules-root cluster in progress: #1435 actions/#1436 armor/#1437 styles/#1438 helpers/#1439 hunterPrey closed; implementsOfMercy = campaign-item/feat proficiency-grant face probably — READ source+disk identity-first #1360 method.)
+- Batch discipline: anchor run2#1439; NEXT flush after run2#1453 (Batch #213) unless user requests earlier.
+- Counters at #212: completed 2582 / remaining 110 / total 2692 (verified ✓ 2582+110=2692; strict drop 124→110; both queue copies synced).
+- Families CLOSED this window: wardingBond ALL-6 (#1425-#1430, 49 boundary), breath trio (#1431+#1390+#1295 mapped), zone-engine quad (#1434 four-engine seam map + #1405/#1432/#1416), rules-root ticket trio MN-020/FT-046/hunterPrey (#1437/38/39). LANDMARK: weakening producer-carries-source => #1295-class collisions PURELY reader-side (fix recipe: readers add source).
+- Standing stale cites (retarget on touching): regenerateHandler:13->L250-264/.active:52/:53->:247/:268; MonsterCardHelpers.infernal-wound:10 :75->:127; applyDamage.hypnotic-break :281-333->:287-380; saveResults :159-167->:350-384/:169->:411-417; revivify base :85->:322/:286-310->:341-362/:504->:199-254; roar base :107-191->:180-218/:221-248/:263-283/:307-377 (Modal.staged-roar:10 fix-on-turn); errors :116->:310; bugs-ledger :222->:292; weakening clock-payload :85->:158.
+- Coverage-gaps reported unowned (owner decision, maybe queue): noSavePath.js:51 (#1420); applyFeyShadowTouchedSpells/applyRulesType + addFightingStyleFeatFeatures/addBackgroundFeatures (#1437/38).
+- 🔴 new-#212 full detail in ledger block: stale-cs multi-te overwrite; negative-heals-uncapped+contradiction+NaN-poison; fire-and-forget no-catch x3 sites; 2014 disk-dead trigger bytes; non-sorcerer-surge RAW-violation; ternary guard-hole localeCompare death.
 
-## attackCalc family lane map (#1233-#1238 live)
-- BASE attackCalc.test.js (#1234, 19 blocks/54): units parseMagicItemName/findEquippedWeapons/buildWeaponAttack/buildMonkAttacks/resolveSpellDamageAtLevel + getAttacks magic-thread end-to-end NEW.
-- topic attackCalc-5e-attacks (#1233, 6/11): Druidic/Thrown/Starry/Nick runtime seam.
-- 2024: class-features (#1235, 6/15 cla225 canon origin), edge-cases (#1236, 8, PB 4/5 ladder unique), fighting-styles (#1237, table/12, Dueling gates :231), light-melee (#1238, 5, tie-row pickHighest).
-- REMAINING 2024 siblings (cla225 conversion + folds pending own turns): light-ranged (NEXT, Archery dup :174-206), special-attacks (invalid 'Ranged' category fixtures), nick-dual-wielder (vs wm003 table-fold), attackCalc2024.test.js base (:331 wholesale stub).
-- GAP REC: 2024 Blessed/Druidic WEAPON-row byte-pin nowhere — add on #1235 re-touch (#1238).
+## MARKER / DETERMINISM / PARITY CANON (enforced every lane)
+- MARKER: exactly one '// @maintained-by-ai' at line 1 — ANY variant ('AUDITED' etc.) VOIDS THE PASS (#1361 incident; orchestrator fixed once).
+- DETERMINISM BAR (#1366+): argument-keyed STATEFUL strict store fakes THROW unknown owner/key/campaign/arity + read-order censuses; explicit re-seed not Once-chains (vitest-4 clearAllMocks RETAINS implementations #1312); spies afterEach-restored; fake-timer Date.now log-freezes.
+- DISK-PARITY GOLD (#1365 method): read BOTH rulesets programmatically every lane; fabricated fixtures banned; claimed-pin existence audits both directions (#1368 byte-repair, #1394/96 verified-exist); coercions census six-family spectrum in batch #209 ledger block.
+- FAKE-TEST HARVEST standing duty: vacuous it.each ignored-args (#1389), order-dependent leaks (#1286), objectContaining envelopes (#1395/96), expect.any on mutations (#1307/41), trivially-empty results (#1266/97).
 
-## dc-success family CLOSED x12 — byte-slot taxonomy: after damage_type_primary (ghost/constrictor/banshee) | after save_effect (piercer/poltergeist/ooze/shambling/whelm) | after save_type (gladiator/sphinxes/vrock-scream/yeti) — read disk never assume (#1230).
+## CLOSED DOMAINS (do not re-queue)
+effects/ FULLY CLOSED #1280-#1332 (turnStart seam map, restRules SR/LR families, expireStale maturity table, clear- family, zone clock). features/ lanes #1333-#1397 (65 serviced so far: enchantment/dominion, protection/heal, holy/aura, companion/mount, breath/paralysis clusters). spellCalc2024 #1264-#1277, getPlayerStats #1254-#1259, 2024 attackCalc #1235-#1244, applyDamage #1182-#1210, dc-success x12 #1230, steps/, advisory, maps, npcs, items.
 
-## cite-table live map
-- applyDamage.helpers (#1196): :53-86/:88-104/:106-166/:168-182/:184-196. applyDamage BASE (#1207): guards :146-155, playerHP :157-177, monster :201-223, resists :179-199, DCrecalc :334-366, ward :367-411. npcCon :259-303 (#1200). healingBlock :92 (#1219). abilityCalc 5e (#1231): getAbilities :46-197, getHitPoints :199-293, carrying :295-304. abilityCalc2024 (#1232): getAbilities :70-264, getHitPoints :266-356, carrying :358-366. recharge #1132 / selfBuff #1146 / summon #1156 / legendaryUses :12-27 #1116.
+## CITED-RANGE SHIFT MAP (retarget stale cites on citing file's touch)
+- regenerateService.test.js:13 + .active:52 -> applyTurnStartEffects L250-264; .active:53 L524 -> expirations_additional :247/:268 (#1283/96/97 deleted 3rd pin).
+- MonsterCardHelpers.infernal-wound.test.js:10 :75 -> infernalWoundService.test.js :127 (#1380).
+- applyDamage.hypnotic-break.test.js:15 :281-333 -> :287-380 (#1378).
+- sp091 rest-latch :6 contract cite -> prayerOfHealingService.test.js :483-541 stamp bytes :516-521 (#1394); .results prose cites shifted :277/:311/:345/:381/:483/:610 (#1394).
+- primalCompanionService gates cite kept-by-name; .share-chain:5 reciprocal (#1395/96).
+- Standing: bane rec-1287 folded-done; wm003 :88-104; carryingCapacity :15-59; attackCalc2024 base map; error-handling :38-61; senses-speed :237-245; rules.test.js mega-queue intact (#199/200 + :935).
 
-- PENDING RECS: nick vs wm003 fold; special-attacks/attackCalc2024.test.js stub conversion; attackWeaponUtils dedicated lane (#1234); teleportService:180 literal (#1224); giantAncestry dedupe (#1164); effectiveWalls :9 (#1175); map.test-utils :97 (#1173); lootSuggestions (#1166); card-lane selfBuff (#1146); summon ranges (#1156); recharge :50-58 (#1132); ma2022 (#1126); ma1931 (#1119); ma1952 (#1121); lair chips (#1099); diceStub x6 (#1072); CharConditions 5x (#1008); psychic/tempTeleport (#1068); assertCanAct.charge (#984); MA-1463 (#932); Maneuvers (#1041); conditionEffects dupes (#1000); travelService:42; steps/bs:18; grapple (#1097); hellish/berserk (#1098). CONSUMED: dc-success x12, attackCalc 5e recs (#1235/#1236/#1237/#1238), applyDamage.test recs (#1207), intercept trio (#1201/#1209).
-- OPEN SOURCE BUGS (report only): 🔴 attackCalc.js:306 Short-Sword dead branch (#1233/#1234); 🔴 applyDamage.js:552-557 frightened+charmed resurrect (#1207); 🔴 applyDamage.js:451 campaignName (#1185/#1207); 🔴 contextBuilder-map:286+damageRoll:135 envelope (#1181); 🔴 mapsService .json drift (#1173); 🔴 monsterSelfAura:71 (#1136); 🔴 monsterSelfBuff:67 (#1145); 🔴 monsterLegendaryUses:228 (#1116); ⚠ attackCalc parseMagicItemName substring + weaponType main-hand asym (#1234); ⚠ expertise-doubles-without-proficiency twins abilityCalc:29-31/abilityCalc2024:34-36 (#1231/#1232); ⚠ abilityCalc2024 Con-missing throws :72/:78 divergence (#1232); ⚠ attackCalc2024:541 unguarded abilities.find latent (#1236); ⚠ damageUtils shield-AC+2 drop/:94 AC-0 (#1213); ⚠ rangeValidation mile-regex :37 (#1224); prior minors per ledger.
-- Subagent prompt hygiene: OUTPUT HYGIENE + exact-path guard + verified-before-delete + cla225 real-builder canon for 2024 lanes + falsifier tables + byte-slot-read-disk rule.
+## ACCUMULATED REC QUEUE (apply when owning file comes up)
+- Tighten cited objectContaining/expect.any in: useSimpleSpellHandlers bless slotLevel 🔴-fix-owner (report-only, source); restRules-longRest base done #1312; massHealingWord/massCure twin owner-checks done; primalCompanionService cones 🔴-dead-strings; turnStartEffects_additional :675 placeholder RESOLVED real-tests #1324; wildCompanion rec APPLIED keep #1314; healService poison-gate 🔴 owner decision; invisibility inline-dupe delegation recs x2 (#1382); arcaneFortitude lane (queue later) share-family boundary per #1395/96 split.
+- Next queue heads verbatim each turn from disk.
+
+## OPEN SOURCE BUGS (report only — full detail bugs ledger #199-#209)
+- 🔴 new #209: AoE-heal first-6 affiliation-blind x2 (MCW/MHWD, range never enforced); paralyzingBreath te-source collision (#1295 twin confirmed); prayerOfHealing caster-stats-leak + neg-heal-log; mountService rider-unvalidated ok:true + size unnormalized; primalCompanion dead-guards/:0/alive-===false/dead-exports; rayOfEnfeeblement metaCtx-never-attached (heighten unreachable).
+- 🔴 standing: forcecage ruleset-hardcode :9-19; rules.js carryingCapacity=HP :394-399; Improved Illusions wipe :348-356/:775; Starry 120ft :17; armorClass UD shield-drop trio+Dance gate; Swift Quiver :428-429; HC 'Light' disk; Short-Sword :306; applyDamage :552-557/:451; survivivor-guard-dead :446; BM tiers trackedResources :80-83; FP save triad; weakening-breath :482; naturalRecovery dead-post-batch; WS cache-stale :287; triggerFear/triggerCompulsion dead; holyAuraDamage CON-vs-con.
+- 🗑 census in ledger #207-209 blocks.
+
+## Harness discipline
+- NO-DISPATCH-DURING-BATCHCHECK: end turn after launching boundary check; adjudicate GREEN-vs-CANON (exactly 2 FIXME + 3 expected) before dispatching.
+- Detached suite (inline &) gets killed with parent shell — ALWAYS tool background:true (#206 lesson); tool-managed runs notify; foreign runs probe EXIT bounded only.
+- Verbatim queue heads via sed -n 'Np' EVERY dispatch (#1125/1383 incidents).
+- Contradictory/noisy returns -> scoped disk adjudication before accept (#1249, ':7 marker paste' noise benign if grep shows line 1).
 - Spec: ~/.config/opencode/commands/test-maintain.md (PREFLIGHT + SCOPED-GIT active).

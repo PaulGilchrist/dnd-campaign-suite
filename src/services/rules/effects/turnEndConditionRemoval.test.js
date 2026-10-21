@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -21,6 +22,9 @@ const selfRestorationStats = {
   }],
 };
 
+const storedConditions = (conds) => (name, prop) =>
+  prop === 'activeConditions' ? conds : null;
+
 describe('applyTurnEndConditionRemoval (CLA-307 Self-Restoration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,14 +32,12 @@ describe('applyTurnEndConditionRemoval (CLA-307 Self-Restoration)', () => {
     addEntry.mockImplementation(() => Promise.resolve());
   });
 
-  it('removes charmed/frightened/poisoned from the owner at owner turn end', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeConditions') return ['poisoned', 'blinded', 'charmed'];
-      return null;
-    });
-
+  it('writes the surviving conditions in one atomic setRuntimeValue call, passing skipSync through', async () => {
+    // GM turn-end seam: default skipSync=false so the removal POSTs and broadcasts.
+    getRuntimeValue.mockImplementation(storedConditions(['poisoned', 'blinded', 'charmed']));
     await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign');
 
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Disciplined_Monk',
       'activeConditions',
@@ -43,16 +45,28 @@ describe('applyTurnEndConditionRemoval (CLA-307 Self-Restoration)', () => {
       'test-campaign',
       false
     );
+
+    // SSE echo seam (sseHandlers): skipSync=true — the server already holds it, re-POSTing loops.
+    setRuntimeValue.mockClear();
+    getRuntimeValue.mockImplementation(storedConditions(['charmed', 'frightened']));
+    await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign', true);
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Disciplined_Monk',
+      'activeConditions',
+      [],
+      'test-campaign',
+      true
+    );
   });
 
   it('emits one condition/removed log entry per removed condition naming Self-Restoration', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeConditions') return ['poisoned', 'frightened', 'blinded'];
-      return null;
-    });
+    getRuntimeValue.mockImplementation(storedConditions(['poisoned', 'frightened', 'blinded']));
 
     await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign');
 
+    // Exactly two entries: the survivors (blinded) are never logged as removed.
     expect(addEntry).toHaveBeenCalledTimes(2);
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'condition',
@@ -70,48 +84,8 @@ describe('applyTurnEndConditionRemoval (CLA-307 Self-Restoration)', () => {
     }));
   });
 
-  it('passes skipSync through to setRuntimeValue on the SSE echo path', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeConditions') return ['poisoned'];
-      return null;
-    });
-
-    await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign', true);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Disciplined_Monk',
-      'activeConditions',
-      [],
-      'test-campaign',
-      true
-    );
-  });
-
-  it('is idempotent — no write and no log when nothing matches (previous/rewind re-entry)', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeConditions') return ['blinded'];
-      return null;
-    });
-
-    await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign');
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('never touches a creature without the feature (non-owner control)', async () => {
-    await applyTurnEndConditionRemoval('Thug 1', { turnStartEffects: [] }, 'test-campaign');
-    await applyTurnEndConditionRemoval('Thug 1', null, 'test-campaign');
-
-    expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(addEntry).not.toHaveBeenCalled();
-  });
-
-  it('handles case-insensitive condition matching', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeConditions') return ['Poisoned', 'Blinded'];
-      return null;
-    });
+  it('matches stored conditions case-insensitively and preserves survivor casing in the write', async () => {
+    getRuntimeValue.mockImplementation(storedConditions(['Poisoned', 'Blinded']));
 
     await applyTurnEndConditionRemoval('Disciplined_Monk', selfRestorationStats, 'test-campaign');
 
@@ -122,5 +96,30 @@ describe('applyTurnEndConditionRemoval (CLA-307 Self-Restoration)', () => {
       'test-campaign',
       false
     );
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      condition: 'Poisoned',
+      reason: 'Self-Restoration',
+    }));
+  });
+
+  it('is a zero-write, zero-log no-op whenever nothing can drop (previous/rewind re-entry, non-owners, empty store)', async () => {
+    const noOps = [
+      { name: null, stats: selfRestorationStats, stored: ['poisoned'] },              // no owner
+      { name: 'Disciplined_Monk', stats: null, stored: ['poisoned'] },                // no stats (non-owner / rewind)
+      { name: 'Disciplined_Monk', stats: {}, stored: ['poisoned'] },                  // turnStartEffects missing
+      { name: 'Disciplined_Monk', stats: { turnStartEffects: [] }, stored: ['poisoned'] }, // no condition_removal effect
+      { name: 'Disciplined_Monk', stats: selfRestorationStats, stored: null },       // store has no conditions yet
+      { name: 'Disciplined_Monk', stats: selfRestorationStats, stored: [] },         // empty activeConditions
+      { name: 'Disciplined_Monk', stats: selfRestorationStats, stored: ['blinded'] }, // no intersection
+    ];
+
+    for (const { name, stats, stored } of noOps) {
+      getRuntimeValue.mockImplementation(storedConditions(stored));
+      await applyTurnEndConditionRemoval(name, stats, 'test-campaign');
+    }
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 });

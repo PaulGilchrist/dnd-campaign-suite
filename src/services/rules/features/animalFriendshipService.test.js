@@ -1,9 +1,19 @@
+// @maintained-by-ai
+// animalFriendshipService lane — triggerAnimalFriendship is the cast seam invoked by
+// spellCastService execution/triggerSpells.js handleAnimalFriendship (metaCtx carries
+// targetNames + spellSaveDc + slotLevel). Downstream dispatch internals belong to
+// automation/handlers/spells/animalFriendshipHandler.test.js; confirm-runner threading
+// belongs to useSimpleSpellHandlers.animalFriendship.test.js. This suite owns only the
+// service's public contract: name gate, Beast auto-selection, action composition,
+// handler pass-through, and the error popup.
+// Mock surface = service's real import set 1:1 (automation/index, damageUtils,
+// monsterUtils). The legacy logService mock was deleted — the service never imported it.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells from '../../../../public/data/spells.json';
 import { triggerAnimalFriendship } from './animalFriendshipService.js';
 import { executeHandler } from '../../automation/index.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { getMonsterData } from '../../npcs/monsterUtils.js';
-import { addEntry } from '../../ui/logService.js';
 
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
@@ -17,211 +27,202 @@ vi.mock('../../npcs/monsterUtils.js', () => ({
     getMonsterData: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
-}));
+// Disk canon — name/level/DC come from spells.json, never transcribed.
+const AF = spells.find(s => s.name === 'Animal Friendship');
 
-describe('animalFriendshipService', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        addEntry.mockResolvedValue({});
-    });
+const NO_TARGETS_POPUP = {
+    type: 'popup',
+    payload: {
+        type: 'automation_info',
+        name: 'Animal Friendship',
+        description: 'No Beast targets available for Animal Friendship.',
+    },
+};
 
-    const campaignName = 'TestCampaign';
+describe('triggerAnimalFriendship', () => {
+    const campaignName = 'test-campaign';
     const mapName = 'testMap';
-    const baseSpell = { name: 'Animal Friendship' };
-    const baseMetaCtx = { targetNames: ['Wolf'] };
-    const baseStats = {
+    const stats = {
         name: 'Druid',
         spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Wisdom' },
         proficiency: 4,
     };
 
-    function callTrigger(spell = baseSpell, metaCtx = baseMetaCtx, stats = baseStats) {
-        return triggerAnimalFriendship(spell, metaCtx, stats, campaignName, mapName);
-    }
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-    describe('triggerAnimalFriendship', () => {
-        it('returns null when spell name does not match "animal friendship"', async () => {
-            for (const name of [null, undefined, '', 'Animal', 'Friendship', 'Animal Friends']) {
-                const result = await callTrigger({ ...baseSpell, name });
-                expect(result).toBeNull();
-            }
-        });
+    const call = (spell = AF, metaCtx = { targetNames: ['Wolf'] }, s = stats) =>
+        triggerAnimalFriendship(spell, metaCtx, s, campaignName, mapName);
 
-        it('is case-insensitive for spell name matching', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [] });
+    it.each([null, undefined, '', 'Animal', 'Friendship', 'Animal Friends'])(
+        'returns null and dispatches nothing for non-matching spell name %s',
+        async (name) => {
+            const result = await call({ ...AF, name });
 
-            for (const name of ['ANIMAL FRIENDSHIP', 'animal friendship', 'Animal Friendship']) {
-                const result = await triggerAnimalFriendship({ name }, { targetNames: ['Wolf'] }, baseStats, campaignName, mapName);
-                expect(result).toEqual({ type: 'popup' });
-                vi.clearAllMocks();
-                addEntry.mockResolvedValue({});
-            }
-        });
-
-        it('returns popup when no targetNames and no creatures in combat context', async () => {
-            vi.mocked(getCombatContext).mockResolvedValue({ creatures: [] });
-            const result = await callTrigger(baseSpell, { ...baseMetaCtx, targetNames: [] }, baseStats);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Animal Friendship', description: 'No Beast targets available for Animal Friendship.' },
-            });
+            expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
+            expect(getCombatContext).not.toHaveBeenCalled();
+        }
+    );
+
+    it.each(['ANIMAL FRIENDSHIP', 'animal friendship', 'Animal Friendship'])(
+        'gate matches %s case-insensitively and returns the handler result verbatim',
+        async (name) => {
+            const sentinel = { type: 'popup', payload: { handled: name } };
+            executeHandler.mockResolvedValue(sentinel);
+
+            const result = await call({ ...AF, name });
+
+            expect(result).toBe(sentinel);
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+        }
+    );
+
+    it('auto-selects only Beasts and dispatches the full composed action', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Wolf', type: 'npc' },
+                { name: 'Goblin', type: 'npc' },
+                { name: 'Druid', type: 'player' },
+            ],
         });
-
-        it('returns popup when no targetNames and combat context is null', async () => {
-            vi.mocked(getCombatContext).mockResolvedValue(null);
-            const result = await callTrigger(baseSpell, { ...baseMetaCtx, targetNames: [] }, baseStats);
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Animal Friendship', description: 'No Beast targets available for Animal Friendship.' },
-            });
-            expect(executeHandler).not.toHaveBeenCalled();
+        getMonsterData.mockImplementation(async (name) => {
+            if (name === 'Wolf') return { type: 'Beast' };
+            if (name === 'Goblin') return { type: 'Humanoid' };
+            return null;
         });
+        const sentinel = { type: 'popup', payload: { handled: true } };
+        executeHandler.mockResolvedValue(sentinel);
 
-        it('auto-selects beasts from combat context when no targetNames provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wolf', type: 'npc' },
-                    { name: 'Goblin', type: 'npc' },
-                    { name: 'Druid', type: 'player' },
-                ],
-            });
-            vi.mocked(getMonsterData).mockImplementation(async (name) => {
-                if (name === 'Wolf') return { type: 'Beast' };
-                if (name === 'Goblin') return { type: 'Humanoid' };
-                return null;
-            });
+        const result = await call(AF, { targetNames: [] });
 
-            const result = await triggerAnimalFriendship(baseSpell, { targetNames: null }, baseStats, campaignName, mapName);
+        expect(result).toBe(sentinel);
+        expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+        expect(executeHandler).toHaveBeenCalledTimes(1);
+        expect(executeHandler).toHaveBeenCalledWith(
+            {
+                name: 'Animal Friendship',
+                automation: {
+                    type: 'animal_friendship',
+                    saveDc: stats.spellAbilities.saveDc,
+                    targetNames: ['Wolf'],
+                },
+                spell: AF,
+                spellSlotLevel: AF.level,
+            },
+            stats,
+            campaignName,
+            mapName,
+        );
+        // Players short-circuit before the bestiary; only npc creatures are looked up.
+        expect(getMonsterData).toHaveBeenCalledWith('Wolf', null);
+        expect(getMonsterData).toHaveBeenCalledWith('Goblin', null);
+        expect(getMonsterData).not.toHaveBeenCalledWith('Druid', null);
+    });
 
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ targetNames: ['Wolf'] }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
+    it('passes explicit targetNames straight through without consulting combat context', async () => {
+        executeHandler.mockResolvedValue({ type: 'popup' });
 
-        it('filters out non-beast creatures from auto-selection', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Goblin', type: 'npc' },
-                    { name: 'Ogre', type: 'npc' },
-                ],
-            });
-            vi.mocked(getMonsterData).mockImplementation(async (name) => {
-                if (name === 'Goblin') return { type: 'Humanoid' };
-                if (name === 'Ogre') return { type: 'Giant' };
-                return null;
-            });
+        await call(AF, { targetNames: ['Wolf', 'Hawk'] });
 
-            const result = await triggerAnimalFriendship(baseSpell, { targetNames: null }, baseStats, campaignName, mapName);
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(getMonsterData).not.toHaveBeenCalled();
+        expect(executeHandler).toHaveBeenCalledWith(
+            expect.objectContaining({
+                automation: expect.objectContaining({ targetNames: ['Wolf', 'Hawk'] }),
+            }),
+            stats,
+            campaignName,
+            mapName,
+        );
+    });
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Animal Friendship', description: 'No Beast targets available for Animal Friendship.' },
-            });
-        });
+    it.each([
+        {
+            label: 'metaCtx spellSaveDc and slotLevel override stats and spell.level',
+            spell: AF,
+            metaCtx: { targetNames: ['Wolf'], spellSaveDc: 18, slotLevel: 3 },
+            s: stats,
+            saveDc: 18,
+            slotLevel: 3,
+        },
+        {
+            label: 'fallbacks: saveDc = 8 + proficiency, slotLevel = 1',
+            spell: { name: 'Animal Friendship' },
+            metaCtx: { targetNames: ['Wolf'] },
+            s: { name: 'Druid', proficiency: 4 },
+            saveDc: 12,
+            slotLevel: 1,
+        },
+    ])('resolves saveDc/slotLevel priority — $label', async ({ spell, metaCtx, s, saveDc, slotLevel }) => {
+        executeHandler.mockResolvedValue({ type: 'popup' });
 
-        it('filters out player creatures from auto-selection', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Druid', type: 'player' },
-                    { name: 'Bard', type: 'player' },
-                ],
-            });
+        await call(spell, metaCtx, s);
 
-            const result = await triggerAnimalFriendship(baseSpell, { targetNames: null }, baseStats, campaignName, mapName);
+        expect(executeHandler).toHaveBeenCalledWith(
+            expect.objectContaining({
+                automation: expect.objectContaining({ saveDc }),
+                spellSlotLevel: slotLevel,
+            }),
+            s,
+            campaignName,
+            mapName,
+        );
+    });
 
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Animal Friendship', description: 'No Beast targets available for Animal Friendship.' },
-            });
-        });
+    it.each([
+        {
+            label: 'empty combat context',
+            context: { creatures: [] },
+            monsters: {},
+        },
+        {
+            label: 'null combat context',
+            context: null,
+            monsters: {},
+        },
+        {
+            label: 'only non-Beast npcs (known Humanoid, unknown Giant)',
+            context: { creatures: [{ name: 'Goblin', type: 'npc' }, { name: 'Ogre', type: 'npc' }] },
+            monsters: { Goblin: { type: 'Humanoid' } },
+        },
+        {
+            label: 'players are never Beasts',
+            context: { creatures: [{ name: 'Druid', type: 'player' }] },
+            monsters: {},
+        },
+        {
+            label: 'bestiary lookup failure defaults to not a Beast',
+            context: { creatures: [{ name: 'Wolf', type: 'npc' }] },
+            monsters: 'reject',
+        },
+    ])('returns the no-targets popup and never dispatches — $label', async ({ context, monsters }) => {
+        getCombatContext.mockResolvedValue(context);
+        if (monsters === 'reject') {
+            getMonsterData.mockRejectedValue(new Error('bestiary unavailable'));
+        } else {
+            getMonsterData.mockImplementation(async (name) => monsters[name] ?? null);
+        }
 
-        it('passes explicit targetNames through to handler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+        const result = await call(AF, { targetNames: null });
 
-            await callTrigger(baseSpell, { targetNames: ['Wolf', 'Hawk'] }, baseStats);
+        expect(result).toEqual(NO_TARGETS_POPUP);
+        expect(executeHandler).not.toHaveBeenCalled();
+    });
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ targetNames: ['Wolf', 'Hawk'] }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
+    it('returns the exact error popup when the handler throws', async () => {
+        executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-        it('uses spellSaveDc from metaCtx or calculates from playerStats', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+        const result = await call();
 
-            await callTrigger(baseSpell, { targetNames: ['Wolf'], spellSaveDc: 18 }, baseStats);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 18 }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses slotLevel from metaCtx', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await callTrigger(baseSpell, { targetNames: ['Wolf'], slotLevel: 3 }, baseStats);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 3 }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('defaults slotLevel to spell.level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Animal Friendship', level: 1 };
-
-            await callTrigger(spell, { targetNames: ['Wolf'] }, baseStats);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 1 }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes through handler result', async () => {
-            const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Animal Friendship', description: 'Target charmed' } };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await callTrigger(baseSpell, baseMetaCtx, baseStats);
-
-            expect(result).toBe(expectedResult);
-        });
-
-        it('returns error popup when handler throws', async () => {
-            executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await callTrigger(baseSpell, baseMetaCtx, baseStats);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('Failed to execute Animal Friendship');
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Animal Friendship',
+                description: 'Failed to execute Animal Friendship.',
+            },
         });
     });
 });

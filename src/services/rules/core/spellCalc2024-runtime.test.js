@@ -1,5 +1,13 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
+
+// Runtime lane: owns getSpellAbilities behavior driven by the RUNTIME STORE
+// (getRuntimeValue reads at build time) — Spell Mastery picks, Savant/Signature
+// selections — plus the automation-passive spell-list grants (Phantasmal Creatures,
+// Improved Illusions) that no sibling lane covers. Static-data lanes own the rest:
+// slots/base (spellCalc2024.test.js, :251 owns the level-then-name sort),
+// automation payload (#1266), arcanum (#1265), rituals (#1271), ritualMaster (#1270).
 
 // ── Module-level mocks for all ESM dependencies ──
 vi.mock('../../character/classRules2024.js', () => ({
@@ -42,61 +50,52 @@ describe('spellCalc2024-runtime', () => {
   let mockGetRuntimeValue;
 
   beforeEach(async () => {
+    // resetAllMocks restores the factory's () => null store impl, so every test
+    // starts with an empty runtime store and installs its own mockImplementation.
     vi.resetAllMocks();
     const runtimeState = await import('../../../hooks/runtime/useRuntimeState.js');
     mockGetRuntimeValue = runtimeState.getRuntimeValue;
   });
 
   describe('getSpellAbilities', () => {
-    // ── Automation: runtime-state features (Spell Mastery, Savants, Signature Spells) ──
-
-    it('adds Spell Mastery level 1 and level 2 spells from runtime state', () => {
-      const allSpells = [
-        makeSpell('Shield', 1),
-        makeSpell('Web', 1),
-      ];
+    it('grants Spell Mastery runtime picks as Always rows, dedupes known spells, and reverts when the store is cleared', () => {
       mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === 'SpellMastery_level1') return 'Shield';
         if (prop === 'SpellMastery_level2') return 'Web';
         return null;
       });
 
+      const allSpells = [makeSpell('Shield', 1), makeSpell('Web', 1)];
       const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'spell_mastery' }],
-      };
+      stats.spells = ['Shield']; // already in the spellbook — the mastery pick must not duplicate it
+      stats.automation = { passives: [{ type: 'spell_mastery' }] };
 
       const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Shield');
-      expect(names).toContain('Web');
+      // the store is read under this character/campaign's exact runtime keys
+      expect(mockGetRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level1', 'TestCampaign');
+      expect(mockGetRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'SpellMastery_level2', 'TestCampaign');
+
+      const shieldRows = result.spells.filter(s => s.name === 'Shield');
+      expect(shieldRows.length).toBe(1);
+      expect(shieldRows[0].prepared).toBe('Prepared'); // the known wizard row is left untouched
+      const webRow = result.spells.find(s => s.name === 'Web');
+      expect(webRow).toBeDefined();
+      expect(webRow.prepared).toBe('Always'); // the runtime grant is always-prepared
+
+      // Falsifying pair: clear the store — the granted row reverts away, the known row stays.
+      mockGetRuntimeValue.mockImplementation(() => null);
+      const cleared = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+      expect(cleared.spells.map(s => s.name)).toEqual(['Shield']);
     });
 
-    it('deduplicates Spell Mastery spells already known', () => {
-      mockGetRuntimeValue.mockImplementation((_key, prop) => {
-        if (prop === 'SpellMastery_level1') return 'Fire Bolt';
-        return null;
-      });
-
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = {
-        passives: [{ type: 'spell_mastery' }],
-      };
-
-      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign' });
-
-      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
-    });
-
-    it('adds Savant and Signature spells from runtime state', () => {
+    it('adds Savant and Signature school selections from runtime state, deduped across keys', () => {
       mockGetRuntimeValue.mockImplementation((_key, prop) => {
         if (prop === '_Abjuration_Savant_selection') return ['Shield'];
         if (prop === '_Divination_Savant_selection') return ['Detect Magic'];
         if (prop === '_Illusion_Savant_selection') return ['Minor Illusion'];
         if (prop === '_Evocation_Savant_selection') return ['Fire Bolt'];
-        if (prop === 'SignatureSpells_selection') return ['Shield'];
+        if (prop === 'SignatureSpells_selection') return ['Shield']; // overlaps Abjuration Savant
         return null;
       });
 
@@ -119,18 +118,13 @@ describe('spellCalc2024-runtime', () => {
 
       const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Shield');
-      expect(names).toContain('Detect Magic');
-      expect(names).toContain('Minor Illusion');
-      expect(names).toContain('Fire Bolt');
-      // Shield is already deduplicated (from abjuration_savant + signature_spells)
-      expect(result.spells.filter(s => s.name === 'Shield').length).toBe(1);
+      // every selection becomes an Always row; nothing else is smuggled in
+      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Minor Illusion', 'Detect Magic', 'Shield']);
+      expect(mockGetRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_Abjuration_Savant_selection', 'TestCampaign');
+      expect(result.spells.find(s => s.name === 'Shield').prepared).toBe('Always');
     });
 
-    // ── Automation: Phantasmal Creatures ──
-
-    it('adds phantasmal creatures always prepared spells', () => {
+    it('phantasmal_creatures passive always-prepares its declared summon spells', () => {
       const allSpells = [
         makeSpell('Summon Beast', 1),
         makeSpell('Summon Fey', 1),
@@ -144,59 +138,36 @@ describe('spellCalc2024-runtime', () => {
 
       const result = getSpellAbilities(allSpells, stats);
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Summon Beast');
-      expect(names).toContain('Summon Fey');
+      expect(result.spells.map(s => s.name)).toEqual(['Summon Beast', 'Summon Fey']);
+      expect(result.spells.every(s => s.prepared === 'Always')).toBe(true);
+
+      // Negative: without the passive the declared list grants nothing.
+      stats.automation = { passives: [] };
+      expect(getSpellAbilities(allSpells, stats).spells).toEqual([]);
     });
 
-    // ── Automation: Improved Illusions ──
-
-    it('adds Minor Illusion from Improved Illusions when not already known', () => {
-      const allSpells = [makeSpell('Minor Illusion', 0, { casting_time: '1 action' })];
+    it('improved_illusions grants Minor Illusion as an Always cantrip row only when the passive is present', () => {
+      const allSpells = [makeSpell('Minor Illusion', 0)];
       const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{ type: 'improved_illusions' }],
-      };
+      stats.automation = { passives: [{ type: 'improved_illusions' }] };
 
-      const result = getSpellAbilities(allSpells, stats);
+      const granted = getSpellAbilities(allSpells, stats);
+      expect(granted.spells.find(s => s.name === 'Minor Illusion')).toMatchObject({ level: 0, prepared: 'Always' });
 
-      const minorIllusion = result.spells.find(s => s.name === 'Minor Illusion');
-      expect(minorIllusion).toBeDefined();
-      expect(minorIllusion.casting_time).toBe('1 action');
-    });
+      // Already known: still exactly one Always row. NOTE: casting_time stays '1 action' —
+      // applyImprovedIllusions's '1 bonus action' stamp (spellCalc2024.js:355) is wiped by
+      // the finalizeSpellRows detail remap; pinned here so a fix that restores the upgrade
+      // fails loudly (reported as a source defect, not faked green).
+      stats.spells = ['Minor Illusion'];
+      const known = getSpellAbilities(allSpells, stats);
+      const knownRow = known.spells.find(s => s.name === 'Minor Illusion');
+      expect(known.spells.filter(s => s.name === 'Minor Illusion').length).toBe(1);
+      expect(knownRow).toMatchObject({ prepared: 'Always', casting_time: '1 action' });
 
-    // ── Final sort after automation adds spells ──
-
-    it('sorts spells correctly after automation adds spells at various levels', () => {
-      const allSpells = [
-        makeSpell('Fire Bolt', 0),
-        makeSpell('Light', 0),
-        makeSpell('Shield', 1),
-        makeSpell('Magic Missile', 1),
-      ];
-      const stats = makePlayerStats({
-        class: {
-          name: 'Sorcerer',
-          class_levels: [{ level: 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 2 } } }],
-          spell_casting_ability: 'Charisma',
-          major: {
-            name: 'Draconic Sorcery',
-            features: [{ name: 'Draconic Spells' }],
-          },
-        },
-        abilities: [{ name: 'Charisma', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
-      stats.spells = ['Magic Missile', 'Fire Bolt'];
-      stats.automation = {
-        passives: [
-          { type: 'passive_rule', effect: 'always_prepared_spells', name: 'Draconic Spells', spells: ['Light'] },
-          { type: 'free_spell', spell: 'Shield' },
-        ],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Light', 'Magic Missile', 'Shield']);
+      // Negative: no passive and not known — never granted.
+      stats.spells = [];
+      stats.automation = {};
+      expect(getSpellAbilities(allSpells, stats).spells).toEqual([]);
     });
   });
 });

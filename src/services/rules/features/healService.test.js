@@ -1,347 +1,379 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+/**
+ * healService lane — fixed-amount PRODUCER for 'Heal' (lv6), live export.
+ *
+ * LIVE-vs-DEAD (#1370 method): triggerHeal has a production caller —
+ * useSimpleSpellHandlers.js runHeal at :102 (imported at :17), forwarding
+ * {name, spell, level} + {targetName}. Caller-side tuples are NOT pinned here —
+ * useSpellMetamagicFlow.complex-handlers.charm-heal.test.js and
+ * confirm-payloads.test.js own those. Single export, nothing dead.
+ *
+ * Producer vs forwarder: this lane builds the heal amount itself — parseInt
+ * ladder over heal_at_slot_level plus additive bonus stacking via
+ * resolveHealingBonusesWithDetails (healService.js:49-60, :117-123). It never
+ * calls resolveHealExpression, so dice-expression ownership (#1278
+ * spellDamageUtils.test.js:173-194 — VERBATIM:
+ * resolveHealExpression(disk5e('Healing Word'), 1, 5) === '1d4+5') does not
+ * apply: the disk 'Heal' rows carry static numeric literals only and this
+ * lane owns that ladder end-to-end.
+ *
+ * DISK DETERMINATION (both rulesets read programmatically below):
+ *  5e   'Heal': regain 70 HP; ends blindness, deafness, and any DISEASES;
+ *       no effect on CONSTRUCTS OR UNDEAD; +10 per slot above 6th.
+ *  2024 'Heal': 70 HP; status_effects ['Blinded','Deafened','Poisoned'].
+ *  Both: heal_at_slot_level {6:'70',7:'80',8:'90',9:'100'} — parity pinned.
+ *  NOT 10+d10 — the steering's d10 recollection is not disk canon.
+ *
+ * SOURCE BUGS REPORTED (not fixed here):
+ *  - healService.js:8 hardcoded remove-list has 'poisoned' but the 5e disk
+ *    ends DISEASES (2024 semantics): 5e casts clear Poisoned and never Disease.
+ *  - healService.js:32-33 over-log: once anything is cleared it logs EVERY
+ *    name in the remove-list that is absent from the remainder — including
+ *    conditions never stored. Quirk pinned in condition table row A.
+ *  - no undead/construct exclusion gate anywhere despite the 5e disk text —
+ *    undead get healed; current behavior pinned in the undead row.
+ *  - healService.js:52 vs :148 asymmetry: unknown slot heals at the
+ *    highest-key tier (100) while result.formula reports '70'. Quirk pinned.
+ *  - healService.js:65 vs :69 null-guard asymmetry on the canonical HP pair
+ *    (hitPoints/currentHitPoints, #1371): maxHp falls back only on
+ *    null/undefined (??), currentHp additionally rejects ''. Both pinned.
+ *
+ * Store machine-proof: strict fake permits exactly hitPoints /
+ * currentHitPoints / activeConditions at CAMPAIGN and throws on any other
+ * read; per-row read ORDER asserted. skipSync POSITION audit: the single
+ * write is setRuntimeValue(target,'activeConditions',next,campaign) — a
+ * 4-tuple; setRuntimeValue (useRuntimeState.js:78) has no skipSync param and
+ * this lane never calls setRuntimeObject, so no SSE-echo path exists here.
+ * applyHealingToTarget's return value is ignored by the source (:126) — only
+ * its call tuple is pinned. markFortifiedHealthUsed: not imported here.
+ *
+ * Family-class scan, honest: prof||0 + level||1 coercion into the bonus ctx
+ * pinned (#1365 class); :0-chains are those plus spell.level||6; no
+ * latch/once-per-rest pair; no never-executed guards beyond the gaps listed
+ * above — otherwise zero-clean. No clocks: duration is Instantaneous on disk
+ * both rulesets; Date.now() stamps log payloads only — fake timers freeze
+ * every timestamp at 0; nothing schedules anything; no stored expiry number.
+ * PRESERVED-CITED-BY: none — no src file cites healService.test.js (grep).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { triggerHeal } from './healService.js';
+import spells5e from '../../../../public/data/spells.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
 
-import { triggerHeal } from './healService.js'
-import * as applyHealing from '../combat/applyHealing.js'
-import * as damageUtils from '../combat/damageUtils.js'
-import * as runtime from '../../../hooks/runtime/useRuntimeState.js'
-import * as logService from '../../ui/logService.js'
-
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn((_char, key) => {
-    if (key === 'activeConditions' || key === 'targetEffects') return []
-    return undefined
-  }),
-}))
-
-vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
-  getLog: vi.fn(),
-}))
-
-vi.mock('../combat/applyHealing.js', () => ({
-  applyHealingToTarget: vi.fn(),
-}))
+// ── Mocks (module boundaries only) ────────────────────────────
 
 vi.mock('../combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-}))
+    getCombatContext: vi.fn(),
+}));
+
+vi.mock('../combat/applyHealing.js', () => ({
+    applyHealingToTarget: vi.fn(),
+}));
+
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
 
 vi.mock('../../combat/automation/automationService.js', () => ({
-  resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
-  markFortifiedHealthUsed: vi.fn(),
-}))
+    resolveHealingBonusesWithDetails: vi.fn(),
+}));
 
-const CAMPAIGN = 'testCampaign'
+import { getCombatContext } from '../combat/damageUtils.js';
+import { applyHealingToTarget } from '../combat/applyHealing.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
+import { resolveHealingBonusesWithDetails } from '../../combat/automation/automationService.js';
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Heal',
-    level: 6,
-    school: 'Evocation',
-    casting_time: '1 action',
-    components: ['V', 'S'],
-    range: '60 feet',
-    heal_at_slot_level: { 6: '70', 7: '80', 8: '90', 9: '100' },
-    ...overrides,
-  }
+// ── Canon helpers ─────────────────────────────────────────────
+
+const CAMPAIGN = 'test-campaign';
+
+function diskRow(spells, name) {
+    const spell = spells.find(s => s.name === name);
+    if (!spell) throw new Error(`spell missing from disk: ${name}`);
+    return spell;
+}
+const heal5e = diskRow(spells5e, 'Heal');
+const heal2024 = diskRow(spells2024, 'Heal');
+
+const playerStats = { name: 'TestCaster', proficiency: 4, level: 5 };
+
+let combatCtx;
+let store;
+let reads;
+let dispatchSpy;
+let consoleSpy;
+
+function seed(entity, key, value) {
+    store.set(`${entity}|${key}|${CAMPAIGN}`, value);
 }
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestCaster',
-    abilities: [{ name: 'Wisdom', bonus: 5 }],
-    proficiency: 4,
-    spellAbilities: { spellCastingAbility: 'Wisdom', toHit: 9, saveDc: 17, modifier: 5 },
-    automation: { passives: [] },
-    activeBuffs: [],
-    level: 5,
-    hitPoints: 100,
-    ...overrides,
-  }
+function logsOfType(type) {
+    return addEntry.mock.calls.filter(c => c[1].type === type).map(c => c[1]);
 }
 
-function mockCombatContext(targetName, currentHp, maxHp) {
-  vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-    creatures: [{ name: targetName, maxHp: maxHp || 100, currentHp: currentHp }],
-  })
+function popupCall() {
+    const hit = dispatchSpy.mock.calls.find(c => c[0]?.type === 'healing-popup');
+    return hit ? hit[0] : undefined;
 }
 
-function mockHealingResult(actualHeal, oldHp, newHp) {
-  vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal, oldHp, newHp })
-}
+const ALLOWED_KEYS = ['hitPoints', 'currentHitPoints', 'activeConditions'];
 
-describe('healService', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-      if (key === 'activeConditions' || key === 'targetEffects') return []
-      return undefined
-    })
-    vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null)
-    vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue(null)
-  })
+beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // explicit re-seed every test: monster Target at 30/100, no stored conditions,
+    // zero healing bonuses.
+    reads = [];
+    store = new Map([['Target|activeConditions|' + CAMPAIGN, []]]);
+    getRuntimeValue.mockImplementation((entity, key, campaign) => {
+        if (!ALLOWED_KEYS.includes(key)) {
+            throw new Error(`unexpected store key read: ${key} (heal reads only ${ALLOWED_KEYS.join('/')})`);
+        }
+        if (campaign !== CAMPAIGN) {
+            throw new Error(`unexpected store read campaign: ${campaign}`);
+        }
+        reads.push(key);
+        return store.get(`${entity}|${key}|${campaign}`);
+    });
+    combatCtx = { creatures: [{ name: 'Target', type: 'npc', currentHp: 30, maxHp: 100 }] };
+    getCombatContext.mockResolvedValue(combatCtx);
+    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
+});
 
-  describe('triggerHeal', () => {
-    it('returns null when targetName is missing', async () => {
-      const result = await triggerHeal(makeSpell(), {}, makePlayerStats(), CAMPAIGN, null)
-      expect(result).toBeNull()
-    })
+afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+});
 
-    it('returns null when combat context is null', async () => {
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-      expect(result).toBeNull()
-    })
+describe('healService.triggerHeal', () => {
+    it.each([
+        ['real-disk near-miss Healing Word', diskRow(spells5e, 'Healing Word'), 'Target'],
+        ['real-disk near-miss Cure Wounds', diskRow(spells5e, 'Cure Wounds'), 'Target'],
+        ['real-disk near-miss Mass Heal', diskRow(spells5e, 'Mass Heal'), 'Target'],
+        ['lowercase name heal (case-sensitive gate)', { name: 'heal' }, 'Target'],
+        ['missing name', {}, 'Target'],
+        ['null name', { name: null }, 'Target'],
+        ['targetName undefined', heal5e, undefined],
+        ['targetName empty string', heal5e, ''],
+    ])('returns null for %s and touches nothing downstream', async (_label, spell, targetName) => {
+        const result = await triggerHeal(spell, { targetName }, playerStats, CAMPAIGN, null);
+        expect(result).toBeNull();
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(reads).toEqual([]);
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        expect(consoleSpy).not.toHaveBeenCalled();
+    });
 
-    it('returns null when target creature is not found', async () => {
-      mockCombatContext('OtherCreature', 50, 100)
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-      expect(result).toBeNull()
-    })
+    it.each([
+        ['null combat context', null],
+        ['target not found in combatSummary (exact-name match)', { creatures: [{ name: 'OtherCreature', currentHp: 10, maxHp: 50 }] }],
+    ])('returns null without healing or dispatching when %s', async (_label, ctx) => {
+        getCombatContext.mockResolvedValue(ctx);
+        const result = await triggerHeal(heal5e, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
+        expect(result).toBeNull();
+        expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+    });
 
-    it('applies healing and posts log entry when combat context and target exist', async () => {
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
+    it('main path (disk 5e row, slot 6, npc 30/100): exact tuples, envelopes, events, identity pins', async () => {
+        const result = await triggerHeal(heal5e, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
 
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+        const [statsArg, ctxArg] = resolveHealingBonusesWithDetails.mock.calls[0];
+        expect(statsArg).toBe(playerStats);
+        expect(ctxArg).toEqual({ prof: 4, level: 5, slotLevel: 6, campaignName: CAMPAIGN });
+        expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', 70, CAMPAIGN);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
 
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledTimes(1)
-      expect(result).not.toBeNull()
-      expect(result.targetName).toBe('Target')
-      expect(result.healAmount).toBe(70)
-    })
+        expect(logsOfType('hp_change')).toEqual([{
+            type: 'hp_change',
+            targetName: 'Target',
+            delta: 70,
+            currentHp: 100,
+            maxHp: 100,
+            isHealing: true,
+            sourceName: 'TestCaster',
+            note: 'Heal',
+            formula: '70',
+            bonusDetails: undefined,
+            timestamp: 0,
+        }]);
 
-    it('removes Blinded, Deafened, and Poisoned conditions from target', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['Blinded', 'Deafened', 'Poisoned', 'Prone'])
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
+        expect(result).toEqual({
+            targetName: 'Target',
+            healAmount: 70,
+            formula: '70',
+            rolls: [],
+            rawTotal: 70,
+            bonusHeal: 0,
+            bonusDetails: [],
+        });
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+        const events = dispatchSpy.mock.calls.map(c => c[0]);
+        expect(events.map(e => e.type)).toEqual(['combat-summary-updated', 'healing-popup']);
+        expect(events[1].detail).toEqual({
+            targetName: 'Target',
+            sourceName: 'TestCaster',
+            healingName: 'Heal',
+            rollInfo: '',
+            maximizeHealingDice: false,
+            popupText: 'Heal on Target: Regained 70 HP',
+        });
+    });
 
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'Target',
-        'activeConditions',
-        ['Prone'],
-        CAMPAIGN,
-      )
-    })
+    it('upcast disk lv7 + bonus composition: ladder 80, Bless 10 stacks to 90, log formula exact', async () => {
+        resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 10, details: [{ name: 'Bless', amount: 10 }] });
+        combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp: 10, maxHp: 100 }];
 
-    it('logs condition removal entries for each removed condition', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
-        if (key === 'activeConditions') return ['Blinded', 'Deafened', 'Poisoned']
-        return undefined
-      })
-      mockCombatContext('Target', 30, 100)
+        const result = await triggerHeal({ ...heal2024, level: 7 }, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+        expect(resolveHealingBonusesWithDetails.mock.calls[0][1]).toEqual({ prof: 4, level: 5, slotLevel: 7, campaignName: CAMPAIGN });
+        expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', 90, CAMPAIGN);
+        expect(logsOfType('hp_change')[0]).toMatchObject({ formula: '80 + (10 Bless)', delta: 90, currentHp: 100, maxHp: 100 });
+        expect(result).toEqual({
+            targetName: 'Target',
+            healAmount: 90,
+            formula: '80',
+            rolls: [],
+            rawTotal: 90,
+            bonusHeal: 10,
+            bonusDetails: [{ name: 'Bless', amount: 10 }],
+        });
+        expect(popupCall().detail.popupText).toBe('Heal on Target: Regained 90 HP');
+    });
 
-      const conditionCalls = logService.addEntry.mock.calls.filter(call => call[1]?.type === 'condition')
-      expect(conditionCalls.length).toBe(3)
-      const conditionsRemoved = conditionCalls.map(call => call[1].condition)
-      expect(conditionsRemoved).toContain('Blinded')
-      expect(conditionsRemoved).toContain('Deafened')
-      expect(conditionsRemoved).toContain('Poisoned')
+    it.each([
+        ['slot 10 not on the disk table: base falls back to highest tier 100 but result.formula reports the 70 quirk (healService.js:52 vs :148)', { ...heal5e, level: 10 }, 200, 0, 100, '70', '70'],
+        ['spell with no heal_at_slot_level at all: hardcoded 70 default', { name: 'Heal', level: 6 }, 100, 30, 70, '70', '70'],
+    ])('base-amount fallbacks — %s', async (_label, spell, maxHp, currentHp, expectedHeal, expectedResultFormula, expectedLogFormula) => {
+        combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp, maxHp }];
 
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'Target',
-        'activeConditions',
-        [],
-        CAMPAIGN,
-      )
-    })
+        const result = await triggerHeal(spell, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
 
-    it('does not remove conditions that are not present', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['Prone', 'Restrained'])
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
+        expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', expectedHeal, CAMPAIGN);
+        expect(result.healAmount).toBe(expectedHeal);
+        expect(result.formula).toBe(expectedResultFormula);
+        expect(logsOfType('hp_change')[0].formula).toBe(expectedLogFormula);
+    });
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+    it('rejects with exact Error and exact-prefix console.error when the slot literal is non-numeric (synthetic row; disk is always numeric), before any store read', async () => {
+        const spell = { ...heal5e, heal_at_slot_level: { 6: 'seventy' } };
 
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalled()
-    })
+        await expect(triggerHeal(spell, { targetName: 'Target' }, playerStats, CAMPAIGN, null))
+            .rejects.toThrow('heal_at_slot_level expression must be a valid number for heal spell');
 
-    it('uses heal_at_slot_level for different slot levels', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        return undefined
-      })
-      mockCombatContext('Target', 10, 100)
+        expect(consoleSpy).toHaveBeenCalledWith('[heal] triggerHeal: heal_at_slot_level expression is not a valid number:', 'seventy');
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(reads).toEqual([]);
+        expect(dispatchSpy).not.toHaveBeenCalled();
+    });
 
-      const spell = makeSpell({ level: 7, heal_at_slot_level: { 6: '70', 7: '80', 8: '90', 9: '100' } })
-      const result = await triggerHeal(spell, { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+    it('coerces prof||0 and level||1 into the bonus context when playerStats omits them', async () => {
+        await triggerHeal(heal5e, { targetName: 'Target' }, { name: 'TestCaster' }, CAMPAIGN, null);
 
-      expect(result).not.toBeNull()
-      expect(result.healAmount).toBe(80)
-      expect(result.formula).toBe('80')
-    })
+        expect(resolveHealingBonusesWithDetails).toHaveBeenCalledWith(
+            { name: 'TestCaster' },
+            { prof: 0, level: 1, slotLevel: 6, campaignName: CAMPAIGN },
+        );
+    });
 
-    it('caps healing at max HP', async () => {
-      mockCombatContext('Target', 95, 100)
-      mockHealingResult(5, 95, 100)
+    it.each([
+        // label, spell, stored conditions, creature HP, expectWrite (null = no write), expectLogged, expectApply
+        ['A: 5e default hardcoded list + over-log quirk — only Blinded stored yet all three names are logged (healService.js:32-33)',
+            heal5e, ['Blinded', 'Prone'], [30, 100], ['Prone'], ['Blinded', 'Deafened', 'Poisoned'], 70],
+        ['B: 2024 disk status_effects drive the removal list',
+            heal2024, ['Deafened', 'Charmed'], [30, 100], ['Charmed'], ['Blinded', 'Deafened', 'Poisoned'], 70],
+        ['C: no matching conditions — zero writes, zero condition logs',
+            heal5e, ['Prone', 'Restrained'], [30, 100], null, [], 70],
+        ['D: target at full HP — no healing applied yet Blinded is still cleared (condition removal is outside the actualHeal>0 gate) and the over-log fires even with zero HP healed',
+            heal5e, ['Blinded'], [100, 100], [], ['Blinded', 'Deafened', 'Poisoned'], null],
+    ])('condition removal — %s', async (_label, spell, stored, [currentHp, maxHp], expectWrite, expectLogged, expectApply) => {
+        combatCtx.creatures = [{ name: 'Target', type: 'npc', currentHp, maxHp }];
+        seed('Target', 'activeConditions', stored);
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+        await triggerHeal(spell, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
 
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Target',
-        5,
-        CAMPAIGN,
-      )
-    })
+        if (expectWrite === null) {
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        } else {
+            expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+            expect(setRuntimeValue).toHaveBeenCalledWith('Target', 'activeConditions', expectWrite, CAMPAIGN);
+        }
+        expect(logsOfType('condition')).toEqual(expectLogged.map(condition => ({
+            type: 'condition',
+            action: 'removed',
+            characterName: 'Target',
+            condition,
+            reason: 'Heal',
+            timestamp: 0,
+        })));
+        if (expectApply === null) {
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            // popup is honest (names only ACTUALLY-stored removals) even while the log over-reports
+            expect(popupCall().detail.popupText).toBe('Heal on Target: Already at full HP Also removed: Blinded.');
+        } else {
+            expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', expectApply, CAMPAIGN);
+        }
+    });
 
-    it('does not apply healing when target is already at max HP', async () => {
-      mockCombatContext('Target', 100, 100)
-      mockHealingResult(0, 100, 100)
+    it.each([
+        // label, creature, store seeds, expectApply (null = not called), expectTriple
+        ['A: player full-deficit — runtime hitPoints 122 beats combatSummary stub maxHp:1, heal 70 lands under cap',
+            { name: 'Target', type: 'player', currentHp: 1, maxHp: 1 }, { hitPoints: 122, currentHitPoints: 50 }, 70, { delta: 70, currentHp: 120, maxHp: 122 }],
+        ['B: player capped at runtime deficit 79-75',
+            { name: 'Target', type: 'player', currentHp: 1, maxHp: 1 }, { hitPoints: 79, currentHitPoints: 75 }, 4, { delta: 4, currentHp: 79, maxHp: 79 }],
+        ['C: player zero-deficit — never negative, popup reports full HP, no hp_change log',
+            { name: 'Target', type: 'player', currentHp: 1, maxHp: 1 }, { hitPoints: 122, currentHitPoints: 122 }, null, null],
+        ['D: currentHitPoints empty string falls back to creature stub (the :69-vs-:65 guard asymmetry)',
+            { name: 'Target', type: 'player', currentHp: 1, maxHp: 1 }, { hitPoints: 50, currentHitPoints: '' }, 49, { delta: 49, currentHp: 50, maxHp: 50 }],
+        ['E: monster keeps combatSummary HP (runtime hitPoints never read)',
+            { name: 'Animated Rug of Smothering 1', type: 'npc', currentHp: 16, maxHp: 27 }, {}, 11, { delta: 11, currentHp: 27, maxHp: 27 }],
+    ])('SP-060 HP resolution — %s', async (_label, creature, seeds, expectApply, expectTriple) => {
+        combatCtx.creatures = [creature];
+        Object.entries(seeds).forEach(([key, value]) => seed(creature.name, key, value));
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
+        const result = await triggerHeal(heal5e, { targetName: creature.name }, playerStats, CAMPAIGN, null);
 
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
-    })
+        if (expectApply === null) {
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(logsOfType('hp_change')).toEqual([]);
+            expect(result.healAmount).toBe(0);
+            expect(result.rawTotal).toBe(0);
+            expect(popupCall().detail.popupText).toBe(`Heal on ${creature.name}: Already at full HP`);
+            expect(popupCall().detail.popupText).not.toMatch(/-/);
+        } else {
+            expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, creature.name, expectApply, CAMPAIGN);
+            expect(result.healAmount).toBe(expectApply);
+            expect(logsOfType('hp_change')[0]).toMatchObject(expectTriple);
+        }
+        const expectedReads = creature.type === 'player'
+            ? ['hitPoints', 'currentHitPoints', 'activeConditions']
+            : ['currentHitPoints', 'activeConditions'];
+        expect(reads).toEqual(expectedReads);
+    });
 
-    it('dispatches combat-summary-updated event', async () => {
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
+    it('undead/construct exclusion from the 5e disk description is NOT implemented — undead are healed (reported gap; pinning current behavior)', async () => {
+        combatCtx.creatures = [{ name: 'Target', type: 'undead', currentHp: 30, maxHp: 100 }];
 
-      const dispatchEventSpy = vi.fn()
-      const originalWindow = globalThis.window
-      Object.defineProperty(globalThis, 'window', { value: { dispatchEvent: dispatchEventSpy }, writable: true })
+        const result = await triggerHeal(heal5e, { targetName: 'Target' }, playerStats, CAMPAIGN, null);
 
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }))
-      globalThis.window = originalWindow
-    })
-  })
-
-  describe('SP-060 player HP resolution (runtime canonical, combatSummary stub maxHp:1)', () => {
-    function mockPlayerStubContext(targetName, currentHp = 1, maxHp = 1) {
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: targetName, type: 'player', currentHp, maxHp }],
-      })
-    }
-
-    it('resolves player maxHp from runtime hitPoints, not combatSummary stub, and heals full deficit', async () => {
-      mockPlayerStubContext('Target')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        if (key === 'hitPoints') return 122
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      mockHealingResult(70, 50, 120)
-
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Target',
-        70,
-        CAMPAIGN,
-      )
-      expect(result.healAmount).toBe(70)
-      const popup = dispatchEventSpy.mock.calls.find(c => c[0]?.type === 'healing-popup')
-      expect(popup[0].detail.popupText).toContain('Regained 70 HP')
-      dispatchEventSpy.mockRestore()
-    })
-
-    it('logs hp_change with runtime-resolved maxHp for players', async () => {
-      mockPlayerStubContext('Target')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        if (key === 'hitPoints') return 122
-        if (key === 'currentHitPoints') return 50
-        return undefined
-      })
-      mockHealingResult(70, 50, 120)
-
-      await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      const hpLog = logService.addEntry.mock.calls.find(call => call[1]?.type === 'hp_change')
-      expect(hpLog).toBeDefined()
-      expect(hpLog[1].delta).toBe(70)
-      expect(hpLog[1].maxHp).toBe(122)
-      expect(hpLog[1].currentHp).toBe(120)
-    })
-
-    it('shows "Already at full HP" popup (never negative) when runtime deficit is zero', async () => {
-      mockPlayerStubContext('Target')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        if (key === 'hitPoints') return 122
-        if (key === 'currentHitPoints') return 122
-        return undefined
-      })
-
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled()
-      expect(result.healAmount).toBe(0)
-      const popup = dispatchEventSpy.mock.calls.find(c => c[0]?.type === 'healing-popup')
-      expect(popup[0].detail.popupText).toContain('Already at full HP')
-      expect(popup[0].detail.popupText).not.toMatch(/-/g)
-      dispatchEventSpy.mockRestore()
-    })
-
-    it('caps player healing at runtime maxHp minus runtime current HP', async () => {
-      mockPlayerStubContext('Target')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        if (key === 'hitPoints') return 79
-        if (key === 'currentHitPoints') return 75
-        return undefined
-      })
-      mockHealingResult(4, 75, 79)
-
-      const result = await triggerHeal(makeSpell(), { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Target',
-        4,
-        CAMPAIGN,
-      )
-      expect(result.healAmount).toBe(4)
-    })
-
-    it('keeps monster healing path on combatSummary HP unchanged', async () => {
-      vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
-        creatures: [{ name: 'Animated Rug of Smothering 1', type: 'npc', currentHp: 16, maxHp: 27 }],
-      })
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions' || key === 'targetEffects') return []
-        return undefined
-      })
-      mockHealingResult(11, 16, 27)
-
-      const result = await triggerHeal(makeSpell(), { targetName: 'Animated Rug of Smothering 1' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        expect.any(Object),
-        'Animated Rug of Smothering 1',
-        11,
-        CAMPAIGN,
-      )
-      expect(result.healAmount).toBe(11)
-    })
-  })
-
-  describe('triggerHeal with status_effects from 2024 ruleset', () => {
-    it('removes conditions listed in status_effects', async () => {
-      vi.mocked(runtime.getRuntimeValue).mockReturnValue(['Blinded', 'Deafened', 'Poisoned', 'Charmed'])
-      mockCombatContext('Target', 30, 100)
-      mockHealingResult(70, 30, 100)
-
-      const spell2024 = makeSpell({ status_effects: ['Blinded', 'Deafened', 'Poisoned'] })
-      await triggerHeal(spell2024, { targetName: 'Target' }, makePlayerStats(), CAMPAIGN, null)
-
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'Target',
-        'activeConditions',
-        ['Charmed'],
-        CAMPAIGN,
-      )
-    })
-  })
-})
+        expect(applyHealingToTarget).toHaveBeenCalledWith(combatCtx, 'Target', 70, CAMPAIGN);
+        expect(result.healAmount).toBe(70);
+    });
+});

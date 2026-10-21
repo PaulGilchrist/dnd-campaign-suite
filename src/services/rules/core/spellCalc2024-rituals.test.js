@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 
 // ── Module-level mocks for all ESM dependencies ──
@@ -39,83 +40,63 @@ function makeSpell(name, level = 0, extra = {}) {
 }
 
 describe('spellCalc2024-rituals', () => {
-  beforeEach(async () => {
-    vi.resetAllMocks();
-    await import('../../../hooks/runtime/useRuntimeState.js');
-    await import('../../character/classRules2024.js');
-  });
+  describe('getSpellAbilities — applyRitualSpellPassives lane', () => {
+    // FT-068 Ritual Master chosenSpells injection and _ritualMasterRitual stamps are
+    // owned by spellCalc2024-ritualMaster.test.js (injection :127, stamps :152,
+    // zero-caster container :208) — not re-run here.
 
-  describe('getSpellAbilities', () => {
-    // ── Automation: Ritual Adept (wizard class feature) ──
-
-    it('does not inject every ritual spell for the wizard Ritual Adept class feature — only known spells appear', () => {
+    // Both no-injection guards: empty ritualSpells array (early return) and the
+    // wizard Ritual Adept class feature (known rituals already live in the spellbook;
+    // injecting the full game list here would flood the sheet).
+    it.each([
+      ['empty ritualSpells array', []],
+      ['wizard Ritual Adept class feature', [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }]],
+    ])('injects no unknown ritual spells for %s', (_label, ritualSpells) => {
       const allSpells = [
         makeSpell('Fire Bolt', 0, { ritual: false }),
         makeSpell('Alarm', 1, { ritual: true }),
+        makeSpell('Detect Magic', 1, { ritual: true }),
         makeSpell('Find Familiar', 1, { ritual: true }),
-        makeSpell('Detect Magic', 1, { ritual: true, classes: ['Bard', 'Cleric'] }),
+      ];
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt', 'Alarm'];
+      stats.automation = { ritualSpells };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      // Final rows are sorted by level then name; only the known spells remain,
+      // as ordinary prepared wizard rows.
+      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Alarm']);
+      expect(result.spells.find(s => s.name === 'Alarm').prepared).toBe('Prepared');
+    });
+
+    // Generic full-list injection (e.g. the Ritual Caster feat), including the dedup
+    // path: known rituals are never injected twice nor re-stamped as always-prepared.
+    it('injects every unlearned ritual spell as an always-prepared row for other ritual_spells features like the Ritual Caster feat', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0, { ritual: false }),
+        makeSpell('Alarm', 1, { ritual: true }),
+        makeSpell('Detect Magic', 1, { ritual: true }),
+        makeSpell('Find Familiar', 1, { ritual: true }),
       ];
       const stats = makePlayerStats();
       stats.spells = ['Fire Bolt', 'Alarm'];
       stats.automation = {
-        ritualSpells: [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Fire Bolt');
-      expect(names).toContain('Alarm');
-      expect(names).not.toContain('Find Familiar');
-      expect(names).not.toContain('Detect Magic');
-    });
-
-    it('still injects all ritual spells for other ritual_spells features like the Ritual Caster feat', () => {
-      const allSpells = [
-        makeSpell('Fire Bolt', 0, { ritual: false }),
-        makeSpell('Alarm', 1, { ritual: true }),
-        makeSpell('Find Familiar', 1, { ritual: true }),
-      ];
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = {
         ritualSpells: [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Caster', hasAutomation: true }],
       };
 
       const result = getSpellAbilities(allSpells, stats);
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Fire Bolt');
-      expect(names).toContain('Alarm');
-      expect(names).toContain('Find Familiar');
-    });
-
-    it('deduplicates ritual spells already in known list', () => {
-      const allSpells = [makeSpell('Alarm', 1, { ritual: true })];
-      const stats = makePlayerStats();
-      stats.spells = ['Alarm'];
-      stats.automation = {
-        ritualSpells: [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Caster', hasAutomation: true }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      expect(result.spells.filter(s => s.name === 'Alarm').length).toBe(1);
-    });
-
-    it('does not add ritual spells when ritualSpells array is empty', () => {
-      const allSpells = [
-        makeSpell('Fire Bolt', 0, { ritual: false }),
-        makeSpell('Alarm', 1, { ritual: true }),
-      ];
-      const stats = makePlayerStats();
-      stats.spells = ['Fire Bolt'];
-      stats.automation = { ritualSpells: [] };
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).not.toContain('Alarm');
+      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Alarm', 'Detect Magic', 'Find Familiar']);
+      const alarmRows = result.spells.filter(s => s.name === 'Alarm');
+      expect(alarmRows).toHaveLength(1);
+      expect(alarmRows[0].prepared).toBe('Prepared');
+      for (const name of ['Detect Magic', 'Find Familiar']) {
+        const row = result.spells.find(s => s.name === name);
+        expect(row.prepared).toBe('Always');
+        expect(row.level).toBe(1);
+        expect(row.ritual).toBe(true);
+      }
     });
   });
 });

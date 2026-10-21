@@ -1,7 +1,18 @@
-// CLA-118 regression: the Wood Elf lineage speed grant must seed from the
-// race JSON base when the loaded summary carries no speed, and race.subrace
-// must outrank a stale runtime _elfishLineageSelection.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// CLA-118 unit lane for speedUtils.applyElfisLineageSpeed ONLY: the seed
+// arithmetic (base = playerStats.speed ?? race.speed), the zero-bonus
+// passthrough, and the no-base error branch.
+// Cited-by / ownership split:
+// - elfishLineageHandler.test.js — resolveElfishLineage precedence
+//   (subrace > stale runtime; runtime fallback) and every
+//   elfishLineageSpeedBonus() guard (trait gating, non-Wood-Elf,
+//   5e absolute subrace speed, missing speedBonus).
+// - speedUtils.cla201-race-speed-fold.test.js — applySpeedIncreasePassives
+//   fold + no-base guard, resolveHalfSpeedFeet.
+// - rules-playerStats-senses-speed.test.js (#1259) — the +5 grant
+//   end-to-end through rules.getPlayerStats (handler mocked there;
+//   real handler runs here so the 30 → 35 seam is pinned unmocked).
+import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
@@ -9,10 +20,9 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-import { applyElfisLineageSpeed, applySpeedIncreasePassives } from './speedUtils.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { applyElfisLineageSpeed } from './speedUtils.js';
 
-const elfishRow = {
+const woodElfTraitRow = {
     type: 'elfish_lineage',
     options: [
         { name: 'Drow', spellcastingAbility: 'CHA', cantrip: 'Dancing Lights', level3Spell: 'Faerie Fire', level5Spell: 'Darkness', darkvisionRange: '120' },
@@ -21,53 +31,39 @@ const elfishRow = {
     ],
 };
 
-const woodElfStats = (overrides = {}) => ({
+const elfStats = (overrides = {}) => ({
     name: 'ElfTest',
     speed: undefined,
     race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf' } },
-    automation: { passives: [], specialActions: [elfishRow] },
+    automation: { passives: [], specialActions: [woodElfTraitRow] },
     ...overrides,
 });
 
 describe('applyElfisLineageSpeed (CLA-118)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue(null);
+
+    it('seeds the +5 grant from the race JSON base when the summary carries no speed', () => {
+        expect(applyElfisLineageSpeed(elfStats(), { campaignName: 'test-campaign' })).toBe(35);
     });
 
-    it('grants +5 onto the race JSON base when the summary has no speed (Wood Elf, no runtime key)', () => {
-        const stats = woodElfStats();
-        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBe(35);
+    it('seeds from the summary speed when present, not the race JSON base', () => {
+        // speed 40 (e.g. magic-item layer) must outrank race.speed 30 —
+        // reading the wrong side of `??` here would show 35, not 45.
+        const stats = elfStats({ speed: 40 });
+        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBe(45);
     });
 
-    it('keeps the summary speed as the base when present', () => {
-        const stats = woodElfStats({ speed: 30 });
-        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBe(35);
+    it('passes speed through unchanged when the bonus guard denies the grant', () => {
+        // Guard truth table lives in elfishLineageHandler.test.js; here only
+        // the speedUtils `!bonus` passthrough matters: 30 stays 30, never 35.
+        const stats = elfStats({ speed: 30, race: { name: 'Elf', speed: 30, subrace: { name: 'Drow' } } });
+        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBe(30);
     });
 
-    it('ignores a stale runtime Wood Elf selection when subrace is Drow', () => {
-        getRuntimeValue.mockImplementation((name, key) => (key === '_elfishLineageSelection' ? 'Wood Elf' : null));
-        const stats = woodElfStats({ race: { name: 'Elf', speed: 30, subrace: { name: 'Drow' } } });
+    it('logs an error and leaves speed undefined when there is no base speed to grant onto', () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const stats = elfStats({ race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
         expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBeUndefined();
-    });
-
-    it('applies the runtime selection when no subrace is persisted', () => {
-        getRuntimeValue.mockImplementation((name, key) => (key === '_elfishLineageSelection' ? 'Wood Elf' : null));
-        const stats = woodElfStats({ race: { name: 'Elf', speed: 30 } });
-        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBe(35);
-    });
-
-    it('does not stack the bonus onto a 5e subrace absolute speed (no elfish_lineage trait row)', () => {
-        const stats = woodElfStats({
-            race: { name: 'Elf', speed: 30, subrace: { name: 'Wood Elf', speed: 35 } },
-            automation: { passives: [], specialActions: [] },
-        });
-        expect(applyElfisLineageSpeed(stats, { campaignName: 'test-campaign' })).toBeUndefined();
-    });
-
-    it('still applies passive speed_increase after the lineage grant', () => {
-        const stats = woodElfStats({ speed: applyElfisLineageSpeed(woodElfStats(), { campaignName: 'test-campaign' }) });
-        stats.automation.passives = [{ type: 'passive_buff', effect: 'speed_increase', bonusExpression: '10' }];
-        expect(applySpeedIncreasePassives(stats)).toBe(45);
+        expect(spy).toHaveBeenCalled();
+        spy.mockRestore();
     });
 });

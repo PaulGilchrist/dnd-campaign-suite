@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { triggerCrownOfMadness } from './crownOfMadnessService.js';
 import { executeHandler } from '../../automation/index.js';
-import { getCombatContext, getTargetFromAttacker } from "../combat/damageUtils.js";
+import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { getMonsterData } from '../../npcs/monsterUtils.js';
 
 vi.mock('../../automation/index.js', () => ({
@@ -17,11 +18,15 @@ vi.mock('../../npcs/monsterUtils.js', () => ({
     getMonsterData: vi.fn(),
 }));
 
+// Base lane: trigger-level behavior of triggerCrownOfMadness — the name gate,
+// target resolution (explicit metaCtx passthrough, initiative-view fallback,
+// every no-target face), the exact action envelope on the happy path
+// (Humanoid monster-data mock, saveDc 15, advantage true, slotLevel default 2),
+// and result/error handling. Helper-internal branches (non-Humanoid rejections,
+// humanoid defaults, DC override tiers, slotLevel 5/3, advantage false,
+// monster-data warning) live in crownOfMadnessService.helpers.test.js —
+// not repeated here.
 describe('crownOfMadnessService', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     const campaignName = 'TestCampaign';
     const mapName = 'testMap';
     const baseSpell = { name: 'Crown of Madness' };
@@ -31,411 +36,207 @@ describe('crownOfMadnessService', () => {
         proficiency: 4,
     };
 
-    describe('triggerCrownOfMadness', () => {
-        describe('spell name matching', () => {
-            it.each([
-                ['Crown of Madness'],
-                ['crown of madness'],
-                ['CROWN OF MADNESS'],
-                ['CrOwN oF mAdNeSs'],
-            ])('triggers for "%s" spell name (case-insensitive)', async (name) => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+    const NO_TARGET_POPUP = {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: 'Crown of Madness',
+            description: 'No target selected for Crown of Madness.',
+        },
+    };
+    const NO_TARGET_LOG = '[crownOfMadnessService] No target selected for Crown of Madness by Wizard. Caster has no target in initiative view.';
 
-                const result = await triggerCrownOfMadness(
-                    { name, level: 2 },
-                    {},
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+    let consoleError;
 
-                expect(executeHandler).toHaveBeenCalledTimes(1);
-                expect(result).toEqual({ type: 'popup' });
-            });
+    beforeEach(() => {
+        vi.clearAllMocks();
+        consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
+    });
 
-            it.each([
-                'Crown of Sorrow',
-                'Madness',
-                'Crown',
-                'Burning Hands',
-                '',
-                undefined,
-                null,
-            ])('returns null for non-Crown of Madness spell: "%s"', async (name) => {
-                const result = await triggerCrownOfMadness(
-                    { name, level: 1 },
-                    {},
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+    afterEach(() => {
+        consoleError.mockRestore();
+    });
 
-                expect(result).toBeNull();
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
+    describe('spell name gate', () => {
+        it.each([
+            'crown of madness',
+            'CrOwN oF mAdNeSs',
+        ])('triggers for "%s" (case-insensitive), resolving the target via the initiative view', async (name) => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+            const context = { creatures: [{ name: 'Goblin' }] };
+            getCombatContext.mockResolvedValue(context);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+
+            const result = await triggerCrownOfMadness(
+                { name, level: 2 },
+                {},
+                baseStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(getTargetFromAttacker).toHaveBeenCalledWith(context, 'Wizard');
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ targetName: 'Goblin' }),
+                }),
+                baseStats,
+                campaignName,
+                mapName,
+            );
+            expect(result).toEqual({ type: 'popup' });
         });
 
-        describe('target resolution', () => {
-            it('uses metaCtx.targetName when provided', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+        it.each([
+            'Crown of Sorrow',
+            'Madness',
+            '',
+            undefined,
+        ])('returns null without touching the handler for non-Crown spell "%s"', async (name) => {
+            const result = await triggerCrownOfMadness(
+                { name, level: 1 },
+                {},
+                baseStats,
+                campaignName,
+                mapName,
+            );
 
-                await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+    });
 
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ targetName: 'Goblin' }),
-                    }),
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-            });
+    describe('target resolution', () => {
+        it('passes metaCtx.targetName straight through without consulting the initiative view', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
 
-            it('returns popup when no targetName and no combat context', async () => {
-                getCombatContext.mockResolvedValue(null);
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                { targetName: 'Goblin' },
+                baseStats,
+                campaignName,
+                mapName,
+            );
 
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: null },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('returns popup when no targetName and empty creatures list', async () => {
-                getCombatContext.mockResolvedValue({ creatures: [] });
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: null },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('logs error when no target selected from combat context when targetName is missing', async () => {
-                getCombatContext.mockResolvedValue({
-                    creatures: [
-                        { name: 'Wizard', type: 'player' },
-                        { name: 'Goblin', type: 'npc' },
-                    ],
-                });
-                getTargetFromAttacker.mockReturnValue(null);
-                const consoleSpy = vi.spyOn(console, 'error');
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: null },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[crownOfMadnessService] No target selected for Crown of Madness'),
-                );
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-                consoleSpy.mockRestore();
-            });
-
-            it('returns popup when all creatures match the caster name', async () => {
-                getCombatContext.mockResolvedValue({
-                    creatures: [
-                        { name: 'Wizard', type: 'player' },
-                        { name: 'Wizard', type: 'npc' },
-                    ],
-                });
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: null },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-            });
-
-            it('logs error when metaCtx is null', async () => {
-                getCombatContext.mockResolvedValue({
-                    creatures: [{ name: 'Goblin', type: 'npc' }],
-                });
-                getTargetFromAttacker.mockReturnValue(null);
-                const consoleSpy = vi.spyOn(console, 'error');
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    null,
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[crownOfMadnessService] No target selected for Crown of Madness'),
-                );
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-                consoleSpy.mockRestore();
-            });
-
-            it('logs error when metaCtx is undefined', async () => {
-                getCombatContext.mockResolvedValue({
-                    creatures: [{ name: 'Goblin', type: 'npc' }],
-                });
-                getTargetFromAttacker.mockReturnValue(null);
-                const consoleSpy = vi.spyOn(console, 'error');
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    undefined,
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[crownOfMadnessService] No target selected for Crown of Madness'),
-                );
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-                consoleSpy.mockRestore();
-            });
-
-            it('logs error when metaCtx is empty', async () => {
-                getCombatContext.mockResolvedValue({
-                    creatures: [{ name: 'Goblin', type: 'npc' }],
-                });
-                getTargetFromAttacker.mockReturnValue(null);
-                const consoleSpy = vi.spyOn(console, 'error');
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    {},
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[crownOfMadnessService] No target selected for Crown of Madness'),
-                );
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'No target selected for Crown of Madness.',
-                    },
-                });
-                expect(executeHandler).not.toHaveBeenCalled();
-                consoleSpy.mockRestore();
-            });
+            expect(getTargetFromAttacker).not.toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ targetName: 'Goblin' }),
+                }),
+                baseStats,
+                campaignName,
+                mapName,
+            );
         });
 
-        describe('action structure', () => {
-            it('constructs action with correct type and fields', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                getCombatContext.mockResolvedValue({
-                    creatures: [
-                        { name: 'Wizard', type: 'player' },
-                        { name: 'Goblin', type: 'npc' },
-                    ],
-                });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
+        // One table for every no-target face: each row must land on the same
+        // popup + console.error outcome with the handler never invoked.
+        it.each([
+            ['no combat context', { targetName: null }, null, undefined],
+            ['empty creatures list', { targetName: null }, { creatures: [] }, undefined],
+            ['no target in initiative view', { targetName: null }, { creatures: [{ name: 'Wizard', type: 'player' }, { name: 'Goblin', type: 'npc' }] }, null],
+            ['all creatures named the caster', { targetName: null }, { creatures: [{ name: 'Wizard', type: 'player' }, { name: 'Wizard', type: 'npc' }] }, undefined],
+            ['metaCtx is an empty object', {}, { creatures: [{ name: 'Goblin', type: 'npc' }] }, null],
+            ['metaCtx is null', null, { creatures: [{ name: 'Goblin', type: 'npc' }] }, null],
+            ['metaCtx is undefined', undefined, { creatures: [{ name: 'Goblin', type: 'npc' }] }, null],
+        ])('returns the no-target popup and logs when %s', async (_label, metaCtx, context, attackerTarget) => {
+            getCombatContext.mockResolvedValue(context);
+            getTargetFromAttacker.mockReturnValue(attackerTarget);
 
-                await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                metaCtx,
+                baseStats,
+                campaignName,
+                mapName,
+            );
 
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        name: 'Crown of Madness',
-                        automation: expect.objectContaining({
-                            type: 'crown_of_madness',
-                            saveDc: 15,
-                            targetName: 'Goblin',
-                            advantage: true,
-                        }),
-                        spell: baseSpell,
-                        spellSlotLevel: 2,
-                    }),
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+            expect(result).toEqual(NO_TARGET_POPUP);
+            expect(consoleError).toHaveBeenCalledWith(NO_TARGET_LOG);
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('action envelope', () => {
+        it('builds the exact Crown of Madness action and returns the handler result unchanged', async () => {
+            const expectedResult = {
+                type: 'popup',
+                payload: { type: 'automation_info', name: 'Crown of Madness', description: 'Crown of Madness affects target.' },
+            };
+            executeHandler.mockResolvedValue(expectedResult);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'Wizard', type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                ],
             });
+            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
 
-            it('passes the spell object into the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-                const spell = { name: 'Crown of Madness', level: 2, school: 'Enchantment' };
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                { targetName: 'Goblin' },
+                baseStats,
+                campaignName,
+                mapName,
+            );
 
-                await triggerCrownOfMadness(
-                    spell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+            expect(executeHandler).toHaveBeenCalledWith(
+                {
+                    name: 'Crown of Madness',
+                    automation: { type: 'crown_of_madness', saveDc: 15, targetName: 'Goblin', advantage: true },
+                    spell: baseSpell,
+                    spellSlotLevel: 2,
+                },
+                baseStats,
+                campaignName,
+                mapName,
+            );
+            // the spell object travels through by reference, untouched
+            expect(executeHandler.mock.calls[0][0].spell).toBe(baseSpell);
+            expect(result).toBe(expectedResult);
+        });
+    });
 
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spell }),
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-            });
+    describe('handler result handling', () => {
+        it('returns null when the handler resolves null (no fabricated fallback)', async () => {
+            executeHandler.mockResolvedValue(null);
+
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                { targetName: 'Goblin' },
+                baseStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
 
-        describe('return value', () => {
-            it('returns result from executeHandler on success', async () => {
-                const expectedResult = {
-                    type: 'popup',
-                    payload: { type: 'automation_info', name: 'Crown of Madness', description: 'Crown of Madness affects target.' },
-                };
-                executeHandler.mockResolvedValue(expectedResult);
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
+        it('returns an error popup and logs the identical Error when the handler throws', async () => {
+            const failure = new Error('Handler failed');
+            executeHandler.mockRejectedValue(failure);
 
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                { targetName: 'Goblin' },
+                baseStats,
+                campaignName,
+                mapName,
+            );
 
-                expect(result).toBe(expectedResult);
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Crown of Madness',
+                    description: 'Failed to execute Crown of Madness.',
+                },
             });
-
-            it('returns null when executeHandler returns null', async () => {
-                executeHandler.mockResolvedValue(null);
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
-
-            it('returns error popup when executeHandler throws', async () => {
-                executeHandler.mockRejectedValue(new Error('Handler failed'));
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-                const result = await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Crown of Madness',
-                        description: 'Failed to execute Crown of Madness.',
-                    },
-                });
-            });
-        });
-
-        describe('mapName passthrough', () => {
-            it('passes mapName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-                getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-                await triggerCrownOfMadness(
-                    baseSpell,
-                    { targetName: 'Goblin' },
-                    baseStats,
-                    campaignName,
-                    'otherMap',
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.anything(),
-                    baseStats,
-                    campaignName,
-                    'otherMap',
-                );
-            });
+            expect(consoleError).toHaveBeenCalledWith(
+                '[crownOfMadnessService] Failed to execute Crown of Madness handler:',
+                failure,
+            );
         });
     });
 });

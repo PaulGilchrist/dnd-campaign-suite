@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../ui/dataLoader.js', () => ({
@@ -29,12 +30,14 @@ vi.mock('../../character/race-rules/index.js', () => ({
   rules2024: { getRace: vi.fn(), getSenses: vi.fn(), getTraits: vi.fn() },
 }));
 
+// No getCarryingCapacity stub: rules.js:394-399 routes carryingCapacity through
+// abilityCalc.getHitPoints (capacity pin lives in rules-core.test.js:95-114).
 vi.mock('./abilityCalc.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(),
 }));
 
 vi.mock('./abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(),
 }));
 
 vi.mock('./attackCalc.js', () => ({
@@ -105,6 +108,7 @@ import * as abilityCalc from './abilityCalc.js';
 import * as abilityCalc2024 from './abilityCalc2024.js';
 import * as attackCalc from './attackCalc.js';
 import * as automationService from '../../combat/automation/automationService.js';
+import * as proficiencyUtils from '../../character/proficiencyUtils.js';
 import * as dataLoader from '../../ui/dataLoader.js';
 import * as featBuffService from '../../character/featBuffService.js';
 
@@ -147,15 +151,18 @@ const makePlayerSummary = (overrides = {}) => ({
   ...overrides,
 });
 
+// getPlayerStats replaces playerStats.class with cr.getClass()'s result
+// (rules.js:444), so fighting styles must be pinned on the class mock, not
+// only on the playerSummary.
 const setupDefaults = (overrides = {}) => {
   vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
   classRules.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, ...overrides.class });
   raceRules.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [], ...overrides.race });
-  raceRules.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.traits });
+  raceRules.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
   raceRules.getSenses.mockReturnValue(overrides.senses || []);
   raceRules.getImmunities.mockReturnValue(overrides.immunities || []);
   raceRules.getResistances.mockReturnValue(overrides.resistances || []);
-  classRules.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features });
+  classRules.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
   automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
   automationService.collectSaveModifiers.mockReturnValue({});
   automationService.collectTurnStartEffects.mockReturnValue([]);
@@ -165,7 +172,6 @@ const setupDefaults = (overrides = {}) => {
   automationService.getAllSaveProficiencies.mockReturnValue([]);
   abilityCalc.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
   abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
 };
 
@@ -173,9 +179,9 @@ const setupDefaults2024 = (overrides = {}) => {
   vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
   classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, ...overrides.class });
   raceRules2024.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [], ...overrides.race });
-  raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.traits });
+  raceRules2024.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
   raceRules2024.getSenses.mockReturnValue(overrides.senses || []);
-  classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features });
+  classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] });
   automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
   automationService.collectSaveModifiers.mockReturnValue({});
   automationService.collectTurnStartEffects.mockReturnValue([]);
@@ -185,182 +191,158 @@ const setupDefaults2024 = (overrides = {}) => {
   automationService.getAllSaveProficiencies.mockReturnValue([]);
   abilityCalc2024.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
   abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
 };
 
-const fightStyleCases5e = [
-  { name: 'Interception', style: 'Interception', className: 'Paladin', array: 'reactions', featureName: 'Interception', type: 'interception' },
-  { name: 'Protection', style: 'Protection', className: 'Paladin', array: 'reactions', featureName: 'Protection', type: 'protection' },
-  { name: 'Thrown Weapon Fighting', style: 'Thrown Weapon Fighting', className: 'Fighter', array: 'specialActions', featureName: 'Thrown Weapon Fighting', type: 'thrown_weapon_fighting' },
-  { name: 'Two-Weapon Fighting', style: 'Two-Weapon Fighting', className: 'Fighter', array: 'specialActions', featureName: 'Two-Weapon Fighting', type: 'two_weapon_fighting' },
-  { name: 'Blessed Warrior', style: 'Blessed Warrior', className: 'Cleric', array: 'specialActions', featureName: 'Blessed Warrior', type: 'blessed_warrior' },
-  { name: 'Druidic Warrior', style: 'Druidic Warrior', className: 'Druid', array: 'specialActions', featureName: 'Druidic Warrior', type: 'druidic_warrior' },
-  { name: 'Superior Technique', style: 'Superior Technique', className: 'Battle Master', array: 'specialActions', featureName: 'Combat Superiority', type: 'combat_superiority' },
-];
+const getPlayerStats = (playerSummary) =>
+  rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
 
-describe('rules.getPlayerStats - fighting style reaction features (5e)', () => {
+describe('rules.getPlayerStats - fighting style features (5e)', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it.each(fightStyleCases5e)(
-    'should add $name feature when fighting style "$name" is present',
-    async ({ style, className, array, featureName, type }) => {
-      classRules.getClass.mockReturnValue({ name: className, hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, fightingStyles: [style] });
-      const playerSummary = makePlayerSummary({
-        class: { name: className, fightingStyles: [style] },
-      });
-      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-      const feature = result[array].find((a) => a.name === featureName);
-      expect(feature).toBeDefined();
-      expect(feature.type).toBe(type);
-      expect(feature.hasAutomation).toBe(true);
-    },
-  );
+  it('adds every 5e fighting style reaction/special action with its type and automation payload', async () => {
+    const styles = ['Interception', 'Protection', 'Thrown Weapon Fighting', 'Two-Weapon Fighting', 'Blessed Warrior', 'Druidic Warrior', 'Superior Technique'];
+    classRules.getClass.mockReturnValue({ name: 'Paladin', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, fightingStyles: styles });
+    const result = await getPlayerStats(makePlayerSummary());
 
-  it('should add both Interception and Protection reactions when both styles are present', async () => {
-    classRules.getClass.mockReturnValue({ name: 'Paladin', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, fightingStyles: ['Interception', 'Protection'] });
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Paladin', fightingStyles: ['Interception', 'Protection'] },
+    // Exact arrays pin which builder ran, alphabetical order after
+    // rules.js:127 sortActionArrays, and the 5e reaction push order.
+    expect(result.reactions.map((r) => r.name)).toEqual(['Interception', 'Protection']);
+    expect(result.specialActions.map((a) => a.name)).toEqual([
+      'Blessed Warrior', 'Combat Superiority', 'Druidic Warrior', 'Thrown Weapon Fighting', 'Two-Weapon Fighting',
+    ]);
+
+    const byName = (array, name) => result[array].find((f) => f.name === name);
+    expect(byName('reactions', 'Interception')).toMatchObject({
+      type: 'interception', hasAutomation: true,
+      automation: { type: 'interception', trigger: 'ally_within_5ft_attacked', range: '5_ft', damageExpression: '1d10', damageBonusExpression: 'proficiency_bonus', requiresShield: true },
     });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.reactions.find((r) => r.name === 'Interception')).toBeDefined();
-    expect(result.reactions.find((r) => r.name === 'Protection')).toBeDefined();
+    expect(byName('reactions', 'Protection')).toMatchObject({
+      type: 'protection', hasAutomation: true,
+      automation: { type: 'reaction_debuff', trigger: 'creature_attacks_ally_within_5ft_while_holding_shield', effect: 'disadvantage_on_attacks_vs_ally', duration: 'until_start_of_next_turn', requiresShield: true },
+    });
+    for (const [name, effect] of [
+      ['Thrown Weapon Fighting', 'thrown_weapon_fighting'],
+      ['Two-Weapon Fighting', 'two_weapon_fighting'],
+      ['Blessed Warrior', 'blessed_warrior'],
+      ['Druidic Warrior', 'druidic_warrior'],
+    ]) {
+      expect(byName('specialActions', name)).toMatchObject({
+        type: effect, hasAutomation: true,
+        automation: { type: 'passive_rule', effect },
+      });
+    }
+    expect(byName('specialActions', 'Combat Superiority')).toMatchObject({
+      type: 'combat_superiority', hasAutomation: true,
+      automation: { type: 'combat_superiority', dieExpression: '6', uses_max: 1, saveDc: 'ability', saveAbility: ['STR', 'DEX'] },
+    });
   });
 });
 
-describe('rules.getPlayerStats - fighting style reaction features (2024)', () => {
+describe('rules.getPlayerStats - fighting style features (2024)', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults2024(); });
 
-  it.each([
-    { style: 'Protection', className: 'Paladin', array: 'reactions', featureName: 'Protection', type: 'protection' },
-    { style: 'Interception', className: 'Paladin', array: 'reactions', featureName: 'Interception', type: 'interception' },
-  ])(
-    'should add $featureName reaction when fighting style "$style" is present (2024)',
-    async ({ style, className, array, featureName, type }) => {
-      classRules2024.getClass.mockReturnValue({ name: className, hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, fightingStyles: [style] });
-      const playerSummary = makePlayerSummary({
-        rules: '2024',
-        class: { name: className, fightingStyles: [style] },
-        race: { name: 'Human', languages: ['Common'], traits: [] },
-      });
-      const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-      const feature = result[array].find((a) => a.name === featureName);
-      expect(feature).toBeDefined();
-      expect(feature.type).toBe(type);
-      expect(feature.hasAutomation).toBe(true);
-    },
-  );
-
-  it('should not add 5e-specific features when ruleset is 2024', async () => {
-    classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, fightingStyles: ['Thrown Weapon Fighting', 'Two-Weapon Fighting'] });
-    const playerSummary = makePlayerSummary({
+  it('routes 2024 characters through the 2024 builders and excludes 5e-only style features', async () => {
+    classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, fightingStyles: ['Interception', 'Protection', 'Thrown Weapon Fighting', 'Two-Weapon Fighting'] });
+    const result = await getPlayerStats(makePlayerSummary({
       rules: '2024',
-      class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting', 'Two-Weapon Fighting'] },
-      race: { name: 'Human', languages: ['Common'], traits: [] },
+      class: { name: 'Fighter', fightingStyles: ['Interception', 'Protection', 'Thrown Weapon Fighting', 'Two-Weapon Fighting'] },
+    }));
+
+    // 2024 builder pushes Protection before Interception (rules-fightingStyles.js:68/:92),
+    // so this exact sorted order also proves sortActionArrays ran.
+    expect(result.reactions.map((r) => r.name)).toEqual(['Interception', 'Protection']);
+    // 2024-specific automation proves the 2024 Interception ran, not the 5e one
+    // (5e uses trigger 'ally_within_5ft_attacked' + requiresShield).
+    const interception = result.reactions.find((r) => r.name === 'Interception');
+    expect(interception).toMatchObject({
+      type: 'interception', hasAutomation: true,
+      automation: { type: 'interception', trigger: 'creature_hits_ally_within_5ft', damageExpression: '1d10', damageBonusExpression: 'proficiency_bonus', requiresShieldOrWeapon: true },
     });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.specialActions.find((a) => a.name === 'Thrown Weapon Fighting')).toBeUndefined();
-    expect(result.specialActions.find((a) => a.name === 'Two-Weapon Fighting')).toBeUndefined();
+    expect(interception.automation.requiresShield).toBeUndefined();
+    expect(result.reactions.find((r) => r.name === 'Protection')).toMatchObject({
+      type: 'protection', hasAutomation: true,
+      automation: { type: 'reaction_debuff', requiresShield: true },
+    });
+    // 5e-only passive styles must not appear under 2024.
+    expect(result.specialActions).toEqual([]);
   });
 });
 
-describe('rules.getPlayerStats - action array re-sorting after fighting styles', () => {
+describe('rules.getPlayerStats - action array sorting and dedupe', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should re-sort all action arrays after adding fighting style features', async () => {
-    const playerSummary = makePlayerSummary({
-      class: { name: 'Paladin', fightingStyles: ['Interception', 'Protection'] },
-      actions: [{ name: 'ZAction' }, { name: 'AAction' }],
-      reactions: [{ name: 'ZReaction' }, { name: 'AReaction' }],
-      specialActions: [{ name: 'ZSpecial' }, { name: 'ASpecial' }],
+  it('returns every action array sorted and deduped by name, with no fighting style features injected', async () => {
+    // characterAdvancement flows only from class features (rules-actions.js:111) —
+    // summary-level entries are dropped, so supply the unsorted pair there.
+    classRules.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [{ name: 'ZAdvancement' }, { name: 'AAdvancement' }, { name: 'ZAdvancement' }] });
+    const result = await getPlayerStats(makePlayerSummary({
+      actions: [{ name: 'ZAction' }, { name: 'AAction' }, { name: 'ZAction' }],
       bonusActions: [{ name: 'ZBonus' }, { name: 'ABonus' }],
-      characterAdvancement: [{ name: 'ZAdvancement' }, { name: 'AAdvancement' }],
-    });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.actions.map((a) => a.name)).toEqual([...result.actions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
-    expect(result.reactions.map((r) => r.name)).toEqual([...result.reactions.map((r) => r.name)].sort((a, b) => a.localeCompare(b)));
-    expect(result.specialActions.map((a) => a.name)).toEqual([...result.specialActions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
-    expect(result.bonusActions.map((a) => a.name)).toEqual([...result.bonusActions.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
-    expect(result.characterAdvancement.map((a) => a.name)).toEqual([...result.characterAdvancement.map((a) => a.name)].sort((a, b) => a.localeCompare(b)));
+      reactions: [{ name: 'ZReaction' }, { name: 'AReaction' }],
+      specialActions: [{ name: 'ZSpecial' }, { name: 'ZSpecial' }, { name: 'ASpecial' }],
+    }));
+
+    expect(result.actions.map((a) => a.name)).toEqual(['AAction', 'ZAction']);
+    expect(result.bonusActions.map((a) => a.name)).toEqual(['ABonus', 'ZBonus']);
+    expect(result.specialActions.map((a) => a.name)).toEqual(['ASpecial', 'ZSpecial']);
+    expect(result.characterAdvancement.map((a) => a.name)).toEqual(['AAdvancement', 'ZAdvancement']);
+    // No fighting styles on the class mock → nothing fighting-style-related injected.
+    expect(result.reactions.map((r) => r.name)).toEqual(['AReaction', 'ZReaction']);
+    expect(result.reactions.some((r) => ['Interception', 'Protection'].includes(r.name))).toBe(false);
+    expect(result.specialActions.some((a) => ['Blessed Warrior', 'Druidic Warrior', 'Combat Superiority'].includes(a.name))).toBe(false);
   });
 });
-
-const proficiencyBuffCases = [
-  {
-    name: 'should add non-choice proficiency feat buffs (e.g., Heavily Armored)',
-    buff: { name: 'Heavy Armor', type: 'proficiency', isChoice: false },
-    existingProfs: [],
-    expectedProf: 'Heavy Armor',
-    expectedSkillProfs: null,
-    checkDup: false,
-  },
-  {
-    name: 'should add all_skills proficiency feat buffs to skillProficiencies',
-    buff: { name: 'all_skills', type: 'skill', isChoice: false },
-    existingProfs: [],
-    expectedProf: null,
-    expectedSkillProfs: ['Athletics', 'Stealth'],
-    checkDup: false,
-  },
-  {
-    name: 'should handle proficiency choice feat buffs (e.g., Crafter\'s 3 Artisan\'s Tools)',
-    buff: { name: 'Artisan\'s Tools', type: 'proficiency', isChoice: true, choose: 3, from: ['Artisan\'s Tools'] },
-    existingProfs: [],
-    expectedProf: null,
-    expectedToolProfs: null,
-    expectedSkillProfs: null,
-    checkDup: false,
-  },
-  {
-    name: 'should not duplicate existing proficiencies from feat buffs',
-    buff: { name: 'Skill: Stealth', type: 'proficiency', isChoice: false },
-    existingProfs: ['Skill: Stealth'],
-    expectedProf: 'Skill: Stealth',
-    expectedSkillProfs: null,
-    checkDup: true,
-  },
-];
 
 describe('rules.getPlayerStats - feat proficiency buffs', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it.each(proficiencyBuffCases)('$name', async ({ buff, existingProfs, expectedProf, expectedToolProfs, expectedSkillProfs, checkDup }) => {
+  it('expands an all_skills feat buff into the full skill list without leaking it into proficiencies', async () => {
+    // rules.js:69-73: name 'all_skills' + type 'skill' fans out to every
+    // loadSkills() name; the non-choice proficiency filter at rules.js:92
+    // requires type 'proficiency', so 'all_skills' itself must not appear.
     vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
       abilityScoreIncreases: [],
-      proficiencies: [buff],
+      proficiencies: [{ name: 'all_skills', type: 'skill', isChoice: false }],
       features: [],
     });
-    const playerSummary = makePlayerSummary({
-      proficiencies: existingProfs,
+    const result = await getPlayerStats(makePlayerSummary());
+
+    expect(result.skillProficiencies).toEqual(defaultSkills.map((s) => s.name));
+    expect(result.proficiencies).not.toContain('all_skills');
+  });
+
+  it('skips duplicated proficiencies — both those already granted and repeats within the buff list', async () => {
+    // Existing proficiencies arrive via the getProficiencies channel
+    // (rules.js:492), not the playerSummary — mock it there so the
+    // dedupe Set at rules.js:99-104 actually runs.
+    proficiencyUtils.getProficiencies.mockReturnValue([5, ['Heavy Armor']]);
+    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
+      abilityScoreIncreases: [],
+      proficiencies: [
+        { name: 'Heavy Armor', type: 'proficiency', isChoice: false }, // already granted → skipped
+        { name: 'Heavy Armor', type: 'proficiency', isChoice: false }, // repeat in buff list → skipped
+        { name: 'Medium Armor', type: 'proficiency', isChoice: false }, // new → appended once
+      ],
+      features: [],
     });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    if (expectedProf) {
-      expect(result.proficiencies).toContain(expectedProf);
-    }
-    if (expectedToolProfs) {
-      expect(result.toolProficiencies).toContain(expectedToolProfs);
-    }
-    if (expectedSkillProfs) {
-      for (const skill of expectedSkillProfs) {
-        expect(result.skillProficiencies).toContain(skill);
-      }
-    }
-    if (checkDup && expectedProf) {
-      const count = result.proficiencies.filter((p) => p === expectedProf).length;
-      expect(count).toBe(1);
-    }
+    const result = await getPlayerStats(makePlayerSummary());
+
+    expect(result.proficiencies).toEqual(['Heavy Armor', 'Medium Armor']);
   });
 });
 
 describe('rules.getPlayerStats - expertise handling', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
-  it('should add expertSkills entries to expertise array and skip empty/non-string entries', async () => {
-    const playerSummary = makePlayerSummary({
+  it('merges only non-empty string expertSkills into expertise, skipping invalid entries in order', async () => {
+    // rules.js:83-88: typeof-string-and-non-empty guard. Exact array — an
+    // empty string or 123 leaking through would break this pin.
+    const result = await getPlayerStats(makePlayerSummary({
+      expertise: ['Insight'],
       expertSkills: ['', 123, 'Stealth', null, 'Persuasion'],
-    });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.expertise).toContain('Stealth');
-    expect(result.expertise).toContain('Persuasion');
+    }));
+
+    expect(result.expertise).toEqual(['Insight', 'Stealth', 'Persuasion']);
   });
 });

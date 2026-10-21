@@ -1,5 +1,9 @@
+// @maintained-by-ai
 // Regression tests for CLA-175: Hurl Through Hell incapacitated duration and
 // return-to-space resolution via the expiration queue.
+// Owner of the hurl_through_hell_return clear lane: condition + targetEffect
+// removal bytes, exact log text, and queue-seam dispatch. The registration
+// side (addExpiration rounds:2) lives in HurlThroughHellModal.saveResults.test.jsx.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -67,17 +71,16 @@ describe('hurl_through_hell_return expiration (CLA-175)', () => {
     addEntry.mockImplementation(() => Promise.resolve());
   });
 
-  it('removes the incapacitated condition from the target', () => {
+  it('strips incapacitated from every activeConditions write, keeping other conditions', () => {
     clearExpirationEffects(hurlEffect, TARGET, CASTER, CAMPAIGN);
 
-    const condCalls = setCallsForKey('activeConditions');
-    expect(condCalls.length).toBeGreaterThan(0);
-    expect(condCalls[0][0]).toBe(TARGET);
-    expect(condCalls[0][2]).toEqual(['prone']);
-    expect(condCalls[0][2]).not.toContain('incapacitated');
+    expect(setRuntimeValue).toHaveBeenCalledWith(TARGET, 'activeConditions', ['prone'], CAMPAIGN);
+    for (const [, , value] of setCallsForKey('activeConditions')) {
+      expect(value).not.toContain('incapacitated');
+    }
   });
 
-  it('removes the matching hurl targetEffects entry but keeps unrelated ones', () => {
+  it('removes only the hurl incapacitated targetEffect from the campaign store', () => {
     const unrelated = { target: 'Goblin', source: 'Faerie Fire', effect: 'faerie_fire' };
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'campaign' && key === 'targetEffects') return [hurlTe, unrelated];
@@ -87,10 +90,7 @@ describe('hurl_through_hell_return expiration (CLA-175)', () => {
 
     clearExpirationEffects(hurlEffect, TARGET, CASTER, CAMPAIGN);
 
-    const teCalls = setCallsForKey('targetEffects');
-    expect(teCalls).toHaveLength(1);
-    expect(teCalls[0][0]).toBe('campaign');
-    expect(teCalls[0][2]).toEqual([unrelated]);
+    expect(setCallsForKey('targetEffects')).toEqual([['campaign', 'targetEffects', [unrelated], CAMPAIGN]]);
   });
 
   it('does not rewrite campaign targetEffects when no entry matches', () => {
@@ -105,31 +105,30 @@ describe('hurl_through_hell_return expiration (CLA-175)', () => {
     expect(setCallsForKey('targetEffects')).toHaveLength(0);
   });
 
-  it('logs that the target returns to the space it previously occupied', async () => {
+  it('logs the return-to-space condition end with exact payload', () => {
     clearExpirationEffects(hurlEffect, TARGET, CASTER, CAMPAIGN);
 
-    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'condition',
       action: 'ended',
       characterName: TARGET,
+      condition: 'Incapacitated',
       source: 'Hurl Through Hell',
-      description: expect.stringContaining('returns to the space it previously occupied'),
-    }));
+      description: 'Ogre 1 returns to the space it previously occupied — the Hurl Through Hell effect ends.',
+      timestamp: expect.any(Number),
+    });
   });
 
   it('expires at the start of round appliedRound+2, not before (until end of caster next turn)', () => {
     const list = [{ target: TARGET, effects: hurlEffect, appliedRound: 1, expiryRounds: 2, expireOnCreatureName: null }];
 
     const atRound2 = processExpirationList(list, 2, CASTER, CAMPAIGN, CASTER);
-    expect(atRound2.changed).toBe(false);
-    expect(atRound2.expiredCount).toBe(0);
+    expect(atRound2).toEqual({ processed: list, expiredCount: 0, changed: false });
+    expect(setRuntimeValue).not.toHaveBeenCalled();
 
     const atRound3 = processExpirationList(list, 3, CASTER, CAMPAIGN, CASTER);
-    expect(atRound3.changed).toBe(true);
-    expect(atRound3.expiredCount).toBe(1);
-    expect(atRound3.processed).toHaveLength(0);
-
-    const condCalls = setCallsForKey('activeConditions');
-    expect(condCalls[0][2]).toEqual(['prone']);
+    expect(atRound3).toEqual({ processed: [], expiredCount: 1, changed: true });
+    expect(setRuntimeValue).toHaveBeenCalledWith(TARGET, 'activeConditions', ['prone'], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], CAMPAIGN);
   });
 });

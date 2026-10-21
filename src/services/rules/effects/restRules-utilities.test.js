@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getHitDieSize,
@@ -8,29 +9,19 @@ import {
   getShortRestResources,
   getLongRestResources,
   spellSlotLevels,
+  SHORT_REST_RESOURCES,
+  LONG_REST_RESOURCES,
 } from './restRules.js'
 
-// Mock dependencies
+// restRules.js is a barrel: the pure helpers and resource lists are
+// re-exported verbatim from restRules-constants.js and exercised here
+// through the barrel's public surface. Only clearHuntersMarkConcentration
+// is impure — it reads/writes the three seams mocked below.
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_name, key, _campaign) => {
-    if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-    return undefined;
-  }),
+  getRuntimeValue: vi.fn(() => undefined),
   setRuntimeBatch: vi.fn(),
   setRuntimeValue: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
-}))
-
-vi.mock('./expirations.js', () => ({
-  clearAllExpirationEffects: vi.fn(),
-}))
-
-vi.mock('../../combat/conditions/exhaustionRules.js', () => ({
-  getLevelAfterLongRest: vi.fn((level) => Math.max(0, level - 1)),
-}))
-
-vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve({})),
 }))
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
@@ -38,32 +29,10 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
   setCombatSummaryCache: vi.fn(),
 }))
 
-vi.mock('../../../services/combat/concentration/concentrationService.js', () => ({
-  clearAllConcentrations: vi.fn(),
-}))
-
-vi.mock('../../../services/automation/handlers/class-warlock/celestialResilienceHandler.js', () => ({
-  grantCelestialResilience: vi.fn(() => null),
-  // automation/index.js imports handle + confirm/skip statically — mock full surface
-  handle: vi.fn(() => null),
-  confirmCelestialResilience: vi.fn(() => null),
-  skipCelestialResilience: vi.fn(() => null),
-}))
-
-vi.mock('../../../services/automation/handlers/buffs/tempHpService.js', () => ({
-  setTempHp: vi.fn((name, amount) => amount),
-}))
-
-vi.mock('../features/invisibilityService.js', () => ({
-  endInvisibility: vi.fn(),
-  endGreaterInvisibility: vi.fn(),
-}))
-
 vi.mock('../../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }))
 
-// Import mocked functions for per-test customization
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'
 import * as storageService from '../../../services/ui/storage.js'
@@ -73,162 +42,138 @@ const CAMPAIGN = 'test-campaign'
 describe('restRules utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-      if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-      return undefined;
-    })
+    // mockImplementation survives clearAllMocks — re-seed determinism per test
+    vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+    vi.mocked(getCombatSummary).mockReturnValue(null)
   })
 
   describe('getHitDieSize', () => {
-    it('returns the parsed die size from hit_point_die or hit_die', () => {
-      expect(getHitDieSize({ class: { hit_point_die: 'd12' } })).toBe(12)
-      expect(getHitDieSize({ class: { hit_die: 'd8' } })).toBe(8)
-      expect(getHitDieSize({ class: { hit_point_die: 'd10-extra' } })).toBe(10)
-    })
-
-    it('returns 8 as default when playerStats, class, or hit_point_die is missing or falsy', () => {
-      expect(getHitDieSize(null)).toBe(8)
-      expect(getHitDieSize({})).toBe(8)
-      expect(getHitDieSize({ class: { hit_point_die: null } })).toBe(8)
-      expect(getHitDieSize({ class: { hit_point_die: '' } })).toBe(8)
+    it.each([
+      ['parses the primary key', { class: { hit_point_die: 'd12' } }, 12],
+      ['primary key wins over fallback', { class: { hit_point_die: 'd10', hit_die: 'd8' } }, 10],
+      ['falls back to hit_die', { class: { hit_die: 'd8' } }, 8],
+      ['extracts digits from a dirty string', { class: { hit_point_die: 'd10-extra' } }, 10],
+      ['empty primary falls through to fallback', { class: { hit_point_die: '', hit_die: 'd12' } }, 12],
+      ['non-numeric value defaults to 8', { class: { hit_point_die: 'dX' } }, 8],
+      ['null stats defaults to 8', null, 8],
+      ['missing class defaults to 8', {}, 8],
+    ])('%s', (_case, stats, expected) => {
+      expect(getHitDieSize(stats)).toBe(expected)
     })
   })
 
   describe('getShortRestResourceLabels', () => {
-    it('returns class-specific resource labels', () => {
-      expect(getShortRestResourceLabels({ class: { name: 'Cleric' } })).toContain('Channel Divinity')
-      expect(getShortRestResourceLabels({ class: { name: 'Druid' } })).toContain('Wild Shape')
-      expect(getShortRestResourceLabels({ class: { name: 'Monk' } })).toContain('Focus Points')
-      expect(getShortRestResourceLabels({ class: { name: 'Rogue' } })).toEqual([])
+    // Full arrays pinned verbatim against the SHORT_REST_RESOURCE_LABELS
+    // registry in restRules-constants.js (exact membership and order).
+    it.each([
+      ['Cleric', { class: { name: 'Cleric' } }, ['Channel Divinity']],
+      ['Monk', { class: { name: 'Monk' } }, ['Focus Points']],
+      ['Rogue without the Soulknife subclass gets nothing', { class: { name: 'Rogue' } }, []],
+      ['Soulknife Rogue', { class: { name: 'Rogue', subclass: { name: 'Soulknife' } } }, ['Psionic Energy']],
+      ['Fighter base', { class: { name: 'Fighter' } }, ['Second Wind', 'Action Surge']],
+      ['Psi Warrior Fighter', { class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } }, ['Second Wind', 'Action Surge', 'Psionic Energy', 'Telekinetic Thrust']],
+      ['Battle Master Fighter', { class: { name: 'Fighter', subclass: { name: 'Battle Master' } } }, ['Second Wind', 'Action Surge', 'Superiority Dice']],
+      ['Wizard', { class: { name: 'Wizard' } }, ['Arcane Recovery (Spell Slots)']],
+      ['major.name acts as subclass fallback', { class: { name: 'Druid', major: { name: 'Circle of the Land' } } }, ['Wild Shape', 'Natural Recovery (Spell Slots)']],
+      ['missing class', {}, []],
+    ])('%s', (_case, stats, expected) => {
+      expect(getShortRestResourceLabels(stats)).toEqual(expected)
     })
 
-    it('returns Fighter resources and respects subclass matching', () => {
-      const fighterLabels = getShortRestResourceLabels({ class: { name: 'Fighter' } })
-      expect(fighterLabels).toContain('Second Wind')
-      expect(fighterLabels).toContain('Action Surge')
-      expect(fighterLabels).not.toContain('Psionic Energy')
-      expect(fighterLabels).not.toContain('Superiority Dice')
-
-      const psiLabels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } })
-      expect(psiLabels).toContain('Psionic Energy')
-
-      const battleLabels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Battle Master' } } })
-      expect(battleLabels).toContain('Superiority Dice')
-
-      // FS-010: Superior Technique style (non-Battle Master) also restores Superiority Dice
-      const styleLabels = getShortRestResourceLabels({
+    // FS-010: Superior Technique style (non-Battle Master) also restores
+    // Superiority Dice; other styles must not (label-layer owner for fs010).
+    it('gates Superiority Dice on the Superior Technique fighting style', () => {
+      expect(getShortRestResourceLabels({
         class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Superior Technique'] },
-      })
-      expect(styleLabels).toContain('Superiority Dice')
+      })).toEqual(['Second Wind', 'Action Surge', 'Superiority Dice'])
 
-      const noStyleLabels = getShortRestResourceLabels({
+      expect(getShortRestResourceLabels({
         class: { name: 'Fighter', subclass: { name: 'Champion' }, fightingStyles: ['Defense'] },
-      })
-      expect(noStyleLabels).not.toContain('Superiority Dice')
-    })
-
-    it('uses major.name as fallback for subclass matching', () => {
-      const labels = getShortRestResourceLabels({
-        class: { name: 'Druid', major: { name: 'Circle of the Land' } },
-      })
-      expect(labels).toContain('Natural Recovery (Spell Slots)')
-    })
-
-    it('returns empty array when class is missing', () => {
-      expect(getShortRestResourceLabels({})).toEqual([])
+      })).toEqual(['Second Wind', 'Action Surge'])
     })
   })
 
   describe('computeHitDieRecovery', () => {
-    it('returns roll + conBonus when positive, minimum 1', () => {
-      expect(computeHitDieRecovery(5, 3)).toBe(8)
-      expect(computeHitDieRecovery(1, -5)).toBe(1)
-      expect(computeHitDieRecovery(0, 0)).toBe(1)
-      expect(computeHitDieRecovery(5, -2)).toBe(3)
+    it.each([
+      ['adds the CON bonus', 5, 3, 8],
+      ['deep negative CON floors at 1', 1, -5, 1],
+      ['zero roll zero bonus floors at 1', 0, 0, 1],
+      ['negative CON still pays out the remainder', 5, -2, 3],
+    ])('%s', (_case, roll, conBonus, expected) => {
+      expect(computeHitDieRecovery(roll, conBonus)).toBe(expected)
     })
   })
 
   describe('computeShortRestHpNewCurrent', () => {
-    it('adds recovered amount to currentHp capped at maxHp', () => {
-      expect(computeShortRestHpNewCurrent(10, 20, 5)).toBe(15)
-      expect(computeShortRestHpNewCurrent(18, 20, 5)).toBe(20)
-    })
-
-    it('uses maxHp as base when currentHp is null or empty string', () => {
-      expect(computeShortRestHpNewCurrent(null, 20, 5)).toBe(20)
-      expect(computeShortRestHpNewCurrent('', 20, 5)).toBe(20)
-    })
-
-    it('handles zero recovery', () => {
-      expect(computeShortRestHpNewCurrent(null, 20, 0)).toBe(20)
-      expect(computeShortRestHpNewCurrent(10, 20, 0)).toBe(10)
+    it.each([
+      ['adds recovery to current HP', 10, 20, 5, 15],
+      ['caps at maxHp', 18, 20, 5, 20],
+      ['null currentHp starts from max', null, 20, 5, 20],
+      ['empty-string currentHp starts from max', '', 20, 5, 20],
+      ['zero HP is a real value, not missing', 0, 20, 5, 5],
+      ['zero recovery leaves HP untouched', 10, 20, 0, 10],
+      ['missing recovery is treated as 0', 10, 20, undefined, 10],
+    ])('%s', (_case, currentHp, maxHp, recovered, expected) => {
+      expect(computeShortRestHpNewCurrent(currentHp, maxHp, recovered)).toBe(expected)
     })
   })
 
   describe('clearHuntersMarkConcentration', () => {
-    it('clears Hunter\'s Mark concentration and removes from activeBuffs when creature has it', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'activeBuffs') return [{ name: "Hunter's Mark" }, { name: 'Haste' }]
-        return undefined
-      })
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Caster', concentration: { spell: "Hunter's Mark" } }],
-      })
-      clearHuntersMarkConcentration('Caster', CAMPAIGN)
-      expect(storageService.default.set).toHaveBeenCalled()
+    it('nulls the concentration, persists combatSummary, filters the buff, and broadcasts', () => {
+      const cs = { creatures: [{ name: 'Caster', concentration: { spell: "Hunter's Mark" } }] }
+      vi.mocked(getCombatSummary).mockReturnValue(cs)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'activeBuffs' ? [{ name: "Hunter's Mark" }, { name: 'Haste' }] : undefined)
+      const onUpdate = vi.fn()
+      window.addEventListener('combat-summary-updated', onUpdate)
+      try {
+        clearHuntersMarkConcentration('Caster', CAMPAIGN)
+      } finally {
+        window.removeEventListener('combat-summary-updated', onUpdate)
+      }
+      expect(cs.creatures[0].concentration).toBeNull()
+      expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith('Caster', 'activeBuffs', [{ name: 'Haste' }], CAMPAIGN)
+      expect(onUpdate).toHaveBeenCalledTimes(1)
     })
 
-    it('does nothing when creature is not found', () => {
-      vi.clearAllMocks()
-      vi.mocked(getCombatSummary).mockReturnValue({ creatures: [] })
-      clearHuntersMarkConcentration('NonExistent', CAMPAIGN)
+    it('still persists a cleared concentration when the buff list has no Hunter\'s Mark to filter', () => {
+      const cs = { creatures: [{ name: 'Caster', concentration: { spell: "Hunter's Mark" } }] }
+      vi.mocked(getCombatSummary).mockReturnValue(cs)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'activeBuffs' ? [{ name: 'Haste' }] : undefined)
+      clearHuntersMarkConcentration('Caster', CAMPAIGN)
+      expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN)
       expect(setRuntimeValue).not.toHaveBeenCalled()
     })
 
-    it('does nothing when creature has no Hunter\'s Mark concentration', () => {
-      vi.clearAllMocks()
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Caster', concentration: { spell: 'Witch Bolt' } }],
-      })
+    it.each([
+      ['combatSummary is null', null],
+      ['combatSummary has no creatures list', {}],
+      ['no creature with that name', { creatures: [{ name: 'Other', concentration: { spell: "Hunter's Mark" } }] }],
+      ['creature is concentrated on another spell', { creatures: [{ name: 'Caster', concentration: { spell: 'Witch Bolt' } }] }],
+      ['creature has no concentration', { creatures: [{ name: 'Caster', concentration: null }] }],
+    ])('does nothing when %s', (_case, cs) => {
+      vi.mocked(getCombatSummary).mockReturnValue(cs)
       clearHuntersMarkConcentration('Caster', CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when creature has no concentration', () => {
-      vi.clearAllMocks()
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Caster', concentration: null }],
-      })
-      clearHuntersMarkConcentration('Caster', CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalled()
-    })
-
-    it('does nothing when combatSummary is null', () => {
-      vi.clearAllMocks()
-      vi.mocked(getCombatSummary).mockReturnValue(null)
-      clearHuntersMarkConcentration('Caster', CAMPAIGN)
+      expect(storageService.default.set).not.toHaveBeenCalled()
       expect(setRuntimeValue).not.toHaveBeenCalled()
     })
   })
 
-  describe('resource/slot getters', () => {
-    it('getShortRestResources returns a copy of SHORT_REST_RESOURCES', () => {
-      const resources = getShortRestResources()
-      expect(Array.isArray(resources)).toBe(true)
-      expect(resources.length).toBeGreaterThan(0)
-      expect(resources).not.toBe(getShortRestResources())
+  describe('resource lists', () => {
+    it.each([
+      ['getShortRestResources', getShortRestResources, SHORT_REST_RESOURCES],
+      ['getLongRestResources', getLongRestResources, LONG_REST_RESOURCES],
+    ])('%s returns a defensive copy of the registry', (_case, getter, registry) => {
+      const copy = getter()
+      expect(copy).toEqual(registry)
+      expect(copy).not.toBe(registry)
+      copy.push('__mutated__')
+      expect(getter()).not.toContain('__mutated__')
     })
 
-    it('getLongRestResources returns a copy of LONG_REST_RESOURCES', () => {
-      const resources = getLongRestResources()
-      expect(Array.isArray(resources)).toBe(true)
-      expect(resources.length).toBeGreaterThan(0)
-      expect(resources).not.toBe(getLongRestResources())
-    })
-
-    it('spellSlotLevels returns array 1-9', () => {
+    it('spellSlotLevels returns the nine spell slot levels', () => {
       expect(spellSlotLevels()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
     })
   })

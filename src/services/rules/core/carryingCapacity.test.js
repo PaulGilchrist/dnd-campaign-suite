@@ -1,72 +1,75 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+import { describe, it, expect } from 'vitest'
 import { applyMaxHpPassives, getCarryingCapacity } from './carryingCapacity.js'
 
-vi.mock('../../combat/automation/automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn(),
-}))
+// Unit canon for carryingCapacity.js itself. abilityCalc2024.test.js pins the
+// getHitPoints seam; abilityCalc.test.js pins the re-export rows cited below.
+// The real evaluateAutoExpression runs here (no mock): 'level'-style tokens
+// resolve deterministically and pure-arithmetic expressions never hit the dice.
 
-import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js'
-
-function statsWithPassives(passives) {
-  return { automation: { passives } }
+function statsWithPassives(passives, extra = {}) {
+  return { automation: { passives }, ...extra }
 }
 
 describe('applyMaxHpPassives', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('folds fortified_health amount into max HP (FT-012)', () => {
-    const stats = statsWithPassives([
+  it('folds amount from max_hp_increase and fortified_health, singly and stacked (FT-012)', () => {
+    // fortified_health (2024 Epic Boon) carries amount under its own key and
+    // ignores its alsoSelfHealing metadata here.
+    expect(applyMaxHpPassives(statsWithPassives([
       { type: 'passive_rule', effect: 'fortified_health', name: 'Fortified Health', amount: 40, alsoSelfHealing: { extraHealingExpression: 'CON modifier', oncePerTurn: true } },
-    ])
-    expect(applyMaxHpPassives(stats, 143)).toBe(183)
-  })
+    ]), 143)).toBe(183)
 
-  it('still folds max_hp_increase unchanged (regression)', () => {
-    const stats = statsWithPassives([
+    expect(applyMaxHpPassives(statsWithPassives([
       { type: 'passive_rule', effect: 'max_hp_increase', name: 'Toughness', amount: 20 },
-    ])
-    expect(applyMaxHpPassives(stats, 100)).toBe(120)
-  })
+    ]), 100)).toBe(120)
 
-  it('folds max_hp_increase bonusExpression via evaluateAutoExpression', () => {
-    evaluateAutoExpression.mockReturnValue(5)
-    const stats = statsWithPassives([
-      { type: 'passive_rule', effect: 'max_hp_increase', name: 'Expr', bonusExpression: 'level' },
-    ])
-    expect(applyMaxHpPassives(stats, 100)).toBe(105)
-    expect(evaluateAutoExpression).toHaveBeenCalledWith('level', stats)
-  })
-
-  it('folds fortified_health bonusExpression when amount is absent', () => {
-    evaluateAutoExpression.mockReturnValue(8)
-    const stats = statsWithPassives([
-      { type: 'passive_rule', effect: 'fortified_health', name: 'Fortified Health', bonusExpression: 'level / 2' },
-    ])
-    expect(applyMaxHpPassives(stats, 100)).toBe(108)
-  })
-
-  it('ignores passives of the wrong type even with matching effect', () => {
-    const stats = statsWithPassives([
-      { type: 'passive_buff', effect: 'fortified_health', amount: 40 },
-      { type: 'passive_buff', effect: 'max_hp_increase', amount: 10 },
-    ])
-    expect(applyMaxHpPassives(stats, 100)).toBe(100)
-  })
-
-  it('stacks multiple max-HP passives', () => {
-    const stats = statsWithPassives([
+    expect(applyMaxHpPassives(statsWithPassives([
       { type: 'passive_rule', effect: 'fortified_health', amount: 40 },
       { type: 'passive_rule', effect: 'max_hp_increase', amount: 20 },
-    ])
-    expect(applyMaxHpPassives(stats, 100)).toBe(160)
+    ]), 100)).toBe(160)
+  })
+
+  it('falls back to bonusExpression via the real evaluator when amount is absent; amount wins when both present', () => {
+    const level = { level: 8 }
+    expect(applyMaxHpPassives(statsWithPassives([
+      { type: 'passive_rule', effect: 'max_hp_increase', name: 'Expr', bonusExpression: 'level' },
+    ], level), 100)).toBe(108)
+
+    expect(applyMaxHpPassives(statsWithPassives([
+      { type: 'passive_rule', effect: 'fortified_health', name: 'Fortified Health', bonusExpression: 'level / 2' },
+    ], level), 100)).toBe(104)
+
+    // static amount takes precedence over bonusExpression
+    expect(applyMaxHpPassives(statsWithPassives([
+      { type: 'passive_rule', effect: 'max_hp_increase', amount: 3, bonusExpression: 'level' },
+    ], level), 100)).toBe(103)
+  })
+
+  it('ignores wrong-type passives, unrelated effects, unresolvable expressions, and missing automation', () => {
+    expect(applyMaxHpPassives(statsWithPassives([
+      { type: 'passive_buff', effect: 'fortified_health', amount: 40 },
+      { type: 'passive_buff', effect: 'max_hp_increase', amount: 10 },
+      { type: 'passive_rule', effect: 'other_effect', amount: 100 },
+      // dice notation is returned unresolved by evaluateAutoExpression — never rolled, never added
+      { type: 'passive_rule', effect: 'max_hp_increase', bonusExpression: '1d4+1' },
+    ]), 100)).toBe(100)
+
+    expect(applyMaxHpPassives({}, 100)).toBe(100)
   })
 })
 
 describe('getCarryingCapacity', () => {
-  it('is STR x 15 with size multiplier', () => {
-    const stats = { abilities: [{ name: 'Strength', totalScore: 10 }], sizeMultiplier: 2 }
-    expect(getCarryingCapacity(stats)).toBe(300)
+  // Default-STR, x2 and x1.5 rows are pinned verbatim at abilityCalc.test.js:295-304.
+  // This owns the direct-module formula falsifiers across the full STR span.
+  it('is STR totalScore x 15 x sizeMultiplier', () => {
+    const capacity = (strScore, sizeMultiplier) =>
+      getCarryingCapacity({ abilities: [{ name: 'Strength', totalScore: strScore }], sizeMultiplier })
+
+    expect(capacity(1)).toBe(15) // low-end falsifier
+    expect(capacity(8)).toBe(120)
+    expect(capacity(20)).toBe(300)
+    expect(capacity(30)).toBe(450) // high-end falsifier
+    expect(capacity(10, 0.5)).toBe(75) // Tiny halves; x1/x1.5/x2 live in the twin
+    expect(capacity(10, 3)).toBe(450)
   })
 })

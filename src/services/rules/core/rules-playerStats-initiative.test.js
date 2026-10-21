@@ -1,285 +1,113 @@
+// @maintained-by-ai
+// Initiative lane of getPlayerStats: pins computeInitiative() numeric composition and
+// Alert/Gloom Stalker flags (rules.js:556 calls it unmodified). Facade invocation of
+// getPlayerStats is owned by rules.getPlayerStats.test.js; the dread_ambush_initiative
+// numeric lane is owned here per the dreadAmbushHandler.test.js cross-reference.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../ui/dataLoader.js', () => ({
-  loadSkills: vi.fn(),
-  loadFeatData: vi.fn().mockResolvedValue([]),
-  loadBackgroundData: vi.fn(() => null),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
-}));
-
-vi.mock('../../character/classRules.js', () => ({
-  default: {
-    getClass: vi.fn(),
-    getFeatures: vi.fn(),
-    getHighestSubclassLevel: vi.fn(),
-    getRangerFeatures: vi.fn(() => ({ extraAttacks: 0 })),
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getClass: vi.fn(),
-    getFeatures: vi.fn(),
-    getHighestSubclassLevel: vi.fn(),
-  },
-}));
-
-vi.mock('../../character/race-rules/index.js', () => ({
-  rules5e: {
-    getRace: vi.fn(),
-    getRacialBonus: vi.fn(),
-    getImmunities: vi.fn(),
-    getResistances: vi.fn(),
-    getSenses: vi.fn(),
-    getTraits: vi.fn(),
-  },
-  rules2024: {
-    getRace: vi.fn(),
-    getSenses: vi.fn(),
-    getTraits: vi.fn(),
-  },
-}));
-
-vi.mock('./abilityCalc.js', () => ({
-  getAbilities: vi.fn(),
-  getHitPoints: vi.fn(),
-  getCarryingCapacity: vi.fn(),
-}));
-
-vi.mock('./abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(),
-  getHitPoints: vi.fn(),
-  getCarryingCapacity: vi.fn(),
-}));
-
-vi.mock('./attackCalc.js', () => ({
-  getAttacks: vi.fn(() => []),
-  parseMagicItemName: vi.fn((name) => ({ baseName: name, magicBonus: 0 })),
-}));
-
-vi.mock('./attackCalc2024.js', () => ({
-  getAttacks: vi.fn(),
-}));
-
-vi.mock('./spellCalc.js', () => ({
-  getSpellAbilities: vi.fn(() => null),
-}));
-
-vi.mock('./spellCalc2024.js', () => ({
-  getSpellAbilities: vi.fn(() => null),
-}));
-
-vi.mock('../../character/proficiencyUtils.js', () => ({
-  getProficiencyChoiceCount: vi.fn(() => 0),
-  getProficiencies: vi.fn(() => [5, []]),
-}));
-
-vi.mock('../../character/proficiencyUtils2024.js', () => ({
-  getProficiencyChoiceCount: vi.fn(),
-  getProficiencies: vi.fn(),
-}));
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
-  getRuntimeValue: vi.fn(() => undefined),
-}));
-
 vi.mock('../../combat/automation/automationService.js', () => ({
-  collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),
-  collectSaveModifiers: vi.fn(() => ({})),
-  collectTurnStartEffects: vi.fn(() => []),
-  getConditionImmunities: vi.fn(() => []),
-  getConditionalImmunities: vi.fn(() => []),
-  getEvasionEffects: vi.fn(() => []),
-  getAllSaveProficiencies: vi.fn(() => []),
   evaluateAutoExpression: vi.fn(() => 0),
-  buildAttackInfo: vi.fn(() => null),
 }));
 
-vi.mock('../../automation/handlers/class-other/elfishLineageHandler.js', () => ({
-  getElfisLineageSelection: vi.fn(() => null),
-  elfishLineageSpeedBonus: vi.fn(() => 0),
-}));
+import { computeInitiative } from '../rules-initiative.js';
+import { evaluateAutoExpression } from '../../combat/automation/automationService.js';
 
-vi.mock('../../character/featBuffService.js', () => ({
-  computeAllFeatBuffs: vi.fn(() => ({
-    abilityScoreIncreases: [],
-    proficiencies: [],
-    features: [],
-  })),
-}));
-
-vi.mock('../../character/featureCategories.js', () => ({
-  getCategories: vi.fn(() => ({
-    actions: [],
-    bonusActions: [],
-    reactions: [],
-    specialActions: [],
-    characterAdvancement: [],
-  })),
-}));
-
-import rules from '../rules.js';
-import classRules from '../../character/classRules.js';
-import { rules5e as raceRules } from '../../character/race-rules/index.js';
-import * as abilityCalc from './abilityCalc.js';
-import * as attackCalc from './attackCalc.js';
-import * as automationService from '../../combat/automation/automationService.js';
-import * as dataLoader from '../../ui/dataLoader.js';
-
-const defaultSkills = [
-  { name: 'Athletics', ability: 'Strength' },
-  { name: 'Stealth', ability: 'Dexterity' },
-  { name: 'Acrobatics', ability: 'Dexterity' },
-  { name: 'Arcana', ability: 'Intelligence' },
-  { name: 'History', ability: 'Intelligence' },
-  { name: 'Perception', ability: 'Wisdom' },
-  { name: 'Insight', ability: 'Wisdom' },
-  { name: 'Persuasion', ability: 'Charisma' },
-  { name: 'Deception', ability: 'Charisma' },
-];
-
-const defaultAbilities = [
-  { name: 'Strength', totalScore: 15, bonus: 2, skills: [] },
-  { name: 'Dexterity', totalScore: 14, bonus: 2, skills: [] },
-  { name: 'Constitution', totalScore: 13, bonus: 1, skills: [] },
-  { name: 'Intelligence', totalScore: 12, bonus: 1, skills: [] },
-  { name: 'Wisdom', totalScore: 10, bonus: 0, skills: [] },
-  { name: 'Charisma', totalScore: 8, bonus: -1, skills: [] },
-];
-
-const makePlayerSummary = (overrides = {}) => ({
-  name: 'TestCharacter',
-  level: 1,
-  rules: '5e',
-  class: {
-    name: 'Fighter',
-    saving_throws: [],
-    languages: [],
-    fightingStyles: [],
-    proficiencies: [],
-    class_levels: [{}],
-    subclass: {},
-    major: {},
-  },
-  race: { name: 'Human', languages: ['Common'], traits: [] },
-  languages: [],
-  abilities: [
-    { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-    { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-    { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-    { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-    { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-    { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-  ],
-  inventory: { equipped: [], magicItems: [] },
-  skillProficiencies: [],
-  expertise: [],
-  actions: [],
-  bonusActions: [],
-  reactions: [],
-  specialActions: [],
-  activeBuffs: [],
-  ...overrides,
-});
-
-const setupDefaults = (overrides = {}) => {
-  vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
-  classRules.getClass.mockReturnValue({
-    name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [],
-    class_levels: [{}], languages: [], subclass: {}, major: {}, ...overrides.class,
-  });
-  raceRules.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [], ...overrides.race });
-  raceRules.getTraits.mockReturnValue({
-    actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.traits,
-  });
-  raceRules.getSenses.mockReturnValue(overrides.senses || []);
-  raceRules.getImmunities.mockReturnValue(overrides.immunities || []);
-  raceRules.getResistances.mockReturnValue(overrides.resistances || []);
-  classRules.getFeatures.mockReturnValue({
-    actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features,
-  });
-  automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
-  automationService.collectSaveModifiers.mockReturnValue({});
-  automationService.collectTurnStartEffects.mockReturnValue([]);
-  automationService.getConditionImmunities.mockReturnValue([]);
-  automationService.getConditionalImmunities.mockReturnValue([]);
-  automationService.getEvasionEffects.mockReturnValue([]);
-  automationService.getAllSaveProficiencies.mockReturnValue([]);
-  abilityCalc.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
-  abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
-  attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
+const makeStats = ({ dex = 2, wis, passives } = {}) => {
+  const abilities = [{ name: 'Dexterity', bonus: dex }];
+  if (wis !== undefined) abilities.push({ name: 'Wisdom', bonus: wis });
+  const stats = { abilities };
+  if (passives !== undefined) stats.automation = { passives };
+  return stats;
 };
 
-describe('rules.getPlayerStats - initiative', () => {
+describe('computeInitiative (getPlayerStats initiative lane)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    setupDefaults();
+    vi.mocked(evaluateAutoExpression).mockReset().mockReturnValue(0);
   });
 
-  it('should set initiative from Dexterity bonus', async () => {
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.initiative).toBe(2);
+  it('leaves initiative at the Dexterity modifier when no automation passives exist', () => {
+    const stats = makeStats({ dex: 4 });
+    computeInitiative(stats);
+    expect(stats.initiative).toBe(4);
+    expect(stats.initiativeAdvantage).toBe(false);
+    expect(stats.noSurprise).toBe(false);
+    expect(stats.unseenAttackerAdvantageNegate).toBe(false);
   });
 
-  it('should set initiative from a higher Dexterity bonus', async () => {
-    setupDefaults({
-      abilities: [
-        { name: 'Strength', totalScore: 15, bonus: 2, skills: [] },
-        { name: 'Dexterity', totalScore: 18, bonus: 4, skills: [] },
-        { name: 'Constitution', totalScore: 13, bonus: 1, skills: [] },
-        { name: 'Intelligence', totalScore: 12, bonus: 1, skills: [] },
-        { name: 'Wisdom', totalScore: 10, bonus: 0, skills: [] },
-        { name: 'Charisma', totalScore: 8, bonus: -1, skills: [] },
+  it.each([
+    {
+      label: 'Dread Ambush (passive_rule) adds the Wisdom modifier: 2 + 3 = 5',
+      wis: 3,
+      passives: [{ type: 'passive_rule', effect: 'dread_ambush_initiative' }],
+      expected: 5,
+    },
+    {
+      label: 'Dread Ambush with the wrong passive type is ignored',
+      wis: 3,
+      passives: [{ type: 'passive_buff', effect: 'dread_ambush_initiative' }],
+      exprResult: 5,
+      expected: 2,
+    },
+    {
+      label: 'initiative_bonus (passive_buff) adds the evaluated expression: 2 + 2 = 4',
+      passives: [{ type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: '2' }],
+      exprResult: 2,
+      expected: 4,
+    },
+    {
+      label: 'multiple initiative_bonus passives stack (2 + 2 + 2 = 6)',
+      passives: [
+        { type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: '2' },
+        { type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: '2' },
       ],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.initiative).toBe(4);
+      exprResult: 2,
+      calls: 2,
+      expected: 6,
+    },
+    {
+      label: 'initiative_bonus with the wrong passive type is ignored',
+      passives: [{ type: 'passive_rule', effect: 'initiative_bonus', bonusExpression: '2' }],
+      exprResult: 5,
+      expected: 2,
+    },
+    {
+      label: 'a NaN evaluation is not added',
+      passives: [{ type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: 'bad' }],
+      exprResult: NaN,
+      expected: 2,
+    },
+    {
+      label: 'a string evaluation result is not added even if numeric-looking',
+      passives: [{ type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: '2' }],
+      exprResult: '3',
+      expected: 2,
+    },
+  ])('$label', ({ wis, passives, exprResult, calls, expected }) => {
+    if (exprResult !== undefined) {
+      vi.mocked(evaluateAutoExpression).mockReturnValue(exprResult);
+    }
+    const stats = makeStats({ wis, passives });
+    computeInitiative(stats);
+    expect(stats.initiative).toBe(expected);
+    const applied = passives.filter(
+      (p) => p.type === 'passive_buff' && p.effect === 'initiative_bonus'
+    );
+    if (applied.length) {
+      expect(evaluateAutoExpression).toHaveBeenCalledWith(applied[0].bonusExpression, stats);
+      expect(evaluateAutoExpression).toHaveBeenCalledTimes(calls ?? 1);
+    } else {
+      expect(evaluateAutoExpression).not.toHaveBeenCalled();
+    }
   });
 
-  it('should add Dread Ambush initiative bonus for Gloom Stalker', async () => {
-    setupDefaults({
-      abilities: [
-        { name: 'Strength', totalScore: 15, bonus: 2, skills: [] },
-        { name: 'Dexterity', totalScore: 14, bonus: 2, skills: [] },
-        { name: 'Constitution', totalScore: 13, bonus: 1, skills: [] },
-        { name: 'Intelligence', totalScore: 12, bonus: 1, skills: [] },
-        { name: 'Wisdom', totalScore: 16, bonus: 3, skills: [] },
-        { name: 'Charisma', totalScore: 8, bonus: -1, skills: [] },
-      ],
-      automation: { passives: [{ type: 'passive_rule', effect: 'dread_ambush_initiative' }] },
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.initiative).toBe(5);
-  });
-
-  it('should add initiative_bonus from passive_buff', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'initiative_bonus', bonusExpression: '2' }] },
-    });
-    vi.mocked(automationService.evaluateAutoExpression).mockReturnValue(2);
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.initiative).toBe(4);
-  });
-
-  it.each`
-    effect                                | flag                     | passiveType
-    ${'initiative_advantage'}             | ${'initiativeAdvantage'} | ${'passive_rule'}
-    ${'no_surprise'}                      | ${'noSurprise'}          | ${'passive_buff'}
-    ${'unseen_attacker_advantage_negate'} | ${'unseenAttackerAdvantageNegate'} | ${'passive_buff'}
-  `('should set $flag when $passiveType with effect $effect exists', async ({ effect, flag, passiveType }) => {
-    setupDefaults({
-      automation: { passives: [{ type: passiveType, effect }] },
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result[flag]).toBe(true);
+  it.each([
+    ['initiative_advantage', 'initiativeAdvantage', 'passive_rule'],
+    ['no_surprise', 'noSurprise', 'passive_buff'],
+    ['unseen_attacker_advantage_negate', 'unseenAttackerAdvantageNegate', 'passive_buff'],
+  ])('sets $flag=true from a $type passive $effect without touching numeric initiative', (effect, flag, type) => {
+    const stats = makeStats({ passives: [{ type, effect }] });
+    computeInitiative(stats);
+    expect(stats[flag]).toBe(true);
+    expect(stats.initiative).toBe(2);
   });
 });

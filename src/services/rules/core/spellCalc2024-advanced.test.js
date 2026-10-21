@@ -1,3 +1,22 @@
+// @maintained-by-ai
+// spellCalc2024 twin lane. Scope: 2024 Path-of-the-Wild-Heart behavior NOT owned by siblings,
+// pinned against disk ground truth (public/data/2024/classes.json Barbarian, read 2026-10-20:
+// class spell_casting_ability is 'Intelligence'; major declares 'Wisdom'; major.spells carry
+// unlock levels — Speak with Animals 1, Beast Sense 2, Commune with Nature 10).
+//
+// Owned elsewhere — cited, not duplicated:
+//  - 'returns null when class level has no spellcasting and getHighestMajorLevel returns nothing'
+//    — spellCalc2024.test.js:60 (covers the old Berserker-null test folded from this file)
+//  - 'falls back to getHighestMajorLevel when class_levels lack spellcasting'
+//    — spellCalc2024.test.js:120 (covers the old lv3 fallback-grant test folded from this file;
+//    its Wisdom-header fixture was disk-inaccurate — the class's own Intelligence wins)
+//  - 'returns spell abilities from class level spellcasting' (header DC math 8+3+2)
+//    — spellCalc2024.test.js:86
+//  - 'marks all spells Always prepared for non-wizard 2024 classes'
+//    — spellCalc2024.test.js:235
+//  - Wild Heart per-spell ritual stamps (_ritualOnly/_ritualFeature/casting_time 'Ritual',
+//    per-spell Wisdom) and lv10 lv5-slotless survival — spellCalc2024-wildheart-rituals.test.js
+//    (CLA-234). This file only pins the header-ability selection and the major.spells level gate.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 
@@ -12,289 +31,87 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((_key, _prop) => null),
 }));
 
-// ── Helpers ──
+// ── Fixtures (Barbarian class_levels rows transcribed verbatim from classes.json) ──
 
-function makePlayerStats(overrides = {}) {
+const DISK_CLASS_LEVELS = {
+  1: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_type: 'known', spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spellCastingAbility: 'Intelligence' },
+  3: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_type: 'known', spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spellCastingAbility: 'Intelligence' },
+  9: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_type: 'known', spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 1, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spellCastingAbility: 'Intelligence' },
+  10: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_type: 'known', spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 2, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spellCastingAbility: 'Intelligence' },
+};
+
+// major.spells entries carry the classes.json unlock level verbatim (Commune lv10).
+function makeWildHeartBarbarianStats({ level, proficiency }) {
   return {
-    name: 'TestCharacter',
-    level: 1,
-    proficiency: 2,
+    name: 'WildHeartTest',
+    level,
+    proficiency,
     class: {
-      name: 'Wizard',
-      class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' } }],
+      name: 'Barbarian',
+      // Disk ground truth: Barbarian class itself declares Intelligence.
       spell_casting_ability: 'Intelligence',
-      ...overrides.class,
+      major: {
+        name: 'Path of the Wild Heart',
+        spell_casting_ability: 'Wisdom',
+        spells: [
+          { name: 'Speak with Animals', level: 1 },
+          { name: 'Beast Sense', level: 2 },
+          { name: 'Commune with Nature', level: 10 },
+        ],
+      },
+      class_levels: Array.from({ length: level }, (_, i) => {
+        const row = DISK_CLASS_LEVELS[i + 1];
+        return row ? { level: i + 1, spellcasting: row } : { level: i + 1 };
+      }),
     },
+    // Wisdom decoy: if the header ever resolved through major.spell_casting_ability,
+    // modifier/toHit/saveDc below would all shift upward and the test would fail.
     abilities: [
-      { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
+      { name: 'Intelligence', baseScore: 16, bonus: 3 },
+      { name: 'Wisdom', baseScore: 20, bonus: 5 },
     ],
     spells: [],
     automation: {},
-    ...overrides,
   };
 }
 
-function makeSpell(name, level = 0, extra = {}) {
-  return { name, level, damage: {}, casting_time: '1 action', range: 'Self', ...extra };
-}
+const SPELL_DB = [
+  { name: 'Speak with Animals', level: 1, casting_time: '1 action', range: '10 feet', school: 'Divination' },
+  { name: 'Beast Sense', level: 2, casting_time: '1 action', range: 'Touch', school: 'Divination' },
+  { name: 'Commune with Nature', level: 5, casting_time: '1 minute', range: '1 mile', school: 'Divination' },
+];
 
-describe('spellCalc2024-advanced', () => {
-  let mockGetHighestMajorLevel;
-
-  beforeEach(async () => {
+describe('spellCalc2024-advanced — Path of the Wild Heart', () => {
+  beforeEach(() => {
     vi.resetAllMocks();
-    await import('../../../hooks/runtime/useRuntimeState.js');
-    const classRules2024 = await import('../../character/classRules2024.js');
-    mockGetHighestMajorLevel = classRules2024.default.getHighestMajorLevel;
   });
 
-  describe('getSpellAbilities', () => {
-    // ── Path of the Wild Heart ──
+  it('computes the header from the class Intelligence — the major\'s Wisdom never promotes to header math (CLA-234 disk ground truth)', () => {
+    // lv3 is when this major's table and grants switch on (required_major row appears here).
+    const result = getSpellAbilities(SPELL_DB, makeWildHeartBarbarianStats({ level: 3, proficiency: 2 }));
 
-    it('returns null for Barbarian without Path of the Wild Heart major', () => {
-      mockGetHighestMajorLevel.mockReturnValue(undefined);
+    expect(result).not.toBeNull();
+    expect(result.spellCastingAbility).toBe('Intelligence');
+    expect(result.modifier).toBe(3);
+    expect(result.toHit).toBe(5);
+    expect(result.saveDc).toBe(13);
+    expect(result.cantrips_known).toBe(0);
+    expect(result.spell_slots_level_1).toBe(2);
+    // Grants enter the known list the same lv3 the required_major table starts.
+    expect(result.spells.map(s => s.name).sort()).toEqual(['Beast Sense', 'Speak with Animals']);
+    // Per-spell Wisdom/ritual-only stamps on these rows are pinned in
+    // spellCalc2024-wildheart-rituals.test.js (CLA-234) — not re-pinned here.
+  });
 
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          name: 'Barbarian',
-          class_levels: [{ level: 3 }],
-          major: { name: 'Path of the Berserker' },
-        },
-        abilities: [{ name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
+  it('gates major.spells on the classes.json unlock level — Commune with Nature joins exactly at lv10, not lv9', () => {
+    const lv9Names = getSpellAbilities(SPELL_DB, makeWildHeartBarbarianStats({ level: 9, proficiency: 4 })).spells.map(s => s.name);
+    expect(lv9Names).not.toContain('Commune with Nature');
 
-      const result = getSpellAbilities([], stats);
-      expect(result).toBeNull();
-    });
-
-    it('grants spellcasting for Path of the Wild Heart Barbarian at level 3', () => {
-      mockGetHighestMajorLevel.mockReturnValue({
-        spellcasting: {
-          cantrips_known: 0,
-          spells_known: 0,
-          spell_slots_level_1: 2,
-          spell_slots_level_2: 0,
-          spell_slots_level_3: 0,
-          spell_slots_level_4: 0,
-          spell_type: 'known',
-        },
-      });
-
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          name: 'Barbarian',
-          class_levels: [{ level: 3 }],
-          major: {
-            name: 'Path of the Wild Heart',
-            spell_casting_ability: 'Wisdom',
-            spells: [
-              { name: 'Speak with Animals', level: 1 },
-              { name: 'Beast Sense', level: 2 },
-            ],
-          },
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
-
-      const result = getSpellAbilities([], stats);
-
-      expect(result).not.toBeNull();
-      expect(result.cantrips_known).toBe(0);
-      expect(result.spellCastingAbility).toBe('Wisdom');
-      expect(result.modifier).toBe(3);
-      expect(result.toHit).toBe(5);
-      expect(result.saveDc).toBe(13);
-      expect(result.spell_slots_level_1).toBe(2);
-    });
-
-    it('overrides casting_time to Ritual for Beast Sense and Speak with Animals', () => {
-      mockGetHighestMajorLevel.mockReturnValue({
-        spellcasting: {
-          cantrips_known: 0,
-          spells_known: 0,
-          spell_slots_level_1: 2,
-          spell_slots_level_2: 2,
-          spell_type: 'known',
-        },
-      });
-
-      const allSpells = [
-        makeSpell('Speak with Animals', 1, { casting_time: 'Action or Ritual' }),
-        makeSpell('Beast Sense', 2, { casting_time: 'Action or Ritual' }),
-      ];
-
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          name: 'Barbarian',
-          class_levels: [{ level: 3 }],
-          major: {
-            name: 'Path of the Wild Heart',
-            spell_casting_ability: 'Wisdom',
-            spells: [
-              { name: 'Speak with Animals', level: 1 },
-              { name: 'Beast Sense', level: 2 },
-            ],
-          },
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const speakWithAnimals = result.spells.find(s => s.name === 'Speak with Animals');
-      expect(speakWithAnimals.casting_time).toBe('Ritual');
-      const beastSense = result.spells.find(s => s.name === 'Beast Sense');
-      expect(beastSense.casting_time).toBe('Ritual');
-    });
-
-    it('adds Commune with Nature from Nature Speaker at level 10', () => {
-      mockGetHighestMajorLevel.mockReturnValue({
-        spellcasting: {
-          cantrips_known: 0,
-          spells_known: 0,
-          spell_slots_level_1: 4,
-          spell_slots_level_2: 3,
-          spell_slots_level_3: 2,
-          spell_slots_level_4: 0,
-          spell_slots_level_5: 1,
-          spell_type: 'known',
-        },
-      });
-
-      const allSpells = [
-        makeSpell('Commune with Nature', 5, { casting_time: '1 minute or Ritual' }),
-      ];
-
-      const stats = makePlayerStats({
-        level: 10,
-        class: {
-          name: 'Barbarian',
-          class_levels: [{ level: 10 }],
-          major: {
-            name: 'Path of the Wild Heart',
-            spell_casting_ability: 'Wisdom',
-            spells: [
-              { name: 'Speak with Animals', level: 1 },
-              { name: 'Beast Sense', level: 2 },
-              { name: 'Commune with Nature', level: 10 },
-            ],
-          },
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Commune with Nature');
-      const communeWithNature = result.spells.find(s => s.name === 'Commune with Nature');
-      expect(communeWithNature.casting_time).toBe('Ritual');
-    });
-
-    it('does not add Commune with Nature when level < 10', () => {
-      mockGetHighestMajorLevel.mockReturnValue({
-        spellcasting: {
-          cantrips_known: 0,
-          spells_known: 0,
-          spell_slots_level_1: 2,
-          spell_type: 'known',
-        },
-      });
-
-      const allSpells = [
-        makeSpell('Commune with Nature', 5),
-      ];
-
-      const stats = makePlayerStats({
-        level: 6,
-        class: {
-          name: 'Barbarian',
-          class_levels: [{ level: 6 }],
-          major: {
-            name: 'Path of the Wild Heart',
-            spell_casting_ability: 'Wisdom',
-            spells: [
-              { name: 'Speak with Animals', level: 1 },
-              { name: 'Beast Sense', level: 2 },
-              { name: 'Commune with Nature', level: 10 },
-            ],
-          },
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-      });
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      const names = result.spells.map(s => s.name);
-      expect(names).not.toContain('Commune with Nature');
-    });
-
-    it('works for level 20 Barbarian with spellcasting on every class level', () => {
-      mockGetHighestMajorLevel.mockReturnValue(undefined);
-
-      const allSpells = [
-        makeSpell('Speak with Animals', 1, { casting_time: 'Action or Ritual' }),
-        makeSpell('Beast Sense', 2, { casting_time: 'Action or Ritual' }),
-        makeSpell('Commune with Nature', 5, { casting_time: '1 minute or Ritual' }),
-      ];
-
-      const stats = makePlayerStats({
-        level: 20,
-        class: {
-          name: 'Barbarian',
-          class_levels: [
-            { level: 1, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 2, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 3, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 4, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 5, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 6, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 2, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 7, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 8, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 9, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 10, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 2, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 11, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 12, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 13, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 14, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 1, spell_type: 'known' } },
-            { level: 15, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 16, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 17, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 18, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 19, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 0, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_type: 'known' } },
-            { level: 20, spellcasting: { required_major: 'Path of the Wild Heart', cantrips_known: 0, spells_known: 0, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 1, spell_slots_level_5: 1, spell_type: 'known' } },
-          ],
-          major: {
-            name: 'Path of the Wild Heart',
-            spell_casting_ability: 'Wisdom',
-            spells: [
-              { name: 'Speak with Animals', level: 1 },
-              { name: 'Beast Sense', level: 2 },
-              { name: 'Commune with Nature', level: 10 },
-            ],
-          },
-        },
-        abilities: [{ name: 'Wisdom', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 5 }],
-        proficiency: 6,
-      });
-
-      const result = getSpellAbilities(allSpells, stats);
-
-      expect(result).not.toBeNull();
-      expect(result.spellCastingAbility).toBe('Wisdom');
-      expect(result.modifier).toBe(5);
-      expect(result.saveDc).toBe(19);
-      expect(result.spell_slots_level_4).toBe(1);
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Speak with Animals');
-      expect(names).toContain('Beast Sense');
-      expect(names).toContain('Commune with Nature');
-      expect(result.spells.find(s => s.name === 'Speak with Animals').casting_time).toBe('Ritual');
-      expect(result.spells.find(s => s.name === 'Beast Sense').casting_time).toBe('Ritual');
-      expect(result.spells.find(s => s.name === 'Commune with Nature').casting_time).toBe('Ritual');
-    });
+    const lv10 = getSpellAbilities(SPELL_DB, makeWildHeartBarbarianStats({ level: 10, proficiency: 4 }));
+    expect(lv10.spells.map(s => s.name)).toContain('Commune with Nature');
+    // Disk lv10 has no lv5 slot; the row's survival past the slot filter is owned by
+    // spellCalc2024-wildheart-rituals.test.js 'keeps Commune with Nature past the
+    // slot-level filter at lv10…' (CLA-234). Header DC at half-caster lv10: 8+3+4.
+    expect(lv10.saveDc).toBe(15);
   });
 });

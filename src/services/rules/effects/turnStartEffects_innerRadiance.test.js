@@ -1,11 +1,29 @@
-// BUG CLA-198 — Inner Radiance recurring radiant tick.
-// Regression coverage:
-//  1. The `inner_radiance_turn_start` consumer ticks EXACTLY ONCE per
-//     applyTurnStartEffects invocation, even when the creature carries
-//     multiple turnStartEffects entries (previously applyAuraDamage sat
-//     unconditionally inside the loop and ticked once per entry).
-//  2. No tick at all when the creature has no `inner_radiance_turn_start` entry.
-//  3. Tick amount = proficiency bonus, Radiant, 10 ft, gated by innerRadianceActive.
+// @maintained-by-ai
+// BUG CLA-198 — Inner Radiance recurring Radiant tick at the turn-start seam.
+// THIS lane owns, at applyTurnStartEffects level:
+//  1. The `inner_radiance_turn_start` consumer dispatches EXACTLY ONE
+//     applyAuraDamage call per invocation even when the creature carries
+//     multiple turnStartEffects entries (regression: applyAuraDamage sat
+//     unconditionally in the loop and ticked once per entry).
+//  2. Recurrence: the dispatch consumes no latch at this seam — it ticks
+//     again on every later invocation while the entry persists (cited BY
+//     auraDamageService.test.js and expirations_applyAuraDamage.test.js).
+//  3. Inertness: zero dispatch with foreign entries only or an empty
+//     turnStartEffects list (cited BY expirations_additional.test.js and
+//     by the #1296 fold trail).
+//  4. Caller-side options contract (cited BY applyAuraDamage.test.js):
+//     damageValue is playerStats.proficiency (NOT the expression evaluator —
+//     pinned by using a proficiency distinct from every mock return),
+//     range 10, damageType Radiant, activeKey 'innerRadianceActive', and
+//     characters are passed through untouched. The active-gate itself and
+//     damage application run INSIDE applyAuraDamage — owned by
+//     applyAuraDamage.test.js / auraDamageService.test.js /
+//     expirations_applyAuraDamage.test.js; the collector entry shape is
+//     owned by automationCollector.turnStartEffects.test.js against disk
+//     truth public/data/2024/races.json (Radiant, proficiency_bonus, 10_ft).
+// Zero-write / zero-log budget: this lane mutates no runtime store and logs
+// nothing itself (extra entries are chosen from zero-write handlers so the
+// full-set write budget stays exact; write-side bookkeeping is #1280's).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -54,67 +72,73 @@ vi.mock('../../ui/storage.js', () => ({
 
 import { applyTurnStartEffects } from './turnStartEffects.js';
 import { applyAuraDamage } from './auraDamageService.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
 
 const campaignName = 'test-campaign';
 
-function stats(turnStartEffects, proficiency = 5) {
-    return { name: 'AasimarTest', proficiency, turnStartEffects };
-}
+// Collector shape per automation/turnStartEffects.js + public/data/2024/races.json.
+const INNER_RADIANCE = {
+    type: 'inner_radiance_turn_start',
+    name: 'Inner Radiance',
+    damageExpression: 'proficiency_bonus',
+    damageType: 'Radiant',
+    range: '10_ft',
+};
 
 describe('BUG CLA-198 — Inner Radiance tick in applyTurnStartEffects', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('ticks exactly ONCE when inner_radiance_turn_start is present, even with extra effect entries', async () => {
-        await applyTurnStartEffects(
-            'AasimarTest',
-            stats([
-                { type: 'inner_radiance_turn_start', name: 'Inner Radiance', damageExpression: 'proficiency_bonus', damageType: 'Radiant', range: '10_ft' },
-                { type: 'steady_aim_clear', name: 'Steady Aim Clear' },
-                { type: 'steady_aim_clear', name: 'Roving Aim Clear' },
-            ]),
-            campaignName,
-            []
-        );
+    it.each([
+        {
+            label: 'dispatches once even with extra turnStartEffects entries, damageValue from proficiency 3',
+            invocations: 1,
+            proficiency: 3,
+            // proficiency 3 vs evaluateAutoExpression mock 5 pins the value as
+            // playerStats.proficiency, not the expression evaluator. Extras are
+            // zero-write handlers so the full-set write budget stays exact.
+            turnStartEffects: [INNER_RADIANCE, { type: 'use_magic_device' }, { type: 'mage_hand_legerdemain' }],
+        },
+        {
+            label: 'recurrence — ticks again at every later invocation while the entry persists',
+            invocations: 3,
+            proficiency: 5,
+            turnStartEffects: [INNER_RADIANCE],
+        },
+    ])('ticks: $label', async ({ invocations, proficiency, turnStartEffects }) => {
+        const playerStats = { name: 'AasimarTest', proficiency, turnStartEffects };
+        const characters = ['AasimarTest', 'Goblin'];
 
-        expect(applyAuraDamage).toHaveBeenCalledTimes(1);
-        expect(applyAuraDamage).toHaveBeenCalledWith(
-            'AasimarTest',
-            expect.any(Object),
-            campaignName,
-            [],
-            expect.objectContaining({
-                activeKey: 'innerRadianceActive',
-                damageValue: 5,
-                range: 10,
-                damageType: 'Radiant',
-            })
-        );
+        for (let i = 0; i < invocations; i++) {
+            await applyTurnStartEffects('AasimarTest', playerStats, campaignName, characters);
+        }
+
+        expect(applyAuraDamage).toHaveBeenCalledTimes(invocations);
+        expect(applyAuraDamage).toHaveBeenCalledWith('AasimarTest', playerStats, campaignName, characters, {
+            activeKey: 'innerRadianceActive',
+            damageValue: proficiency,
+            range: 10,
+            damageType: 'Radiant',
+        });
+        // This seam neither mutates the runtime store nor logs — all of that
+        // happens inside applyAuraDamage (#1280 write-side, #1282 consumer).
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('does NOT tick when the creature has no inner_radiance_turn_start entry', async () => {
+    it.each([
+        { label: 'foreign turnStartEffects entries only', turnStartEffects: [{ type: 'steady_aim_clear', name: 'Steady Aim Clear' }] },
+        { label: 'empty turnStartEffects list', turnStartEffects: [] },
+    ])('does NOT tick with $label', async ({ turnStartEffects }) => {
         await applyTurnStartEffects(
             'AasimarTest',
-            stats([{ type: 'steady_aim_clear', name: 'Steady Aim Clear' }]),
+            { name: 'AasimarTest', proficiency: 3, turnStartEffects },
             campaignName,
             []
         );
 
         expect(applyAuraDamage).not.toHaveBeenCalled();
-    });
-
-    it('does NOT tick on an empty turnStartEffects list', async () => {
-        await applyTurnStartEffects('AasimarTest', stats([]), campaignName, []);
-        expect(applyAuraDamage).not.toHaveBeenCalled();
-    });
-
-    it('ticks once per invocation for every invocation (recurrence across rounds)', async () => {
-        const s = stats([{ type: 'inner_radiance_turn_start', name: 'Inner Radiance' }]);
-        await applyTurnStartEffects('AasimarTest', s, campaignName, []);
-        expect(applyAuraDamage).toHaveBeenCalledTimes(1);
-        // Simulates the next round's owner turn-start invocation
-        await applyTurnStartEffects('AasimarTest', s, campaignName, []);
-        expect(applyAuraDamage).toHaveBeenCalledTimes(2);
     });
 });

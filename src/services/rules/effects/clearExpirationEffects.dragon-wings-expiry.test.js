@@ -1,6 +1,20 @@
+// @maintained-by-ai
 // BUG CLA-099 lock: the dragon_wings rounds-clock expiry must clear the active
 // flag and log — previously the EXPIRATION_HANDLERS entry was a silent strip
 // with zero runtime producers.
+// Direct-handler contract of the inline 'dragon_wings' entry
+// (clearExpirationEffects.js:418-431). This is a DISTINCT handler from
+// handleFlySpeedEqualsWalkSpeed (CLA-096, owned by
+// clearExpirationEffects.draconic-flight-expiry.test.js): no activeConditions
+// read, no Incapacitated branch. Every expiry dispatch performs exactly two
+// setRuntimeValue writes (unconditional flag clear + buff-strip); the log is
+// gated on a wings buff standing:
+//   1. buff standing → flag cleared, only the wings buff stripped (foreign
+//      buff survives), one duration-expiry log with exact bytes;
+//   2. no wings buff standing (retract already dropped it) → flag still
+//      cleared, silent, foreign buffs preserved verbatim.
+// Activation-side lives in dragonWingsHandler/dragonWingsService tests;
+// rest-resource keys in restRules-constants.cla099-dragon-wings.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -42,40 +56,56 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../ui/logService.js';
 
 const campaignName = 'test-campaign';
+const holder = 'AberrantSorcerer';
+
 const WINGS_BUFF = { name: 'Dragon Wings', effect: 'dragon_wings' };
+const FOREIGN_BUFF = { name: 'Bless', effect: 'bless' };
+
+const expiry = [{ type: 'dragon_wings' }];
 
 describe('CLA-099 dragon_wings expiry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('clears the buff and the active flag and logs the duration expiry', () => {
+  it('strips only the wings buff, clears the flag, and logs the duration expiry once', () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [WINGS_BUFF, { name: 'Bless', effect: 'bless' }];
+      if (key === 'activeBuffs') return [WINGS_BUFF, FOREIGN_BUFF];
       return null;
     });
 
-    clearExpirationEffects([{ type: 'dragon_wings' }], 'AberrantSorcerer', 'AberrantSorcerer', campaignName);
+    clearExpirationEffects(expiry, holder, holder, campaignName);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('AberrantSorcerer', 'dragonWingsActive', false, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('AberrantSorcerer', 'activeBuffs', [{ name: 'Bless', effect: 'bless' }], campaignName);
-    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+    // Exact write budget: flag clear + buff-strip, nothing more.
+    expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(setRuntimeValue).toHaveBeenCalledWith(holder, 'dragonWingsActive', false, campaignName);
+    // Exact buff-strip write: the wings buff goes, the foreign buff stands.
+    expect(setRuntimeValue).toHaveBeenCalledWith(holder, 'activeBuffs', [FOREIGN_BUFF], campaignName);
+
+    // Full log bytes.
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith(campaignName, {
       type: 'ability_use',
-      characterName: 'AberrantSorcerer',
+      characterName: holder,
       abilityName: 'Dragon Wings',
-      description: expect.stringContaining('duration has expired'),
-    }));
+      description: "AberrantSorcerer's draconic wings dissolve — Dragon Wings' duration has expired.",
+      timestamp: expect.any(Number),
+    });
   });
 
   it('clears the flag but stays silent when no wings buff stands (retract already dropped it)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'activeBuffs') return [];
+      if (key === 'activeBuffs') return [FOREIGN_BUFF];
       return null;
     });
 
-    clearExpirationEffects([{ type: 'dragon_wings' }], 'AberrantSorcerer', 'AberrantSorcerer', campaignName);
+    clearExpirationEffects(expiry, holder, holder, campaignName);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('AberrantSorcerer', 'dragonWingsActive', false, campaignName);
     expect(addEntry).not.toHaveBeenCalled();
+    // The flag clear is unconditional even on the silent path; the foreign
+    // buff is preserved untouched by the no-strip buff write.
+    expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(setRuntimeValue).toHaveBeenCalledWith(holder, 'dragonWingsActive', false, campaignName);
+    expect(setRuntimeValue).toHaveBeenCalledWith(holder, 'activeBuffs', [FOREIGN_BUFF], campaignName);
   });
 });

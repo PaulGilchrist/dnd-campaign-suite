@@ -1,3 +1,13 @@
+// @maintained-by-ai
+// Barrel lane for expirations.js → turnStartEffects.js: effect handlers NOT
+// pinned elsewhere — ensureArray guard (full-message pin),
+// vitalityOfTheTree_turn_start, aura_of_life_turn_start_heal (log included),
+// confusion_turn_start (delegates to handleConfusionTurnStart + logs the
+// behavior), and regenerate_turn_start_heal via the barrel dispatch
+// (cited by regenerateHandler.active.test.js as the turn-start tick face).
+// Direct orchestration dispatch/order: applyTurnStartEffects.test.js.
+// Inner Radiance empty-list inertness: turnStartEffects_innerRadiance.test.js.
+// addExpiration queue write + barrel-import smoke: #1280/#1281 lanes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -73,10 +83,9 @@ vi.mock('../../automation/handlers/spells/shapechangeService.js', () => ({
 }));
 
 vi.mock('../../combat/automation/automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn((expr) => {
-    if (typeof expr === 'number') return expr;
-    return 1;
-  }),
+  // Faithful-enough stub: numeric strings evaluate to their number so
+  // healExpression pass-through is distinguishable from fixed heals.
+  evaluateAutoExpression: vi.fn((expr) => (typeof expr === 'number' ? expr : Number(expr))),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
@@ -102,6 +111,8 @@ vi.mock('../../../hooks/useAllySelection.js', () => ({
 
 import { applyTurnStartEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../ui/logService.js';
+import { handleConfusionTurnStart } from '../../automation/handlers/spells/confusionTurnStartHandler.js';
 import utils from '../../ui/utils.js';
 
 function resetMocks() {
@@ -111,10 +122,10 @@ function resetMocks() {
 }
 
 // ---------------------------------------------------------------------------
-// ensureArray (private helper — tested indirectly via applyTurnStartEffects)
+// ensureArray (private helper — tested via the barrel's applyTurnStartEffects)
 // ---------------------------------------------------------------------------
 describe('ensureArray', () => {
-  it('throws when turnStartEffects is not an array', async () => {
+  it('rejects non-array turnStartEffects with the typed rejection message', async () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
@@ -122,23 +133,16 @@ describe('ensureArray', () => {
 
     await expect(
       applyTurnStartEffects('TestCharacter', { turnStartEffects: 'not-an-array' }, 'TestCampaign'),
-    ).rejects.toThrow('Expected array for turnStartEffects');
-  });
-
-  it('throws when turnStartEffects is null', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
+    ).rejects.toThrow('Expected array for turnStartEffects, got string');
 
     await expect(
       applyTurnStartEffects('TestCharacter', { turnStartEffects: null }, 'TestCampaign'),
-    ).rejects.toThrow('Expected array for turnStartEffects');
+    ).rejects.toThrow('Expected array for turnStartEffects, got null');
   });
 });
 
 // ---------------------------------------------------------------------------
-// applyTurnStartEffects — additional effect types not in other test files
+// applyTurnStartEffects — handler types not pinned in sibling lanes
 // ---------------------------------------------------------------------------
 describe('applyTurnStartEffects — additional effect types', () => {
   beforeEach(() => {
@@ -148,10 +152,12 @@ describe('applyTurnStartEffects — additional effect types', () => {
   });
 
   describe('vitalityOfTheTree_turn_start effect', () => {
-    it('sets vitalityOfTheTreeAvailable to true when Rage buff is active', async () => {
+    it.each([
+      ['Rage buff active', [{ name: 'Rage', effect: 'rage' }], true],
+      ['Rage buff absent', [{ name: 'Haste', effect: 'haste' }], false],
+    ])('sets vitalityOfTheTreeAvailable to %s', async (_case, activeBuffs, expected) => {
       getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeBuffs') return [{ name: 'Rage', effect: 'rage' }];
-        if (prop === 'targetEffects') return [];
+        if (prop === 'activeBuffs') return activeBuffs;
         return null;
       });
 
@@ -162,38 +168,18 @@ describe('applyTurnStartEffects — additional effect types', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
         'vitalityOfTheTreeAvailable',
-        true,
-        'TestCampaign',
-      );
-    });
-
-    it('sets vitalityOfTheTreeAvailable to false when Rage buff is absent', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeBuffs') return [{ name: 'Haste', effect: 'haste' }];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'vitalityOfTheTree_turn_start' }],
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'vitalityOfTheTreeAvailable',
-        false,
+        expected,
         'TestCampaign',
       );
     });
   });
 
   describe('aura_of_life_turn_start_heal effect', () => {
-    it('heals 1 HP when auraOfLifeHpMaxProtected is true and current HP is 0', async () => {
+    it('heals dropped-to-0 character to 1 HP and logs the hp_change entry', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'auraOfLifeHpMaxProtected') return true;
         if (prop === 'hitPoints') return 20;
         if (prop === 'currentHitPoints') return 0;
-        if (prop === 'targetEffects') return [];
         return null;
       });
 
@@ -207,35 +193,21 @@ describe('applyTurnStartEffects — additional effect types', () => {
         1,
         'TestCampaign',
       );
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+        type: 'hp_change',
+        targetName: 'TestCharacter',
+        delta: 1,
+        isHealing: true,
+        sourceName: null,
+        note: 'Aura of Life (1 HP at start of turn)',
+      });
     });
 
-    it('does not heal when auraOfLifeHpMaxProtected is false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'auraOfLifeHpMaxProtected') return false;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'aura_of_life_turn_start_heal' }],
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestCharacter',
-        'currentHitPoints',
-        1,
-        'TestCampaign',
-      );
-    });
-
-    it('does not heal when current HP is already above 0', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'auraOfLifeHpMaxProtected') return true;
-        if (prop === 'hitPoints') return 20;
-        if (prop === 'currentHitPoints') return 5;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
+    it.each([
+      ['protection flag false', { auraOfLifeHpMaxProtected: false, currentHitPoints: 0 }],
+      ['already above 0 HP', { auraOfLifeHpMaxProtected: true, currentHitPoints: 5 }],
+    ])('does not write currentHitPoints when %s', async (_case, values) => {
+      getRuntimeValue.mockImplementation((name, prop) => values[prop] ?? null);
 
       await applyTurnStartEffects('TestCharacter', {
         turnStartEffects: [{ type: 'aura_of_life_turn_start_heal' }],
@@ -251,29 +223,32 @@ describe('applyTurnStartEffects — additional effect types', () => {
   });
 
   describe('confusion_turn_start effect', () => {
-    it('logs confusion turn-start behavior', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
+    it('delegates to handleConfusionTurnStart and logs the turn-start behavior', async () => {
+      getRuntimeValue.mockImplementation(() => null);
 
       await applyTurnStartEffects('TestCharacter', {
         turnStartEffects: [{ type: 'confusion_turn_start' }],
       }, 'TestCampaign');
 
-      // The confusion handler should have been called
-      // Since addEntry is mocked, we just verify no error was thrown
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(handleConfusionTurnStart).toHaveBeenCalledWith('TestCharacter', 'TestCampaign');
+      expect(addEntry).toHaveBeenCalledWith('TestCampaign', {
+        type: 'condition',
+        action: 'turn_start_behavior',
+        characterName: 'TestCharacter',
+        condition: 'Confused',
+        reason: 'Confusion spell turn-start effect',
+        note: 'Attacks nearest creature',
+        timestamp: expect.any(Number),
+      });
     });
   });
 
   describe('regenerate_turn_start_heal effect', () => {
-    it('heals when regenerateActive is true', async () => {
+    it('heals via the effect healExpression, not the fixed 1 HP buff tick', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'regenerateActive') return true;
         if (prop === 'hitPoints') return 20;
         if (prop === 'currentHitPoints') return 10;
-        if (prop === 'targetEffects') return [];
         return null;
       });
 
@@ -281,19 +256,18 @@ describe('applyTurnStartEffects — additional effect types', () => {
         turnStartEffects: [{ type: 'regenerate_turn_start_heal', healExpression: '3' }],
       }, 'TestCampaign');
 
-      // evaluateAutoExpression('3', ...) returns 1 (string, not number), so heal = min(20, 10+1) = 11
+      // Only the effect-type handler can produce 13 (buff heal is always +1 → 11).
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
         'currentHitPoints',
-        11,
+        13,
         'TestCampaign',
       );
     });
 
-    it('does not heal when regenerateActive is false', async () => {
+    it('does not heal currentHitPoints when regenerateActive is false', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'regenerateActive') return false;
-        if (prop === 'targetEffects') return [];
         return null;
       });
 
@@ -301,31 +275,9 @@ describe('applyTurnStartEffects — additional effect types', () => {
         turnStartEffects: [{ type: 'regenerate_turn_start_heal', healExpression: '3' }],
       }, 'TestCampaign');
 
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('innerRadiance aura damage via applyAuraDamage in loop', () => {
-    it('applies radiant damage to creatures in range when innerRadianceActive is true', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'innerRadianceActive') return true;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      // applyAuraDamage is called inside the turnStartEffects loop
-      // Since turnStartEffects is empty, the loop doesn't execute
-      // This test verifies the innerRadiance logic is reached
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [],
-        proficiency: 2,
-      }, 'TestCampaign');
-
-      // No turnStartEffects means the loop doesn't execute, so applyAuraDamage is never called
-      // The function returns without errors
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'TestCharacter',
-        'innerRadianceActive',
+        'currentHitPoints',
         expect.anything(),
         'TestCampaign',
       );

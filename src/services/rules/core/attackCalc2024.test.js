@@ -1,519 +1,217 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Base lane of 2024 getAttacks: the unique orchestration seams and ability-select
+// byte contracts NOT owned by topic lanes. Real builders end-to-end per the
+// #1235-#1242 canon — the wholesale ./attackCalc.js stub, the classRules2024
+// stub, and every builder-stub echo assertion are retired: each expectation
+// below is canonical buildWeaponAttack / buildFallbackUnarmedAttacks output
+// bytes, so any miswired ability select, bonus fold, or row order fails a
+// full toEqual. Only combatData is stubbed (SSE-backed, unavoidable — the
+// Swift Quiver gate reads getCombatSummary on every getAttacks call;
+// null = concentration inactive). No campaignName on the test characters, so
+// the Nick runtime latch (collectWeaponMastery / getRuntimeValue) is never
+// entered, and every character is a non-Monk, so classRules2024 and the
+// CLA-225 Martial Arts lane are never entered — no mocks needed for them.
+// Fixtures transcribed verbatim from public/data/equipment.json
+// (Shortbow/Longsword/Rapier/Shortsword, verified against disk 2026-10-20).
+//
+// Deleted here, with their owning lanes cited (accumulated queue via
+// light-ranged #1239, nick-dual-wielder #1240, cla225 #1242):
+// - light-melee seam placement + two_weapon_fighting off-hand damage legs
+//   (old 'places all non-light melee weapons in CharActions...' :255-292 and
+//   'includes ability bonus in damage...' :294-329, stub echoes over
+//   fabricated no-Properties fixtures) →
+//   attackCalc2024-light-melee.test.js:91-186 full-row toEqual truth tables.
+// - Crossbow Expert lane → attackCalc2024-light-ranged.test.js:106-144
+//   truth-table faces 2/4. The old :466 test was a mislabeled melee-lane
+//   TWF case: its fixture fabricated a 'Melee' Hand Crossbow (disk: Ranged)
+//   and its automation.passives crossbow fixture never reached the real
+//   feats[] gate at attackCalc2024.js:64.
+// - Dual Wielder feat holder/non-holder legs (old :366-418 / :420-449,
+//   non-disk fixtures without mastery fields) →
+//   attackCalc2024-nick-dual-wielder.test.js:199-310 FT-104 byte pair.
+// - fallback unarmed degenerate faces (empty abilities, negative STR) →
+//   attackCalc2024-edge-cases.test.js:112-160; this lane keeps only the
+//   positive-STR baseline that file's :108 cites it for.
+//
+// Incoming citations — test names preserved, line ranges shifted by rewrite:
+// - attackCalc2024-edge-cases.test.js:20 & :108 cite the no-weapon baseline
+//   ('no weapons or spells...') below at :121-131.
+// - attackCalc2024-light-ranged.test.js:12 cites 'selects Dexterity for
+//   ranged weapon attacks' below at :133-146.
+// - attackCalc2024-edge-cases.test.js:21 cites
+//   'includes both ranged and melee weapon attacks when both are equipped'
+//   below at :194-216.
+import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
 
-// ---------------------------------------------------------------------------
-// Module-level stubs for functions that getAttacks calls internally.
-// We replace the real implementations with controlled stubs so that
-// getAttacks' branching logic (ranged vs melee, monk, spells, etc.) is
-// exercised while keeping each test focused on one path.
-// ---------------------------------------------------------------------------
-
-const findEquippedWeaponsStub = vi.fn();
-const buildWeaponAttackStub = vi.fn((opts) => ({
-  name: opts.weaponName,
-  damage: opts.includeAbilityBonusInDamage !== false
-    ? `${opts.weapon.damage.damage_dice}+${opts.abilityBonus}`
-    : opts.weapon.damage.damage_dice,
-  damageType: opts.weapon.damage.damage_type,
-  damageFormula: 'Damage Formula',
-  hitBonus: opts.abilityBonus + opts.proficiency,
-  hitBonusFormula: 'Hit Bonus Formula',
-  range: opts.weapon.range?.normal ?? 5,
-  type: opts.actionType,
-  weaponType: opts.weaponType,
-}));
-const buildMonkAttacksStub = vi.fn((_opts) => [
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Action',
-  },
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Bonus Action',
-  },
-]);
-
-vi.mock('./attackCalc.js', () => ({
-  parseMagicItemName: (name) =>
-    name && name.charAt(0) === '+'
-      ? { baseName: name.substring(3), magicBonus: Number(name.charAt(1)) || 0 }
-      : { baseName: name, magicBonus: 0 },
-  findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
-  buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
-  buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  parseDamageDice: (diceStr) => {
-    const match = String(diceStr).match(/(\d+)d(\d+)/);
-    if (!match) return 0;
-    const [, count, sides] = match;
-    return parseInt(count, 10) * (parseInt(sides, 10) + 1) / 2;
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getMartialArtsDie: vi.fn(() => 8),
-  },
-}));
-
+// Unavoidable mock only: SSE/runtime-backed combat summary.
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Fixtures — copied from public/data/equipment.json (verified 2026-10-20)
 // ---------------------------------------------------------------------------
 
-const defaultPlayerStats = (overrides = {}) => ({
-  level: 1,
+const SHORTBOW = {
+  name: 'Shortbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Simple',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+  range: { normal: 80, long: 320 },
+  properties: ['Ammunition', 'Two-Handed'],
+  mastery: 'Vex',
+};
+
+const LONGSWORD = {
+  name: 'Longsword',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Melee',
+  damage: { damage_dice: '1d8', damage_type: 'Slashing' },
+  range: { normal: 5, long: null },
+  properties: ['Versatile'],
+  mastery: 'Sap',
+};
+
+const RAPIER = {
+  name: 'Rapier',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Melee',
+  damage: { damage_dice: '1d8', damage_type: 'Piercing' },
+  range: { normal: 5, long: null },
+  properties: ['Finesse'],
+  mastery: 'Vex',
+};
+
+const SHORTSWORD = {
+  name: 'Shortsword',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Melee',
+  damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+  range: { normal: 5, long: null },
+  properties: ['Finesse', 'Light', 'Monk'],
+  mastery: 'Vex',
+};
+
+const CATALOG = [SHORTBOW, LONGSWORD, RAPIER, SHORTSWORD];
+
+// lv1 Fighter, PB +2 (proficiency ladder owned by attackCalc2024-edge-cases.test.js:76-101).
+const char = ({ level = 1, str = 0, dex = 0, equipped = [] } = {}) => ({
+  level,
   abilities: [
-    { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-    { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+    { name: 'Strength', bonus: str },
+    { name: 'Dexterity', bonus: dex },
   ],
-  inventory: { equipped: [] },
+  inventory: { equipped },
   automation: { passives: [], bonusActions: [] },
   activeBuffs: [],
   class: { name: 'Fighter' },
-  ...overrides,
 });
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('attackCalc2024', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('attackCalc2024 - getAttacks base seams', () => {
+  it('no weapons or spells — positive-STR fallback Unarmed Strike baseline (cited by attackCalc2024-edge-cases.test.js:108)', () => {
+    expect(getAttacks([], [], char({ str: 2 }))).toEqual([
+      {
+        name: 'Unarmed Strike', damage: '1d4+2', damageType: 'Bludgeoning',
+        damageFormula: 'Damage Formula = Unarmed Strike (1d4) + Strength Bonus (2)',
+        hitBonus: 4,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (2) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'unarmed',
+      },
+    ]);
   });
 
-  describe('getAttacks', () => {
-    it('returns unarmed strike when the character has no weapons, spells, or special features', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+  it('selects Dexterity for ranged weapon attacks (cited by attackCalc2024-light-ranged.test.js:12)', () => {
+    // STR -1 falsifier: if the ranged lane ever used Strength the row would
+    // read 1d6-1 / hitBonus 1 — the builder forces Dexterity (attackCalc2024.js:29-30).
+    expect(getAttacks(CATALOG, [], char({ str: -1, dex: 3, equipped: ['Shortbow'] }))).toEqual([
+      {
+        name: 'Shortbow', damage: '1d6+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Ammunition', 'Two-Handed'],
+      },
+    ]);
+  });
 
-      const result = getAttacks([], [], defaultPlayerStats());
+  // Melee ability select (attackCalc2024.js:241-242): max(STR, DEX), tie →
+  // Dexterity. This is the base lane's owned axis — topic lanes pin other intents.
+  it.each([
+    {
+      label: 'STR +4 > DEX +0 → Strength drives hit and damage',
+      abilities: { str: 4, dex: 0 },
+      equipped: ['Longsword'],
+      row: {
+        name: 'Longsword', damage: '1d8+4', damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (4)',
+        hitBonus: 6,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (4) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+        properties: ['Versatile'],
+      },
+    },
+    {
+      label: 'DEX +4 > STR +0 → Dexterity drives hit and damage',
+      abilities: { str: 0, dex: 4 },
+      equipped: ['Rapier'],
+      row: {
+        name: 'Rapier', damage: '1d8+4', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Dexterity Bonus (4)',
+        hitBonus: 6,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (4) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Vex',
+        properties: ['Finesse'],
+      },
+    },
+    {
+      label: 'tie STR +2 = DEX +2 → Dexterity wins the tie',
+      abilities: { str: 2, dex: 2 },
+      equipped: ['Shortsword'],
+      row: {
+        name: 'Shortsword', damage: '1d6+2', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (2)',
+        hitBonus: 4,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (2) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Vex',
+        properties: ['Finesse', 'Light', 'Monk'],
+      },
+    },
+  ])('melee ability select: $label', ({ abilities, equipped, row }) => {
+    expect(getAttacks(CATALOG, [], char({ ...abilities, equipped }))).toEqual([row]);
+  });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
-
-    it('selects Dexterity for ranged weapon attacks', () => {
-      // Ranged returns Shortbow, melee returns empty
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce([]);
-
-      const allEquipment = [
-        {
-          name: 'Shortbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 80 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0, bonus: -1 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Shortbow');
-      expect(result[0].type).toBe('Action');
-      expect(result[0].range).toBe(80);
-      expect(result[0].damageType).toBe('Piercing');
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          abilityName: 'Dexterity',
-          abilityBonus: 3,
-          proficiency: 2,
-          actionType: 'Action',
-        })
-      );
-    });
-
-    it('selects Strength for melee weapon attacks when Strength > Dexterity', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Longsword']);
-
-      const allEquipment = [
-        {
-          name: 'Longsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Longsword');
-      expect(result[0].damageType).toBe('Slashing');
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          abilityName: 'Strength',
-          abilityBonus: 4,
-        })
-      );
-    });
-
-    it('selects Dexterity for melee weapon attacks when Dexterity > Strength', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Rapier']);
-
-      const allEquipment = [
-        {
-          name: 'Rapier',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          abilityName: 'Dexterity',
-          abilityBonus: 4,
-        })
-      );
-    });
-
-    it('ties to Dexterity when Strength and Dexterity bonuses are equal for melee', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-        expect.objectContaining({
-          abilityName: 'Dexterity',
-          abilityBonus: 2,
-        })
-      );
-    });
-
-    it('places all non-light melee weapons in CharActions when <2 light weapons', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword', 'Dagger']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-        {
-          name: 'Dagger',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].type).toBe('Action');
-      expect(result[1].type).toBe('Action');
-      expect(result[0].name).toBe('Shortsword');
-      expect(result[1].name).toBe('Dagger');
-    });
-
-    it('includes ability bonus in damage for all melee weapons in CharActions', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword', 'Dagger']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-        {
-          name: 'Dagger',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      // Both weapons in Action, both with ability bonus
-      expect(result[0].damage).toContain('+2');
-      expect(result[1].damage).toContain('+2');
-    });
-
-    it('includes both ranged and melee weapon attacks when both are equipped', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce(['Shortbow'])
-        .mockReturnValueOnce(['Longsword']);
-
-      const allEquipment = [
-        {
-          name: 'Shortbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 80 },
-        },
-        {
-          name: 'Longsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d8', damage_type: 'Slashing' },
-          range: { normal: 5 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        class: { name: 'Fighter' },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(2);
-    });
-
-    it('handles off-hand with Dual Wielder feat bonus action attack', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword', 'Dagger', 'Sickle']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-        {
-          name: 'Dagger',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-        {
-          name: 'Sickle',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Slashing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-        automation: {
-          passives: [],
-          bonusActions: [
-            { type: 'bonus_attacks', trigger: 'attack_action_with_light_weapon' },
-          ],
-        },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      // Shortsword (non-light) Action + Dagger (light, highest damage) Action + Sickle (light, Bonus Action) + Dual Wielder extra = 4
-      expect(result).toHaveLength(4);
-      expect(result[2].name).toBe('Sickle');
-      expect(result[2].type).toBe('Bonus Action');
-      expect(result[3].name).toBe('Dual Wielder Extra Attack');
-    });
-
-    it('does not add Dual Wielder extra without the feat', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword', 'Dagger', 'Sickle']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-        {
-          name: 'Dagger',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-        {
-          name: 'Sickle',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Slashing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-        automation: { passives: [], bonusActions: [] },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      // Shortsword (non-light) Action + Dagger (light, highest) Action + Sickle (light, Bonus Action) = 3
-      expect(result).toHaveLength(3);
-    });
-
-    it('includes ability bonus on off-hand for Light Crossbow with Crossbow Expert Dual Wielding passive', () => {
-      findEquippedWeaponsStub
-        .mockReturnValueOnce([])
-        .mockReturnValueOnce(['Shortsword', 'Hand Crossbow', 'Dagger']);
-
-      const allEquipment = [
-        {
-          name: 'Shortsword',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-        },
-        {
-          name: 'Hand Crossbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-        {
-          name: 'Dagger',
-          equipment_category: 'Weapon',
-          weapon_range: 'Melee',
-          damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-          range: { normal: 5 },
-          properties: ['Light'],
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-        ],
-        class: { name: 'Fighter' },
-        automation: {
-          passives: [{ effect: 'two_weapon_fighting', name: 'Dual Wielding' }],
-          bonusActions: [],
-        },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      // Shortsword (non-light) Action + Hand Crossbow (light, highest damage) Action + Dagger (light, Bonus Action with TWF) = 3
-      expect(result).toHaveLength(3);
-      // Dagger in Bonus Action should have ability bonus from two_weapon_fighting passive
-      expect(result[2].name).toBe('Dagger');
-      expect(result[2].type).toBe('Bonus Action');
-      expect(result[2].damage).toContain('+2');
-    });
+  it('includes both ranged and melee weapon attacks when both are equipped', () => {
+    // Orchestration seam: ranged rows build first (attackCalc2024.js:568-571),
+    // and each lane picks its own ability — DEX (+3) for the bow, STR (+4) for
+    // the sword, in one pass.
+    expect(getAttacks(CATALOG, [], char({ str: 4, dex: 3, equipped: ['Shortbow', 'Longsword'] }))).toEqual([
+      {
+        name: 'Shortbow', damage: '1d6+3', damageType: 'Piercing',
+        damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+        hitBonus: 5,
+        hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+        range: 80, type: 'Action', weaponType: '', mastery: 'Vex',
+        properties: ['Ammunition', 'Two-Handed'],
+      },
+      {
+        name: 'Longsword', damage: '1d8+4', damageType: 'Slashing',
+        damageFormula: 'Damage Formula = Weapon (1d8) + Strength Bonus (4)',
+        hitBonus: 6,
+        hitBonusFormula: 'To Hit Bonus Formula = Strength Bonus (4) + Proficiency (2)',
+        range: 5, type: 'Action', weaponType: 'melee', mastery: 'Sap',
+        properties: ['Versatile'],
+      },
+    ]);
   });
 });

@@ -1,12 +1,17 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { applyLongRest } from './restRules.js'
 
+// This file owns the SPECIAL long-rest seams: named consumers inside applyLongRest
+// that do more than null resource keys (Star Map/Cosmic Omen, Chef, campaign
+// targetEffects rows, True Polymorph persistence, Spell Thief cross-store prune,
+// log lines). Base batch/exhaustion-reset, regenerateActive clearing (:547),
+// bolsteringTreats craft count (:171), Bastion of Law ward reset (:430-439) and
+// Spell Thief batch tracking + null-branch (:489-511) live in restRules-longRest.test.js.
+
 // Mock dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_name, key, _campaign) => {
-    if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-    return undefined;
-  }),
+  getRuntimeValue: vi.fn(() => undefined),
   setRuntimeBatch: vi.fn(),
   setRuntimeValue: vi.fn(),
   getAllStoreKeys: vi.fn(() => []),
@@ -20,6 +25,8 @@ vi.mock('./expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }))
 
+// restRules-constants re-exports this; drives both the batch reset (base lane)
+// and the 'Exhaustion: n → m' log line (this lane).
 vi.mock('../../combat/conditions/exhaustionRules.js', () => ({
   getLevelAfterLongRest: vi.fn((level) => Math.max(0, level - 1)),
 }))
@@ -59,11 +66,11 @@ vi.mock('../../../services/ui/storage.js', () => ({
 }))
 
 // Import mocked functions for per-test customization
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { addEntry } from '../../../services/ui/logService.js'
-import { getCombatSummary } from '../../../services/encounters/combatData.js'
+import { getCombatSummary, setCombatSummaryCache } from '../../../services/encounters/combatData.js'
 import * as storageService from '../../../services/ui/storage.js'
 
 const CAMPAIGN = 'test-campaign'
@@ -80,411 +87,98 @@ function makeStats(overrides = {}) {
   }
 }
 
+function starsDruid(level, wisBonus) {
+  return makeStats({
+    class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
+    level,
+    abilities: [{ name: 'Wisdom', bonus: wisBonus }],
+  })
+}
+
 describe('restRules - long rest special features', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getRuntimeValue).mockImplementation((_name, key, _campaign) => {
-      if (key === 'bastionOfLawWardTarget') return 'WardTarget';
-      return undefined;
-    })
+    vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
   })
 
-  describe('Circle of the Stars', () => {
-    it('sets Star Map free cast count on long rest for Druid level 3+', async () => {
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 3,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
+  describe('Circle of the Stars (Star Map + Cosmic Omen)', () => {
+    it('arms Star Map free casts to the WIS modifier at level 3 and defers Cosmic Omen until level 6', async () => {
+      await applyLongRest(starsDruid(3, 4), CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', '_Star_Map_freeCastCount', 4, CAMPAIGN, true,
       )
+      // Omen guard is level 6+ — no roll, no omen ledger at level 3
+      expect(rollD20).not.toHaveBeenCalled()
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Test Hero', 'cosmicOmenEffect', expect.anything(), CAMPAIGN, expect.anything(),
+      )
     })
 
-    it('sets Star Map free cast count to minimum 1 when WIS mod is 0', async () => {
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 3,
-        abilities: [{ name: 'Wisdom', bonus: 0 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
+    it('clamps Star Map free casts to a minimum of 1 when WIS modifier is 0', async () => {
+      await applyLongRest(starsDruid(3, 0), CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', '_Star_Map_freeCastCount', 1, CAMPAIGN, true,
       )
     })
 
-    it('does not set Star Map for Druid below level 3', async () => {
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 2,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', '_Star_Map_freeCastCount', expect.anything(), CAMPAIGN, true,
-      )
-    })
-
-    it('does not set Star Map for non-Circle of the Stars Druid', async () => {
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Land' } },
-        level: 5,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', '_Star_Map_freeCastCount', expect.anything(), CAMPAIGN, true,
-      )
-    })
-
-    it('rolls Cosmic Omen on long rest for Druid level 6+', async () => {
-      vi.clearAllMocks()
+    it('rolls Cosmic Omen at level 6+: odd Woe, even Weal, superseding the pending global bonus', async () => {
       vi.mocked(rollD20).mockReturnValue(7)
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 6,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
-      expect(rollD20).toHaveBeenCalled()
+      await applyLongRest(starsDruid(6, 4), CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', 'cosmicOmenEffect',
         JSON.stringify({ type: 'Woe', isEven: false, starMapRoll: 7 }),
         CAMPAIGN, true,
       )
+      // CLA-065: an armed-but-unspent ±1d6 pending bonus lives under the canonical
+      // global 'cosmicOmen' store — a fresh Star Map supersedes it at the seam.
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'cosmicOmen', 'cosmicOmenPendingBonus', null, CAMPAIGN, true,
+      )
       expect(clearAllExpirationEffects).toHaveBeenCalledWith('Test Hero', CAMPAIGN)
-    })
 
-    it('rolls Weal for even Cosmic Omen number', async () => {
-      vi.clearAllMocks()
       vi.mocked(rollD20).mockReturnValue(12)
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 6,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
+      await applyLongRest(starsDruid(6, 4), CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Hero', 'cosmicOmenEffect',
         JSON.stringify({ type: 'Weal', isEven: true, starMapRoll: 12 }),
         CAMPAIGN, true,
       )
+      // exactly one Star Map roll per long rest
+      expect(rollD20).toHaveBeenCalledTimes(2)
     })
 
-    it('CLA-065: clears unspent cosmicOmenPendingBonus from the global cosmicOmen store', async () => {
-      vi.clearAllMocks()
-      vi.mocked(rollD20).mockReturnValue(4)
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 6,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'cosmicOmen', 'cosmicOmenPendingBonus', null, CAMPAIGN, true,
-      )
-    })
-
-    it('CLA-065: does not clear the pending store for Druid below level 6', async () => {
-      vi.clearAllMocks()
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
+    it('leaves no Star Map or Cosmic Omen state for ineligible characters', async () => {
+      // level-2 Stars (level guard) and level-5 Land (subclass guard) —
+      // the level-6 omen guard's negative is covered level 3+ above
+      await applyLongRest(starsDruid(2, 4), CAMPAIGN)
+      await applyLongRest(makeStats({
+        class: { name: 'Druid', major: { name: 'Circle of the Land' } },
         level: 5,
         abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
+      }), CAMPAIGN)
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Test Hero', '_Star_Map_freeCastCount', expect.anything(), CAMPAIGN, expect.anything(),
+      )
+      expect(rollD20).not.toHaveBeenCalled()
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         'cosmicOmen', 'cosmicOmenPendingBonus', expect.anything(), CAMPAIGN, expect.anything(),
       )
     })
-
-    it('does not roll Cosmic Omen for Druid below level 6', async () => {
-      vi.clearAllMocks()
-      const druidStats = makeStats({
-        class: { name: 'Druid', major: { name: 'Circle of the Stars' } },
-        level: 5,
-        abilities: [{ name: 'Wisdom', bonus: 4 }],
-      })
-      await applyLongRest(druidStats, CAMPAIGN)
-      expect(rollD20).not.toHaveBeenCalled()
-    })
   })
 
-  describe('Replenishing Meal on long rest', () => {
-    it('resets replenishingMeals on long rest when feature exists', async () => {
+  describe('Chef features on long rest', () => {
+    it('resets Replenishing Meals to 4+proficiency, clears the recipient treat, and logs both chef lines', async () => {
       const chefStats = makeStats({
         proficiency: 5,
-        automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
+        automation: {
+          passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }],
+          specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }],
+        },
       })
       await applyLongRest(chefStats, CAMPAIGN)
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'replenishingMeals', 9, CAMPAIGN, true)
-    })
-
-    it('does not reset replenishingMeals when feature is absent', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'Test Hero', 'replenishingMeals', expect.anything(), CAMPAIGN, true,
-      )
-    })
-  })
-
-  describe('Bolstering Treats on long rest', () => {
-    it('crafts Bolstering Treats on long rest when feature exists', async () => {
-      const chefStats = makeStats({
-        proficiency: 4,
-        automation: { specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-      })
-      await applyLongRest(chefStats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'chefBolsteringTreats', 4, CAMPAIGN, true)
-    })
-
-    it('uses 0 when proficiency is missing for Bolstering Treats', async () => {
-      const chefStats = makeStats({
-        proficiency: 0,
-        automation: { specialActions: [{ type: 'temp_hp_buff', name: 'Bolstering Treats' }] },
-      })
-      await applyLongRest(chefStats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'chefBolsteringTreats', 0, CAMPAIGN, true)
-    })
-
-    it('clears bolsteringTreat on long rest', async () => {
-      await applyLongRest(makeStats(), CAMPAIGN)
+      // craft-count write (chefBolsteringTreats) is owned by restRules-longRest.test.js:171
       expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bolsteringTreat', null, CAMPAIGN, true)
-    })
-  })
-
-  describe('targetEffects clearing on long rest when effects exist', () => {
-    it('clears clairvoyant_combatant effects on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'clairvoyant_combatant' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears pass_without_trace_bonus on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'pass_without_trace_bonus' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears blur on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'blur' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears regenerate on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'regenerate' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears beacon_of_hope on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'beacon_of_hope' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears resistance_damage_reduction on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'resistance_damage_reduction' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears barkskin on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'barkskin' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears enhance_ability on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'enhance_ability' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears circle_of_power on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'circle_of_power' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears foresight on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'foresight' }, { effect: 'advantage_attacks' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-
-    it('clears starry_form on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'starry_form' }]
-        return undefined
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'campaign', 'targetEffects', [], CAMPAIGN, true,
-      )
-    })
-  })
-
-  describe('regenerateActive clearing on long rest', () => {
-    it('clears regenerateActive from all store keys on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'regenerateActive') return true
-        if (key === 'hitPoints') return 50
-        return undefined
-      })
-      vi.mocked(getAllStoreKeys).mockReturnValue(['Char1', 'Char2'])
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'regenerateActive', false, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith('Char1', 'currentHitPoints', 50, CAMPAIGN)
-    })
-  })
-
-  describe('True Polymorph on long rest', () => {
-    it('removes true_polymorph summoned creatures on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [
-          { name: 'Summon1', summonSource: 'true_polymorph' },
-          { name: 'Normal1' },
-        ],
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), CAMPAIGN)
-    })
-
-    it('handles object transforms on long rest', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'activeConditions') return ['incapacitated', 'blinded']
-        return undefined
-      })
-      vi.mocked(getCombatSummary).mockReturnValue({
-        creatures: [
-          {
-            name: 'Transformed1',
-            polymorphObject: { maxHp: 50, ac: 15, speed: 30 },
-            polymorphOriginal: { maxHp: 50, ac: 15, speed: 30 },
-          },
-        ],
-      })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
-      expect(storageService.default.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), CAMPAIGN)
-    })
-  })
-
-  describe('Spell Thief caster block on long rest', () => {
-    it('updates caster block lists on long rest when entries remain', async () => {
-      vi.clearAllMocks()
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === '_spellThiefBlockedList') return JSON.stringify([
-          { casterName: 'Caster1', spellName: 'Fireball' },
-          { casterName: 'Caster2', spellName: 'Witch Bolt' },
-        ])
-        if (key === '_spellThiefStolenList') return '[]'
-        if (key === '_spellThiefCasterBlock') return JSON.stringify([
-          { thiefName: 'Test Hero', spellName: 'Fireball' },
-          { thiefName: 'OtherThief', spellName: 'Lightning Bolt' },
-        ])
-        return undefined
-      })
-      const stats = makeStats({
-        automation: { reactions: [{ type: 'spell_thief' }] },
-      })
-      await applyLongRest(stats, CAMPAIGN)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster1', '_spellThiefCasterBlock',
-        JSON.stringify([{ thiefName: 'OtherThief', spellName: 'Lightning Bolt' }]),
-        CAMPAIGN,
-      )
-    })
-  })
-
-  describe('long rest logging', () => {
-    it('logs Replenishing Meals in long rest log when feature exists', async () => {
-      vi.clearAllMocks()
-      const chefStats = makeStats({
-        proficiency: 3,
-        automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
-      })
-      await applyLongRest(chefStats, CAMPAIGN)
       expect(addEntry).toHaveBeenCalledWith(
         CAMPAIGN,
         expect.objectContaining({
@@ -492,29 +186,172 @@ describe('restRules - long rest special features', () => {
           message: expect.stringContaining('Replenishing Meals'),
         }),
       )
-    })
-
-    it('logs long rest with basic message when no special features', async () => {
-      vi.clearAllMocks()
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
       expect(addEntry).toHaveBeenCalledWith(
         CAMPAIGN,
         expect.objectContaining({
-          type: 'long_rest',
-          message: expect.stringContaining('takes a long rest'),
+          message: expect.stringContaining('Bolstering Treats'),
         }),
+      )
+    })
+
+    it('skips chef resets but still clears bolsteringTreat for characters without chef features', async () => {
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Test Hero', 'replenishingMeals', expect.anything(), CAMPAIGN, expect.anything(),
+      )
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Test Hero', 'chefBolsteringTreats', expect.anything(), CAMPAIGN, expect.anything(),
+      )
+      // unconditionally re-armed even without the crafting feature
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Hero', 'bolsteringTreat', null, CAMPAIGN, true)
+    })
+  })
+
+  describe('campaign targetEffects rows', () => {
+    it('clears every long-rest row down to only unrelated effects', async () => {
+      // Stateful campaign store: each row read/filter/write advances the store,
+      // so final residue proves a row was skipped. One entry per source row,
+      // incl. the foresight multi-key row, plus hp_max_reduce without baseMax
+      // (restore skipped honestly — ledger cleared with the row).
+      let tes = [
+        { effect: 'ability_score_drain' },
+        { effect: 'hp_max_reduce' },
+        { effect: 'clairvoyant_combatant' },
+        { effect: 'pass_without_trace_bonus' },
+        { effect: 'blur' },
+        { effect: 'regenerate' },
+        { effect: 'beacon_of_hope' },
+        { effect: 'resistance_damage_reduction' },
+        { effect: 'barkskin' },
+        { effect: 'enhance_ability' },
+        { effect: 'circle_of_power' },
+        { effect: 'foresight' },
+        { effect: 'advantage_attacks' },
+        { effect: 'starry_form' },
+        { effect: 'bless' },
+      ]
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => (key === 'targetEffects' ? tes : undefined))
+      vi.mocked(setRuntimeValue).mockImplementation((name, key, value) => {
+        if (name === 'campaign' && key === 'targetEffects') tes = value
+      })
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(tes).toEqual([{ effect: 'bless' }])
+    })
+
+    it('does not write skipSync targetEffects clears when no campaign effect matches a row', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'targetEffects' ? [{ effect: 'bless' }] : undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+      // row filter is arity-safe (writes only when the list actually shrinks);
+      // clearLongRestSummonEffects' unconditional write is 4-arg and does not match
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'campaign', 'targetEffects', expect.any(Array), CAMPAIGN, true,
       )
     })
   })
 
-  describe('long rest error handling', () => {
-    it('catches and logs addEntry errors on long rest', async () => {
+  describe('True Polymorph summons and object transforms', () => {
+    it('removes true_polymorph summons and restores object transforms in the persisted combat summary', async () => {
+      const cs = {
+        creatures: [
+          { name: 'Summon1', summonSource: 'true_polymorph' },
+          {
+            name: 'Transformed1',
+            maxHp: 50, ac: 15, speed: 30,
+            polymorphObject: { maxHp: 50, ac: 15, speed: 30 },
+            polymorphOriginal: { maxHp: 90, ac: 12, speed: 30 },
+            objectType: 'chest',
+          },
+          { name: 'Normal1' },
+        ],
+      }
+      vi.mocked(getCombatSummary).mockReturnValue(cs)
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'activeConditions' ? ['incapacitated', 'blinded'] : undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+      const persisted = storageService.default.set.mock.calls.at(-1)[1]
+      expect(persisted.creatures.map(c => c.name)).toEqual(['Transformed1', 'Normal1'])
+      const restored = persisted.creatures[0]
+      expect({ maxHp: restored.maxHp, ac: restored.ac, speed: restored.speed })
+        .toEqual({ maxHp: 90, ac: 12, speed: 30 })
+      expect(restored.polymorphObject).toBeUndefined()
+      expect(restored.objectType).toBeUndefined()
+      // object-form incapacitation ends with the transform; other conditions stay
+      expect(setRuntimeValue).toHaveBeenCalledWith('Transformed1', 'activeConditions', ['blinded'], CAMPAIGN)
+      expect(setCombatSummaryCache).toHaveBeenCalledWith(persisted, CAMPAIGN)
+    })
+  })
+
+  describe('Spell Thief caster block prune', () => {
+    it('removes the resting thief entries from caster block lists — filtered JSON when others remain, null when empty', async () => {
+      const blockedLists = {
+        Caster1: JSON.stringify([
+          { thiefName: 'Test Hero', spellName: 'Fireball' },
+          { thiefName: 'OtherThief', spellName: 'Lightning Bolt' },
+        ]),
+        Caster2: JSON.stringify([{ thiefName: 'Test Hero', spellName: 'Lightning Bolt' }]),
+      }
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (name === 'Test Hero' && key === '_spellThiefBlockedList') {
+          return JSON.stringify([
+            { casterName: 'Caster1', spellName: 'Fireball' },
+            { casterName: 'Caster2', spellName: 'Lightning Bolt' },
+          ])
+        }
+        if (name === 'Test Hero' && key === '_spellThiefStolenList') return '[]'
+        if (key === '_spellThiefCasterBlock') return blockedLists[name]
+        return undefined
+      })
+      const thiefStats = makeStats({ automation: { reactions: [{ type: 'spell_thief' }] } })
+      await applyLongRest(thiefStats, CAMPAIGN)
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Caster1', '_spellThiefCasterBlock',
+        JSON.stringify([{ thiefName: 'OtherThief', spellName: 'Lightning Bolt' }]),
+        CAMPAIGN,
+      )
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster2', '_spellThiefCasterBlock', null, CAMPAIGN)
+
+      // a character without the Spell Thief reaction never touches caster lists
       vi.clearAllMocks()
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Caster1', '_spellThiefCasterBlock', expect.anything(), CAMPAIGN,
+      )
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Caster2', '_spellThiefCasterBlock', expect.anything(), CAMPAIGN,
+      )
+    })
+  })
+
+  describe('long rest log', () => {
+    it('logs the basic long rest message and reports exhaustion reduction at the seam', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+        key === 'exhaustionLevel' ? 2 : undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'long_rest',
+          message: expect.stringContaining('Test Hero takes a long rest.'),
+        }),
+      )
+      // getLevelAfterLongRest mock: 2 → 1 (batch reset itself is base-lane)
+      expect(addEntry.mock.calls.at(-1)[1].message).toContain('Exhaustion: 2 → 1')
+
+      // no exhaustion line when the hero is not exhausted
+      vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+      await applyLongRest(makeStats(), CAMPAIGN)
+      const second = addEntry.mock.calls.at(-1)[1]
+      expect(second.message).toContain('takes a long rest')
+      expect(second.message).not.toContain('Exhaustion:')
+    })
+  })
+
+  describe('long rest error handling', () => {
+    it('catches and logs addEntry errors so the completed rest never throws', async () => {
       const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       vi.mocked(addEntry).mockImplementation(() => { throw new Error('Log failed') })
-      const stats = makeStats()
-      await applyLongRest(stats, CAMPAIGN)
+      await expect(applyLongRest(makeStats(), CAMPAIGN)).resolves.toBeDefined()
       expect(mockConsoleError).toHaveBeenCalledWith(
         '[restRules] Failed to log long rest:',
         'Log failed',

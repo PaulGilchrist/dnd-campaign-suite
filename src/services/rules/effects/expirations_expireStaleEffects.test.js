@@ -1,3 +1,25 @@
+// @maintained-by-ai
+// Lane: the per-round maturity sweep — expireStaleEffects driving the real
+// expirationQueue (expireForCreature/expireForTarget → processExpirationList).
+// OWNER of the maturity truth table (confirmed by #1294: the round-arithmetic
+// boundary is not pinned in the ba001/addExpiration lanes): currentRound vs
+// appliedRound + expiryRounds, including the exact-expiry row (source operator
+// is `>=` — pinned honestly), Infinity/missing-rounds inertness, negative and
+// NaN rows, and the expireOnCreatureName seam (operator is strict `>`).
+// Expiry CONSEQUENCE routing is pinned here as exact dispatch args with a
+// multi-type mixed batch — per-type clear internals are owned by
+// clearExpirationEffects*.test.js; the FT-082 te option-scoping collateral is
+// owned by turnStartEffects_additional.test.js; real condition-clear
+// consequence end-to-end + early exits live in expireStaleEffects.test.js.
+// Original :275 cite preserved: "damage application is tested in
+// applyAuraDamage.test.js" (plus turnStartEffects_innerRadiance.test.js and
+// expirations_applyAuraDamage.test.js — innerRadiance aura damage is NOT
+// this lane; the vacuous innerRadiance probe that stood here was removed).
+// Cited BY: applyTurnStartEffects.test.js header (topple/cloak/wild-magic/
+// flag clears), sleetStormHandler.areaSave.test.js (sleet seam pins),
+// naturesVeilHandler.test.js (expiration queue internals).
+// No-timers policy: the round is read ONLY through the getCurrentCombatRound
+// seam — determinism proven by the negative test below.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -9,12 +31,6 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('../../ui/utils.js', () => ({
   default: {
     getName: vi.fn((val) => String(val)),
-  },
-}));
-
-vi.mock('../../ui/storage.js', () => ({
-  default: {
-    set: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -30,534 +46,395 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(() => 5),
-}));
-
-vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
-  processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
-  processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/confusionTurnStartHandler.js', () => ({
-  handleConfusionTurnStart: vi.fn().mockResolvedValue({ behaviorText: 'Attacks nearest creature' }),
+// Consequence routing is pinned here; the real per-type switch is owned by
+// clearExpirationEffects*.test.js lanes.
+vi.mock('./clearExpirationEffects.js', () => ({
+  clearExpirationEffects: vi.fn(),
 }));
 
 vi.mock('../../automation/handlers/spells/sleetStormHandler.js', () => ({
   processSleetStormAreaSave: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../combat/summons/summonedCreatureService.js', () => ({
-  removeSummonedCreatures: vi.fn(),
+vi.mock('../../automation/handlers/spells/stinkingCloudHandler.js', () => ({
+  processStinkingCloudAreaSave: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../automation/handlers/spells/polymorphService.js', () => ({
-  revertPolymorph: vi.fn(),
+vi.mock('../../automation/handlers/spells/webAreaSaveHandler.js', () => ({
+  processWebAreaSave: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../automation/handlers/spells/animalShapesService.js', () => ({
-  revertAnimalShapes: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/truePolymorphService.js', () => ({
-  revertTruePolymorph: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/shapechangeService.js', () => ({
-  revertShapechange: vi.fn(),
-}));
-
+// Inert under these fixtures (no matching turnStartEffects entries); mocked
+// only to keep the import chain off unrelated services.
 vi.mock('../../combat/automation/automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn((expr) => {
-    if (typeof expr === 'number') return expr;
-    return 1;
-  }),
+  evaluateAutoExpression: vi.fn((expr) => (typeof expr === 'number' ? expr : 1)),
 }));
-
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn().mockResolvedValue(true),
 }));
-
 vi.mock('../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
-
-vi.mock('../../combat/concentration/concentrationService.js', () => ({
-  breakConcentration: vi.fn(),
-  cleanupConcentrationEffects: vi.fn(),
-}));
-
 vi.mock('../../automation/handlers/buffs/tempHpService.js', () => ({
   setTempHp: vi.fn(),
 }));
-
 vi.mock('../../../hooks/useAllySelection.js', () => ({
   getAllyList: vi.fn(() => []),
 }));
+vi.mock('../../ui/storage.js', () => ({
+  default: {
+    set: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
-import { expireStaleEffects, applyTurnStartEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
-import utils from '../../ui/utils.js';
+import { expireStaleEffects } from './expireStaleEffects.js';
+import { applyTurnStartEffects, KEY } from './turnStartEffects.js';
+import { clearExpirationEffects } from './clearExpirationEffects.js';
+import { processSleetStormAreaSave } from '../../automation/handlers/spells/sleetStormHandler.js';
+import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../../encounters/combatData.js';
 
-const KEY = 'pendingExpirations';
+const CAMPAIGN = 'test-campaign';
 
+// mockClear keeps implementations — reset the mutable seams so a throwing or
+// seeded stub from a previous test can never leak into the next.
 function resetMocks() {
   vi.clearAllMocks();
-  localStorage.clear();
-  window.dispatchEvent = vi.fn();
+  getRuntimeValue.mockReset().mockReturnValue(null);
+  getCombatSummary.mockReset().mockReturnValue(null);
+  getCurrentCombatRound.mockReset();
+  getActiveCreatureName.mockReset();
 }
 
-function stubUtilsNameIdentity() {
-  utils.getName.mockImplementation((v) => String(v));
+function seedStore(values) {
+  getRuntimeValue.mockImplementation((name, prop) => {
+    const key = `${name}.${prop}`;
+    return key in values ? values[key] : null;
+  });
+}
+
+function seedActiveCombat(activeName, currentRound) {
+  getCurrentCombatRound.mockReturnValue(currentRound);
+  getActiveCreatureName.mockReturnValue(activeName);
+  getCombatSummary.mockReturnValue({ creatures: [{ name: activeName }] });
 }
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — Sleet Storm area saves (Phase 3)
+// Maturity truth table — processExpirationList via expireStaleEffects (real)
+// currentRound vs appliedRound + expiryRounds. Source operator is `>=`.
 // ---------------------------------------------------------------------------
-describe('expireStaleEffects — Sleet Storm area saves', () => {
+describe('expireStaleEffects — queue maturity boundary table', () => {
   beforeEach(() => {
     resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(3);
-    getActiveCreatureName.mockReturnValue('Caster');
+    seedActiveCombat('Caster', 3);
   });
 
-  it('triggers sleet storm saves for creatures in the area', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Caster' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Caster' && prop === '_sleetStorm_Caster') return { saveDc: 14, mapName: 'Cave' };
-      if (name === 'Caster' && prop === KEY) return [];
-      if (name === 'Orc' && prop === KEY) return [];
-      if (name === 'campaign' && prop === 'targetEffects') return [
+  it.each([
+    { label: 'survives one round before the expiry round', appliedRound: 3, expiryRounds: 2, currentRound: 4, expires: false },
+    { label: 'expires on the exact expiry round (operator >=, honestly pinned)', appliedRound: 3, expiryRounds: 2, currentRound: 5, expires: true },
+    { label: 'never matures with expiryRounds Infinity (until:combat write shape)', appliedRound: 3, expiryRounds: Infinity, currentRound: 999, expires: false },
+    { label: 'survives when appliedRound is missing (NaN comparison is false)', expiryRounds: 2, currentRound: 999, expires: false },
+    { label: 'matures immediately when expiryRounds is negative', appliedRound: 5, expiryRounds: -1, currentRound: 5, expires: true },
+  ])('$label', async ({ appliedRound, expiryRounds, currentRound, expires }) => {
+    const entry = { target: 'Orc', effects: [{ type: 'condition', condition: 'restrained' }], expireOnCreatureName: null };
+    if (appliedRound !== undefined) entry.appliedRound = appliedRound;
+    if (expiryRounds !== undefined) entry.expiryRounds = expiryRounds;
+    seedActiveCombat('Caster', currentRound);
+    seedStore({ 'Caster.pendingExpirations': [entry] });
+
+    await expireStaleEffects(CAMPAIGN, 'Caster');
+
+    if (expires) {
+      expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
+      expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [], CAMPAIGN);
+    } else {
+      expect(clearExpirationEffects).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    }
+  });
+
+  it('matures on the expireOnCreatureName seam with strict > — holds on the applied round itself, fires the round after', async () => {
+    const entry = { target: 'Orc', effects: [{ type: 'condition', condition: 'blinded' }], appliedRound: 3, expiryRounds: Infinity, expireOnCreatureName: 'Caster' };
+    seedActiveCombat('Caster', 3);
+    seedStore({ 'Caster.pendingExpirations': [entry] });
+
+    await expireStaleEffects(CAMPAIGN, 'Caster');
+    expect(clearExpirationEffects).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+
+    resetMocks();
+    seedActiveCombat('Caster', 4);
+    seedStore({ 'Caster.pendingExpirations': [entry] });
+
+    await expireStaleEffects(CAMPAIGN, 'Caster');
+    expect(clearExpirationEffects).toHaveBeenCalledWith(entry.effects, 'Orc', 'Caster', CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [], CAMPAIGN);
+  });
+
+  it('dispatches one expired entry once with its FULL multi-type effects batch and rewrites the queue with only the live entry', async () => {
+    const matured = { target: 'Orc', appliedRound: 1, expiryRounds: 2, expireOnCreatureName: null, effects: [
+      { type: 'condition', condition: 'restrained' },
+      { type: 'remove_target_effect', effect: 'slow', source: 'Caster' },
+      { type: 'badge', badge: 'sleet_storm_zone' },
+    ] };
+    const live = { target: 'Troll', appliedRound: 3, expiryRounds: 2, expireOnCreatureName: null, effects: [{ type: 'condition', condition: 'blinded' }] };
+    seedActiveCombat('Caster', 3);
+    seedStore({ 'Caster.pendingExpirations': [matured, live] });
+
+    await expireStaleEffects(CAMPAIGN, 'Caster');
+
+    expect(clearExpirationEffects).toHaveBeenCalledTimes(1);
+    expect(clearExpirationEffects).toHaveBeenCalledWith(matured.effects, 'Orc', 'Caster', CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Caster', KEY, [live], CAMPAIGN);
+  });
+
+  it('is deterministic — the round comes from the getCurrentCombatRound seam only, never Date.now', async () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    seedActiveCombat('Caster', 4);
+    seedStore({ 'Caster.pendingExpirations': [{ target: 'Orc', effects: [], appliedRound: 3, expiryRounds: 2, expireOnCreatureName: null }] });
+
+    await expireStaleEffects(CAMPAIGN, 'Caster');
+
+    expect(getCurrentCombatRound).toHaveBeenCalledWith(CAMPAIGN);
+    expect(nowSpy).not.toHaveBeenCalled();
+    nowSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sleet Storm recurring turn-start DEX saves (Phase 3) — seam owner cited by
+// sleetStormHandler.areaSave.test.js
+// ---------------------------------------------------------------------------
+describe('expireStaleEffects — Sleet Storm recurring saves', () => {
+  beforeEach(() => {
+    resetMocks();
+    seedActiveCombat('Caster', 3);
+  });
+
+  it('forces the area save at the caster tracking DC/map for live targets, skipping the caster itself', async () => {
+    seedStore({
+      'Caster._sleetStorm_Caster': { saveDc: 14, mapName: 'Cave' },
+      'campaign.targetEffects': [
         { effect: 'sleet_storm', source: 'Caster', target: 'Orc' },
-      ];
-      if (name === 'Orc' && prop === 'activeConditions') return ['fatigued'];
-      if (prop === KEY) return [];
-      return null;
+        { effect: 'sleet_storm', source: 'Caster', target: 'Caster' },
+      ],
+      'Orc.activeConditions': [],
     });
 
-    expireStaleEffects('test-campaign', 'Caster');
+    await expireStaleEffects(CAMPAIGN, 'Caster');
 
-    // Should have called processSleetStormAreaSave (mocked, so no error)
-    // Phase 1 calls expireForCreature which calls setRuntimeValue for empty list
-    const phase1Calls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Caster' && c[1] === KEY,
-    );
-    expect(phase1Calls.length).toBeGreaterThanOrEqual(0);
+    expect(processSleetStormAreaSave).toHaveBeenCalledTimes(1);
+    expect(processSleetStormAreaSave).toHaveBeenCalledWith('Caster', 'Orc', CAMPAIGN, 'Cave');
   });
 
-  it('skips targets that are already prone', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Caster' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Caster' && prop === '_sleetStorm_Caster') return { saveDc: 14, mapName: 'Cave' };
-      if (name === 'Caster' && prop === KEY) return [];
-      if (name === 'Orc' && prop === KEY) return [];
-      if (name === 'campaign' && prop === 'targetEffects') return [
-        { effect: 'sleet_storm', source: 'Caster', target: 'Orc' },
-      ];
-      if (name === 'Orc' && prop === 'activeConditions') return ['prone', 'fatigued'];
-      if (prop === KEY) return [];
-      return null;
+  it('skips a target that is already prone (no re-save)', async () => {
+    seedStore({
+      'Caster._sleetStorm_Caster': { saveDc: 14, mapName: 'Cave' },
+      'campaign.targetEffects': [{ effect: 'sleet_storm', source: 'Caster', target: 'Orc' }],
+      'Orc.activeConditions': ['prone', 'fatigued'],
     });
 
-    expireStaleEffects('test-campaign', 'Caster');
+    await expireStaleEffects(CAMPAIGN, 'Caster');
 
-    // Prone creature should be skipped - no sleet storm save triggered
-    // Phase 1 still calls expireForCreature which calls setRuntimeValue for empty list
-    const phase1Calls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Caster' && c[1] === KEY,
-    );
-    expect(phase1Calls.length).toBeGreaterThanOrEqual(0);
+    expect(processSleetStormAreaSave).not.toHaveBeenCalled();
   });
 
-  it('skips when the caster has no sleet storm tracking', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Caster' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Caster' && prop === KEY) return [];
-      if (prop === KEY) return [];
-      return null;
+  it('is inert when the caster has no sleet storm tracking (spell ended)', async () => {
+    seedStore({
+      'campaign.targetEffects': [{ effect: 'sleet_storm', source: 'Caster', target: 'Orc' }],
+      'Orc.activeConditions': [],
     });
 
-    expireStaleEffects('test-campaign', 'Caster');
+    await expireStaleEffects(CAMPAIGN, 'Caster');
 
-    // No sleet storm tracking means no Phase 3 logic runs
-    expect(setRuntimeValue).not.toHaveBeenCalledWith(
-      'Orc',
-      'activeConditions',
-      expect.anything(),
-      'test-campaign',
-    );
+    expect(processSleetStormAreaSave).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — Wild Magic Surge "end of current turn" (Phase 1)
+// Wild Magic Surge "end of your current turn" filter (Phase 1 side of
+// expireStaleEffects). "end of your next turn" is owned by the
+// applyTurnStartEffects lane below.
 // ---------------------------------------------------------------------------
-describe('expireStaleEffects — Wild Magic Surge end of current turn', () => {
+describe('expireStaleEffects — Wild Magic current-turn surge filter', () => {
   beforeEach(() => {
     resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(3);
-    getActiveCreatureName.mockReturnValue('Wild Mage');
+    seedActiveCombat('Wild Mage', 3);
   });
 
-  it('filters "end of your current turn" surge effects at start of Phase 1', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Wild Mage' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Wild Mage' && prop === KEY) return [];
-      if (name === 'Wild Mage' && prop === 'wildMagicSurgeEffects') return [
-        { duration: 'end of your current turn', type: 'some_effect' },
-        { duration: '1 minute', type: 'other_effect' },
-      ];
-      if (prop === KEY) return [];
-      return null;
+  it('drops "end of your current turn" entries (case/whitespace tolerant), writing the exact survivor list once', async () => {
+    seedStore({
+      'Wild Mage.wildMagicSurgeEffects': [
+        { duration: ' End Of Your Current Turn ', type: 'surged' },
+        { duration: '1 minute', type: 'keep_me' },
+      ],
     });
 
-    expireStaleEffects('test-campaign', 'Wild Mage');
+    await expireStaleEffects(CAMPAIGN, 'Wild Mage');
 
-    const surgeCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Wild Mage' && c[1] === 'wildMagicSurgeEffects',
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Wild Mage',
+      'wildMagicSurgeEffects',
+      [{ duration: '1 minute', type: 'keep_me' }],
+      CAMPAIGN,
+      true,
     );
-    expect(surgeCalls.length).toBeGreaterThan(0);
-    expect(surgeCalls[0][2]).toEqual([
-      { duration: '1 minute', type: 'other_effect' },
-    ]);
   });
 
-  it('keeps "end of your current turn" effects when round not past appliedRound', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Wild Mage' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Wild Mage' && prop === KEY) return [];
-      if (name === 'Wild Mage' && prop === 'wildMagicSurgeEffects') return [
-        { duration: 'end of your current turn', type: 'some_effect' },
-      ];
-      if (prop === KEY) return [];
-      return null;
+  it('writes nothing when no surge effect matches the current-turn duration', async () => {
+    seedStore({
+      'Wild Mage.wildMagicSurgeEffects': [{ duration: '1 minute', type: 'keep_me' }],
     });
 
-    expireStaleEffects('test-campaign', 'Wild Mage');
+    await expireStaleEffects(CAMPAIGN, 'Wild Mage');
 
-    const surgeCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Wild Mage' && c[1] === 'wildMagicSurgeEffects',
-    );
-    // Since it's "end of your current turn" and currentRound=3 > appliedRound, it should be removed
-    expect(surgeCalls.length).toBeGreaterThan(0);
+    const surgeWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === 'wildMagicSurgeEffects');
+    expect(surgeWrites).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// expireStaleEffects — applyAuraDamage innerRadiance in the loop
-// ---------------------------------------------------------------------------
-describe('expireStaleEffects — applyAuraDamage innerRadiance in loop', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(3);
-    getActiveCreatureName.mockReturnValue('Radiant Caster');
-  });
-
-  it('innerRadiance aura damage is applied during applyTurnStartEffects loop', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Radiant Caster' }] });
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-
-    // This test verifies that the innerRadiance aura damage function call
-    // in the applyTurnStartEffects loop is reached. The actual damage application
-    // is tested in applyAuraDamage.test.js
-    expireStaleEffects('test-campaign', 'Radiant Caster');
-
-    expect(setRuntimeValue).toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// expireStaleEffects — self-targeted expirations for Nature's Veil / Misty Escape
-// ---------------------------------------------------------------------------
-describe('expireStaleEffects — self-targeted expirations (Phase 2)', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(4);
-    getActiveCreatureName.mockReturnValue('Ranger');
-  });
-
-  it('expires entries where the target matches the active creature', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Ranger' }] });
-    getAllStoreKeys.mockReturnValue(['Ranger', 'Orc']);
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Ranger' && prop === KEY) return [
-        { target: 'Ranger', effects: [{ type: 'condition', condition: 'invisible' }], appliedRound: 3, expiryRounds: 1 },
-      ];
-      if (key === 'Ranger' && prop === 'activeConditions') return ['invisible'];
-      if (key === 'Orc' && prop === KEY) return [];
-      if (prop === KEY) return [];
-      return null;
-    });
-
-    expireStaleEffects('test-campaign', 'Ranger');
-
-    // Should have removed the invisible condition
-    const condCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Ranger' && c[1] === 'activeConditions',
-    );
-    expect(condCalls.length).toBeGreaterThan(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// expireStaleEffects — error recovery in try/catch
+// Error recovery
 // ---------------------------------------------------------------------------
 describe('expireStaleEffects — error recovery', () => {
-  beforeEach(() => {
+  it('resolves quietly with zero writes when getCombatSummary throws', async () => {
     resetMocks();
-    stubUtilsNameIdentity();
     getCurrentCombatRound.mockReturnValue(5);
     getActiveCreatureName.mockReturnValue('Goblin');
-  });
+    getCombatSummary.mockImplementation(() => { throw new Error('summary offline'); });
 
-  it('does not throw when getCombatSummary throws', () => {
-    getCombatSummary.mockImplementation(() => { throw new Error('test error'); });
-
-    expect(() => expireStaleEffects('test-campaign')).not.toThrow();
-
-    getCombatSummary.mockReset();
+    await expect(expireStaleEffects(CAMPAIGN)).resolves.toBeUndefined();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// applyTurnStartEffects — cloak_of_shadows check
+// applyTurnStartEffects — cloak of shadows ends early when incapacitated
+// (lane cited by applyTurnStartEffects.test.js header)
 // ---------------------------------------------------------------------------
 describe('applyTurnStartEffects — cloak_of_shadows', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
-  });
-
-  it('removes cloak_of_shadows buff and invisible condition when incapacitated', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }, { effect: 'other' }];
-      if (prop === 'activeConditions') return ['invisible', 'incapacitated', 'fatigued'];
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'TestCharacter',
-      'activeBuffs',
-      [{ effect: 'other' }],
-      'TestCampaign',
-    );
-    // activeConditions is called multiple times by removeActiveCondition (once per condition removal)
-    // The mock returns the same array each time, so each call filters independently.
-    // At minimum, 'invisible' should be removed from the original array.
-    const condCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'TestCharacter' && c[1] === 'activeConditions',
-    );
-    expect(condCalls.length).toBeGreaterThan(0);
-    // One of the calls should remove 'invisible' from the original array
-    const hasInvisibleRemoved = condCalls.some(c =>
-      c[2].includes('fatigued') && !c[2].includes('invisible'),
-    );
-    expect(hasInvisibleRemoved).toBe(true);
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign',
-      '_activeInvisibility_TestCharacter',
-      null,
-      'TestCampaign',
-    );
-  });
-
-  it('does not remove cloak_of_shadows when not incapacitated', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'activeBuffs') return [{ effect: 'cloak_of_shadows' }];
-      if (prop === 'activeConditions') return ['fatigued'];
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-    const buffCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'TestCharacter' && c[1] === 'activeBuffs',
-    );
-    expect(buffCalls.length).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// applyTurnStartEffects — topple prone condition removal
-// ---------------------------------------------------------------------------
-describe('applyTurnStartEffects — topple prone removal', () => {
-  beforeEach(() => {
-    resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
-  });
-
-  it('removes prone from toppled targets and cleans topple targetEffects', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'resistanceUsedThisTurn') return false;
-      if (prop === 'portentUsedThisTurn') return false;
-      if (prop === 'targetEffects') return [
-        { effect: 'topple', target: 'Orc', appliedRound: 1 },
-      ];
-      if (name === 'Orc' && prop === 'activeConditions') return ['prone', 'poisoned'];
-      if (prop === 'activeConditions') return [];
-      return null;
-    });
     getCurrentCombatRound.mockReturnValue(2);
-
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Orc',
-      'activeConditions',
-      ['poisoned'],
-      'TestCampaign',
-    );
-    const effectCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'campaign' && c[1] === 'targetEffects',
-    );
-    expect(effectCalls.length).toBeGreaterThan(0);
   });
 
-  it('does not remove prone when round not yet met', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'resistanceUsedThisTurn') return false;
-      if (prop === 'portentUsedThisTurn') return false;
-      if (prop === 'targetEffects') return [
-        { effect: 'topple', target: 'Orc', appliedRound: 2 },
-      ];
-      if (name === 'Orc' && prop === 'activeConditions') return ['prone', 'poisoned'];
-      if (prop === 'activeConditions') return [];
-      return null;
+  it('strips the buff and Invisible condition, clears the invisibility key, and logs when incapacitated', async () => {
+    seedStore({
+      'TestCharacter.activeBuffs': [{ effect: 'cloak_of_shadows' }, { effect: 'other' }],
+      'TestCharacter.activeConditions': ['invisible', 'incapacitated', 'fatigued'],
     });
+
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, CAMPAIGN);
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeBuffs', [{ effect: 'other' }], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'activeConditions', ['incapacitated', 'fatigued'], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', '_activeInvisibility_TestCharacter', null, CAMPAIGN);
+    expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, expect.objectContaining({
+      type: 'ability_use',
+      characterName: 'TestCharacter',
+      abilityName: 'Cloak of Shadows',
+    }));
+  });
+
+  it('leaves the cloak standing when not incapacitated (zero writes)', async () => {
+    seedStore({
+      'TestCharacter.activeBuffs': [{ effect: 'cloak_of_shadows' }],
+      'TestCharacter.activeConditions': ['fatigued'],
+    });
+
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, CAMPAIGN);
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyTurnStartEffects — Topple prone cleanup boundary (currentRound >=
+// appliedRound + 1, via the real toppleCleanup)
+// ---------------------------------------------------------------------------
+describe('applyTurnStartEffects — topple prone boundary', () => {
+  beforeEach(() => {
+    resetMocks();
     getCurrentCombatRound.mockReturnValue(2);
+  });
 
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+  it.each([
+    { label: 'clears prone on the exact expiry round (2 >= 1 + 1)', appliedRound: 1, expires: true },
+    { label: 'keeps prone before the expiry round (2 >= 2 + 1 is false)', appliedRound: 2, expires: false },
+  ])('$label', async ({ appliedRound, expires }) => {
+    seedStore({
+      'campaign.targetEffects': [{ effect: 'topple', target: 'Orc', appliedRound }],
+      'Orc.activeConditions': ['prone', 'poisoned'],
+    });
 
-    const condCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'Orc' && c[1] === 'activeConditions',
-    );
-    expect(condCalls.length).toBe(0);
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, CAMPAIGN);
+
+    if (expires) {
+      expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', ['poisoned'], CAMPAIGN);
+      expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], CAMPAIGN);
+    } else {
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    }
   });
 });
 
 // ---------------------------------------------------------------------------
-// applyTurnStartEffects — Wild Magic Surge "end of next turn"
+// applyTurnStartEffects — Wild Magic Surge "end of your next turn" clears at
+// the START of the next turn (turnStartEffects.js:275 seam)
 // ---------------------------------------------------------------------------
-describe('applyTurnStartEffects — Wild Magic Surge end of next turn', () => {
+describe('applyTurnStartEffects — Wild Magic next-turn surge expiry', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
+    getCurrentCombatRound.mockReturnValue(2);
   });
 
-  it('removes "end of your next turn" surge effects at start of next turn', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'wildMagicSurgeEffects') return [
-        { duration: 'end of your next turn', type: 'some_effect' },
-        { duration: '1 minute', type: 'other_effect' },
-      ];
-      if (prop === 'resistanceUsedThisTurn') return false;
-      if (prop === 'portentUsedThisTurn') return false;
-      if (prop === 'targetEffects') return [];
-      return null;
+  it('removes "end of your next turn" surge effects at next-turn start, keeping others', async () => {
+    seedStore({
+      'TestCharacter.wildMagicSurgeEffects': [
+        { duration: 'end of your next turn', type: 'surged' },
+        { duration: '1 minute', type: 'keep_me' },
+      ],
     });
 
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-    const surgeCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'TestCharacter' && c[1] === 'wildMagicSurgeEffects',
-    );
-    expect(surgeCalls.length).toBeGreaterThan(0);
-    expect(surgeCalls[0][2]).toEqual([
-      { duration: '1 minute', type: 'other_effect' },
-    ]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// applyTurnStartEffects — piercing_puncture, savage_attacker clearing
-// ---------------------------------------------------------------------------
-describe('applyTurnStartEffects — Piercer Puncture & Savage Attacker clearing', () => {
-  beforeEach(() => {
-    resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
-  });
-
-  it('clears piercerPunctureUsedThisTurn when true', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'piercerPunctureUsedThisTurn') return true;
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, CAMPAIGN);
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
-      'piercerPunctureUsedThisTurn',
-      null,
-      'TestCampaign',
-    );
-  });
-
-  it('clears _Savage_Attacker_usedRound when true', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === '_Savage_Attacker_usedRound') return true;
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'TestCharacter',
-      '_Savage_Attacker_usedRound',
-      null,
-      'TestCampaign',
+      'wildMagicSurgeEffects',
+      [{ duration: '1 minute', type: 'keep_me' }],
+      CAMPAIGN,
+      true,
     );
   });
 });
 
 // ---------------------------------------------------------------------------
-// applyTurnStartEffects — _recklessAttack_offeredThisTurn clearing
+// applyTurnStartEffects — once-per-turn flag clears (clearFlagIfSet seam)
 // ---------------------------------------------------------------------------
-describe('applyTurnStartEffects — Reckless Attack offered clearing', () => {
+describe('applyTurnStartEffects — once-per-turn flag clears', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
+    getCurrentCombatRound.mockReturnValue(2);
   });
 
-  it('clears _recklessAttack_offeredThisTurn when true', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === '_recklessAttack_offeredThisTurn') return true;
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
+  it.each([
+    { flag: '_recklessAttack_offeredThisTurn', value: true, clears: true },
+    { flag: 'piercerPunctureUsedThisTurn', value: true, clears: true },
+    { flag: '_Savage_Attacker_usedRound', value: true, clears: true },
+    { flag: 'piercerPunctureUsedThisTurn', value: null, clears: false },
+  ])('clears $flag to null when set: $clears', async ({ flag, value, clears }) => {
+    seedStore({ [`TestCharacter.${flag}`]: value });
 
-    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, CAMPAIGN);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'TestCharacter',
-      '_recklessAttack_offeredThisTurn',
-      null,
-      'TestCampaign',
-    );
+    const flagWrites = setRuntimeValue.mock.calls.filter((c) => c[1] === flag);
+    if (clears) {
+      expect(flagWrites).toEqual([['TestCharacter', flag, null, CAMPAIGN]]);
+    } else {
+      expect(flagWrites).toEqual([]);
+    }
   });
 });

@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerCrownOfMadness } from './crownOfMadnessService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -17,7 +18,13 @@ vi.mock('../../npcs/monsterUtils.js', () => ({
     getMonsterData: vi.fn(),
 }));
 
-describe('crownOfMadnessService helpers', () => {
+// Branches of the private helpers (isTargetHumanoid, resolveCrownSaveDc,
+// spellSlotLevel composition, advantage flag) that the base lane
+// crownOfMadnessService.test.js does NOT reach through triggerCrownOfMadness.
+// The base lane pins: name matching, target resolution, the happy-path action
+// (type/saveDc 15/targetName/advantage true), spellSlotLevel default 2,
+// return passthrough, and mapName passthrough — not repeated here.
+describe('crownOfMadnessService helper branches', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -31,19 +38,22 @@ describe('crownOfMadnessService helpers', () => {
         proficiency: 4,
     };
 
-    describe('humanoid check', () => {
-        it('returns popup when target is not a Humanoid', async () => {
+    describe('isTargetHumanoid rejection', () => {
+        it.each([
+            ['Wolf', 'Beast'],
+            ['Oozy', 'Ooze'],
+        ])('returns automation_info popup naming %s and skips the handler when target type is %s', async (targetName, type) => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'Wizard', type: 'player' },
-                    { name: 'Wolf', type: 'npc' },
+                    { name: targetName, type: 'npc' },
                 ],
             });
-            getMonsterData.mockResolvedValue({ type: 'Beast' });
+            getMonsterData.mockResolvedValue({ type });
 
             const result = await triggerCrownOfMadness(
                 baseSpell,
-                { targetName: 'Wolf' },
+                { targetName },
                 baseStats,
                 campaignName,
                 mapName,
@@ -54,35 +64,15 @@ describe('crownOfMadnessService helpers', () => {
                 payload: {
                     type: 'automation_info',
                     name: 'Crown of Madness',
-                    description: 'No effect. Wolf is not a Humanoid.',
+                    description: `No effect. ${targetName} is not a Humanoid.`,
                 },
             });
             expect(executeHandler).not.toHaveBeenCalled();
         });
+    });
 
-        it('proceeds when target is a Humanoid NPC', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Shopkeeper', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            const result = await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Shopkeeper' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('treats player-type creatures as Humanoid without calling getMonsterData', async () => {
+    describe('isTargetHumanoid defaults', () => {
+        it('treats player-type creatures as Humanoid without consulting monster data', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             getCombatContext.mockResolvedValue({
                 creatures: [
@@ -101,15 +91,59 @@ describe('crownOfMadnessService helpers', () => {
 
             expect(result).toEqual({ type: 'popup' });
             expect(getMonsterData).not.toHaveBeenCalled();
-            expect(executeHandler).toHaveBeenCalled();
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ targetName: 'Cleric' }),
+                }),
+                baseStats,
+                campaignName,
+                mapName,
+            );
         });
 
-        it('defaults to Humanoid when getMonsterData throws', async () => {
+        it.each([
+            ['target absent from a populated combat context', { creatures: [{ name: 'Wizard', type: 'player' }] }, 'UnknownTarget', undefined, false],
+            ['combat context has no creatures', { creatures: [] }, 'Unknown', undefined, false],
+            ['combat context is null', null, 'Unknown', undefined, false],
+            ['monster data resolves without a type', { creatures: [{ name: 'Mystery', type: 'npc' }] }, 'Mystery', { challenge_rating: 5 }, true],
+        ])('defaults to Humanoid when %s', async (_label, context, targetName, monsterData, expectedAdvantage) => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+            getCombatContext.mockResolvedValue(context);
+            if (monsterData) {
+                getMonsterData.mockResolvedValue(monsterData);
+            }
+
+            const result = await triggerCrownOfMadness(
+                baseSpell,
+                { targetName },
+                baseStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toEqual({ type: 'popup' });
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({
+                        type: 'crown_of_madness',
+                        saveDc: 15,
+                        targetName,
+                        advantage: expectedAdvantage,
+                    }),
+                }),
+                baseStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('defaults to Humanoid and logs a warning when monster data fails to load', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Mystery', type: 'npc' }],
             });
             getMonsterData.mockRejectedValue(new Error('Failed to load'));
+            const consoleSpy = vi.spyOn(console, 'warn');
 
             const result = await triggerCrownOfMadness(
                 baseSpell,
@@ -120,91 +154,24 @@ describe('crownOfMadnessService helpers', () => {
             );
 
             expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('defaults to Humanoid when creature not found in combat context', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [] });
-
-            const result = await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Unknown' },
-                baseStats,
-                campaignName,
-                mapName,
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[crownOfMadnessService] Monster type unavailable, defaulting to Humanoid:'),
+                expect.any(Error),
             );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('defaults to Humanoid when combat context is null', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue(null);
-
-            const result = await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Unknown' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('skips getMonsterData when target is not in combat context (defaults to Humanoid)', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Wizard', type: 'player' }],
-            });
-
-            const result = await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'UnknownTarget' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup' });
-            expect(getMonsterData).not.toHaveBeenCalled();
-            expect(executeHandler).toHaveBeenCalled();
-        });
-    });
-
-    describe('advantage logic', () => {
-        it('sets advantage:true when target is in combat and not the caster', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Goblin', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ advantage: true }),
+                    automation: expect.objectContaining({ targetName: 'Mystery', advantage: true }),
                 }),
                 baseStats,
                 campaignName,
                 mapName,
             );
+            consoleSpy.mockRestore();
         });
+    });
 
-        it('sets advantage:false when target is the caster', async () => {
+    describe('advantage flag', () => {
+        it('is false when the target is the caster themself', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             getCombatContext.mockResolvedValue({
                 creatures: [
@@ -212,7 +179,6 @@ describe('crownOfMadnessService helpers', () => {
                     { name: 'Goblin', type: 'npc' },
                 ],
             });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
 
             await triggerCrownOfMadness(
                 baseSpell,
@@ -224,55 +190,10 @@ describe('crownOfMadnessService helpers', () => {
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ advantage: false }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets advantage:false when target is not in combat context', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin', type: 'npc' }],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'UnknownTarget' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ advantage: false }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets advantage:false when combat context is null', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue(null);
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ advantage: false }),
+                    automation: expect.objectContaining({
+                        targetName: 'Wizard',
+                        advantage: false,
+                    }),
                 }),
                 baseStats,
                 campaignName,
@@ -282,61 +203,20 @@ describe('crownOfMadnessService helpers', () => {
     });
 
     describe('save DC resolution', () => {
-        it('uses metaCtx.spellSaveDc when provided', async () => {
+        it.each([
+            ['metaCtx.spellSaveDc overrides spellAbilities', { spellSaveDc: 18 }, baseStats, 18],
+            ['spellAbilities.saveDc is used when no override', {}, baseStats, 15],
+            ['8 + proficiency when spellAbilities exists without saveDc', {}, { name: 'Wizard', spellAbilities: {}, proficiency: 4 }, 12],
+            ['8 + proficiency when spellAbilities is missing', {}, { name: 'Wizard', proficiency: 3 }, 11],
+            ['8 + default proficiency 2 on minimal stats', {}, {}, 10],
+        ])('%s resolves to %i', async (_label, metaCtx, stats, expectedDc) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
             getMonsterData.mockResolvedValue({ type: 'Humanoid' });
 
             await triggerCrownOfMadness(
                 baseSpell,
-                { targetName: 'Goblin', spellSaveDc: 18 },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 18 }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('falls back to playerStats.spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
-                }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('computes saveDc from proficiency when spellAbilities is missing', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-            const stats = { name: 'Wizard', proficiency: 3 };
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin' },
+                { targetName: 'Goblin', ...metaCtx },
                 stats,
                 campaignName,
                 mapName,
@@ -344,32 +224,9 @@ describe('crownOfMadnessService helpers', () => {
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 11 }),
+                    automation: expect.objectContaining({ saveDc: expectedDc }),
                 }),
                 stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default saveDc of 10 when stats are minimal (8 + default proficiency 2)', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin' },
-                {},
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                {},
                 campaignName,
                 mapName,
             );
@@ -377,116 +234,28 @@ describe('crownOfMadnessService helpers', () => {
     });
 
     describe('slot level resolution', () => {
-        it('uses metaCtx.slotLevel when provided', async () => {
+        it.each([
+            ['metaCtx.slotLevel wins over spell.level', { slotLevel: 5 }, { name: 'Crown of Madness', level: 3 }, 5],
+            ['spell.level used when metaCtx has no slotLevel', {}, { name: 'Crown of Madness', level: 3 }, 3],
+        ])('%s resolves to slot %i', async (_label, metaCtx, spell, expectedSlot) => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
             getMonsterData.mockResolvedValue({ type: 'Humanoid' });
 
             await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Goblin', slotLevel: 5 },
+                spell,
+                { targetName: 'Goblin', ...metaCtx },
                 baseStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 5 }),
+                expect.objectContaining({ spellSlotLevel: expectedSlot }),
                 baseStats,
                 campaignName,
                 mapName,
             );
-        });
-
-        it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                { name: 'Crown of Madness', level: 3 },
-                { targetName: 'Goblin' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 3 }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('defaults slotLevel to 2 when neither metaCtx nor spell has level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
-            getMonsterData.mockResolvedValue({ type: 'Humanoid' });
-
-            await triggerCrownOfMadness(
-                { name: 'Crown of Madness' },
-                { targetName: 'Goblin' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 2 }),
-                baseStats,
-                campaignName,
-                mapName,
-            );
-        });
-    });
-
-    describe('non-humanoid popup description', () => {
-        it('includes the target name in the non-humanoid popup', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Oozy', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Ooze' });
-
-            const result = await triggerCrownOfMadness(
-                baseSpell,
-                { targetName: 'Oozy' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: 'Crown of Madness',
-                    description: 'No effect. Oozy is not a Humanoid.',
-                },
-            });
-        });
-
-        it('uses correct spell name in popup when spell has different casing', async () => {
-            getCombatContext.mockResolvedValue({
-                creatures: [
-                    { name: 'Wizard', type: 'player' },
-                    { name: 'Wolf', type: 'npc' },
-                ],
-            });
-            getMonsterData.mockResolvedValue({ type: 'Beast' });
-
-            const result = await triggerCrownOfMadness(
-                { name: 'CROWN OF MADNESS' },
-                { targetName: 'Wolf' },
-                baseStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result.payload.name).toBe('Crown of Madness');
         });
     });
 });

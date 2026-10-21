@@ -1,9 +1,17 @@
+// @maintained-by-ai
+// applyAuraDamage at its own seam: which entities get selected into the aura
+// damage set and the exact applyDamageToTarget call shape.
+// Owned elsewhere (not duplicated here): early-return gates, allyFilter,
+// targetFilter, out-of-range skip, per-creature error recovery —
+// expirations_applyAuraDamage.test.js; detached-copy persistence + inactive
+// skip — auraDamageService.test.js; caller-side range/damage expressions —
+// turnStartEffects_innerRadiance.test.js; distance truth tables —
+// rangeCheck owner lane (#1223).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
-  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../ui/utils.js', () => ({
@@ -19,226 +27,106 @@ vi.mock('../../ui/storage.js', () => ({
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(() => 5),
-  getActiveCreatureName: vi.fn(() => 'TestCharacter'),
-  getCombatSummary: vi.fn(),
+  getCombatSummary: vi.fn(() => null),
   loadCombatSummary: vi.fn().mockResolvedValue(null),
   setCombatSummaryCache: vi.fn(),
-}));
-
-vi.mock('../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
 }));
 
 vi.mock('../../rules/combat/rangeCheck.js', () => ({
   isWithinRange: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
-  processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
-  processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../combat/automation/automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn(() => 5),
-}));
-
 vi.mock('../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
-import { applyAuraDamage } from './expirations.js';
+import { applyAuraDamage } from './auraDamageService.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary, loadCombatSummary } from '../../encounters/combatData.js';
 import { isWithinRange } from '../../rules/combat/rangeCheck.js';
-import utils from '../../ui/utils.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 
-function resetMocks() {
-  vi.clearAllMocks();
-  localStorage.clear();
-  window.dispatchEvent = vi.fn();
+const ACTIVE_KEY = 'innerRadianceActive';
+
+function auraOptions({ damageValue = 7, range = 10, ...rest } = {}) {
+  return { activeKey: ACTIVE_KEY, damageValue, range, ...rest };
 }
 
-// ---------------------------------------------------------------------------
-// applyAuraDamage — damage application
-// ---------------------------------------------------------------------------
+async function runAura(options) {
+  await applyAuraDamage('Test', {}, 'Campaign', [{ name: 'Test' }], options);
+}
+
 describe('applyAuraDamage — damage application', () => {
   beforeEach(() => {
-    resetMocks();
-    getRuntimeValue.mockImplementation((_name, _prop, _campaign) => null);
-    utils.getName.mockImplementation((v) => String(v));
+    vi.clearAllMocks();
+    getRuntimeValue.mockImplementation((_name, prop) => (prop === ACTIVE_KEY ? true : null));
+    getCombatSummary.mockReturnValue(null);
+    loadCombatSummary.mockResolvedValue(null);
+    isWithinRange.mockResolvedValue(true);
     applyDamageToTarget.mockReturnValue(undefined);
   });
 
-  it('applies damage to creatures in range', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
-    });
+  it('applies the exact damage call to every in-range enemy, forwarding range and characters', async () => {
     getCombatSummary.mockReturnValue({
       creatures: [
         { name: 'Orc', hit_points: { current: 15 } },
         { name: 'Goblin', hit_points: { current: 7 } },
       ],
     });
-    isWithinRange.mockResolvedValue(true);
 
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-    });
+    await runAura(auraOptions({ damageType: 'Fire' }));
 
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], { campaignName: 'Campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Test' });
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      expect.any(Object), 'Orc', 7, ['Fire'],
+      { campaignName: 'Campaign', characters: [{ name: 'Test' }], ignoreResistance: false, attackerName: 'Test' },
+    );
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      expect.any(Object), 'Goblin', 7, ['Fire'],
+      { campaignName: 'Campaign', characters: [{ name: 'Test' }], ignoreResistance: false, attackerName: 'Test' },
+    );
+    // Aura range must reach the shared range check verbatim.
+    expect(isWithinRange).toHaveBeenCalledWith('Test', 'Orc', 10);
   });
 
-  it('skips self when creature name matches activeName', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
+  it('defaults damageType to Radiant when omitted', async () => {
+    getCombatSummary.mockReturnValue({
+      creatures: [{ name: 'Orc', hit_points: { current: 15 } }],
     });
+
+    await runAura(auraOptions());
+
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      expect.any(Object), 'Orc', 7, ['Radiant'],
+      { campaignName: 'Campaign', characters: [{ name: 'Test' }], ignoreResistance: false, attackerName: 'Test' },
+    );
+  });
+
+  it('never damages the aura source even when it is in range', async () => {
     getCombatSummary.mockReturnValue({
       creatures: [
         { name: 'Test' },
         { name: 'Orc' },
       ],
     });
-    isWithinRange.mockResolvedValue(true);
 
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-    });
+    await runAura(auraOptions({ damageType: 'Fire' }));
 
-    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-    expect(applyDamageToTarget.mock.calls[0][1]).toBe('Orc');
+    const damaged = applyDamageToTarget.mock.calls.map((c) => c[1]);
+    expect(damaged).toEqual(['Orc']);
   });
 
-  it('includes creatures with null distance when map is active', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      if (name === '__map__' && prop === 'activeMapName') return 'TestMap';
-      return null;
-    });
-    getCombatSummary.mockReturnValue({
-      players: [{ name: 'Test', gridX: 1, gridY: 1 }],
-      creatures: [
-        { name: 'Orc', gridX: 1, gridY: 1 },
-        { name: 'Goblin', gridX: 10, gridY: 10 },
-      ],
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-    });
-
-    expect(applyDamageToTarget).toHaveBeenCalledTimes(2);
-    const targetNames = applyDamageToTarget.mock.calls.map(c => c[1]);
-    expect(targetNames).toContain('Orc');
-    expect(targetNames).toContain('Goblin');
-  });
-
-  it('applies targetFilter to exclude creatures', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'holyNimbusActive') return true;
-      return null;
-    });
-    getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Demon', type: 'fiend', hit_points: { current: 20 } },
-        { name: 'Slime', type: 'ooze', hit_points: { current: 5 } },
-      ],
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'holyNimbusActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-      targetFilter: (c) => c.type === 'fiend' || c.type === 'undead',
-    });
-
-    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-    expect(applyDamageToTarget.mock.calls[0][1]).toBe('Demon');
-  });
-
-  it('applies damage when map exists but position info is incomplete', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      if (prop === '__map__') return 'TestMap';
-      return null;
-    });
-    getCombatSummary.mockReturnValue({
-      players: [{ name: 'Test', gridX: 1, gridY: 1 }],
-      creatures: [
-        { name: 'Orc' },
-      ],
-    });
-
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-    });
-
-    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-  });
-
-  it('uses loadCombatSummary when getCombatSummary returns null', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
-    });
+  it('falls back to loadCombatSummary and damages from the loaded summary', async () => {
     getCombatSummary.mockReturnValue(null);
-    const loadedSummary = { creatures: [{ name: 'Orc', hit_points: { current: 15 } }] };
-    loadCombatSummary.mockResolvedValue(loadedSummary);
-    isWithinRange.mockResolvedValue(true);
+    loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Orc', hit_points: { current: 15 } }] });
 
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-      damageType: 'Radiant',
-    });
+    await runAura(auraOptions({ damageType: 'Fire' }));
 
-    expect(applyDamageToTarget).toHaveBeenCalled();
-  });
-
-  it('uses default damageType Radiant when not specified', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (prop === 'innerRadianceActive') return true;
-      return null;
-    });
-    getCombatSummary.mockReturnValue({
-      creatures: [{ name: 'Orc', hit_points: { current: 15 } }],
-    });
-    isWithinRange.mockResolvedValue(true);
-
-    await applyAuraDamage('Test', {}, 'Campaign', [], {
-      activeKey: 'innerRadianceActive',
-      damageValue: 5,
-      range: 10,
-    });
-
-    expect(applyDamageToTarget).toHaveBeenCalledWith(expect.any(Object), 'Orc', 5, ['Radiant'], { campaignName: 'Campaign', characters: expect.any(Array), ignoreResistance: false, attackerName: 'Test' });
+    expect(loadCombatSummary).toHaveBeenCalledWith('Campaign');
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      expect.any(Object), 'Orc', 7, ['Fire'],
+      { campaignName: 'Campaign', characters: [{ name: 'Test' }], ignoreResistance: false, attackerName: 'Test' },
+    );
   });
 });

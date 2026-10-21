@@ -1,88 +1,117 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { processManeuvers } from './maneuvers.js';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import maneuversData from '../../../../public/data/2024/maneuvers.json';
 
-vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
-
-vi.mock('../../ui/dataLoader.js', () => ({
-    loadManeuvers: vi.fn(async () => [
-        { name: 'Evasive Footwork', description: 'Bonus action Disengage + AC.', actionType: 'bonus_action', effect: 'ac_bonus_disengage', dieExpression: 'superiority_die' },
-        { name: 'Bait and Switch', description: 'Swap places + AC.', actionType: 'movement', effect: 'ac_bonus_and_swap', dieExpression: 'superiority_die', range: '5_ft' },
-        { name: 'Riposte', description: 'Reaction attack.', actionType: 'reaction', effect: 'melee_attack_reaction', dieExpression: 'superiority_die' },
-    ]),
+// Serve the real disk-backed 2024 maneuvers at the network boundary so the
+// real loadManeuvers and renameMagicInitiateFeatures modules run unmocked.
+const fetchMock = vi.fn(async () => ({
+    ok: true,
+    json: async () => maneuversData,
 }));
+vi.stubGlobal('fetch', fetchMock);
 
-vi.mock('./magicSpells.js', () => ({
-    renameMagicInitiateFeatures: vi.fn(),
-}));
-
+const CHARACTER = 'TestFighter';
+const CAMPAIGN = 'test-campaign';
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
 function makeFixtures() {
     const playerStats = {
-        name: 'EvasiveFighter',
+        name: CHARACTER,
         rules: '2024',
         bonusActions: [],
         reactions: [],
         automation: { specialActions: [] },
     };
-    const playerSummary = { campaignName: 'test-campaign' };
+    const playerSummary = { campaignName: CAMPAIGN };
     const allFeatures = [];
     const collectAutomationFromFeatures = vi.fn(() => ({ specialActions: [] }));
     const mergeAutomationSpecialActions = vi.fn();
     return { playerStats, playerSummary, allFeatures, collectAutomationFromFeatures, mergeAutomationSpecialActions };
 }
 
+async function runWith(f, selection) {
+    setRuntimeValue(CHARACTER, SELECTION_KEY, selection, CAMPAIGN);
+    await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
+}
+
 describe('processManeuvers', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        setRuntimeValue('EvasiveFighter', SELECTION_KEY, [], 'test-campaign');
+        fetchMock.mockClear();
+        setRuntimeValue(CHARACTER, SELECTION_KEY, [], CAMPAIGN);
     });
 
     it('does nothing when no maneuvers are selected', async () => {
         const f = makeFixtures();
-        await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
-        expect(f.playerStats.bonusActions).toHaveLength(0);
+        await runWith(f, []);
+
+        expect(f.allFeatures).toHaveLength(0);
         expect(f.collectAutomationFromFeatures).not.toHaveBeenCalled();
+        expect(f.mergeAutomationSpecialActions).not.toHaveBeenCalled();
     });
 
-    it('adds Evasive Footwork as a bonus action with combat_superiority_bonus_action automation', async () => {
-        setRuntimeValue('EvasiveFighter', SELECTION_KEY, ['Evasive Footwork'], 'test-campaign');
+    // Truth table: one row per actionType branch in maneuvers.js — selected
+    // maneuver must land in the right container with the right automation type.
+    // [selection, actionType, automation.type, container (null = allFeatures only), effect, trigger, range]
+    it.each([
+        ['Evasive Footwork', 'bonus_action', 'combat_superiority_bonus_action', 'bonusActions', 'ac_bonus_disengage', null, null],
+        ['Riposte', 'reaction', 'combat_superiority_reaction', 'reactions', 'melee_attack_reaction', 'melee_attack_miss', null],
+        ['Commander\'s Strike', 'grant_attack', 'combat_superiority_grant_attack', null, null, 'replace_attack', '30_ft'],
+        ['Bait and Switch', 'movement', 'combat_superiority_movement', null, 'ac_bonus_and_swap', null, '5_ft'],
+        ['Ambush', 'skill_check', 'combat_superiority_skill_check', null, null, null, null],
+    ])('%s → %s', async (name, actionType, type, container, effect, trigger, range) => {
         const f = makeFixtures();
+        await runWith(f, [name]);
 
-        await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
-
-        const feature = f.playerStats.bonusActions.find(a => a.name === 'Evasive Footwork');
-        expect(feature).toBeDefined();
+        expect(f.allFeatures).toHaveLength(1);
+        const feature = f.allFeatures[0];
         expect(feature.hasAutomation).toBe(true);
-        expect(feature.automation.type).toBe('combat_superiority_bonus_action');
-        expect(feature.automation.maneuverName).toBe('Evasive Footwork');
-        expect(feature.automation.actionType).toBe('bonus_action');
-        expect(feature.automation.effect).toBe('ac_bonus_disengage');
-        expect(f.allFeatures).toContain(feature);
-        expect(f.collectAutomationFromFeatures).toHaveBeenCalled();
+        expect(feature.automation).toMatchObject({ type, maneuverName: name, actionType, hasAutomation: true });
+        expect(feature.automation.dieExpression).toBe('superiority_die');
+        if (effect !== null) expect(feature.automation.effect).toBe(effect);
+        if (trigger !== null) expect(feature.automation.trigger).toBe(trigger);
+        if (range !== null) expect(feature.automation.range).toBe(range);
+        if (actionType === 'grant_attack') expect(feature.automation.oncePerTurn).toBe(true);
+
+        if (container) {
+            expect(f.playerStats[container]).toEqual([feature]);
+        } else {
+            expect(f.playerStats.bonusActions).toHaveLength(0);
+            expect(f.playerStats.reactions).toHaveLength(0);
+        }
+        expect(f.collectAutomationFromFeatures).toHaveBeenCalledWith(f.allFeatures, f.playerStats);
         expect(f.mergeAutomationSpecialActions).toHaveBeenCalledWith(f.playerStats);
     });
 
-    it('adds movement maneuvers to automation without touching bonus actions', async () => {
-        setRuntimeValue('EvasiveFighter', SELECTION_KEY, ['Bait and Switch'], 'test-campaign');
+    it('skill_check maneuver with reactionSaveType adds a companion (Reaction) feature', async () => {
         const f = makeFixtures();
+        await runWith(f, ['Commanding Presence']);
 
-        await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
+        const names = f.allFeatures.map(a => a.name);
+        expect(names).toEqual(['Commanding Presence', 'Commanding Presence (Reaction)']);
 
-        expect(f.playerStats.bonusActions).toHaveLength(0);
-        const movement = f.allFeatures.find(a => a.name === 'Bait and Switch');
-        expect(movement.automation.type).toBe('combat_superiority_movement');
+        const companion = f.allFeatures[1].automation;
+        expect(companion).toMatchObject({
+            type: 'combat_superiority_commanding_presence_reaction',
+            maneuverName: 'Commanding Presence',
+            reactionSaveType: 'WIS',
+            reactionEffect: 'disadvantage_next_attack',
+            reactionDuration: 'until_end_of_next_turn',
+            reactionRange: '30_ft',
+            saveDc: 'ability',
+            saveAbility: 'CHA',
+            hasAutomation: true,
+        });
     });
 
-    it('picks up a selection changed at runtime without character JSON changes', async () => {
+    it('attack_rider maneuvers are not surfaced here (handled by the attack pipeline)', async () => {
         const f = makeFixtures();
-        await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
+        await runWith(f, ['Disarming Attack', 'Menacing Attack']);
+
+        expect(f.allFeatures).toHaveLength(0);
         expect(f.playerStats.bonusActions).toHaveLength(0);
-
-        setRuntimeValue('EvasiveFighter', SELECTION_KEY, ['Evasive Footwork'], 'test-campaign');
-        await processManeuvers(f.playerStats, f.playerSummary, f.allFeatures, f.collectAutomationFromFeatures, f.mergeAutomationSpecialActions);
-
-        expect(f.playerStats.bonusActions.map(a => a.name)).toContain('Evasive Footwork');
+        expect(f.playerStats.reactions).toHaveLength(0);
+        expect(f.collectAutomationFromFeatures).not.toHaveBeenCalled();
     });
 });

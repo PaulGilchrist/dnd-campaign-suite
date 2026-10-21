@@ -1,3 +1,17 @@
+// @maintained-by-ai
+// Barrel-import lane: imports addExpiration via ./expirations.js (the public
+// re-export consumers use), unlike addExpiration.ba001-single-write.test.js
+// which imports ./expirationQueue.js directly. That direct module owns the
+// single-write exact-payload lane (§39); fold notes for tests removed here:
+//   - "adds a new expiration entry when no existing list" -> ba001 :37-64
+//   - "appends to existing expiration list without mutating" -> ba001 :66-91
+//   - "uses getCurrentCombatRound for appliedRound" -> ba001 :9 and appliedRound: 2 stamps in :37-64 / :66-91
+//   - "uses Infinity when rounds is nullish" -> ba001 :37-64 (rounds undefined -> Infinity) and :93-117 (until:'combat' rides Infinity)
+// The ONLY face unique to this file: a FINITE round clock (rounds: 3 ->
+// expiryRounds: 3). ba001 pins Infinity in every payload, so the finite
+// stamp is verified nowhere else — pinned exact-byte below.
+// No-timers policy: appliedRound is a round counter from
+// getCurrentCombatRound, expiryRounds a round budget — never Date.now().
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -19,8 +33,8 @@ vi.mock('../../ui/storage.js', () => ({
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(() => 5),
-  getActiveCreatureName: vi.fn(() => 'TestCharacter'),
+  getCurrentCombatRound: vi.fn(),
+  getActiveCreatureName: vi.fn(),
   getCombatSummary: vi.fn(),
   loadCombatSummary: vi.fn(),
 }));
@@ -56,92 +70,39 @@ import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 const KEY = 'pendingExpirations';
 
-function resetMocks() {
-  vi.clearAllMocks();
-  localStorage.clear();
-  window.dispatchEvent = vi.fn();
-}
-
-// ---------------------------------------------------------------------------
-// addExpiration
-// ---------------------------------------------------------------------------
-describe('addExpiration', () => {
+describe('addExpiration via ./expirations.js barrel', () => {
   beforeEach(() => {
-    resetMocks();
+    vi.clearAllMocks();
   });
 
-  describe('creates correct entry structure', () => {
-    it('adds a new expiration entry when no existing list', () => {
-      getRuntimeValue.mockReturnValueOnce([]);
+  it('finite rounds: 3 stamps expiryRounds: 3 — ONE exact-payload write through the barrel', () => {
+    getRuntimeValue.mockReturnValueOnce([]);
+    getCurrentCombatRound.mockReturnValueOnce(5);
 
-      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'MyCampaign', rounds: 3 });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster',
-        KEY,
-        [
-          {
-            target: 'Target',
-            effects: [{ type: 'stunned' }],
-            appliedRound: 5,
-            expiryRounds: 3,
-            expireOnCreatureName: null,
-          },
-        ],
-        'MyCampaign',
-      );
+    addExpiration({
+      attackerName: 'Caster',
+      targetName: 'Target',
+      effects: [{ type: 'stunned' }],
+      campaignName: 'MyCampaign',
+      rounds: 3,
     });
 
-    it('appends to existing expiration list without mutating the original', () => {
-      const existingList = [
-        {
-          target: 'Orc',
-          effects: [{ type: 'advantage_on_target' }],
-          appliedRound: 0,
-        },
-      ];
-      const originalLength = existingList.length;
-      getRuntimeValue.mockReturnValueOnce(existingList);
-
-      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'MyCampaign', rounds: 2 });
-
-      // Original array should be unchanged (spread creates new array)
-      expect(existingList.length).toBe(originalLength);
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster',
-        KEY,
-        expect.arrayContaining([
-          expect.objectContaining({ target: 'Orc' }),
-          expect.objectContaining({ target: 'Target' }),
-        ]),
-        'MyCampaign',
-      );
-    });
-
-    it('uses getCurrentCombatRound for appliedRound', () => {
-      getCurrentCombatRound.mockReturnValue(10);
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'blinded' }], campaignName: 'MyCampaign', rounds: 3 });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Caster',
-        KEY,
-        expect.arrayContaining([
-          expect.objectContaining({ appliedRound: 10 }),
-        ]),
-        'MyCampaign',
-      );
-    });
-
-    it('uses Infinity when rounds is nullish', () => {
-      getRuntimeValue.mockReturnValueOnce([]);
-
-      addExpiration({ attackerName: 'Caster', targetName: 'Target', effects: [{ type: 'stunned' }], campaignName: 'TestCampaign', rounds: null });
-
-      expect(setRuntimeValue).toHaveBeenCalledWith('Caster', expect.any(String), expect.arrayContaining([
-        expect.objectContaining({ expiryRounds: Infinity }),
-      ]), 'TestCampaign');
-    });
+    // Exact deep equality pins every byte of the entry: appliedRound from
+    // the round counter, a FINITE expiryRounds, expireOnCreatureName
+    // defaulted to null, no extra fields (no until key, no timestamps),
+    // and one merged write (times(1) — no seed [] POST, per BA-001).
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Caster',
+      KEY,
+      [{
+        target: 'Target',
+        effects: [{ type: 'stunned' }],
+        appliedRound: 5,
+        expiryRounds: 3,
+        expireOnCreatureName: null,
+      }],
+      'MyCampaign',
+    );
   });
 });

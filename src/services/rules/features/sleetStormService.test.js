@@ -1,3 +1,4 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerSleetStorm } from './sleetStormService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -6,9 +7,23 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
+// Identity: pure forwarder/producer for the Lv3 conjuration zone spell
+// (public/data/spells.json sleet-storm + public/data/2024/spells.json —
+// concentration up to 1 minute, DEX save, NO damage dice on the disk row:
+// damage:null). This service composes the cast envelope and dispatches it;
+// the 'sleet_storm' automation routes to routeSaveStyle at
+// automationRouter.js:191. Zone maturation, per-turn area saves, te stamps
+// ('sleet_storm' te at targetEffectDefinitions.js:1150) and the
+// 'sleet_storm_area_save' round-seam repeat live in
+// automation/handlers/spells/sleetStormHandler.js + expireStaleEffects.js —
+// NOT this lane. No dice, no store writes, no clock here (no-clock
+// mandatory: 'up to 1 minute' is combat-scoped).
 describe('sleetStormService', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
+        // Explicit re-seed: vitest clearAllMocks retains implementations;
+        // reset clears them, so re-arm the default dispatch outcome here.
+        executeHandler.mockResolvedValue({ type: 'popup' });
     });
 
     const campaignName = 'TestCampaign';
@@ -19,339 +34,108 @@ describe('sleetStormService', () => {
         proficiency: 4,
     };
 
-    describe('triggerSleetStorm', () => {
-        describe('action construction', () => {
-            it('calls executeHandler with correct action structure', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it('dispatches the exact sleet_storm action envelope positionally, inputs untouched', async () => {
+        const spell = Object.freeze({ name: 'Sleet Storm', level: 3 });
+        const metaCtx = Object.freeze({ spellSaveDc: 18 });
+        const result = Object.freeze({ type: 'popup' });
+        executeHandler.mockResolvedValue(result);
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        const returned = await triggerSleetStorm(spell, metaCtx, playerStats, campaignName, mapName);
 
-                expect(executeHandler).toHaveBeenCalledTimes(1);
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.name).toBe('Sleet Storm');
-                expect(action.automation.type).toBe('sleet_storm');
-                expect(action.automation.saveType).toBe('DEX');
-                expect(action.spell).toEqual({ name: 'Sleet Storm', level: 3 });
-            });
-
-            it('passes spellSlotLevel to action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(3);
-            });
-
-            it('handles null metaCtx by treating it as empty', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    null,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.automation.saveType).toBe('DEX');
-                expect(action.automation.type).toBe('sleet_storm');
-            });
-
-            it('handles undefined metaCtx by treating it as empty', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    undefined,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.automation.saveType).toBe('DEX');
-            });
+        expect(executeHandler).toHaveBeenCalledTimes(1);
+        const [action, forwardedStats, forwardedCampaign, forwardedMap] = executeHandler.mock.calls[0];
+        expect(action).toEqual({
+            name: 'Sleet Storm',
+            automation: { type: 'sleet_storm', saveDc: 18, saveType: 'DEX' },
+            spell,
+            spellSlotLevel: 3,
         });
+        expect(Object.keys(action)).toEqual(['name', 'automation', 'spell', 'spellSlotLevel']);
+        expect(Object.keys(action.automation)).toEqual(['type', 'saveDc', 'saveType']);
+        // Same-reference forwarding (aliasing contract, not deep copies).
+        expect(action.spell).toBe(spell);
+        expect(forwardedStats).toBe(playerStats);
+        expect(forwardedCampaign).toBe(campaignName);
+        expect(forwardedMap).toBe(mapName);
+        // Frozen inputs prove zero mutation of caller data.
+        expect(Object.isFrozen(spell)).toBe(true);
+        expect(Object.isFrozen(metaCtx)).toBe(true);
+        expect(returned).toBe(result);
+    });
 
-        describe('save DC resolution', () => {
-            it('uses metaCtx spellSaveDc when provided', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it.each([
+        { label: 'prefers metaCtx.spellSaveDc over playerStats', metaCtx: { spellSaveDc: 18 }, stats: playerStats, expected: 18 },
+        { label: 'falls back to playerStats.spellAbilities.saveDc', metaCtx: {}, stats: playerStats, expected: 15 },
+        { label: 'computes 8 + proficiency when spellAbilities missing', metaCtx: {}, stats: { name: 'Wizard', proficiency: 3 }, expected: 11 },
+        { label: 'defaults to 8 + 2 on empty stats', metaCtx: {}, stats: {}, expected: 10 },
+        { label: 'treats null saveDc as falsy', metaCtx: {}, stats: { spellAbilities: { saveDc: null }, proficiency: 4 }, expected: 12 },
+        { label: 'treats 0 saveDc as falsy', metaCtx: {}, stats: { spellAbilities: { saveDc: 0 }, proficiency: 5 }, expected: 13 },
+        { label: 'null metaCtx falls back to playerStats', metaCtx: null, stats: playerStats, expected: 15 },
+        { label: 'undefined metaCtx falls back to playerStats', metaCtx: undefined, stats: playerStats, expected: 15 },
+        { label: 'metaCtx.spellSaveDc:0 is falsy, falls back', metaCtx: { spellSaveDc: 0 }, stats: playerStats, expected: 15 },
+    ])('saveDc resolution: $label', async ({ metaCtx, stats, expected }) => {
+        executeHandler.mockClear();
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    { spellSaveDc: 18 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        await triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, metaCtx, stats, campaignName, mapName);
 
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.automation.saveDc).toBe(18);
-            });
+        expect(executeHandler).toHaveBeenCalledTimes(1);
+        const [action] = executeHandler.mock.calls[0];
+        // Full-set automation object: type and saveType are constants of this lane.
+        expect(action.automation).toEqual({ type: 'sleet_storm', saveDc: expected, saveType: 'DEX' });
+    });
 
-            it('falls back to playerStats.spellAbilities.saveDc when metaCtx lacks it', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it.each([
+        { label: 'prefers metaCtx.slotLevel', metaCtx: { slotLevel: 5 }, spell: { name: 'Sleet Storm', level: 3 }, expected: 5 },
+        { label: 'falls back to spell.level', metaCtx: {}, spell: { name: 'Sleet Storm', level: 4 }, expected: 4 },
+        { label: 'defaults to 3 when neither provides a level', metaCtx: {}, spell: { name: 'Sleet Storm' }, expected: 3 },
+        { label: 'treats null slotLevel as falsy', metaCtx: { slotLevel: null }, spell: { name: 'Sleet Storm', level: 4 }, expected: 4 },
+        { label: 'treats 0 slotLevel as falsy', metaCtx: { slotLevel: 0 }, spell: { name: 'Sleet Storm', level: 5 }, expected: 5 },
+    ])('spellSlotLevel resolution: $label', async ({ metaCtx, spell, expected }) => {
+        executeHandler.mockClear();
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        await triggerSleetStorm(spell, metaCtx, playerStats, campaignName, mapName);
 
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.automation.saveDc).toBe(15);
-            });
+        expect(executeHandler).toHaveBeenCalledTimes(1);
+        const [action] = executeHandler.mock.calls[0];
+        expect(action.spellSlotLevel).toBe(expected);
+    });
 
-            it('computes saveDc from proficiency when spellAbilities is missing', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 3 };
+    it('returns the handler result by identity (pass-through, incl. null)', async () => {
+        const expectedResult = {
+            type: 'popup',
+            payload: { type: 'automation_info', name: 'Sleet Storm', description: '...' },
+        };
+        executeHandler.mockResolvedValue(expectedResult);
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
+        const result = await triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, {}, playerStats, campaignName, mapName);
+        expect(result).toBe(expectedResult);
 
-                const [action] = executeHandler.mock.calls[0];
-                // 8 + 3 = 11
-                expect(action.automation.saveDc).toBe(11);
-            });
+        executeHandler.mockResolvedValue(null);
+        expect(await triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, {}, playerStats, campaignName, mapName)).toBeNull();
+    });
 
-            it('uses default saveDc of 10 when stats object is empty', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it('swallows a handler rejection: logs exact bytes, returns null', async () => {
+        const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+        const err = new Error('sleet dispatch failure');
+        executeHandler.mockRejectedValue(err);
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    {},
-                    campaignName,
-                    mapName,
-                );
+        const result = await triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, {}, playerStats, campaignName, mapName);
 
-                const [action] = executeHandler.mock.calls[0];
-                // 8 + (2 default) = 10
-                expect(action.automation.saveDc).toBe(10);
-            });
+        expect(result).toBeNull();
+        expect(consoleSpy).toHaveBeenCalledWith('[sleetStormService] Failed to execute Sleet Storm handler:', err);
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        consoleSpy.mockRestore();
+    });
 
-            it('treats null saveDc as falsy and falls back to proficiency', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', spellAbilities: { saveDc: null }, proficiency: 4 };
+    it('golden quirk: derefs playerStats unguarded — rejects TypeError, executeHandler never reached', async () => {
+        await expect(
+            triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, {}, undefined, campaignName, mapName),
+        ).rejects.toThrow(TypeError('Cannot read properties of undefined (reading \'spellAbilities\')'));
 
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
+        await expect(
+            triggerSleetStorm({ name: 'Sleet Storm', level: 3 }, {}, null, campaignName, mapName),
+        ).rejects.toThrow(TypeError('Cannot read properties of null (reading \'spellAbilities\')'));
 
-                const [action] = executeHandler.mock.calls[0];
-                // 8 + 4 = 12
-                expect(action.automation.saveDc).toBe(12);
-            });
-
-            it('treats 0 saveDc as falsy and falls back to proficiency', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', spellAbilities: { saveDc: 0 }, proficiency: 5 };
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                // 8 + 5 = 13
-                expect(action.automation.saveDc).toBe(13);
-            });
-        });
-
-        describe('slot level resolution', () => {
-            it('uses metaCtx slotLevel when provided', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    { slotLevel: 5 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(5);
-            });
-
-            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 4 },
-                    { spellSaveDc: 17 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(4);
-            });
-
-            it('defaults slotLevel to 3 when neither metaCtx nor spell has level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(3);
-            });
-
-            it('treats null slotLevel as falsy and falls back to spell.level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 4 },
-                    { slotLevel: null },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(4);
-            });
-
-            it('treats 0 slotLevel as falsy and falls back to spell.level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 5 },
-                    { slotLevel: 0 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.spellSlotLevel).toBe(5);
-            });
-        });
-
-        describe('return value', () => {
-            it('returns result from executeHandler on success', async () => {
-                const expectedResult = {
-                    type: 'popup',
-                    payload: { type: 'automation_info', name: 'Sleet Storm', description: '...' },
-                };
-                executeHandler.mockResolvedValue(expectedResult);
-
-                const result = await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBe(expectedResult);
-            });
-
-            it('returns null when executeHandler throws an error', async () => {
-                const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
-                executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-                const result = await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[sleetStormService] Failed to execute Sleet Storm handler'),
-                    expect.any(Error),
-                );
-                consoleSpy.mockRestore();
-            });
-
-            it('returns null when executeHandler returns null', async () => {
-                executeHandler.mockResolvedValue(null);
-
-                const result = await triggerSleetStorm(
-                    { name: 'Sleet Storm', level: 3 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
-        });
-
-        describe('defensive coding', () => {
-            it('handles empty spell object with defaults', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerSleetStorm({}, undefined, playerStats, campaignName, mapName);
-
-                const [action] = executeHandler.mock.calls[0];
-                expect(action.name).toBe(undefined);
-                expect(action.automation.type).toBe('sleet_storm');
-                expect(action.automation.saveType).toBe('DEX');
-                expect(action.automation.saveDc).toBe(15);
-                expect(action.spellSlotLevel).toBe(3);
-            });
-
-            it('throws when playerStats is undefined or null', async () => {
-                await expect(
-                    triggerSleetStorm(
-                        { name: 'Sleet Storm', level: 3 },
-                        {},
-                        undefined,
-                        campaignName,
-                        mapName,
-                    ),
-                ).rejects.toThrow();
-
-                await expect(
-                    triggerSleetStorm(
-                        { name: 'Sleet Storm', level: 3 },
-                        {},
-                        null,
-                        campaignName,
-                        mapName,
-                    ),
-                ).rejects.toThrow();
-            });
-        });
+        expect(executeHandler).not.toHaveBeenCalled();
     });
 });

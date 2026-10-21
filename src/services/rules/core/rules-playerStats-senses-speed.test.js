@@ -1,3 +1,10 @@
+// @maintained-by-ai
+// Lane owner: rules.getPlayerStats speed passthrough (applyElfisLineageSpeed +
+// applySpeedIncreasePassives, cited by #1254/#1255) and the computeSenses -> senseUtils
+// chain (Third Eye / Umbral / Truesight / Blindsight) for both rulesets.
+// canMoveThroughCreatureSpace -> rules-playerStats-advanced.test.js:164; initiative ->
+// rules-playerStats-initiative.test.js; immunities/resistances -> rules.getPlayerStats.test.js:290;
+// carryingCapacity DEFECT pin -> rules-core.test.js:95-114.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../ui/dataLoader.js', () => ({
@@ -148,6 +155,19 @@ const makePlayerSummary = (overrides = {}) => ({
   ...overrides,
 });
 
+// useRuntimeState is NOT mocked by this file (the vi.mock path above resolves to a
+// nonexistent module), so senseUtils/rules-helpers call the real getRuntimeValue.
+// Third Eye tests spy it; the spy persists past vi.clearAllMocks, so setupDefaults
+// restores it — without this, buffs leak into every later test in the file.
+let runtimeSpy = null;
+function restoreRuntimeSpy() {
+  if (runtimeSpy) { runtimeSpy.mockRestore(); runtimeSpy = null; }
+}
+function mockRuntimeBuffs(value) {
+  restoreRuntimeSpy();
+  runtimeSpy = vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(value);
+}
+
 const setupDefaults = (overrides = {}) => {
   vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
   classRules.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, ...overrides.class });
@@ -166,7 +186,7 @@ const setupDefaults = (overrides = {}) => {
   automationService.getAllSaveProficiencies.mockReturnValue([]);
   abilityCalc.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
   abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
+  restoreRuntimeSpy();
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
   elfishLineageHandler.getElfisLineageSelection.mockReturnValue(overrides.lineage ?? null);
   elfishLineageHandler.elfishLineageSpeedBonus.mockReturnValue(overrides.lineage === 'Wood Elf' ? 5 : 0);
@@ -180,8 +200,8 @@ const setup2024Defaults = (overrides = {}) => {
   classRules2024.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], major: {}, ...overrides.class });
   classRules2024.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features });
   abilityCalc2024.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
-  abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
-  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
+  abilityCalc2024.getHitPoints.mockReturnValue(12);
+  restoreRuntimeSpy();
   attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
   automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
   automationService.collectSaveModifiers.mockReturnValue({});
@@ -193,6 +213,9 @@ const setup2024Defaults = (overrides = {}) => {
   elfishLineageHandler.getElfisLineageSelection.mockReturnValue(null);
   elfishLineageHandler.elfishLineageSpeedBonus.mockReturnValue(0);
 };
+
+const getPlayerStats = (playerSummary) =>
+  rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
 
 describe('rules.getPlayerStats - speed bonuses', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
@@ -223,152 +246,66 @@ describe('rules.getPlayerStats - speed bonuses', () => {
   });
 });
 
-describe('rules.getPlayerStats - senses enhancements (5e)', () => {
+describe('rules.getPlayerStats - 5e senses', () => {
   beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
 
+  // senseUtils.applyThirdEyeDarkvision branches via the 5e computeSenses lane:
+  // upgrade below 120 ft, never downgrade, grant when absent. Exact-array
+  // toEqual also pins that no Truesight/Blindsight appears without passives.
   it.each`
-    existingSenses                          | expectedSenses
-    ${[{ name: 'Darkvision', value: '60 ft.' }]}                         | ${[{ name: 'Darkvision', value: '120 ft.' }]}
-    ${[{ name: 'Darkvision', value: '120 ft.' }]}                         | ${[{ name: 'Darkvision', value: '120 ft.' }]}
-    ${[]}                                   | ${[{ name: 'Darkvision', value: '120 ft.' }]}
-  `('should handle Third Eye darkvision: existing=$existingSenses', async ({ existingSenses, expectedSenses }) => {
-    vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    raceRules.getSenses.mockReturnValue(existingSenses);
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
+    label                            | raceSenses                                       | expectedSenses
+    ${'upgrades 60 ft darkvision'}  | ${[{ name: 'Darkvision', value: '60 ft.' }]}  | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+    ${'never downgrades 120 ft'}    | ${[{ name: 'Darkvision', value: '120 ft.' }]} | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+    ${'grants missing darkvision'}  | ${[]}                                            | ${[{ name: 'Darkvision', value: '120 ft.' }]}
+  `('Third Eye buff: $label', async ({ raceSenses, expectedSenses }) => {
+    mockRuntimeBuffs([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
+    raceRules.getSenses.mockReturnValue(raceSenses);
+    const result = await getPlayerStats(makePlayerSummary());
     expect(result.senses).toEqual(expectedSenses);
   });
 
-  it('should add Truesight from passive_buff automation', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '60 ft.' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
-  });
-
-  it('should use default 60 ft for Truesight when range is missing', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'truesight' }], actions: [], specialActions: [] },
-      senses: [],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Truesight', value: '60 ft.' });
-  });
-
-  it('should not duplicate Truesight if already present', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Truesight', value: '30 ft.' }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    const truesightCount = result.senses.filter(s => s.name === 'Truesight').length;
-    expect(truesightCount).toBe(1);
-  });
-
-  it('should add Blindsight from passive_buff automation', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight', range: '10 ft' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
-  });
-
-  it('should use default 10 ft for Blindsight when range is missing', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight' }], actions: [], specialActions: [] },
-      senses: [],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
-  });
-
-  it('should not duplicate Blindsight if already present', async () => {
-    setupDefaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight', range: '30 ft' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Blindsight', value: '30 ft.' }],
-    });
-    const playerSummary = makePlayerSummary();
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    const blindsightCount = result.senses.filter(s => s.name === 'Blindsight').length;
-    expect(blindsightCount).toBe(1);
+  // senseUtils.applyTruesightSenses / applyBlindsightSenses branches in one pass:
+  // missing range falls back to defaults, explicit range parses and normalizes
+  // ("30 ft" -> "30 ft."), and existing entries are never stacked over.
+  it.each`
+    label                       | passives                                                                                                      | raceSenses                                                                        | expectedSenses
+    ${'default ranges'}        | ${[{ type: 'passive_buff', effect: 'truesight' }, { type: 'passive_buff', effect: 'blindsight' }]}         | ${[{ name: 'Darkvision', value: '60 ft.' }]}                                     | ${[{ name: 'Darkvision', value: '60 ft.' }, { name: 'Truesight', value: '60 ft.' }, { name: 'Blindsight', value: '10 ft.' }]}
+    ${'explicit ranges'}       | ${[{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }, { type: 'passive_buff', effect: 'blindsight', range: '30 ft' }]} | ${[]}                 | ${[{ name: 'Truesight', value: '120 ft.' }, { name: 'Blindsight', value: '30 ft.' }]}
+    ${'existing entries kept'} | ${[{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }, { type: 'passive_buff', effect: 'blindsight', range: '60 ft' }]}  | ${[{ name: 'Truesight', value: '30 ft.' }, { name: 'Blindsight', value: '30 ft.' }]} | ${[{ name: 'Truesight', value: '30 ft.' }, { name: 'Blindsight', value: '30 ft.' }]}
+  `('Truesight/Blindsight passives: $label', async ({ passives, raceSenses, expectedSenses }) => {
+    setupDefaults({ automation: { passives, actions: [], specialActions: [] }, senses: raceSenses });
+    const result = await getPlayerStats(makePlayerSummary());
+    expect(result.senses).toEqual(expectedSenses);
   });
 });
 
 describe('rules.getPlayerStats - 2024 senses', () => {
   beforeEach(() => { vi.clearAllMocks(); setup2024Defaults(); });
 
-  it('should set senses from raceRules.getSenses in 2024 mode', async () => {
-    raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '120 ft.' }]);
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
+  it('passes 2024 race senses through unchanged with no buffs or passives', async () => {
+    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }] });
+    const result = await getPlayerStats(makePlayerSummary({ rules: '2024' }));
+    expect(result.senses).toEqual([{ name: 'Darkvision', value: '60 ft.' }]);
   });
 
-  it('should apply Umbral Sight darkvision for Gloom Stalker in 2024', async () => {
+  it('stacks Umbral Sight (+60), default Truesight and parsed Blindsight for a Gloom Stalker', async () => {
     setup2024Defaults({
       class: { name: 'Ranger', major: { name: 'Stalker' } },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
+      senses: [{ name: 'Darkvision', value: '120 ft.' }],
+      automation: { passives: [{ type: 'passive_buff', effect: 'truesight' }, { type: 'passive_buff', effect: 'blindsight', range: '30 ft' }], actions: [], specialActions: [] },
     });
-    const playerSummary = makePlayerSummary({ rules: '2024', class: { name: 'Ranger', major: { name: 'Stalker' } } });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
+    const result = await getPlayerStats(makePlayerSummary({ rules: '2024' }));
+    expect(result.senses).toEqual([
+      { name: 'Darkvision', value: '180 ft.' },
+      { name: 'Truesight', value: '60 ft.' },
+      { name: 'Blindsight', value: '30 ft.' },
+    ]);
   });
 
-  it('should apply Third Eye darkvision in 2024 mode', async () => {
-    vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
-    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }], class: { name: 'Fighter' } });
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
-  });
-
-  it('should apply Truesight in 2024 mode', async () => {
-    setup2024Defaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Truesight', value: '120 ft.' });
-  });
-
-  it('should apply Blindsight in 2024 mode', async () => {
-    setup2024Defaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight', range: '10 ft' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
-  });
-
-  it('should apply Blindsight with default range in 2024 mode', async () => {
-    setup2024Defaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    expect(result.senses).toContainEqual({ name: 'Blindsight', value: '10 ft.' });
-  });
-
-  it('should not duplicate Blindsight if already present in 2024 mode', async () => {
-    setup2024Defaults({
-      automation: { passives: [{ type: 'passive_buff', effect: 'blindsight', range: '30 ft' }], actions: [], specialActions: [] },
-      senses: [{ name: 'Blindsight', value: '30 ft.' }, { name: 'Darkvision', value: '60 ft.' }],
-    });
-    const playerSummary = makePlayerSummary({ rules: '2024' });
-    const result = await rules.getPlayerStats({ allClasses: [], allEquipment: [], allMagicItems: [], allRaces: [], allSpells: [], playerSummary });
-    const blindsightEntries = result.senses.filter(s => s.name === 'Blindsight');
-    expect(blindsightEntries.length).toBe(1);
-    expect(blindsightEntries[0].value).toBe('30 ft.');
+  it('applies Third Eye darkvision in 2024 mode', async () => {
+    setup2024Defaults({ senses: [{ name: 'Darkvision', value: '60 ft.' }] });
+    mockRuntimeBuffs([{ name: 'The Third Eye', effect: 'darkvision_120' }]);
+    const result = await getPlayerStats(makePlayerSummary({ rules: '2024' }));
+    expect(result.senses).toEqual([{ name: 'Darkvision', value: '120 ft.' }]);
   });
 });

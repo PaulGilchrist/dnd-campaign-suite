@@ -1,7 +1,18 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
+import races from '../../../../public/data/2024/races.json';
+import classes from '../../../../public/data/2024/classes.json';
+import spellsDb from '../../../../public/data/2024/spells.json';
 
-// ── Module-level mocks for all ESM dependencies ──
+// ── 2024 spellCalc lineage lane ──
+// Racial spell grants (elfish_lineage / gnomish_lineage / fiendish_legacy) flow
+// through applyLineageFeatureSpells in getSpellAbilities. Every granted spell and
+// option name below is read programmatically from public/data/2024/races.json —
+// never hand-transcribed (drift precedents #1239/#1267). The automation rows mirror
+// the collector shape (automationInfoBuilder/core-handlers.js): {type, name, options}.
+
+// ── Module-level mocks for runtime/class-data-backed collaborators only ──
 vi.mock('../../character/classRules2024.js', () => ({
   default: {
     getHighestMajorLevel: vi.fn(() => undefined),
@@ -9,325 +20,182 @@ vi.mock('../../character/classRules2024.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn((_key, _prop) => null),
+  getRuntimeValue: vi.fn(() => null),
 }));
 
 const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 
-// ── Helpers ──
+// ── Fixtures ──
 
-function makePlayerStats(overrides = {}) {
+// Distinct bonus per ability so casting-ability overrides are falsifiable.
+const ABILITY_BONUSES = { Strength: 1, Dexterity: 2, Constitution: 0, Intelligence: 3, Wisdom: 4, Charisma: 5 };
+const SHORT_TO_LONG = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', INT: 'Intelligence', WIS: 'Wisdom', CHA: 'Charisma' };
+
+function makeAbilities() {
+  return Object.entries(ABILITY_BONUSES).map(([name, bonus]) => ({
+    name, baseScore: 12 + bonus * 2, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus,
+  }));
+}
+
+// Wizard slot tables pulled straight from classes.json (indexed by level-1).
+const wizardDisk = classes.find(c => c.name === 'Wizard');
+const wizardClass = { name: 'Wizard', class_levels: wizardDisk.class_levels, spell_casting_ability: 'Intelligence' };
+
+function wizardStats(level, automation) {
   return {
     name: 'TestCharacter',
-    level: 1,
+    level,
     proficiency: 2,
-    class: {
-      name: 'Wizard',
-      class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' } }],
-      spell_casting_ability: 'Intelligence',
-      ...overrides.class,
-    },
-    abilities: [
-      { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-    ],
-    spells: [],
-    automation: {},
-    ...overrides,
+    class: wizardClass,
+    abilities: makeAbilities(),
+    spells: ['Magic Missile'],
+    automation,
   };
 }
 
-function makeSpell(name, level = 0, extra = {}) {
-  return { name, level, damage: {}, casting_time: '1 action', range: 'Self', ...extra };
+const LINEAGE_TYPES = ['elfish_lineage', 'gnomish_lineage', 'fiendish_legacy'];
+
+function lineageTrait(raceName) {
+  const race = races.find(r => r.name === raceName);
+  const trait = race.traits.find(t => LINEAGE_TYPES.includes(t.automation?.type));
+  return { race, trait };
 }
 
-const lv1Casting = { cantrips_known: 3, spell_slots_level_1: 2, spell_slots_level_2: 0, spell_slots_level_3: 0, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' };
-const lv5Casting = { cantrips_known: 4, spell_slots_level_1: 4, spell_slots_level_2: 3, spell_slots_level_3: 3, spell_slots_level_4: 2, spell_slots_level_5: 1, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' };
-// class_levels is indexed by level-1 — pad the holes.
-const lv5WizardClass = {
-  name: 'Wizard',
-  class_levels: [{ level: 1, spellcasting: lv1Casting }, undefined, undefined, undefined, { level: 5, spellcasting: lv5Casting }],
-  spell_casting_ability: 'Intelligence',
-};
+// Collector-shaped automation row straight off the disk trait.
+function lineageAutomation(raceName) {
+  const { trait } = lineageTrait(raceName);
+  return { specialActions: [{ type: trait.automation.type, name: trait.name, options: trait.automation.options }] };
+}
+
+// CLA-118/CLA-139 gate: levelNSpell keys unlock at the level encoded in the key.
+function expectedLadder(option, level) {
+  return [option.cantrip, level >= 3 ? option.level3Spell : null, level >= 5 ? option.level5Spell : null].filter(Boolean);
+}
+
+// Subrace-backed selectable lineages only (the wizard persists race.subrace, and
+// resolveLineageName maps subrace → option, stripping the Tiefling legacy suffix).
+const LINEAGE_ROWS = ['Elf', 'Gnome', 'Tiefling'].flatMap(raceName => {
+  const { race, trait } = lineageTrait(raceName);
+  return race.subraces.map(subrace => ({
+    raceName,
+    subrace: subrace.name,
+    type: trait.automation.type,
+    option: trait.automation.options.find(o => subrace.name === o.name || subrace.name.startsWith(`${o.name} `)),
+  }));
+});
 
 describe('spellCalc2024-lineage', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.resetAllMocks();
-    await import('../../../hooks/runtime/useRuntimeState.js');
-    await import('../../character/classRules2024.js');
+    getRuntimeValue.mockReturnValue(null);
   });
 
-  describe('getSpellAbilities', () => {
-    // ── Automation: elfish_lineage ──
+  it.each(LINEAGE_ROWS)('$subrace ($type): disk ladder grants exactly, gated by levelNSpell keys', ({ raceName, subrace, option }) => {
+    const automation = lineageAutomation(raceName);
+    const raceArg = { name: raceName, subrace: { name: subrace } };
 
-    it('adds elfish lineage cantrip, level 3, and level 5 spells at level 5 when lineage matches', () => {
-      const allSpells = [
-        makeSpell('Blade Ward', 0),
-        makeSpell('Burning Hands', 1),
-        makeSpell('Crown of Madness', 1),
-      ];
+    for (const level of [1, 3, 5]) {
+      const result = getSpellAbilities(spellsDb, wizardStats(level, automation), { campaignName: 'test-campaign', race: raceArg });
 
-      const stats = makePlayerStats({ level: 5, class: lv5WizardClass });
-      stats.automation = {
-        passives: [{
-          type: 'elfish_lineage',
-          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma', cantrip: 'Blade Ward', level3Spell: 'Burning Hands', level5Spell: 'Crown of Madness' }],
-        }],
-      };
+      // Grant set is exact — rival lineage options never leak in (falsifying pair).
+      const granted = expectedLadder(option, level);
+      expect(result.spells.map(s => s.name).sort()).toEqual([...granted, 'Magic Missile'].sort());
 
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Elf', subrace: { name: 'Shadow Magic' } } });
+      // Lineage grants stamp always-prepared; the wizard's persisted row stays 'Prepared'.
+      for (const name of granted) {
+        expect(result.spells.find(s => s.name === name).prepared).toBe('Always');
+      }
+      expect(result.spells.find(s => s.name === 'Magic Missile').prepared).toBe('Prepared');
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Blade Ward');
-      expect(names).toContain('Burning Hands');
-      expect(names).toContain('Crown of Madness');
+      // Counters: cantrips track the key grant. spells_known stays NaN here — the
+      // 2024 Wizard disk table (classes.json) carries no spells_known key, so the
+      // += in applyLineageFeatureSpells starts from undefined; the sheet masks it
+      // (CharSpells.jsx:79 prepared_spells || spells_known). Slotless-host counter
+      // math is pinned below (#1262).
+      expect(result.cantrips_known).toBe(wizardClass.class_levels[level - 1].spellcasting.cantrips_known + 1);
+
+      // Casting ability: lineage override (short name) when the disk option declares
+      // one, else the class ability — with header math recomputed off it.
+      if (option.spellcastingAbility) {
+        const bonus = ABILITY_BONUSES[SHORT_TO_LONG[option.spellcastingAbility]];
+        expect(result.spellCastingAbility).toBe(option.spellcastingAbility);
+        expect(result.modifier).toBe(bonus);
+        expect(result.toHit).toBe(bonus + 2);
+        expect(result.saveDc).toBe(8 + bonus + 2);
+      } else {
+        expect(result.spellCastingAbility).toBe('Intelligence');
+        expect(result.modifier).toBe(3);
+        expect(result.saveDc).toBe(13);
+      }
+    }
+  });
+
+  it('CLA-139: subrace is the authoritative legacy channel; runtime refines only when absent', () => {
+    const automation = lineageAutomation('Tiefling');
+    const trait = lineageTrait('Tiefling').trait;
+    const chthonic = trait.automation.options.find(o => o.name === 'Chthonic');
+    const infernal = trait.automation.options.find(o => o.name === 'Infernal');
+
+    // Stale runtime selection must never override a set subrace.
+    getRuntimeValue.mockImplementation((_name, key) => (key === '_fiendishLegacySelection' ? 'Infernal' : null));
+    const withSubrace = getSpellAbilities(spellsDb, wizardStats(5, automation), { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: { name: 'Chthonic Tiefling' } } });
+    expect(withSubrace.spells.map(s => s.name).sort()).toEqual([...expectedLadder(chthonic, 5), 'Magic Missile'].sort());
+    expect(withSubrace.spells.map(s => s.name)).not.toContain(infernal.cantrip);
+    expect(getRuntimeValue).not.toHaveBeenCalledWith('TestCharacter', '_fiendishLegacySelection', 'test-campaign');
+
+    // No subrace: the sheet-chooser runtime selection resolves the legacy (CLA-118 shape).
+    const noSubrace = getSpellAbilities(spellsDb, wizardStats(5, automation), { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: null } });
+    expect(noSubrace.spells.map(s => s.name).sort()).toEqual([...expectedLadder(infernal, 5), 'Magic Missile'].sort());
+    expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_fiendishLegacySelection', 'test-campaign');
+  });
+
+  it('non-casting host: lineage creates a slotless container and re-stamps the ability math', () => {
+    const automation = lineageAutomation('Elf');
+    const raceArg = { name: 'Elf', subrace: { name: 'Wood Elf' } };
+    const fighterStats = (level) => ({
+      name: 'TestCharacter',
+      level,
+      proficiency: 2,
+      class: { name: 'Fighter', class_levels: [{ level: 3 }], spell_casting_ability: 'Intelligence' },
+      abilities: makeAbilities(),
+      spells: [],
+      automation,
     });
 
-    it('CLA-118: level 1 elfish lineage adds ONLY the cantrip — ladder spells stay gated', () => {
-      const allSpells = [
-        makeSpell('Druidcraft', 0),
-        makeSpell('Longstrider', 1),
-        makeSpell('Pass Without Trace', 2),
-      ];
+    const lv1 = getSpellAbilities(spellsDb, fighterStats(1), { campaignName: 'test-campaign', race: raceArg });
+    // No class spellcasting table → SLOTLESS container: no slot keys at all.
+    expect(Object.keys(lv1).filter(k => k.startsWith('spell_slots_'))).toEqual([]);
+    expect(lv1.spells.map(s => s.name)).toEqual(['Druidcraft']);
+    expect(lv1.spells[0].prepared).toBe('Always');
+    expect(lv1.cantrips_known).toBe(1);
+    // lv1 quirk: ladder gated by key, so spells_known stays 0 (#1262).
+    expect(lv1.spells_known).toBe(0);
+    // Lineage ability WIS outranks the class Intelligence, math recomputed.
+    expect(lv1.spellCastingAbility).toBe('WIS');
+    expect(lv1.modifier).toBe(4);
+    expect(lv1.toHit).toBe(6);
+    expect(lv1.saveDc).toBe(14);
 
-      const stats = makePlayerStats();
-      stats.automation = {
-        specialActions: [{
-          type: 'elfish_lineage',
-          options: [{ name: 'Wood Elf', spellcastingAbility: 'Wisdom', cantrip: 'Druidcraft', level3Spell: 'Longstrider', level5Spell: 'Pass Without Trace', speedBonus: 5 }],
-        }],
-      };
+    const lv5 = getSpellAbilities(spellsDb, fighterStats(5), { campaignName: 'test-campaign', race: raceArg });
+    expect(lv5.spells.map(s => s.name)).toEqual(['Druidcraft', 'Longstrider', 'Pass Without Trace']);
+    expect(lv5.cantrips_known).toBe(1);
+    expect(lv5.spells_known).toBe(2);
+  });
 
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'test-campaign', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
+  it('unresolvable lineage grants nothing', () => {
+    const automation = lineageAutomation('Elf');
 
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Druidcraft');
-      expect(names).not.toContain('Longstrider');
-      expect(names).not.toContain('Pass Without Trace');
-      expect(result.spells.filter(s => s.level > 0)).toHaveLength(0);
-    });
+    // Elf with no subrace and no runtime fallback (only Tiefling refines via runtime).
+    const noSubrace = getSpellAbilities(spellsDb, wizardStats(5, automation), { campaignName: 'test-campaign', race: { name: 'Elf', subrace: null } });
+    expect(noSubrace.spells.map(s => s.name)).toEqual(['Magic Missile']);
+    expect(noSubrace.cantrips_known).toBe(wizardClass.class_levels[4].spellcasting.cantrips_known);
 
-    it('CLA-118: level 3 elfish lineage adds the level 3 spell but not the level 5 spell', () => {
-      const allSpells = [
-        makeSpell('Druidcraft', 0),
-        makeSpell('Longstrider', 1),
-        makeSpell('Pass Without Trace', 2),
-      ];
-
-      const stats = makePlayerStats({
-        level: 3,
-        class: {
-          name: 'Fighter',
-          class_levels: [{ level: 3 }],
-          spell_casting_ability: 'Wisdom',
-        },
-      });
-      stats.automation = {
-        specialActions: [{
-          type: 'elfish_lineage',
-          options: [{ name: 'Wood Elf', spellcastingAbility: 'Wisdom', cantrip: 'Druidcraft', level3Spell: 'Longstrider', level5Spell: 'Pass Without Trace', speedBonus: 5 }],
-        }],
-      };
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'test-campaign', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Druidcraft');
-      expect(names).toContain('Longstrider');
-      expect(names).not.toContain('Pass Without Trace');
-      expect(result.spells_known).toBe(1);
-    });
-
-    it('does not add elfish lineage spells when lineage does not match', () => {
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{
-          type: 'elfish_lineage',
-          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma', cantrip: 'Blade Ward' }],
-        }],
-      };
-
-      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
-
-      expect(result.spells).toHaveLength(0);
-    });
-
-    // ── Automation: gnomish_lineage ──
-
-    it('adds gnomish lineage cantrip at level 1 and gates ladder spells until their levels', () => {
-      const allSpells = [
-        makeSpell('Friends', 0),
-        makeSpell('Web', 1),
-        makeSpell('Hold Monster', 1),
-      ];
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{
-          type: 'gnomish_lineage',
-          options: [{ name: 'Deep Gnome', spellcastingAbility: 'Intelligence', cantrip: 'Friends', level3Spell: 'Web', level5Spell: 'Hold Monster' }],
-        }],
-      };
-
-      const lv1 = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Gnome', subrace: { name: 'Deep Gnome' } } });
-      const lv1Names = lv1.spells.map(s => s.name);
-      expect(lv1Names).toContain('Friends');
-      expect(lv1Names).not.toContain('Web');
-      expect(lv1Names).not.toContain('Hold Monster');
-
-      const lv5Stats = makePlayerStats({ level: 5, class: lv5WizardClass });
-      lv5Stats.automation = stats.automation;
-      const lv5 = getSpellAbilities(allSpells, lv5Stats, { campaignName: 'TestCampaign', race: { name: 'Gnome', subrace: { name: 'Deep Gnome' } } });
-      const lv5Names = lv5.spells.map(s => s.name);
-      expect(lv5Names).toContain('Friends');
-      expect(lv5Names).toContain('Web');
-      expect(lv5Names).toContain('Hold Monster');
-    });
-
-    // ── Automation: fiendish_legacy ──
-
-    it('gates fiendish legacy ladder spells until the character reaches their levels', () => {
-      const allSpells = [
-        makeSpell('Infestation', 0),
-        makeSpell('Scorching Ray', 1),
-        makeSpell('Dominate Person', 1),
-      ];
-
-      const stats = makePlayerStats();
-      stats.automation = {
-        passives: [{
-          type: 'fiendish_legacy',
-          options: [{ name: 'Fiend', spellcastingAbility: 'Charisma', cantrip: 'Infestation', level3Spell: 'Scorching Ray', level5Spell: 'Dominate Person' }],
-        }],
-      };
-
-      const lv1Names = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Fiend Tiefling' } } }).spells.map(s => s.name);
-      expect(lv1Names).toContain('Infestation');
-      expect(lv1Names).not.toContain('Scorching Ray');
-      expect(lv1Names).not.toContain('Dominate Person');
-
-      const lv5Stats = makePlayerStats({ level: 5, class: lv5WizardClass });
-      lv5Stats.automation = stats.automation;
-      const lv5Names = getSpellAbilities(allSpells, lv5Stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Fiend Tiefling' } } }).spells.map(s => s.name);
-      expect(lv5Names).toContain('Infestation');
-      expect(lv5Names).toContain('Scorching Ray');
-      expect(lv5Names).toContain('Dominate Person');
-    });
-
-    it('creates spellAbilities for non-spellcasting character with fiendish legacy (ladder gated by level)', () => {
-      const allSpells = [
-        makeSpell('Fire Bolt', 0),
-        makeSpell('Hellish Rebuke', 1),
-        makeSpell('Darkness', 2),
-      ];
-
-      const stats = makePlayerStats({
-        class: {
-          name: 'Fighter',
-          class_levels: [{ level: 3 }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Charisma', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        automation: {
-          specialActions: [{
-            type: 'fiendish_legacy',
-            options: [{ name: 'Infernal', spellcastingAbility: 'Charisma', cantrip: 'Fire Bolt', level3Spell: 'Hellish Rebuke', level5Spell: 'Darkness' }],
-          }],
-        },
-      });
-
-      // Level 1: cantrip only, ladder spells gated.
-      const lv1 = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Infernal Tiefling' } } });
-      expect(lv1).not.toBeNull();
-      const lv1Names = lv1.spells.map(s => s.name);
-      expect(lv1Names).toContain('Fire Bolt');
-      expect(lv1Names).not.toContain('Hellish Rebuke');
-      expect(lv1Names).not.toContain('Darkness');
-      expect(lv1.cantrips_known).toBe(1);
-      expect(lv1.spells_known).toBe(0);
-
-      const lv5Stats = { ...stats, level: 5 };
-      const result = getSpellAbilities(allSpells, lv5Stats, { campaignName: 'TestCampaign', race: { name: 'Tiefling', subrace: { name: 'Infernal Tiefling' } } });
-
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Fire Bolt');
-      expect(names).toContain('Hellish Rebuke');
-      expect(names).toContain('Darkness');
-      expect(result.spellCastingAbility).toBe('Charisma');
-      expect(result.cantrips_known).toBe(1);
-      expect(result.spells_known).toBe(2);
-      expect(result.modifier).toBe(3);
-      expect(result.toHit).toBe(5);
-      expect(result.saveDc).toBe(13);
-    });
-
-    // CLA-139 mirror: Abyssal ladder per races.json:880 (Ray of Sickness lv1 in the
-    // 2024 spells DB, Hold Person lv2) — the level keys, not the slot filter, gate.
-    it('CLA-139: lv1/lv3 Abyssal Tiefling ladder is gated by the levelNSpell keys', () => {
-      const allSpells = [
-        makeSpell('Poison Spray', 0),
-        makeSpell('Ray of Sickness', 1),
-        makeSpell('Hold Person', 1),
-      ];
-
-      const abyssal = [{ name: 'Abyssal', cantrip: 'Poison Spray', level3Spell: 'Ray of Sickness', level5Spell: 'Hold Person' }];
-      const automation = { specialActions: [{ type: 'fiendish_legacy', options: abyssal }] };
-      const tiefling = { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } } };
-
-      const lv1Names = getSpellAbilities(allSpells, makePlayerStats({ automation }), tiefling).spells.map(s => s.name);
-      expect(lv1Names).toContain('Poison Spray');
-      expect(lv1Names).not.toContain('Ray of Sickness');
-      expect(lv1Names).not.toContain('Hold Person');
-
-      const lv3Casting = { cantrips_known: 4, spell_slots_level_1: 4, spell_slots_level_2: 2, spell_slots_level_3: 2, spell_slots_level_4: 0, spell_slots_level_5: 0, spell_slots_level_6: 0, spell_slots_level_7: 0, spell_slots_level_8: 0, spell_slots_level_9: 0, spell_type: 'prepared' };
-      const lv3Stats = makePlayerStats({
-        level: 3,
-        class: {
-          name: 'Wizard',
-          class_levels: [{ level: 1, spellcasting: lv1Casting }, undefined, { level: 3, spellcasting: lv3Casting }],
-          spell_casting_ability: 'Intelligence',
-        },
-        automation,
-      });
-      const lv3Names = getSpellAbilities(allSpells, lv3Stats, tiefling).spells.map(s => s.name);
-      expect(lv3Names).toContain('Poison Spray');
-      expect(lv3Names).toContain('Ray of Sickness');
-      expect(lv3Names).not.toContain('Hold Person');
-
-      const lv5Stats = makePlayerStats({ level: 5, class: lv5WizardClass, automation });
-      const lv5Names = getSpellAbilities(allSpells, lv5Stats, tiefling).spells.map(s => s.name);
-      expect(lv5Names).toContain('Ray of Sickness');
-      expect(lv5Names).toContain('Hold Person');
-    });
-
-    // CLA-139: no subrace → the sheet-chooser runtime selection refines the lane.
-    it('CLA-139: Tiefling without subrace resolves legacy from the runtime selection', () => {
-      const allSpells = [
-        makeSpell('Fire Bolt', 0),
-        makeSpell('Hellish Rebuke', 1),
-        makeSpell('Darkness', 2),
-      ];
-
-      getRuntimeValue.mockImplementation((_name, key) => (key === '_fiendishLegacySelection' ? 'Infernal' : null));
-
-      const stats = makePlayerStats({
-        level: 5,
-        class: lv5WizardClass,
-        automation: {
-          specialActions: [{
-            type: 'fiendish_legacy',
-            options: [{ name: 'Infernal', cantrip: 'Fire Bolt', level3Spell: 'Hellish Rebuke', level5Spell: 'Darkness' }],
-          }],
-        },
-      });
-
-      const result = getSpellAbilities(allSpells, stats, { campaignName: 'test-campaign', race: { name: 'Tiefling', subrace: null } });
-      const names = result.spells.map(s => s.name);
-      expect(names).toContain('Fire Bolt');
-      expect(names).toContain('Hellish Rebuke');
-      expect(names).toContain('Darkness');
-      expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_fiendishLegacySelection', 'test-campaign');
-    });
+    // Missing character level: cantrip still lands, gated ladder never does.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const noLevel = getSpellAbilities(spellsDb, { ...wizardStats(5, automation), level: undefined }, { campaignName: 'test-campaign', race: { name: 'Elf', subrace: { name: 'Wood Elf' } } });
+    expect(noLevel.spells.map(s => s.name).sort()).toEqual(['Druidcraft', 'Magic Missile']);
+    expect(noLevel.spells_known).toBe(0);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 });

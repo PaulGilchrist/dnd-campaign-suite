@@ -1,725 +1,320 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Sole-real-body-owner lane for holyAuraDamageService.js:1-62. Only production
+// consumer is applyDamage.js:819 (handleWardedDamageEvents), which runs this
+// service REAL (no applyDamage* lane mocks it) — so every branch of the real
+// body is pinned HERE with fixed-stub dice: guard gates, the two campaign-scoped
+// store READ shapes (:20 two-arg 'campaign' key, :30 three-arg caster read —
+// this service performs ZERO direct writes), fiend/undead detection
+// normalization (:11-14), the ability_score_modifiers ?? chain (:33), the
+// resolved saveResult contract consumed downstream by DiceRollResult.jsx:817-829
+// (.roll/.modifier/.total/.dc/.success), delegation to addCondition at :49, and
+// both console.error catch branches (:44/:57).
+// Owned elsewhere, NOT re-pinned here: Blinded append/dedup/case-insensitivity/
+// meta-stamp live in addCondition (conditionSaveService.test.js #1003/#1002
+// owns byte shape of that body). The PRODUCER write of holyAuraSaveDc and the
+// aura trigger belong to features/holyAuraService.test.js; turn-start radiant
+// damage → effects/auraDamageService.test.js (#1284); consumer call shapes →
+// effects/applyAuraDamage.test.js (#1282); SP-008 expiry clear →
+// hpMaxReduceService.aura-of-life.test.js (#1289).
+// No-clock policy: this service stores no duration/countdown — the 'blinded'
+// lifetime is stamped by addCondition/its expiry lanes, never here.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { checkHolyAuraDamage } from './holyAuraDamageService.js';
 import { rollD20 } from '../../dice/diceRoller.js';
 import { addEntry } from '../../ui/logService.js';
 import { getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
+import { addCondition } from '../../combat/conditions/conditionSaveService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { loadCombatSummary } from '../../encounters/combatData.js';
 
-vi.mock('../../dice/diceRoller.js', () => ({
-    rollD20: vi.fn(),
-}));
-
-vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn().mockReturnValue({ catch: (fn) => fn() }),
-}));
-
+vi.mock('../../dice/diceRoller.js', () => ({ rollD20: vi.fn() }));
+vi.mock('../../ui/logService.js', () => ({ addEntry: vi.fn() }));
 vi.mock('../../automation/handlers/buffs/holyAuraHandler.js', () => ({
     handle: vi.fn(),
     getHolyAuraTargets: vi.fn(),
 }));
-
+// addCondition is mocked at the seam: delegation call-shape is pinned here;
+// its behavior (merge/dedup/suppression) belongs to conditionSaveService.test.js.
+vi.mock('../../combat/conditions/conditionSaveService.js', () => ({ addCondition: vi.fn() }));
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
+vi.mock('../../encounters/combatData.js', () => ({ loadCombatSummary: vi.fn() }));
 
-vi.mock('../../encounters/combatData.js', () => ({
-    loadCombatSummary: vi.fn(),
-}));
+const CAMPAIGN = 'TestCampaign';
+const TS = 1700000000000; // fixed Date.now — exact tuples, no expect.any
 
-// Re-import after mocking so the module's internal imports are mocked
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { loadCombatSummary } from '../../encounters/combatData.js';
+const CREATURE = { name: 'Goblin' }; // aura-protected ally taking the melee hit
+const CASTER = 'Paladin';
+const ATTACKER = 'Warlock'; // fiend attacker forced to CON-save
+
+// Disk-canon monsters.json carries LOWERCASE ability_score_modifiers keys
+// ('con') — a real near-miss proving :33 never consults the disk-canonical key.
+function fiend(extra = {}) {
+    return { name: ATTACKER, type: 'npc', monsterType: 'Fiend', template: [], ...extra };
+}
+
+function makeSummary(attacker) {
+    return {
+        creatures: [
+            { name: CASTER, type: 'player', template: [] },
+            ...(attacker ? [attacker] : []),
+        ],
+    };
+}
+
+// Argument-keyed strict store fake: unknown/wrong-scope reads throw (no silent null).
+function seedStore(targetEffects) {
+    getRuntimeValue.mockImplementation((name, key, campaign) => {
+        if (name === 'campaign' && key === 'targetEffects') return targetEffects;
+        if (name === CASTER && key === 'holyAuraSaveDc' && campaign === CAMPAIGN) return store.saveDc;
+        throw new Error(`unexpected getRuntimeValue('${name}', '${key}', '${campaign}')`);
+    });
+}
+
+const store = { saveDc: 15 };
+let freshCs; // re-loaded summary returned by loadCombatSummary — distinct ref from the arg summary
+
+const saveTuple = (roll, modifier, total, success, dc) => ({
+    type: 'save_result',
+    characterName: ATTACKER,
+    roll,
+    modifier,
+    total,
+    success,
+    description: `Holy Aura CON save vs DC ${dc}`,
+    timestamp: TS,
+});
+
+const blindedConditionTuple = {
+    type: 'condition',
+    action: 'added',
+    characterName: ATTACKER,
+    condition: 'Blinded',
+    reason: 'Holy Aura (Fiend/Undead melee hit)',
+    timestamp: TS,
+};
 
 describe('holyAuraDamageService', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
+        store.saveDc = 15;
+        addEntry.mockResolvedValue(undefined);
+        addCondition.mockReturnValue({ suppressed: false });
+        getHolyAuraTargets.mockReturnValue([CREATURE.name]);
+        rollD20.mockReturnValue(7); // fixed stub — never a real roll
+        freshCs = makeSummary(fiend());
+        loadCombatSummary.mockResolvedValue(freshCs);
+        seedStore([{ effect: 'holy_aura', target: CREATURE.name, source: CASTER }]);
         vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(Date, 'now').mockReturnValue(TS);
     });
 
-    const campaignName = 'TestCampaign';
-
-    function makeCombatSummary(attackerCreature, ...otherCreatures) {
-        const baseCreature = { name: 'Paladin', type: 'player', template: [] };
-        const attacker = attackerCreature
-            ? { ...attackerCreature, template: attackerCreature.template ?? [] }
-            : null;
-        return {
-            creatures: [
-                baseCreature,
-                ...(attacker ? [attacker] : []),
-                ...otherCreatures.map(c => ({ ...c, template: c.template ?? [] })),
-            ],
-        };
-    }
-
-    function setupTargetEffectsMocks(holyAuraTargets, saveDc, attackerConditions) {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'targetEffects') return holyAuraTargets;
-            if (key === 'holyAuraSaveDc') return saveDc;
-            if (key === 'activeConditions') return attackerConditions;
-            return null;
-        });
-    }
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        loadCombatSummary.mockResolvedValue(null);
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
-    describe('guard conditions', () => {
-        it('does nothing when attackerName is falsy', () => {
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                null,
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
+    describe('guard gates (:19)', () => {
+        it.each([
+            ['falsy attackerName', null, 5],
+            ['self-attack (attackerName === creature.name)', CREATURE.name, 5],
+            ['wardDamage 0', ATTACKER, 0],
+            ['wardDamage negative', ATTACKER, -1],
+        ])('no-op and resolves null on %s', async (_label, attackerName, wardDamage) => {
+            const result = await checkHolyAuraDamage(CREATURE, attackerName, makeSummary(fiend()), CAMPAIGN, wardDamage);
 
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
+            expect(result).toBeNull();
+            expect(getRuntimeValue).not.toHaveBeenCalled(); // strict fake: any read would throw
+            expect(getHolyAuraTargets).not.toHaveBeenCalled();
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(addCondition).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('targetEffects selection + save-success golden path (:20-45)', () => {
+        it('reads campaign targetEffects (exact 2-arg shape), filters holy_aura rows to this target, chains caster source to the aura, logs the successful save, and resolves the saveResult contract', async () => {
+            rollD20.mockReturnValue(12); // 12 + CON 3 = 15 >= DC 15
+            const attacker = fiend({ ability_score_modifiers: { CON: 3 } });
+            seedStore([
+                { effect: 'aura_of_life', target: CREATURE.name, source: 'Cleric' }, // real near-miss effect name
+                { effect: 'holy_aura', target: 'Orc', source: 'WrongCaster' },        // wrong target
+                { effect: 'holy_aura', target: CREATURE.name, source: CASTER },       // the selected row (:24)
+            ]);
+            getHolyAuraTargets.mockReturnValue([CREATURE.name, 'Orc']);
+
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(attacker), CAMPAIGN, 5);
+
+            expect(getRuntimeValue).toHaveBeenCalledTimes(2);
+            expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects'); // :20 — no third arg by design
+            expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'holyAuraSaveDc', CAMPAIGN); // :30
+            expect(getHolyAuraTargets).toHaveBeenCalledTimes(1);
+            expect(getHolyAuraTargets).toHaveBeenCalledWith(CASTER, CAMPAIGN); // :25 source is targetEffects[0]
+            expect(rollD20).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, saveTuple(12, 3, 15, true, 15));
+            expect(addCondition).not.toHaveBeenCalled(); // :46 success seam
+            expect(loadCombatSummary).not.toHaveBeenCalled(); // :47 fail-seam only
+            expect(setRuntimeValue).not.toHaveBeenCalled(); // this service writes nothing directly
+            // resolved contract (DiceRollResult.jsx:817-829 consumer)
+            expect(result).toEqual({ roll: 12, modifier: 3, total: 15, success: true, dc: 15 });
+        });
+
+        it.each([
+            ['no holy_aura row — only near-miss aura_of_life targets the creature', [{ effect: 'aura_of_life', target: CREATURE.name, source: 'Cleric' }]],
+            ['holy_aura row targets another creature', [{ effect: 'holy_aura', target: 'Orc', source: CASTER }]],
+        ])('resolves null before delegating when filter (:21-23) yields nothing: %s', async (_label, effects) => {
+            seedStore(effects);
+
+            await expect(checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend()), CAMPAIGN, 5)).resolves.toBeNull();
+
+            expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
+            expect(getHolyAuraTargets).not.toHaveBeenCalled();
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('aura protection gate (:26-27)', () => {
+        it.each([
+            ['protected list omits the creature', ['Orc', 'Dragon']],
+            ['near-miss case: stored "goblin" does not match "Goblin"', ['goblin']],
+        ])('resolves null without rolling when creature is unprotected (%s)', async (_label, auraTargets) => {
+            getHolyAuraTargets.mockReturnValue(auraTargets);
+
+            await expect(checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend()), CAMPAIGN, 5)).resolves.toBeNull();
+
+            expect(getHolyAuraTargets).toHaveBeenCalledTimes(1);
+            expect(getHolyAuraTargets).toHaveBeenCalledWith(CASTER, CAMPAIGN);
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(addCondition).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('attacker lookup + fiend/undead detection (:8-16)', () => {
+        it('resolves null when attacker is absent from combatSummary', async () => {
+            await expect(checkHolyAuraDamage(CREATURE, 'UnknownAttacker', makeSummary(null), CAMPAIGN, 5)).resolves.toBeNull();
+
+            expect(getHolyAuraTargets).toHaveBeenCalledWith(CASTER, CAMPAIGN); // gate reached first
+            expect(rollD20).not.toHaveBeenCalled();
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('does nothing when attackerName matches creature.name', () => {
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Goblin',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
+        it.each([
+            ['monsterType Fiend (disk-canon capitalization)', 'Fiend', [], true],
+            ['monsterType lowercase undead', 'undead', [], true],
+            ['template carries Fiend (type Humanoid)', 'Humanoid', ['Fiend'], true],
+            ['template carries lowercase undead', 'Humanoid', ['undead'], true],
+            ['Humanoid + Dragon template', 'Humanoid', ['Dragon'], false],
+            ['missing monsterType and template', undefined, [], false],
+        ])('%s detection proceeds: %s', async (_label, monsterType, template, proceeds) => {
+            rollD20.mockReturnValue(7); // 7 + 0 (no modifiers) < 15 → fail
+            const attacker = fiend({ monsterType, template });
 
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
-        });
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(attacker), CAMPAIGN, 5);
 
-        it('does nothing when wardDamage is 0', () => {
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                0,
-            );
-
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
-        });
-
-        it('does nothing when wardDamage is negative', () => {
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                -1,
-            );
-
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
+            if (proceeds) {
+                expect(addEntry).toHaveBeenNthCalledWith(1, CAMPAIGN, saveTuple(7, 0, 7, false, 15));
+                expect(addEntry).toHaveBeenNthCalledWith(2, CAMPAIGN, blindedConditionTuple);
+                expect(addCondition).toHaveBeenCalledTimes(1);
+                expect(result).toEqual({ roll: 7, modifier: 0, total: 7, success: false, dc: 15 });
+            } else {
+                expect(rollD20).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
+                expect(addCondition).not.toHaveBeenCalled();
+                expect(result).toBeNull();
+            }
         });
     });
 
-    describe('Holy Aura activation check', () => {
-        beforeEach(() => {
-            loadCombatSummary.mockResolvedValue(makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }));
-        });
+    describe('CON save DC gate (:30-31)', () => {
+        it.each([
+            ['null DC', null],
+            ['undefined DC', undefined],
+            ['DC 0 (falsy-coercion pin: :0 treated as absent)', 0],
+        ])('resolves null before rolling when %s', async (_label, dc) => {
+            store.saveDc = dc;
 
-        it('does nothing when no holy_aura targetEffects exist', () => {
-            setupTargetEffectsMocks([], 15, []);
+            await expect(checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend()), CAMPAIGN, 5)).resolves.toBeNull();
 
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(getHolyAuraTargets).not.toHaveBeenCalled();
-        });
-
-        it('finds caster from targetEffects on the creature', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(getHolyAuraTargets).toHaveBeenCalledWith('Paladin', campaignName);
+            expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'holyAuraSaveDc', CAMPAIGN);
+            expect(rollD20).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+            expect(addCondition).not.toHaveBeenCalled();
         });
     });
 
-    describe('target protection check', () => {
-        it('protects creature when creature.name is in the target list', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin', 'Orc']);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(getHolyAuraTargets).toHaveBeenCalledWith('Paladin', campaignName);
-        });
-
-        it('does NOT protect creature when not in target list', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Orc', 'Demon']);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(getHolyAuraTargets).toHaveBeenCalledWith('Paladin', campaignName);
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-
-        it('does NOT protect creature when target list is empty', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue([]);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(getHolyAuraTargets).toHaveBeenCalledWith('Paladin', campaignName);
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('attacker creature lookup', () => {
-        it('does nothing when attacker is not found in combatSummary', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'UnknownAttacker',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('Fiend/Undead detection', () => {
-        function setupFiendUndeadMocks() {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            rollD20.mockReturnValue(5);
-        }
-
-        it('detects fiend by type (lowercase)', () => {
-            setupFiendUndeadMocks();
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
-        });
-
-        it('detects undead by type (lowercase)', () => {
-            setupFiendUndeadMocks();
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Undead' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
-        });
-
-        it('detects fiend by template', () => {
-            setupFiendUndeadMocks();
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Humanoid', template: ['Fiend'] }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
-        });
-
-        it('detects undead by template', () => {
-            setupFiendUndeadMocks();
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Humanoid', template: ['Undead'] }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
-        });
-
-        it('does NOT trigger for non-fiend/undead type', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Humanoid' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('does NOT trigger for non-fiend/undead template', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Humanoid', template: ['Dragon'] }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-
-        it('handles missing type gracefully (treated as non-fiend/undead)', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).not.toHaveBeenCalled();
-        });
-
-        it('handles missing template gracefully', () => {
-            setupFiendUndeadMocks();
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
-        });
-    });
-
-    describe('CON save resolution', () => {
-        it('reads holyAuraSaveDc from runtime store', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
+    describe('ability_score_modifiers ?? chain (:33)', () => {
+        it.each([
+            ['CON abbr wins over constitution long-form', { CON: 5, constitution: 2 }, 5, true],  // 10+5 >= 15
+            ['constitution long-form fallback', { constitution: 4 }, 4, false],                      // 10+4 < 15
+            ['disk-canonical lowercase "con" is ignored → bonus 0', { con: 3 }, 0, false],         // monsters.json shape
+            ['empty modifiers object → bonus 0', {}, 0, false],
+        ])('%s (roll fixed 10 vs DC 15)', async (_label, mods, mod, success) => {
             rollD20.mockReturnValue(10);
 
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend', ability_score_modifiers: { CON: 3 } }),
-                campaignName,
-                5,
-            );
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend({ ability_score_modifiers: mods })), CAMPAIGN, 5);
 
-            expect(getRuntimeValue).toHaveBeenCalledWith('Paladin', 'holyAuraSaveDc', campaignName);
-        });
-
-        it('does nothing when holyAuraSaveDc is falsy', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                null,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(rollD20).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).toHaveBeenCalledTimes(success ? 1 : 2);
+            expect(addEntry).toHaveBeenNthCalledWith(1, CAMPAIGN, saveTuple(10, mod, 10 + mod, success, 15));
+            if (!success) expect(addEntry).toHaveBeenNthCalledWith(2, CAMPAIGN, blindedConditionTuple);
+            expect(addCondition).toHaveBeenCalledTimes(success ? 0 : 1);
+            expect(result).toEqual({ roll: 10, modifier: mod, total: 10 + mod, success, dc: 15 });
         });
     });
 
-    describe('Blinded condition application', () => {
-        const fiendWarlock = { name: 'Warlock', type: 'npc', monsterType: 'Fiend', ability_score_modifiers: { CON: 3 } };
-        beforeEach(() => {
-            loadCombatSummary.mockResolvedValue(makeCombatSummary(fiendWarlock));
-        });
+    describe('failed-save delegation seam (:46-58)', () => {
+        it('re-loads the combat summary and delegates the exact Blinded write to addCondition, logging save then condition entries in order', async () => {
+            rollD20.mockReturnValue(5); // 5 + CON 3 = 8 < 15
+            const attacker = fiend({ ability_score_modifiers: { CON: 3 } });
+            const argSummary = makeSummary(attacker); // stale arg summary — must NOT be forwarded
 
-        it('adds Blinded condition when save fails', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-            // saveTotal = 5 + 3 = 8 < 15
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, argSummary, CAMPAIGN, 5);
 
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-        });
-
-        it('logs a condition entry when Blinded is added', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'condition',
-                action: 'added',
-                characterName: 'Warlock',
-                condition: 'Blinded',
-                reason: 'Holy Aura (Fiend/Undead melee hit)',
-                timestamp: expect.any(Number),
+            expect(loadCombatSummary).toHaveBeenCalledTimes(1);
+            expect(loadCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
+            expect(addCondition).toHaveBeenCalledTimes(1);
+            expect(addCondition).toHaveBeenCalledWith({
+                combatSummary: freshCs, // :47 forwarded identity — re-loaded, not argSummary
+                creatureName: ATTACKER,
+                conditionDef: { key: 'blinded', label: 'Blinded' },
+                dc: 15,
+                ability: 'CON',
+                getRuntimeValue,
+                setRuntimeValue,
+                campaignName: CAMPAIGN,
+                playerStats: attacker, // :49 attackerCreature identity, not the damaged creature
             });
+            expect(addEntry).toHaveBeenCalledTimes(2);
+            expect(addEntry).toHaveBeenNthCalledWith(1, CAMPAIGN, saveTuple(5, 3, 8, false, 15));
+            expect(addEntry).toHaveBeenNthCalledWith(2, CAMPAIGN, blindedConditionTuple);
+            expect(setRuntimeValue).not.toHaveBeenCalled(); // write budget delegated wholesale
+            expect(result).toEqual({ roll: 5, modifier: 3, total: 8, success: false, dc: 15 });
         });
 
-        it('does NOT add Blinded when save succeeds', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(12);
-            // saveTotal = 12 + 3 = 15 >= 15
+        it('rejecting save-result log does not break the flow: identical Error + exact prefix to console.error', async () => {
+            const err = new Error('log down');
+            addEntry.mockRejectedValueOnce(err);
 
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend()), CAMPAIGN, 5);
 
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'save_result',
-                characterName: 'Warlock',
-                roll: 12,
-                modifier: 3,
-                total: 15,
-                success: true,
-                description: 'Holy Aura CON save vs DC 15',
-                timestamp: expect.any(Number),
-            });
+            expect(console.error).toHaveBeenCalledWith('[holyAura] Error logging save:', err);
+            expect(result).toEqual({ roll: 7, modifier: 0, total: 7, success: false, dc: 15 });
         });
 
-        it('does NOT add duplicate Blinded condition when already present', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                ['blinded']
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
+        it('rejecting condition log does not break the flow: identical Error + exact prefix to console.error', async () => {
+            const err = new Error('log down');
+            addEntry.mockImplementationOnce(() => Promise.resolve()).mockImplementationOnce(() => Promise.reject(err));
 
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
+            const result = await checkHolyAuraDamage(CREATURE, ATTACKER, makeSummary(fiend()), CAMPAIGN, 5);
 
-            // setRuntimeValue is called to update activeConditions (filtered + re-added) and activeConditionMeta
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'save_result',
-                characterName: 'Warlock',
-                roll: 5,
-                modifier: 3,
-                total: 8,
-                success: false,
-                description: 'Holy Aura CON save vs DC 15',
-                timestamp: expect.any(Number),
-            });
-        });
-
-        it('uses CON modifier from ability_score_modifiers', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(10);
-            // saveTotal = 10 + 3 = 13 < 15
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ ...fiendWarlock, ability_score_modifiers: { CON: 3 } }),
-                campaignName,
-                5,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-        });
-
-        it('uses 0 as CON bonus when ability_score_modifiers is missing', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(14);
-            // saveTotal = 14 + 0 = 14 < 15
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                5,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-        });
-
-        it('handles undefined ability_score_modifiers gracefully', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(14);
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend', ability_score_modifiers: undefined }),
-                campaignName,
-                5,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-        });
-
-        it('treats existing blinded condition case-insensitively', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                ['Blinded']
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
-
-            // setRuntimeValue is called to update activeConditions (filtered case-insensitively + re-added) and activeConditionMeta
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'save_result',
-                characterName: 'Warlock',
-                roll: 5,
-                modifier: 3,
-                total: 8,
-                success: false,
-                description: 'Holy Aura CON save vs DC 15',
-                timestamp: expect.any(Number),
-            });
-        });
-
-        it('adds blinded alongside existing non-blinded conditions', async () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            await checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary(fiendWarlock),
-                campaignName,
-                5,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Warlock',
-                'activeConditions',
-                ['blinded'],
-                campaignName,
-            );
-        });
-    });
-
-    describe('wardDamage parameter', () => {
-        it('does nothing when wardDamage is 0 even with all conditions met', () => {
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend' }),
-                campaignName,
-                0,
-            );
-
-            expect(getRuntimeValue).not.toHaveBeenCalledWith('campaign', 'targetEffects');
-        });
-
-        it('triggers when wardDamage is positive', () => {
-            setupTargetEffectsMocks(
-                [{ effect: 'holy_aura', target: 'Goblin', source: 'Paladin' }],
-                15,
-                []
-            );
-            getHolyAuraTargets.mockReturnValue(['Goblin']);
-            rollD20.mockReturnValue(5);
-
-            checkHolyAuraDamage(
-                { name: 'Goblin' },
-                'Warlock',
-                makeCombatSummary({ name: 'Warlock', type: 'npc', monsterType: 'Fiend', ability_score_modifiers: { CON: 3 } }),
-                campaignName,
-                1,
-            );
-
-            expect(rollD20).toHaveBeenCalled();
+            expect(addCondition).toHaveBeenCalledTimes(1); // delegation precedes the second log
+            expect(console.error).toHaveBeenCalledWith('[holyAura] Error:', err);
+            expect(result).toEqual({ roll: 7, modifier: 0, total: 7, success: false, dc: 15 });
         });
     });
 });

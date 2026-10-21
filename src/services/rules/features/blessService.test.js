@@ -1,5 +1,30 @@
+// @maintained-by-ai
+// blessService lane contract — two live lanes, one file, no duplication elsewhere:
+// 1) triggerBlessSpell: gate + envelope forwarder. Live dispatch:
+//    spellCastService/execution/triggerSpells.js handleBless (:153) spreads
+//    { ...metaCtx, spellSaveDc } in, then DISCARDS the return (:155-156);
+//    the live picker is spellGates.gateBless (own lane). blessHandler.test.js
+//    owns the executeHandler→handle popup side — this file mocks executeHandler
+//    and pins only the envelope it receives. Bless has NO saving throw
+//    (disk row: no save field, 2024 attack_type null) — the spellSaveDc
+//    sentinel is pinned NOT-read (#1338 determination).
+// 2) applyBlessEffect: SOLE owner of the apply-side writes. Called directly by
+//    useSimpleSpellHandlers.js:288 (metamagic confirm), never via blessHandler
+//    (blessHandler.test.js:5-8). One full-set write per cast, skipSync=true in
+//    the 5th position; effect key from the targetEffectDefinitions registry
+//    (:699 bless_bonus); replace per target+source; duration 'concentration'
+//    mirrors the disk row (concentration: true, #1290 boundary).
+// Live cross-lane note (reported, not fixed here): the bane spec
+// (useSimpleSpellHandlers.js:287) forwards the paid slot as level: per SP-011;
+// the bless spec (:288) does not, so metamagic-upcast bless stamps slotLevel 1
+// in this lane's row — the trigger lane's metaCtx.slotLevel precedence below
+// pins the seam awaiting that wiring fix.
+// Weapon-row gap #1238 verdict: blessService composes NO weapon rows (te write
+// only) — gap does not live in this lane.
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { triggerBlessSpell, applyBlessEffect } from './blessService.js';
+import spells5e from '../../../../public/data/spells.json';
+import { getEffectDefinition } from '../../combat/conditions/targetEffectDefinitions.js';
 
 vi.mock('../../../services/automation/index.js', () => ({
     executeHandler: vi.fn(),
@@ -17,346 +42,149 @@ vi.mock('../../../services/ui/logService.js', () => ({
 import { executeHandler } from '../../../services/automation/index.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
+import { triggerBlessSpell, applyBlessEffect } from './blessService.js';
 
 const CAMPAIGN_NAME = 'TestCampaign';
 const MAP_NAME = 'testMap';
 
-const PLAYER_STATS = {
-    name: 'Cleric',
-    spellAbilities: { modifier: 3, saveDc: 15 },
-    proficiency: 3,
-    abilities: [{ name: 'Wisdom', bonus: 3 }],
-    computedStats: { saveBonuses: { WIS: 3 } },
-};
+// Disk-derived fixtures — never hand-transcribed (#1339).
+const DISK_BLESS = spells5e.find(s => s.name === 'Bless');
+const BLESS_TE = getEffectDefinition('bless_bonus').effect;
+const NEAR_MISS_NAMES = spells5e
+    .map(s => s.name)
+    .filter(n => /bless|bane|blade/i.test(n) && n !== 'Bless');
 
-const makeSpell = (overrides = {}) => ({
-    name: 'Bless',
-    level: 1,
-    casting_time: '1 action',
-    range: '30 feet',
-    ...overrides,
-});
+const PLAYER_STATS = { name: 'Cleric' };
 
-describe('triggerBlessSpell', () => {
+describe('triggerBlessSpell — gate + envelope forwarder', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('returns null when spell name is not "Bless"', async () => {
-        const spell = { name: 'Bane', level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+    it.each([
+        ...NEAR_MISS_NAMES.map(n => [n]),
+        ['bless (trailing space)'],
+        [''],
+        [undefined],
+        [null],
+    ])('spell name %j does not open the gate — null, zero dispatch', async (name) => {
+        const result = await triggerBlessSpell({ name }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+
         expect(result).toBeNull();
         expect(executeHandler).not.toHaveBeenCalled();
     });
 
-    it('returns null for case variations that do not match exactly', async () => {
-        const spell = { name: 'Blessing', level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-        expect(result).toBeNull();
-        expect(executeHandler).not.toHaveBeenCalled();
-    });
+    it('matches the gate case-insensitively and forwards the exact envelope positionally', async () => {
+        executeHandler.mockResolvedValue({ type: 'popup', payload: { forwarded: true } });
+        const spell = { ...DISK_BLESS };
 
-    it('matches "bless" case-insensitively', async () => {
-        executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
+        for (const name of ['BLESS', 'bless', 'BlEsS']) {
+            executeHandler.mockClear();
+            const result = await triggerBlessSpell({ ...spell, name }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
 
-        const spell = { name: 'BLESS', level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalled();
-        expect(result).toEqual({ type: 'popup', payload: {} });
-    });
-
-    it('matches "bless" lowercase', async () => {
-        executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-        const spell = { name: 'bless', level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalled();
-        expect(result).toEqual({ type: 'popup', payload: {} });
-    });
-
-    it('returns null when spell name is empty string', async () => {
-        const spell = { name: '', level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-        expect(result).toBeNull();
-        expect(executeHandler).not.toHaveBeenCalled();
-    });
-
-    it('returns null when spell name is null', async () => {
-        const spell = { name: null, level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-        expect(result).toBeNull();
-        expect(executeHandler).not.toHaveBeenCalled();
-    });
-
-    it('returns null when spell name is undefined', async () => {
-        const spell = { level: 1 };
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-        expect(result).toBeNull();
-        expect(executeHandler).not.toHaveBeenCalled();
-    });
-
-    it('calls executeHandler with correct action for Bless spell', async () => {
-        executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-        const spell = makeSpell();
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            // Exact envelope: no extra keys may leak in (e.g. a future {...metaCtx} spread).
+            expect(executeHandler.mock.calls[0][0]).toEqual({
                 name: 'Bless',
-                automation: {
-                    type: 'bless',
-                    range: '30 feet',
-                    maxTargets: 3,
-                },
-                spell,
-                spellSlotLevel: 1,
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-        expect(result).toEqual({ type: 'popup', payload: {} });
+                automation: { type: 'bless', range: DISK_BLESS.range, maxTargets: 3 },
+                spell: { ...spell, name },
+                spellSlotLevel: DISK_BLESS.level,
+            });
+            expect(executeHandler.mock.calls[0][1]).toBe(PLAYER_STATS);
+            expect(executeHandler.mock.calls[0][2]).toBe(CAMPAIGN_NAME);
+            expect(executeHandler.mock.calls[0][3]).toBe(MAP_NAME);
+            expect(result).toEqual({ type: 'popup', payload: { forwarded: true } });
+        }
     });
 
-    it('uses slotLevel from metaCtx when available', async () => {
+    it.each([
+        ['metaCtx.slotLevel outranks spell.level (paid-slot upcast)', { slotLevel: 4 }, { ...DISK_BLESS, level: 2 }, 4],
+        ['spell.level used when metaCtx.slotLevel absent', {}, { ...DISK_BLESS, level: 2 }, 2],
+        ['defaults to 1 when neither carries a level', {}, { name: 'Bless' }, 1],
+    ])('slotLevel precedence: %s', async (_label, metaCtx, spell, expected) => {
         executeHandler.mockResolvedValue(null);
-        const spell = makeSpell();
-        await triggerBlessSpell(spell, { slotLevel: 3 }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
 
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ spellSlotLevel: 3 }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
+        await triggerBlessSpell(spell, { spellSaveDc: 99, ...metaCtx }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+
+        const action = executeHandler.mock.calls[0][0];
+        expect(action.spellSlotLevel).toBe(expected);
+        // Bless has no save — the triggerSpells-spread spellSaveDc must NOT
+        // reach the envelope (#1338 determination).
+        expect(action).not.toHaveProperty('spellSaveDc');
+        expect(action.automation).not.toHaveProperty('saveDc');
     });
 
-    it('uses spell.level when metaCtx slotLevel is missing', async () => {
+    it('uses spell.range and automation.maxTargets, defaulting to disk values 30 feet / 3', async () => {
         executeHandler.mockResolvedValue(null);
-        const spell = makeSpell({ level: 2 });
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
 
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ spellSlotLevel: 2 }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
+        await triggerBlessSpell({ ...DISK_BLESS, range: '60 feet', automation: { maxTargets: 6 } }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+        expect(executeHandler.mock.calls[0][0].automation).toEqual({ type: 'bless', range: '60 feet', maxTargets: 6 });
+
+        await triggerBlessSpell({ name: 'Bless' }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+        expect(executeHandler.mock.calls[1][0].automation).toEqual({ type: 'bless', range: '30 feet', maxTargets: 3 });
     });
 
-    it('defaults slotLevel to 1 when neither metaCtx nor spell.level available', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spellNoLevel = { name: 'Bless', casting_time: '1 action', range: '30 feet' };
-        await triggerBlessSpell(spellNoLevel, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ spellSlotLevel: 1 }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('uses spell.range for action range', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = makeSpell({ range: '60 feet' });
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ range: '60 feet' }),
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('defaults range to "30 feet" when not on spell', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spellNoRange = { name: 'Bless', level: 1, casting_time: '1 action' };
-        await triggerBlessSpell(spellNoRange, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ range: '30 feet' }),
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('uses auto.maxTargets from spell automation', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = makeSpell({ automation: { maxTargets: 6 } });
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ maxTargets: 6 }),
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('defaults maxTargets to 3 when no automation defined', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = { name: 'Bless', level: 1, casting_time: '1 action', range: '30 feet' };
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ maxTargets: 3 }),
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('returns result from executeHandler on success', async () => {
-        const expectedResult = { type: 'popup', payload: { name: 'Bless', description: '3 creatures selected' } };
-        executeHandler.mockResolvedValue(expectedResult);
-
-        const spell = makeSpell();
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(result).toEqual(expectedResult);
-    });
-
-    it('returns null and logs error on executeHandler throw', async () => {
+    it('returns the handler result unchanged; on throw returns null with the exact console.error', async () => {
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        executeHandler.mockRejectedValue(new Error('Handler failed'));
+        const error = new Error('Handler failed');
 
-        const spell = makeSpell();
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
+        const forwarded = { type: 'popup', payload: { name: 'Bless' } };
+        executeHandler.mockResolvedValue(forwarded);
+        await expect(triggerBlessSpell({ ...DISK_BLESS }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME))
+            .resolves.toBe(forwarded);
+
+        executeHandler.mockRejectedValue(error);
+        const result = await triggerBlessSpell({ ...DISK_BLESS }, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
 
         expect(result).toBeNull();
-        expect(consoleSpy).toHaveBeenCalledWith(
-            '[blessSpell] Failed to execute Bless handler:',
-            expect.any(Error),
-        );
+        expect(consoleSpy).toHaveBeenCalledWith('[blessSpell] Failed to execute Bless handler:', error);
         consoleSpy.mockRestore();
     });
-
-    it('returns null when executeHandler returns null', async () => {
-        executeHandler.mockResolvedValue(null);
-
-        const spell = makeSpell();
-        const result = await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(result).toBeNull();
-    });
-
-    it('passes metaCtx slotLevel even when spell has level', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = makeSpell({ level: 2 });
-        await triggerBlessSpell(spell, { slotLevel: 4 }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ spellSlotLevel: 4 }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('passes spell object in action', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = makeSpell({ level: 1, casting_time: '1 action', range: '30 feet' });
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({ spell: spell }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
-
-    it('includes automation.type: "bless" in action', async () => {
-        executeHandler.mockResolvedValue(null);
-        const spell = makeSpell();
-        await triggerBlessSpell(spell, {}, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME);
-
-        expect(executeHandler).toHaveBeenCalledWith(
-            expect.objectContaining({
-                automation: expect.objectContaining({ type: 'bless' }),
-            }),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-        );
-    });
 });
 
-describe('applyBlessEffect', () => {
+describe('applyBlessEffect — apply-side targetEffects writer', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.useFakeTimers();
     });
 
-    afterEach(() => {
-        vi.useRealTimers();
-    });
+    it.each([
+        ['null', null],
+        ['undefined', undefined],
+        ['empty array', []],
+        ['string', 'Goblin'],
+        ['number', 5],
+        ['object', { name: 'Goblin' }],
+    ])('rejects invalid targetNames (%s): null, zero reads, zero writes, zero logs', async (_label, targets) => {
+        const result = await applyBlessEffect({ ...DISK_BLESS }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, targets);
 
-    it('returns null when targetNames is null', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, null);
         expect(result).toBeNull();
+        expect(getRuntimeValue).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('returns null when targetNames is undefined', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, undefined);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is empty array', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, []);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is not an array', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, 'not-an-array');
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is a number', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, 5);
-        expect(result).toBeNull();
-    });
-
-    it('returns null when targetNames is an object', async () => {
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, { name: 'Goblin' });
-        expect(result).toBeNull();
-    });
-
-    it('applies bless_bonus effect for a single target', async () => {
+    it.each([
+        ['disk level', { ...DISK_BLESS }, DISK_BLESS.level],
+        ['level-less spell defaults to slot 1', { name: 'Bless' }, 1],
+    ])('one full-set write (skipSync pos 5): %s — exact bless row and popup envelope', async (_label, spell, expectedSlot) => {
         getRuntimeValue.mockReturnValue([]);
 
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
+        const result = await applyBlessEffect(spell, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    effect: 'bless_bonus',
-                    source: 'Cleric',
-                    slotLevel: 1,
-                    duration: 'concentration',
-                }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-
+        expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        const [scope, key, effects, campaign, skipSync] = setRuntimeValue.mock.calls[0];
+        expect(scope).toBe('campaign');
+        expect(key).toBe('targetEffects');
+        expect(campaign).toBe(CAMPAIGN_NAME);
+        expect(skipSync).toBe(true);
+        expect(effects).toEqual([{
+            target: 'Goblin',
+            effect: BLESS_TE,
+            source: 'Cleric',
+            slotLevel: expectedSlot,
+            duration: 'concentration',
+        }]);
         expect(result).toEqual({
             type: 'popup',
             payload: {
@@ -367,363 +195,101 @@ describe('applyBlessEffect', () => {
         });
     });
 
-    it('applies bless_bonus effect for multiple targets', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const result = await applyBlessEffect(
-            makeSpell(),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-            ['Goblin', 'Orc', 'Skeleton'],
-        );
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ target: 'Goblin', effect: 'bless_bonus', source: 'Cleric' }),
-                expect.objectContaining({ target: 'Orc', effect: 'bless_bonus', source: 'Cleric' }),
-                expect.objectContaining({ target: 'Skeleton', effect: 'bless_bonus', source: 'Cleric' }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-
-        expect(result.payload.description).toContain('3 of 3');
-    });
-
-    it('replaces existing bless_bonus effect from same caster on re-cast', async () => {
-        const existingEffects = [
-            { target: 'Goblin', effect: 'bless_bonus', source: 'OldCleric', slotLevel: 1, duration: 'concentration' },
-            { target: 'Goblin', effect: 'bane_penalty', source: 'Cleric', slotLevel: 1 },
+    it('replaces own bless row in place, upgrades the paid slot, scopes one row per target, preserves all others by identity', async () => {
+        const existing = [
+            { target: 'Goblin', effect: BLESS_TE, source: 'Cleric', slotLevel: 1, duration: 'concentration' },      // own row — replace idx 0
+            { target: 'Goblin', effect: BLESS_TE, source: 'OtherCleric', slotLevel: 1, duration: 'concentration' },  // other caster — keep
+            { target: 'Orc', effect: BLESS_TE, source: 'Cleric', slotLevel: 1, duration: 'concentration' },           // not re-targeted — keep
+            { target: 'Goblin', effect: 'bane_penalty', source: 'Hag', slotLevel: 1 },                                 // unrelated effect — keep
         ];
-        getRuntimeValue.mockReturnValue(existingEffects);
+        getRuntimeValue.mockReturnValue(existing);
 
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
+        const result = await applyBlessEffect({ ...DISK_BLESS, level: 3 }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin', 'Skeleton']);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    effect: 'bless_bonus',
-                    source: 'Cleric',
-                    slotLevel: 1,
-                }),
-                expect.objectContaining({
-                    effect: 'bane_penalty',
-                }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-    });
-
-    it('does not replace bless_bonus from a different caster', async () => {
-        const existingEffects = [
-            { target: 'Goblin', effect: 'bless_bonus', source: 'OtherCleric', slotLevel: 1, duration: 'concentration' },
-        ];
-        getRuntimeValue.mockReturnValue(existingEffects);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        // Should push a new entry since source differs
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ source: 'OtherCleric', effect: 'bless_bonus' }),
-                expect.objectContaining({ source: 'Cleric', effect: 'bless_bonus' }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-    });
-
-    it('uses spell.level for slotLevel in effect', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell({ level: 3 }), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ slotLevel: 3 }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-    });
-
-    it('defaults slotLevel to 1 when spell.level is missing', async () => {
-        getRuntimeValue.mockReturnValue([]);
-        const spellNoLevel = { name: 'Bless', casting_time: '1 action', range: '30 feet' };
-
-        await applyBlessEffect(spellNoLevel, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ slotLevel: 1 }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-    });
-
-    it('uses playerStats.name as source in effect', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.any(Array),
-            CAMPAIGN_NAME,
-            true,
-        );
-
-        const effectCalls = setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'targetEffects',
-        );
-        expect(effectCalls.length).toBe(1);
-        const effects = effectCalls[0][2];
-        expect(effects[0].source).toBe('Cleric');
-    });
-
-    it('sets duration to "concentration" in effect', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const effectCalls = setRuntimeValue.mock.calls.filter(
-            call => call[1] === 'targetEffects',
-        );
-        const effects = effectCalls[0][2];
-        expect(effects[0].duration).toBe('concentration');
-    });
-
-    it('logs spell cast entry for each target', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.targetName,
-        );
-        expect(spellEntries.length).toBeGreaterThanOrEqual(1);
-        expect(spellEntries[0][1].description).toContain('Cleric casts Bless on Goblin');
-        expect(spellEntries[0][1].characterName).toBe('Cleric');
-        expect(spellEntries[0][1].spellName).toBe('Bless');
-        expect(spellEntries[0][1].targetName).toBe('Goblin');
-        expect(spellEntries[0][1].targets).toEqual(['Goblin']);
-    });
-
-    it('logs summary entry after all targets processed', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(
-            makeSpell(),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-            ['Goblin', 'Orc'],
-        );
-
-        const summaryEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.targets,
-        );
-        expect(summaryEntries.length).toBeGreaterThanOrEqual(1);
-        expect(summaryEntries[0][1].targets).toEqual(['Goblin', 'Orc']);
-    });
-
-    it('logs with casting_time from spell when available', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        const spellWithCastingTime = makeSpell({ casting_time: 'Bonus Action' });
-        await applyBlessEffect(spellWithCastingTime, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.targetName,
-        );
-        expect(spellEntries[0][1].castingTime).toBe('Bonus Action');
-    });
-
-    it('defaults casting_time to "1 action" when not on spell', async () => {
-        getRuntimeValue.mockReturnValue([]);
-        const spellNoCastingTime = { name: 'Bless', level: 1, range: '30 feet' };
-
-        await applyBlessEffect(spellNoCastingTime, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.targetName,
-        );
-        expect(spellEntries[0][1].castingTime).toBe('1 action');
-    });
-
-    it('uses spell.level for spellLevel in log entries', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell({ level: 2 }), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.spellLevel != null,
-        );
-        expect(spellEntries[0][1].spellLevel).toBe(2);
-    });
-
-    it('defaults spellLevel to 1 when spell.level is missing', async () => {
-        getRuntimeValue.mockReturnValue([]);
-        const spellNoLevel = { name: 'Bless', casting_time: '1 action', range: '30 feet' };
-
-        await applyBlessEffect(spellNoLevel, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.spellLevel != null,
-        );
-        expect(spellEntries[0][1].spellLevel).toBe(1);
-    });
-
-    it('sets timestamp in log entries', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless',
-        );
-        for (const call of spellEntries) {
-            expect(call[1].timestamp).toBeDefined();
-            expect(typeof call[1].timestamp).toBe('number');
-        }
-    });
-
-    it('handles log entry promise rejections gracefully', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        addEntry.mockImplementation(() => Promise.reject(new Error('Log failed')));
-
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-        consoleSpy.mockRestore();
-
-        expect(result).toBeDefined();
-        expect(result.payload.description).toContain('1 of 1');
-    });
-
-    it('handles storedEffects that are not an array (converts to empty array)', async () => {
-        getRuntimeValue.mockReturnValue(null);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.any(Array),
-            CAMPAIGN_NAME,
-            true,
-        );
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         const effects = setRuntimeValue.mock.calls[0][2];
-        expect(effects).toContainEqual(
-            expect.objectContaining({ target: 'Goblin', effect: 'bless_bonus' }),
-        );
+        expect(effects).toEqual([
+            { target: 'Goblin', effect: BLESS_TE, source: 'Cleric', slotLevel: 3, duration: 'concentration' },
+            existing[1],
+            existing[2],
+            existing[3],
+            { target: 'Skeleton', effect: BLESS_TE, source: 'Cleric', slotLevel: 3, duration: 'concentration' },
+        ]);
+        // Untouched rows are carried by reference, and each target holds exactly one own bless row.
+        expect(effects[1]).toBe(existing[1]);
+        expect(effects.filter(te => te.effect === BLESS_TE && te.source === 'Cleric' && te.target === 'Goblin')).toHaveLength(1);
+        expect(result.payload.description).toBe('2 of 2 target(s) blessed by Bless.');
     });
 
-    it('preserves unrelated effects when updating', async () => {
-        const existingEffects = [
-            { target: 'Goblin', effect: 'bane_penalty', source: 'Wizard', slotLevel: 1 },
-            { target: 'Orc', effect: 'frightened', source: 'Dragon', duration: '1 minute' },
-        ];
-        getRuntimeValue.mockReturnValue(existingEffects);
-
-        await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Orc']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({ effect: 'bane_penalty', source: 'Wizard' }),
-                expect.objectContaining({ target: 'Orc', effect: 'frightened' }),
-                expect.objectContaining({ target: 'Orc', effect: 'bless_bonus', source: 'Cleric' }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
-    });
-
-    it('returns popup with correct description format', async () => {
+    it.each([
+        ['explicit casting_time passthrough', { ...DISK_BLESS, casting_time: 'Bonus Action', level: 2 }, 'Bonus Action', 2],
+        ['5e disk defaults', { name: 'Bless' }, '1 action', 1],
+    ])('logs the cast entry then the summary entry, both exact: %s', async (_label, spell, expectedCastingTime, expectedLevel) => {
         getRuntimeValue.mockReturnValue([]);
+        const targets = ['Goblin', 'Orc'];
 
-        const result = await applyBlessEffect(
-            makeSpell(),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-            ['Goblin', 'Orc', 'Skeleton', 'Troll', 'Ghoul'],
-        );
+        await applyBlessEffect(spell, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, targets);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe('Bless');
-        expect(result.payload.description).toBe('5 of 5 target(s) blessed by Bless.');
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        const [castEntry, summaryEntry] = addEntry.mock.calls.map(c => c[1]);
+        expect(addEntry.mock.calls[0][0]).toBe(CAMPAIGN_NAME);
+        expect(addEntry.mock.calls[1][0]).toBe(CAMPAIGN_NAME);
+        expect(castEntry).toEqual({
+            type: 'spell',
+            characterName: 'Cleric',
+            targetName: 'Goblin',
+            targets,
+            spellName: 'Bless',
+            spellLevel: expectedLevel,
+            castingTime: expectedCastingTime,
+            description: 'Cleric casts Bless on Goblin, Orc.',
+            timestamp: expect.any(Number),
+        });
+        expect(summaryEntry).toEqual({
+            type: 'spell',
+            characterName: 'Cleric',
+            targetName: 'Goblin',
+            targets,
+            spellName: 'Bless',
+            spellLevel: expectedLevel,
+            castingTime: expectedCastingTime,
+            description: 'Bless cast: 2 creature(s) blessed.',
+            timestamp: expect.any(Number),
+        });
+        // Targets reach the log verbatim, special characters included.
+        expect(castEntry.targets).toBe(targets);
     });
 
-    it('works with single target in array', async () => {
+    it.each([
+        ['null', null],
+        ['undefined', undefined],
+        ['string', 'corrupt'],
+        ['object', { 0: 'corrupt' }],
+    ])('coerces non-array storedEffects (%s) to a fresh list holding only this cast', async (_label, stored) => {
+        getRuntimeValue.mockReturnValue(stored);
+
+        await applyBlessEffect({ ...DISK_BLESS }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin', 'Orc']);
+
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+        expect(setRuntimeValue.mock.calls[0][2]).toEqual([
+            { target: 'Goblin', effect: BLESS_TE, source: 'Cleric', slotLevel: DISK_BLESS.level, duration: 'concentration' },
+            { target: 'Orc', effect: BLESS_TE, source: 'Cleric', slotLevel: DISK_BLESS.level, duration: 'concentration' },
+        ]);
+    });
+
+    it('swallows log rejections: cast still writes state, returns popup, and both catches console.error', async () => {
         getRuntimeValue.mockReturnValue([]);
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const error = new Error('Log failed');
+        addEntry.mockRejectedValue(error);
 
-        const result = await applyBlessEffect(makeSpell(), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
+        const result = await applyBlessEffect({ ...DISK_BLESS }, PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
 
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(result.payload.description).toBe('1 of 1 target(s) blessed by Bless.');
-    });
-
-    it('handles targets with special characters in names', async () => {
-        getRuntimeValue.mockReturnValue([]);
-
-        await applyBlessEffect(
-            makeSpell(),
-            PLAYER_STATS,
-            CAMPAIGN_NAME,
-            MAP_NAME,
-            ["Goblin's Ally", 'Orc#2', 'Dragon (Young)'],
-        );
-
-        const spellEntries = addEntry.mock.calls.filter(
-            call => call[1]?.type === 'spell' && call[1]?.spellName === 'Bless' && call[1]?.targetName,
-        );
-        expect(spellEntries[0][1].targets).toEqual(["Goblin's Ally", 'Orc#2', 'Dragon (Young)']);
-    });
-
-    it('preserves existing effects from same target/source combo when replacing', async () => {
-        const existingEffects = [
-            { target: 'Goblin', effect: 'bless_bonus', source: 'Cleric', slotLevel: 1, duration: 'concentration' },
-            { target: 'Other', effect: 'bane_penalty', source: 'Cleric', slotLevel: 1 },
-        ];
-        getRuntimeValue.mockReturnValue(existingEffects);
-
-        await applyBlessEffect(makeSpell({ level: 2 }), PLAYER_STATS, CAMPAIGN_NAME, MAP_NAME, ['Goblin']);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'campaign',
-            'targetEffects',
-            expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    effect: 'bless_bonus',
-                    source: 'Cleric',
-                    slotLevel: 2,
-                }),
-                expect.objectContaining({
-                    target: 'Other',
-                    effect: 'bane_penalty',
-                }),
-            ]),
-            CAMPAIGN_NAME,
-            true,
-        );
+        for (let i = 0; i < 5; i++) await Promise.resolve(); // flush the two .catch microtasks
+        expect(consoleSpy).toHaveBeenNthCalledWith(1, '[blessSpell] Error logging cast:', error);
+        expect(consoleSpy).toHaveBeenNthCalledWith(2, '[blessSpell] Error logging summary:', error);
+        consoleSpy.mockRestore();
     });
 });

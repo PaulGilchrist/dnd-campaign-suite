@@ -1,224 +1,130 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import rules from './rules.js'
-
-vi.mock('../ui/utils.js', () => ({
-  default: {
-    getAbilityLongName: vi.fn((short) => ({
-      STR: 'Strength',
-      DEX: 'Dexterity',
-      CON: 'Constitution',
-      INT: 'Intelligence',
-      WIS: 'Wisdom',
-      CHA: 'Charisma',
-    }[short] || short.toUpperCase())),
-  },
-}))
-
-vi.mock('./core/attackCalc.js', () => ({
-  parseMagicItemName: vi.fn((name) => ({ baseName: name, magicBonus: 0 })),
-  getAttacks: vi.fn(() => []),
-}))
-
-vi.mock('./core/abilityCalc.js', () => ({
-  getAbilities: vi.fn(() => []),
-  getHitPoints: vi.fn(() => 10),
-  getCarryingCapacity: vi.fn(() => 150),
-}))
-
-vi.mock('./core/abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(() => []),
-  getHitPoints: vi.fn(() => 10),
-  getCarryingCapacity: vi.fn(() => 150),
-}))
-
-vi.mock('./core/spellCalc.js', () => ({
-  getSpellAbilities: vi.fn(() => ({})),
-}))
-
-vi.mock('./core/spellCalc2024.js', () => ({
-  getSpellAbilities: vi.fn(() => ({})),
-}))
-
-vi.mock('./core/attackCalc2024.js', () => ({
-  getAttacks: vi.fn(() => []),
-}))
+// @maintained-by-ai
+// Lane: rules-actions.js getActions2024 divergences vs the 5e twin (same file,
+// getActions5e) — the half of the guard table and dedup precedence the 5e lanes
+// do NOT cover:
+//   - 5e throws on all four channels not-an-array: rules.helpers.test.js:226-267
+//     and core/rules-error-handling.test.js:38-61 (both fixtures are rules:'5e').
+//   - 2024 magic/utilize/craft folding + full-set dedup/sort: core/rules-actions.test.js:127
+//   - 2024 string normalization all five channels: core/rules-actions.test.js:159, rules.helpers.test.js:176-201
+//   - facade identity + language channels: core/rules-languages.test.js, core/rules-core.test.js:73
+// getActions is pure merge/dedup/sort — zero-dice, zero-store (getRuntimeValue is
+// imported by rules-helpers for mergeAutomationSpecialActions only, never invoked
+// here). Only stubbed seams: classRules/classRules2024/raceRules feature providers
+// (true collaborators with their own lanes: classRules2024.test.js, race-rules/).
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../character/classRules.js', () => ({
-  default: {
-    getClass: vi.fn(() => ({ name: 'Fighter', languages: [], subclass: {} })),
-    getFeatures: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
-    getRangerFeatures: vi.fn(() => ({ extraAttacks: 0 })),
-  },
-}))
+  default: { getFeatures: vi.fn(), featureCategories: {} },
+}));
 
 vi.mock('../character/classRules2024.js', () => ({
-  default: {
-    getClass: vi.fn(() => ({ name: 'Fighter', languages: [] })),
-    getFeatures: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
-  },
-}))
+  default: { getFeatures: vi.fn(), featureCategories: {} },
+}));
 
 vi.mock('../character/race-rules/index.js', () => ({
-  rules5e: {
-    getRace: vi.fn(() => ({ languages: ['Common'], traits: [] })),
-    getTraits: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
-    getImmunities: vi.fn(() => []),
-    getResistances: vi.fn(() => []),
-    getSenses: vi.fn(() => []),
-  },
-  rules2024: {
-    getRace: vi.fn(() => ({ languages: ['Common'], traits: [] })),
-    getTraits: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
-    getImmunities: vi.fn(() => []),
-    getResistances: vi.fn(() => []),
-    getSenses: vi.fn(() => []),
-  },
-}))
+  rules5e: { getTraits: vi.fn() },
+  rules2024: { getTraits: vi.fn() },
+}));
 
-vi.mock('../character/proficiencyUtils.js', () => ({
-  getProficiencies: vi.fn(() => [5, []]),
-  getProficiencyChoiceCount: vi.fn(() => 0),
-}))
+import rules from './rules.js';
+import classRules from '../character/classRules.js';
+import classRules2024 from '../character/classRules2024.js';
+import { rules5e as raceRules, rules2024 as raceRules2024 } from '../character/race-rules/index.js';
 
-vi.mock('../character/proficiencyUtils2024.js', () => ({
-  getProficiencies: vi.fn(() => [5, []]),
-  getProficiencyChoiceCount: vi.fn(() => 0),
-}))
+const emptyCats = () => ({
+  actions: [],
+  bonusActions: [],
+  reactions: [],
+  specialActions: [],
+  characterAdvancement: [],
+});
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
-  getRuntimeValue: vi.fn(() => undefined),
-}))
+const stats = (overrides = {}) => ({
+  name: 'TestCharacter',
+  actions: [],
+  bonusActions: [],
+  reactions: [],
+  specialActions: [],
+  ...overrides,
+});
 
-vi.mock('../shared/spell-utils.js', () => ({
-  getSpellMaxLevel: vi.fn(() => 9),
-}))
-
-vi.mock('../ui/dataLoader.js', () => ({
-  loadFeatData: vi.fn(async () => ({ abilityScoreIncreases: [], proficiencies: [], features: [] })),
-  loadSkills: vi.fn(async () => []),
-  loadBackgroundData: vi.fn(() => null),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
-  loadManeuvers: vi.fn(async () => []),
-}))
-
-vi.mock('../character/featBuffService.js', () => ({
-  computeAllFeatBuffs: vi.fn(() => ({ abilityScoreIncreases: [], proficiencies: [], features: [] })),
-}))
-
-vi.mock('../../combat/automation/automationService.js', () => ({
-  collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),
-  collectSaveModifiers: vi.fn(() => ({})),
-  collectTurnStartEffects: vi.fn(() => []),
-  getConditionImmunities: vi.fn(() => []),
-  getConditionalImmunities: vi.fn(() => []),
-  getEvasionEffects: vi.fn(() => []),
-  getAllSaveProficiencies: vi.fn(() => []),
-  evaluateAutoExpression: vi.fn(() => 0),
-  buildAttackInfo: vi.fn(() => null),
-}))
-
-vi.mock('../automation/handlers/class-other/elfishLineageHandler.js', () => ({
-  getElfisLineageSelection: vi.fn(() => null),
-  handle: vi.fn(),
-}))
-
-describe('rules getPlayerStats - 2024 actions and fighting styles', () => {
+describe('rules.getActions 2024 guard + precedence divergence from 5e twin', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+    classRules.getFeatures.mockReturnValue(emptyCats());
+    classRules2024.getFeatures.mockReturnValue(emptyCats());
+    raceRules.getTraits.mockReturnValue(emptyCats());
+    raceRules2024.getTraits.mockReturnValue(emptyCats());
+  });
 
-  function createSummary2024(overrides = {}) {
-    return {
-      name: 'TestChar',
-      rules: '2024',
-      level: 5,
-      campaignName: 'test-campaign',
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
-      expertise: [],
-      abilities: [
-        { name: 'Strength', bonus: 3, totalScore: 16 },
-        { name: 'Dexterity', bonus: 2, totalScore: 14 },
-        { name: 'Constitution', bonus: 1, totalScore: 12 },
-        { name: 'Intelligence', bonus: 0, totalScore: 10 },
-        { name: 'Wisdom', bonus: 0, totalScore: 10 },
-        { name: 'Charisma', bonus: 0, totalScore: 10 },
-      ],
-      race: { languages: ['Common'], traits: [] },
-      class: { name: 'Fighter', languages: [] },
-      inventory: { magicItems: [], equipped: [] },
-      automation: { passives: [], specialActions: [] },
-      ...overrides,
+  it.each`
+    field
+    ${'actions'}
+    ${'specialActions'}
+  `('2024: required-array guard fires on $field for null and undefined (the untested half of the 5e throw table)', ({ field }) => {
+    for (const bad of [null, undefined]) {
+      const playerStats = stats({ rules: '2024' });
+      delete playerStats[field];
+      if (bad === null) playerStats[field] = null;
+      expect(() => rules.getActions(playerStats, {})).toThrow(`Missing array: ${field} for TestCharacter`);
     }
-  }
+  });
 
-  it('returns 2024 actions with magic/utilize/craft actions', () => {
-    const stats = createSummary2024({
-      magicActions: [{ name: 'Cast Magic' }],
-      utilizeActions: [{ name: 'Utilize' }],
-      craftActions: [{ name: 'Craft' }],
-      magicSpecialActions: [{ name: 'Magic Special' }],
-      utilizeSpecialActions: [{ name: 'Utilize Special' }],
-      craftSpecialActions: [{ name: 'Craft Special' }],
-    })
-    const result = rules.getActions(stats, {})
-    const actionNames = result[0].map((a) => a.name)
-    expect(actionNames).toContain('Cast Magic')
-    expect(actionNames).toContain('Utilize')
-    expect(actionNames).toContain('Craft')
-  })
+  it('2024-only tolerance: falsy bonusActions/reactions fall back to [] instead of throwing (5e twin throws — rules.helpers.test.js:237-260)', () => {
+    const [actions, bonusActions, reactions, specialActions, characterAdvancement] = rules.getActions(
+      stats({
+        rules: '2024',
+        actions: [{ name: 'Attack' }],
+        bonusActions: null,
+        reactions: undefined,
+        magicActions: [{ name: 'Cast a Spell' }],
+        specialActions: [],
+      }),
+      {},
+    );
+    expect(actions.map((a) => a.name)).toEqual(['Attack', 'Cast a Spell']);
+    expect(bonusActions).toEqual([]);
+    expect(reactions).toEqual([]);
+    expect(specialActions).toEqual([]);
+    expect(characterAdvancement).toEqual([]);
+  });
 
-  it('adds Protection fighting style reaction for 2024', async () => {
-    const { default: classRules } = await import('../character/classRules2024.js')
-    vi.mocked(classRules.getClass).mockReturnValue({ name: 'Fighter', languages: [], fightingStyles: ['Protection'] })
-    vi.mocked(classRules.getFeatures).mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })
+  it('2024: duplicate-name conflict in specialActions resolves to the FEATURE row while actions resolve to the PLAYER row — inverted vs 5e where the player row wins both', () => {
+    classRules.getFeatures.mockReturnValue({
+      ...emptyCats(),
+      actions: [{ name: 'Attack', description: '5e feature attack' }],
+      specialActions: [{ name: 'Rally', description: '5e feature rally' }],
+    });
+    classRules2024.getFeatures.mockReturnValue({
+      ...emptyCats(),
+      actions: [{ name: 'Attack', description: '2024 feature attack' }],
+      specialActions: [{ name: 'Rally', description: '2024 feature rally' }],
+    });
 
-    const stats = createSummary2024({
-      class: { name: 'Fighter', languages: [], fightingStyles: ['Protection'] },
-    })
-    // Use getActions which triggers the 2024 path
-    const result = rules.getActions(stats, {})
-    // Protection fighting style adds a reaction in getPlayerStats, not getActions
-    // So we just verify getActions works for 2024
-    expect(result.length).toBe(5)
-  })
+    // 2024: actions list player-mapped first (rules-actions.js:38) but specialActions
+    // list features first and player LAST (rules-actions.js:70-74) — uniqBy first-wins
+    // therefore keeps the FEATURE special, the opposite of the player-first 5e path.
+    const [actions2024, , , specialActions2024] = rules.getActions(
+      stats({
+        rules: '2024',
+        actions: [{ name: 'Attack', description: 'player attack' }],
+        specialActions: [{ name: 'Rally', description: 'player rally' }],
+      }),
+      {},
+    );
+    expect(actions2024).toEqual([{ name: 'Attack', description: 'player attack' }]);
+    expect(specialActions2024).toEqual([{ name: 'Rally', description: '2024 feature rally' }]);
 
-  it('adds Interception fighting style reaction for 2024', () => {
-    const stats = createSummary2024({
-      class: { name: 'Fighter', languages: [], fightingStyles: ['Interception'] },
-    })
-    const result = rules.getActions(stats, {})
-    expect(result.length).toBe(5)
-  })
-
-  it('handles 2024 subclass language_choices via major', () => {
-    const stats = createSummary2024({
-      race: { languages: ['Common'] },
-      class: {
-        name: 'Wizard',
-        languages: [],
-        major: { language_choices: { choose: 1 } },
-      },
-      languages: [],
-    })
-    const result = rules.getLanguages(stats, {})
-    expect(result[0]).toBe(4) // 1 (race) + 2 (background) + 1 (major language_choices)
-  })
-
-  it('handles 5e subclass language_choices', () => {
-    const stats5e = {
-      name: 'TestChar',
-      rules: '5e',
-      race: { languages: ['Common'] },
-      class: { name: 'Wizard', languages: [], subclass: { language_choices: { choose: 1 } } },
-      languages: [],
-    }
-    expect(rules.getLanguages(stats5e, {})[0]).toBe(4)
-  })
-})
+    // 5e twin, same names: player row wins in BOTH channels (rules-actions.js:107,110).
+    const [actions5e, , , specialActions5e] = rules.getActions(
+      stats({
+        rules: '5e',
+        actions: [{ name: 'Attack', description: 'player attack' }],
+        specialActions: [{ name: 'Rally', description: 'player rally' }],
+      }),
+      {},
+    );
+    expect(actions5e).toEqual([{ name: 'Attack', description: 'player attack' }]);
+    expect(specialActions5e).toEqual([{ name: 'Rally', description: 'player rally' }]);
+  });
+});

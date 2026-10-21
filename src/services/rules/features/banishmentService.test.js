@@ -1,451 +1,172 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerBanishment } from './banishmentService.js';
 import { executeHandler } from '../../automation/index.js';
 
+// Sole collaborator of banishmentService.js — mocked 1:1 with its import set.
+// Downstream automation (banishment handler: conditions/te writes, concentration
+// scoping per disk duration 'Concentration, up to 1 minute') is the handler's
+// ownership, not this trigger service's (#1290 delegation precedent).
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
-describe('banishmentService', () => {
+const playerStats = {
+    name: 'Wizard',
+    spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence' },
+    proficiency: 4,
+};
+
+describe('triggerBanishment', () => {
     beforeEach(() => {
+        // clearAllMocks retains implementations — re-seed explicitly each test.
         vi.clearAllMocks();
+        executeHandler.mockResolvedValue({ type: 'popup' });
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'testMap';
-    const playerStats = {
-        name: 'Wizard',
-        spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence' },
-        proficiency: 4,
-    };
-    const spell = { name: 'Banishment', level: 4 };
+    describe('spell name gate (exact match, case-insensitive)', () => {
+        it.each([
+            ['Banishment', true],
+            ['banishment', true],
+            // Real spell on disk (2024/spells.json, level 5 CHA) — must NOT trigger this service.
+            ['Banishing Smite', false],
+            ['Banishment Shield', false],
+            ['Banished', false],
+            ['', false],
+            [undefined, false],
+        ])('"%" %s executeHandler', async (name, shouldTrigger) => {
+            const result = await triggerBanishment(
+                { name, level: 1 },
+                {},
+                playerStats,
+                'TestCampaign',
+                'testMap',
+            );
 
-    describe('triggerBanishment', () => {
-        describe('spell name matching', () => {
-            it.each([
-                'Banishment',
-                'banishment',
-                'BANISHMENT',
-                'bAnIsHmEnT',
-            ])('triggers for "%s" spell name (case-insensitive)', async (name) => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                const result = await triggerBanishment(
-                    { name, level: 4 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
+            if (shouldTrigger) {
                 expect(executeHandler).toHaveBeenCalledTimes(1);
                 expect(result).toEqual({ type: 'popup' });
-            });
-
-            it.each([
-                'Banishment Shield',
-                'Banishing Smite',
-                'Banishment Force',
-                'Banished',
-                'Banisher',
-                '',
-                undefined,
-                null,
-            ])('returns null for non-banishment spell: "%s"', async (name) => {
-                const result = await triggerBanishment(
-                    { name, level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
+            } else {
                 expect(executeHandler).not.toHaveBeenCalled();
-            });
-        });
-
-        describe('save DC resolution', () => {
-            it('uses metaCtx.spellSaveDc when provided', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    { spellSaveDc: 18 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 18 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('falls back to playerStats.spellAbilities.saveDc', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 15 }),
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('computes saveDc from proficiency when spellAbilities is missing', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const stats = { name: 'Wizard', proficiency: 3 };
-
-                await triggerBanishment(
-                    spell,
-                    {},
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-
-                // 8 + proficiency(3) = 11
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 11 }),
-                    }),
-                    stats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('uses default saveDc of 10 when stats are minimal (proficiency defaults to 2)', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    {},
-                    {},
-                    campaignName,
-                    mapName,
-                );
-
-                // 8 + (undefined || 2) = 10
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        automation: expect.objectContaining({ saveDc: 10 }),
-                    }),
-                    {},
-                    campaignName,
-                    mapName,
-                );
-            });
-        });
-
-        describe('slot level resolution', () => {
-            it('uses metaCtx.slotLevel when provided', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    { slotLevel: 5 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 5 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 4 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('defaults slotLevel to 4 when neither metaCtx nor spell has level', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    { name: 'banishment' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 4 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-        });
-
-        describe('action structure', () => {
-            it('constructs action with correct type and fields', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        name: 'Banishment',
-                        automation: expect.objectContaining({
-                            type: 'banishment',
-                            saveDc: 15,
-                            saveType: 'CHA',
-                        }),
-                        spell,
-                        spellSlotLevel: 4,
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('passes spell object through to the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const customSpell = { name: 'banishment', level: 6, school: 'abjuration' };
-
-                await triggerBanishment(
-                    customSpell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        spell: customSpell,
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-
-            it('passes metaCtx through to the action', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-                const customMeta = { targetName: 'Dragon', slotLevel: 5 };
-
-                await triggerBanishment(
-                    spell,
-                    customMeta,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        metaCtx: customMeta,
-                    }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
-        });
-
-        describe('return value', () => {
-            it('returns result from executeHandler on success', async () => {
-                const expectedResult = {
-                    type: 'popup',
-                    payload: { type: 'automation_info', name: 'Banishment', description: 'Banishment affects target.' },
-                };
-                executeHandler.mockResolvedValue(expectedResult);
-
-                const result = await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBe(expectedResult);
-            });
-
-            it('returns null when executeHandler returns null', async () => {
-                executeHandler.mockResolvedValue(null);
-
-                const result = await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
                 expect(result).toBeNull();
-            });
-
-            it('returns null when executeHandler throws', async () => {
-                executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-                const result = await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
+            }
         });
+    });
 
-        describe('metaCtx handling', () => {
-            it.each([null, undefined])('handles %s metaCtx gracefully', async (metaCtx) => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    describe('saveDc / slotLevel precedence', () => {
+        // Discriminants: every expected number differs from all fixture sources
+        // (18/5 metaCtx overrides, 15 stats, 6 spell.level, 11 = 8+prof 3,
+        // 10 = 8+default prof 2, 4 = disk level default, 7 unique slot).
+        it.each([
+            {
+                label: 'metaCtx overrides win over stats and spell',
+                spell: { name: 'Banishment', level: 4 },
+                metaCtx: { spellSaveDc: 18, slotLevel: 5 },
+                stats: playerStats,
+                saveDc: 18,
+                slotLevel: 5,
+            },
+            {
+                label: 'falls back to spellAbilities.saveDc and spell.level',
+                spell: { name: 'Banishment', level: 6 },
+                metaCtx: {},
+                stats: playerStats,
+                saveDc: 15,
+                slotLevel: 6,
+            },
+            {
+                label: 'derives 8 + proficiency when spellAbilities is missing',
+                spell: { name: 'Banishment', level: 4 },
+                metaCtx: {},
+                stats: { name: 'Wizard', proficiency: 3 },
+                saveDc: 11,
+                slotLevel: 4,
+            },
+            {
+                label: 'minimal stats default to DC 10, spell defaults to slot 4 (disk level)',
+                spell: { name: 'Banishment' },
+                metaCtx: {},
+                stats: {},
+                saveDc: 10,
+                slotLevel: 4,
+            },
+            {
+                label: 'undefined metaCtx is guarded and forwards',
+                spell: { name: 'banishment', level: 7 },
+                metaCtx: undefined,
+                stats: playerStats,
+                saveDc: 15,
+                slotLevel: 7,
+            },
+        ])('$label', async ({ spell, metaCtx, stats, saveDc, slotLevel }) => {
+            const result = await triggerBanishment(spell, metaCtx, stats, 'TestCampaign', 'testMap');
 
-                const result = await triggerBanishment(
-                    spell,
-                    metaCtx,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalled();
-                expect(result).toEqual({ type: 'popup' });
-            });
-
-            it('handles metaCtx with only partial fields', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
-
-                await triggerBanishment(
-                    spell,
-                    { slotLevel: 6 },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(executeHandler).toHaveBeenCalled();
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.objectContaining({ spellSlotLevel: 6 }),
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-            });
+            const action = executeHandler.mock.calls[0][0];
+            expect(action.automation.saveDc).toBe(saveDc);
+            expect(action.spellSlotLevel).toBe(slotLevel);
+            expect(action.metaCtx).toBe(metaCtx);
+            expect(result).toEqual({ type: 'popup' });
         });
+    });
 
-        describe('campaignName and mapName forwarding', () => {
-            it('forwards campaignName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it('builds the exact action envelope and forwards all arguments positionally', async () => {
+        const sentinel = { type: 'popup', payload: { automation: 'banishment' } };
+        executeHandler.mockResolvedValue(sentinel);
+        const spell = { name: 'Banishment', level: 4 };
+        const metaCtx = { targetName: 'Dragon', slotLevel: 5 };
 
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    'MyCampaign',
-                    mapName,
-                );
+        const result = await triggerBanishment(spell, metaCtx, playerStats, 'PinCampaign', 'pin-map');
 
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    playerStats,
-                    'MyCampaign',
-                    mapName,
-                );
-            });
+        expect(executeHandler).toHaveBeenCalledWith(
+            {
+                name: 'Banishment',
+                // saveType CHA pinned verbatim from disk banishment dc.dc_type.
+                automation: { type: 'banishment', saveDc: 15, saveType: 'CHA' },
+                spell,
+                spellSlotLevel: 5,
+                metaCtx,
+            },
+            playerStats,
+            'PinCampaign',
+            'pin-map',
+        );
+        // Pure forwarder: returns the handler's resolved value by identity, no shaping.
+        expect(result).toBe(sentinel);
+    });
 
-            it('forwards mapName to executeHandler', async () => {
-                executeHandler.mockResolvedValue({ type: 'popup' });
+    it('returns null (no fabricated fallback) when the handler resolves null', async () => {
+        executeHandler.mockResolvedValue(null);
 
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    'dungeon-map-1',
-                );
+        const result = await triggerBanishment(
+            { name: 'Banishment', level: 4 },
+            {},
+            playerStats,
+            'TestCampaign',
+            'testMap',
+        );
 
-                expect(executeHandler).toHaveBeenCalledWith(
-                    expect.any(Object),
-                    playerStats,
-                    campaignName,
-                    'dungeon-map-1',
-                );
-            });
-        });
+        expect(result).toBeNull();
+    });
 
-        describe('error handling', () => {
-            it('logs error to console.error when executeHandler throws', async () => {
-                executeHandler.mockRejectedValue(new Error('Handler failed'));
-                const consoleSpy = vi.spyOn(console, 'error');
+    it('logs the exact error string and returns null when the handler throws', async () => {
+        const failure = new Error('Handler failed');
+        executeHandler.mockRejectedValue(failure);
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-                await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        const result = await triggerBanishment(
+            { name: 'Banishment', level: 4 },
+            {},
+            playerStats,
+            'TestCampaign',
+            'testMap',
+        );
 
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('[banishmentService] Failed to execute Banishment handler:'),
-                    expect.any(Error),
-                );
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[banishmentService] Failed to execute Banishment handler:',
+            failure,
+        );
+        expect(result).toBeNull();
 
-                consoleSpy.mockRestore();
-            });
-
-            it('still returns null even when console.error is unavailable', async () => {
-                executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-                const result = await triggerBanishment(
-                    spell,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
-        });
+        consoleSpy.mockRestore();
     });
 });

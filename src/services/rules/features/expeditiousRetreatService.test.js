@@ -1,8 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { triggerExpeditiousRetreat } from './expeditiousRetreatService.js';
+// @maintained-by-ai
+// SP-128 cast lane: expeditiousRetreatService.triggerExpeditiousRetreat body.
+// Owns "cast stamp + grant flag" (delegated VERBATIM by dashHandler.test.js:5-6
+// "cast stamp + grant flag → rules/features/expeditiousRetreatService.test.js"
+// and turnStartEffects.expeditious-retreat-dash-offer.test.js:12-13, and named
+// "cast lane expeditiousRetreatService" by concentrationService.sp128-er-purge.test.js:15).
+// Pinned here, byte-exact: name gate (early-return BEFORE any lookup), concentration
+// stamp + DC formula, persisted grant flag write (literal 'expeditiousRetreatActive' —
+// consumers inline-duplicate this string: turnStartEffects.js:607, dashHandler.js:21,
+// concentrationService.js:168, CharBonusActions.jsx:731; the exported ER_* constants
+// have NO repo importer, so tests pin literals, not exports, as the wire contract),
+// turnStartEffects offer append (dedupe + non-array sanitize), spell log, popup envelope.
+// Writes are 4-arg cast-origin POSTs (no skipSync — by design, service.js:33-36: no te
+// marker; the persisted flag is authoritative). Disk canon: spells.json + 2024/spells.json
+// both "Expeditious Retreat", level 1, concentration, up to 10 min → combat-scoped flag,
+// NO wall-clock duration stored by this service (#no-timers). Outside-combat cast still
+// stamps the grant (#cs-null leg). Dash execution → dashHandler lane; re-offer seam →
+// turnStartEffects offer lane; purge → sp128-er-purge lane.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+    triggerExpeditiousRetreat,
+    ER_ACTIVE_FLAG,
+    ER_DASH_USED_ROUND_KEY,
+    ER_TURN_START_OFFER_TYPE,
+} from './expeditiousRetreatService.js';
 
 vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn().mockResolvedValue({}),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../ui/storage.js', () => ({
@@ -20,311 +43,171 @@ vi.mock('../../combat/concentration/concentrationService.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(() => null),
-    setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
 }));
 
-const { getCombatSummary } = await import('../../encounters/combatData.js');
-const { addConcentration } = await import('../../combat/concentration/concentrationService.js');
-const { addEntry } = await import('../../ui/logService.js');
-const storage = await import('../../ui/storage.js');
-const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
+import { getCombatSummary } from '../../encounters/combatData.js';
+import { addConcentration } from '../../combat/concentration/concentrationService.js';
+import { addEntry } from '../../ui/logService.js';
+import storage from '../../ui/storage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
-describe('expeditiousRetreatService', () => {
+const CAMPAIGN = 'TestCampaign';
+const MAP = 'testMap';
+const CASTER = 'Wizard';
+const SPELL_ARGS = { name: 'Expeditious Retreat', level: 1 };
+
+function cast(stats = { name: CASTER, proficiency: 2, abilities: { CON: { bonus: 0 } } }) {
+    return triggerExpeditiousRetreat(SPELL_ARGS, {}, stats, CAMPAIGN, MAP);
+}
+
+describe('expeditiousRetreatService.triggerExpeditiousRetreat', () => {
+    let cs;
     let dispatchSpy;
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // explicit re-seed (clearAllMocks preserves implementations from prior tests)
+        cs = { creatures: [{ name: CASTER }] };
+        getCombatSummary.mockReturnValue(cs);
+        getRuntimeValue.mockReturnValue(null);
+        setRuntimeValue.mockResolvedValue(undefined);
         addEntry.mockResolvedValue({});
         dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'testMap';
-    const playerStats = {
-        name: 'Wizard',
-        proficiency: 2,
-        abilities: { CON: { bonus: 0 } },
-    };
+    afterEach(() => {
+        dispatchSpy.mockRestore();
+    });
 
-    function callTrigger(spell = { name: 'Expeditious Retreat', level: 1 }, metaCtx = {}, stats = playerStats) {
-        return triggerExpeditiousRetreat(spell, metaCtx, stats, campaignName, mapName);
-    }
+    it('casts in-combat: stamps concentration, grant flag, offer, log, popup — exact bytes', async () => {
+        const result = await triggerExpeditiousRetreat(
+            { name: 'ExpEdItIoUs ReTrEaT' }, {}, { name: CASTER, proficiency: 2, abilities: { CON: { bonus: 0 } } }, CAMPAIGN, MAP,
+        );
 
-    describe('triggerExpeditiousRetreat', () => {
-        describe('non-Expeditious Retreat spells', () => {
-            it('returns null for non-matching spell names', async () => {
-                const result = await triggerExpeditiousRetreat(
-                    { name: 'Blur' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        // exported constants are the same bytes consumers inline-duplicate
+        expect(ER_ACTIVE_FLAG).toBe('expeditiousRetreatActive');
+        expect(ER_DASH_USED_ROUND_KEY).toBe('_Expeditious_Retreat_dash_usedRound');
+        expect(ER_TURN_START_OFFER_TYPE).toBe('expeditious_retreat_dash_offer');
 
-                expect(result).toBeNull();
-                expect(addConcentration).not.toHaveBeenCalled();
-                expect(addEntry).not.toHaveBeenCalled();
-            });
+        expect(addConcentration).toHaveBeenCalledWith(cs, CASTER, 'Expeditious Retreat', 10);
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN);
+        expect(dispatchSpy).toHaveBeenCalledTimes(1);
+        expect(dispatchSpy.mock.calls[0][0]).toEqual(expect.objectContaining({ type: 'combat-summary-updated' }));
 
-            it.each([
-                'blur',
-                'friends',
-                'expeditious retreats',
-                'not expeditious retreat',
-            ])('returns null for spell "%s"', async (spellName) => {
-                const result = await triggerExpeditiousRetreat(
-                    { name: spellName },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+        // ordered, exact grant writes: flag true FIRST, then offer append onto empty store;
+        // 4-arg cast-origin writes (no skipSync) — asserted by exact-arity toEqual above
+        expect(setRuntimeValue.mock.calls).toEqual([
+            [CASTER, 'expeditiousRetreatActive', true, CAMPAIGN],
+            [CASTER, 'turnStartEffects', [{ type: 'expeditious_retreat_dash_offer' }], CAMPAIGN],
+        ]);
 
-                expect(result).toBeNull();
-            });
+        expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
+            type: 'spell',
+            characterName: CASTER,
+            targetName: CASTER,
+            spellName: 'Expeditious Retreat',
+            spellLevel: 1,
+            description: 'Wizard casts Expeditious Retreat on themself. They can take the Dash action as a bonus action on each of their turns until concentration breaks.',
+            timestamp: expect.any(Number),
         });
 
-        describe('case-insensitive matching', () => {
-            it.each([
-                'expeditious retreat',
-                'Expeditious Retreat',
-                'EXPEDITIOUS RETREAT',
-                'ExpEdItIoUs ReTrEaT',
-            ])('matches spell name "%s"', async (spellName) => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const result = await triggerExpeditiousRetreat(
-                    { name: spellName },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).not.toBeNull();
-                expect(result.type).toBe('popup');
-            });
-
-            it('handles spell with no name property', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const result = await triggerExpeditiousRetreat(
-                    {},
-                    {},
-                    { ...playerStats, name: 'Wizard' },
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).toBeNull();
-            });
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Expeditious Retreat',
+                automationType: 'expeditious_retreat',
+                description: '<b>Expeditious Retreat</b><br/>Wizard has <b>Concentration</b> — can take the Dash action as a bonus action on each of their turns. A <b>Dash (Expeditious Retreat)</b> row is now offered in your Bonus Actions on every turn until the spell ends.',
+            },
         });
+    });
 
-        describe('concentration badge', () => {
-            it('adds concentration when combatSummary exists', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
+    describe('name gate (zero side effects, early-return before lookups)', () => {
+        it.each([
+            [{ name: 'Blur' }, 'real disk near name (spells.json)'],
+            [{ name: 'expeditious retreats' }, 'plural near-miss'],
+            [{ name: 'not expeditious retreat' }, 'superstring'],
+            [{}, 'no name property'],
+        ])('returns null and touches nothing for %s (%s)', async (spell) => {
+            const result = await triggerExpeditiousRetreat(spell, {}, { name: CASTER, proficiency: 2, abilities: { CON: { bonus: 0 } } }, CAMPAIGN, MAP);
 
-                await callTrigger();
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    cs,
-                    playerStats.name,
-                    'Expeditious Retreat',
-                    10, // 8 + 2 (proficiency) + 0 (CON bonus)
-                );
-            });
-
-            it('uses player CON bonus in concentration DC', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const statsWithConBonus = {
-                    ...playerStats,
-                    abilities: { CON: { bonus: 2 } },
-                };
-
-                await callTrigger({ name: 'Expeditious Retreat', level: 1 }, {}, statsWithConBonus);
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    cs,
-                    statsWithConBonus.name,
-                    'Expeditious Retreat',
-                    12, // 8 + 2 + 2
-                );
-            });
-
-            it('defaults CON bonus to 0 when missing', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const statsNoCon = {
-                    ...playerStats,
-                    abilities: {},
-                };
-
-                await callTrigger({ name: 'Expeditious Retreat', level: 1 }, {}, statsNoCon);
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    cs,
-                    playerStats.name,
-                    'Expeditious Retreat',
-                    10, // 8 + 2 + 0
-                );
-            });
-
-            it('defaults proficiency to 2 when missing', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const statsNoProf = {
-                    name: 'Wizard',
-                    proficiency: undefined,
-                    abilities: { CON: { bonus: 0 } },
-                };
-
-                await callTrigger({ name: 'Expeditious Retreat', level: 1 }, {}, statsNoProf);
-
-                expect(addConcentration).toHaveBeenCalledWith(
-                    cs,
-                    'Wizard',
-                    'Expeditious Retreat',
-                    10, // 8 + 2 (defaulted proficiency) + 0
-                );
-            });
-
-            it('dispatches combat-summary-updated event', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                await callTrigger();
-
-                expect(storage.default.set).toHaveBeenCalledWith(
-                    'combatSummary',
-                    cs,
-                    campaignName,
-                );
-
-                expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({
-                    type: 'combat-summary-updated',
-                }));
-            });
-
-            it('does nothing when combatSummary is null', async () => {
-                getCombatSummary.mockReturnValue(null);
-
-                await callTrigger();
-
-                expect(addConcentration).not.toHaveBeenCalled();
-                expect(storage.default.set).not.toHaveBeenCalled();
-            });
+            expect(result).toBeNull();
+            expect(getCombatSummary).not.toHaveBeenCalled();
+            expect(addConcentration).not.toHaveBeenCalled();
+            expect(storage.set).not.toHaveBeenCalled();
+            expect(dispatchSpy).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
+    });
 
-        describe('campaign logging', () => {
-            it('logs spell entry to campaign', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
+    describe('concentration DC formula: 8 + (proficiency || 2) + (abilities?.CON?.bonus ?? 0)', () => {
+        it.each([
+            ['prof+CON both flow', { proficiency: 2, abilities: { CON: { bonus: 3 } } }, 13],
+            ['prof 0 falsy → || defaults to 2 (quirk: silent)', { proficiency: 0, abilities: { CON: { bonus: 0 } } }, 10],
+            ['abilities missing → ?. short-circuits, ?? defaults CON 0', { abilities: undefined }, 10],
+        ])('%s → DC %i', async (_label, statsPatch, expectedDc) => {
+            await cast({ name: CASTER, ...statsPatch });
 
-                await callTrigger();
-
-                expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-                    type: 'spell',
-                    characterName: 'Wizard',
-                    targetName: 'Wizard',
-                    spellName: 'Expeditious Retreat',
-                    spellLevel: 1,
-                    description: expect.stringContaining('casts Expeditious Retreat on themself'),
-                }));
-            });
-
-            it('handles addEntry rejection gracefully', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-                addEntry.mockRejectedValue(new Error('DB error'));
-
-                const consoleErrSpy = vi.spyOn(console, 'error');
-
-                const result = await callTrigger();
-
-                expect(result).not.toBeNull();
-                expect(result.type).toBe('popup');
-                expect(consoleErrSpy).toHaveBeenCalledWith(
-                    '[expeditiousRetreat] Error logging:',
-                    expect.any(Error),
-                );
-            });
+            expect(addConcentration).toHaveBeenCalledWith(cs, CASTER, 'Expeditious Retreat', expectedDc);
         });
+    });
 
-        describe('SP-128 Dash grant stamp', () => {
-            beforeEach(() => {
-                getCombatSummary.mockReturnValue({ creatures: [{ name: 'Wizard' }] });
-                getRuntimeValue.mockReturnValue(null);
-            });
+    it('outside combat (no combatSummary): skips concentration lane but STILL stamps grant + logs + returns popup', async () => {
+        getCombatSummary.mockReturnValue(null);
 
-            it('stamps the persisted grant flag', async () => {
-                await callTrigger();
+        const result = await cast();
 
-                expect(setRuntimeValue).toHaveBeenCalledWith('Wizard', 'expeditiousRetreatActive', true, campaignName);
-            });
+        expect(addConcentration).not.toHaveBeenCalled();
+        expect(storage.set).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        // the grant stamp does NOT depend on combat state
+        expect(setRuntimeValue.mock.calls).toEqual([
+            [CASTER, 'expeditiousRetreatActive', true, CAMPAIGN],
+            [CASTER, 'turnStartEffects', [{ type: 'expeditious_retreat_dash_offer' }], CAMPAIGN],
+        ]);
+        expect(addEntry).toHaveBeenCalled();
+        expect(result).not.toBeNull();
+        expect(result.type).toBe('popup');
+    });
 
-            it('pushes a turn-start Dash re-offer entry', async () => {
-                await callTrigger();
+    it('offer append: dedupes existing offer entry (tolerating null/junk entries); sanitizes non-array stored value', async () => {
+        getRuntimeValue.mockImplementation((_n, key) =>
+            key === 'turnStartEffects'
+                ? [{ type: 'steady_aim_clear' }, null, { type: 'expeditious_retreat_dash_offer' }]
+                : null,
+        );
 
-                const offerWrite = vi.mocked(setRuntimeValue).mock.calls.find(c => c[1] === 'turnStartEffects');
-                expect(offerWrite).toBeTruthy();
-                expect(offerWrite[2]).toEqual(expect.arrayContaining([
-                    expect.objectContaining({ type: 'expeditious_retreat_dash_offer' }),
-                ]));
-            });
+        await cast();
 
-            it('does not duplicate the re-offer entry when one already exists', async () => {
-                getRuntimeValue.mockImplementation((_n, key) => {
-                    if (key === 'turnStartEffects') return [{ type: 'expeditious_retreat_dash_offer' }];
-                    return null;
-                });
+        // no second offer write; flag stamp still the only write
+        expect(setRuntimeValue.mock.calls).toEqual([
+            [CASTER, 'expeditiousRetreatActive', true, CAMPAIGN],
+        ]);
 
-                await callTrigger();
+        // non-array garbage stored value → replaced with a fresh one-offer array
+        setRuntimeValue.mockClear();
+        getRuntimeValue.mockReturnValue('oops');
 
-                expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => c[1] === 'turnStartEffects')).toHaveLength(0);
-            });
+        await cast();
 
-            it('does not stamp grant state for non-matching spells', async () => {
-                await triggerExpeditiousRetreat({ name: 'Blur' }, {}, playerStats, campaignName, mapName);
+        expect(setRuntimeValue.mock.calls).toEqual([
+            [CASTER, 'expeditiousRetreatActive', true, CAMPAIGN],
+            [CASTER, 'turnStartEffects', [{ type: 'expeditious_retreat_dash_offer' }], CAMPAIGN],
+        ]);
+    });
 
-                expect(setRuntimeValue).not.toHaveBeenCalled();
-            });
-        });
+    it('log rejection is swallowed with exact console.error prefix; cast still completes', async () => {
+        const consoleErrSpy = vi.spyOn(console, 'error');
+        addEntry.mockRejectedValue(new Error('DB error'));
 
-        describe('return value', () => {
-            it('returns popup with automation_info', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
+        const result = await cast();
 
-                const result = await callTrigger();
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Expeditious Retreat',
-                        automationType: 'expeditious_retreat',
-                        description: expect.stringContaining('Expeditious Retreat'),
-                    },
-                });
-            });
-
-            it('includes concentration badge info in popup', async () => {
-                const cs = { creatures: [{ name: 'Wizard' }] };
-                getCombatSummary.mockReturnValue(cs);
-
-                const result = await callTrigger();
-
-                expect(result.payload.description).toContain('Concentration');
-                expect(result.payload.description).toContain('Dash action');
-            });
-        });
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(consoleErrSpy).toHaveBeenCalledWith('[expeditiousRetreat] Error logging:', new Error('DB error'));
+        consoleErrSpy.mockRestore();
     });
 });

@@ -1,180 +1,173 @@
-// Suppress fire-and-forget logService.addEntry rejection warnings from source code
-process.on('unhandledRejection', () => {});
+// @maintained-by-ai
+// Unit tests for the Death Ward zero-HP interceptor consumed via applyDamage's
+// ZERO_HP_INTERCEPTORS table. The cast/arming lane (buff application, target-selection
+// popup, isDeathWardActive) is owned by src/services/automation/handlers/buffs/
+// deathWardHandler.test.js — this file covers only consume-on-certain-death here.
+// Disk canon (public/data/spells.json + data/2024): level 4, Touch, NOT concentration,
+// duration "8 hours" — combat-scoped per duration policy; no clock is stored or read.
+// Registry key 'death_ward' is defined in src/services/combat/conditions/
+// targetEffectDefinitions.js. Deterministic: only stable service boundaries are mocked
+// (runtime store, log service). Writes are 4-arg setRuntimeValue without skipSync —
+// this runs inside applyDamage on a real player action, not an SSE echo, so the
+// server-side broadcast is the intended behavior.
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { checkDeathWard } from './deathWardService.js';
 import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../services/ui/logService.js';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../services/ui/logService.js', () => ({ addEntry: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(),
+}));
 
 const CAMPAIGN_NAME = 'TestCampaign';
 
-describe('deathWardService', () => {
-    const mockCreature = { name: 'Fighter1', type: 'player', currentHp: 10 };
-    const mockPlayerComputed = {
-        name: 'Fighter1',
-    };
+// Seed the runtime-store read table. Omitted keys return undefined, exercising the
+// source's `rawConditions || []` fallback when 'activeConditions' is not provided.
+function seedTable({ hitPoints = 20, buffs = [], conditions } = {}) {
+    runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return buffs;
+        if (key === 'hitPoints') return hitPoints;
+        if (key === 'activeConditions') return conditions;
+        return undefined;
+    });
+}
 
+const DEATH_WARD_BUFF = { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' };
+
+describe('deathWardService.checkDeathWard', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
+        logService.addEntry.mockResolvedValue(undefined);
+        runtimeState.getRuntimeValue.mockReturnValue(undefined);
     });
 
-    describe('checkDeathWard', () => {
-        it('should return intercepted: false when no death_ward buff active', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [];
-                return undefined;
-            });
+    it('does nothing and reports not-intercepted unless a buff matches name AND effect exactly', () => {
+        const creature = { name: 'Fighter1', type: 'player', currentHp: 10 };
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
-            const result = checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
+        const noMatchSeeds = [
+            [],
+            null,
+            'not-an-array',
+            [{ name: 'Death Ward', effect: 'shield_of_faith' }],
+            [{ name: 'Armor of Agathys', effect: 'death_ward' }],
+        ];
+        for (const buffs of noMatchSeeds) {
+            seedTable({ buffs });
+            expect(checkDeathWard(creature, {}, CAMPAIGN_NAME)).toEqual({ intercepted: false });
+        }
 
-            expect(result.intercepted).toBe(false);
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        expect(creature.currentHp).toBe(10);
+        dispatchSpy.mockRestore();
+    });
+
+    it('restores a dying player to 1 HP, clears all dying state, consumes the buff, logs, and broadcasts', () => {
+        const creature = { name: 'Fighter1', type: 'player', currentHp: 0 };
+        seedTable({
+            hitPoints: 20,
+            buffs: [DEATH_WARD_BUFF, { name: 'Bless', effect: 'bless' }],
+            conditions: ['Unconscious', 'poisoned'],
+        });
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+        const result = checkDeathWard(creature, { name: 'Fighter1' }, CAMPAIGN_NAME);
+
+        expect(result).toEqual({ intercepted: true, finalDamage: 0, newHp: 1 });
+        expect(creature.currentHp).toBe(1);
+
+        // Exactly six writes: hp, conditions (case-insensitive unconscious removal,
+        // others preserved), dying state reset, and buff consumed with others intact.
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledTimes(6);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'currentHitPoints', 1, CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'activeConditions', ['poisoned'], CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'deathSaves', [false, false, false], CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'deathFailures', [false, false, false], CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'isDead', 0, CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Fighter1', 'activeBuffs', [{ name: 'Bless', effect: 'bless' }], CAMPAIGN_NAME);
+
+        expect(logService.addEntry).toHaveBeenCalledTimes(2);
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+            type: 'hp_change',
+            targetName: 'Fighter1',
+            delta: 1,
+            currentHp: 1,
+            maxHp: 20,
+            isUnconscious: false,
+            sourceName: 'Death Ward',
+        });
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+            type: 'ability_use',
+            characterName: 'Cleric1',
+            abilityName: 'Death Ward',
+            description: 'Death Ward protected Fighter1 from death! They drop to 1 HP instead of 0. The spell ends.',
         });
 
-        it('should intercept when death_ward buff is active and set HP to 1', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key, _campaign) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                ];
-                if (key === 'activeConditions') return ['unconscious'];
+        expect(dispatchSpy).toHaveBeenCalledTimes(1);
+        const event = dispatchSpy.mock.calls[0][0];
+        expect(event).toBeInstanceOf(CustomEvent);
+        expect(event.type).toBe('combat-summary-updated');
+        dispatchSpy.mockRestore();
+    });
+
+    it('protects a non-player creature without local HP mutation, defaulting an uncredited caster to unknown', () => {
+        const creature = { name: 'Goblin', type: 'monster' };
+        seedTable({ buffs: [{ name: 'Death Ward', effect: 'death_ward' }] });
+
+        const result = checkDeathWard(creature, {}, CAMPAIGN_NAME);
+
+        expect(result).toEqual({ intercepted: true, finalDamage: 0, newHp: 1 });
+        expect(creature.currentHp).toBeUndefined();
+
+        // Missing activeConditions falls back to [] and is written back; buffs fully consumed.
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], CAMPAIGN_NAME);
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', [], CAMPAIGN_NAME);
+
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+            type: 'hp_change',
+            targetName: 'Goblin',
+            delta: 1,
+            currentHp: 1,
+            maxHp: 20,
+            isUnconscious: false,
+            sourceName: 'Death Ward',
+        });
+        expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, {
+            type: 'ability_use',
+            characterName: 'unknown',
+            abilityName: 'Death Ward',
+            description: 'Death Ward protected Goblin from death! They drop to 1 HP instead of 0. The spell ends.',
+        });
+    });
+
+    it('throws with prefixed error log and writes nothing when stored max HP is null or undefined', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const creature = { name: 'Fighter1', type: 'player', currentHp: 0 };
+
+        for (const missing of [null, undefined]) {
+            runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
+                if (key === 'activeBuffs') return [DEATH_WARD_BUFF];
+                if (key === 'hitPoints') return missing;
                 return undefined;
             });
-            logService.addEntry.mockResolvedValue(undefined);
 
-            const result = checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(result.intercepted).toBe(true);
-            expect(result.newHp).toBe(1);
-            expect(result.finalDamage).toBe(0);
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter1',
-                'currentHitPoints',
-                1,
-                CAMPAIGN_NAME,
+            expect(() => checkDeathWard(creature, {}, CAMPAIGN_NAME)).toThrowError(
+                new Error('Death Ward: hitPoints not found for Fighter1'),
             );
-        });
+        }
 
-        it('should clear death saves and death failures', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                ];
-                if (key === 'activeConditions') return ['unconscious'];
-                if (key === 'deathSaves') return [false, true, false];
-                if (key === 'deathFailures') return [true, false, false];
-                return undefined;
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter1',
-                'deathSaves',
-                [false, false, false],
-                CAMPAIGN_NAME,
-            );
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter1',
-                'deathFailures',
-                [false, false, false],
-                CAMPAIGN_NAME,
-            );
-        });
-
-        it('should remove unconscious condition', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                ];
-                if (key === 'activeConditions') return ['unconscious', 'poisoned'];
-                return undefined;
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter1',
-                'activeConditions',
-                ['poisoned'],
-                CAMPAIGN_NAME,
-            );
-        });
-
-        it('should remove death_ward buff after triggering', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                    { name: 'Mage Armor', effect: 'mage_armor' },
-                ];
-                if (key === 'activeConditions') return [];
-                return undefined;
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'Fighter1',
-                'activeBuffs',
-                [{ name: 'Mage Armor', effect: 'mage_armor' }],
-                CAMPAIGN_NAME,
-            );
-        });
-
-        it('should log hp_change and ability_use entries', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                ];
-                if (key === 'activeConditions') return [];
-                return undefined;
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
-                type: 'hp_change',
-                targetName: 'Fighter1',
-                currentHp: 1,
-                maxHp: 20,
-                isUnconscious: false,
-                sourceName: 'Death Ward',
-            }));
-            expect(logService.addEntry).toHaveBeenCalledWith(CAMPAIGN_NAME, expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'Cleric1',
-                abilityName: 'Death Ward',
-                description: expect.stringContaining('Death Ward protected Fighter1'),
-            }));
-        });
-
-        it('should dispatch combat-summary-updated event', () => {
-            runtimeState.getRuntimeValue.mockImplementation((charName, key) => {
-                if (key === 'hitPoints') return 20;
-                if (key === 'activeBuffs') return [
-                    { name: 'Death Ward', effect: 'death_ward', sourceCharacter: 'Cleric1' },
-                ];
-                if (key === 'activeConditions') return [];
-                return undefined;
-            });
-            logService.addEntry.mockResolvedValue(undefined);
-
-            const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
-
-            checkDeathWard(mockCreature, mockPlayerComputed, CAMPAIGN_NAME);
-
-            expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-            dispatchSpy.mockRestore();
-        });
+        expect(errSpy).toHaveBeenCalledWith('[applyDamage] Death Ward: hitPoints not found for Fighter1 in TestCampaign');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
+        expect(creature.currentHp).toBe(0);
+        errSpy.mockRestore();
     });
 });

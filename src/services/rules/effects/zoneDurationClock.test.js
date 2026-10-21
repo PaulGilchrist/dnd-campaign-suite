@@ -1,4 +1,16 @@
+// @maintained-by-ai
 // L5-003 §8.3 (triage #1) — duration-clock producer tests.
+// The clock here is the repo's ROUND counter: entries mature at initiative
+// seams (roundToSet / getCurrentCombatRound), NEVER on wall-clock time
+// (no-timers MANDATORY). Source audit: Date.now() appears ONLY inside
+// addEntry log payloads (benign logging category), never in maturity math.
+// WRITE-face split: the until-stamp / single-write payload INSIDE
+// addExpiration is owned VERBATIM by addExpiration.ba001-single-write.test.js;
+// this file owns arm semantics (which args the clock is armed with), the
+// initiative-20 round-wrap drain, and the T4 combat-scoped sweep seams'
+// gates + delegation + log wording. Caller wiring (initiative/rest seams)
+// is covered by createCreatureHandlers.test.jsx / initiative.test.jsx /
+// restRules-*.test.js against this mocked module — not duplicated here.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -8,20 +20,26 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 vi.mock('./expirationQueue.js', () => ({
     addExpiration: vi.fn(),
-    // Mirror the real maturity rule (currentRound >= appliedRound + rounds);
-    // the real processExpirationList has its own exhaustive suite.
-    processExpirationList: (list, currentRound, _owner, _campaignName) => {
+    // Mirror the real maturity rule (currentRound >= appliedRound + rounds;
+    // creature anchors mature ONLY when an activeName is supplied — the
+    // round-wrap drain passes null, so anchored entries must survive there).
+    // The exhaustive consumer suite lives in this folder's queue tests.
+    processExpirationList: vi.fn((list, currentRound, _owner, _campaignName, activeName) => {
         const processed = [];
         let expiredCount = 0;
         for (const item of list) {
             const rounds = item.expiryRounds ?? Infinity;
-            if (Number.isFinite(item.appliedRound) && currentRound >= item.appliedRound + rounds) expiredCount++;
+            const isRoundExpired = Number.isFinite(item.appliedRound) && currentRound >= item.appliedRound + rounds;
+            const isCreatureExpired = !!(item.expireOnCreatureName && activeName
+                && item.expireOnCreatureName === activeName && currentRound > item.appliedRound);
+            if (isRoundExpired || isCreatureExpired) expiredCount++;
             else processed.push(item);
         }
         return { processed, expiredCount, changed: expiredCount > 0 };
-    },
-    // Mirror the real combat-scoped sweep (until === 'combat') for the seam tests.
-    sweepCombatScopedExpirations: ({ campaignName, ownerName = null }) => {
+    }),
+    // Mirror the real combat-scoped sweep (until === 'combat') so the seam
+    // tests see realistic swept counts while owning only gate/delegation/log.
+    sweepCombatScopedExpirations: vi.fn(({ campaignName, ownerName = null }) => {
         const keys = ownerName ? [ownerName] : (getAllStoreKeys() || []);
         let swept = 0;
         for (const key of keys) {
@@ -33,7 +51,7 @@ vi.mock('./expirationQueue.js', () => ({
             setRuntimeValue(key, 'pendingExpirations', list.filter((e) => e?.until !== 'combat'), campaignName);
         }
         return swept;
-    },
+    }),
 }));
 vi.mock('./turnStartEffects.js', () => ({ KEY: 'pendingExpirations' }));
 vi.mock('../../encounters/combatData.js', () => ({ getCurrentCombatRound: vi.fn(() => 1) }));
@@ -41,7 +59,7 @@ vi.mock('../../ui/logService.js', () => ({ addEntry: vi.fn(() => Promise.resolve
 
 import { clauseDurationRounds, clauseCombatScopedDuration, durationArmNote, zonesClockEnforcementLive, armDurationClockIfEnforced, drainRoundWrapClocks, sweepNewCombatClocks, sweepRestClocks } from './zoneDurationClock.js';
 import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
-import { addExpiration } from './expirationQueue.js';
+import { addExpiration, sweepCombatScopedExpirations } from './expirationQueue.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
 
@@ -51,68 +69,64 @@ beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue(null);
     getAllStoreKeys.mockReturnValue([]);
+    getCurrentCombatRound.mockReturnValue(1);
 });
 
-describe('clauseDurationRounds — initiative-20 lair cadence (§8.3 rank 3)', () => {
-    it('initiative-count-20 durations map to rounds:1 (next round wrap)', () => {
-        expect(clauseDurationRounds('until initiative count 20 next round (advisory)')).toBe(1);
-        expect(clauseDurationRounds('until_initiative_count_20_next_round')).toBe(1);
-        expect(clauseDurationRounds('until initiative count 20 on the next round (contested Charisma check to escape early — GM-enforced)')).toBe(1);
+describe('authored-duration parsing policy (CLA-334 recipe + no-timers T3)', () => {
+    it('sub-minute durations parse to finite round counts; explicit rounds beat a trailing initiative clause', () => {
+        const finite = [
+            ['1 round', 1],
+            ['2_rounds', 2],
+            ['2 rounds', 2],
+            ['until the end of next turn — 3 rounds', 3],
+            ['2 rounds, ends earlier on initiative count 20', 2],
+            // initiative-count-20 lair cadence ⇒ 1: matures at the very next round wrap (§8.3 rank 3)
+            ['until initiative count 20 next round (advisory)', 1],
+            ['until_initiative_count_20_next_round', 1],
+            ['until initiative count 20 on the next round (contested Charisma check to escape early — GM-enforced)', 1],
+        ];
+        for (const [text, rounds] of finite) {
+            expect(clauseDurationRounds(text)).toBe(rounds);
+        }
     });
 
-    it('re-crest/dismiss/die-bounded rows are NOT clocked by a trailing initiative clause', () => {
-        expect(clauseDurationRounds('until the dragon uses this lair action again or dies; mud hardens at initiative count 20 next round (advisory)')).toBeUndefined();
-        expect(clauseDurationRounds('until dismissed or used again (advisory)')).toBeUndefined();
-    });
-
-    it('explicit rounds win; minute-plus durations are combat-scoped, never rounds', () => {
-        expect(clauseDurationRounds('2 rounds, ends earlier on initiative count 20')).toBe(2);
-        expect(clauseDurationRounds('1 minute (advisory)')).toBeUndefined();
-    });
-});
-
-describe('clauseDurationRounds (CLA-334 recipe)', () => {
-    it('rounds text parses to the round count', () => {
-        expect(clauseDurationRounds('1 round')).toBe(1);
-        expect(clauseDurationRounds('2_rounds')).toBe(2);
-        expect(clauseDurationRounds('until the end of next turn — 3 rounds')).toBe(3);
-    });
-
-    it('minutes/hours are COMBAT-SCOPED (no-timers T3) — never round countdowns', () => {
-        expect(clauseDurationRounds('1 minute')).toBeUndefined();
-        expect(clauseDurationRounds('10 minutes')).toBeUndefined();
-        expect(clauseDurationRounds('8 hours')).toBeUndefined();
-        expect(clauseDurationRounds('1 hour')).toBeUndefined();
-        expect(clauseCombatScopedDuration('1 minute')).toBe(true);
-        expect(clauseCombatScopedDuration('8 hours')).toBe(true);
+    it('authored >=1 MINUTE is COMBAT-SCOPED — never a minutes×10/hours×600 round countdown', () => {
+        for (const text of ['1 minute', '10 minutes', '1 hour', '8 hours', '1 minute (advisory)']) {
+            expect(clauseDurationRounds(text)).toBeUndefined();
+            expect(clauseCombatScopedDuration(text)).toBe(true);
+        }
+        expect(clauseDurationRounds('2 rounds')).toBe(2);
         expect(clauseCombatScopedDuration('2 rounds')).toBe(false);
-        expect(clauseCombatScopedDuration('concentration')).toBe(false);
-        expect(clauseCombatScopedDuration(null)).toBe(false);
     });
 
-    it('indefinite / unauthored durations parse to NOTHING — never a guess', () => {
-        expect(clauseDurationRounds('concentration')).toBeUndefined();
-        expect(clauseDurationRounds('until dismissed')).toBeUndefined();
-        expect(clauseDurationRounds(null)).toBeUndefined();
-        expect(clauseDurationRounds(undefined)).toBeUndefined();
-        expect(clauseDurationRounds('')).toBeUndefined();
+    it('indefinite / re-crest-bounded / unauthored durations parse to NOTHING — never a fabricated clock (MA-1215)', () => {
+        const unclocked = [
+            'concentration',
+            'until dismissed',
+            'until dismissed or used again (advisory)',
+            // BOUNDED BY RE-CREST, not by the trailing initiative clause — never clocked to the cadence
+            'until the dragon uses this lair action again or dies; mud hardens at initiative count 20 next round (advisory)',
+            null,
+            undefined,
+            '',
+        ];
+        for (const text of unclocked) {
+            expect(clauseDurationRounds(text)).toBeUndefined();
+            expect(clauseCombatScopedDuration(text)).toBe(false);
+        }
     });
 });
 
 describe('zonesClockEnforcementLive', () => {
-    it('off / flag-off / no-campaign ⇒ false', () => {
-        getRuntimeValue.mockReturnValue(null);
-        expect(zonesClockEnforcementLive('test-campaign')).toBe(false);
-        getRuntimeValue.mockReturnValue({ mode: 'off', zones: true });
-        expect(zonesClockEnforcementLive('test-campaign')).toBe(false);
-        getRuntimeValue.mockReturnValue({ mode: 'on', zones: false });
-        expect(zonesClockEnforcementLive('test-campaign')).toBe(false);
-        expect(zonesClockEnforcementLive(null)).toBe(false);
-    });
-
-    it('mode on + zones ⇒ true', () => {
+    it('true ONLY with campaign + mode on + zones flag', () => {
         getRuntimeValue.mockReturnValue(ZONES_ON);
         expect(zonesClockEnforcementLive('test-campaign')).toBe(true);
+        for (const enforcement of [null, undefined, { mode: 'off', zones: true }, { mode: 'on', zones: false }]) {
+            getRuntimeValue.mockReturnValue(enforcement);
+            expect(zonesClockEnforcementLive('test-campaign')).toBe(false);
+        }
+        getRuntimeValue.mockReturnValue(ZONES_ON);
+        expect(zonesClockEnforcementLive(null)).toBe(false);
     });
 });
 
@@ -125,29 +139,13 @@ describe('armDurationClockIfEnforced', () => {
         durationText: '1 minute',
     };
 
-    it('enforcement OFF ⇒ null with ZERO clock writes (byte-parity)', () => {
-        getRuntimeValue.mockReturnValue(null);
-        expect(armDurationClockIfEnforced(base)).toBeNull();
-        expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('zones flag OFF ⇒ zero writes even with the text present', () => {
-        getRuntimeValue.mockReturnValue({ mode: 'on', zones: false });
-        expect(armDurationClockIfEnforced(base)).toBeNull();
-        expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('indefinite duration NEVER fabricates a clock', () => {
-        getRuntimeValue.mockReturnValue(ZONES_ON);
-        expect(armDurationClockIfEnforced({ ...base, durationText: 'concentration' })).toBeNull();
-        expect(armDurationClockIfEnforced({ ...base, durationText: null })).toBeNull();
-        expect(addExpiration).not.toHaveBeenCalled();
-    });
-
-    it('live + authored ≥1-minute duration ⇒ ONE merged COMBAT-SCOPED entry (no countdown)', () => {
+    it('live + authored >=1 minute ⇒ ONE merged COMBAT-SCOPED arm (rounds: Infinity, until: combat — no countdown)', () => {
         getRuntimeValue.mockReturnValue(ZONES_ON);
         expect(armDurationClockIfEnforced(base)).toBe('combat');
         expect(addExpiration).toHaveBeenCalledTimes(1);
+        // Arming ARGS are this module's contract; the until-stamped payload
+        // written INSIDE addExpiration is owned VERBATIM by
+        // addExpiration.ba001-single-write.test.js.
         expect(addExpiration).toHaveBeenCalledWith({
             attackerName: 'Dragon',
             targetName: 'Dragon',
@@ -156,24 +154,40 @@ describe('armDurationClockIfEnforced', () => {
             rounds: Infinity,
             until: 'combat',
         });
-    });
-
-    it('live + sub-minute rounds ⇒ finite round clock (unchanged lane)', () => {
-        getRuntimeValue.mockReturnValue(ZONES_ON);
-        expect(armDurationClockIfEnforced({ ...base, durationText: '2 rounds' })).toBe(2);
-        expect(addExpiration).toHaveBeenCalledWith(expect.objectContaining({ rounds: 2 }));
-    });
-
-    it('durationArmNote: rounds vs combat-scoped prose', () => {
-        expect(durationArmNote(2)).toBe('2 rounds (enforcement: zones)');
         expect(durationArmNote('combat')).toContain('combat-scoped');
         expect(durationArmNote('combat')).toContain('next initiative roll or a rest');
     });
 
-    it('empty effects / missing owner ⇒ no write even when live', () => {
+    it('live + sub-minute rounds ⇒ finite round clock with exact args (no until key)', () => {
         getRuntimeValue.mockReturnValue(ZONES_ON);
-        expect(armDurationClockIfEnforced({ ...base, effects: [] })).toBeNull();
-        expect(armDurationClockIfEnforced({ ...base, ownerName: null })).toBeNull();
+        expect(armDurationClockIfEnforced({ ...base, durationText: '2 rounds' })).toBe(2);
+        expect(addExpiration).toHaveBeenCalledTimes(1);
+        expect(addExpiration).toHaveBeenCalledWith({
+            attackerName: 'Dragon',
+            targetName: 'Dragon',
+            effects: base.effects,
+            campaignName: 'test-campaign',
+            rounds: 2,
+        });
+        expect(durationArmNote(2)).toBe('2 rounds (enforcement: zones)');
+    });
+
+    it('NEVER arms — returns null with ZERO writes whenever enforcement is off or nothing is authored', () => {
+        const noArmCases = [
+            [{ ...base }, null, 'enforcement absent'],
+            [{ ...base }, { mode: 'off', zones: true }, 'enforcement mode off'],
+            [{ ...base }, { mode: 'on', zones: false }, 'zones flag off even with text present'],
+            [{ ...base, campaignName: null }, ZONES_ON, 'no campaign'],
+            [{ ...base, ownerName: null }, ZONES_ON, 'no owner store'],
+            [{ ...base, effects: [] }, ZONES_ON, 'empty effects'],
+            [{ ...base, durationText: 'concentration' }, ZONES_ON, 'concentration stays concentration'],
+            [{ ...base, durationText: 'until dismissed' }, ZONES_ON, 'dismiss-bounded'],
+            [{ ...base, durationText: null }, ZONES_ON, 'no duration text'],
+        ];
+        for (const [ctx, enforcement] of noArmCases) {
+            getRuntimeValue.mockReturnValue(enforcement);
+            expect(armDurationClockIfEnforced(ctx)).toBeNull();
+        }
         expect(addExpiration).not.toHaveBeenCalled();
     });
 });
@@ -187,25 +201,33 @@ describe('drainRoundWrapClocks — initiative-20 cadence seam (rank 3)', () => {
         expireOnCreatureName: null,
     });
 
-    it('enforcement off ⇒ zero scans, zero writes', () => {
+    it('enforcement off / no campaign ⇒ zero scans, zero writes (byte-parity)', () => {
         getRuntimeValue.mockReturnValue(null);
         expect(drainRoundWrapClocks({ campaignName: 'test-campaign', roundToSet: 2 })).toBe(0);
+        expect(drainRoundWrapClocks({ campaignName: null, roundToSet: 2 })).toBe(0);
         expect(getAllStoreKeys).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('zones ON: matures round clocks across ALL stores at the wrap, rewrites each dirty store once', () => {
+    it('zones ON: matures round clocks at the wrap, rewrites the dirty store once, logs — creature-anchored entries SURVIVE the wrap', () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
             if (name === 'Dragon' && key === 'pendingExpirations') return [lairEntry(1), lairEntry(1, 5)];
+            if (name === 'Hero' && key === 'pendingExpirations') return [{ ...lairEntry(0, Infinity), expireOnCreatureName: 'Hero' }];
             return null;
         });
         getAllStoreKeys.mockReturnValue(['campaign', 'Dragon', 'Hero']);
         expect(drainRoundWrapClocks({ campaignName: 'test-campaign', roundToSet: 2 })).toBe(1);
-        // one rewrite carrying the un-matured entry only
+        // one rewrite carrying the un-matured entry only; the anchored Hero
+        // store must NOT be touched (drain passes activeName: null — if it
+        // leaked its store key as activeName, the anchored entry would expire)
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'pendingExpirations', [lairEntry(1, 5)], 'test-campaign');
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ automationType: 'enforcement_clock_expired' }));
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+            automationType: 'enforcement_clock_expired',
+            description: expect.stringContaining('Initiative-20 cadence: 1 zone/effect clock expired at the round-2 wrap'),
+        }));
     });
 
     it('nothing matured ⇒ no writes, no log', () => {
@@ -220,7 +242,7 @@ describe('drainRoundWrapClocks — initiative-20 cadence seam (rank 3)', () => {
         expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('no roundToSet falls back to getCurrentCombatRound', () => {
+    it('no roundToSet falls back to getCurrentCombatRound at the seam', () => {
         getCurrentCombatRound.mockReturnValue(2);
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
@@ -229,10 +251,7 @@ describe('drainRoundWrapClocks — initiative-20 cadence seam (rank 3)', () => {
         });
         getAllStoreKeys.mockReturnValue(['Dragon']);
         expect(drainRoundWrapClocks({ campaignName: 'test-campaign' })).toBe(1);
-    });
-
-    it('no campaign ⇒ 0', () => {
-        expect(drainRoundWrapClocks({ roundToSet: 2 })).toBe(0);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'pendingExpirations', [], 'test-campaign');
     });
 });
 
@@ -253,15 +272,15 @@ describe('no-timers T4 — combat-scoped sweeps (new initiative roll / rests)', 
         expireOnCreatureName: null,
     });
 
-    it('enforcement OFF ⇒ zero scans, zero writes (byte-parity)', async () => {
+    it('enforcement OFF ⇒ zero scans, zero writes, zero log (byte-parity)', async () => {
         getRuntimeValue.mockReturnValue(null);
         expect(await sweepNewCombatClocks('test-campaign')).toBe(0);
         expect(getAllStoreKeys).not.toHaveBeenCalled();
-        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(sweepCombatScopedExpirations).not.toHaveBeenCalled();
         expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('new initiative roll: sweeps ALL stores, rewrites dirty store once, keeps legacy round clocks, logs', async () => {
+    it('new initiative roll: gates live, delegates the ALL-stores sweep, logs the swept count', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
             if (name === 'Dragon' && key === 'pendingExpirations') return [legacyEntry(), combatEntry()];
@@ -269,37 +288,46 @@ describe('no-timers T4 — combat-scoped sweeps (new initiative roll / rests)', 
         });
         getAllStoreKeys.mockReturnValue(['campaign', 'Dragon']);
         expect(await sweepNewCombatClocks('test-campaign')).toBe(1);
-        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-        expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'pendingExpirations', [legacyEntry()], 'test-campaign');
+        // delegation WITHOUT ownerName = every store; the until:'combat'
+        // filter + survivor rewrite INSIDE the queue is owned by the
+        // expirationQueue suite (see sweep at #1285 clear-side lane).
+        expect(sweepCombatScopedExpirations).toHaveBeenCalledWith({ campaignName: 'test-campaign' });
         expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
             automationType: 'enforcement_clock_expired',
             description: expect.stringContaining('New initiative roll: 1 combat-scoped effect ended'),
         }));
     });
 
-    it('rests sweep too; nothing armed ⇒ no writes, no log', async () => {
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
-            if (name === 'Dragon' && key === 'pendingExpirations') return [legacyEntry()];
-            return null;
-        });
-        getAllStoreKeys.mockReturnValue(['Dragon']);
-        expect(await sweepRestClocks('test-campaign', 'short')).toBe(0);
-        expect(setRuntimeValue).not.toHaveBeenCalled();
-        expect(addEntry).not.toHaveBeenCalled();
-        expect(await sweepRestClocks('test-campaign', 'long')).toBe(0);
-        expect(addEntry).not.toHaveBeenCalled();
+    it('rests sweep short AND long with their own wording (unconditional by design — combat-scoped entries only exist while armed)', async () => {
+        for (const [restKind, wording] of [
+            ['short', 'Short rest: 1 combat-scoped effect ended'],
+            ['long', 'Long rest: 1 combat-scoped effect ended'],
+        ]) {
+            vi.clearAllMocks();
+            getRuntimeValue.mockImplementation((name, key) =>
+                (name === 'Dragon' && key === 'pendingExpirations' ? [combatEntry()] : null));
+            getAllStoreKeys.mockReturnValue(['Dragon']);
+            expect(await sweepRestClocks('test-campaign', restKind)).toBe(1);
+            expect(sweepCombatScopedExpirations).toHaveBeenCalledWith({ campaignName: 'test-campaign' });
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                automationType: 'enforcement_clock_expired',
+                description: expect.stringContaining(wording),
+            }));
+        }
     });
 
-    it('long rest logs with its own wording', async () => {
+    it('nothing armed ⇒ zero writes, zero log at every sweep seam', async () => {
         getRuntimeValue.mockImplementation((name, key) => {
-            if (name === 'Dragon' && key === 'pendingExpirations') return [combatEntry()];
+            if (name === 'campaign' && key === 'enforcement') return ZONES_ON;
+            if (key === 'pendingExpirations') return [legacyEntry()];
             return null;
         });
         getAllStoreKeys.mockReturnValue(['Dragon']);
-        expect(await sweepRestClocks('test-campaign', 'long')).toBe(1);
-        expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-            description: expect.stringContaining('Long rest: 1 combat-scoped effect ended'),
-        }));
+        expect(await sweepNewCombatClocks('test-campaign')).toBe(0);
+        expect(await sweepRestClocks('test-campaign', 'short')).toBe(0);
+        expect(await sweepRestClocks('test-campaign', 'long')).toBe(0);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 });

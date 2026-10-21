@@ -1,307 +1,199 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// 2024 light-ranged seam lane of getAttacks (attackCalc2024.js buildRangedAttacks):
+// row placement by the Light property on Ranged weapons (non-Light → Action;
+// <2 Light → all Action; ≥2 Light → highest average damage, tie → first, takes
+// Action, the rest Bonus Action with damage dice-only) plus the Crossbow Expert
+// feat gate (feats[] string match, :64) which adds the DEX bonus to the damage
+// of Bonus Action Hand Crossbow rows ONLY (:86-87).
+// Real builders end-to-end per the cla225 pattern (#1235/#1236/#1237 canon) —
+// the wholesale attackCalc.js stubbing is retired: the old stub-echo legs asserted
+// the mock's own output (buildWeaponAttackStub call args and echoed bytes) and are
+// deleted citing their owners:
+// - base ability select & ranged+melee combination → attackCalc2024.test.js:110-149
+//   ('selects Dexterity for ranged weapon attacks' pins Dexterity/abilityBonus/Action)
+// - Archery on light ranged → attackCalc2024-fighting-styles.test.js:98-123 and
+//   :241-251 (full-row toEqual truth table; Archery is applied by the SAME
+//   buildRangedActionAttack used by both ranged branches, so the Light
+//   property cannot change its output)
+// - light-seam placement pattern twin → attackCalc2024-light-melee.test.js:91-186
+// Only combatData is stubbed (SSE-backed, unavoidable; null = Swift Quiver
+// concentration inactive). No campaignName on the test characters, so the Nick
+// runtime lane (collectWeaponMastery / getRuntimeValue) and classRules2024
+// (Monk-only) are never entered — no mocks needed for them.
+// Lane splits (verified 2026-10-20):
+// - Thrown Weapon Fighting / fighting-style gates → attackCalc2024-fighting-styles.test.js
+// - Swift Quiver / Starry Form ranged specials → attackCalc2024-special-attacks.test.js
+// - Nick / Dual Wielder off-hand → attackCalc2024-nick-dual-wielder.test.js
+// - MA gate & proficiency ladder → attackCalc2024-edge-cases.test.js,
+//   attackCalc2024.cla225-martial-arts-gate.test.js
+// - Light melee seam → attackCalc2024-light-melee.test.js
+import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
 
-const findEquippedWeaponsStub = vi.fn();
-const buildWeaponAttackStub = vi.fn((opts) => ({
-  name: opts.weaponName,
-  damage: opts.includeAbilityBonusInDamage !== false
-    ? `${opts.weapon.damage.damage_dice}+${opts.abilityBonus}`
-    : opts.weapon.damage.damage_dice,
-  damageType: opts.weapon.damage.damage_type,
-  damageFormula: 'Damage Formula',
-  hitBonus: opts.abilityBonus + opts.proficiency,
-  hitBonusFormula: 'Hit Bonus Formula',
-  range: opts.weapon.range?.normal ?? 5,
-  type: opts.actionType,
-  weaponType: opts.weaponType,
-}));
-const buildMonkAttacksStub = vi.fn((_opts) => [
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Action',
-  },
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Bonus Action',
-  },
-]);
-
-vi.mock('./attackCalc.js', () => ({
-  parseMagicItemName: (name) =>
-    name && name.charAt(0) === '+'
-      ? { baseName: name.substring(3), magicBonus: Number(name.charAt(1)) || 0 }
-      : { baseName: name, magicBonus: 0 },
-  findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
-  buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
-  buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  parseDamageDice: (diceStr) => {
-    const match = String(diceStr).match(/(\d+)d(\d+)/);
-    if (!match) return 0;
-    const [, count, sides] = match;
-    return parseInt(count, 10) * (parseInt(sides, 10) + 1) / 2;
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getMartialArtsDie: vi.fn(() => 8),
-  },
-}));
-
+// Unavoidable mock only: SSE/runtime-backed combat summary (the Swift Quiver
+// gate reads it on every getAttacks call; null = concentration inactive).
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
   getCurrentCombatRound: vi.fn(() => 1),
 }));
 
-vi.mock('../../combat/automation/automationPassives.js', () => ({
-  collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
-}));
+// ---------------------------------------------------------------------------
+// Fixtures — copied from public/data/equipment.json (Hand Crossbow, Heavy
+// Crossbow, Light Crossbow entries; verified against disk 2026-10-20). The
+// disk catalog's ONLY Light Ranged weapons are Hand Crossbow and Heavy
+// Crossbow (Heavy Crossbow carries 'Light' + 'Two-Handed' on disk — pinned
+// as-authored). The retired stub fixtures fabricated bytes: Dart carried a
+// 'Light' property (disk: ['Finesse','Thrown'] — Dart never enters this
+// seam), Sling was listed 'Light' (disk: ['Ammunition']), and Dart 1d8
+// (disk: 1d4).
+// ---------------------------------------------------------------------------
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => undefined),
-}));
+const HAND_CROSSBOW = {
+  name: 'Hand Crossbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d6', damage_type: 'Piercing' },
+  range: { normal: 30, long: 120 },
+  properties: ['Ammunition', 'Light', 'Loading'],
+  mastery: 'Vex',
+};
 
-const defaultPlayerStats = (overrides = {}) => ({
+const HEAVY_CROSSBOW = {
+  name: 'Heavy Crossbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d10', damage_type: 'Piercing' },
+  range: { normal: 100, long: 400 },
+  properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+  mastery: 'Push',
+};
+
+const LIGHT_CROSSBOW = {
+  name: 'Light Crossbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Simple',
+  weapon_range: 'Ranged',
+  damage: { damage_dice: '1d8', damage_type: 'Piercing' },
+  range: { normal: 80, long: 320 },
+  properties: ['Ammunition', 'Loading', 'Two-Handed'],
+  mastery: 'Slow',
+};
+
+const CATALOG = [HAND_CROSSBOW, HEAVY_CROSSBOW, LIGHT_CROSSBOW];
+
+// lv1 Fighter, PB +2. DEX +3 > STR +0 → Dexterity drives every row.
+// feats is the channel buildRangedAttacks actually reads (:64); the retired
+// lane's automation.passives crossbow_expert fixture was inert decoration.
+const char = (equipped, feats = []) => ({
   level: 1,
   abilities: [
-    { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-    { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+    { name: 'Strength', bonus: 0 },
+    { name: 'Dexterity', bonus: 3 },
   ],
-  inventory: { equipped: [] },
+  inventory: { equipped },
   automation: { passives: [], bonusActions: [] },
   activeBuffs: [],
   class: { name: 'Fighter' },
-  ...overrides,
+  feats,
 });
 
+// ---------------------------------------------------------------------------
+// Truth-table: full getAttacks output per light-ranged seam face.
+// ---------------------------------------------------------------------------
+
 describe('attackCalc2024 - light ranged weapons', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('places single light ranged weapon as Action attack', () => {
-    findEquippedWeaponsStub
-      .mockReturnValueOnce(['Hand Crossbow'])
-      .mockReturnValueOnce([]);
-
-    const allEquipment = [
-      {
-        name: 'Hand Crossbow',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-        range: { normal: 30, long: 120 },
-        properties: ['Light', 'Ammunition', 'Loading'],
-      },
-    ];
-    const playerStats = defaultPlayerStats({
-      level: 1,
-      abilities: [
-        { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+  it.each([
+    {
+      label: 'non-Light + single Light: both Action rows; Crossbow Expert fabricates no Bonus row below the 2-Light gate',
+      equipped: ['Light Crossbow', 'Hand Crossbow'], feats: ['Crossbow Expert'],
+      rows: [
+        {
+          name: 'Light Crossbow', damage: '1d8+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d8) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 80, type: 'Action', weaponType: '', mastery: 'Slow',
+          properties: ['Ammunition', 'Loading', 'Two-Handed'],
+        },
+        {
+          name: 'Hand Crossbow', damage: '1d6+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 30, type: 'Action', weaponType: '', mastery: 'Vex',
+          properties: ['Ammunition', 'Light', 'Loading'],
+        },
       ],
-      class: { name: 'Fighter' },
-    });
-
-    const result = getAttacks(allEquipment, [], playerStats);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('Hand Crossbow');
-    expect(result[0].type).toBe('Action');
-    expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actionType: 'Action',
-        abilityName: 'Dexterity',
-        abilityBonus: 3,
-      })
-    );
-  });
-
-  it('places two light ranged weapons: highest damage as Action, rest as Bonus Action', () => {
-    findEquippedWeaponsStub
-      .mockReturnValueOnce(['Hand Crossbow', 'Dart'])
-      .mockReturnValueOnce([]);
-
-    const allEquipment = [
-      {
-        name: 'Hand Crossbow',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-        range: { normal: 30, long: 120 },
-        properties: ['Light', 'Ammunition', 'Loading'],
-      },
-      {
-        name: 'Dart',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-        range: { normal: 20, long: 80 },
-        properties: ['Light', 'Thrown'],
-      },
-    ];
-    const playerStats = defaultPlayerStats({
-      level: 1,
-      abilities: [
-        { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+    },
+    {
+      label: 'two Light Hand Crossbows (1d6 tie → first takes Action): Crossbow Expert adds DEX to the Bonus row: 1d6→1d6+3',
+      equipped: ['Hand Crossbow', 'Hand Crossbow'], feats: ['Crossbow Expert'],
+      rows: [
+        {
+          name: 'Hand Crossbow', damage: '1d6+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 30, type: 'Action', weaponType: '', mastery: 'Vex',
+          properties: ['Ammunition', 'Light', 'Loading'],
+        },
+        {
+          name: 'Hand Crossbow', damage: '1d6+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 30, type: 'Bonus Action', weaponType: 'ranged', mastery: 'Vex',
+          properties: ['Ammunition', 'Light', 'Loading'],
+        },
       ],
-      class: { name: 'Fighter' },
-    });
-
-    const result = getAttacks(allEquipment, [], playerStats);
-
-    // Hand Crossbow (1d6 avg 3.5) > Dart (1d4 avg 2.5), so Hand Crossbow = Action, Dart = Bonus Action
-    expect(result).toHaveLength(2);
-    expect(result[0].name).toBe('Hand Crossbow');
-    expect(result[0].type).toBe('Action');
-    expect(result[1].name).toBe('Dart');
-    expect(result[1].type).toBe('Bonus Action');
-  });
-
-  it('applies Archery fighting style to light ranged weapon attacks', () => {
-    findEquippedWeaponsStub
-      .mockReturnValueOnce(['Hand Crossbow'])
-      .mockReturnValueOnce([]);
-
-    const allEquipment = [
-      {
-        name: 'Hand Crossbow',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-        range: { normal: 30, long: 120 },
-        properties: ['Light', 'Ammunition', 'Loading'],
-      },
-    ];
-    const playerStats = defaultPlayerStats({
-      level: 1,
-      abilities: [
-        { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+    },
+    {
+      label: 'two Light, different dice: Heavy Crossbow 1d10 outranks equipped-order-first Hand Crossbow for Action; off-hand row default dice-only 1d6',
+      equipped: ['Hand Crossbow', 'Heavy Crossbow'], feats: [],
+      rows: [
+        {
+          name: 'Heavy Crossbow', damage: '1d10+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d10) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 100, type: 'Action', weaponType: '', mastery: 'Push',
+          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+        },
+        {
+          name: 'Hand Crossbow', damage: '1d6', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 30, type: 'Bonus Action', weaponType: 'ranged', mastery: 'Vex',
+          properties: ['Ammunition', 'Light', 'Loading'],
+        },
       ],
-      class: { name: 'Fighter', fightingStyles: ['Archery'] },
-    });
-
-    getAttacks(allEquipment, [], playerStats);
-
-    expect(buildWeaponAttackStub).toHaveBeenCalledWith(
-      expect.objectContaining({
-        extraHitBonus: 2,
-        extraHitBonusLabel: 'Archery Fighting Style (2)',
-      })
-    );
-  });
-
-  it('applies Crossbow Expert to Hand Crossbow bonus action attacks (ability bonus in damage)', () => {
-    // Make Dart higher damage so it becomes the Action and Hand Crossbow becomes Bonus Action
-    findEquippedWeaponsStub
-      .mockReturnValueOnce(['Dart', 'Hand Crossbow'])
-      .mockReturnValueOnce([]);
-
-    const allEquipment = [
-      {
-        name: 'Dart',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-        range: { normal: 20, long: 80 },
-        properties: ['Light', 'Thrown'],
-      },
-      {
-        name: 'Hand Crossbow',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-        range: { normal: 30, long: 120 },
-        properties: ['Light', 'Ammunition', 'Loading'],
-      },
-    ];
-    const playerStats = defaultPlayerStats({
-      level: 1,
-      abilities: [
-        { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+    },
+    {
+      label: 'Crossbow Expert is Hand Crossbow ONLY: two Heavy Crossbows leave the Bonus row dice-only 1d10',
+      equipped: ['Heavy Crossbow', 'Heavy Crossbow'], feats: ['Crossbow Expert'],
+      rows: [
+        {
+          name: 'Heavy Crossbow', damage: '1d10+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d10) + Dexterity Bonus (3)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 100, type: 'Action', weaponType: '', mastery: 'Push',
+          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+        },
+        {
+          name: 'Heavy Crossbow', damage: '1d10', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d10)',
+          hitBonus: 5,
+          hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
+          range: 100, type: 'Bonus Action', weaponType: 'ranged', mastery: 'Push',
+          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+        },
       ],
-      class: { name: 'Fighter' },
-      feats: ['Crossbow Expert'],
-    });
-
-    const result = getAttacks(allEquipment, [], playerStats);
-
-    // Hand Crossbow bonus action should have ability bonus in damage due to Crossbow Expert
-    expect(result).toHaveLength(2);
-    expect(result[0].name).toBe('Dart');
-    expect(result[0].type).toBe('Action');
-    expect(result[1].name).toBe('Hand Crossbow');
-    expect(result[1].type).toBe('Bonus Action');
-    expect(result[1].damage).toContain('+3');
-    expect(buildWeaponAttackStub).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        includeAbilityBonusInDamage: true,
-      })
-    );
-  });
-
-  it('does not apply Crossbow Expert ability bonus to non-Hand Crossbow bonus actions', () => {
-    findEquippedWeaponsStub
-      .mockReturnValueOnce(['Dart', 'Sling'])
-      .mockReturnValueOnce([]);
-
-    const allEquipment = [
-      {
-        name: 'Dart',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-        range: { normal: 20, long: 80 },
-        properties: ['Light', 'Thrown'],
-      },
-      {
-        name: 'Sling',
-        equipment_category: 'Weapon',
-        weapon_range: 'Ranged',
-        damage: { damage_dice: '1d4', damage_type: 'Piercing' },
-        range: { normal: 30, long: 120 },
-        properties: ['Light', 'Ammunition'],
-      },
-    ];
-    const playerStats = defaultPlayerStats({
-      level: 1,
-      abilities: [
-        { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-        { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-      ],
-      class: { name: 'Fighter' },
-      automation: {
-        passives: [{ effect: 'crossbow_expert', name: 'Crossbow Expert' }],
-        bonusActions: [],
-      },
-    });
-
-    const result = getAttacks(allEquipment, [], playerStats);
-
-    // Sling bonus action should NOT have ability bonus in damage (not Hand Crossbow)
-    expect(result).toHaveLength(2);
-    expect(result[1].name).toBe('Sling');
-    expect(result[1].type).toBe('Bonus Action');
-    // Without includeAbilityBonusInDamage, the stub returns just the dice
-    expect(buildWeaponAttackStub).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        includeAbilityBonusInDamage: false,
-      })
-    );
+    },
+  ])('$label', ({ equipped, feats, rows }) => {
+    expect(getAttacks(CATALOG, [], char(equipped, feats))).toEqual(rows);
   });
 });

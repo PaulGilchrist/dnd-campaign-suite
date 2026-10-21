@@ -1,5 +1,36 @@
+// @maintained-by-ai
+/**
+ * foresightService lane — the TRIGGER-STAMP OWNER (foresightService.js L3-77).
+ *
+ * Owner boundary: this file pins ONLY what triggerForesight composes/stamps that
+ * no other lane exercises for real:
+ *  - name gate (lowercase-compare vs REAL near-miss disk names)
+ *  - target resolution via metaCtx?.targetName || stats.name (falsy triples)
+ *  - exact runtime-store envelope: buff write on the TARGET (source stays the
+ *    CASTER), 4-key te stamp set on 'campaign', exact read arity/order
+ *  - SP-052 null-store coercion (cleared campaign store must NOT throw — the
+ *    old throw leaked the lv9 slot after prepareSpellCast)
+ *  - popup automation_info envelope
+ *
+ * NOT this lane (cited, not re-pinned):
+ *  - caller envelopes into triggerForesight: useSimpleSpellHandlers.foresight-sp052.test.js,
+ *    automation/handlers/spells/foresightHandler.test.js
+ *  - foresight te CONSUMPTION (attacker disadvantage): automation/contextBuilder-sync.foresight-dis.test.js;
+ *    advantage computation: conditions/conditionEffects*.test.js; registry defs: targetEffectDefinitions.test.js
+ *  - buff/expiry semantics: restRules-longRest-special.test.js (foresight multi-key SURVIVOR row,
+ *    #1319 converged-store purge — cite, don't re-pin)
+ *
+ * Ruleset posture: the service stamps identical literals for BOTH rulesets and never
+ * reads disk; the disk-canon block below proves hardcode-vs-disk PARITY for both rows
+ * (family #1365 class). No clocks: durations are static labels (disk says 8 hours,
+ * concentration FALSE both rulesets, no save/dc — RAW), never a countdown.
+ * skipSync: N/A — standalone setRuntimeValue POST lane, not setRuntimeObject SSE echo.
+ * console.error: none in this service — the preflight catch is the caller's lane.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerForesight } from './foresightService.js';
+import spells5e from '../../../../public/data/spells.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
 
 const mockGetRuntimeValue = vi.fn();
 const mockSetRuntimeValue = vi.fn();
@@ -9,293 +40,160 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: (...args) => mockSetRuntimeValue(...args),
 }));
 
-describe('foresightService', () => {
+const campaignName = 'TestCampaign';
+const mapName = 'testMap';
+const playerStats = { name: 'Wizard' };
+
+const findSpell = (data, name) => (data.spells || data).find(s => s.name === name);
+
+// Exact stamp constants — one canonical shape per concept, referenced everywhere.
+const BUFF = { name: 'Foresight', effect: 'foresight', duration: '8 hours', source: 'Wizard' };
+const TE_KEYS = ['foresight', 'advantage_attacks', 'advantage_saves', 'advantage_abilities'];
+const teStamps = (target) => TE_KEYS.map(effect => ({ target, source: 'Wizard', effect, duration: '8_hours' }));
+const popupFor = (target) => ({
+    type: 'popup',
+    payload: {
+        type: 'automation_info',
+        name: 'Foresight',
+        automationType: 'foresight',
+        description: `${target} has <b>Advantage on D20 Tests</b> (attacks, saves, ability checks), and other creatures have <b>Disadvantage on attack rolls</b> against them for 8 hours.`,
+    },
+});
+
+// Argument-keyed store fake (deterministic; unknown read keys are a test failure).
+function fakeStore(buffs, effects) {
+    mockGetRuntimeValue.mockImplementation((key, key2) => {
+        if (key2 === 'activeBuffs') return buffs;
+        if (key === 'campaign' && key2 === 'targetEffects') return effects;
+        throw new Error(`unexpected getRuntimeValue("${key}", "${key2}")`);
+    });
+}
+
+describe('foresightService — triggerForesight stamps', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        vi.resetAllMocks();
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'testMap';
-    const playerStats = { name: 'Wizard' };
+    describe('disk canon (both rulesets) — why the literals', () => {
+        it.each([
+            ['5e', spells5e],
+            ['2024', spells2024],
+        ])('%s: lv9 Touch, concentration FALSE, 8 hours, no save/dc — automation identical cross-ruleset', (_label, data) => {
+            const fs = findSpell(data, 'Foresight');
+            expect(fs.level).toBe(9);
+            expect(fs.range).toBe('Touch');
+            expect(fs.duration).toBe('8 hours');
+            expect(fs.concentration).toBe(false);
+            expect(fs.automation).toEqual({ type: 'foresight', duration: '8 hours' });
+            // RAW no save — disk rows carry no save/dc fields at all.
+            expect(fs).not.toHaveProperty('save');
+            expect(fs).not.toHaveProperty('dc');
+            expect(fs.automation.saveDc).toBeUndefined();
+            // near-miss REAL disk names backing the negative-gate rows below
+            expect(findSpell(data, 'True Seeing')).toBeTruthy();
+            expect(findSpell(data, 'Clairvoyance')).toBeTruthy();
+            // hardcode-vs-disk parity premise: both rulesets agree byte-for-byte
+            expect(findSpell(spells5e, 'Foresight').automation).toEqual(findSpell(spells2024, 'Foresight').automation);
+        });
 
-    function mockEmptyThen(value) {
-        mockGetRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce(value ?? []);
-    }
+        it('stamped literals match disk automation in BOTH rulesets (te uses the registry "_" variant)', async () => {
+            const disk = [findSpell(spells5e, 'Foresight'), findSpell(spells2024, 'Foresight')];
+            fakeStore(undefined, undefined);
 
-    function callTrigger(spell = { name: 'Foresight' }, metaCtx = {}, stats = playerStats) {
-        return triggerForesight(spell, metaCtx, stats, campaignName, mapName);
-    }
+            await triggerForesight({ name: 'Foresight' }, {}, playerStats, campaignName, mapName);
 
-    describe('triggerForesight', () => {
-        describe('non-Foresight spells', () => {
-            it.each([
-                ['Fire Bolt', {}],
-                ['lesser restoration', {}],
-                ['not foresight', {}],
-            ])('returns null for non-Foresight spell "%s"', async (spellName, metaCtx) => {
-                const result = await triggerForesight(
-                    { name: spellName },
-                    metaCtx,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
+            const buffs = mockSetRuntimeValue.mock.calls[0][2];
+            const effects = mockSetRuntimeValue.mock.calls[1][2];
+            for (const auto of disk.map(s => s.automation)) {
+                expect(buffs[0].duration).toBe(auto.duration);        // '8 hours' verbatim
+                expect(buffs[0].effect).toBe(auto.type);                // 'foresight'
+                for (const te of effects) expect(te.duration).toBe(auto.duration.replace(' ', '_'));
+            }
+        });
+    });
 
+    describe('name gate', () => {
+        it.each([
+            ['foresight', true],
+            ['FORESIGHT', true],
+            ['True Seeing', false],
+            ['Clairvoyance', false],
+            ['Fire Bolt', false],
+            [undefined, false],
+        ])('spell name %s → %s', async (spellName, expectHit) => {
+            if (expectHit) fakeStore(undefined, undefined);
+
+            const result = await triggerForesight(
+                { name: spellName },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            if (expectHit) {
+                expect(result).toEqual(popupFor('Wizard'));
+                expect(mockSetRuntimeValue).toHaveBeenCalledTimes(2);
+            } else {
                 expect(result).toBeNull();
                 expect(mockGetRuntimeValue).not.toHaveBeenCalled();
                 expect(mockSetRuntimeValue).not.toHaveBeenCalled();
-            });
+            }
         });
+    });
 
-        describe('activeBuffs management', () => {
-            it('adds Foresight buff to target activeBuffs', async () => {
-                mockEmptyThen([]);
+    it('full cast envelope — exact reads, buff re-stamp (target ≠ caster), 4-key te set, popup', async () => {
+        const bless = { name: 'Bless', effect: 'bless', duration: '1 minute', source: 'Cleric' };
+        const otherCasterForesight = { target: 'Other', source: 'OtherCaster', effect: 'foresight', duration: '8_hours' };
+        const wizardUnrelated = { target: 'Fighter', source: 'Wizard', effect: 'some_other_effect', duration: '1_hour' };
+        fakeStore([bless, { ...BUFF, source: 'Cleric' }], [
+            ...teStamps('OldTarget'),        // same caster, previous target — must end early
+            otherCasterForesight,             // other casters untouched
+            wizardUnrelated,                  // same caster, unrelated effect preserved
+        ]);
+        const metaCtx = { targetName: 'Fighter' };
 
-                await callTrigger();
+        const result = await triggerForesight({ name: 'foresight' }, metaCtx, playerStats, campaignName, mapName);
 
-                expect(mockSetRuntimeValue).toHaveBeenCalledWith(
-                    playerStats.name,
-                    'activeBuffs',
-                    [{
-                        name: 'Foresight',
-                        effect: 'foresight',
-                        duration: '8 hours',
-                        source: playerStats.name,
-                    }],
-                    campaignName,
-                );
-            });
+        // reads: buff on TARGET, te on 'campaign' with EXACT 2-arg arity (SP-052 convention)
+        expect(mockGetRuntimeValue).toHaveBeenCalledTimes(2);
+        expect(mockGetRuntimeValue.mock.calls[0]).toEqual(['Fighter', 'activeBuffs', campaignName]);
+        expect(mockGetRuntimeValue.mock.calls[1]).toEqual(['campaign', 'targetEffects']);
 
-            it('resolves target from metaCtx.targetName over playerStats.name', async () => {
-                mockEmptyThen([]);
+        // buff write: Bless preserved, Foresight deduped and re-stamped, source stays the CASTER
+        expect(mockSetRuntimeValue.mock.calls[0]).toEqual(['Fighter', 'activeBuffs', [bless, BUFF], campaignName]);
+        // te write: prior-target set dropped, unrelated kept, 4 exact stamps appended in order
+        expect(mockSetRuntimeValue.mock.calls[1]).toEqual(['campaign', 'targetEffects', [otherCasterForesight, wizardUnrelated, ...teStamps('Fighter')], campaignName]);
+        expect(metaCtx).toEqual({ targetName: 'Fighter' }); // not mutated
+        expect(result).toEqual(popupFor('Fighter'));
+    });
 
-                await callTrigger({ name: 'Foresight' }, { targetName: 'Fighter' });
+    it.each([
+        ['null metaCtx', null],
+        ['undefined metaCtx', undefined],
+        ['missing targetName', {}],
+        ['empty-string targetName', { targetName: '' }],
+    ])('target falls back to stats.name when %s', async (_desc, metaCtx) => {
+        fakeStore(undefined, undefined);
 
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    'Fighter',
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
+        const result = await triggerForesight({ name: 'Foresight' }, metaCtx, playerStats, campaignName, mapName);
 
-            it('preserves existing non-Foresight buffs', async () => {
-                const existingBuffs = [
-                    { name: 'Bless', effect: 'bless', duration: '1 minute', source: 'Cleric' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(existingBuffs)
-                    .mockReturnValueOnce([]);
+        expect(mockSetRuntimeValue.mock.calls[0]).toEqual(['Wizard', 'activeBuffs', [BUFF], campaignName]);
+        expect(mockSetRuntimeValue.mock.calls[1]).toEqual(['campaign', 'targetEffects', teStamps('Wizard'), campaignName]);
+        expect(result).toEqual(popupFor('Wizard'));
+    });
 
-                await callTrigger();
+    it.each([
+        ['SP-052: null stores (admin clear / first cast) do NOT throw — stamps land on the selected target', { targetName: 'ElfTest' }, null, null],
+        ['non-array garbage stores coerce to empty', {}, { not: 'an-array' }, 'stale'],
+    ])('%s', async (_desc, metaCtx, buffs, effects) => {
+        fakeStore(buffs, effects);
 
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs).toHaveLength(2);
-                expect(newBuffs[0]).toEqual(existingBuffs[0]);
-                expect(newBuffs[1].name).toBe('Foresight');
-            });
+        const target = metaCtx.targetName || 'Wizard';
+        await expect(triggerForesight({ name: 'Foresight' }, metaCtx, playerStats, campaignName, mapName))
+            .resolves.toEqual(popupFor(target));
 
-            it('deduplicates Foresight buffs from different casters', async () => {
-                const existingBuffs = [
-                    { name: 'Foresight', effect: 'foresight', duration: '8 hours', source: 'Cleric' },
-                    { name: 'Bless', effect: 'bless', duration: '1 minute', source: 'Cleric' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(existingBuffs)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs.filter(b => b.name === 'Foresight')).toHaveLength(1);
-                expect(newBuffs[1].source).toBe('Wizard');
-            });
-
-            it('treats non-array activeBuffs as empty array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce(null)
-                    .mockReturnValueOnce([]);
-
-                await callTrigger();
-
-                const newBuffs = mockSetRuntimeValue.mock.calls[0][2];
-                expect(newBuffs).toHaveLength(1);
-                expect(newBuffs[0].name).toBe('Foresight');
-            });
-        });
-
-        describe('targetEffects management', () => {
-            it('adds foresight effect at campaign level', async () => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Foresight' }, { targetName: 'Fighter' });
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    2,
-                    'campaign',
-                    'targetEffects',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-
-            it('removes old foresight effect from same caster before adding new one', async () => {
-                const existingEffects = [
-                    { target: 'OldTarget', source: 'Wizard', effect: 'foresight', duration: '8_hours' },
-                    { target: 'OtherTarget', source: 'AnotherCaster', effect: 'foresight', duration: '8_hours' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(existingEffects);
-
-                await callTrigger({ name: 'Foresight' }, { targetName: 'Fighter' });
-
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(5);
-                expect(newEffects[0]).toEqual(existingEffects[1]);
-                expect(newEffects[1].effect).toBe('foresight');
-                expect(newEffects[1].target).toBe('Fighter');
-                expect(newEffects[1].source).toBe('Wizard');
-                expect(newEffects[2].effect).toBe('advantage_attacks');
-                expect(newEffects[3].effect).toBe('advantage_saves');
-                expect(newEffects[4].effect).toBe('advantage_abilities');
-            });
-
-            it('preserves unrelated targetEffects', async () => {
-                const existingEffects = [
-                    { target: 'Fighter', source: 'Wizard', effect: 'some_other_effect', duration: '1_hour' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(existingEffects);
-
-                await callTrigger({ name: 'Foresight' }, { targetName: 'Fighter' });
-
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(5);
-                expect(newEffects[0]).toEqual(existingEffects[0]);
-                expect(newEffects[1].effect).toBe('foresight');
-                expect(newEffects[1].target).toBe('Fighter');
-            });
-
-            it('treats non-array targetEffects as empty array', async () => {
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce({ not: 'an-array' });
-
-                await callTrigger();
-
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(4);
-                expect(newEffects[0].effect).toBe('foresight');
-                expect(newEffects[0].target).toBe('Wizard');
-            });
-
-            it('SP-052: null targetEffects (cleared campaign store) does NOT throw — te lands on the selected target', async () => {
-                // Admin-clear / first cast of a session returns null for the
-                // campaign te key. The old throw aborted AFTER slot spend
-                // (slot leak) with zero te. Null must behave like empty.
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(null);
-
-                await expect(callTrigger({ name: 'Foresight' }, { targetName: 'ElfTest' })).resolves.toMatchObject({
-                    type: 'popup',
-                });
-
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects).toHaveLength(4);
-                expect(newEffects[0]).toEqual({ target: 'ElfTest', source: 'Wizard', effect: 'foresight', duration: '8_hours' });
-            });
-
-            it('SP-052: re-cast replaces the previous target te ("ends early if cast again")', async () => {
-                const existing = [
-                    { target: 'Bandit 1', source: 'Wizard', effect: 'foresight', duration: '8_hours' },
-                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_attacks', duration: '8_hours' },
-                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_saves', duration: '8_hours' },
-                    { target: 'Bandit 1', source: 'Wizard', effect: 'advantage_abilities', duration: '8_hours' },
-                ];
-                mockGetRuntimeValue
-                    .mockReturnValueOnce([])
-                    .mockReturnValueOnce(existing);
-
-                await callTrigger({ name: 'Foresight' }, { targetName: 'ElfTest' });
-
-                const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-                expect(newEffects.filter(te => te.target === 'Bandit 1')).toHaveLength(0);
-                expect(newEffects.filter(te => te.target === 'ElfTest')).toHaveLength(4);
-            });
-        });
-
-        describe('return value', () => {
-            it('returns popup with automation_info on success', async () => {
-                mockEmptyThen([]);
-
-                const result = await callTrigger({ name: 'Foresight' }, { targetName: 'Fighter' });
-
-                expect(result).toEqual({
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: 'Foresight',
-                        automationType: 'foresight',
-                        description: 'Fighter has <b>Advantage on D20 Tests</b> (attacks, saves, ability checks), and other creatures have <b>Disadvantage on attack rolls</b> against them for 8 hours.',
-                    },
-                });
-            });
-
-            it('uses playerStats.name as target in description when no targetName provided', async () => {
-                mockEmptyThen([]);
-
-                const result = await callTrigger();
-
-                expect(result.payload.description).toContain('Wizard');
-            });
-        });
-
-        describe('case-insensitive matching', () => {
-            it.each([
-                'foresight',
-                'Foresight',
-                'FORESIGHT',
-                'FoReSiGhT',
-            ])('matches spell name "%s"', async (spellName) => {
-                mockEmptyThen([]);
-
-                const result = await triggerForesight(
-                    { name: spellName },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                );
-
-                expect(result).not.toBeNull();
-                expect(result.type).toBe('popup');
-            });
-        });
-
-        describe('metaCtx handling', () => {
-            it.each([
-                ['null metaCtx', null],
-                ['undefined metaCtx', undefined],
-                ['missing targetName', {}],
-            ])('uses playerStats.name when %s', async (_, metaCtx) => {
-                mockEmptyThen([]);
-
-                await callTrigger({ name: 'Foresight' }, metaCtx);
-
-                expect(mockSetRuntimeValue).toHaveBeenNthCalledWith(
-                    1,
-                    playerStats.name,
-                    'activeBuffs',
-                    expect.any(Array),
-                    campaignName,
-                );
-            });
-        });
+        expect(mockSetRuntimeValue.mock.calls[0]).toEqual([target, 'activeBuffs', [BUFF], campaignName]);
+        expect(mockSetRuntimeValue.mock.calls[1]).toEqual(['campaign', 'targetEffects', teStamps(target), campaignName]);
     });
 });

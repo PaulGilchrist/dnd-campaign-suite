@@ -1,10 +1,33 @@
+// @maintained-by-ai
+/**
+ * Lane: the distinct effect TYPES dispatched by the EXPIRATION_HANDLERS table
+ * in clearExpirationEffects.js that no other lane pins. Tested at the unit
+ * seam (clearExpirationEffects called directly) so surrounding queue/rest
+ * writes cannot mask a broken handler dispatch.
+ *
+ * Owned elsewhere — do not duplicate here:
+ *   - main queue types (condition, stunned, speed_zero, remove_active_buff,
+ *     feign death, haste, bardic/maneuver flags, etc.): clearExpirationEffects.test.js
+ *   - outgoing/incoming queue wiring + Infinity purge seam:
+ *     clearAllExpirationEffects_additional.test.js
+ *   - rest-scene cleanup (Otto, Flesh to Stone, Prismatic Spray, 8h preserve):
+ *     clearAllExpirationEffects_rest_cleanup.test.js
+ *   - remove_aura_of_life_buff / aura_of_life_hp_protection_end:
+ *     clearExpirationEffects.aura-of-life.test.js (SP-008, stronger merged-write pin)
+ *   - hurl_through_hell_return / calm_emotions_end / fly_speed_equals_walk_speed /
+ *     dragon_wings / frightful_presence_immunity_grant / weakening_breath_auto_success:
+ *     their per-spell clearExpirationEffects.*.test.js files
+ *   - Holy Nimbus damage: auraDamageService.test.js + expirations_applyAuraDamage.test.js
+ *
+ * Cited by: smiteOfProtectionHandler.test.js (remove_smite_of_protection expiry
+ * side) and SilenceModal.test.jsx (clear_silence_zone zone consumption).
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
   setRuntimeObject: vi.fn(),
-  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../ui/utils.js', () => ({
@@ -20,37 +43,17 @@ vi.mock('../../ui/storage.js', () => ({
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(),
-  getActiveCreatureName: vi.fn(),
   getCombatSummary: vi.fn(),
-  loadCombatSummary: vi.fn(),
-  setCombatSummaryCache: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(() => 5),
-}));
-
-vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
-  processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
-  processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
-  handle: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/spells/confusionTurnStartHandler.js', () => ({
-  handleConfusionTurnStart: vi.fn().mockResolvedValue({ behaviorText: 'Attacks nearest creature' }),
-}));
-
-vi.mock('../../automation/handlers/spells/sleetStormHandler.js', () => ({
-  processSleetStormAreaSave: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../combat/concentration/concentrationService.js', () => ({
+  breakConcentration: vi.fn(),
+  cleanupConcentrationEffects: vi.fn(),
+  restoreSuppressedConditions: vi.fn(),
 }));
 
 vi.mock('../../combat/summons/summonedCreatureService.js', () => ({
@@ -73,467 +76,233 @@ vi.mock('../../automation/handlers/spells/shapechangeService.js', () => ({
   revertShapechange: vi.fn(),
 }));
 
-vi.mock('../../combat/automation/automationExpressions.js', () => ({
-  evaluateAutoExpression: vi.fn((expr) => {
-    if (typeof expr === 'number') return expr;
-    return 1;
-  }),
-}));
-
-vi.mock('../../rules/combat/rangeCheck.js', () => ({
-  isWithinRange: vi.fn().mockResolvedValue(true),
-}));
-
-vi.mock('../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
-}));
-
-vi.mock('../../combat/concentration/concentrationService.js', () => ({
-  breakConcentration: vi.fn(),
-  cleanupConcentrationEffects: vi.fn(),
-}));
-
-vi.mock('../../automation/handlers/buffs/tempHpService.js', () => ({
-  setTempHp: vi.fn(),
-}));
-
-vi.mock('../../../hooks/useAllySelection.js', () => ({
-  getAllyList: vi.fn(() => []),
-}));
-
-import { clearAllExpirationEffects, applyTurnStartEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue, setRuntimeObject } from '../../../hooks/runtime/useRuntimeState.js';
+import { clearExpirationEffects } from './clearExpirationEffects.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
-import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
-import { getAllyList } from '../../../hooks/useAllySelection.js';
-import { breakConcentration } from '../../combat/concentration/concentrationService.js';
+import storage from '../../ui/storage.js';
+import { addEntry } from '../../ui/logService.js';
+import { breakConcentration, cleanupConcentrationEffects } from '../../combat/concentration/concentrationService.js';
+import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
+import { revertPolymorph } from '../../automation/handlers/spells/polymorphService.js';
+import { revertAnimalShapes } from '../../automation/handlers/spells/animalShapesService.js';
+import { revertTruePolymorph } from '../../automation/handlers/spells/truePolymorphService.js';
+import { revertShapechange } from '../../automation/handlers/spells/shapechangeService.js';
 
-const KEY = 'pendingExpirations';
+const CAMPAIGN = 'MyCampaign';
 
 function resetMocks() {
   vi.clearAllMocks();
   localStorage.clear();
   window.dispatchEvent = vi.fn();
-}
-
-function stubUtilsNameIdentity() {
   utils.getName.mockImplementation((v) => String(v));
+  // Baseline: empty runtime. Each test overrides exactly the reads it stages.
+  getRuntimeValue.mockImplementation(() => null);
 }
 
+// Writes recorded for one (name, key) pair.
+const writesTo = (name, key) =>
+  setRuntimeValue.mock.calls.filter((c) => c[0] === name && c[1] === key);
+
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — polymorph-related effect types
+// Shape-family types: each routes to its own revert service
 // ---------------------------------------------------------------------------
-describe('clearExpirationEffects — polymorph-related effect types', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+describe('clearExpirationEffects — shape-family types', () => {
+  beforeEach(resetMocks);
 
-  describe('polymorph effect type', () => {
-    it('calls revertPolymorph for target', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'polymorph' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
+  it('routes polymorph, animal_shapes, true_polymorph and shapechange to their own revert services', () => {
+    clearExpirationEffects(
+      [
+        { type: 'polymorph' },
+        { type: 'animal_shapes' },
+        { type: 'true_polymorph' },
+        { type: 'shapechange' },
+      ],
+      'Orc', 'Caster', CAMPAIGN,
+    );
 
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalled();
-    });
-  });
-
-  describe('animal_shapes effect type', () => {
-    it('calls revertAnimalShapes for target', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'animal_shapes' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalled();
-    });
-  });
-
-  describe('true_polymorph effect type', () => {
-    it('calls revertTruePolymorph for target', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'true_polymorph' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalled();
-    });
-  });
-
-  describe('shapechange effect type', () => {
-    it('calls revertShapechange for target', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'shapechange' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        if (key === 'activeConditions') return [];
-        return null;
-      });
-
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalled();
-    });
-  });
-
-  describe('charmed effect type', () => {
-    it('removes charmed condition', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'charmed' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (name === 'Orc' && key === 'activeConditions') return ['charmed', 'poisoned'];
-        if (key === 'activeConditions') return [];
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        return null;
-      });
-
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Orc',
-        'activeConditions',
-        ['poisoned'],
-        'MyCampaign',
-      );
-    });
-  });
-
-  describe('dominated effect type', () => {
-    it('removes charmed condition (dominated maps to charmed)', () => {
-      const myList = [
-        { target: 'Orc', effects: [{ type: 'dominated' }], appliedRound: 1 },
-      ];
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (name === 'Orc' && key === 'activeConditions') return ['charmed', 'poisoned'];
-        if (key === 'activeConditions') return [];
-        if (key === KEY && name === 'Caster') return myList;
-        if (key === KEY) return [];
-        return null;
-      });
-
-      clearAllExpirationEffects('Caster', 'MyCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Orc',
-        'activeConditions',
-        ['poisoned'],
-        'MyCampaign',
-      );
-    });
+    // Each type dispatches to exactly its own service, exactly once —
+    // a mis-wired handler breaks the times(1) or the not-called pair.
+    expect(revertPolymorph).toHaveBeenCalledTimes(1);
+    expect(revertAnimalShapes).toHaveBeenCalledTimes(1);
+    expect(revertTruePolymorph).toHaveBeenCalledTimes(1);
+    expect(revertShapechange).toHaveBeenCalledTimes(1);
+    for (const revert of [revertPolymorph, revertAnimalShapes, revertTruePolymorph, revertShapechange]) {
+      expect(revert).toHaveBeenCalledWith('Orc', CAMPAIGN);
+    }
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — break_concentration effect type
+// charmed / dominated: both map to removing the charmed condition
+// ---------------------------------------------------------------------------
+describe('clearExpirationEffects — charmed and dominated types', () => {
+  beforeEach(resetMocks);
+
+  it.each(['charmed', 'dominated'])(
+    "'%s' expiry strips the charmed condition from the target and preserves other conditions",
+    (type) => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (name === 'Orc' && key === 'activeConditions') return ['charmed', 'poisoned'];
+        return null;
+      });
+
+      clearExpirationEffects([{ type }], 'Orc', 'Caster', CAMPAIGN);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', ['poisoned'], CAMPAIGN);
+      // No condition write anywhere may still carry 'charmed'
+      // (covers both the activeConditions and NPC-condition legs).
+      for (const call of setRuntimeValue.mock.calls) {
+        if (Array.isArray(call[2])) {
+          expect(call[2]).not.toContain('charmed');
+        }
+      }
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// break_concentration
 // ---------------------------------------------------------------------------
 describe('clearExpirationEffects — break_concentration', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+  beforeEach(resetMocks);
 
-  it('breaks concentration and cleans up effects when combatSummary exists', () => {
-    const myList = [
-      { target: 'Caster', effects: [{ type: 'break_concentration' }], appliedRound: 1 },
-    ];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-    getCombatSummary.mockReturnValue({ casterName: 'Caster', spell: 'Fireball' });
+  it('breaks the concentration, cleans up its effects, persists the summary and broadcasts', () => {
+    const cs = { creatures: [{ name: 'Caster', concentration: { spell: 'Fireball' } }] };
+    getCombatSummary.mockReturnValue(cs);
     breakConcentration.mockReturnValue('Fireball');
 
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
+    clearExpirationEffects([{ type: 'break_concentration' }], 'Caster', 'Attacker', CAMPAIGN);
 
-    expect(breakConcentration).toHaveBeenCalled();
-    expect(setRuntimeValue).toHaveBeenCalled();
+    expect(breakConcentration).toHaveBeenCalledWith(cs, 'Caster');
+    expect(cleanupConcentrationEffects).toHaveBeenCalledWith('Caster', 'Fireball', CAMPAIGN);
+    expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, CAMPAIGN);
+    expect(window.dispatchEvent).toHaveBeenCalledTimes(1);
+    expect(window.dispatchEvent.mock.calls[0][0].type).toBe('combat-summary-updated');
   });
 
-  it('does nothing when combatSummary is null', () => {
-    const myList = [
-      { target: 'Caster', effects: [{ type: 'break_concentration' }], appliedRound: 1 },
-    ];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (key === 'activeConditions') return [];
-      return null;
-    });
+  it('does nothing when there is no combat summary', () => {
     getCombatSummary.mockReturnValue(null);
 
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
+    clearExpirationEffects([{ type: 'break_concentration' }], 'Caster', 'Attacker', CAMPAIGN);
 
     expect(breakConcentration).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('persists nothing when the caster holds no concentration to break', () => {
+    const cs = { creatures: [{ name: 'Caster', concentration: null }] };
+    getCombatSummary.mockReturnValue(cs);
+    breakConcentration.mockReturnValue(null);
+
+    clearExpirationEffects([{ type: 'break_concentration' }], 'Caster', 'Attacker', CAMPAIGN);
+
+    expect(breakConcentration).toHaveBeenCalledWith(cs, 'Caster');
+    expect(cleanupConcentrationEffects).not.toHaveBeenCalled();
+    expect(storage.set).not.toHaveBeenCalled();
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — clear_runtime_value effect type
+// clear_runtime_value
 // ---------------------------------------------------------------------------
 describe('clearExpirationEffects — clear_runtime_value', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+  beforeEach(resetMocks);
 
-  it('clears the specified runtime value for the creature', () => {
-    const myList = [
-      { target: 'Caster', effects: [{ type: 'clear_runtime_value', creatureName: 'Caster', key: 'myCustomFlag' }], appliedRound: 1 },
-    ];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Caster',
-      'myCustomFlag',
-      null,
-      'MyCampaign',
+  it('nulls the named key on effect.creatureName — not on the expiration target', () => {
+    clearExpirationEffects(
+      [{ type: 'clear_runtime_value', creatureName: 'Caster', key: 'myCustomFlag' }],
+      'UnrelatedTarget', 'Attacker', CAMPAIGN,
     );
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Caster', 'myCustomFlag', null, CAMPAIGN);
+    expect(writesTo('UnrelatedTarget', 'myCustomFlag')).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — remove_smite_of_protection effect type
+// remove_smite_of_protection (cited by smiteOfProtectionHandler.test.js)
 // ---------------------------------------------------------------------------
 describe('clearExpirationEffects — remove_smite_of_protection', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+  beforeEach(resetMocks);
 
-  it('clears smiteOfProtectionActive and increments coverRefresh', () => {
-    const myList = [
-      { target: 'Paladin', effects: [{ type: 'remove_smite_of_protection' }], appliedRound: 1 },
-    ];
+  it.each([
+    { stored: 3, expected: 4, label: 'increments the existing coverRefresh count' },
+    { stored: null, expected: 1, label: 'starts coverRefresh at 1 when none was recorded' },
+  ])('$label', ({ stored, expected }) => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (name === 'campaign' && key === 'coverRefresh') return 3;
-      if (key === 'activeConditions') return [];
+      if (name === 'campaign' && key === 'coverRefresh') return stored;
       return null;
     });
 
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
+    clearExpirationEffects([{ type: 'remove_smite_of_protection' }], 'Paladin', 'Attacker', CAMPAIGN);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin',
-      'smiteOfProtectionActive',
-      null,
-      'MyCampaign',
-    );
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'campaign',
-      'coverRefresh',
-      4,
-      'MyCampaign',
-    );
+    expect(setRuntimeValue).toHaveBeenCalledWith('Paladin', 'smiteOfProtectionActive', null, CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'coverRefresh', expected, CAMPAIGN);
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — clear_silence_zone effect type
+// clear_silence_zone (cited by SilenceModal.test.jsx zone consumption)
 // ---------------------------------------------------------------------------
 describe('clearExpirationEffects — clear_silence_zone', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+  beforeEach(resetMocks);
 
-  it('removes deafened condition and silenced targetEffects for the caster', () => {
-    const myList = [
-      { target: 'Caster', effects: [{ type: 'clear_silence_zone', casterName: 'Caster' }], appliedRound: 1 },
-    ];
+  it('strips Deafened from this caster\'s silenced targets and removes only this caster\'s silenced targetEffects', () => {
     getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Caster') return myList;
-      if (key === KEY) return [];
       if (name === 'campaign' && key === 'targetEffects') return [
         { effect: 'silenced', source: 'Caster', target: 'Orc' },
         { effect: 'silenced', source: 'Caster', target: 'Human' },
-        { effect: 'slow', target: 'Orc' },
+        { effect: 'silenced', source: 'OtherCaster', target: 'Troll' },
+        { effect: 'slow', source: 'Caster', target: 'Orc' },
       ];
       if (name === 'Orc' && key === 'activeConditions') return ['deafened', 'poisoned'];
       if (name === 'Human' && key === 'activeConditions') return ['deafened', 'fatigued'];
-      if (key === 'activeConditions') return [];
+      if (name === 'Troll' && key === 'activeConditions') return ['deafened'];
       return null;
     });
 
-    clearAllExpirationEffects('Caster', 'MyCampaign');
+    clearExpirationEffects(
+      [{ type: 'clear_silence_zone', casterName: 'Caster' }],
+      'Caster', 'Caster', CAMPAIGN,
+    );
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Orc',
-      'activeConditions',
-      ['poisoned'],
-      'MyCampaign',
-    );
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Human',
-      'activeConditions',
-      ['fatigued'],
-      'MyCampaign',
-    );
-    const effectCalls = setRuntimeValue.mock.calls.filter(
-      (c) => c[0] === 'campaign' && c[1] === 'targetEffects',
-    );
-    expect(effectCalls.length).toBeGreaterThan(0);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', ['poisoned'], CAMPAIGN);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'activeConditions', ['fatigued'], CAMPAIGN);
+    // Exact payload: another caster's silence and an unrelated slow survive.
+    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [
+      { effect: 'silenced', source: 'OtherCaster', target: 'Troll' },
+      { effect: 'slow', source: 'Caster', target: 'Orc' },
+    ], CAMPAIGN);
+    // The foreign-zone Troll is never touched.
+    expect(setRuntimeValue.mock.calls.filter((c) => c[0] === 'Troll')).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — remove_aura_of_life_buff effect type
+// dispatcher contract: unknown types are inert
 // ---------------------------------------------------------------------------
-describe('clearExpirationEffects — remove_aura_of_life_buff', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+describe('clearExpirationEffects — unknown effect types', () => {
+  beforeEach(resetMocks);
 
-  it('removes the buff and sets auraOfLifeHpMaxProtected to false', () => {
-    const myList = [
-      { target: 'Cleric', effects: [{ type: 'remove_aura_of_life_buff', buffName: 'AuraOfLife' }], appliedRound: 1 },
-    ];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (name === 'Cleric' && key === 'activeBuffs') return [{ name: 'AuraOfLife', effect: 'aura_of_life' }];
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (key === 'activeConditions') return [];
-      return null;
-    });
+  it('ignores unknown types without writing anything', () => {
+    clearExpirationEffects([{ type: 'not_a_registered_type' }], 'Orc', 'Caster', CAMPAIGN);
 
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Cleric',
-      'activeBuffs',
-      [],
-      'MyCampaign',
-    );
-    expect(setRuntimeObject).toHaveBeenCalledWith(
-      'Cleric',
-      expect.objectContaining({ auraOfLifeHpMaxProtected: false }),
-      'MyCampaign',
-    );
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(revertPolymorph).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
-// clearExpirationEffects — aura_of_life_hp_protection_end effect type
+// remove_summoned_creatures (SP-114)
 // ---------------------------------------------------------------------------
-describe('clearExpirationEffects — aura_of_life_hp_protection_end', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
+describe('clearExpirationEffects — SP-114 remove_summoned_creatures', () => {
+  beforeEach(resetMocks);
 
-  it('sets auraOfLifeHpMaxProtected to false', () => {
-    const myList = [
-      { target: 'Cleric', effects: [{ type: 'aura_of_life_hp_protection_end' }], appliedRound: 1 },
-    ];
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === KEY && name === 'Attacker') return myList;
-      if (key === KEY) return [];
-      if (key === 'activeConditions') return [];
-      return null;
-    });
-
-    clearAllExpirationEffects('Attacker', 'MyCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Cleric',
-      'auraOfLifeHpMaxProtected',
-      false,
-      'MyCampaign',
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// applyHolyNimbusDamage is not exported - tested indirectly through applyTurnStartEffects
-// ---------------------------------------------------------------------------
-describe('applyHolyNimbusDamage (indirect via applyTurnStartEffects)', () => {
-  beforeEach(() => {
-    resetMocks();
-    stubUtilsNameIdentity();
-    getRuntimeValue.mockImplementation((_name, _key, _campaign) => null);
-  });
-
-  it('applies holy nimbus damage through applyTurnStartEffects when holyNimbusActive is true', async () => {
-    getRuntimeValue.mockImplementation((name, prop) => {
-      if (name === 'Paladin' && prop === 'holyNimbusActive') return true;
-      if (prop === 'targetEffects') return [];
-      return null;
-    });
-    getCombatSummary.mockReturnValue({
-      creatures: [
-        { name: 'Orc', computedStats: { proficiency: 2, abilities: [{ name: 'Charisma', bonus: 3 }] } },
-      ],
-    });
-    getAllyList.mockReturnValue([]);
-
-    await applyTurnStartEffects('Orc', { turnStartEffects: [] }, 'MyCampaign', [
-      { name: 'Paladin', computedStats: { proficiency: 2, abilities: [{ name: 'Charisma', bonus: 3 }] } },
-    ]);
-
-    // Holy nimbus should have applied damage
-    expect(applyDamageToTarget).toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// SP-114: remove_summoned_creatures expiration type
-// ---------------------------------------------------------------------------
-
-import { removeSummonedCreatures } from '../../combat/summons/summonedCreatureService.js';
-import storage from '../../ui/storage.js';
-import { addEntry } from '../../ui/logService.js';
-import { clearExpirationEffects } from './expirations.js';
-
-describe('SP-114 remove_summoned_creatures expiration', () => {
-  beforeEach(() => resetMocks());
-
-  it('clears the matching caster concentration, removes summons, and logs', () => {
+  it('clears the matching caster concentration, persists the summary, removes summons and logs', () => {
     const cs = {
       creatures: [
         { name: 'Wizard', concentration: { spell: 'Summon Aberration', dc: 18 } },
@@ -544,20 +313,21 @@ describe('SP-114 remove_summoned_creatures expiration', () => {
 
     clearExpirationEffects(
       [{ type: 'remove_summoned_creatures', spell: 'Summon Aberration' }],
-      'Wizard', 'Wizard', 'test-campaign'
+      'Wizard', 'Wizard', 'test-campaign',
     );
 
-    expect(cs.creatures.find(c => c.name === 'Wizard').concentration).toBeNull();
+    expect(cs.creatures.find((c) => c.name === 'Wizard').concentration).toBeNull();
     expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, 'test-campaign');
     expect(removeSummonedCreatures).toHaveBeenCalledWith('Wizard', 'test-campaign');
     expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
       type: 'summons',
       characterName: 'Wizard',
-      description: expect.stringContaining('summoned creatures disappear'),
+      summonName: 'Summon Aberration',
+      description: 'Summon Aberration ends — summoned creatures disappear.',
     }));
   });
 
-  it('leaves a different concentration spell on the caster intact', () => {
+  it('leaves a different concentration spell on the caster intact but still removes summons', () => {
     const cs = {
       creatures: [{ name: 'Wizard', concentration: { spell: 'Slow', dc: 18 } }],
     };
@@ -565,11 +335,15 @@ describe('SP-114 remove_summoned_creatures expiration', () => {
 
     clearExpirationEffects(
       [{ type: 'remove_summoned_creatures', spell: 'Summon Aberration' }],
-      'Wizard', 'Wizard', 'test-campaign'
+      'Wizard', 'Wizard', 'test-campaign',
     );
 
     expect(cs.creatures[0].concentration.spell).toBe('Slow');
     expect(storage.set).not.toHaveBeenCalled();
     expect(removeSummonedCreatures).toHaveBeenCalledWith('Wizard', 'test-campaign');
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      type: 'summons',
+      characterName: 'Wizard',
+    }));
   });
 });

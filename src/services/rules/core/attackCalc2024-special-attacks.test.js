@@ -1,304 +1,181 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// Special-attack lane of 2024 getAttacks (attackCalc2024.js): Swift Quiver
+// (:478-494) and Starry Form (:595-597) rows.
+// Real builders end-to-end per the cla225/edge-cases pattern (#1235/#1236
+// canon): the wholesale ./attackCalc.js stub is retired — its old legs echoed
+// buildWeaponAttackStub/buildMonkAttacksStub bytes back (stub-echo, deleted).
+// The fabricated fixtures carrying equipment_category: 'Ranged' (rec #1236)
+// are replaced by disk rows copied from public/data/equipment.json (Longbow,
+// index: longbow — verified against disk 2026-10-20); note the disk value is
+// 'Weapon' and the real findEquippedWeapons (attackCalc.js:24-33) matches on
+// 'Weapon', so the old category would never have resolved un-stubbed. The
+// disk Longbow's numeric range {normal: 150, long: 600} keeps the SP-129
+// numeric-range pin live for real.
+// The classRules2024 mock is deleted: every character here is a non-Monk, so
+// the Martial Arts lane (attackCalc2024.js:504-513) is never entered.
+// collectWeaponMastery / getRuntimeValue (WM #1240, :140-148) are not stubbed
+// and never run: the off-hand lane needs >=2 Light melee weapons and this lane
+// equips no Light melee. Only combatData is stubbed (SSE-backed, unavoidable —
+// the Swift Quiver gate reads getCombatSummary on every getAttacks call).
+// Lane splits (verified 2026-10-20):
+// - Starry Form row construction, hitBonusFormula bytes, Chalice null, and the
+//   1d8/2d8 Twinkled level scaling → starryFormDamage.test.js:17-52
+//   (this file only pins the getAttacks wiring: the row appears/vanishes with
+//   playerStats.activeBuffs and spellAbilities.toHit flows through verbatim)
+// - Fallback unarmed bytes & proficiency ladder steps PB 4/5 →
+//   attackCalc2024-edge-cases.test.js:76-159 (PB 3/6 stay exercised here,
+//   as that file's :73 split records)
+// - Soulknife Psychic Blade rows → attackCalc2024-class-features.test.js:113-157
+// - Swift Quiver sheet rendering → CharBonusActions.swift-quiver.test.jsx
+import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
-// ---------------------------------------------------------------------------
-// Module-level stubs
-// ---------------------------------------------------------------------------
-
-const findEquippedWeaponsStub = vi.fn();
-const buildWeaponAttackStub = vi.fn((opts) => ({
-  name: opts.weaponName,
-  damage: opts.includeAbilityBonusInDamage !== false
-    ? `${opts.weapon.damage.damage_dice}+${opts.abilityBonus}`
-    : opts.weapon.damage.damage_dice,
-  damageType: opts.weapon.damage.damage_type,
-  damageFormula: 'Damage Formula',
-  hitBonus: opts.abilityBonus + opts.proficiency,
-  hitBonusFormula: 'Hit Bonus Formula',
-  range: opts.weapon.range?.normal ?? 5,
-  type: opts.actionType,
-  weaponType: opts.weaponType,
-}));
-const buildMonkAttacksStub = vi.fn((_opts) => [
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Action',
-  },
-  {
-    name: 'Unarmed Strike',
-    damage: `${_opts.diceStr}+${_opts.dexterityBonus}`,
-    damageType: 'Bludgeoning',
-    damageFormula: 'Damage Formula',
-    hitBonus: _opts.dexterityBonus + _opts.proficiency,
-    hitBonusFormula: 'Hit Bonus Formula',
-    range: 5,
-    type: 'Bonus Action',
-  },
-]);
-
-vi.mock('./attackCalc.js', () => ({
-  parseMagicItemName: (name) =>
-    name && name.charAt(0) === '+'
-      ? { baseName: name.substring(3), magicBonus: Number(name.charAt(1)) || 0 }
-      : { baseName: name, magicBonus: 0 },
-  findEquippedWeapons: (...args) => findEquippedWeaponsStub(...args),
-  buildWeaponAttack: (...args) => buildWeaponAttackStub(...args),
-  buildMonkAttacks: (...args) => buildMonkAttacksStub(...args),
-  parseDamageDice: (diceStr) => {
-    const match = String(diceStr).match(/(\d+)d(\d+)/);
-    if (!match) return 0;
-    const [, count, sides] = match;
-    return parseInt(count, 10) * (parseInt(sides, 10) + 1) / 2;
-  },
-}));
-
-vi.mock('../../character/classRules2024.js', () => ({
-  default: {
-    getMartialArtsDie: vi.fn(() => 8),
-  },
-}));
-
+// Unavoidable mock only: SSE/runtime-backed combat summary.
 vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
+  getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Fixtures — Longbow copied from public/data/equipment.json (index: longbow)
 // ---------------------------------------------------------------------------
 
-const defaultPlayerStats = (overrides = {}) => ({
-  level: 1,
-  abilities: [
-    { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-    { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-  ],
-  inventory: { equipped: [] },
+const LONGBOW = {
+  name: 'Longbow',
+  equipment_category: 'Weapon',
+  weapon_category: 'Martial',
+  weapon_range: 'Ranged',
+  category_range: 'Martial Ranged',
+  damage: { damage_dice: '1d8', damage_type: 'Piercing' },
+  range: { normal: 150, long: 600 },
+  properties: ['Ammunition', 'Heavy', 'Two-Handed'],
+  mastery: 'Slow',
+};
+
+const char = ({ level = 1, abilities, equipped = [], campaignName, activeBuffs = [] }) => ({
+  level,
+  name: 'Test Character',
+  abilities,
+  inventory: { equipped },
   automation: { passives: [], bonusActions: [] },
-  activeBuffs: [],
+  activeBuffs,
   class: { name: 'Fighter' },
-  ...overrides,
+  ...(campaignName ? { campaignName } : {}),
+});
+
+const concentrateOn = (spell) => ({
+  creatures: [{ name: 'Test Character', concentration: spell ? { spell } : undefined }],
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// Swift Quiver — two Bonus Action ranged rows while concentrating (SP-129)
 // ---------------------------------------------------------------------------
 
-describe('attackCalc2024 - special attacks', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('attackCalc2024 - Swift Quiver', () => {
+  const dexChar = (level, dexBonus) => char({
+    level,
+    abilities: [{ name: 'Strength', bonus: 0 }, { name: 'Dexterity', bonus: dexBonus }],
+    equipped: ['Longbow'],
   });
 
-  describe('Swift Quiver', () => {
-    it('adds Swift Quiver attacks when concentration is active', async () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+  it('concentrating on Swift Quiver adds two Bonus Action rows beside the Longbow Action row', () => {
+    vi.mocked(getCombatSummary).mockReturnValue(concentrateOn('Swift Quiver'));
 
-      const combatData = await import('../../encounters/combatData.js');
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Test Character', concentration: { spell: 'Swift Quiver' } }],
-      });
+    const result = getAttacks([LONGBOW], [], dexChar(5, 3));
 
-      const allEquipment = [
-        {
-          name: 'Longbow',
-          equipment_category: 'Ranged',
-          weapon_range: 'Ranged',
-          properties: ['Ammunition'],
-          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-          range: { normal: '80_ft', long: '200_ft' },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        name: 'Test Character',
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        inventory: { equipped: ['Longbow'] },
-      });
+    // The bow keeps its own Action row; SQ adds exactly two bonus rows.
+    expect(result.map(a => a.name)).toEqual([
+      'Longbow',
+      'Swift Quiver (1st Attack)',
+      'Swift Quiver (2nd Attack)',
+    ]);
+    expect(result[0].type).toBe('Action');
+    const sqRow = {
+      isSwiftQuiver: true,
+      isRanged: true,
+      attackType: 'ranged',
+      type: 'Bonus Action',
+      actionType: 'Bonus Action',
+      abilityName: 'Dexterity',
+      damageType: 'Piercing',
+      properties: ['Ammunition'],
+      damage: '1d8+3',
+      hitBonus: 6,
+      toHit: 6,
+      range: 600,
+    };
+    expect(result[1]).toMatchObject({ name: 'Swift Quiver (1st Attack)', ...sqRow });
+    expect(result[2]).toMatchObject({ name: 'Swift Quiver (2nd Attack)', ...sqRow });
+  });
 
-      const result = getAttacks(allEquipment, [], playerStats);
+  it('SP-129 lv17: threads campaignName into the summary gate; disk numeric range + PB 6 fold into the rows', () => {
+    vi.mocked(getCombatSummary).mockReturnValue(concentrateOn('Swift Quiver'));
 
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Swift Quiver (1st Attack)');
-      expect(result[1].name).toBe('Swift Quiver (2nd Attack)');
-      expect(result[0].isSwiftQuiver).toBe(true);
-      expect(result[0].actionType).toBe('Bonus Action');
-      expect(result[0].type).toBe('Bonus Action');
-      expect(result[1].type).toBe('Bonus Action');
-    });
+    const result = getAttacks([LONGBOW], [], { ...dexChar(17, 5), campaignName: 'test-campaign' });
 
-    it('handles numeric weapon range from live equipment data (SP-129)', async () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+    expect(getCombatSummary).toHaveBeenCalledWith('test-campaign');
+    const sq = result.find(a => a.isSwiftQuiver);
+    expect(result.filter(a => a.isSwiftQuiver)).toHaveLength(2);
+    expect(sq.range).toBe(600); // numeric passthrough of disk range.long, not '80_ft'-style string
+    expect(sq.damage).toBe('1d8+5');
+    expect(sq.damageFormula).toBe('Damage Formula = 1d8 + Dexterity Modifier (5)');
+    expect(sq.hitBonus).toBe(11);
+    expect(sq.toHit).toBe(11);
+    expect(sq.hitBonusFormula).toBe('To Hit Bonus = Dexterity Modifier (5) + Proficiency (6)');
+  });
 
-      const combatData = await import('../../encounters/combatData.js');
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Test Character', concentration: { spell: 'Swift Quiver' } }],
-      });
+  it.each([
+    { label: 'no concentration at all', summary: concentrateOn(undefined) },
+    { label: 'concentrating on another spell', summary: concentrateOn('Bless') },
+    { label: 'another creature holds the concentration', summary: { creatures: [{ name: 'Someone Else', concentration: { spell: 'Swift Quiver' } }] } },
+  ])('$label — no Swift Quiver rows, only the Longbow Action row', ({ summary }) => {
+    vi.mocked(getCombatSummary).mockReturnValue(summary);
 
-      const allEquipment = [
-        {
-          name: 'Longbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          properties: ['Ammunition', 'Heavy', 'Two-Handed'],
-          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-          range: { normal: 150, long: 600 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 17,
-        name: 'Test Character',
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 20, abilityImprovements: 0, miscBonus: 0, bonus: 5 },
-        ],
-        inventory: { equipped: ['Longbow'] },
-      });
+    const result = getAttacks([LONGBOW], [], dexChar(5, 3));
 
-      const result = getAttacks(allEquipment, [], playerStats);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: 'Longbow', type: 'Action' });
+  });
+});
 
-      expect(result).toHaveLength(2);
-      expect(result[0].range).toBe(600);
-      expect(result[0].type).toBe('Bonus Action');
-      expect(result[0].hitBonus).toBe(11);
-      expect(result[0].damage).toBe('1d8+5');
-    });
+// ---------------------------------------------------------------------------
+// Starry Form — getAttacks wiring only (construction & level scaling live in
+// starryFormDamage.test.js:17-52)
+// ---------------------------------------------------------------------------
 
-    it('threads playerStats.campaignName into getCombatSummary for the concentration gate (SP-129)', async () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+describe('attackCalc2024 - Starry Form Archer integration', () => {
+  const druidChar = (level, activeBuffs) => ({
+    ...char({
+      level,
+      abilities: [{ name: 'Strength', bonus: 0 }, { name: 'Wisdom', bonus: 3 }],
+      activeBuffs,
+    }),
+    class: { name: 'Druid' },
+    spellAbilities: { toHit: 5 },
+  });
 
-      const combatData = await import('../../encounters/combatData.js');
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Test Character', concentration: { spell: 'Swift Quiver' } }],
-      });
+  it('unarmed caster with the Archer buff receives exactly the Luminous Arrow row from playerStats.activeBuffs', () => {
+    const result = getAttacks([], [], druidChar(5, [{ name: 'Starry Form', constellation: 'Archer' }]));
 
-      const allEquipment = [
-        {
-          name: 'Longbow',
-          equipment_category: 'Weapon',
-          weapon_range: 'Ranged',
-          properties: ['Ammunition', 'Heavy', 'Two-Handed'],
-          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-          range: { normal: 150, long: 600 },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        name: 'Test Character',
-        campaignName: 'test-campaign',
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        inventory: { equipped: ['Longbow'] },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      expect(result).toHaveLength(2);
-      expect(combatData.getCombatSummary).toHaveBeenCalledWith('test-campaign');
-    });
-
-    it('does not add Swift Quiver attacks when concentration is not active', async () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const combatData = await import('../../encounters/combatData.js');
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Test Character' }],
-      });
-
-      const allEquipment = [
-        {
-          name: 'Longbow',
-          equipment_category: 'Ranged',
-          weapon_range: 'Ranged',
-          properties: ['Ammunition'],
-          damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-          range: { normal: '80_ft', long: '200_ft' },
-        },
-      ];
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        name: 'Test Character',
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        inventory: { equipped: ['Longbow'] },
-      });
-
-      const result = getAttacks(allEquipment, [], playerStats);
-
-      // No Swift Quiver, no weapons found via findEquippedWeapons, so fallback unarmed strike
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
+    // The arrow row is appended before the fallback guard, so no Unarmed Strike appears.
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      name: 'Starry Form: Luminous Arrow',
+      attackType: 'spell',
+      damage: '1d8+3',
+      damageType: 'Radiant',
+      actionType: 'Bonus Action',
+      hitBonus: 5,
+      toHit: 5,
+      range: '120_ft',
     });
   });
 
-  describe('Starry Form', () => {
-    it('adds Starry Form Archer attack when the buff is active', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
+  it('without the buff the lane stays closed — fallback Unarmed Strike only, no arrow row', () => {
+    const result = getAttacks([], [], druidChar(5, []));
 
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        activeBuffs: [{ name: 'Starry Form', constellation: 'Archer' }],
-        spellAbilities: { toHit: 5 },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Starry Form: Luminous Arrow');
-      expect(result[0].attackType).toBe('spell');
-      expect(result[0].damage).toBe('1d8+3');
-      expect(result[0].damageType).toBe('Radiant');
-      expect(result[0].actionType).toBe('Bonus Action');
-    });
-
-    it('uses 2d8 damage for Starry Form Archer at level 10+ (Twinkled)', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 10,
-        abilities: [
-          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        activeBuffs: [{ name: 'Starry Form', constellation: 'Archer' }],
-        spellAbilities: { toHit: 5 },
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result[0].damage).toBe('2d8+3');
-    });
-
-    it('does not add Starry Form attack when the buff is not active', () => {
-      findEquippedWeaponsStub.mockReturnValue([]);
-
-      const playerStats = defaultPlayerStats({
-        level: 5,
-        abilities: [
-          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
-        ],
-        activeBuffs: [],
-      });
-
-      const result = getAttacks([], [], playerStats);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Unarmed Strike');
-    });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: 'Unarmed Strike', type: 'Action', weaponType: 'unarmed' });
   });
 });

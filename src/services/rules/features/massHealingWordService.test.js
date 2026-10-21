@@ -1,6 +1,81 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+/**
+ * massHealingWordService lane — AoE PRODUCER (bonus-action, multi-target,
+ * per-target d4 dice). Twin of the #1384 massCureWoundsService lane; this
+ * file pins ITS OWN bytes at ITS OWN lane (#1344 family verdict method:
+ * structurally identical slice(0,6)/clamp/MOD idioms stay duplicated here
+ * on purpose — each service keeps its own copy; nothing folded).
+ *
+ * TWIN DIFF vs massCureWoundsService.js (read side-by-side):
+ *  - UNIQUE here: NO postCastHealService import — CLA-038 blessed-healer
+ *    does NOT fire from this lane (grep: source imports 6 modules, none is
+ *    postCastHealService; upstream postCastHealService.js:19 lists the
+ *    spell-name for its own caller lane). No unique-vs-twin test needed
+ *    beyond the name/note/default-slot bytes below.
+ *  - DIFFERENT here: default slot :113 `|| 3` (twin || 5); name gate
+ *    'Mass Healing Word'; log note + console prefixes '[massHealingWordService]'
+ *    (requireCreatures :57) and '[massHealingWord]' (floating addEntry
+ *    catch :103 — twin has no such catch, its log-rejection lane is unique).
+ *  - SHARED SHAPE (pinned here verbatim): first-6 affiliation-blind slice
+ *    :129-130, one roll per target :141, clamp Math.min :83, stored-HP
+ *    `!= null && !== ''` guard :77, heal-apply-before-log :86 vs :91,
+ *    Fortified-Health latch :149-151, delta-0/negative over-log :91.
+ *
+ * Producer vs forwarder verdict (#1335): this lane computes its own heals —
+ * resolveHealExpression ladder (:28-52) + MOD substitute (:47-49), dice per
+ * target (:79), clamp per target (:83). It OWNS its numbers.
+ *
+ * LIVE export: triggerMassHealingWord — sole export; live caller
+ * triggerSpells.js handleMassHealingWord :421-423 (imports :37). Dead-export
+ * hunt: no other import of this module anywhere (grep src/server).
+ * Caller lanes aoeHealingSpecial/aoeSpells/noformula-* mock this module and
+ * own routing — not re-pinned here.
+ *
+ * DISK DETERMINATION (both rulesets, imported below; old hand-rolled fixture
+ * used '2d4 + MOD' at lv3 — matched the 2024 row only, silently mis-modelling
+ * 5e):
+ *  5e   'Mass Healing Word': lv3, 60ft, V, bonus action,
+ *       heal_at_slot_level 3:'1d4 + MOD' ... 9:'7d4 + MOD'.
+ *  2024 'Mass Healing Word': lv3, 60ft, V, Bonus Action,
+ *       heal_at_slot_level 3:'2d4 + MOD' ... 9:'8d4 + MOD'.
+ *  Cross-ruleset divergence at the SAME lv3 slot (1d4 vs 2d4) pinned.
+ *
+ * BUG CLASSES re-checked from twin #1384 (all EXIST here, pinned as quirks):
+ *  (1) :129-130 heals FIRST 6 creatures in array order, affiliation-blind —
+ *      hostiles in the list get healed; disk 60ft range never enforced
+ *      (source imports no range util — old vi.mock of rangeValidation was
+ *      already absent here).
+ *  (2) :91 over-log: every processed creature logs hp_change even with
+ *      delta 0, and :83 lets negative actualHeal (storedHp > maxHp) reach
+ *      the log and the returned totals (:105/:146).
+ *  (3) :11 gate case-sensitive while caller triggerSpells.js:422 gates on
+ *      lowercased name — case-drift passes caller, silently nulls here.
+ *  (4) :19 ability found but bonus undefined -> MOD never substituted;
+ *      dice receives literal '1d4 + MOD' bytes (:47 guard).
+ *  (5) stored HP ''/string coercion guard shape :77 — '' and null/undefined
+ *      mean full HP; numeric strings coerce via Number.
+ *  (6) heal-then-log ordering :86 before :91 — pinned via call order.
+ *  :0-swallow census (#1374): :113 slotLevel||level||3 coerces (not NaN,
+ *  not throw), and :122 prof||0 / level||1 — both pinned.
+ *
+ * Store audit: getRuntimeValue reads ONLY key 'currentHitPoints' per target
+ * at CAMPAIGN — strict fake throws on any other key/campaign (#1371).
+ * ZERO writes: the mocked useRuntimeState exports getRuntimeValue ONLY, so
+ * any setRuntimeValue/setRuntimeObject attempt is a machine-checked TypeError;
+ * skipSync positions: none exist in this lane. Dice is a fixed-stub single
+ * queue asserting routing order; unstubbed dice THROWS (#1380).
+ * NO-CLOCK audit: heals are instantaneous; Date.now() stamps log payloads
+ * only, frozen at 0 by fake timers; no expiry stored, no timers started.
+ *
+ * PRESERVED-CITED-BY: none — no src file cites this test (grep, only the
+ * .opencode maintenance queue lists it).
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { triggerMassHealingWord } from './massHealingWordService.js';
+import spells5e from '../../../../public/data/spells.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
 
-// ── Mocks ──────────────────────────────────────────────────────
+// ── Mocks (module boundaries only) ────────────────────────────
 
 vi.mock('../combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
@@ -10,13 +85,13 @@ vi.mock('../combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
+// getRuntimeValue ONLY: any store WRITE in this lane is a TypeError.
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(),
 }));
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -25,704 +100,421 @@ vi.mock('../../dice/diceRoller.js', () => ({
 }));
 
 vi.mock('../../combat/automation/automationService.js', () => ({
-    resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
-    hasHealingMaximization: vi.fn(() => false),
-    hasHealingMaximizationForTarget: vi.fn(() => false),
+    resolveHealingBonusesWithDetails: vi.fn(),
+    hasHealingMaximization: vi.fn(),
+    hasHealingMaximizationForTarget: vi.fn(),
     markFortifiedHealthUsed: vi.fn(),
 }));
 
-// ── Imports ────────────────────────────────────────────────────
-
-import { triggerMassHealingWord } from './massHealingWordService.js';
 import { getCombatContext } from '../combat/damageUtils.js';
-import { rollExpression } from '../../dice/diceRoller.js';
+import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { hasHealingMaximization } from '../../combat/automation/automationService.js';
+import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
+import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
-// ── Globals ────────────────────────────────────────────────────
+// ── Canon helpers ─────────────────────────────────────────────
 
-global.fetch = vi.fn(() => new Promise(() => {}));
+const CAMPAIGN = 'test-campaign';
+const MAP = 'test-map';
 
-const CAMPAIGN = 'TestCampaign';
-
-function makeSpell(name, level, healAtSlotLevel) {
-    return {
-        name,
-        level,
-        heal_at_slot_level: healAtSlotLevel || {
-            '3': '2d4 + MOD',
-            '4': '3d4 + MOD',
-            '5': '4d4 + MOD',
-            '6': '5d4 + MOD',
-            '7': '6d4 + MOD',
-            '8': '7d4 + MOD',
-            '9': '8d4 + MOD',
-        },
-    };
+function diskRow(spells, name) {
+    const spell = spells.find(s => s.name === name);
+    if (!spell) throw new Error(`spell missing from disk: ${name}`);
+    return spell;
 }
+const mhw5e = diskRow(spells5e, 'Mass Healing Word');
+const mhw2024 = diskRow(spells2024, 'Mass Healing Word');
 
-function makePlayerStats(modifier, spellCastingAbility) {
-    const mod = modifier ?? 3;
-    const ability = spellCastingAbility || 'Charisma';
+function stats(overrides = {}) {
     return {
         name: 'Cleric',
-        hitPoints: 30,
-        spellAbilities: { modifier: mod, spellCastingAbility: ability, saveDc: 13, toHit: 8 },
-        abilities: [{ name: ability, bonus: mod }],
-        proficiency: 2,
-        level: 5,
+        hitPoints: 50,
+        abilities: [{ name: 'Wisdom', bonus: 4 }],
+        spellAbilities: { spellCastingAbility: 'Wisdom', modifier: 4 },
+        proficiency: 3,
+        level: 8,
+        ...overrides,
     };
 }
 
-function makeCombatSummary(creatures) {
-    return { round: 1, creatures };
+// ── Shared fakes: single dice queue + strict store ────────────
+
+let diceQ;      // [{ mode: 'normal'|'max', value: {total, rolls} | null }]
+let store;      // 'entity|campaign' -> stored currentHitPoints
+let reads;      // ordered store reads
+let dispatchSpy;
+let consoleSpy;
+
+function roll(mode, total, rolls) {
+    diceQ.push({ mode, value: { total, rolls } });
+}
+function rollNull() {
+    diceQ.push({ mode: 'normal', value: null });
+}
+function seedHp(entity, value, campaign = CAMPAIGN) {
+    store.set(`${entity}|${campaign}`, value);
+}
+function cs(creatures) {
+    return { creatures };
+}
+function trigger(spell = mhw5e, metaCtx = { slotLevel: 3 }, casterStats = stats()) {
+    return triggerMassHealingWord(spell, metaCtx, casterStats, CAMPAIGN, MAP);
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+function lastRollArg(mock) {
+    return mock.mock.calls[mock.mock.calls.length - 1][0];
+}
 
-describe('triggerMassHealingWord', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // explicit re-seed after reset (vitest-4 retains impls otherwise — #1312)
+    diceQ = [];
+    reads = [];
+    store = new Map();
+    const pop = (mode) => {
+        const e = diceQ.shift();
+        if (!e) throw new Error(`unstubbed dice: ${mode} roll has no queued entry`);
+        if (e.mode !== mode) throw new Error(`dice routing drift: ${mode} called, queued ${e.mode}`);
+        return e.value;
+    };
+    rollExpression.mockImplementation(() => pop('normal'));
+    rollExpressionMaximized.mockImplementation(() => pop('max'));
+    getRuntimeValue.mockImplementation((entity, key, campaign) => {
+        if (key !== 'currentHitPoints') {
+            throw new Error(`unexpected store key read: ${key} (massHealingWord reads only currentHitPoints)`);
+        }
+        if (campaign !== CAMPAIGN) {
+            throw new Error(`unexpected store read campaign: ${campaign}`);
+        }
+        reads.push(`${entity}|${key}`);
+        return store.get(`${entity}|${campaign}`);
+    });
+    getCombatContext.mockImplementation(() => { throw new Error('unseeded combat context'); });
+    resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
+    hasHealingMaximization.mockReturnValue(false);
+    hasHealingMaximizationForTarget.mockReturnValue(false);
+    markFortifiedHealthUsed.mockResolvedValue(undefined);
+    addEntry.mockReturnValue(Promise.resolve());
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+});
+
+// ── Tests ─────────────────────────────────────────────────────
+
+describe('massHealingWordService.triggerMassHealingWord', () => {
+    it.each([
+        ['real-disk family twin Mass Cure Wounds', diskRow(spells5e, 'Mass Cure Wounds')],
+        ['real-disk near-miss Healing Word (same 1d4 ladder family)', diskRow(spells5e, 'Healing Word')],
+        ['real-disk near-miss Mass Heal', diskRow(spells5e, 'Mass Heal')],
+        ['case-drift name (caller gates lowercase, service does not)', { name: 'mass healing word', level: 3, heal_at_slot_level: mhw5e.heal_at_slot_level }],
+        ['missing name', { level: 3, heal_at_slot_level: mhw5e.heal_at_slot_level }],
+        ['null name', { name: null, level: 3 }],
+    ])('name gate rejects %s before any engine work', async (_label, spell) => {
+        expect(await trigger(spell)).toBeNull();
+        expect(getCombatContext).not.toHaveBeenCalled();
+        expect(hasHealingMaximization).not.toHaveBeenCalled();
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(rollExpressionMaximized).not.toHaveBeenCalled();
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
+        expect(reads).toEqual([]);
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        expect(consoleSpy).not.toHaveBeenCalled();
     });
 
-    describe('early returns', () => {
-        it('returns null for non-Mass Healing Word spells', async () => {
-            const spell = makeSpell('Fire Bolt', 0);
-            const result = await triggerMassHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-            expect(result).toBeNull();
-        });
+    it('short-circuits combat context: null context, missing creatures array (exact throw + log), empty creatures', async () => {
+        getCombatContext.mockResolvedValueOnce(null);
+        expect(await trigger()).toBeNull();
+        expect(rollExpression).not.toHaveBeenCalled();
 
-        it('returns null when spell has no heal_at_slot_level data', async () => {
-            const spell = { name: 'Mass Healing Word', level: 3, heal_at_slot_level: null };
-            const result = await triggerMassHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-            expect(result).toBeNull();
-        });
+        // creatures absent: requireCreatures throws identically-shaped Error + exact console pair
+        getCombatContext.mockResolvedValueOnce({});
+        await expect(trigger()).rejects.toThrowError(new Error('Expected array, got undefined'));
+        expect(consoleSpy).toHaveBeenCalledWith('[massHealingWordService] Missing array:', undefined);
+        expect(rollExpression).not.toHaveBeenCalled();
 
-        it('returns null when resolveHealExpression returns null for the slot level', async () => {
-            const spell = { name: 'Mass Healing Word', level: 3, heal_at_slot_level: { '3': '2d4 + MOD' } };
-            const result = await triggerMassHealingWord(spell, { slotLevel: 9 }, makePlayerStats(), CAMPAIGN, 'testMap');
-            expect(result).toBeNull();
-        });
-
-        it('returns result with no targets when rollExpression fails', async () => {
-            getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin', maxHp: 7, currentHp: 3 }]));
-            rollExpression.mockReturnValue(null);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const result = await triggerMassHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-            expect(result).not.toBeNull();
-            expect(result.targets).toHaveLength(0);
-            expect(result.totalHealed).toBe(0);
-        });
-
-        it('returns null when combat context is unavailable', async () => {
-            getCombatContext.mockResolvedValue(null);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const result = await triggerMassHealingWord(spell, {}, makePlayerStats(), CAMPAIGN, 'testMap');
-            expect(result).toBeNull();
-        });
+        // empty creatures: exact noTargets envelope, nothing downstream
+        getCombatContext.mockResolvedValueOnce(cs([]));
+        expect(await trigger()).toEqual({ noTargets: true });
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        expect(getCombatContext).toHaveBeenCalledTimes(3);
+        expect(getCombatContext).toHaveBeenLastCalledWith(CAMPAIGN);
     });
 
-    describe('target selection', () => {
-        it('includes the caster in targets', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Cleric', maxHp: 30, currentHp: 10 },
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-                { name: 'Ally2', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets.length).toBe(3);
-            expect(result.targets.map(t => t.targetName)).toContain('Cleric');
-            expect(result.targets.map(t => t.targetName)).toContain('Ally1');
-            expect(result.targets.map(t => t.targetName)).toContain('Ally2');
-        });
-
-        it('returns noTargets when creature list is empty', async () => {
-            const cs = makeCombatSummary([]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.noTargets).toBe(true);
-        });
-
-        it('limits targets to 6 creatures', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-                { name: 'Ally2', maxHp: 25, currentHp: 5 },
-                { name: 'Ally3', maxHp: 20, currentHp: 2 },
-                { name: 'Ally4', maxHp: 35, currentHp: 15 },
-                { name: 'Ally5', maxHp: 28, currentHp: 8 },
-                { name: 'Ally6', maxHp: 32, currentHp: 12 },
-                { name: 'Ally7', maxHp: 30, currentHp: 10 },
-                { name: 'Ally8', maxHp: 40, currentHp: 20 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets.length).toBe(6);
-        });
-
-        it('includes all creatures regardless of distance', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Close Goblin', maxHp: 7, currentHp: 3 },
-                { name: 'Far Orc', maxHp: 15, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(3);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets.length).toBe(2);
-            expect(result.targets.map(t => t.targetName)).toContain('Close Goblin');
-            expect(result.targets.map(t => t.targetName)).toContain('Far Orc');
-        });
-
-        it('takes first N creatures from the array', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                { name: 'Goblin', maxHp: 7, currentHp: 3 },
-                { name: 'Orc', maxHp: 15, currentHp: 10 },
-                { name: 'Troll', maxHp: 25, currentHp: 15 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result.targets.length).toBe(4);
-            expect(result.targets.map(t => t.targetName)).toEqual(['Cleric', 'Goblin', 'Orc', 'Troll']);
-        });
+    it('disk ladder, both rulesets: reached tiers substituted and mutually distinguishable (5e lv3 1d4 vs 2024 lv3 2d4)', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Ally', maxHp: 100 }]));
+        seedHp('Ally', 50);
+        for (const [slot, expr] of Object.entries(mhw5e.heal_at_slot_level)) {
+            roll('normal', 20, [4, 4, 4, 4, 4]);
+            const result = await trigger(mhw5e, { slotLevel: Number(slot) });
+            expect(lastRollArg(rollExpression)).toBe(expr.replace('MOD', '4'));
+            expect(result.formula).toBe(expr.replace('MOD', '4'));
+        }
+        // 2024 divergence at the same lv3 slot, plus its top tier
+        for (const [slot, expr] of [[3, '2d4 + 4'], [9, '8d4 + 4']]) {
+            roll('normal', 20, [4, 4, 4, 4, 4]);
+            const result = await trigger(mhw2024, { slotLevel: slot });
+            expect(lastRollArg(rollExpression)).toBe(expr);
+            expect(result.formula).toBe(expr);
+        }
+        expect(rollExpression).toHaveBeenCalledTimes(9);
+        expect(rollExpressionMaximized).not.toHaveBeenCalled();
     });
 
-    describe('healing calculations', () => {
-        it('heals up to 6 creatures with correct formula', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-                { name: 'Ally2', maxHp: 25, currentHp: 5 },
-                { name: 'Ally3', maxHp: 20, currentHp: 2 },
-                { name: 'Ally4', maxHp: 35, currentHp: 15 },
-                { name: 'Ally5', maxHp: 28, currentHp: 8 },
-                { name: 'Ally6', maxHp: 32, currentHp: 12 },
-                { name: 'Ally7', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 11, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
+    it('slot resolution chain: metaCtx > spell.level > 3 default (unique byte vs twin||5), :0-swallow, highest-below fallback, below-floor and missing-ladder null before combat fetch', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Ally', maxHp: 100 }]));
+        seedHp('Ally', 50);
+        const base = { name: 'Mass Healing Word', spellCastingAbility: 'Wisdom' };
+        const full = { ...base, level: 3, heal_at_slot_level: { 3: '1d4 + MOD', 4: '2d4 + MOD', 5: '3d4 + MOD' } };
+        const sparse = { ...base, level: 3, heal_at_slot_level: { 3: '4d4', 5: '6d4' } };
 
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets.length).toBe(6);
-            expect(result.formula).toBe('2d4 + 3');
-            expect(result.totalHealed).toBe(65);
-        });
-
-        it('caps healing at target max HP', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 12, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(2);
-        });
-
-        it('applies zero healing when creature is already at full HP from runtime storage', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 30 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(30);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(0);
-        });
-
-        it('defaults to playerStats.hitPoints when creature has no maxHp', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', currentHp: 5 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(5);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(8);
-        });
-
-        it('rolls per-target instead of single roll for all targets', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-                { name: 'Ally2', maxHp: 25, currentHp: 5 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression
-                .mockReturnValueOnce({ total: 8, rolls: [[2, 3, 3]], modifier: 3 })
-                .mockReturnValueOnce({ total: 10, rolls: [[3, 4, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(rollExpression).toHaveBeenCalledTimes(2);
-            expect(result.targets[0].healAmount).toBe(8);
-            expect(result.targets[1].healAmount).toBe(10);
-            expect(result.totalHealed).toBe(18);
-        });
-
-        it('includes bonus healing when available', async () => {
-            const { resolveHealingBonusesWithDetails } = await import('../../combat/automation/automationService.js');
-            resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Test Bonus', amount: 2 }] });
-
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(10);
-            expect(result.targets[0].rawTotal).toBe(10);
-        });
-
-        it('marks Fortified Health used when healing applied and bonus is from Fortified Health', async () => {
-            const { resolveHealingBonusesWithDetails, markFortifiedHealthUsed } = await import('../../combat/automation/automationService.js');
-            resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
-
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(markFortifiedHealthUsed).toHaveBeenCalledWith(playerStats, CAMPAIGN);
-        });
-
-        it('does not mark Fortified Health when no healing applied', async () => {
-            const { resolveHealingBonusesWithDetails, markFortifiedHealthUsed } = await import('../../combat/automation/automationService.js');
-            resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Fortified Health', amount: 2 }] });
-
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 10, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(markFortifiedHealthUsed).not.toHaveBeenCalled();
-        });
+        roll('normal', 20, [20]);
+        expect((await trigger(full, { slotLevel: 4 })).formula).toBe('2d4 + 4');           // metaCtx wins over spell.level 3
+        roll('normal', 20, [20]);
+        expect((await trigger({ ...full, level: 5 }, {})).formula).toBe('3d4 + 4');         // spell.level fallback
+        roll('normal', 20, [20]);
+        expect((await trigger({ ...full, level: undefined }, {})).formula).toBe('1d4 + 4'); // || 3 default
+        roll('normal', 20, [20]);
+        expect((await trigger({ ...full, level: 5 }, { slotLevel: 0 })).formula).toBe('3d4 + 4'); // :0 swallowed (#1374)
+        roll('normal', 20, [20]);
+        expect((await trigger(sparse, { slotLevel: 4 })).formula).toBe('4d4');               // exact miss -> highest below (3)
+        roll('normal', 20, [20]);
+        expect((await trigger(sparse, { slotLevel: 9 })).formula).toBe('6d4');               // beyond top -> highest (5)
+        expect(await trigger(sparse, { slotLevel: 2 })).toBeNull();                           // below floor -> null, no roll
+        expect(await trigger({ ...base, level: 3, heal_at_slot_level: null }, {})).toBeNull(); // no ladder -> null
+        expect(diceQ).toEqual([]);
     });
 
-    describe('maximization', () => {
-        it('uses rollExpressionMaximized when healing maximization is active', async () => {
-            const { rollExpressionMaximized } = await import('../../dice/diceRoller.js');
-            rollExpressionMaximized.mockReturnValue({ total: 8, rolls: [[2, 2, 2, 2]], modifier: 3 });
+    it('spellcasting-mod sources: spell ability, negative byte, spellAbilities ability, modifier fallback, zero, unresolved-MOD leak quirk', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Ally', maxHp: 100 }]));
+        seedHp('Ally', 50);
+        // mhw5e's lv3 tier is '1d4 + MOD'; MOD replaced by String(bonus)
 
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            hasHealingMaximization.mockReturnValue(true);
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(rollExpressionMaximized).toHaveBeenCalledWith('2d4 + 3');
-            expect(result).not.toBeNull();
-        });
-
-        it('uses regular rollExpression when no maximization', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            hasHealingMaximization.mockReturnValue(false);
-            rollExpression.mockReturnValue({ total: 5, rolls: [[1, 2, 2]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(rollExpression).toHaveBeenCalledWith('2d4 + 3');
-        });
+        roll('normal', 20, [20]);
+        expect((await trigger({ ...mhw5e, spellCastingAbility: 'Intelligence' }, { slotLevel: 3 },
+            stats({ abilities: [{ name: 'Wisdom', bonus: 4 }, { name: 'Intelligence', bonus: -3 }] }))).formula)
+            .toBe('1d4 + -3'); // negative modifier concatenated verbatim
+        roll('normal', 20, [20]);
+        expect((await trigger({ ...mhw5e, spellCastingAbility: undefined }, { slotLevel: 3 },
+            stats({ abilities: [{ name: 'Charisma', bonus: 2 }], spellAbilities: { spellCastingAbility: 'Charisma', modifier: 9 } }))).formula)
+            .toBe('1d4 + 2'); // spellAbilities.spellCastingAbility path
+        roll('normal', 20, [20]);
+        expect((await trigger(mhw5e, { slotLevel: 3 },
+            stats({ abilities: [], spellAbilities: { spellCastingAbility: 'Wisdom', modifier: 3 } }))).formula)
+            .toBe('1d4 + 3'); // lookup miss -> spellAbilities.modifier
+        roll('normal', 20, [20]);
+        expect((await trigger(mhw5e, { slotLevel: 3 },
+            { name: 'Cleric', hitPoints: 50 })).formula)
+            .toBe('1d4 + 0'); // no abilities at all -> 0
+        roll('normal', 20, [20]);
+        expect((await trigger(mhw5e, { slotLevel: 3 },
+            stats({ abilities: [{ name: 'Wisdom' }] }))).formula)
+            .toBe('1d4 + MOD'); // QUIRK: ability found, bonus undefined -> MOD never substituted
     });
 
-    describe('slot level scaling', () => {
-        it('uses spell level when no slotLevel is provided', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
+    it('healing-bonus ctx tuple: identity stats, prof/level :0-coercion census (prof||0, level||1), resolved once per cast not per target', async () => {
+        getCombatContext.mockResolvedValue(cs([
+            { name: 'Ally1', maxHp: 100 }, { name: 'Ally2', maxHp: 100 }, { name: 'Ally3', maxHp: 100 },
+        ]));
+        seedHp('Ally1', 50); seedHp('Ally2', 50); seedHp('Ally3', 50);
+        const caster = stats();
+        roll('normal', 10, [10]); roll('normal', 10, [10]); roll('normal', 10, [10]);
+        await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(resolveHealingBonusesWithDetails).toHaveBeenCalledTimes(1);
+        const [statsArg, ctxArg] = resolveHealingBonusesWithDetails.mock.calls[0];
+        expect(statsArg).toBe(caster);
+        expect(ctxArg).toEqual({ prof: 3, level: 8, slotLevel: 3, campaignName: CAMPAIGN });
 
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 3');
-        });
-
-        it('uses slotLevel from metaCtx when provided', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 14, rolls: [[3, 4, 4, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, { slotLevel: 4 }, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('3d4 + 3');
-        });
-
-        it('falls back to highest available slot level when slotLevel exceeds defined levels', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = { name: 'Mass Healing Word', level: 3, heal_at_slot_level: { '3': '2d4 + MOD' } };
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, { slotLevel: 9 }, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 3');
-        });
-
-        it('uses highest slot level below or equal to requested', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 11, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = {
-                name: 'Mass Healing Word', level: 3,
-                heal_at_slot_level: { '3': '2d4 + MOD', '5': '4d4 + MOD' },
-            };
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, { slotLevel: 6 }, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('4d4 + 3');
-        });
+        const zeroed = stats({ proficiency: 0, level: 0 });
+        roll('normal', 10, [10]); roll('normal', 10, [10]); roll('normal', 10, [10]);
+        await trigger(mhw5e, { slotLevel: 3 }, zeroed);
+        expect(resolveHealingBonusesWithDetails.mock.calls[1][1])
+            .toEqual({ prof: 0, level: 1, slotLevel: 3, campaignName: CAMPAIGN });
     });
 
-    describe('spell casting ability', () => {
-        it('uses spellCastingAbility from spell when provided', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 9, rolls: [[2, 3, 4]], modifier: 4 });
-            getRuntimeValue.mockReturnValue(10);
+    it('flagship 4-target cast: per-target rolls and clamps, string/stored-HP canon, apply-before-log order, caster and full-HP over-log at delta 0, exact log envelope, exact result envelope, single dispatch', async () => {
+        const combatCtx = cs([
+            { name: 'Goblin', maxHp: 7 },
+            { name: 'Orc', maxHp: 15 },
+            { name: 'Cleric', maxHp: 50 },   // caster included; unseeded -> full HP
+            { name: 'Ally', maxHp: 20 },     // stored '' -> treated as full HP
+        ]);
+        getCombatContext.mockResolvedValue(combatCtx);
+        seedHp('Goblin', 5);
+        seedHp('Orc', '9'); // string stored HP coerced by Number()
+        seedHp('Ally', '');
+        const caster = stats();
 
-            const spell = { ...makeSpell('Mass Healing Word', 3), spellCastingAbility: 'Wisdom' };
-            const playerStats = makePlayerStats(4, 'Wisdom');
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
+        roll('normal', 6, [2, 4]);   // Goblin: clamp(6, 7-5) = 2
+        roll('normal', 12, [4, 4, 4]); // Orc: clamp(12, 15-9) = 6
+        roll('normal', 4, [4]);      // Cleric: full -> 0 (over-log)
+        roll('normal', 3, [3]);      // Ally: '' full -> 0 (over-log)
+        const result = await trigger(mhw5e, { slotLevel: 3 }, caster);
 
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 4');
+        expect(rollExpression).toHaveBeenCalledTimes(4); // one fixed roll per target
+        expect(rollExpression).toHaveBeenCalledWith('1d4 + 4');
+        expect(reads).toEqual(['Goblin|currentHitPoints', 'Orc|currentHitPoints', 'Cleric|currentHitPoints', 'Ally|currentHitPoints']);
+        expect(hasHealingMaximization).toHaveBeenCalledTimes(1);
+        expect(hasHealingMaximization).toHaveBeenCalledWith(caster);
+        expect(hasHealingMaximizationForTarget.mock.calls.map(c => [c[1], c[2]]))
+            .toEqual([['Goblin', CAMPAIGN], ['Orc', CAMPAIGN], ['Cleric', CAMPAIGN], ['Ally', CAMPAIGN]]);
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(2);
+        expect(applyHealingToTarget).toHaveBeenNthCalledWith(1, combatCtx, 'Goblin', 2, CAMPAIGN);
+        expect(applyHealingToTarget).toHaveBeenNthCalledWith(2, combatCtx, 'Orc', 6, CAMPAIGN);
+
+        // over-log quirk: full-HP creatures logged at delta 0 although never applied;
+        // heal-apply strictly precedes the log for healed targets
+        expect(addEntry).toHaveBeenCalledTimes(4);
+        expect(addEntry.mock.calls.map(c => [c[0], c[1].targetName, c[1].delta]))
+            .toEqual([['test-campaign', 'Goblin', 2], ['test-campaign', 'Orc', 6], ['test-campaign', 'Cleric', 0], ['test-campaign', 'Ally', 0]]);
+        const goblinLog = addEntry.mock.calls[0][1];
+        expect(goblinLog).toEqual({
+            type: 'hp_change',
+            targetName: 'Goblin',
+            delta: 2,
+            currentHp: 7,
+            maxHp: 7,
+            isHealing: true,
+            sourceName: 'Cleric',
+            note: 'Mass Healing Word',
+            formula: '1d4 + 4',
+            bonusDetails: undefined,
+            timestamp: 0,
         });
 
-        it('falls back to spellAbilities.modifier when no spellCastingAbility on spell', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3, 'Charisma');
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 3');
+        expect(result).toEqual({
+            targets: [
+                { targetName: 'Goblin', healAmount: 2, rolls: [2, 4], rawTotal: 6 },
+                { targetName: 'Orc', healAmount: 6, rolls: [4, 4, 4], rawTotal: 12 },
+                { targetName: 'Cleric', healAmount: 0, rolls: [4], rawTotal: 4 },
+                { targetName: 'Ally', healAmount: 0, rolls: [3], rawTotal: 3 },
+            ],
+            formula: '1d4 + 4',
+            totalHealed: 8,
+            rolls: [2, 4, 4, 4, 4, 4, 3],
+            rawTotal: 25,
         });
-
-        it('returns 0 modifier when playerStats has no abilities or spellAbilities', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 2, rolls: [[2]], modifier: 0 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = { name: 'Cleric', hitPoints: 30 };
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 0');
-        });
-
-        it('uses spellCastingAbility from spell even when playerStats has different ability', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 9, rolls: [[2, 3, 4]], modifier: 4 });
-            getRuntimeValue.mockReturnValue(10);
-
-            const spell = { ...makeSpell('Mass Healing Word', 3), spellCastingAbility: 'Wisdom' };
-            const playerStats = makePlayerStats(3, 'Charisma');
-            playerStats.abilities.push({ name: 'Wisdom', bonus: 4 });
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.formula).toBe('2d4 + 4');
-        });
+        const events = dispatchSpy.mock.calls.map(c => c[0]);
+        expect(events.map(e => e.type)).toEqual(['combat-summary-updated']);
     });
 
-    describe('runtime storage fallback', () => {
-        it('treats empty string runtime value as full HP', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue('');
+    it('first-6 slice is array-order and affiliation-blind; maxHp falls back to numeric playerStats.hitPoints; stored HP above max yields negative delta quirk', async () => {
+        const many = Array.from({ length: 8 }, (_, i) => ({ name: `C${i}`, maxHp: 100 }));
+        getCombatContext.mockResolvedValue(cs(many));
+        many.forEach(c => seedHp(c.name, 50));
+        for (let i = 0; i < 6; i++) roll('normal', 10, [10]);
+        const result = await trigger(mhw5e, { slotLevel: 3 });
+        // selection boundary forwarded to this lane verbatim: slice(0, 6), no sorting/filtering here
+        expect(result.targets.map(t => t.targetName)).toEqual(['C0', 'C1', 'C2', 'C3', 'C4', 'C5']);
+        expect(rollExpression).toHaveBeenCalledTimes(6);
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(6);
 
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(0);
-        });
-
-        it('uses maxHp when runtime value is null', async () => {
-            const cs = makeCombatSummary([
-                { name: 'Ally1', maxHp: 30, currentHp: 10 },
-            ]);
-            getCombatContext.mockResolvedValue(cs);
-            rollExpression.mockReturnValue({ total: 8, rolls: [[2, 3, 3]], modifier: 3 });
-            getRuntimeValue.mockReturnValue(null);
-
-            const spell = makeSpell('Mass Healing Word', 3);
-            const playerStats = makePlayerStats(3);
-            const result = await triggerMassHealingWord(spell, {}, playerStats, CAMPAIGN, 'testMap');
-
-            expect(result).not.toBeNull();
-            expect(result.targets[0].healAmount).toBe(0);
-        });
+        // creature without maxHp borrows numeric playerStats.hitPoints (50);
+        // Titan stored above max -> heal clamps negative, apply skipped, log still written
+        const combatCtx2 = cs([{ name: 'Armor' }, { name: 'Titan', maxHp: 50 }]);
+        getCombatContext.mockResolvedValueOnce(combatCtx2);
+        seedHp('Armor', 40);
+        seedHp('Titan', '60');
+        roll('normal', 25, [5, 20]);
+        roll('normal', 10, [10]);
+        const q = await trigger(mhw5e, { slotLevel: 3 });
+        expect(q.targets).toEqual([
+            { targetName: 'Armor', healAmount: 10, rolls: [5, 20], rawTotal: 25 },
+            { targetName: 'Titan', healAmount: -10, rolls: [10], rawTotal: 10 },
+        ]);
+        expect(q.totalHealed).toBe(0);
+        expect(applyHealingToTarget).toHaveBeenLastCalledWith(combatCtx2, 'Armor', 10, CAMPAIGN);
+        expect(applyHealingToTarget.mock.calls.filter(c => c[1] === 'Titan')).toEqual([]);
+        const titanLog = addEntry.mock.calls.find(c => c[1].targetName === 'Titan')[1];
+        expect(titanLog).toMatchObject({ delta: -10, currentHp: 50, maxHp: 50, timestamp: 0 });
     });
 
-    describe('logging and events', () => {
-        it('posts log entries for each target that receives healing', async () => {
-            const { resolveHealingBonusesWithDetails } = await import('../../combat/automation/automationService.js');
-            resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 0, details: [] });
-            rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-            getRuntimeValue.mockImplementation((name) => {
-                if (name === 'Goblin') return 5;
-                return null;
-            });
-            getCombatContext.mockResolvedValue({
-                players: [
-                    { name: 'Cleric', gridX: 5, gridY: 5 },
-                    { name: 'Goblin', gridX: 6, gridY: 5 },
-                ],
-                creatures: [
-                    { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                    { name: 'Goblin', maxHp: 7, currentHp: 3 },
-                ],
-            });
+    it('dice routing: global maximization, per-target maximization, null-roll target skipped silently', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Goblin', maxHp: 7 }, { name: 'Orc', maxHp: 15 }]));
+        seedHp('Goblin', 1);
+        seedHp('Orc', 1);
+        const caster = stats();
 
-            await triggerMassHealingWord(
-                makeSpell('Mass Healing Word', 3),
-                {},
-                makePlayerStats(3),
-                CAMPAIGN,
-                'testMap',
-            );
+        hasHealingMaximization.mockReturnValueOnce(true);
+        roll('max', 5, [1, 4]);
+        roll('max', 5, [1, 4]);
+        const g = await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(rollExpressionMaximized).toHaveBeenNthCalledWith(1, '1d4 + 4');
+        expect(g.totalHealed).toBe(10); // 5 + 5
 
-            const goblinCall = addEntry.mock.calls.find(
-                (call) => call[1]?.targetName === 'Goblin',
-            );
-            expect(goblinCall).toBeDefined();
-            expect(goblinCall[1]).toEqual(expect.objectContaining({
-                type: 'hp_change',
-                targetName: 'Goblin',
-                delta: 2,
-                isHealing: true,
-                sourceName: 'Cleric',
-                note: 'Mass Healing Word',
-            }));
-        });
+        // per-target: only Goblin maximized (drift-proof queue asserts call order/mode)
+        hasHealingMaximizationForTarget.mockImplementation((_s, name) => name === 'Goblin');
+        roll('max', 5, [1, 4]);
+        roll('normal', 4, [4]);
+        const p = await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(p.targets.map(t => t.healAmount)).toEqual([5, 4]);
 
-        it('dispatches combat-summary-updated event', async () => {
-            rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-            getRuntimeValue.mockImplementation((name) => {
-                if (name === 'Goblin') return 5;
-                return null;
-            });
-            getCombatContext.mockResolvedValue({
-                players: [
-                    { name: 'Cleric', gridX: 5, gridY: 5 },
-                    { name: 'Goblin', gridX: 6, gridY: 5 },
-                ],
-                creatures: [
-                    { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                    { name: 'Goblin', maxHp: 7, currentHp: 5 },
-                ],
-            });
-
-            const eventHandler = vi.fn();
-            window.addEventListener('combat-summary-updated', eventHandler);
-
-            await triggerMassHealingWord(
-                makeSpell('Mass Healing Word', 3),
-                {},
-                makePlayerStats(3),
-                CAMPAIGN,
-                'testMap',
-            );
-
-            expect(eventHandler).toHaveBeenCalled();
-
-            window.removeEventListener('combat-summary-updated', eventHandler);
-        });
+        // null roll: target skipped — no result entry, no log for it, cast still dispatches
+        hasHealingMaximizationForTarget.mockReturnValue(false);
+        addEntry.mockClear();
+        roll('normal', 4, [4]);
+        rollNull();
+        const n = await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(n.targets.map(t => t.targetName)).toEqual(['Goblin']);
+        expect(addEntry.mock.calls.map(c => c[1].targetName)).toEqual(['Goblin']);
+        expect(dispatchSpy).toHaveBeenCalledTimes(3);
     });
 
-    describe('result structure', () => {
-        it('returns correct result structure with targets, formula, and totalHealed', async () => {
-            rollExpression.mockReturnValue({ total: 20, rolls: [10, 10] });
-            getRuntimeValue.mockImplementation((name) => {
-                if (name === 'Goblin') return 5;
-                if (name === 'Orc') return 10;
-                return null;
-            });
-            getCombatContext.mockResolvedValue({
-                players: [
-                    { name: 'Cleric', gridX: 5, gridY: 5 },
-                    { name: 'Goblin', gridX: 6, gridY: 5 },
-                    { name: 'Orc', gridX: 7, gridY: 5 },
-                ],
-                creatures: [
-                    { name: 'Cleric', maxHp: 50, currentHp: 20 },
-                    { name: 'Goblin', maxHp: 7, currentHp: 5 },
-                    { name: 'Orc', maxHp: 15, currentHp: 10 },
-                ],
-            });
+    it('healing bonuses: exact composed log formula, bonusDetails identity, Fortified-Health latch armed only on real heal', async () => {
+        const details = [{ name: 'Inspiring Leader', amount: 2 }, { name: 'Fortified Health', amount: 1 }];
+        resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 3, details });
+        getCombatContext.mockResolvedValue(cs([{ name: 'Goblin', maxHp: 7 }]));
+        seedHp('Goblin', 1);
+        const caster = stats();
 
-            const result = await triggerMassHealingWord(
-                makeSpell('Mass Healing Word', 3),
-                {},
-                makePlayerStats(3),
-                CAMPAIGN,
-                'testMap',
-            );
-
-            expect(result).toEqual(expect.objectContaining({
-                targets: expect.arrayContaining([
-                    expect.objectContaining({ targetName: 'Goblin', healAmount: 2 }),
-                    expect.objectContaining({ targetName: 'Orc', healAmount: 5 }),
-                ]),
-                formula: '2d4 + 3',
-                totalHealed: 7,
-            }));
+        roll('normal', 5, [1, 4]);
+        const r = await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(r.targets).toEqual([{ targetName: 'Goblin', healAmount: 6, rolls: [1, 4], rawTotal: 8 }]);
+        expect(addEntry.mock.calls[0][1]).toMatchObject({
+            formula: '1d4 + 4 + (2 Inspiring Leader + 1 Fortified Health)',
+            delta: 6,
+            currentHp: 7,
         });
+        expect(addEntry.mock.calls[0][1].bonusDetails).toBe(details);
+        expect(markFortifiedHealthUsed).toHaveBeenCalledTimes(1);
+        expect(markFortifiedHealthUsed).toHaveBeenCalledWith(caster, CAMPAIGN);
 
-        it('calculates totalHealed as sum of all individual heal amounts', async () => {
-            rollExpression.mockReturnValue({ total: 25, rolls: [13, 12] });
-            getRuntimeValue.mockReturnValue(1);
-            getCombatContext.mockResolvedValue({
-                players: [],
-                creatures: [
-                    { name: 'Goblin', maxHp: 7, currentHp: 1 },
-                    { name: 'Orc', maxHp: 15, currentHp: 1 },
-                    { name: 'Troll', maxHp: 25, currentHp: 1 },
-                    { name: 'Ogre', maxHp: 30, currentHp: 1 },
-                    { name: 'Yeti', maxHp: 40, currentHp: 1 },
-                    { name: 'Giant', maxHp: 60, currentHp: 1 },
-                ],
-            });
+        // all full: zero heals must NOT arm the fortified latch (still over-logs delta 0)
+        seedHp('Goblin', 7);
+        roll('normal', 5, [5]);
+        await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(markFortifiedHealthUsed).toHaveBeenCalledTimes(1);
 
-            const result = await triggerMassHealingWord(
-                makeSpell('Mass Healing Word', 3),
-                {},
-                makePlayerStats(3),
-                CAMPAIGN,
-                'testMap',
-            );
+        // fortified absent from details while healing happens: latch stays untouched
+        resolveHealingBonusesWithDetails.mockReturnValue({ totalBonus: 2, details: [{ name: 'Inspiring Leader', amount: 2 }] });
+        seedHp('Goblin', 1);
+        roll('normal', 4, [4]);
+        await trigger(mhw5e, { slotLevel: 3 }, caster);
+        expect(markFortifiedHealthUsed).toHaveBeenCalledTimes(1);
+    });
 
-            expect(result.targets).toHaveLength(6);
-            expect(result.totalHealed).toBeGreaterThan(0);
-            expect(result.totalHealed).toBe(
-                result.targets.reduce((sum, t) => sum + t.healAmount, 0),
-            );
-        });
+    it('log rejection swallowed by floating catch with exact lane-unique prefix; cast completes', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Goblin', maxHp: 7 }]));
+        seedHp('Goblin', 1);
+        roll('normal', 6, [2, 4]);
+        addEntry.mockRejectedValueOnce(new Error('boom'));
+        const r = await trigger(mhw5e, { slotLevel: 3 });
+        await Promise.resolve(); // let the floating .catch (:103) run
+        expect(r.totalHealed).toBe(6);
+        expect(dispatchSpy).toHaveBeenCalledTimes(1);
+        // prefix '[massHealingWord]' (no 'Service') is unique to this lane vs twin's '[massCureWounds]'
+        expect(consoleSpy).toHaveBeenCalledWith('[massHealingWord] Error:', new Error('boom'));
     });
 });

@@ -1,15 +1,30 @@
-// MA-0374: Beholder Eye Rays service — failed-save te grants with ONE
-// rounds clock, the Paralyzed end-of-turn repeat ladder (10-round
-// auto-success clock), and the Petrification Restrained→Petrified two-stage.
+// @maintained-by-ai
+// MA-0374 / MA-0383: Beholder Eye Rays service. Failed-save grants are driven
+// from monsters.json ray rows (Beholder d10 table, DC 16; Beholder Zombie d4
+// table, DC 14) — every expectation is derived from disk, never hand-transcribed.
+// One addExpiration clock per grant; the Paralyzed end-of-turn repeat ladder with
+// its rounds:10 auto-success clock; the Petrification Restrained→Petrified
+// two-stage; PC targets route through the queued save prompt.
+// d10/d4 dice selection and the saveProcessing dispatcher live in
+// saveProcessing.eye-rays.test.js / MonsterCardHelpers.eye-rays.test.js —
+// cited here, not re-run. Concentration boundary: neither ladder te is
+// concentration; neither touches it. No wall-clock timers: repeats resolve only
+// at the turn-end seam; the auto-success leg rides the rounds:10 clock.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import monsters from '../../../../public/data/monsters.json';
 
 const runtimeStore = {};
 const logs = [];
 const expirations = [];
+const writes = [];
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: (name, key) => runtimeStore[`${name}.${key}`],
-    setRuntimeValue: (name, key, value) => { runtimeStore[`${name}.${key}`] = value; return Promise.resolve(); },
+    setRuntimeValue: (name, key, value, _campaign, skipSync) => {
+        runtimeStore[`${name}.${key}`] = value;
+        writes.push({ name, key, skipSync });
+        return Promise.resolve();
+    },
 }));
 
 vi.mock('../../ui/logService.js', () => ({
@@ -38,171 +53,203 @@ import { applyEyeRayFailedGrants, applyEyeRaysTurnEnd, EYE_RAY_PARALYZED_TE, EYE
 
 const C = 'test-campaign';
 const BH = 'Beholder 1';
+const ZB = 'Beholder Zombie 1';
 const T = 'HexWarlock';
 
-function ray(key, extra = {}) {
-    const base = {
-        charm: { save_ability: 'Wisdom', conditions: ['charmed'], clock_rounds: 600 },
-        paralyzing: { save_ability: 'Constitution', conditions: [], ladder: 'paralyzed' },
-        slowing: { save_ability: 'Constitution', conditions: [], te_grants: ['speed_half', 'no_reactions', 'no_action_and_bonus_action'], clock_rounds: 2 },
-        enervation: { save_ability: 'Constitution', conditions: ['poisoned'], te_grants: ['no_healing'], clock_rounds: 2 },
-        telekinetic: { save_ability: 'Strength', conditions: ['restrained'], te_grants: ['telekinetic_movement'], clock_rounds: 2 },
-        petrification: { save_ability: 'Constitution', conditions: [], ladder: 'petrification' },
-    };
-    return { key, save_dc: 16, ...base[key], ...extra };
+const list = Array.isArray(monsters) ? monsters : monsters.monsters;
+function rayRow(monsterName) {
+    const row = (list.find(m => m.name === monsterName)?.actions || []).find(a => Array.isArray(a.rays) && a.rays.length >= 2);
+    if (!row) throw new Error(`monsters.json: ${monsterName} has no authored rays[] row`);
+    return row;
 }
+function pickRay(row, key) {
+    const ray = row.rays.find(r => r.key === key);
+    if (!ray) throw new Error(`monsters.json: ${key} ray missing from ${row.name} row`);
+    return ray;
+}
+// The monster-card seam stamps the row DC onto the picked ray before the
+// failed-save call (same shape as saveProcessing.eye-rays.test.js).
+function ctxRay(row, ray) {
+    return { ...ray, save_dc: row.save_dc };
+}
+
+const BH_ROW = rayRow('Beholder');    // d10 table, DC 16
+const ZOMBIE_ROW = rayRow('Beholder Zombie'); // d4 table, DC 14
 
 function tes() {
     return runtimeStore['campaign.targetEffects'] || [];
 }
-
-beforeEach(() => {
-    vi.clearAllMocks();
+function activeConditions() {
+    return runtimeStore[`${T}.activeConditions`] || [];
+}
+function effectKeys(effects) {
+    return effects.map(e => `${e.type}|${e.effectKey ?? e.condition}`).sort();
+}
+function reset() {
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
     logs.length = 0;
     expirations.length = 0;
+    writes.length = 0;
     csCreatures = [];
-});
+}
 
-describe('MA-0374 applyEyeRayFailedGrants', () => {
-    it('slowing ray grants the MA-0087 slowed trio te with ONE rounds:2 clock', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('slowing') });
-        const keys = tes().filter(te => te.target === T).map(te => te.effect).sort();
-        expect(keys).toEqual(['no_action_and_bonus_action', 'no_reactions', 'speed_half']);
+async function stage(ray, attacker = BH, row = BH_ROW) {
+    await applyEyeRayFailedGrants({ campaignName: C, attackerName: attacker, targetName: T, ray: ctxRay(row, ray) });
+}
+
+// Every expectation on this disk ray row is derived from the row itself:
+// exact te set = te_grants, ONE clock whose rounds and effect list match
+// clock_rounds / te_grants / conditions, ladder branches per ladder field.
+async function assertRayGrant(row, ray, attacker) {
+    await stage(ray, attacker, row);
+    const teKeys = tes().filter(te => te.target === T).map(te => te.effect).sort();
+
+    if (ray.ladder === 'paralyzed') {
+        expect(activeConditions()).toEqual(['paralyzed']);
+        expect(teKeys).toEqual([EYE_RAY_PARALYZED_TE]);
+        expect(tes().find(te => te.effect === EYE_RAY_PARALYZED_TE)).toMatchObject({
+            source: attacker, dc: row.save_dc, saveType: 'CON', stage: 'paralyzed',
+        });
         expect(expirations).toHaveLength(1);
-        expect(expirations[0]).toMatchObject({ attackerName: BH, targetName: T, campaignName: C, rounds: 2 });
-        expect(expirations[0].effects.map(e => e.effectKey).sort()).toEqual(keys);
+        expect(expirations[0]).toMatchObject({ attackerName: attacker, targetName: T, campaignName: C, rounds: 10 });
+        expect(effectKeys(expirations[0].effects)).toEqual(effectKeys([
+            { type: 'condition', condition: 'paralyzed' },
+            { type: 'remove_target_effect', effectKey: EYE_RAY_PARALYZED_TE },
+        ]));
+        expect(logs.some(e => e.type === 'condition' && e.condition === 'Paralyzed' && /Paralyzing Ray/.test(e.sourceAbility))).toBe(true);
+    } else if (ray.ladder === 'petrification') {
+        expect(activeConditions()).toEqual(['restrained']);
+        expect(teKeys).toEqual([EYE_RAY_PETRIFYING_TE]);
+        expect(expirations).toHaveLength(0); // repeat save owns the clock — never two racing
+        expect(logs.some(e => e.type === 'condition' && e.condition === 'Restrained' && /Petrification Ray/.test(e.sourceAbility))).toBe(true);
+    } else {
+        expect(teKeys).toEqual([...(ray.te_grants || [])].sort());
+        expect(activeConditions()).toEqual([]); // plain condition legs ride the standard seam
+        for (const te of tes().filter(te => te.target === T)) {
+            expect(te.saveType).toBe(String(ray.save_ability).toUpperCase());
+        }
+        if (ray.te_grants?.includes('telekinetic_movement')) {
+            expect(tes().find(te => te.effect === 'telekinetic_movement').value).toBe(30);
+        }
+        const hasClock = Number(ray.clock_rounds) > 0;
+        expect(expirations).toHaveLength(hasClock ? 1 : 0);
+        if (hasClock) {
+            expect(expirations[0]).toMatchObject({ attackerName: attacker, targetName: T, campaignName: C, rounds: Number(ray.clock_rounds) });
+            const expected = [
+                ...(ray.te_grants || []).map(effectKey => ({ type: 'remove_target_effect', effectKey })),
+                ...(ray.conditions || []).map(condition => ({ type: 'condition', condition })),
+            ];
+            expect(effectKeys(expirations[0].effects)).toEqual(effectKeys(expected));
+            expect(expirations[0].effects.every(e => e.type !== 'remove_target_effect' || (e.source === attacker && e.target === T))).toBe(true);
+        }
+    }
+}
+
+beforeEach(reset);
+
+describe('MA-0374 applyEyeRayFailedGrants — disk ray table', () => {
+    it('every Beholder d10 ray (all 10 enumerable): exact te grants + ONE clock, pinned to its monsters.json row', async () => {
+        expect(BH_ROW.rays).toHaveLength(10);
+        for (const ray of BH_ROW.rays) {
+            reset();
+            await assertRayGrant(BH_ROW, ray, BH);
+        }
     });
 
-    it('telekinetic ray carries the telekinetic_movement te with value 30 + rounds:2 clock covering the restrained condition', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('telekinetic') });
-        const tk = tes().find(te => te.effect === 'telekinetic_movement');
-        expect(tk).toMatchObject({ target: T, source: BH, value: 30 });
-        expect(expirations).toHaveLength(1);
-        const types = expirations[0].effects.map(e => e.type);
-        expect(types).toContain('remove_target_effect');
-        expect(expirations[0].effects.some(e => e.type === 'condition' && e.condition === 'restrained')).toBe(true);
-    });
-
-    it('charm ray: single rounds:600 clock (1 hour, CLA-334 hours×600), no te', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('charm') });
-        expect(expirations).toHaveLength(1);
-        expect(expirations[0]).toMatchObject({ rounds: 600 });
-        expect(expirations[0].effects).toEqual([{ type: 'condition', condition: 'charmed' }]);
-    });
-
-    it('paralyzing ray stages Paralyzed + te + the 10-round auto-success clock, logs the ladder', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('paralyzing') });
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('paralyzed');
-        expect(tes().some(te => te.effect === EYE_RAY_PARALYZED_TE && te.source === BH)).toBe(true);
-        expect(expirations).toHaveLength(1);
-        expect(expirations[0]).toMatchObject({ rounds: 10 });
-        const log = logs.find(e => e.type === 'condition' && e.condition === 'Paralyzed');
-        expect(log.sourceAbility).toMatch(/Paralyzing Ray/);
-    });
-
-    it('petrification ray stages Restrained + ladder te (no clock — repeat save owns it)', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('petrification') });
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('restrained');
-        expect(tes().some(te => te.effect === EYE_RAY_PETRIFYING_TE && te.stage === 'restrained')).toBe(true);
-        expect(expirations).toHaveLength(0);
-    });
-
-    it('no ray / no target: inert', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: null, ray: ray('slowing') });
+    it('ray-less / target-less calls are inert', async () => {
+        const slowing = ctxRay(BH_ROW, pickRay(BH_ROW, 'slowing'));
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: null, ray: slowing });
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: null });
+        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T });
         expect(tes()).toHaveLength(0);
         expect(expirations).toHaveLength(0);
+        expect(logs).toHaveLength(0);
+    });
+});
+
+describe('MA-0383 Beholder Zombie d4 row rides the identical service', () => {
+    it('every zombie ray (all 4 enumerable): same grants, clocks, and ladders at DC 14', async () => {
+        expect(ZOMBIE_ROW.rays).toHaveLength(4);
+        for (const ray of ZOMBIE_ROW.rays) {
+            reset();
+            await assertRayGrant(ZOMBIE_ROW, ray, ZB);
+        }
     });
 });
 
 describe('MA-0374 applyEyeRaysTurnEnd ladders', () => {
-    async function npcTarget(con) {
+    function npc(con) {
         csCreatures = [{ name: T, type: 'monster', saveBonuses: { con: con } }];
     }
 
     it('no staged te → not handled', async () => {
         expect((await applyEyeRaysTurnEnd(C, T)).handled).toBe(false);
+        expect(logs).toHaveLength(0);
     });
 
-    it('paralyzing repeat save succeeds (NPC auto-roll high CON) → te + Paralyzed shed + removed log', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('paralyzing') });
-        await npcTarget(20);
-        const res = await applyEyeRaysTurnEnd(C, T);
-        expect(res.handled).toBe(true);
-        expect(res.success).toBe(true);
-        expect(tes().some(te => te.effect === EYE_RAY_PARALYZED_TE)).toBe(false);
-        expect(runtimeStore[`${T}.activeConditions`] || []).not.toContain('paralyzed');
-        expect(logs.some(e => e.type === 'save_result' && e.rollType === 'save-paralyzing-repeat' && e.success)).toBe(true);
-    });
-
-    it('paralyzing repeat save fails (NPC auto-roll low CON) → stays Paralyzed (clock owns auto-success)', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('paralyzing') });
-        await npcTarget(-20);
-        const res = await applyEyeRaysTurnEnd(C, T);
-        expect(res.success).toBe(false);
+    it('paralyzing ladder vs NPC: fail holds Paralyzed, next-turn success sheds te + condition and the campaign write is skipSync', async () => {
+        await stage(pickRay(BH_ROW, 'paralyzing'));
+        npc(-20); // roll(1-20) − 20 < DC 16: deterministic fail
+        const fail = await applyEyeRaysTurnEnd(C, T);
+        expect(fail).toMatchObject({ handled: true, success: false });
+        expect(fail.roll).toBeGreaterThanOrEqual(1);
+        expect(fail.roll).toBeLessThanOrEqual(20);
+        expect(fail.total).toBe(fail.roll - 20);
         expect(tes().some(te => te.effect === EYE_RAY_PARALYZED_TE)).toBe(true);
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('paralyzed');
+        expect(activeConditions()).toContain('paralyzed');
+        expect(logs.some(e => e.type === 'save_result' && e.rollType === 'save-paralyzing-repeat' && !e.success && e.saveDc === 16)).toBe(true);
+
+        logs.length = 0;
+        npc(20); // roll + 20 ≥ DC 16: deterministic success
+        const win = await applyEyeRaysTurnEnd(C, T);
+        expect(win).toMatchObject({ handled: true, success: true });
+        expect(win.total).toBe(win.roll + 20);
+        expect(tes().some(te => te.effect === EYE_RAY_PARALYZED_TE)).toBe(false);
+        expect(activeConditions()).not.toContain('paralyzed');
+        expect(logs.some(e => e.type === 'condition' && e.action === 'removed' && e.condition === 'Paralyzed')).toBe(true);
+        expect(writes.filter(w => w.name === 'campaign').every(w => w.skipSync === true)).toBe(true);
     });
 
     it('petrification ladder: failed repeat save escalates Restrained → Petrified, te cleared', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('petrification') });
-        await npcTarget(-20);
+        await stage(pickRay(BH_ROW, 'petrification'));
+        npc(-20);
         const res = await applyEyeRaysTurnEnd(C, T);
-        expect(res.success).toBe(false);
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('petrified');
-        expect(runtimeStore[`${T}.activeConditions`]).not.toContain('restrained');
+        expect(res).toMatchObject({ handled: true, success: false });
+        expect(activeConditions()).toContain('petrified');
+        expect(activeConditions()).not.toContain('restrained');
         expect(tes().some(te => te.effect === EYE_RAY_PETRIFYING_TE)).toBe(false);
         expect(logs.some(e => e.type === 'condition' && e.condition === 'Petrified')).toBe(true);
+        expect(logs.some(e => e.type === 'save_result' && e.rollType === 'save-petrification-repeat')).toBe(true);
     });
 
     it('petrification ladder: successful repeat save sheds Restrained without petrifying', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('petrification') });
-        await npcTarget(20);
+        await stage(pickRay(BH_ROW, 'petrification'));
+        npc(20);
         const res = await applyEyeRaysTurnEnd(C, T);
-        expect(res.success).toBe(true);
-        expect(runtimeStore[`${T}.activeConditions`] || []).not.toContain('restrained');
-        expect(runtimeStore[`${T}.activeConditions`] || []).not.toContain('petrified');
+        expect(res).toMatchObject({ handled: true, success: true });
+        expect(activeConditions()).toEqual([]);
+        expect(tes().some(te => te.effect === EYE_RAY_PETRIFYING_TE)).toBe(false);
     });
 
-    it('PC target repeat save routes through the queued save prompt', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: BH, targetName: T, ray: ray('paralyzing') });
+    it('PC repeat saves route through the queued prompt: beholder DC 16 success sheds, zombie DC 14 fail holds', async () => {
+        await stage(pickRay(BH_ROW, 'paralyzing'));
         csCreatures = [{ name: T, type: 'player' }];
-        const promise = applyEyeRaysTurnEnd(C, T);
+        const winPromise = applyEyeRaysTurnEnd(C, T);
         nextSaveResolve({ roll: 19, saveBonus: 5, success: true });
-        const res = await promise;
-        expect(res.success).toBe(true);
-        expect(logs.some(e => e.type === 'ability_use' && /repeats its Constitution save/.test(e.description))).toBe(true);
-    });
-});
+        expect(await winPromise).toMatchObject({ handled: true, success: true, roll: 19, total: 24 });
+        const promptRow = logs.find(e => e.type === 'ability_use' && /repeats its Constitution save \(DC 16\)/.test(e.description));
+        expect(promptRow.promptId).toBe('prompt-1');
+        expect(tes().some(te => te.effect === EYE_RAY_PARALYZED_TE)).toBe(false);
 
-// ── MA-0383: Beholder Zombie rows ride the identical service (DC 14) ────
-describe('MA-0383 zombie DC propagation through the shared ladder', () => {
-    it('zombie paralyzing ray (save_dc 14): te + repeat ladder register with DC 14, ONE rounds:10 clock', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('paralyzing'), save_dc: 14, ladder: 'paralyzed' } });
-        const te = tes().find(e => e.effect === EYE_RAY_PARALYZED_TE);
-        expect(te).toMatchObject({ target: T, source: 'Beholder Zombie 1', dc: 14, saveType: 'CON', stage: 'paralyzed' });
-        expect(runtimeStore[`${T}.activeConditions`]).toContain('paralyzed');
-        expect(expirations).toHaveLength(1);
-        expect(expirations[0]).toMatchObject({ attackerName: 'Beholder Zombie 1', targetName: T, rounds: 10 });
-    });
-
-    it('zombie turn-end repeat save: fail vs DC 14 keeps Paralyzed, logs the DC 14 ladder roll', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('paralyzing'), save_dc: 14, ladder: 'paralyzed' } });
+        reset();
+        await stage(pickRay(ZOMBIE_ROW, 'paralyzing'), ZB, ZOMBIE_ROW);
         csCreatures = [{ name: T, type: 'player' }];
         logs.length = 0;
-        const promise = applyEyeRaysTurnEnd(C, T);
+        const failPromise = applyEyeRaysTurnEnd(C, T);
         nextSaveResolve({ roll: 3, saveBonus: 0, success: false });
-        const res = await promise;
-        expect(res).toMatchObject({ handled: true, success: false, total: 3 });
+        expect(await failPromise).toMatchObject({ handled: true, success: false, roll: 3, total: 3 });
         const saveRow = logs.find(e => e.type === 'save_result' && e.rollType === 'save-paralyzing-repeat');
-        expect(saveRow).toMatchObject({ saveDc: 14, saveType: 'CON', success: false });
-    });
-
-    it('zombie enervation ray: no_healing te with rounds:2 clock (same shape as beholder)', async () => {
-        await applyEyeRayFailedGrants({ campaignName: C, attackerName: 'Beholder Zombie 1', targetName: T, ray: { ...ray('enervation'), save_dc: 14 } });
-        const te = tes().find(e => e.effect === 'no_healing');
-        expect(te).toMatchObject({ target: T, source: 'Beholder Zombie 1', saveType: 'CONSTITUTION' });
-        expect(expirations).toHaveLength(1);
-        expect(expirations[0].rounds).toBe(2);
+        expect(saveRow).toMatchObject({ saveDc: ZOMBIE_ROW.save_dc, saveType: 'CON', success: false });
+        expect(activeConditions()).toContain('paralyzed');
     });
 });

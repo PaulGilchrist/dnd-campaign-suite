@@ -1,13 +1,23 @@
+// @maintained-by-ai
 // CLA-356 regression: Telekinetic Master (2024 Psi Warrior lv18 Fighter).
-// A Fighter has NO spellcasting table. The half-caster fallback (playerStats.spells
-// from Magic Initiate/feats) creates a container capped to the HIGHEST persisted spell
-// level (lv1 Magic Missile). The lv5 Telekinesis free-cast row was silently DROPPED by
-// the slot-level filter (hasAnySlot=true via lv1, no lv5+ slot → filtered out). Fix:
-// the free_spell/always_prepared branches stamp _telekineticMasterFreeCast, and the
-// filter exempts it (CLA-234/_ritualOnly carry pattern) so Telekinesis surfaces castable
-// slot-free with Intelligence as the casting ability + saveDc 17 (8 + INT 3 + PB 6).
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// A Fighter has NO spellcasting table for a Psi Warrior (the disk class_levels
+// spellcasting rows are gated required_major 'Eldritch Knight'), so the persisted
+// lv1 Magic Missile (Magic Initiate/feat) builds a half-caster fallback container
+// capped to the HIGHEST persisted spell level — has slots, but ZERO lv5+ slots.
+// Pre-fix, keepSpellRow silently dropped the lv5 Telekinesis row there. The fix is
+// the CLA-356 stamp/exemption pair: applyAlwaysPreparedGrantSpells / applyFreeSpellGrant
+// stamp _telekineticMasterFreeCast (spellCalc2024.js:232/:237/:264) and keepSpellRow
+// exempts it (:748) so Telekinesis surfaces castable slot-free, remapped to full
+// spells-DB detail, with Intelligence as the casting ability (8 + INT + disk PB saveDc).
+// Lane map: free-cast payment/authorization counters → spellPreparationService
+// .isFreeCastAuthorized.test.js; the generic _freeSpellGrantFreeCast feat lane →
+// spellCalc2024.ft035-free-spell-row.test.js; concentration bonus attack →
+// concentrationBonusAttackHandler.test.js. Not re-pinned here.
+import { describe, it, expect, vi } from 'vitest';
+import { cloneDeep } from 'lodash';
 import { getSpellAbilities } from './spellCalc2024.js';
+import classes2024 from '../../../../public/data/2024/classes.json';
+import spells2024 from '../../../../public/data/2024/spells.json';
 
 vi.mock('../../character/classRules2024.js', () => ({
   default: {
@@ -19,112 +29,112 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
 }));
 
-// ── Fixtures ──
+// Fixture discipline: class ladder, Psi Warrior major, the Telekinetic Master automation
+// payload and the spells-DB rows are ALL read from disk and deep-cloned before use —
+// a classes.json/spells.json edit re-drives these rows.
+const fighter = classes2024.find(c => c.name === 'Fighter');
+const psiWarrior = fighter.majors.find(m => m.name === 'Psi Warrior');
+const tmFeature = psiWarrior.features.find(f => f.name === 'Telekinetic Master');
+const LADDER = cloneDeep(fighter.class_levels);
+const PB = LADDER[17].proficiency_bonus;
+const INT_BONUS = 3;
 
-function makePsiWarriorMajor() {
-  return {
-    name: 'Psi Warrior',
-    features: [
-      { name: 'Telekinetic Master', description: 'Always have Telekinesis prepared.', level: 18 },
-    ],
-  };
+const diskLevel = name => spells2024.find(s => s.name === name).level;
+const ALL_SPELLS = cloneDeep(spells2024.filter(s => ['Magic Missile', 'Telekinesis'].includes(s.name)));
+
+// The real collector stamps feature.name onto every automation row
+// (automationCollector.js) — mirror that on the disk automation entries.
+const tmAutomationRow = type => ({
+  ...cloneDeep(tmFeature.automation.find(a => a.type === type)),
+  name: tmFeature.name,
+});
+
+function makeTMAutomation({ actions = [tmAutomationRow('free_spell')], bonusActions = [tmAutomationRow('concentration_bonus_attack')], passives = [tmAutomationRow('passive_rule')] } = {}) {
+  return { actions, bonusActions, passives, specialActions: [] };
 }
 
-function makeAutomation() {
+function makeFighterStats({ automation = makeTMAutomation(), spells = ['Magic Missile'] } = {}) {
   return {
-    actions: [{
-      type: 'free_spell',
-      name: 'Telekinetic Master',
-      spell: 'Telekinesis',
-      uses: 1,
-      usesMax: 1,
-      recharge: 'long_rest',
-      action: 'action',
-      concentration: true,
-      casting_time: '1 action',
-      hasAutomation: true,
-    }],
-    bonusActions: [{
-      type: 'concentration_bonus_attack',
-      name: 'Telekinetic Master',
-      concentrationSpell: 'Telekinesis',
-      action: 'bonus_action',
-      weaponAttack: true,
-      hasAutomation: true,
-    }],
-    passives: [{
-      type: 'passive_rule',
-      effect: 'always_prepared_spells',
-      name: 'Telekinetic Master',
-      spells: ['Telekinesis'],
-      hasAutomation: true,
-    }],
-    specialActions: [],
-  };
-}
-
-function makeFighterStats() {
-  return {
-    name: 'EvasiveFighter',
+    name: 'PsiWarriorFighter',
     level: 18,
     rules: '2024',
-    proficiency: 6,
+    proficiency: PB,
     class: {
       name: 'Fighter',
-      spell_casting_ability: 'Intelligence',
-      major: makePsiWarriorMajor(),
+      spell_casting_ability: fighter.spell_casting_ability,
+      class_levels: LADDER,
+      major: cloneDeep(psiWarrior),
     },
-    // Magic Missile persists from Magic Initiate/feat → the fallback creates lv1 slots only.
-    spells: ['Magic Missile'],
+    // Magic Missile persists from Magic Initiate/feat → the fallback container is lv1-only.
+    spells,
     abilities: [
       { name: 'Strength', bonus: -1 },
       { name: 'Dexterity', bonus: -1 },
-      { name: 'Intelligence', bonus: 3 },
+      { name: 'Intelligence', bonus: INT_BONUS },
     ],
-    automation: makeAutomation(),
+    automation,
   };
 }
 
-function makeAllSpells() {
-  return [
-    { name: 'Magic Missile', level: 1, casting_time: '1 action', range: '120 ft.', damage: null, ritual: false, school: 'Evocation', description: ['<p>Magic Missile.</p>'] },
-    { name: 'Telekinesis', level: 5, casting_time: '1 action', range: '60 ft.', damage: null, ritual: false, school: 'Transmutation', description: ['<p>Telekinesis.</p>'] },
-  ];
-}
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+const rowNames = abilities => abilities.spells.map(s => s.name).sort();
+const findRow = (abilities, name) => abilities.spells.find(s => s.name === name);
 
 describe('spellCalc2024 — CLA-356 Telekinetic Master (Psi Warrior lv18 Fighter)', () => {
-  it('surfaces the lv5 Telekinesis slotless free cast on a Fighter that only has lv1 slots', () => {
-    const abilities = getSpellAbilities(makeAllSpells(), makeFighterStats(), {});
+  it('lv18 disk payload: lv5 Telekinesis free-cast row survives on the lv1-slot-only fallback sheet', () => {
+    const abilities = getSpellAbilities(ALL_SPELLS, makeFighterStats(), {});
+
     expect(abilities).toBeTruthy();
-    // The fallback container only has lv1 slots (Magic Missile). Without the exemption the
-    // lv5 row would be filtered out — assert lv1 exists but NO lv5 slot.
+    // The half-caster fallback is capped to the highest PERSISTED spell level: the
+    // container HAS lv1 slots but ZERO lv5 slots — the exact trap that silently killed
+    // the row pre-CLA-356.
     expect(abilities.spell_slots_level_1).toBeGreaterThan(0);
-    expect(abilities.spell_slots_level_5 ?? 0).toBe(0);
-    const tk = abilities.spells.find(s => s.name === 'Telekinesis');
-    expect(tk, 'Telekinesis must survive the slot-level filter').toBeTruthy();
-    expect(tk.level).toBe(5);
+    expect(abilities.spell_slots_level_2).toBeUndefined();
+    expect(abilities.spell_slots_level_5).toBeUndefined();
+    expect(rowNames(abilities)).toEqual(['Magic Missile', 'Telekinesis']);
+
+    const tk = findRow(abilities, 'Telekinesis');
+    // Remapped to full spells-DB detail (the disk major.spells record says level 0),
+    // always prepared, stamped for the slotless exemption, INT as its casting ability.
+    expect(tk.level).toBe(diskLevel('Telekinesis'));
     expect(tk.prepared).toBe('Always');
     expect(tk._telekineticMasterFreeCast).toBe(true);
-  });
-
-  it('stamps Intelligence as the Telekinesis casting ability + computes saveDc 17 (8+INT3+PB6)', () => {
-    const abilities = getSpellAbilities(makeAllSpells(), makeFighterStats(), {});
-    const tk = abilities.spells.find(s => s.name === 'Telekinesis');
     expect(tk.spellCastingAbility).toBe('Intelligence');
-    expect(abilities.saveDc).toBe(17);
-    expect(abilities.saveDc).not.toBe(10);
+    expect(tk.concentration).toBe(true);
+
+    expect(abilities.spellCastingAbility).toBe('Intelligence');
+    expect(abilities.saveDc).toBe(8 + INT_BONUS + PB);
+    expect(abilities.toHit).toBe(INT_BONUS + PB);
   });
 
-  it('does NOT surface Telekinesis when there is no Telekinetic Master grant (control)', () => {
-    const stats = makeFighterStats();
-    stats.automation = { actions: [], bonusActions: [], passives: [], specialActions: [] };
-    stats.class.major = { name: 'Battle Master', features: [{ name: 'Combat Superiority', level: 3 }] };
-    const abilities = getSpellAbilities(makeAllSpells(), stats, {});
-    expect(abilities).toBeTruthy();
-    expect(abilities.spells.find(s => s.name === 'Telekinesis')).toBeFalsy();
+  it('the exemption is _telekineticMasterFreeCast, not the FT-035 generic lane: passive-only payload survives the slot filter', () => {
+    // Remove the free_spell ACTION from the payload — only the always_prepared_spells
+    // passive remains, so the row carries the CLA-356 stamp alone. Deleting keepSpellRow
+    // :748 fails here (and NOT in the full-payload test, where the co-stamped
+    // _freeSpellGrantFreeCast would mask it); deleting the passive-side stamps at
+    // :232/:237 fails the next test.
+    const abilities = getSpellAbilities(
+      ALL_SPELLS,
+      makeFighterStats({ automation: makeTMAutomation({ actions: [], bonusActions: [] }) }),
+      {},
+    );
+
+    const tk = findRow(abilities, 'Telekinesis');
+    expect(tk, 'CLA-356 exemption must keep the lv5 row with lv1 slots only').toBeTruthy();
+    expect(tk._telekineticMasterFreeCast).toBe(true);
+    expect(tk._freeSpellGrantFreeCast, 'the generic free_spell lane must NOT be what keeps this row alive here').toBeUndefined();
+    expect(tk.spellCastingAbility).toBe('Intelligence');
+  });
+
+  it('unstamped control: the disk major.spells grant alone adds Telekinesis, but keepSpellRow drops the lv5 row', () => {
+    // No automation → no _telekineticMasterFreeCast / _freeSpellGrantFreeCast stamp.
+    // psiWarrior.spells (disk) still adds the row via addMajorSubclassSpells, so this
+    // falsifies the exemption itself: the row arrives and is filtered out, lv5 > lv1.
+    const abilities = getSpellAbilities(
+      ALL_SPELLS,
+      makeFighterStats({ automation: { actions: [], bonusActions: [], passives: [], specialActions: [] } }),
+      {},
+    );
+
+    expect(rowNames(abilities)).toEqual(['Magic Missile']);
   });
 });
