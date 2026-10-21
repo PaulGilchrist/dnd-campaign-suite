@@ -1,9 +1,34 @@
-// CLA-404: Beast Spells (Druid lv18 passive) — Wild Shape blanket block bypass
-// in Beast form, except spells with a costly or consumed Material component.
+// @maintained-by-ai
+// CLA-404: Beast Spells (Druid lv18 passive) — lane: blockChecks.js BEAST-FORM
+// BLOCKING face. Disk identity (#1362, read 2026-10-21): BOTH catalogs carry the
+// row — public/data/classes.json class_levels[17].features[0] and
+// public/data/2024/classes.json class_levels[17].features[0], each with
+// automation {type:'passive_rule', effect:'beast_spells'} (2014 lv18, 2024 lv18;
+// not renamed). The consumer is ruleset-agnostic: blockChecks.js:9-10 never reads
+// `rules`, so one byte-shape serves both.
+//
+// OWNERSHIP SPLIT vs #1450 (materialComponents.js, cited verbatim there): the
+// text-detector internals (COSTLY_OR_CONSUMED_MATERIAL_RE
+// /(\d[\d,]*\s*(?:gp|gold)|worth|consumes)/i, case-fold, Aid free-text false
+// side, 33-row registry) are #1450's lane — NOT re-derived here. This lane pins
+// the blockChecks WIRING: which cast attempts the beast-form gate + detector
+// verdict combos block, exact refusal message bytes, refusable-vs-passthrough,
+// and the missing-material-text silent-allow (#1441-family).
+//
+// 4-QUADRANT TABLE (beastSpells passive × costly/consumed material):
+//   holder × free     → null (allow, no log)                 [gate: allow]
+//   holder × costly   → material refusal (text or registry)  [gate: 2 rows]
+//   holder × M, no cost text, no registry row → null         [gate: passthrough]
+//   non-holder × any  → blanket form refusal (CLA-391)       [gate: no-passive]
+// Hub gate ORDER of this seam vs other blockers lives at execution/index.js:652
+// REAL-chain (#1454 lane) + modals refusal pins (#1457) — module-direct only here.
+// NO-CLOCK: blocking here is instantaneous — no timers, no game clock (#mandatory).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
-/*  Mocks (mirror blockChecks.test.js harness)                       */
+/*  Mocks — line-by-line vs blockChecks.js imports. Detector stays   */
+/*  REAL (materialComponents; its deps setRuntimeValue/addEntry are  */
+/*  the mocked modules above). blockChecks.js itself NEVER mocked.   */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -36,7 +61,7 @@ vi.mock('./spellResolution.js', () => ({
 }));
 
 /* ------------------------------------------------------------------ */
-/*  SUT imports (materialComponents stays REAL — its deps are mocked)*/
+/*  SUT imports                                                      */
 /* ------------------------------------------------------------------ */
 
 const { addEntry } = await import('../../../../ui/logService.js');
@@ -44,130 +69,135 @@ const { getActiveBuffs } = await import('./spellResolution.js');
 const { checkBlockedBySpellcastingBuff, beastSpellsAllowsCast } = await import('./blockChecks.js');
 
 /* ------------------------------------------------------------------ */
-/*  Fixtures                                                          */
+/*  Fixtures — disk-faithful bytes (fabricated-shape ban #1455/57/  */
+/*  58/63): every spell below is a REAL row in its cited catalog.   */
 /* ------------------------------------------------------------------ */
 
 const WILD_SHAPE_BUFF = { name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true };
-
 const BEAST_SPELLS = [{ type: 'passive_rule', effect: 'beast_spells' }];
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'Wild_Sage_Druid',
-    automation: { passives: [], reactions: [], specialActions: [] },
-    ...overrides,
-  };
+function druid(passives) {
+  return { name: 'Wild_Sage_Druid', automation: { passives, reactions: [], specialActions: [] } };
 }
+const lv18Druid = () => druid(BEAST_SPELLS);
+const noPassiveDruid = () => druid([]);
 
-function lv18Druid() {
-  return makePlayerStats({ automation: { passives: BEAST_SPELLS } });
-}
-
-// Guidance (2024): V/S cantrip, no Material — canonical lv18+ ALLOWED in Beast form.
-function guidanceSpell() {
-  return { name: 'Guidance', level: 0, components: ['V', 'S'] };
-}
-
-// Summon Beast (2024): V/S/M, gilded acorn worth 200+ GP — canonical REFUSED-material.
-function summonBeastSpell() {
-  return {
-    name: 'Summon Beast',
-    level: 2,
-    components: ['V', 'S', 'M'],
-    material: 'a feather, tuft of fur, and fish tail inside a gilded acorn worth 200+ GP',
-  };
-}
+// Guidance — 2024 disk: V/S cantrip, material null. ALLOW-side fixture.
+const GUIDANCE = { name: 'Guidance', level: 0, components: ['V', 'S'], material: null };
+// Summon Beast — 2024 disk bytes, text-detector hit ('worth ... GP'); NOT a
+// registry row → proves blockChecks forwards spell.material into the detector.
+const SUMMON_BEAST = {
+  name: 'Summon Beast',
+  level: 2,
+  components: ['V', 'S', 'M'],
+  material: 'a feather, tuft of fur, and fish tail inside a gilded acorn worth 200+ GP',
+};
+// Acid Arrow — 5e disk bytes: real M component, NO cost text, NO registry row.
+// Passthrough-quadrant fixture (silent-allow, sanctioned by blockChecks.js:23-25
+// + materialComponents.js CLA-404 comment: cost/consumption lives only in text).
+const ACID_ARROW_5E = {
+  name: 'Acid Arrow',
+  level: 2,
+  rules: '5e',
+  components: ['V', 'S', 'M'],
+  material: "Powdered rhubarb leaf and an adder's stomach.",
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   getActiveBuffs.mockReturnValue([WILD_SHAPE_BUFF]);
 });
 
-describe('checkBlockedBySpellcastingBuff — Beast Spells bypass (CLA-404)', () => {
-  it('lv18 passive + component-free spell (Guidance-shaped) → allowed, no refusal log', async () => {
-    const result = await checkBlockedBySpellcastingBuff(guidanceSpell(), lv18Druid(), 'test-campaign');
-    expect(result).toBeNull();
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => String(e.automationType).endsWith('_refused'));
-    expect(refusal).toBeUndefined();
+describe('checkBlockedBySpellcastingBuff — Beast Spells gate quadrants (CLA-404)', () => {
+  it('passive holder + free-component spell → allowed in Beast form, ruleset-agnostic, with zero log calls', async () => {
+    expect(await checkBlockedBySpellcastingBuff(GUIDANCE, lv18Druid(), 'test-campaign')).toBeNull();
+    // 5e twin: same passive bytes, different rules field — module never reads `rules`.
+    const speakWithAnimals5e = { name: 'Speak with Animals', level: 1, rules: '5e', components: ['V', 'S'], material: null };
+    expect(await checkBlockedBySpellcastingBuff(speakWithAnimals5e, lv18Druid(), 'test-campaign')).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('lv18 passive + V/S spell without material (Cure Wounds-shaped) → allowed', async () => {
-    const spell = { name: 'Cure Wounds', level: 1, components: ['V', 'S'] };
-    const result = await checkBlockedBySpellcastingBuff(spell, lv18Druid(), 'test-campaign');
-    expect(result).toBeNull();
+  it('passive holder + text-detector costly material (Summon Beast disk bytes) → material refusal, exact popup + full log-entry key set', async () => {
+    const result = await checkBlockedBySpellcastingBuff(SUMMON_BEAST, lv18Druid(), 'test-campaign');
+    expect(result).toStrictEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Wild Shape',
+          description: 'Summon Beast requires a Material component with a cost (or one the spell consumes) — Beast Spells does not allow it while Wild_Sage_Druid is in Beast form.',
+        },
+      },
+    });
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    const [campaign, entry] = addEntry.mock.calls[0];
+    expect(campaign).toBe('test-campaign');
+    const { timestamp, ...rest } = entry;
+    expect(typeof timestamp).toBe('number');
+    expect(rest).toStrictEqual({
+      type: 'automation',
+      automationType: 'shape_shift_refused',
+      automationDetail: 'material_component',
+      creatureName: 'Wild_Sage_Druid',
+      characterName: 'Wild_Sage_Druid',
+      name: 'Wild Shape',
+      description: 'Summon Beast blocked — costly or consumed Material components are not allowed while in Beast form (Beast Spells exception).',
+    });
   });
 
-  it('lv18 + Summon Beast-shaped (costly material) → refused with material reasoning', async () => {
-    const result = await checkBlockedBySpellcastingBuff(summonBeastSpell(), lv18Druid(), 'test-campaign');
-    expect(result?.automationPopup?.payload?.type).toBe('automation_info');
-    expect(result.automationPopup.payload.name).toBe('Wild Shape');
-    expect(result.automationPopup.payload.description).toContain('Material');
-    expect(result.automationPopup.payload.description).toContain('Beast form');
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_refused');
-    expect(refusal).toBeDefined();
-    expect(refusal.automationDetail).toBe('material_component');
-    expect(refusal.description).toContain('Summon Beast blocked');
-  });
-
-  it('lv18 + consumed-material spell without stated cost → refused-material', async () => {
-    const spell = { name: 'Gentle Repose', level: 2, components: ['V', 'S', 'M'], material: '2 Copper Pieces, which the spell consumes' };
-    const result = await checkBlockedBySpellcastingBuff(spell, lv18Druid(), 'test-campaign');
-    expect(result).not.toBeNull();
-    expect(result.automationPopup.payload.description).toContain('Material');
-  });
-
-  it('lv18 + trimmed spell ref (name only, registry fallback) → refused-material', async () => {
+  it('passive holder + trimmed spell ref (name only) → registry fallback still blocks with material reasoning (#1450 registry, wiring pinned here)', async () => {
     const result = await checkBlockedBySpellcastingBuff({ name: 'Raise Dead' }, lv18Druid(), 'test-campaign');
-    expect(result).not.toBeNull();
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_refused');
-    expect(refusal.automationDetail).toBe('material_component');
+    expect(result.automationPopup.payload.description).toBe(
+      'Raise Dead requires a Material component with a cost (or one the spell consumes) — Beast Spells does not allow it while Wild_Sage_Druid is in Beast form.'
+    );
+    const entry = addEntry.mock.calls[0][1];
+    expect(entry.automationDetail).toBe('material_component');
+    expect(entry.automationType).toBe('shape_shift_refused');
+    expect(entry.description).toBe('Raise Dead blocked — costly or consumed Material components are not allowed while in Beast form (Beast Spells exception).');
   });
 
-  it('no passive (lv<18 druid) + blocking buff → blanket form refusal, byte-shape unchanged (CLA-391)', async () => {
-    const result = await checkBlockedBySpellcastingBuff(guidanceSpell(), makePlayerStats(), 'test-campaign');
-    expect(result).not.toBeNull();
-    expect(result.automationPopup.payload.description).toContain('no Spellcasting is allowed');
-    const refusal = addEntry.mock.calls.map(c => c[1]).find(e => e.automationType === 'shape_shift_refused');
-    expect(refusal).toBeDefined();
-    expect(refusal.automationDetail).toBeUndefined();
-    expect(refusal.description).toContain('cannot cast spells while under Wild Shape');
+  it('passive holder + real M-component spell with no cost text and no registry row → silent ALLOW (documented passthrough, #1441-family)', async () => {
+    expect(await checkBlockedBySpellcastingBuff(ACID_ARROW_5E, lv18Druid(), 'test-campaign')).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('non-druid passive set + shape_shift buff → refused-form', async () => {
-    const stats = makePlayerStats({ automation: { passives: [{ type: 'passive_rule', effect: 'hunter_lore' }] } });
-    const result = await checkBlockedBySpellcastingBuff(guidanceSpell(), stats, 'test-campaign');
-    expect(result).not.toBeNull();
-    expect(result.automationPopup.payload.description).toContain('no Spellcasting is allowed');
-  });
-
-  it('lv18 passive but no blocking buff → null', async () => {
-    getActiveBuffs.mockReturnValue([{ name: 'Shield', blocksSpellcasting: false }]);
-    const result = await checkBlockedBySpellcastingBuff(guidanceSpell(), lv18Druid(), 'test-campaign');
-    expect(result).toBeNull();
-  });
-
-  it('5e twin: passive byte-shape is ruleset-agnostic (same automation.passives consult)', async () => {
-    const stats5e = makePlayerStats({ rules: '5e', automation: { passives: [{ type: 'passive_rule', effect: 'beast_spells' }] } });
-    const result = await checkBlockedBySpellcastingBuff({ name: 'Speak with Animals', level: 1, components: ['V', 'S'] }, stats5e, 'test-campaign');
-    expect(result).toBeNull();
+  it('no beast_spells passive (empty, wrong-effect, empty) → CLA-391 blanket form refusal; unnamed buff falls back to Shape-Shift name', async () => {
+    // Wrong-effect passive kills effect-mutants of the some() filter.
+    const hunterLore = druid([{ type: 'passive_rule', effect: 'hunter_lore' }]);
+    // Wrong-type passive kills type-mutants despite correct effect byte.
+    const wrongType = druid([{ type: 'class_feature', effect: 'beast_spells' }]);
+    for (const stats of [noPassiveDruid(), hunterLore, wrongType]) {
+      const result = await checkBlockedBySpellcastingBuff(GUIDANCE, stats, 'test-campaign');
+      expect(result.automationPopup.payload.description).toBe(
+        'Guidance cannot be cast while Wild_Sage_Druid is under Wild Shape — no Spellcasting is allowed.'
+      );
+      const entry = addEntry.mock.calls.at(-1)[1];
+      expect(entry.automationDetail).toBeUndefined();
+      expect(entry.automationType).toBe('shape_shift_refused');
+      expect(entry.description).toBe('Guidance blocked — Wild_Sage_Druid cannot cast spells while under Wild Shape.');
+    }
+    // Unnamed blocking buff → 'Shape-Shift' fallback bytes.
+    getActiveBuffs.mockReturnValue([{ effect: 'shape_shift', blocksSpellcasting: true }]);
+    const result = await checkBlockedBySpellcastingBuff(GUIDANCE, noPassiveDruid(), 'test-campaign');
+    expect(result.automationPopup.payload.name).toBe('Shape-Shift');
+    expect(result.automationPopup.payload.description).toBe(
+      'Guidance cannot be cast while Wild_Sage_Druid is under Shape-Shift — no Spellcasting is allowed.'
+    );
   });
 });
 
-describe('beastSpellsAllowsCast predicate (CLA-404)', () => {
-  it('allows component-free spells for passive holders', () => {
-    expect(beastSpellsAllowsCast(guidanceSpell(), lv18Druid())).toBe(true);
-  });
-
-  it('denies costly-material spells for passive holders', () => {
-    expect(beastSpellsAllowsCast(summonBeastSpell(), lv18Druid())).toBe(false);
-  });
-
-  it('denies for non-holders regardless of components', () => {
-    expect(beastSpellsAllowsCast(guidanceSpell(), makePlayerStats())).toBe(false);
-  });
-
-  it('survives missing automation / missing spell', () => {
-    expect(beastSpellsAllowsCast(guidanceSpell(), { name: 'X' })).toBe(false);
+describe('beastSpellsAllowsCast — full truth table (CLA-404)', () => {
+  it('holder×free allow; holder×costly and non-holder×any deny; missing automation denies without throwing; null spell silently allows', () => {
+    // Quadrant rows (disk-faithful fixtures above).
+    expect(beastSpellsAllowsCast(GUIDANCE, lv18Druid())).toBe(true);
+    expect(beastSpellsAllowsCast(SUMMON_BEAST, lv18Druid())).toBe(false);
+    expect(beastSpellsAllowsCast(GUIDANCE, noPassiveDruid())).toBe(false);
+    expect(beastSpellsAllowsCast(SUMMON_BEAST, noPassiveDruid())).toBe(false);
+    // Golden non-throw guard (#1360 family): automation key absent.
+    expect(beastSpellsAllowsCast(GUIDANCE, { name: 'Wild_Sage_Druid' })).toBe(false);
+    // Quirk pin (silent-null, caller never traversed on REAL chain): null spell
+    // → detector false → ALLOW for holders. materialComponents #1450 pins its
+    // own detector(false) side; the gate-side consequence is owned here.
     expect(beastSpellsAllowsCast(null, lv18Druid())).toBe(true);
   });
 });

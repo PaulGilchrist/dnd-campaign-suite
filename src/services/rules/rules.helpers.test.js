@@ -1,353 +1,355 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import rules from './rules.js'
+// @maintained-by-ai
+// rules-helpers lane: the rules-helpers.js helper surface (ruleset precedence,
+// Fey/Shadow runtime seed, rules-type writer, GENERIC merge contract) plus the
+// string-row/guard ownership cited by four neighbors. Incoming-cite map (old -> new):
+//   :176-201  2024 string bonusActions/reactions passthrough (#1435/#1444) -> :222-239
+//   :226-267  5e getActions four-channel not-array throws (#1435 twin cite) -> :197-220
+//   :237-260  5e twin bonusActions/reactions throws (rules-2024-actions :73) -> :197-220 (loop rows 2-3)
+//   :287      'Missing object: class.major' guard (#1440/#1441/#1442 collector-guard form) -> :250 (table :241-275)
+//   :291-317  getLanguages race/class/subrace not-array throws -> :278-313
+//   :320-332  Ranger language level bonuses -> :315-336
+//   (unnumbered) getMagicItems sync guard, rules-error-handling.test.js:8 -> :340-353
+// Removed (covered elsewhere, report-only): old :203-222 2024 cross-source dedup
+// (owner core/rules-actions.test.js:127, rec test-maintain-bugs.md:782); old
+// :346-351 Spell Scroll desc (same branch as rules.test.js:631 Ring of Spell Storing).
+// Guards run through the OWNING modules (rules-actions/rules-proficiencies/
+// rules-languages/rules-magicItems), not the facade — facade delegates are owned
+// by rules.test.js / rules-core.test.js:73. Stubbed seams only: feature-provider
+// collaborators (own lanes exist) + proficiencyUtils (proves guard runs BEFORE pu)
+// + useRuntimeState (applyFeyShadowTouchedSpells; complete factory: rules-helpers.js
+// imports only getRuntimeValue #1440 lesson). FT-046 featName threading + survivor
+// wrapper bytes owned by rules-helpers.ft046-featname-threading.test.js — NOT
+// re-run here; this file pins the generic contract ft046 does not touch: dedup is
+// vs-existing-only (no in-batch dedup), string-row coercion quirks at :23/:25.
+// No clocks; no dice; zero fs; console.error spied locally per throw test.
+import { describe, it, expect, vi } from 'vitest'
+import { cloneDeep } from 'lodash'
 
-vi.mock('../ui/utils.js', () => ({
-  default: {
-    getAbilityLongName: vi.fn((short) => ({
-      STR: 'Strength',
-      DEX: 'Dexterity',
-      CON: 'Constitution',
-      INT: 'Intelligence',
-      WIS: 'Wisdom',
-      CHA: 'Charisma',
-    }[short] || short.toUpperCase())),
-  },
-}))
-
-vi.mock('./core/attackCalc.js', () => ({
-  parseMagicItemName: vi.fn((name) => ({ baseName: name, magicBonus: 0 })),
-  getAttacks: vi.fn(() => []),
-}))
-
-vi.mock('./core/abilityCalc.js', () => ({
-  getAbilities: vi.fn(() => [
-    { name: 'Strength', bonus: 2, totalScore: 14 },
-    { name: 'Dexterity', bonus: 3, totalScore: 16 },
-    { name: 'Constitution', bonus: 2, totalScore: 14 },
-    { name: 'Intelligence', bonus: 1, totalScore: 12 },
-    { name: 'Wisdom', bonus: 0, totalScore: 10 },
-    { name: 'Charisma', bonus: 0, totalScore: 10 },
-  ]),
-  getHitPoints: vi.fn(() => 45),
-  getCarryingCapacity: vi.fn(() => 150),
-}))
-
-vi.mock('./core/abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(() => [
-    { name: 'Strength', bonus: 2, totalScore: 14 },
-    { name: 'Dexterity', bonus: 3, totalScore: 16 },
-    { name: 'Constitution', bonus: 2, totalScore: 14 },
-    { name: 'Intelligence', bonus: 1, totalScore: 12 },
-    { name: 'Wisdom', bonus: 0, totalScore: 10 },
-    { name: 'Charisma', bonus: 0, totalScore: 10 },
-  ]),
-  getHitPoints: vi.fn(() => 45),
-  getCarryingCapacity: vi.fn(() => 150),
-}))
-
-vi.mock('./core/spellCalc.js', () => ({
-  getSpellAbilities: vi.fn(() => ({})),
-}))
-
-vi.mock('./core/spellCalc2024.js', () => ({
-  getSpellAbilities: vi.fn(() => ({})),
-}))
-
-vi.mock('./core/attackCalc2024.js', () => ({
-  getAttacks: vi.fn(() => []),
-}))
+import {
+  getRulesType,
+  is2024,
+  mergeAutomationSpecialActions,
+  applyFeyShadowTouchedSpells,
+  applyRulesType,
+} from './rules-helpers.js'
+import { getActions } from './rules-actions.js'
+import { getProficiencies } from './rules-proficiencies.js'
+import { getLanguages } from './rules-languages.js'
+import { getMagicItems } from './rules-magicItems.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+import classRules from '../character/classRules.js'
+import { getProficiencies as pu5eGetProficiencies } from '../character/proficiencyUtils.js'
+import { getProficiencies as pu2024GetProficiencies } from '../character/proficiencyUtils2024.js'
 
 vi.mock('../character/classRules.js', () => ({
   default: {
-    getClass: vi.fn(() => ({ name: 'Fighter', languages: [] })),
+    featureCategories: {},
     getFeatures: vi.fn(() => ({
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
+      actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [],
     })),
-    getRangerFeatures: vi.fn(() => ({ extraAttacks: 0 })),
   },
 }))
-
 vi.mock('../character/classRules2024.js', () => ({
   default: {
-    getClass: vi.fn(() => ({ name: 'Fighter', languages: [] })),
+    featureCategories: {},
     getFeatures: vi.fn(() => ({
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
+      actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [],
     })),
   },
 }))
-
 vi.mock('../character/race-rules/index.js', () => ({
   rules5e: {
-    getRace: vi.fn(() => ({})),
     getTraits: vi.fn(() => ({
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
+      actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [],
     })),
-    getImmunities: vi.fn(() => []),
-    getResistances: vi.fn(() => []),
-    getSenses: vi.fn(() => []),
   },
   rules2024: {
-    getRace: vi.fn(() => ({})),
     getTraits: vi.fn(() => ({
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      specialActions: [],
-      characterAdvancement: [],
+      actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [],
     })),
-    getImmunities: vi.fn(() => []),
-    getResistances: vi.fn(() => []),
-    getSenses: vi.fn(() => []),
   },
 }))
-
+// Guard-before-call proof: if a bonusSource guard regressed, the call below would
+// receive a null bonusSource — the exact-message throws + not-called pair pin it.
 vi.mock('../character/proficiencyUtils.js', () => ({
-  getProficiencies: vi.fn(() => [5, []]),
+  getProficiencies: vi.fn(() => [0, []]),
   getProficiencyChoiceCount: vi.fn(() => 0),
 }))
-
 vi.mock('../character/proficiencyUtils2024.js', () => ({
-  getProficiencies: vi.fn(() => [5, []]),
+  getProficiencies: vi.fn(() => [0, []]),
   getProficiencyChoiceCount: vi.fn(() => 0),
 }))
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getStore: vi.fn(() => new Map()),
-  useSyncedState: vi.fn(() => [null, vi.fn()]),
-  listeners: new Map(),
   getRuntimeValue: vi.fn(() => undefined),
 }))
 
-vi.mock('../shared/spell-utils.js', () => ({
-  getSpellMaxLevel: vi.fn(() => 9),
-}))
+const spyConsoleError = () => vi.spyOn(console, 'error').mockImplementation(() => {})
 
-vi.mock('../ui/dataLoader.js', () => ({
-  loadFeatData: vi.fn(async () => ({ abilityScoreIncreases: [], proficiencies: [], features: [] })),
-  loadSkills: vi.fn(async () => []),
-  loadBackgroundData: vi.fn(() => null),
-  loadWildMagicSurgeTable: vi.fn(async () => []),
-  loadManeuvers: vi.fn(async () => []),
-}))
-
-vi.mock('../character/featBuffService.js', () => ({
-  computeAllFeatBuffs: vi.fn(() => ({
-    abilityScoreIncreases: [],
-    proficiencies: [],
-    features: [],
-  })),
-}))
-
-vi.mock('../../combat/automation/automationService.js', () => ({
-  collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),
-  collectSaveModifiers: vi.fn(() => []),
-  collectTurnStartEffects: vi.fn(() => []),
-  getConditionImmunities: vi.fn(() => []),
-  getConditionalImmunities: vi.fn(() => []),
-  getEvasionEffects: vi.fn(() => []),
-  getAllSaveProficiencies: vi.fn(() => []),
-  evaluateAutoExpression: vi.fn(() => 0),
-  buildAttackInfo: vi.fn(() => null),
-}))
-
-vi.mock('../automation/handlers/class-other/elfishLineageHandler.js', () => ({
-  getElfisLineageSelection: vi.fn(() => null),
-  handle: vi.fn(),
-}))
-
-describe('rules helper functions', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+describe('rules-helpers.js ruleset selection', () => {
+  it('getRulesType prefers playerStats.rules, falls back to summary, defaults 5e; is2024 is exact-byte', () => {
+    expect(getRulesType({ rules: '2024' }, { rules: '5e' })).toBe('2024')
+    expect(getRulesType({}, { rules: '2024' })).toBe('2024')
+    expect(getRulesType({ rules: '' }, { rules: '2024' })).toBe('2024') // falsy falls through
+    expect(getRulesType({ rules: null }, null)).toBe('5e')
+    expect(getRulesType(undefined, undefined)).toBe('5e')
+    expect(is2024({ rules: '2024' }, {})).toBe(true)
+    expect(is2024({ rules: '2024 ' }, {})).toBe(false) // whitespace-exact comparison
+    expect(is2024({}, { rules: '2024' })).toBe(true)
+    expect(is2024({}, { rules: '5e' })).toBe(false)
   })
 
-  describe('getActions 2024-specific', () => {
-    it('handles 2024 string bonusActions', () => {
-      const stats = {
-        rules: '2024',
-        actions: [],
-        bonusActions: ['Haste'],
-        reactions: [],
-        specialActions: [],
-      }
-      const result = rules.getActions(stats, {})
-      // String bonusActions are NOT mapped to objects in the 2024 code path
-      // They remain as strings, so .name is undefined
-      expect(result[1].length).toBe(1)
-    })
+  it('applyRulesType rewrites rules from the SUMMARY alone — playerStats.rules is ignored (quirk)', () => {
+    const fromSummary = {}
+    applyRulesType(fromSummary, { rules: '2024' })
+    expect(fromSummary).toStrictEqual({ rules: '2024' })
 
-    it('handles 2024 string reactions', () => {
-      const stats = {
-        rules: '2024',
-        actions: [],
-        bonusActions: [],
-        reactions: ['Reaction Attack'],
-        specialActions: [],
-      }
-      const result = rules.getActions(stats, {})
-      // String reactions are NOT mapped to objects in the 2024 code path
-      expect(result[2].length).toBe(1)
-    })
+    // Quirk: unlike getRulesType, an existing playerStats.rules is CLOBBERED by the
+    // summary fallback — stats:'2024' + summary without rules lands on '5e' (:46).
+    const clobbered = { rules: '2024' }
+    applyRulesType(clobbered, {})
+    expect(clobbered).toStrictEqual({ rules: '5e' })
 
-    it('deduplicates across feature and trait actions in 2024', async () => {
-      const { default: classRules } = await import('../character/classRules2024.js')
-      vi.mocked(classRules.getFeatures).mockReturnValue({
-        actions: [{ name: 'Attack' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: [],
-      })
-      const stats = {
-        rules: '2024',
-        actions: ['Attack'],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-      }
-      const result = rules.getActions(stats, {})
-      const actionNames = result[0].map((a) => a.name)
-      expect(actionNames.filter((n) => n === 'Attack').length).toBe(1)
-    })
+    // Golden unguarded deref (#1360 family): playerSummary is required, console untouched.
+    const errSpy = spyConsoleError()
+    expect(() => applyRulesType({}, undefined)).toThrow(TypeError)
+    expect(errSpy).not.toHaveBeenCalled()
+    errSpy.mockRestore()
   })
 
-  describe('getActions 5e-specific', () => {
-    it('throws when actions is not an array (5e)', () => {
-      const stats = {
-        rules: '5e',
-        actions: 'not an array',
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-      }
-      expect(() => rules.getActions(stats, {})).toThrow('Missing array: actions')
-    })
+  it('applyFeyShadowTouchedSpells reads both runtime keys with exact accessor bytes and never fabricates absent keys', () => {
+    const ftRow = { name: 'Misty Step' }
+    const stRow = { name: 'Pass Without Trace' }
+    vi.mocked(getRuntimeValue).mockImplementation((_name, key) =>
+      (key === 'feyTouchedSpell' ? ftRow : key === 'shadowTouchedSpell' ? stRow : undefined))
 
-    it('throws when bonusActions is not an array (5e)', () => {
-      const stats = {
-        rules: '5e',
-        actions: [],
-        bonusActions: 'not an array',
-        reactions: [],
-        specialActions: [],
-      }
-      expect(() => rules.getActions(stats, {})).toThrow('Missing array: bonusActions')
-    })
+    const stats = { name: 'FeyTest' }
+    applyFeyShadowTouchedSpells(stats)
+    expect(stats.feyTouchedSpell).toBe(ftRow) // by-reference seed, no clone
+    expect(stats.shadowTouchedSpell).toBe(stRow)
+    expect(vi.mocked(getRuntimeValue).mock.calls).toEqual([
+      ['FeyTest', 'feyTouchedSpell'],
+      ['FeyTest', 'shadowTouchedSpell'],
+    ])
 
-    it('throws when reactions is not an array (5e)', () => {
-      const stats = {
-        rules: '5e',
-        actions: [],
-        bonusActions: [],
-        reactions: 'not an array',
-        specialActions: [],
-      }
-      expect(() => rules.getActions(stats, {})).toThrow('Missing array: reactions')
-    })
+    // Absent (undefined) values: keys are NOT created on playerStats (:37/:39 falsy gate).
+    vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+    const untouched = { name: 'FeyTest' }
+    applyFeyShadowTouchedSpells(untouched)
+    expect(untouched).toStrictEqual({ name: 'FeyTest' })
+  })
+})
 
-    it('throws when specialActions is not an array (5e)', () => {
-      const stats = {
-        rules: '5e',
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: 'not an array',
-      }
-      expect(() => rules.getActions(stats, {})).toThrow('Missing array: specialActions')
+describe('mergeAutomationSpecialActions generic contract (rules-helpers.js:21-30)', () => {
+  it('dedups vs EXISTING names only — duplicate automation rows both survive, appended in order', () => {
+    const existing = { name: 'Existing' }
+    const rowA = { name: 'Alpha', description: 'dA', featName: 'Feat A' }
+    const rowA2 = { name: 'Alpha', description: 'dA2' } // same name as rowA
+    const playerStats = { specialActions: [existing], automation: { specialActions: [rowA, rowA2] } }
+    const automationRowsSnapshot = cloneDeep(playerStats.automation.specialActions)
+
+    mergeAutomationSpecialActions(playerStats)
+
+    // existingNames is built once (:23) and never updated on push (:24-29): the
+    // in-batch duplicate rowA2 merges TOO — dedup guards collisions with existing
+    // rows only (generic contract; exact-name swallow vs existing pinned by ft046 lane).
+    expect(playerStats.specialActions.length).toBe(3)
+    expect(playerStats.specialActions[0]).toBe(existing) // survivor passthrough by identity
+    expect(playerStats.specialActions[1]).toStrictEqual({
+      name: 'Alpha', description: 'dA', automation: rowA, featName: 'Feat A', hasAutomation: true,
     })
+    expect(playerStats.specialActions[2]).toStrictEqual({
+      name: 'Alpha', description: 'dA2', automation: rowA2, featName: undefined, hasAutomation: true,
+    })
+    // :27 wraps into a FRESH object each pass; the two same-name survivors stay distinct.
+    expect(playerStats.specialActions[1]).not.toBe(rowA)
+    expect(playerStats.specialActions[1].automation).toBe(rowA)
+    expect(playerStats.specialActions[2].automation).toBe(rowA2)
+    // Input purity (#1395): automation rows are never mutated.
+    expect(playerStats.automation.specialActions).toStrictEqual(automationRowsSnapshot)
   })
 
-  describe('getProficiencies 5e-specific', () => {
-    it('throws when class.subclass is not an object (5e)', () => {
-      const stats = {
-        rules: '5e',
-        class: { subclass: null },
-      }
-      expect(() => rules.getProficiencies(stats, true, {})).toThrow('Missing object: class.subclass')
+  it('string-row quirk: string existing rows poison the name Set with undefined, silently swallowing nameless automation rows; automation string rows never merge', () => {
+    // s.name on a string row is undefined (:23) — any automation row lacking a name
+    // is then silently skipped (:25). Rows stay the original strings, untouched.
+    const stats = { specialActions: ['Attack'], automation: { specialActions: [{ description: 'anon row' }, 'String Row'] } }
+    const arr = stats.specialActions
+    mergeAutomationSpecialActions(stats)
+    expect(stats.specialActions).toBe(arr) // array identity: nothing pushed
+    expect(stats.specialActions).toStrictEqual(['Attack'])
+
+    // With no string existing rows, a nameless automation row merges as name: undefined
+    // (:1374 silent-null form) — the wrapper is emitted unguarded.
+    const fresh = { specialActions: [], automation: { specialActions: [{ description: 'anon row' }] } }
+    mergeAutomationSpecialActions(fresh)
+    expect(fresh.specialActions).toHaveLength(1)
+    expect(fresh.specialActions[0].name).toBeUndefined()
+    expect(fresh.specialActions[0]).toStrictEqual({
+      name: undefined, description: 'anon row', automation: fresh.automation.specialActions[0], featName: undefined, hasAutomation: true,
     })
+
+    // automation truthiness gate (:22): non-object automation degrades to [] no-op.
+    const strAutomation = { specialActions: [{ name: 'Keep' }], automation: 'not-an-object' }
+    mergeAutomationSpecialActions(strAutomation)
+    expect(strAutomation).toStrictEqual({ specialActions: [{ name: 'Keep' }], automation: 'not-an-object' })
+  })
+})
+
+describe('getActions 5e guard table (rules-actions.js:85-106)', () => {
+  it('throws Missing array with exact byte per channel, logs console.error first, first guard wins', () => {
+    // Cited: rules-2024-actions.test.js:5 ("all four channels") and :73
+    // (bonusActions/reactions twins of the 2024 tolerance test).
+    const channels = ['actions', 'bonusActions', 'reactions', 'specialActions']
+    const errSpy = spyConsoleError()
+    for (const channel of channels) {
+      errSpy.mockClear()
+      const stats = { name: 'Guard5e', rules: '5e', actions: [], bonusActions: [], reactions: [], specialActions: [] }
+      stats[channel] = 'not an array'
+      expect(() => getActions(stats, {})).toThrow(new Error(`Missing array: ${channel} for Guard5e`))
+      expect(errSpy.mock.calls).toEqual([[`rules: expected ${channel} to be an array for`, 'Guard5e']])
+    }
+    // Provider seam ran once per invocation BEFORE the guards dispatch (rules-actions.js:10-12).
+    expect(classRules.getFeatures).toHaveBeenCalledTimes(channels.length)
+    // Short-circuit order (:88->:106): actions guard fires before bonusActions.
+    errSpy.mockClear()
+    expect(() => getActions({ name: 'Guard5e', rules: '5e', actions: 'bad', bonusActions: 'bad' }, {}))
+      .toThrow(new Error('Missing array: actions for Guard5e'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected actions to be an array for', 'Guard5e']])
+    expect(classRules.getFeatures).toHaveBeenCalledTimes(channels.length + 1)
+    errSpy.mockRestore()
+  })
+})
+
+describe('getActions 2024 string channels (cited :176-201 -> here)', () => {
+  it('2024 leaves string bonusActions/reactions UNmapped (no string coercion on these two channels) and uniqBy collapses multi-string rows', () => {
+    // Distinct from the coercion channels (actions/specialActions mapped to
+    // {name, description:'', details:null}) owned by core/rules-actions.test.js:159.
+    const stats = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Haste'], reactions: ['Reaction Attack'], specialActions: [] }
+    const [, bonusActions, reactions] = getActions(stats, {})
+    expect(bonusActions).toStrictEqual(['Haste']) // raw string survives :47 uniqBy untouched
+    expect(reactions).toStrictEqual(['Reaction Attack'])
+
+    // Quirk (:47-52): uniqBy(...,'name') on string rows maps EVERY row to undefined,
+    // so the 2nd+ string silently drops — silent-row-loss, no console output.
+    const errSpy = spyConsoleError()
+    const two = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Alpha', 'Bravo'], reactions: [], specialActions: [] }
+    expect(getActions(two, {})[1]).toStrictEqual(['Alpha']) // Bravo silently dropped
+    expect(errSpy).not.toHaveBeenCalled() // silent drop — new member of the #1374 :0-swallow census
+    errSpy.mockRestore()
+  })
+})
+
+describe('getProficiencies guards (rules-proficiencies.js:119-126/:163-170)', () => {
+  it('throws Missing object for null/non-object bonusSource with exact byte, before proficiencyUtils runs; missing class is a golden TypeError', () => {
+    // Cited by #1440 implementsOfMercy ('class.major guard'). Key-vs-value case gate:
+    // near-miss strings mirror REAL disk shapes (classes.json subclass/major are objects;
+    // a plain string is the corruption form the guard exists to catch).
+    const cases = [
+      ['5e', { subclass: null }, 'Missing object: class.subclass for ProfTest',
+        'rules: expected class.subclass to be an object for'],
+      ['5e', { subclass: 'War Knight' }, 'Missing object: class.subclass for ProfTest',
+        'rules: expected class.subclass to be an object for'],
+      ['2024', { major: null }, 'Missing object: class.major for ProfTest',
+        'rules: expected class.major to be an object for'],
+      ['2024', { major: 'War Domain' }, 'Missing object: class.major for ProfTest',
+        'rules: expected class.major to be an object for'],
+    ]
+    const errSpy = spyConsoleError()
+    for (const [ruleset, cls, msg, logPrefix] of cases) {
+      errSpy.mockClear()
+      const stats = { name: 'ProfTest', rules: ruleset, class: cloneDeep(cls) }
+      expect(() => getProficiencies(stats, true, {})).toThrow(new Error(msg))
+      expect(errSpy.mock.calls).toEqual([[logPrefix, 'ProfTest']])
+    }
+    // Guard precedes the collaborator call: bonusSource is built while evaluating the
+    // argument list, so neither ruleset's getProficiencies is ever entered.
+    expect(pu5eGetProficiencies).not.toHaveBeenCalled()
+    expect(pu2024GetProficiencies).not.toHaveBeenCalled()
+
+    // Golden unguarded deref: playerStats.class itself missing throws TypeError with
+    // no console byte (guard checks val, not the class hop).
+    errSpy.mockClear()
+    expect(() => getProficiencies({ name: 'NoClass', rules: '5e' }, true, {})).toThrow(TypeError)
+    expect(() => getProficiencies({ name: 'NoClass', rules: '2024' }, true, {})).toThrow(TypeError)
+    expect(errSpy).not.toHaveBeenCalled()
+    errSpy.mockRestore()
+  })
+})
+
+describe('getLanguages guards + Ranger bonus (rules-languages.js)', () => {
+  it('throws Missing array with exact byte for race/class/subrace channels; subrace guard is behind language_options', () => {
+    const errSpy = spyConsoleError()
+
+    errSpy.mockClear()
+    expect(() => getLanguages({ name: 'LangTest', class: { languages: [] } }, {}))
+      .toThrow(new Error('Missing array: race.languages for LangTest'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected race.languages to be an array for', 'LangTest']])
+
+    errSpy.mockClear()
+    expect(() => getLanguages({
+      name: 'LangTest', race: { languages: ['Common'] }, class: { languages: 'not an array' },
+    }, {})).toThrow(new Error('Missing array: class.languages for LangTest'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected class.languages to be an array for', 'LangTest']])
+
+    errSpy.mockClear()
+    expect(() => getLanguages({
+      name: 'LangTest',
+      race: { languages: ['Common'], subrace: { languages: 'not an array', language_options: { choose: 1 } } },
+      class: { languages: [] },
+    }, {})).toThrow(new Error('Missing array: subrace.languages for LangTest'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected subrace.languages to be an array for', 'LangTest']])
+
+    // Guard-behind-early-return (#1443 form): WITHOUT language_options the subrace
+    // branch exits at :5-7 before the :9 isArray guard — bad subrace.languages never throws.
+    errSpy.mockClear()
+    expect(getLanguages({
+      name: 'LangTest', race: { languages: ['Common'], subrace: { languages: 'silently skipped' } }, class: { languages: [] },
+    }, {})).toStrictEqual([3, ['Common']])
+    expect(errSpy).not.toHaveBeenCalled()
+
+    // Golden unguarded deref: subclassLanguageBonus reads playerStats.class.subclass
+    // unoptional (:34) — missing class throws TypeError, console untouched.
+    expect(() => getLanguages({ name: 'LangTest', race: { languages: ['Common'] } }, {})).toThrow(TypeError)
+    expect(errSpy).not.toHaveBeenCalled()
+    errSpy.mockRestore()
   })
 
-  describe('getProficiencies 2024-specific', () => {
-    it('throws when class.major is not an object (2024)', () => {
-      const stats = {
-        rules: '2024',
-        class: { major: null },
-      }
-      expect(() => rules.getProficiencies(stats, true, {})).toThrow('Missing object: class.major')
+  it('Ranger language bonus flips at strictly-greater levels 5 and 13; other classes never bonus', () => {
+    const rangerStats = (level) => ({
+      name: 'RangerTest',
+      race: { languages: ['Common'] },
+      class: { name: 'Ranger', languages: [], language_choices: { choose: 0 } },
+      languages: [],
+      level,
     })
+    // Boundaries pin the strict > at :23-24: level 5/13 get NO bump, 6/14 do.
+    expect(getLanguages(rangerStats(5), {})).toStrictEqual([3, ['Common']])
+    expect(getLanguages(rangerStats(6), {})).toStrictEqual([4, ['Common']])
+    expect(getLanguages(rangerStats(13), {})).toStrictEqual([4, ['Common']])
+    expect(getLanguages(rangerStats(14), {})).toStrictEqual([5, ['Common']])
+
+    // class.language_choices.choose flows additively on top of the Ranger bump.
+    const withChoose = rangerStats(6)
+    withChoose.class.language_choices = { choose: 1 }
+    expect(getLanguages(withChoose, {})).toStrictEqual([5, ['Common']])
+
+    expect(getLanguages({ ...rangerStats(14), class: { name: 'Fighter', languages: [], language_choices: { choose: 0 } } }, {}))
+      .toStrictEqual([3, ['Common']])
   })
+})
 
-  describe('getLanguages', () => {
-    it('throws when race.languages is not an array', () => {
-      const stats = {
-        race: { languages: 'not an array' },
-        class: { languages: [] },
-      }
-      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: race.languages')
-    })
+describe('getMagicItems guard (rules-magicItems.js:7-11)', () => {
+  it('throws Missing array with summary name, falling back to the literal unknown byte', () => {
+    // Cited by rules-error-handling.test.js:8 (sync per-field guards live here).
+    const errSpy = spyConsoleError()
+    expect(() => getMagicItems([], { name: 'ItemTest', inventory: { magicItems: 'not an array' } }, { rules: '5e' }))
+      .toThrow(new Error('Missing array: inventory.magicItems for ItemTest'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected inventory.magicItems to be an array for', 'ItemTest']])
 
-    it('throws when class.languages is not an array', () => {
-      const stats = {
-        race: { languages: ['Common'] },
-        class: { languages: 'not an array' },
-      }
-      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: class.languages')
-    })
-
-    it('throws when subrace.languages is not an array', () => {
-      const stats = {
-        race: {
-          languages: ['Common'],
-          subrace: { languages: 'not an array', language_options: { choose: 1 } },
-        },
-        class: { languages: [] },
-      }
-      expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: subrace.languages')
-    })
-
-    it('handles ranger language bonuses at levels 6-13 and 14+', () => {
-      const stats6 = {
-        race: { languages: ['Common'] },
-        class: { name: 'Ranger', languages: [], language_choices: { choose: 0 } },
-        languages: [],
-        level: 6,
-      }
-      expect(rules.getLanguages(stats6, {})[0]).toBe(4)
-
-      const stats14 = {
-        race: { languages: ['Common'] },
-        class: { name: 'Ranger', languages: [], language_choices: { choose: 0 } },
-        languages: [],
-        level: 14,
-      }
-      expect(rules.getLanguages(stats14, {})[0]).toBe(5)
-    })
-  })
-
-  describe('getMagicItems', () => {
-    it('throws when inventory.magicItems is not an array', () => {
-      const stats = { rules: '5e' }
-      expect(() => rules.getMagicItems([], { inventory: { magicItems: 'not an array' } }, stats)).toThrow(
-        'Missing array: inventory.magicItems'
-      )
-    })
-
-    it('Spell Scroll items get description from inventory item', () => {
-      const magicItems = [{ name: 'Spell Scroll', description: 'A scroll with a spell' }]
-      const stats = { rules: '5e' }
-      const result = rules.getMagicItems(magicItems, { inventory: { magicItems: [{ name: 'Spell Scroll', spell: 'magic missile' }] } }, stats)
-      expect(result[0].description).toBe('magic missile')
-    })
+    // :9-10 fallback branch: nameless summary reports the literal 'unknown'.
+    errSpy.mockClear()
+    expect(() => getMagicItems([], { inventory: { magicItems: null } }, { rules: '2024' }))
+      .toThrow(new Error('Missing array: inventory.magicItems for unknown'))
+    expect(errSpy.mock.calls).toEqual([['rules: expected inventory.magicItems to be an array for', 'unknown']])
+    errSpy.mockRestore()
   })
 })

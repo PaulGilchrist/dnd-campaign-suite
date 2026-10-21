@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cloneDeep } from 'lodash';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-// ── Mocks ───────────────────────────────────────────────────────
+// ── Mocks (every live-graph import of the unit; real contracts honored) ───
 
 vi.mock('../../../hooks/combat/useMetamagic.js', () => ({
   getMaxSorceryPoints: vi.fn(),
@@ -10,15 +14,7 @@ vi.mock('../../../hooks/combat/useMetamagic.js', () => ({
 }));
 
 vi.mock('../../automation/common/damageRollback.js', () => ({
-  findLastAttack: vi.fn().mockResolvedValue({
-    attackEvent: null,
-    attackerName: null,
-    targetName: null,
-    primaryDamage: 0,
-    secondaryDamage: 0,
-    totalDamage: 0,
-    damageTypes: [],
-  }),
+  findLastAttack: vi.fn(),
 }));
 
 vi.mock('./metamagicRules.js', () => ({
@@ -33,6 +29,9 @@ vi.mock('../combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
+// REAL applyDamageToTarget is async (applyDamage.js:991) resolving
+// { finalDamage, oldHp, newHp, ... } — lane always stubs a Promise so the
+// un-awaited call at empoweredSpellService.js:159 is not masked.
 vi.mock('../combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
@@ -46,6 +45,7 @@ vi.mock('../features/invisibilityService.js', () => ({
 import {
   buildEmpoweredSpellState,
   executeEmpoweredReroll,
+  hasEmpoweredSpell,
   getEmpoweredSpellDescription,
 } from './empoweredSpellService.js';
 
@@ -53,6 +53,7 @@ import {
   getMaxSorceryPoints,
   getCurrentSorceryPoints,
   spendSorceryPoints,
+  logMetamagicUse,
 } from '../../../hooks/combat/useMetamagic.js';
 import { findLastAttack } from '../../automation/common/damageRollback.js';
 import { getChaModifier } from './metamagicRules.js';
@@ -60,6 +61,13 @@ import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyDamageToTarget } from '../combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
+
+// ── REAL disk metamagic rows (public/data[.2024]/classes.json, Sorcerer) ──
+
+const disk5e = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/classes.json'), 'utf8'));
+const disk2024 = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/2024/classes.json'), 'utf8'));
+const diskMeta5e = disk5e[9].class_levels[2].features[0];
+const diskMeta2024 = disk2024[9].class_levels[1].features[1];
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -73,29 +81,55 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeCombatSummary(creatures) {
-  return { round: 1, creatures };
+function makeEvent(overrides = {}) {
+  return {
+    damageFormula: '3d6+2',
+    rolls: [4, 6, 3],
+    rawDamage: 15,
+    spellName: 'Burning Hands',
+    targetName: 'Goblin',
+    damageTypes: ['Fire'],
+    ...overrides,
+  };
 }
+
+// Fixed-stub dice queue: each queue entry is the exact natural rolled for
+// one reroll, consumed in index order. Over-draw throws — pinning reroll
+// count and WHICH indices reroll (die value = floor(rand*sides)+1).
+function stubDice(naturals, sides = 6) {
+  let i = 0;
+  vi.spyOn(Math, 'random').mockImplementation(() => {
+    if (i >= naturals.length) {
+      throw new Error(`Math.random overdraw: ${naturals.length} reroll(s) stubbed, request #${i + 1} exceeds them`);
+    }
+    return (naturals[i++] - 1) / sides;
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  stubDice([]); // any unstubbed reroll draw is a loud failure
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ── buildEmpoweredSpellState ────────────────────────────────────
 
-describe('buildEmpoweredSpellState', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('returns base state with error when no last event', async () => {
+describe('buildEmpoweredSpellState — refusal/error state shapes', () => {
+  it.each([
+    ['no recent attack', null, 'No recent damage event found. Cast a spell that deals damage first.', false],
+    ['event without damageFormula', makeEvent({ damageFormula: undefined }), 'No dice roll data available', false],
+    ['event with empty damageTypes', makeEvent({ damageTypes: [] }), 'No dice roll data available', false],
+    ['unparseable formula', makeEvent({ damageFormula: 'invalid' }), 'Could not parse damage formula', true],
+  ])('%s: full error state, formulaParsed absent', async (_label, attackEvent, error, parseCalled) => {
     const playerStats = makePlayerStats();
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(3);
-    findLastAttack.mockResolvedValue({
-      attackEvent: null,
-      attackerName: null,
-      targetName: null,
-      primaryDamage: 0,
-      secondaryDamage: 0,
-      totalDamage: 0,
-      damageTypes: [],
-    });
-    getChaModifier.mockReturnValue(3);
+    getChaModifier.mockReturnValue(2);
+    findLastAttack.mockResolvedValue({ attackEvent });
+    parseExpression.mockReturnValue(null);
 
     const result = await buildEmpoweredSpellState(playerStats);
 
@@ -104,221 +138,99 @@ describe('buildEmpoweredSpellState', () => {
       name: 'Metamagic - Empowered Spell',
       currentSP: 3,
       maxSP: 5,
-      chaMod: 3,
+      chaMod: 2,
       lastEvent: null,
-      error: 'No recent damage event found. Cast a spell that deals damage first.',
+      error,
     });
+    expect(parseExpression).toHaveBeenCalledTimes(parseCalled ? 1 : 0);
   });
 
-  it('includes lastEvent and formulaParsed when damage event exists', async () => {
-    const playerStats = makePlayerStats();
-    const lastEvent = {
-      damageFormula: '3d6+2',
-      rolls: [4, 6, 3],
-      rawDamage: 15,
-      damageType: 'Fire',
-      spellName: 'Burning Hands',
-      targetName: 'Goblin',
-      damageTypes: ['Fire'],
-    };
-    const parsed = { count: 3, sides: 6, modifier: 2 };
-    getMaxSorceryPoints.mockReturnValue(4);
-    getCurrentSorceryPoints.mockReturnValue(2);
-    findLastAttack.mockResolvedValue({
-      attackEvent: lastEvent,
-      attackerName: 'Xander',
-      targetName: 'Goblin',
-      primaryDamage: 15,
-      secondaryDamage: 0,
-      totalDamage: 15,
-      damageTypes: ['Fire'],
-    });
-    getChaModifier.mockReturnValue(3);
-    parseExpression.mockReturnValue(parsed);
-
-    const result = await buildEmpoweredSpellState(playerStats);
-
-    expect(result.type).toBe('empowered_spell');
-    expect(result.lastEvent).toBe(lastEvent);
-    expect(result.formulaParsed).toEqual(parsed);
-    expect(result.currentSP).toBe(2);
-    expect(result.maxSP).toBe(4);
-    expect(result.chaMod).toBe(3);
-  });
-
-  it('caps chaMod to parsed dice count when chaMod exceeds it', async () => {
-    const playerStats = makePlayerStats();
-    const lastEvent = {
-      damageFormula: '3d6+2',
-      rolls: [4, 6, 3],
-      rawDamage: 15,
-      damageType: 'Fire',
-      spellName: 'Burning Hands',
-      targetName: 'Goblin',
-      damageTypes: ['Fire'],
-    };
-    const parsed = { count: 3, sides: 6, modifier: 2 };
-    getMaxSorceryPoints.mockReturnValue(3);
-    getCurrentSorceryPoints.mockReturnValue(1);
-    findLastAttack.mockResolvedValue({
-      attackEvent: lastEvent,
-      attackerName: 'Xander',
-      targetName: 'Goblin',
-      primaryDamage: 15,
-      secondaryDamage: 0,
-      totalDamage: 15,
-      damageTypes: ['Fire'],
-    });
-    getChaModifier.mockReturnValue(5);
-    parseExpression.mockReturnValue(parsed);
-
-    const result = await buildEmpoweredSpellState(playerStats);
-
-    expect(result.chaMod).toBe(3);
-  });
-
-  it('returns error when damage formula cannot be parsed', async () => {
-    const playerStats = makePlayerStats();
-    const lastEvent = { damageFormula: 'invalid', rolls: [1, 2], rawDamage: 3, damageTypes: ['Fire'] };
+  it('finds the event via campaign-scoped lastAttack store with zero explicit args (arity quirk: findLastAttack(campaignName) real arity 1)', async () => {
     getMaxSorceryPoints.mockReturnValue(5);
-    getCurrentSorceryPoints.mockReturnValue(5);
-    findLastAttack.mockResolvedValue({
-      attackEvent: lastEvent,
-      attackerName: 'Xander',
-      targetName: 'Goblin',
-      primaryDamage: 3,
-      secondaryDamage: 0,
-      totalDamage: 3,
-      damageTypes: ['Fire'],
-    });
+    getCurrentSorceryPoints.mockReturnValue(3);
     getChaModifier.mockReturnValue(2);
-    parseExpression.mockReturnValue(null);
+    findLastAttack.mockResolvedValue({ attackEvent: null });
 
-    const result = await buildEmpoweredSpellState(playerStats);
+    await buildEmpoweredSpellState(makePlayerStats());
 
-    expect(result.type).toBe('empowered_spell');
-    expect(result.lastEvent).toBeNull();
-    expect(result.error).toBe('Could not parse damage formula');
-  });
-
-  it('returns error when lastEvent exists but damageFormula is missing', async () => {
-    const playerStats = makePlayerStats();
-    const lastEvent = { rolls: [3, 4, 5], rawDamage: 12, damageTypes: ['Fire'] };
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCurrentSorceryPoints.mockReturnValue(5);
-    findLastAttack.mockResolvedValue({
-      attackEvent: lastEvent,
-      attackerName: 'Xander',
-      targetName: 'Goblin',
-      primaryDamage: 12,
-      secondaryDamage: 0,
-      totalDamage: 12,
-      damageTypes: ['Fire'],
-    });
-    getChaModifier.mockReturnValue(2);
-
-    const result = await buildEmpoweredSpellState(playerStats);
-
-    expect(result.lastEvent).toBeNull();
-    expect(result.error).toBe('No dice roll data available');
+    expect(findLastAttack).toHaveBeenCalledWith();
+    expect(getCurrentSorceryPoints).toHaveBeenCalledWith('Xander', 5);
   });
 });
 
-// ── executeEmpoweredReroll ──────────────────────────────────────
+describe('buildEmpoweredSpellState — ready states per ruleset (CLA-122 split)', () => {
+  it('5e: caps advertised chaMod at parsed dice count and passes event by identity', async () => {
+    const lastEvent = makeEvent({ damageFormula: '3d6+2', rolls: [4, 6, 3] });
+    const parsed = { count: 3, sides: 6, modifier: 2 };
+    getMaxSorceryPoints.mockReturnValue(4);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getChaModifier.mockReturnValue(5);
+    findLastAttack.mockResolvedValue({ attackEvent: lastEvent });
+    parseExpression.mockReturnValue(parsed);
 
-describe('executeEmpoweredReroll', () => {
-  beforeEach(() => vi.clearAllMocks());
+    const result = await buildEmpoweredSpellState(makePlayerStats());
 
-  it('returns null when formula cannot be parsed', async () => {
+    expect(result).toEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 2,
+      maxSP: 4,
+      chaMod: 3, // min(5 chaMod, 3 dice)
+      lastEvent,
+      formulaParsed: parsed,
+    });
+    expect(result.lastEvent).toBe(lastEvent);
+  });
+
+  it('2024: exposes uncapped 1-or-2 eligible count via maxReroll, chaMod untouched, no chaMod cap applied', async () => {
+    const lastEvent = makeEvent({ damageFormula: '4d6', rolls: [1, 2, 3, 5], rawDamage: 11 });
+    const parsed = { count: 4, sides: 6, modifier: 0 };
+    getMaxSorceryPoints.mockReturnValue(20);
+    getCurrentSorceryPoints.mockReturnValue(10);
+    getChaModifier.mockReturnValue(5);
+    findLastAttack.mockResolvedValue({ attackEvent: lastEvent });
+    parseExpression.mockReturnValue(parsed);
+
+    const result = await buildEmpoweredSpellState(makePlayerStats({ rules: '2024' }));
+
+    // threshold exactness: only the 1 and the 2 qualify (3 must not)
+    expect(result).toEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 10,
+      maxSP: 20,
+      chaMod: 5, // uncapped — mutant applying Math.min would yield 4
+      lastEvent,
+      maxReroll: 2,
+      formulaParsed: parsed,
+    });
+  });
+});
+
+// ── executeEmpoweredReroll — refusal lanes (no phantom spend) ─────
+
+describe('executeEmpoweredReroll refusals never spend sorcery points', () => {
+  it('returns bare null when the formula cannot be parse, before touching the SP store', async () => {
     parseExpression.mockReturnValue(null);
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
       playerStats: makePlayerStats(),
-      lastEvent: { damageFormula: 'invalid', rolls: [], rawDamage: 0 },
+      lastEvent: makeEvent({ damageFormula: 'invalid' }),
       chaMod: 3,
     });
 
     expect(result).toBeNull();
+    expect(getCurrentSorceryPoints).not.toHaveBeenCalled();
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+    expect(Math.random).not.toHaveBeenCalled();
   });
 
-  it('returns error popup when no sorcery points available', async () => {
-    const parsed = { count: 3, sides: 6, modifier: 2 };
-    parseExpression.mockReturnValue(parsed);
+  it('at 0 SP: exact cost-error popup, no spend, no log, no dice rolled', async () => {
+    const lastEvent = makeEvent();
+    parseExpression.mockReturnValue({ count: 3, sides: 6, modifier: 2 });
+    getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(0);
-    getMaxSorceryPoints.mockReturnValue(5);
-
-    const result = await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats(),
-      lastEvent: {
-        damageFormula: '3d6+2',
-        rolls: [4, 6, 3],
-        rawDamage: 15,
-        damageType: 'Fire',
-        spellName: 'Burning Hands',
-        targetName: 'Goblin',
-        damageTypes: ['Fire'],
-      },
-      chaMod: 3,
-    });
-
-    expect(result).toHaveProperty('popupState');
-    expect(result.popupState.type).toBe('empowered_spell');
-    expect(result.popupState.error).toBe('Not enough sorcery points. Empowered Spell costs 1 SP.');
-    expect(result.popupState.currentSP).toBe(0);
-    expect(result.popupState.maxSP).toBe(5);
-    expect(spendSorceryPoints).not.toHaveBeenCalled();
-  });
-
-  it('returns error popup when combat context is unavailable', async () => {
-    const parsed = { count: 3, sides: 6, modifier: 2 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(3);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(null);
-
-    const result = await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats(),
-      lastEvent: {
-        damageFormula: '3d6+2',
-        rolls: [4, 6, 3],
-        rawDamage: 15,
-        damageType: 'Fire',
-        spellName: 'Burning Hands',
-        targetName: 'Goblin',
-        damageTypes: ['Fire'],
-      },
-      chaMod: 3,
-    });
-
-    expect(result).toHaveProperty('popupState');
-    expect(result.popupState.error).toBe('No combat summary found. Cannot reapply damage.');
-    expect(spendSorceryPoints).not.toHaveBeenCalled();
-  });
-
-  it('spends exactly 1 sorcery point and returns updated SP', async () => {
-    const parsed = { count: 3, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(3);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Orc', type: 'npc', currentHp: 20, maxHp: 20, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 0 });
-
-    const lastEvent = {
-      damageFormula: '3d6',
-      rolls: [3, 3, 3],
-      rawDamage: 9,
-      targetName: 'Orc',
-      spellName: 'Firebolt',
-    };
-
-    const randomValues = [0.5];
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => randomValues[randomIndex++]);
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
@@ -327,79 +239,195 @@ describe('executeEmpoweredReroll', () => {
       chaMod: 3,
     });
 
-    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
-    expect(result.popupState.currentSP).toBe(2);
-    expect(result.popupState.maxSP).toBe(5);
-    expect(result.popupState.completed).toBe(true);
-
-    vi.restoreAllMocks();
+    expect(result.popupState).toEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 0,
+      maxSP: 5,
+      lastEvent,
+      chaMod: 3,
+      error: 'Not enough sorcery points. Empowered Spell costs 1 SP.',
+    });
+    expect(result.logEntries).toBeUndefined();
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+    expect(logMetamagicUse).not.toHaveBeenCalled();
+    expect(Math.random).not.toHaveBeenCalled();
   });
 
-  it('rerolls the lowest dice up to chaMod count', async () => {
-    const parsed = { count: 4, sides: 6, modifier: 1 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(2);
+  it.each([
+    ['combat context resolves null', makeEvent(), null],
+    ['event carries no targetName', makeEvent({ targetName: undefined }), { round: 1, creatures: [] }],
+  ])('%s: reroll happens but SP is refunded by omission — guard sits before the spend', async (_label, lastEvent, summary) => {
+    parseExpression.mockReturnValue({ count: 3, sides: 6, modifier: 2 });
     getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 7, finalDamage: 3 });
+    getCurrentSorceryPoints.mockReturnValue(3);
+    getCombatContext.mockResolvedValue(summary);
+    stubDice([5, 5, 5]);
 
-    const lastEvent = {
-      damageFormula: '4d6+1',
-      rolls: [5, 2, 4, 1],
-      rawDamage: 12,
-      damageType: 'Fire',
-      spellName: 'Burning Hands',
-      targetName: 'Goblin',
-    };
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats(),
+      lastEvent,
+      chaMod: 3,
+    });
 
-    // chaMod=2, so reroll 2 lowest: values 1 and 2 (indices 3 and 1)
-    const randomValues = [0.5, 0.5];
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => randomValues[randomIndex++]);
+    expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN);
+    expect(result.popupState).toEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 3,
+      maxSP: 5,
+      lastEvent,
+      chaMod: 3,
+      error: 'No combat summary found. Cannot reapply damage.',
+    });
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+    expect(logMetamagicUse).not.toHaveBeenCalled();
+    expect(applyDamageToTarget).not.toHaveBeenCalled();
+  });
+
+  it('2024: refuses with no spend when no die shows 1 or 2 (a 3 is not eligible)', async () => {
+    const lastEvent = makeEvent({ damageFormula: '3d6', rolls: [3, 4, 6], rawDamage: 13 });
+    parseExpression.mockReturnValue({ count: 3, sides: 6, modifier: 0 });
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCurrentSorceryPoints.mockReturnValue(3);
+
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats({ rules: '2024' }),
+      lastEvent,
+      chaMod: 5,
+    });
+
+    expect(result.popupState).toEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 3,
+      maxSP: 5,
+      lastEvent,
+      chaMod: 5,
+      error: 'No damage dice showing 1 or 2 to reroll.',
+    });
+    expect(result.popupState.completed).toBeUndefined();
+    expect(spendSorceryPoints).not.toHaveBeenCalled();
+    expect(Math.random).not.toHaveBeenCalled();
+  });
+});
+
+// ── executeEmpoweredReroll — reroll arbitration + settlement ─────
+
+describe('executeEmpoweredReroll — 5e arbitration', () => {
+  it('rerolls the chaMod lowest dice, new rolls always win, exact spend/log/reapply tuples, inputs unmutated', async () => {
+    const parsed = { count: 4, sides: 6, modifier: 1 };
+    const lastEvent = makeEvent({ damageFormula: '4d6+1', rolls: [5, 2, 4, 1], rawDamage: 12 });
+    const characters = [{ name: 'Xander' }];
+    const summary = { round: 1, creatures: [{ name: 'Goblin' }] };
+    parseExpression.mockReturnValue(parsed);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getCombatContext.mockResolvedValue(summary);
+    applyDamageToTarget.mockResolvedValue({ finalDamage: 7, newHp: 5 });
+    stubDice([6, 3]); // naturals for indices 1 and 3 in order — over-draw throws
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
       playerStats: makePlayerStats(),
       lastEvent,
       chaMod: 2,
+      characters,
     });
 
-    expect(result.popupState.completed).toBe(true);
-    expect(result.popupState.currentSP).toBe(1);
-    expect(result.popupState.result.oldTotal).toBe(12);
-    expect(result.popupState.result.rerollCount).toBe(2);
-    expect(result.popupState.result.originalDice).toEqual([5, 2, 4, 1]);
-    expect(result.popupState.result.newDice).toEqual([5, 4, 4, 4]);
-    expect(result.logEntries).toHaveLength(1);
-    expect(result.logEntries[0].type).toBe('metamagic');
-    expect(result.logEntries[0].rollType).toBe('empowered-spell');
-    expect(result.logEntries[0].originalDamage).toBe(12);
-    expect(result.logEntries[0].rerolledDiceCount).toBe(2);
-    expect(result.logEntries[0].originalDice).toEqual([5, 2, 4, 1]);
-    expect(result.logEntries[0].newDice).toEqual([5, 4, 4, 4]);
+    // 5e picks the 2 LOWEST by ascending stable sort: values 1@3, 2@1
+    const { lastEvent: ev, ...popupRest } = result.popupState;
+    const { timestamp, ...evRest } = ev;
+    expect(popupRest).toStrictEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 1,
+      maxSP: 5,
+      chaMod: 2,
+      completed: true,
+      result: {
+        oldTotal: 12,
+        newTotal: 19, // 5+6+4+3 + 1 mod
+        damageDifference: 7,
+        rerollCount: 2,
+        rerolledDice: new Set([1, 3]),
+        originalDice: [5, 2, 4, 1],
+        newDice: [5, 6, 4, 3],
+        targetCurrentHp: undefined, // SOURCE BUG pin: applyDamageToTarget is async but un-awaited at :159
+      },
+    });
+    expect(evRest).toEqual({ ...lastEvent, rawDamage: 19, rolls: [5, 6, 4, 3] });
+    expect(typeof timestamp).toBe('number'); // wall-clock stamp is metadata only — no game-state clock
 
-    vi.restoreAllMocks();
+    expect(result.logEntries).toEqual([{
+      type: 'metamagic',
+      characterName: 'Xander',
+      rollType: 'empowered-spell',
+      spellName: 'Burning Hands',
+      originalDamage: 12,
+      newTotal: 19,
+      damageDifference: 7,
+      targetName: 'Goblin',
+      rerolledDiceCount: 2,
+      originalDice: [5, 2, 4, 1],
+      newDice: [5, 6, 4, 3],
+    }]);
+
+    expect(getCurrentSorceryPoints).toHaveBeenCalledWith('Xander', 5);
+    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
+    expect(logMetamagicUse).toHaveBeenCalledWith(CAMPAIGN, 'Xander', 'Burning Hands', ['Empowered Spell'], 1);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(summary, 'Goblin', 7, ['Fire'], {
+      campaignName: CAMPAIGN,
+      characters,
+      ignoreResistance: false,
+      attackerName: 'Xander',
+    });
+    // Invisibility-break is DEAD in production: :159 does not await, so
+    // applyResult.finalDamage is undefined and :162 never fires (#1382 lane).
+    expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+    expect(lastEvent.rolls).toEqual([5, 2, 4, 1]); // input purity
+    expect(cloneDeep(lastEvent).rawDamage).toBe(12);
   });
 
-  it('handles chaMod of 0 — rerolls 0 dice and reports no change', async () => {
+  it('new roll may be WORSE — negative delta is reapplied (must-use-new-rolls), SP still spent at SP=1 boundary, lowest-of-ties picks first index', async () => {
     const parsed = { count: 3, sides: 6, modifier: 0 };
+    const lastEvent = makeEvent({ damageFormula: '3d6', rolls: [6, 5, 5], rawDamage: 16 });
     parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(1);
     getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 10, finalDamage: 0 });
+    getCurrentSorceryPoints.mockReturnValue(1);
+    getCombatContext.mockResolvedValue({ round: 2, creatures: [{ name: 'Goblin' }] });
+    applyDamageToTarget.mockResolvedValue({ finalDamage: 0, newHp: 20 });
+    stubDice([1]); // chaMod=1 rerolls only ONE of the two 5s — tie goes to earlier index
 
-    const lastEvent = {
-      damageFormula: '3d6',
-      rolls: [2, 4, 6],
-      rawDamage: 12,
-      targetName: 'Goblin',
-      spellName: 'Firebolt',
-    };
+    const result = await executeEmpoweredReroll({
+      campaignName: CAMPAIGN,
+      playerStats: makePlayerStats(),
+      lastEvent,
+      chaMod: 1,
+    });
+
+    expect(result.popupState.result.newDice).toEqual([6, 1, 5]);
+    expect(result.popupState.result.oldTotal).toBe(16);
+    expect(result.popupState.result.newTotal).toBe(12);
+    expect(result.popupState.result.damageDifference).toBe(-4);
+    expect(result.popupState.currentSP).toBe(0); // boundary: 1 -> 0, spent honestly
+    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
+    expect(applyDamageToTarget).toHaveBeenCalledWith(
+      { round: 2, creatures: [{ name: 'Goblin' }] },
+      'Goblin', -4, ['Fire'],
+      { campaignName: CAMPAIGN, characters: undefined, ignoreResistance: false, attackerName: 'Xander' },
+    );
+  });
+
+  it('chaMod=0 quirk: spends 1 SP rerolling ZERO dice — diverges from disk RAW minimum-of-one (classes.json:10280), pinned as-is', async () => {
+    const parsed = { count: 3, sides: 6, modifier: 0 };
+    const lastEvent = makeEvent({ damageFormula: '3d6', rolls: [2, 4, 6], rawDamage: 12 });
+    parseExpression.mockReturnValue(parsed);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCurrentSorceryPoints.mockReturnValue(1);
+    stubDice([]); // zero dice rerolled — any draw throws
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
@@ -408,163 +436,42 @@ describe('executeEmpoweredReroll', () => {
       chaMod: 0,
     });
 
-    expect(result.popupState.result.rerollCount).toBe(0);
-    expect(result.popupState.result.damageDifference).toBe(0);
-    expect(result.popupState.result.message).toBe('Reroll did not change the damage total.');
-    expect(result.popupState.result.oldTotal).toBe(12);
-    expect(result.popupState.result.newTotal).toBe(12);
-    expect(spendSorceryPoints).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls endInvisibilityOnHostileAction when finalDamage > 0', async () => {
-    const parsed = { count: 1, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(1);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 7, finalDamage: 3 });
-
-    const lastEvent = {
-      damageFormula: '1d6',
-      rolls: [3],
-      rawDamage: 3,
-      targetName: 'Goblin',
-      spellName: 'Firebolt',
-    };
-
-    const randomValues = [0.5];
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => randomValues[randomIndex++]);
-
-    await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats(),
-      lastEvent,
-      chaMod: 1,
+    const { lastEvent: ev, ...popupRest } = result.popupState;
+    const { timestamp, ...evRest } = ev;
+    expect(popupRest).toStrictEqual({
+      type: 'empowered_spell',
+      name: 'Metamagic - Empowered Spell',
+      currentSP: 0,
+      maxSP: 5,
+      chaMod: 0,
+      completed: true,
+      result: {
+        oldTotal: 12,
+        newTotal: 12,
+        damageDifference: 0,
+        rerollCount: 0,
+        message: 'Reroll did not change the damage total.',
+      },
     });
-
-    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Xander', CAMPAIGN);
-
-    vi.restoreAllMocks();
-  });
-
-  it('does not call endInvisibilityOnHostileAction when finalDamage is 0', async () => {
-    const parsed = { count: 1, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(1);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 10, finalDamage: 0 });
-
-    const lastEvent = {
-      damageFormula: '1d6',
-      rolls: [3],
-      rawDamage: 3,
-      targetName: 'Goblin',
-      spellName: 'Firebolt',
-    };
-
-    const randomValues = [0.5];
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => randomValues[randomIndex++]);
-
-    await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats(),
-      lastEvent,
-      chaMod: 1,
-    });
-
+    expect(evRest).toEqual({ ...lastEvent, rawDamage: 12, rolls: [2, 4, 6] });
+    expect(typeof timestamp).toBe('number');
+    expect(Math.random).not.toHaveBeenCalled();
+    expect(spendSorceryPoints).toHaveBeenCalledTimes(1); // phantom-spend quirk (RAW: min one die)
+    expect(applyDamageToTarget).not.toHaveBeenCalled(); // 0-delta skips reapply entirely
     expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
-
-    vi.restoreAllMocks();
   });
-
 });
 
-// ── getEmpoweredSpellDescription ────────────────────────────────
-
-describe('getEmpoweredSpellDescription', () => {
-  const DEFAULT_DESC =
-    'When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.';
-
-  it.each([
-    {},
-    { details: null },
-    { details: '' },
-    { details: undefined },
-    '<li><b>Quickened Spell</b> Cast as bonus action.</li>',
-    '<p><b>Empowered Spell</b> Not in li tag.</p>',
-    '<li><b>Twinned Spell</b> Target two creatures.</li>',
-  ])('returns default description for action=%j', (action) => {
-    expect(getEmpoweredSpellDescription(action)).toBe(DEFAULT_DESC);
-  });
-
-  it('falls back to 2014 text without rules argument', () => {
-    expect(getEmpoweredSpellDescription({})).toBe(DEFAULT_DESC);
-  });
-
-  it('falls back to 2024 RAW text for rules 2024', () => {
-    expect(getEmpoweredSpellDescription({}, '2024')).toBe(
-      'When you roll damage for a spell, you can spend 1 sorcery point to reroll any number of those dice that rolled a 1 or a 2. You must use the new rolls.'
-    );
-  });
-
-  it.each([
-    [
-      '<li><b>Empowered Spell</b>. Reroll damage dice up to CHA mod.</li>',
-      'Reroll damage dice up to CHA mod.',
-    ],
-    [
-      '<li><b>Empowered Spell</b> Reroll damage dice up to CHA mod.</li>',
-      'Reroll damage dice up to CHA mod.',
-    ],
-    [
-      '<li><b>Empowered Spell</b> Some text\n  with newlines\n  and spaces</li>',
-      'Some text\n  with newlines\n  and spaces',
-    ],
-    [
-      '<li><b>empowered spell</b> Lowercase match.</li>',
-      'Lowercase match.',
-    ],
-  ])('extracts description from: %s', (details, expected) => {
-    const result = getEmpoweredSpellDescription({ details });
-    expect(result).toBe(expected);
-  });
-
-});
-
-// ── 2024 Empowered Spell semantics (CLA-122) ───────────────────
-
-describe('2024 Empowered Spell semantics', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('executeEmpoweredReroll rerolls every die showing 1 or 2, exceeding the CHA modifier cap', async () => {
+describe('executeEmpoweredReroll — 2024 arbitration (CLA-122)', () => {
+  it('rerolls EVERY die showing 1 or 2 even beyond the chaMod cap; a 3 stays', async () => {
     const parsed = { count: 4, sides: 6, modifier: 0 };
+    const lastEvent = makeEvent({ damageFormula: '4d6', rolls: [1, 2, 3, 5], rawDamage: 11, spellName: 'Fire Bolt' });
     parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(2);
     getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 2, finalDamage: 8 });
-
-    const lastEvent = {
-      damageFormula: '4d6',
-      rolls: [1, 2, 1, 5],
-      rawDamage: 9,
-      damageType: 'Fire',
-      spellName: 'Fire Bolt',
-      targetName: 'Goblin',
-      damageTypes: ['Fire'],
-    };
-
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => [0.5, 0.5, 0.5][randomIndex++]);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getCombatContext.mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin' }] });
+    applyDamageToTarget.mockResolvedValue({ finalDamage: 7, newHp: 3 });
+    stubDice([4, 6]); // indices 0 and 1 only — over/under-draw throws
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
@@ -573,90 +480,43 @@ describe('2024 Empowered Spell semantics', () => {
       chaMod: 1,
     });
 
-    expect(result.popupState.completed).toBe(true);
-    expect(result.popupState.result.rerollCount).toBe(3);
-    expect(result.popupState.result.originalDice).toEqual([1, 2, 1, 5]);
-    expect(result.popupState.result.newDice).toEqual([4, 4, 4, 5]);
-    expect(result.popupState.result.oldTotal).toBe(9);
-    expect(result.popupState.result.newTotal).toBe(17);
+    expect(result.popupState.result).toStrictEqual({
+      oldTotal: 11,
+      newTotal: 18, // 4+6+3+5
+      damageDifference: 7,
+      rerollCount: 2,
+      rerolledDice: new Set([0, 1]),
+      originalDice: [1, 2, 3, 5],
+      newDice: [4, 6, 3, 5],
+      targetCurrentHp: undefined, // async-un-awaited pin
+    });
     expect(result.popupState.currentSP).toBe(1);
-    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
-    expect(result.logEntries[0].rerolledDiceCount).toBe(3);
-    expect(result.logEntries[0].rollType).toBe('empowered-spell');
-
-    vi.restoreAllMocks();
-  });
-
-  it('executeEmpoweredReroll spends no SP and errors when no die shows 1 or 2', async () => {
-    const parsed = { count: 3, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(3);
-    getMaxSorceryPoints.mockReturnValue(5);
-
-    const result = await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats({ rules: '2024' }),
-      lastEvent: {
-        damageFormula: '3d6',
-        rolls: [3, 4, 6],
-        rawDamage: 13,
-        damageType: 'Fire',
-        spellName: 'Fire Bolt',
-        targetName: 'Goblin',
-        damageTypes: ['Fire'],
-      },
-      chaMod: 5,
-    });
-
-    expect(result.popupState.error).toBe('No damage dice showing 1 or 2 to reroll.');
-    expect(result.popupState.completed).toBeUndefined();
-    expect(spendSorceryPoints).not.toHaveBeenCalled();
-  });
-
-  it('buildEmpoweredSpellState exposes eligible 1-or-2 die count uncapped by CHA modifier', async () => {
-    getMaxSorceryPoints.mockReturnValue(20);
-    getCurrentSorceryPoints.mockReturnValue(10);
-    findLastAttack.mockResolvedValue({
-      attackEvent: {
-        damageFormula: '4d6',
-        rolls: [1, 2, 4, 1],
-        rawDamage: 8,
-        spellName: 'Fire Bolt',
-        targetName: 'Goblin',
-        damageTypes: ['Fire'],
-      },
-    });
-    getChaModifier.mockReturnValue(1);
-    parseExpression.mockReturnValue({ count: 4, sides: 6, modifier: 0 });
-
-    const result = await buildEmpoweredSpellState(makePlayerStats({ rules: '2024' }));
-
-    expect(result.maxReroll).toBe(3);
-    expect(result.chaMod).toBe(1);
-  });
-
-  it('5e characters keep the CHA-modifier cap (2014 Empower)', async () => {
-    const parsed = { count: 4, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(2);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 8, finalDamage: 2 });
-
-    const lastEvent = {
-      damageFormula: '4d6',
-      rolls: [1, 2, 1, 5],
-      rawDamage: 9,
-      damageType: 'Fire',
+    expect(result.logEntries).toEqual([{
+      type: 'metamagic',
+      characterName: 'Xander',
+      rollType: 'empowered-spell',
       spellName: 'Fire Bolt',
+      originalDamage: 11,
+      newTotal: 18,
+      damageDifference: 7,
       targetName: 'Goblin',
-      damageTypes: ['Fire'],
-    };
+      rerolledDiceCount: 2,
+      originalDice: [1, 2, 3, 5],
+      newDice: [4, 6, 3, 5],
+    }]);
+    expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
+    expect(logMetamagicUse).toHaveBeenCalledWith(CAMPAIGN, 'Xander', 'Fire Bolt', ['Empowered Spell'], 1);
+  });
 
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => [0.5][randomIndex++]);
+  it('5e with the same rolls rerolls only the chaMod-lowest single die (ruleset branch byte)', async () => {
+    const parsed = { count: 4, sides: 6, modifier: 0 };
+    const lastEvent = makeEvent({ damageFormula: '4d6', rolls: [1, 2, 1, 5], rawDamage: 9, spellName: 'Fire Bolt' });
+    parseExpression.mockReturnValue(parsed);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCurrentSorceryPoints.mockReturnValue(2);
+    getCombatContext.mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin' }] });
+    applyDamageToTarget.mockResolvedValue({ finalDamage: 3, newHp: 7 });
+    stubDice([6]); // exactly one die — chaMod=1 cap kills the 2024-no-cap mutant
 
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
@@ -665,9 +525,68 @@ describe('2024 Empowered Spell semantics', () => {
       chaMod: 1,
     });
 
-    expect(result.popupState.result.rerollCount).toBe(1);
-    expect(result.popupState.result.newDice).toEqual([4, 2, 1, 5]);
+    expect(result.popupState.result.rerolledDice).toEqual(new Set([0])); // tie: first 1 wins
+    expect(result.popupState.result.newDice).toEqual([6, 2, 1, 5]);
+    expect(result.popupState.result.newTotal).toBe(14);
+  });
+});
 
-    vi.restoreAllMocks();
+// ── hasEmpoweredSpell (live: handlePlainDamage:329, useLoggedDiceRollAttack:278) ──
+
+describe('hasEmpoweredSpell — capability flag from actions shape', () => {
+  it.each([
+    ['no stats', undefined],
+    ['no actions array', makePlayerStats()],
+    ['action named other than Metamagic', makePlayerStats({ actions: [{ name: 'Metamagics', automation: { type: 'spell_modifier', options: [{ effect: 'reroll_damage_dice' }] } }] })],
+    ['Metamagic but automation.type is not spell_modifier', makePlayerStats({ actions: [{ name: 'Metamagic', automation: { type: 'action_modifier', options: [{ effect: 'reroll_damage_dice' }] } }] })],
+    ['spell_modifier with sibling metamagic only (Quicken near-miss)', makePlayerStats({ actions: [{ name: 'Metamagic', automation: { type: 'spell_modifier', options: [{ name: 'Quickened Spell', cost: 2, effect: 'cast_spell_as_bonus_action' }] } }] })],
+    ['spell_modifier with no options key at all', makePlayerStats({ actions: [{ name: 'Metamagic', automation: { type: 'spell_modifier' } }] })],
+  ])('%s resolves false', (_label, stats) => {
+    expect(hasEmpoweredSpell(stats)).toBe(false);
+  });
+
+  it('true for REAL disk Sorcerer metamagic features (both catalogs carry reroll_damage_dice at cost 1)', () => {
+    expect(diskMeta5e.name).toBe('Metamagic');
+    expect(diskMeta2024.name).toBe('Metamagic');
+    expect(hasEmpoweredSpell(makePlayerStats({ actions: [diskMeta5e] }))).toBe(true);
+    expect(hasEmpoweredSpell(makePlayerStats({ actions: [diskMeta2024] }))).toBe(true);
+    // same-name near-miss straight off disk: strip the empowered option, flag flips false
+    const stripped = { ...diskMeta5e, automation: { ...diskMeta5e.automation, options: diskMeta5e.automation.options.filter(o => o.name !== 'Empowered Spell') } };
+    expect(hasEmpoweredSpell(makePlayerStats({ actions: [stripped] }))).toBe(false);
+  });
+});
+
+// ── getEmpoweredSpellDescription (live: CharActions.jsx:100) ─────
+
+describe('getEmpoweredSpellDescription', () => {
+  const FALLBACK_5E = 'When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.';
+  const FALLBACK_2024 = 'When you roll damage for a spell, you can spend 1 sorcery point to reroll any number of those dice that rolled a 1 or a 2. You must use the new rolls.';
+  // Exact bytes from public/data/classes.json Sorcerer Metamagic <li> content
+  const DISK_5E_EXTRACT = 'When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls. You can use Empowered Spell even if you have already used a different Metamagic option during the casting of the spell.';
+
+  it.each([
+    ['empty action', {}, undefined],
+    ['details null', { details: null }, undefined],
+    ['details empty string', { details: '' }, undefined],
+    ['Quickened li near-miss', { details: '<li><b>Quickened Spell</b> Cast as bonus action.</li>' }, undefined],
+    ['Empowered bytes outside li', { details: '<p><b>Empowered Spell</b> Not in li tag.</p>' }, undefined],
+    ['twinned li', { details: '<li><b>Twinned Spell</b> Target two creatures.</li>' }, '5e'],
+  ])('%s falls back to 2014 RAW text', (_label, action, rules) => {
+    const out = getEmpoweredSpellDescription(action, rules);
+    expect(out).toBe(FALLBACK_5E);
+    // fallback is a byte-prefix of the real disk feature text — no drift
+    expect(diskMeta5e.details).toContain(FALLBACK_5E);
+  });
+
+  it('extracts the full <li> body from REAL disk details and matches it byte-exact (case-insensitive gate too)', () => {
+    expect(getEmpoweredSpellDescription({ details: diskMeta5e.details })).toBe(DISK_5E_EXTRACT);
+    expect(getEmpoweredSpellDescription({ details: '<li><b>empowered spell</b>. Lowercase gate match.</li>' })).toBe('Lowercase gate match.');
+    expect(getEmpoweredSpellDescription({ details: '<li><b>Empowered Spell</b> new\n  lines kept</li>' })).toBe('new\n  lines kept');
+  });
+
+  it('2024 rules fall back to the 1-or-2 wording, and REAL 2024 disk feature (no details field) routes through it', () => {
+    expect(diskMeta2024.details).toBeUndefined();
+    expect(getEmpoweredSpellDescription({}, '2024')).toBe(FALLBACK_2024);
+    expect(getEmpoweredSpellDescription(diskMeta2024, '2024')).toBe(FALLBACK_2024);
   });
 });

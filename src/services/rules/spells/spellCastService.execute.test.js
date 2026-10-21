@@ -1,36 +1,70 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { executeSpellCast } from './spellCastService.js'
+import spells5e from '../../../../public/data/spells.json'
+import spells2024 from '../../../../public/data/2024/spells.json'
+
+import * as runtime from '../../../hooks/runtime/useRuntimeState.js'
+import * as dice from '../../dice/diceRoller.js'
+import * as logService from '../../ui/logService.js'
+import * as silence from '../features/silenceService.js'
+import * as invis from '../features/invisibilityService.js'
+import * as friends from '../features/friendsService.js'
+import * as buffService from '../../combat/buffs/buffService.js'
+import * as rider from './postCastRiderService.js'
+import * as healRider from './postCastHealService.js'
 
 /* ------------------------------------------------------------------ */
-/*  Mocks — minimal surface area, getRuntimeValue returns [] for      */
-/*  keys the source code guards against null/undefined                */
+/*  EXECUTION LANE (#1449 split family)                              */
+/*                                                                   */
+/*  Identity: caller-boundary integration through the facade barrel  */
+/*  (spellCastService.js, imported live by useSpellCastExecutor,     */
+/*  useActionSpellMetamagic, useCharActionsAutomation) with the REAL  */
+/*  execution chain — blockChecks.js, damageCalculation.js,           */
+/*  savePath.js, noSavePath.js, triggerSpells.js, helpers.js,        */
+/*  spellResolution.js, castingTimeUtils.js, spellDamageUtils.js and */
+/*  encounters/combatData.js all run real. Only external-edge        */
+/*  services (runtime store, dice, log, feature services, riders)    */
+/*  are mocked. Sibling lanes that mock these internals or own the   */
+/*  module-direct faces are cited per test — bytes covered there     */
+/*  are NOT re-grown here.                                            */
+/*                                                                    */
+/*  Ownership map (covered elsewhere, cited only):                    */
+/*   - computeSpellStats arithmetic ....... execution/spellStats.test.js (:190-221 of index.js) */
+/*   - hostile side-effect positives (endFriends/endInvisibility/     */
+/*     lastActionSpellCast casings) ....... execution/early-resolutions.test.js:432-521 */
+/*   - block gates payload/log bytes ....... execution/blockChecks.test.js + execution-block-checks.test.js */
+/*   - silence refuse popup/log ....... spellCastService.noformula-modals.test.js */
+/*   - magical ambush -> savePath ctx ... execution/index.magicalAmbushTransport.test.js */
+/*   - auto-miss + overchannel/emp-evoc via hub .. spellCastService.test.js (master) + savePath-aoe-* lanes + damageCalculation-cla120 */
+/*   - riders self-catch console bytes ... execution/execution-post-cast.test.js + .cla389 (#1401/28, #1452:472-522) */
+/*   - psychic opt-in / heal / missile ... psychic-optin / heal / missile lanes */
+/*                                                                    */
+/*  No-clock policy: this lane stores no expiry - the hub stamps    */
+/*  Date.now() only as log timestamps (benign, never a game clock). */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Mocks — external edges only, REAL-Promise-shaped (#1449).        */
+/*  diceRoller mirrors the real null guard (index-level:              */
+/*  diceRoller.js:78-81 `if (!formula) return null`) so the           */
+/*  savePath null-formula guard at savePath.js:260 is not masked.   */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn((_key1, key2) => {
-    if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
-    return undefined
-  }),
+  getRuntimeValue: vi.fn(() => []),
 }))
 
 vi.mock('../../dice/diceRoller.js', () => ({
-  rollExpression: vi.fn(() => ({ total: 10, rolls: [1, 2, 3, 4], modifier: 0 })),
-  rollExpressionMaximized: vi.fn(() => ({ total: 24, rolls: [6, 6, 6, 6], modifier: 0, maximized: true })),
+  rollExpression: vi.fn((formula) => (formula ? { total: 10, rolls: [1, 2, 3, 4], modifier: 0 } : null)),
+  rollExpressionMaximized: vi.fn((formula) => (formula ? { total: 24, rolls: [6, 6, 6, 6], modifier: 0, maximized: true } : null)),
+  applyHealingRerollOnes: vi.fn(),
 }))
 
 vi.mock('../../automation/index.js', () => ({
   executeHandler: vi.fn(),
-}))
-
-vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
-}))
-
-vi.mock('../../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => null),
-  loadCombatSummary: vi.fn(),
 }))
 
 vi.mock('../../ui/logService.js', () => ({
@@ -52,18 +86,23 @@ vi.mock('../features/friendsService.js', () => ({
   triggerFriends: vi.fn(),
 }))
 
+vi.mock('../../combat/buffs/buffService.js', () => ({
+  isInnateSorceryActive: vi.fn(() => false),
+  getActiveBuffs: vi.fn(() => []),
+}))
+
 vi.mock('./postCastRiderService.js', () => ({
-  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve()),
-  triggerSpellThief: vi.fn(() => Promise.resolve()),
-  triggerBewitchingMagic: vi.fn(() => Promise.resolve()),
-  triggerSoulstitchSpells: vi.fn(() => Promise.resolve()),
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerSpellThief: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
+  triggerSoulstitchSpells: vi.fn(() => Promise.resolve([])),
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
 vi.mock('./postCastHealService.js', () => ({
   triggerPostCastSelfHeals: vi.fn(() => Promise.resolve()),
-  triggerPostCastAllyHeals: vi.fn(() => Promise.resolve()),
+  triggerPostCastAllyHeals: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../features/smiteOfProtectionService.js', () => ({
@@ -79,26 +118,23 @@ vi.mock('../features/primalCompanionSpellShareService.js', () => ({
 }))
 
 vi.mock('../features/wildMagicSurgeService.js', () => ({
-  triggerWildMagicSurge: vi.fn(() => Promise.resolve()),
-}))
-
-vi.mock('../../combat/buffs/buffService.js', () => ({
-  isInnateSorceryActive: vi.fn(() => false),
-  getActiveBuffs: vi.fn(() => []),
-}))
-
-vi.mock('../combat/rangeValidation.js', () => ({
-  computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
-  computeEffectiveSpellRange: vi.fn(() => 60),
-  getDistanceFeet: vi.fn(() => 30),
-  rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
+  triggerWildMagicSurge: vi.fn(() => Promise.resolve(null)),
 }))
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Test-data factories (real disk spell tables imported verbatim)   */
 /* ------------------------------------------------------------------ */
 
-function makeSpell(overrides = {}) {
+const CAMPAIGN = 'test-campaign'
+const MAP = 'testMap'
+
+function fireballDisk() {
+  return spells5e.find((s) => s.name === 'Fireball')
+}
+
+// UI-producer cast payload: minimal fields, NO area_of_effect — full data
+// arrives only via lookupFullSpell's fetch merge (index.js:170-189).
+function makeFireballPayload(overrides = {}) {
   return {
     name: 'Fireball',
     level: 3,
@@ -112,17 +148,43 @@ function makeSpell(overrides = {}) {
   }
 }
 
+function makeFireBoltPayload() {
+  return {
+    name: 'Fire Bolt',
+    level: 0,
+    school: 'Evocation',
+    casting_time: '1 action',
+    components: ['V', 'S'],
+    range: '120 feet',
+    attack_type: 'ranged',
+    damage: {
+      damage_type: 'Fire',
+      damage_at_character_level: { 1: '1d10', 5: '2d10', 11: '3d10', 17: '4d10' },
+    },
+  }
+}
+
+function makeCharmMonsterPayload() {
+  return {
+    name: 'Charm Monster',
+    level: 4,
+    school: 'Enchantment',
+    casting_time: 'Action',
+    components: ['V', 'S'],
+    dc: { dc_type: 'WIS', dc_success: 'none' },
+    status_effects: ['Charmed'],
+  }
+}
+
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestWizard',
     abilities: [{ name: 'Intelligence', bonus: 5 }],
     proficiency: 4,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence',
-      toHit: 9,
-      saveDc: 17,
-      modifier: 5,
-    },
+    // Sentinels: spellAbilities.toHit/saveDc are the STALE cached values;
+    // computeSpellStats recomputes 5+4=9 / 8+5+4=17 (owned by
+    // spellStats.test.js). Reaching the seams with 9/17 proves transport.
+    spellAbilities: { spellCastingAbility: 'Intelligence', toHit: 99, saveDc: 13, modifier: 5 },
     automation: { passives: [] },
     hitPoints: 100,
     level: 10,
@@ -130,407 +192,367 @@ function makePlayerStats(overrides = {}) {
   }
 }
 
-function makeMetaCtx(overrides = {}) {
-  return { slotLevel: 3, ...overrides }
-}
-
 function makeServices(overrides = {}) {
   return {
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
     playerStats: makePlayerStats(),
-    getTargetInfo: vi.fn(),
+    getTargetInfo: vi.fn(() => Promise.resolve({ name: 'Goblin1' })),
     attackerPos: null,
     targetPos: null,
     featEffects: {},
-    campaignName: 'testCampaign',
-    mapName: 'testMap',
+    campaignName: CAMPAIGN,
+    mapName: MAP,
+    characters: [],
     ...overrides,
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  fetch stub — URL-aware, real-Promise-shaped (#1449). Serves the  */
+/*  REAL disk spell tables; unknown URLs reject loudly (no silent     */
+/*  network). change-data satisfies damageUtils.getCombatContext.     */
+/* ------------------------------------------------------------------ */
+
+let fetchCalls
+
+function jsonResponse(data) {
+  return { ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(data) }
+}
+
+function installFetchStub() {
+  fetchCalls = []
+  vi.stubGlobal('fetch', vi.fn((url) => {
+    fetchCalls.push(url)
+    if (url === '/data/spells.json') return Promise.resolve(jsonResponse(spells5e))
+    if (url === '/data/2024/spells.json') return Promise.resolve(jsonResponse(spells2024))
+    if (url === `/api/campaigns/${encodeURIComponent(CAMPAIGN)}/change-data`) {
+      return Promise.resolve(jsonResponse({ combatSummary: null, activeCreatureName: null }))
+    }
+    return Promise.reject(new Error(`unexpected fetch in execute lane: ${url}`))
+  }))
 }
 
 /* ------------------------------------------------------------------ */
 /*  Suite                                                             */
 /* ------------------------------------------------------------------ */
 
-describe('executeSpellCast', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
+describe('executeSpellCast - execution lane (real chain via facade)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    installFetchStub()
 
-    // Reset mock implementations to defaults after each test
-    const buffService = await import('../../combat/buffs/buffService.js')
-    buffService.getActiveBuffs.mockReturnValue([])
-
-    const silence = await import('../features/silenceService.js')
-    silence.getSilenceSource.mockReturnValue(null)
-    silence.isCreatureInSilenceZone.mockReturnValue(false)
-
-    const buffService2 = await import('../../combat/buffs/buffService.js')
-    buffService2.isInnateSorceryActive.mockReturnValue(false)
-
-    const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-    runtime.getRuntimeValue.mockImplementation((_key1, key2) => {
-      if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+    runtime.getRuntimeValue.mockImplementation((_character, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return []
       return undefined
     })
-
-    const rider = await import('./postCastRiderService.js')
+    dice.rollExpression.mockImplementation((formula) => (formula ? { total: 10, rolls: [1, 2, 3, 4], modifier: 0 } : null))
+    dice.rollExpressionMaximized.mockImplementation((formula) => (formula ? { total: 24, rolls: [6, 6, 6, 6], modifier: 0, maximized: true } : null))
+    logService.addEntry.mockReturnValue(Promise.resolve())
+    silence.getSilenceSource.mockReturnValue(null)
+    silence.isCreatureInSilenceZone.mockReturnValue(false)
+    buffService.getActiveBuffs.mockReturnValue([])
+    buffService.isInnateSorceryActive.mockReturnValue(false)
     rider.getEmpoweredEvocationFeatures.mockReturnValue([])
     rider.getEmpoweredEvocationIntModifier.mockReturnValue(0)
+    rider.triggerPostCastRiderSaves.mockReturnValue(Promise.resolve(null))
+    rider.triggerSoulstitchSpells.mockReturnValue(Promise.resolve([]))
+    rider.triggerSpellThief.mockReturnValue(Promise.resolve(null))
+    rider.triggerBewitchingMagic.mockReturnValue(Promise.resolve(null))
+    healRider.triggerPostCastSelfHeals.mockReturnValue(Promise.resolve())
+    healRider.triggerPostCastAllyHeals.mockReturnValue(Promise.resolve(null))
+  })
 
-    const range = await import('../combat/rangeValidation.js')
-    range.computeRangeEffect.mockReturnValue({ mode: 'normal' })
-    range.computeEffectiveSpellRange.mockReturnValue(60)
-    range.getDistanceFeet.mockReturnValue(30)
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Early-exit: spellcasting blocked by buffs                       */
+  /*  Gate ORDER 1: buff-block refusal leaves zero downstream trace  */
+  /*  Unique bytes: runCastBlockChecks ordering (index.js:651-667).  */
+  /*  blockChecks.js popup/log payload bytes are owned by             */
+  /*  blockChecks.test.js CLA-391; HERE we pin that the refusal      */
+  /*  short-circuits BEFORE target resolution, the silence gate,      */
+  /*  hostile side effects, dice, and the adjudication lanes.         */
+  /*  Kills: buff gate moved after getTargetInfo/silence, or a        */
+  /*  refusal that keeps executing the pipeline.                      */
   /* ---------------------------------------------------------------- */
 
-  describe('spellcasting-blocked by buffs', () => {
-    it('refuses with popup + refused log and returns early when a buff blocks spellcasting (CLA-391)', async () => {
-      const buffService = await import('../../combat/buffs/buffService.js')
-      vi.mocked(buffService.getActiveBuffs).mockReturnValue([
-        { name: 'Silence', blocksSpellcasting: true },
-      ])
+  it('refuses at the buff gate (real blockChecks.js) with the exact popup and refusal log, and never touches target resolution, the silence gate, hostile side effects or dice', async () => {
+    buffService.getActiveBuffs.mockReturnValue([
+      { name: 'Wild Shape', effect: 'shape_shift', blocksSpellcasting: true },
+    ])
+    const services = makeServices()
 
-      const services = makeServices()
-      const result = await executeSpellCast(makeSpell(), makeMetaCtx(), services)
+    const result = await executeSpellCast(makeFireballPayload(), { slotLevel: 3 }, services)
 
-      expect(result?.automationPopup?.payload?.type).toBe('automation_info')
-      expect(result.automationPopup.payload.description).toContain('Fireball cannot be cast')
-      expect(services.rollAttack).not.toHaveBeenCalled()
-      expect(services.rollDamage).not.toHaveBeenCalled()
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Early-exit: Silence blocks Verbal components                    */
-  /* ---------------------------------------------------------------- */
-
-  describe('silence blocks verbal components', () => {
-    it('refuses with popup and log when caster is in silence zone and spell has Verbal', async () => {
-      const silence = await import('../features/silenceService.js')
-      vi.mocked(silence.getSilenceSource).mockReturnValue('SilenceCaster')
-      vi.mocked(silence.isCreatureInSilenceZone).mockReturnValue(true)
-
-      const services = makeServices()
-      const result = await executeSpellCast(
-        makeSpell({ components: ['V'] }),
-        makeMetaCtx(),
-        services,
-      )
-
-      expect(result).toEqual({
-        automationPopup: {
-          type: 'popup',
-          payload: expect.objectContaining({
-            type: 'automation_info',
-            name: 'Silence',
-          }),
+    expect(result).toEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Wild Shape',
+          description: 'Fireball cannot be cast while TestWizard is under Wild Shape — no Spellcasting is allowed.',
         },
-      })
-      expect(services.rollDamage).not.toHaveBeenCalled()
-
-      vi.mocked(silence.getSilenceSource).mockReturnValue(null)
-      vi.mocked(silence.isCreatureInSilenceZone).mockReturnValue(false)
+      },
     })
+    // Real gate consumes (playerStats.name, campaignName) via spellResolution re-export.
+    expect(buffService.getActiveBuffs).toHaveBeenCalledTimes(1)
+    expect(buffService.getActiveBuffs).toHaveBeenCalledWith('TestWizard', CAMPAIGN)
+    // Refusal is logged exactly once (never silent, CLA-391) — full entry minus timestamp.
+    expect(logService.addEntry).toHaveBeenCalledTimes(1)
+    const [logCampaign, entry] = logService.addEntry.mock.calls[0]
+    expect(logCampaign).toBe(CAMPAIGN)
+    expect({ ...entry, timestamp: undefined }).toEqual({
+      type: 'automation',
+      automationType: 'shape_shift_refused',
+      automationDetail: undefined,
+      creatureName: 'TestWizard',
+      characterName: 'TestWizard',
+      name: 'Wild Shape',
+      description: 'Fireball blocked — TestWizard cannot cast spells while under Wild Shape.',
+      timestamp: undefined,
+    })
+    expect(typeof entry.timestamp).toBe('number')
+    // Zero downstream trace: gates run in order buff -> getTargetInfo -> globe/
+    // forcecage/antimagic -> silence -> hostile side effects; none was reached.
+    expect(services.getTargetInfo).not.toHaveBeenCalled()
+    expect(silence.getSilenceSource).not.toHaveBeenCalled()
+    expect(friends.endFriendsOnHostileAction).not.toHaveBeenCalled()
+    expect(invis.endInvisibilityOnHostileAction).not.toHaveBeenCalled()
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalled()
+    expect(services.rollAttack).not.toHaveBeenCalled()
+    expect(services.rollDamage).not.toHaveBeenCalled()
+    expect(dice.rollExpression).not.toHaveBeenCalled()
+    expect(fetchCalls).toEqual([])
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Hostile-action triggers: Friends & Invisibility end early       */
+  /*  Gate ORDER 2: silence refusal runs AFTER the earlier block      */
+  /*  checks but BEFORE applyHostileCastSideEffects (index.js:682-    */
+  /*  687) — a refused cast must not break Friends/Invisibility nor   */
+  /*  arm lastActionSpellCast. Popup/log payload owned by             */
+  /*  spellCastService.noformula-modals.test.js silence gate; the    */
+  /*  ordering + exact collaborator tuples + zero-roll pin is unique. */
+  /*  Kills: silence check relocated after line 687, or refusal       */
+  /*  falling through to the damage path.                             */
   /* ---------------------------------------------------------------- */
 
-  describe('hostile-action triggers', () => {
-    it('ends Friends when casting a non-Friends spell', async () => {
-      const friends = await import('../features/friendsService.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
+  it('refuses a Verbal cast inside a Silence zone with the exact popup and log, after the globe/forcecage gates ran once, without ending Friends/Invisibility, arming lastActionSpellCast or rolling', async () => {
+    silence.getSilenceSource.mockReturnValue('SilenceCaster')
+    silence.isCreatureInSilenceZone.mockReturnValue(true)
+    const services = makeServices()
 
-      expect(friends.endFriendsOnHostileAction).toHaveBeenCalledWith(
-        'TestWizard',
-        'testCampaign',
-      )
-    })
+    const result = await executeSpellCast(makeFireballPayload({ components: ['V'] }), { slotLevel: 3 }, services)
 
-    it('ends Invisibility on any non-self spell cast', async () => {
-      const invis = await import('../features/invisibilityService.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      expect(invis.endInvisibilityOnHostileAction).toHaveBeenCalledWith(
-        'TestWizard',
-        'testCampaign',
-      )
-    })
-
-    it('sets lastActionSpellCast when casting time is 1 action', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ casting_time: '1 action' }), makeMetaCtx(), services)
-
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard',
-        'lastActionSpellCast',
-        1,
-        'testCampaign',
-      )
-    })
-
-    it('CLA-399: arms lastActionSpellCast for 2024 "Action" casing', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ casting_time: 'Action' }), makeMetaCtx(), services)
-
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
-        'TestWizard',
-        'lastActionSpellCast',
-        1,
-        'testCampaign',
-      )
-    })
-
-    it('CLA-399: does not arm lastActionSpellCast for 2024 "Bonus Action" casing', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ casting_time: 'Bonus Action' }), makeMetaCtx(), services)
-
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestWizard',
-        'lastActionSpellCast',
-        1,
-        'testCampaign',
-      )
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Formula resolution                                              */
-  /* ---------------------------------------------------------------- */
-
-  describe('damage formula resolution', () => {
-    it('uses damage_at_slot_level for normal spell levels', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 3 }), services)
-
-      expect(services.rollDamage).toHaveBeenCalled()
-      expect(services.rollDamage.mock.calls[0][0].formula).toBe('8d6')
-    })
-
-    it('uses damage_at_character_level for cantrips', async () => {
-      const services = makeServices()
-      const spell = makeSpell({
-        level: 0,
-        damage: {
-          damage_type: 'Fire',
-          damage_at_character_level: { 1: '1d10' },
+    expect(result).toEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Silence',
+          description: 'Fireball cannot be cast — TestWizard is inside a Silence zone and Verbal spell components are impossible there.',
         },
-      })
-      delete spell.damage.damage_at_slot_level
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 0 }), services)
-
-      expect(services.rollDamage).toHaveBeenCalled()
-      expect(services.rollDamage.mock.calls[0][0].formula).toBe('1d10')
+      },
     })
+    // Exact tuple: zone lookup by caster name (index.js:136-137).
+    expect(silence.getSilenceSource).toHaveBeenCalledWith('TestWizard', CAMPAIGN)
+    expect(silence.isCreatureInSilenceZone).toHaveBeenCalledWith('TestWizard', 'SilenceCaster', CAMPAIGN)
+    expect(logService.addEntry).toHaveBeenCalledTimes(1)
+    const [logCampaign, entry] = logService.addEntry.mock.calls[0]
+    expect(logCampaign).toBe(CAMPAIGN)
+    expect({ ...entry, timestamp: undefined }).toEqual({
+      type: 'automation',
+      creatureName: 'TestWizard',
+      name: 'Silence',
+      description: 'Fireball blocked — TestWizard is inside SilenceCaster\'s Silence zone; Verbal components are impossible there.',
+      timestamp: undefined,
+    })
+    expect(typeof entry.timestamp).toBe('number')
+    // Ordering: earlier block gates ran (target resolved once, real
+    // checkGlobeOfInvulnerability/checkForcecageBlocked passed on empty
+    // targetEffects) but hostile side effects (line 687) were NOT reached.
+    expect(services.getTargetInfo).toHaveBeenCalledTimes(1)
+    expect(friends.endFriendsOnHostileAction).not.toHaveBeenCalled()
+    expect(invis.endInvisibilityOnHostileAction).not.toHaveBeenCalled()
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalled()
+    expect(services.rollAttack).not.toHaveBeenCalled()
+    expect(services.rollDamage).not.toHaveBeenCalled()
+    expect(dice.rollExpression).not.toHaveBeenCalled()
+    expect(fetchCalls).toEqual([])
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Save DC calculation                                             */
+  /*  lookupFullSpell MERGE -> AoE modal assembly (flagship)          */
+  /*  The ONLY lane that runs index.js:170-189 fetch-merge with a     */
+  /*  disk hit and carries the merged fullSpell through real           */
+  /*  savePath.js into the saveAttackAoe popup (payload assembly      */
+  /*  from REAL disk bytes, real rangeToFeet, full dc precedence       */
+  /*  flip dex->DEX). execution/aoeSpells.test.js supplies             */
+  /*  area_of_effect directly (lookup bypassed, payload asserted with  */
+  /*  objectContaining); CLA-389 post-payment merge rides here too     */
+  /*  with the hub-stamped metaCtx (CLA-134, index.js:741).           */
+  /*  Kills: merge dropped, stale-fixture dc reaching the payload,    */
+  /*  post-cast riders skipped on the modal lane, unstamped metaCtx.  */
   /* ---------------------------------------------------------------- */
 
-  describe('save DC calculation', () => {
-    it('calculates DC from spellCastingAbility when present', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
+  it('merges the fetched 5e Fireball into fullSpell and hands the modal lane the real disk adjudication data, then runs post-cast riders against the stamped metaCtx', async () => {
+    const disk = fireballDisk()
+    const spell = makeFireballPayload()
+    const services = makeServices()
 
-      // 8 + Int bonus(5) + proficiency(4) = 17
-      expect(services.rollDamage).toHaveBeenCalled()
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.saveDc).toBe(17)
-    })
+    const result = await executeSpellCast(spell, { slotLevel: 3 }, services)
 
-    it('falls back to playerStats.spellAbilities.saveDc when no ability match', async () => {
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          spellAbilities: { toHit: 9, saveDc: 17, modifier: 5 },
-          abilities: [],
-        }),
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.saveDc).toBe(17)
-    })
-
-    it('adds Innate Sorcery +1 to save DC', async () => {
-      const buffService = await import('../../combat/buffs/buffService.js')
-      vi.mocked(buffService.isInnateSorceryActive).mockReturnValue(true)
-
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.saveDc).toBe(18)
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Saving-throw spells (dc present)                                */
-  /* ---------------------------------------------------------------- */
-
-  describe('saving-throw spells', () => {
-    it('passes save type and success condition to rollDamage context', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.saveType).toBe('dex')
-      expect(ctx.dcSuccess).toBe('half')
-    })
-
-    it('includes status_effects as statusEffects in context', async () => {
-      const services = makeServices()
-      await executeSpellCast(
-        makeSpell({ status_effects: ['poisoned', 'paralyzed'] }),
-        makeMetaCtx(),
-        services,
-      )
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.statusEffects).toEqual(['poisoned', 'paralyzed'])
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Attack-roll spells (no dc)                                      */
-  /* ---------------------------------------------------------------- */
-
-  describe('attack-roll spells', () => {
-    function makeAttackSpell() {
-      return makeSpell({
-        dc: undefined,
-        name: 'Fire Bolt',
-        level: 0,
-        damage: {
-          damage_type: 'Fire',
-          damage_at_character_level: { 1: '1d10' },
-        },
-      })
+    expect(fetchCalls).toEqual(['/data/spells.json', `/api/campaigns/${encodeURIComponent(CAMPAIGN)}/change-data`])
+    const expectedFullSpell = { ...spell, ...disk, index: undefined, name: 'Fireball' }
+    const expectedMetaCtx = {
+      slotLevel: 3,
+      metamagicHeighten: false,
+      finalFormula: '8d6',
+      featsOfChaosArmedAtCast: false,
     }
 
-    it('calls rollAttack for spells without a DC', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeAttackSpell(), makeMetaCtx({ slotLevel: 0 }), services)
-
-      expect(services.rollAttack).toHaveBeenCalled()
-      expect(services.rollAttack.mock.calls[0][0]).toBe('Fire Bolt')
+    // Exact popup assembly from merged disk data (index.js:754-759 -> savePath.js).
+    expect(result).toEqual({
+      automationPopup: {
+        type: 'modal',
+        modalName: 'saveAttackAoe',
+        payload: {
+          action: { name: 'Fireball', automation: {}, spell: expectedFullSpell },
+          playerStats: services.playerStats,
+          campaignName: CAMPAIGN,
+          shape: 'sphere',
+          range: 150,
+          damage: '8d6',
+          damageType: 'Fire',
+          radiantSoulChaMod: 0,
+          empoweredEvocationIntMod: 0,
+          saveType: 'DEX',
+          saveDc: 17,
+          dcSuccess: 'half',
+          activeOverlay: null,
+          metamagicCareful: false,
+          metamagicHeighten: false,
+          overchannelActive: false,
+          overchannelUseCount: 0,
+          overchannelSpellLevel: 3,
+        },
+      },
     })
-
-    it('passes toHit bonus to rollAttack context', async () => {
-      const services = makeServices()
-      await executeSpellCast(makeAttackSpell(), makeMetaCtx({ slotLevel: 0 }), services)
-
-      // toHit = Int bonus(5) + proficiency(4) = 9
-      expect(services.rollAttack.mock.calls[0][1]).toBe(9)
-    })
+    expect(result.automationPopup.payload.playerStats).toBe(services.playerStats)
+    // The merged fullSpell (not the raw payload) reaches the deepest collaborator.
+    expect(rider.triggerSoulstitchSpells).toHaveBeenCalledWith(expectedFullSpell, expectedMetaCtx, services.playerStats, CAMPAIGN, MAP)
+    // CLA-389: the modal lane paid the slot and still ran the post-cast block;
+    // CLA-134: the cast-time metaCtx stamp (finalFormula + featsOfChaosArmedAtCast)
+    // is the transport riders receive.
+    expect(rider.triggerPostCastRiderSaves).toHaveBeenCalledWith(spell, expectedMetaCtx, services.playerStats, CAMPAIGN, MAP)
+    // Damage adjudication belongs to the picker modal — the hub must not roll.
+    expect(services.rollDamage).not.toHaveBeenCalled()
+    expect(dice.rollExpression).not.toHaveBeenCalled()
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Empowered Evocation                                             */
+  /*  NO-SAVE routing with hub-stamped formula (CLA-200/CLA-134)     */
+  /*  Unique bytes: computeSpellStats transport (toHit sentinel 99     */
+  /*  vs computed 9), the empowered-evocation bake arriving at        */
+  /*  noSavePath.js via metaCtx.finalFormula (single bake, CLA-120),  */
+  /*  and the CLA-134 featsOfChaosArmedAtCast stamp crossing the      */
+  /*  rollAttack seam. noSavePath.test.js owns the module internals.  */
+  /*  NOTE (quirk pinned honestly, see report): the hub resolves the  */
+  /*  cantrip formula at `spell.level || 1` (index.js:53 -> 1d10)     */
+  /*  while noSavePath rolls it at caster level (resolveSpellDamageAt */
+  /*  Level -> '2d10' for CL10); the CL5+ divergent pair is asserted. */
+  /*  Kills: stamp dropped, double-bake, toHit transport failure.     */
   /* ---------------------------------------------------------------- */
 
-  describe('Empowered Evocation', () => {
-    it('appends Int modifier to damage formula for evocation spells', async () => {
-      const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
-      vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(5)
+  it('routes a no-DC Fire Bolt through real handleNoSavePath: rollAttack receives computed toHit, the single-baked empowered formula stamp, and the raw character-level roll formula', async () => {
+    rider.getEmpoweredEvocationFeatures.mockReturnValue([{ name: 'Empowered Evocation', type: 'empowered_evocation' }])
+    rider.getEmpoweredEvocationIntModifier.mockReturnValue(5)
+    const spell = makeFireBoltPayload()
+    const services = makeServices()
 
-      const services = makeServices()
-      await executeSpellCast(makeSpell({ school: 'Evocation' }), makeMetaCtx(), services)
+    const result = await executeSpellCast(spell, { slotLevel: 0 }, services)
 
-      expect(services.rollDamage.mock.calls[0][0].formula).toContain('+ 5')
+    expect(fetchCalls).toEqual(['/data/spells.json'])
+    const [attackName, attackBonus, attackCtx] = services.rollAttack.mock.calls[0]
+    expect(services.rollAttack).toHaveBeenCalledTimes(1)
+    expect(attackName).toBe('Fire Bolt')
+    expect(attackBonus).toBe(9) // Int 5 + proficiency 4 — computed, not the stale 99 sentinel
+    expect(attackCtx.playerStats).toBe(services.playerStats)
+    const ctxRest = { ...attackCtx }
+    delete ctxRest.playerStats
+    expect(ctxRest).toEqual({
+      attackName: 'Fire Bolt',
+      targetName: 'Goblin1',
+      attackerName: 'TestWizard',
+      damageType: 'Fire',
+      autoDamageFormula: '1d10 + 5 [Empowered Evocation]',
+      autoDamageName: 'Fire Bolt',
+      spellName: 'Fire Bolt',
+      autoDamageSchool: 'Evocation',
+      overchannelActive: false,
+      overchannelUseCount: 0,
+      overchannelSpellLevel: 0,
+      autoDamageRollResult: { total: 10, rolls: [1, 2, 3, 4], modifier: 0 },
+      slotLevel: 0,
+      metamagicHeighten: false,
+      finalFormula: '1d10 + 5 [Empowered Evocation]',
+      featsOfChaosArmedAtCast: false,
+      isCantrip: true,
     })
+    // The roll itself rides the caster-scaled raw formula (no double bake).
+    expect(dice.rollExpression).toHaveBeenCalledTimes(1)
+    expect(dice.rollExpression).toHaveBeenCalledWith('2d10')
+    expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
+    // No-save spells never reach the save DC adjudication — no rollDamage.
+    expect(services.rollDamage).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 
   /* ---------------------------------------------------------------- */
-  /*  Overchannel                                                     */
+  /*  2024 ruleset lookup + runStatusEffectsFallback (index.js:246-    */
+  /*  261) — the ONLY pin of the hub's zero-damage adjudication roll  */
+  /*  in the whole spellCastService family. Charm Monster (real 2024   */
+  /*  disk row: dc WIS/none, status_effects ['Charmed'], no AoE) is    */
+  /*  unhandled by the 40-handler trigger chain, so the hub stamps    */
+  /*  the rollDamage envelope exactly once — the faithful null dice    */
+  /*  mock then blocks savePath's null-formula second roll (#1449).    */
+  /*  Kills: URL selection regression (rules flag), fallback removal,   */
+  /*  a phantom savePath roll, statusEffects dropped from the seam.     */
   /* ---------------------------------------------------------------- */
 
-  describe('Overchannel', () => {
-    function makeOverchannelPlayerStats() {
-      return makePlayerStats({
-        automation: { passives: [{ type: 'overchannel' }] },
-      })
-    }
+  it('resolves a 2024 Charm Monster cast against /data/2024/spells.json and adjudicates it with exactly one zero-damage rollDamage envelope carrying statusEffects', async () => {
+    const spell = makeCharmMonsterPayload()
+    const services = makeServices({ playerStats: makePlayerStats({ rules: '2024' }) })
 
-    it('uses maximized roll when overchannel is enabled for valid slot level', async () => {
-      const dice = await import('../../dice/diceRoller.js')
-      const services = makeServices({ playerStats: makeOverchannelPlayerStats() })
-      await executeSpellCast(
-        makeSpell(),
-        makeMetaCtx({ slotLevel: 3, overchannel: true }),
-        services,
-      )
+    const result = await executeSpellCast(spell, { slotLevel: 4 }, services)
 
-      expect(dice.rollExpressionMaximized).toHaveBeenCalled()
-      expect(dice.rollExpression).not.toHaveBeenCalled()
+    expect(fetchCalls).toEqual(['/data/2024/spells.json'])
+    // savePath receives a null formula and the faithful roller returns null —
+    // rollDamage must have been called EXACTLY once (the fallback roll).
+    expect(dice.rollExpression).toHaveBeenCalledTimes(1)
+    expect(dice.rollExpression).toHaveBeenCalledWith(null)
+    expect(services.rollDamage).toHaveBeenCalledTimes(1)
+    expect(services.rollDamage.mock.calls[0][0]).toEqual({
+      name: 'Charm Monster',
+      formula: '0',
+      total: 0,
+      rolls: [],
+      modifier: 0,
+      context: {
+        targetName: 'Goblin1',
+        attackerName: 'TestWizard',
+        slotLevel: 4,
+        spellSchool: 'Enchantment',
+        saveDc: 17,
+        saveType: 'WIS',
+        dcSuccess: 'none',
+        metamagicHeighten: false,
+        isCantrip: false,
+        statusEffects: ['Charmed'],
+      },
     })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Range checking                                                  */
-  /* ---------------------------------------------------------------- */
-
-  describe('range checking', () => {
-    it('marks auto-miss when target exceeds spell range', async () => {
-      const range = await import('../combat/rangeValidation.js')
-      vi.mocked(range.computeEffectiveSpellRange).mockReturnValue(150)
-      vi.mocked(range.getDistanceFeet).mockReturnValue(200)
-      vi.mocked(range.computeRangeEffect).mockReturnValue({ mode: 'miss', reason: 'Out of range' })
-
-      const services = makeServices({
-        attackerPos: { gridX: 0, gridY: 0 },
-        targetPos: { gridX: 40, gridY: 0 },
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.isAutoMiss).toBe(true)
-      expect(ctx.rangeReason).toBe('Out of range')
-    })
-
-    it('skips range check when positions are not provided', async () => {
-      const range = await import('../combat/rangeValidation.js')
-      const services = makeServices({ attackerPos: null, targetPos: null })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      expect(range.computeRangeEffect).not.toHaveBeenCalled()
-    })
-  })
-
-  /* ---------------------------------------------------------------- */
-  /*  Magical Ambush (heighten while invisible)                       */
-  /* ---------------------------------------------------------------- */
-
-  describe('Magical Ambush', () => {
-    it('sets metamagicHeighten when caster is invisible and has the passive', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((_char, key) => {
-        if (key === 'activeConditions') return ['Invisible']
-        return undefined
-      })
-
-      const services = makeServices({
-        playerStats: makePlayerStats({
-          automation: { passives: [{ type: 'passive_rule', effect: 'magical_ambush' }] },
-        }),
-      })
-      await executeSpellCast(makeSpell(), makeMetaCtx(), services)
-
-      const ctx = services.rollDamage.mock.calls[0][0].context
-      expect(ctx.metamagicHeighten).toBe(true)
-    })
+    expect(services.rollAttack).not.toHaveBeenCalled()
+    expect(result).toBeNull()
   })
 })

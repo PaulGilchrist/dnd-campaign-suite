@@ -1,426 +1,379 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @maintained-by-ai
+// materialComponents.js — behavior pin suite.
+// Role in the component domain: name-keyed MATERIAL_REGISTRY (33 consumed-material
+// spells, service-authored literals — NOT disk verbatim, see #1407 revivify precedent),
+// the CLA-404 costly/consumed text detector consumed by blockChecks.js:17 (Beast
+// Spells), and the single consumption chokepoint (consumeMaterial) used by
+// revivifyService.js:37 ('Diamond (300 gp)'), useCustomHandlers.js:251
+// ('Diamond Dust (100 gp)'), useAreaEffectHandlers.js:42 ('Ruby Dust (1,500 gp)'),
+// useMetamagicHandler.js:64 and useSpellMetamagicGates.js:271/274/295 (registry itemName).
+// Kill matrix (per test): G1 kills guard-removal TypeError; G2 kills any registry-row
+// edit; G3 kills case/byte-normalization + registry-scope widening; K1 kills regex edits
+// against disk literals; K2 kills non-string coercion + trimmed-fallback removal;
+// H1 kills match-normalization + missing-backpack guard; C1 kills spend-before-refuse
+// reorder; C2-C5 kill PATCH-body mutants; C6 kills metaKey lookup branches;
+// C7 kills double-decrement; C8 kills refund-lie; C9 kills filename-sanitizer edit;
+// M1 kills requirement-message guard; M2 kills suffix logic; M3 kills duplicate-suffix.
+// No clocks: consumption is instantaneous; the only Date.now() is log metadata, stubbed.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const mockSetRuntimeValue = vi.fn();
 const mockAddEntry = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  setRuntimeValue: vi.fn((...args) => mockSetRuntimeValue(...args)),
+  setRuntimeValue: (...args) => mockSetRuntimeValue(...args),
 }));
 
 vi.mock('../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn((...args) => mockAddEntry(...args)),
+  addEntry: (...args) => mockAddEntry(...args),
 }));
 
 const {
   getConsumedMaterial,
+  spellHasCostlyOrConsumedMaterial,
   hasMaterial,
   consumeMaterial,
   getMaterialRequirementMessage,
 } = await import('./materialComponents.js');
 
-// --- Helpers ---
+const FIXED_TS = 1700000000000;
+let fetchMock;
 
-function mockSpell(name) {
-  return { name };
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  fetchMock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('') });
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(Date, 'now').mockReturnValue(FIXED_TS);
+});
 
-function mockPlayerStats(backpackItems, name = 'Test Character') {
-  return {
-    name,
-    inventory: { backpack: backpackItems },
-  };
-}
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
-// Spells that have material components in the registry
-const SPELLS_WITH_MATERIALS = [
-  'Animate Dead',
-  'Create Undead',
-  'Arcane Lock',
-  'Astral Projection',
-  'Awaken',
-  'Clone',
-  'Continual Flame',
-  'Divination',
-  'Find Familiar',
-  'Forcecage',
-  'Gentle Repose',
-  'Glyph of Warding',
-  'Greater Restoration',
-  'Hallow',
-  "Heroes' Feast",
-  'Illusory Script',
-  'Legend Lore',
-  'Magic Circle',
-  'Magic Mouth',
-  'Nondetection',
-  'Planar Binding',
-  'Protection from Evil and Good',
-  'Raise Dead',
-  'Reincarnate',
-  'Resurrection',
-  'Revivify',
-  'Sequester',
-  'Simulacrum',
-  'Stone Skin',
-  'Symbol',
-  'Teleportation Circle',
-  'True Resurrection',
-  'True Seeing',
+// Full MATERIAL_REGISTRY pin: [spell name, itemName, required] transcribed byte-exact
+// from materialComponents.js. itemName literals are the backpack match/consume keys
+// live callers pass to consumeMaterial.
+const REGISTRY_ROWS = [
+  ['Animate Dead', 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust', 'a drop of blood, a piece of flesh, and a pinch of bone dust'],
+  ['Create Undead', 'Black Onyx (150 gp)', 'one 150+ GP black onyx stone for each corpse'],
+  ['Arcane Lock', 'Gold Dust (25 gp)', 'gold dust worth 25+ GP, which the spell consumes'],
+  ['Astral Projection', 'Jacinth (1,000 gp)', 'jacinth and silver bar, all of which the spell consumes'],
+  ['Awaken', 'Agate (1,000 gp)', 'an agate worth 1,000+ GP, which the spell consumes'],
+  ['Clone', 'Diamond (1,000 gp)', 'a diamond worth 1,000+ GP, which the spell consumes'],
+  ['Continual Flame', 'Ruby Dust (50 gp)', 'ruby dust worth 50+ GP, which the spell consumes'],
+  ['Divination', 'Incense (25 gp)', 'incense worth 25+ GP, which the spell consumes'],
+  ['Find Familiar', 'Incense (10 gp)', 'burning incense worth 10+ GP, which the spell consumes'],
+  ['Forcecage', 'Ruby Dust (1,500 gp)', 'ruby dust worth 1,500+ GP, which the spell consumes'],
+  ['Gentle Repose', 'Copper Piece (2 gp)', '2 Copper Pieces, which the spell consumes'],
+  ['Glyph of Warding', 'Powdered Diamond (200 gp)', 'powdered diamond worth 200+ GP, which the spell consumes'],
+  ['Greater Restoration', 'Diamond Dust (100 gp)', 'diamond dust worth 100+ GP, which the spell consumes'],
+  ['Hallow', 'Incense (1,000 gp)', 'incense worth 1,000+ GP, which the spell consumes'],
+  ["Heroes' Feast", 'Gem-Encrusted Bowl (1,000 gp)', 'a gem-encrusted bowl worth 1,000+ GP, which the spell consumes'],
+  ['Illusory Script', 'Ink (10 gp)', 'ink worth 10+ GP, which the spell consumes'],
+  ['Legend Lore', 'Incense (250 gp)', 'incense worth 250+ GP, which the spell consumes'],
+  ['Magic Circle', 'Salt and Powdered Silver (100 gp)', 'salt and powdered silver worth 100+ GP, which the spell consumes'],
+  ['Magic Mouth', 'Jade Dust (10 gp)', 'jade dust worth 10+ GP, which the spell consumes'],
+  ['Nondetection', 'Diamond Dust (25 gp)', 'a pinch of diamond dust worth 25+ GP, which the spell consumes'],
+  ['Planar Binding', 'Jewel (1,000 gp)', 'a jewel worth 1,000+ GP, which the spell consumes'],
+  ['Protection from Evil and Good', 'Flask of Holy Water (25 gp)', 'a flask of Holy Water worth 25+ GP, which the spell consumes'],
+  ['Raise Dead', 'Diamond (500 gp)', 'a diamond worth 500+ GP, which the spell consumes'],
+  ['Reincarnate', 'Rare Oils (1,000 gp)', 'rare oils worth 1,000+ GP, which the spell consumes'],
+  ['Resurrection', 'Diamond (1,000 gp)', 'a diamond worth 1,000+ GP, which the spell consumes'],
+  ['Revivify', 'Diamond (300 gp)', 'a diamond worth 300+ GP, which the spell consumes'],
+  ['Sequester', 'Gem Dust (5,000 gp)', 'gem dust worth 5,000+ GP, which the spell consumes'],
+  ['Simulacrum', 'Powdered Ruby (1,500 gp)', 'powdered ruby worth 1,500+ GP, which the spell consumes'],
+  ['Stone Skin', 'Diamond Dust (100 gp)', 'diamond dust worth 100+ GP, which the spell consumes'],
+  ['Symbol', 'Powdered Diamond (1,000 gp)', 'powdered diamond worth 1,000+ GP, which the spell consumes'],
+  ['Teleportation Circle', 'Rare Inks (50 gp)', 'rare inks worth 50+ GP, which the spell consumes'],
+  ['True Resurrection', 'Diamond (25,000 gp)', 'diamonds worth 25,000+ GP, which the spell consumes'],
+  ['True Seeing', 'Mushroom Powder (25 gp)', 'mushroom powder worth 25+ GP, which the spell consumes'],
 ];
 
-// Spells that do NOT have material components
-const SPELLS_WITHOUT_MATERIALS = [
-  'Fireball',
-  'Cure Wounds',
-  'Light cantrip',
-  'Mage Hand',
-];
+const spells5e = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/spells.json'), 'utf8'));
+const spells2024 = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/2024/spells.json'), 'utf8'));
+const diskRow = (list, name) => list.find(s => s && s.name === name);
 
-// --- Tests ---
-
-describe('materialComponents', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('getConsumedMaterial — exact-name registry lookup', () => {
+  it('returns null for missing spell and nameless spell', () => {
+    expect(getConsumedMaterial(null)).toBeNull();
+    expect(getConsumedMaterial(undefined)).toBeNull();
+    expect(getConsumedMaterial({})).toBeNull();
+    expect(getConsumedMaterial({ name: '' })).toBeNull();
   });
 
-  describe('getConsumedMaterial', () => {
-    it('returns null when spell is null', () => {
-      expect(getConsumedMaterial(null)).toBeNull();
-    });
-
-    it('returns null when spell is undefined', () => {
-      expect(getConsumedMaterial(undefined)).toBeNull();
-    });
-
-    it('returns null when spell has no name', () => {
-      expect(getConsumedMaterial({})).toBeNull();
-    });
-
-    it('returns null when spell name is empty string', () => {
-      expect(getConsumedMaterial(mockSpell(''))).toBeNull();
-    });
-
-    it('returns material info for spells in the registry', () => {
-      for (const spellName of SPELLS_WITH_MATERIALS) {
-        const result = getConsumedMaterial(mockSpell(spellName));
-        expect(result).not.toBeNull();
-        expect(result.itemName).toBeDefined();
-        expect(result.required).toBeDefined();
-      }
-    });
-
-    it('returns null for spells not in the registry', () => {
-      for (const spellName of SPELLS_WITHOUT_MATERIALS) {
-        expect(getConsumedMaterial(mockSpell(spellName))).toBeNull();
-      }
-    });
-
-    it('returns correct material info for specific spells', () => {
-      expect(getConsumedMaterial(mockSpell('Animate Dead'))).toEqual({
-        itemName: 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust',
-        required: 'a drop of blood, a piece of flesh, and a pinch of bone dust',
-      });
-
-      expect(getConsumedMaterial(mockSpell('Create Undead'))).toEqual({
-        itemName: 'Black Onyx (150 gp)',
-        required: 'one 150+ GP black onyx stone for each corpse',
-      });
-
-      expect(getConsumedMaterial(mockSpell('True Resurrection'))).toEqual({
-        itemName: 'Diamond (25,000 gp)',
-        required: 'diamonds worth 25,000+ GP, which the spell consumes',
-      });
-
-      expect(getConsumedMaterial(mockSpell("Heroes' Feast"))).toEqual({
-        itemName: 'Gem-Encrusted Bowl (1,000 gp)',
-        required: 'a gem-encrusted bowl worth 1,000+ GP, which the spell consumes',
-      });
-    });
-
-    it('returns correct count of registered spells', () => {
-      const allSpellNames = SPELLS_WITH_MATERIALS;
-      for (const spellName of allSpellNames) {
-        expect(getConsumedMaterial(mockSpell(spellName))).not.toBeNull();
-      }
-      expect(allSpellNames.length).toBe(33);
-    });
-  });
-
-  describe('hasMaterial', () => {
-    it('returns true when material is in backpack as object', () => {
-      const stats = mockPlayerStats([
-        { name: 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust' },
-      ]);
-      expect(hasMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust')).toBe(true);
-    });
-
-    it('returns true when material is in backpack as string', () => {
-      const stats = mockPlayerStats(['Drop of Blood, Piece of Flesh, Pinch of Bone Dust']);
-      expect(hasMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust')).toBe(true);
-    });
-
-    it('returns false when material is not in backpack', () => {
-      const stats = mockPlayerStats([
-        { name: 'Some Other Item' },
-      ]);
-      expect(hasMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust')).toBe(false);
-    });
-
-    it('returns false when backpack is empty', () => {
-      const stats = mockPlayerStats([]);
-      expect(hasMaterial(stats, 'Any Material')).toBe(false);
-    });
-
-    it('returns false when backpack is missing', () => {
-      const stats = mockPlayerStats(null);
-      stats.inventory = {};
-      expect(hasMaterial(stats, 'Any Material')).toBe(false);
-    });
-
-    it('handles mixed string and object items in backpack', () => {
-      const stats = mockPlayerStats([
-        'String Item',
-        { name: 'Object Item' },
-      ]);
-      expect(hasMaterial(stats, 'String Item')).toBe(true);
-      expect(hasMaterial(stats, 'Object Item')).toBe(true);
-      expect(hasMaterial(stats, 'Missing Item')).toBe(false);
-    });
-
-    it('returns false when item has no name property', () => {
-      const stats = mockPlayerStats([
-        {},
-        { name: '' },
-      ]);
-      expect(hasMaterial(stats, 'Some Material')).toBe(false);
-    });
-  });
-
-  describe('consumeMaterial', () => {
-    function mockFetchOk() {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve(''),
-      });
+  it('returns the exact {itemName, required} row for every one of the 33 registered spells', () => {
+    for (const [name, itemName, required] of REGISTRY_ROWS) {
+      expect(getConsumedMaterial({ name })).toEqual({ itemName, required });
     }
+  });
 
-    it('removes material from backpack and returns true', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats([
-        'Drop of Blood, Piece of Flesh, Pinch of Bone Dust',
-        'Other Item',
-      ]);
+  it('misses unregistered real spells, case variants, and curly-apostrophe spell names', () => {
+    // Identify is costly on disk but deliberately outside this backpack-gating registry.
+    expect(getConsumedMaterial(diskRow(spells5e, 'Identify'))).toBeNull();
+    // 5e disk spells the one-word 'Stoneskin'; registry key 'Stone Skin' is 2024-only.
+    expect(getConsumedMaterial(diskRow(spells5e, 'Stoneskin'))).toBeNull();
+    expect(getConsumedMaterial({ name: 'Not A Spell' })).toBeNull();
+    expect(getConsumedMaterial({ name: 'revivify' })).toBeNull();
+    expect(getConsumedMaterial({ name: 'REVIVIFY' })).toBeNull();
+    // Registry key carries U+0027 (verified bytewise); U+2019 must NOT match.
+    expect(getConsumedMaterial({ name: 'Heroes\u2019 Feast' })).toBeNull();
+  });
+});
 
-      const result = await consumeMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust', 'test-campaign');
+describe('spellHasCostlyOrConsumedMaterial — CLA-404 cost/consumption detector (blockChecks.js Beast Spells lane)', () => {
+  it('classifies REAL disk material rows from both rulesets', () => {
+    // [disk spell, verbatim material pin (drift detector), expected]
+    const rows = [
+      ['5e', diskRow(spells5e, 'Revivify'), 'Diamonds worth 300gp, which the spell consumes.', true],
+      ['2024', diskRow(spells2024, 'Revivify'), 'a diamond worth 300+ GP, which the spell consumes', true],
+      // Costly but NOT consumed — only the 'worth' clause makes these true.
+      ['5e', diskRow(spells5e, 'Identify'), 'A pearl worth at least 100gp and an owl feather.', true],
+      ['2024', diskRow(spells2024, 'Identify'), 'a pearl worth 100+ GP', true],
+      // No gp/worth/consumes in text — carried solely by the registry fallback.
+      ['5e', diskRow(spells5e, 'Animate Dead'), 'A drop of blood, a piece of flesh, and a pinch of bone dust.', true],
+      // Free materials, unregistered: the ALLOW side of the Beast Spells bypass.
+      ['5e', diskRow(spells5e, 'Aid'), 'A tiny strip of white cloth.', false],
+      ['2024', diskRow(spells2024, 'Aid'), 'a strip of white cloth', false],
+    ];
+    for (const [ruleset, spell, material, expected] of rows) {
+      expect(ruleset === '5e' || ruleset === '2024').toBe(true);
+      expect((spell || {}).material).toBe(material);
+      expect(spellHasCostlyOrConsumedMaterial(spell)).toBe(expected);
+    }
+  });
 
-      expect(result).toBe(true);
-      expect(mockSetRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'inventory',
-        { backpack: ['Other Item'] },
-        'test-campaign',
-      );
+  it('treats trimmed refs via registry fallback, ignores non-string material, false for falsy spell', () => {
+    expect(spellHasCostlyOrConsumedMaterial(null)).toBe(false);
+    expect(spellHasCostlyOrConsumedMaterial(undefined)).toBe(false);
+    expect(spellHasCostlyOrConsumedMaterial({})).toBe(false);
+    expect(spellHasCostlyOrConsumedMaterial({ name: 'Raise Dead' })).toBe(true);
+    // Registry scope pin: Identify is costly on disk but absent from the registry.
+    expect(spellHasCostlyOrConsumedMaterial({ name: 'Identify' })).toBe(false);
+    expect(spellHasCostlyOrConsumedMaterial({ name: 'Fireball', material: 500 })).toBe(false);
+  });
+});
+
+describe('hasMaterial — exact-name backpack match', () => {
+  it('matches string and object rows byte-exactly; misses case, substring, absent, and missing inventory', () => {
+    const stats = {
+      name: 'Test Character',
+      inventory: { backpack: ['Diamond (300 gp)', { name: 'Incense (10 gp)' }, {}] },
+    };
+    expect(hasMaterial(stats, 'Diamond (300 gp)')).toBe(true);
+    expect(hasMaterial(stats, 'Incense (10 gp)')).toBe(true);
+    expect(hasMaterial(stats, 'diamond (300 gp)')).toBe(false);
+    expect(hasMaterial(stats, 'Incense')).toBe(false);
+    expect(hasMaterial(stats, 'Rations')).toBe(false);
+    expect(hasMaterial({ name: 'Test Character', inventory: {} }, 'Diamond (300 gp)')).toBe(false);
+    expect(hasMaterial({ name: 'Test Character' }, 'Diamond (300 gp)')).toBe(false);
+    // Quirk pin (unguarded, golden): nullish playerStats derefs straight through.
+    expect(() => hasMaterial(undefined, 'Diamond (300 gp)')).toThrow(TypeError);
+    // Quirk pin: empty itemName matches a nameless backpack row.
+    expect(hasMaterial({ name: 'Test Character', inventory: { backpack: [{}] } }, '')).toBe(true);
+  });
+});
+
+describe('consumeMaterial — refuse-before-spend, PATCH body, runtime tuple, campaign log', () => {
+  it('refuses before spending anything when the item is not carried', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stats = { name: 'Test Character', inventory: { backpack: ['Rations'] } };
+    const before = JSON.stringify(stats);
+
+    const result = await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign');
+
+    expect(result).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockSetRuntimeValue).not.toHaveBeenCalled();
+    expect(mockAddEntry).not.toHaveBeenCalled();
+    expect(consoleSpy.mock.calls).toEqual([
+      ['[materialComponents] No Diamond (300 gp) found in backpack for Test Character'],
+    ]);
+    expect(JSON.stringify(stats)).toBe(before);
+  });
+
+  it('consumes a string item: full PATCH, arity-4 runtime tuple, exact log entry, input untouched', async () => {
+    const stats = { name: 'Test Character', inventory: { backpack: ['Diamond (300 gp)', 'Rations'] } };
+    const before = JSON.stringify(stats);
+
+    const result = await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign');
+
+    expect(result).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/campaigns/test-campaign/Test_Character.json');
+    expect(init.method).toBe('PATCH');
+    expect(init.mode).toBe('cors');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    // No fabricated keys: inventory had no itemMeta, so none may appear in the PATCH.
+    expect(JSON.parse(init.body)).toEqual({ inventory: { backpack: ['Rations'] } });
+    expect(mockSetRuntimeValue.mock.calls).toEqual([
+      ['Test Character', 'inventory', { backpack: ['Rations'] }, 'test-campaign'],
+    ]);
+    expect(mockAddEntry.mock.calls).toEqual([[
+      'test-campaign',
+      { type: 'material_consumed', characterName: 'Test Character', material: 'Diamond (300 gp)', timestamp: FIXED_TS },
+    ]]);
+    expect(JSON.stringify(stats)).toBe(before);
+  });
+
+  it('splices the matched object row and keeps the surviving object by identity', async () => {
+    const survivor = { name: 'Rations' };
+    const stats = { name: 'Test Character', inventory: { backpack: [{ name: 'Diamond (300 gp)' }, survivor] } };
+
+    const result = await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign');
+
+    expect(result).toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ inventory: { backpack: [{ name: 'Rations' }] } });
+    // Survivor object passes through by reference — no clone, no rebuild.
+    expect(mockSetRuntimeValue.mock.calls[0][2].backpack[0]).toBe(survivor);
+  });
+
+  it('decrements itemMeta quantity and keeps the backpack string when more remain', async () => {
+    const stats = {
+      name: 'Test Character',
+      inventory: {
+        backpack: ['Diamond Dust (100 gp)', 'Rations'],
+        itemMeta: { 'Diamond Dust (100 gp)': { quantity: 3, description: 'ground' } },
+      },
+    };
+    const before = JSON.stringify(stats);
+
+    const result = await consumeMaterial(stats, 'Diamond Dust (100 gp)', 'test-campaign');
+
+    expect(result).toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      inventory: {
+        backpack: ['Diamond Dust (100 gp)', 'Rations'],
+        itemMeta: { 'Diamond Dust (100 gp)': { quantity: 2, description: 'ground' } },
+      },
     });
+    expect(JSON.stringify(stats)).toBe(before);
+  });
 
-    it('decrements itemMeta quantity and keeps the backpack string when more remain', async () => {
-      mockFetchOk();
-      const stats = {
-        name: 'Test Character',
-        inventory: {
-          backpack: ['Incense', 'Rations'],
-          itemMeta: { Incense: { quantity: 3, description: 'burning' } },
-        },
-      };
+  it('removes the string and zeroes itemMeta quantity on the last one (PATCH deep-merge survivable)', async () => {
+    const stats = {
+      name: 'Test Character',
+      inventory: {
+        backpack: ['Diamond Dust (100 gp)', 'Rations'],
+        itemMeta: { 'Diamond Dust (100 gp)': { quantity: 1 } },
+      },
+    };
 
-      const result = await consumeMaterial(stats, 'Incense', 'test-campaign');
+    const result = await consumeMaterial(stats, 'Diamond Dust (100 gp)', 'test-campaign');
 
-      expect(result).toBe(true);
-      const updated = mockSetRuntimeValue.mock.calls.at(-1)[2];
-      expect(updated.backpack).toContain('Incense');
-      expect(updated.itemMeta.Incense.quantity).toBe(2);
-      expect(updated.itemMeta.Incense.description).toBe('burning');
-      expect(hasMaterial(stats, 'Incense')).toBe(true);
-    });
-
-    it('zeroes itemMeta quantity and removes the string when the last one is consumed', async () => {
-      mockFetchOk();
-      const stats = {
-        name: 'Test Character',
-        inventory: {
-          backpack: ['Incense', 'Rations'],
-          itemMeta: { Incense: { quantity: 1 } },
-        },
-      };
-
-      const result = await consumeMaterial(stats, 'Incense', 'test-campaign');
-
-      expect(result).toBe(true);
-      const updated = mockSetRuntimeValue.mock.calls.at(-1)[2];
-      expect(updated.backpack).toEqual(['Rations']);
-      expect(updated.itemMeta.Incense.quantity).toBe(0);
-    });
-
-    it('removes material from backpack when items are objects', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats([
-        { name: 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust' },
-        { name: 'Other Item' },
-      ]);
-
-      const result = await consumeMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust', 'test-campaign');
-
-      expect(result).toBe(true);
-      expect(mockSetRuntimeValue).toHaveBeenCalledWith(
-        'Test Character',
-        'inventory',
-        { backpack: [{ name: 'Other Item' }] },
-        'test-campaign',
-      );
-    });
-
-    it('returns false when material is not in backpack', async () => {
-      const stats = mockPlayerStats(['Some Other Item']);
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const result = await consumeMaterial(stats, 'Missing Material', 'test-campaign');
-
-      expect(result).toBe(false);
-      expect(mockSetRuntimeValue).not.toHaveBeenCalled();
-      expect(mockAddEntry).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[materialComponents] No Missing Material found in backpack for Test Character',
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('logs material consumption to the campaign log', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats([
-        'Drop of Blood, Piece of Flesh, Pinch of Bone Dust',
-      ]);
-
-      const result = await consumeMaterial(stats, 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust', 'test-campaign');
-
-      expect(result).toBe(true);
-      expect(mockAddEntry).toHaveBeenCalledWith('test-campaign', {
-        type: 'material_consumed',
-        characterName: 'Test Character',
-        material: 'Drop of Blood, Piece of Flesh, Pinch of Bone Dust',
-        timestamp: expect.any(Number),
-      });
-    });
-
-    it('uses correct PATCH URL with encoded names', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats(['Some Material'], 'My Character');
-
-      await consumeMaterial(stats, 'Some Material', 'test-campaign');
-
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/test-campaign/My_Character.json',
-        expect.objectContaining({
-          method: 'PATCH',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      );
-    });
-
-    it('handles fetch error gracefully', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats(['Some Material']);
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
-        ok: false,
-        text: () => Promise.resolve('Server error'),
-      });
-
-      const result = await consumeMaterial(stats, 'Some Material', 'test-campaign');
-
-      expect(result).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[materialComponents] PATCH error body: Server error',
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('handles special characters in character name for file generation', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats(['Some Material'], 'Char @ # $ %');
-
-      await consumeMaterial(stats, 'Some Material', 'test-campaign');
-
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/test-campaign/Char________.json',
-        expect.any(Object),
-      );
-    });
-
-    it('handles log entry error gracefully', async () => {
-      mockFetchOk();
-      const stats = mockPlayerStats(['Some Material']);
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockAddEntry.mockRejectedValue(new Error('Log error'));
-
-      const result = await consumeMaterial(stats, 'Some Material', 'test-campaign');
-
-      expect(result).toBe(true);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[materialComponents] Error logging material consumption:',
-        expect.any(Error),
-      );
-
-      consoleSpy.mockRestore();
+    expect(result).toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      inventory: {
+        backpack: ['Rations'],
+        itemMeta: { 'Diamond Dust (100 gp)': { quantity: 0 } },
+      },
     });
   });
 
-  describe('getMaterialRequirementMessage', () => {
-    it('returns null for spells without material components', () => {
-      expect(getMaterialRequirementMessage(mockSpell('Fireball'))).toBeNull();
+  it('resolves itemMeta keys case-insensitively (writing back the original key) and stamps nothing when meta is empty', async () => {
+    const cases = [
+      [
+        { name: 'Test Character', inventory: { backpack: ['Incense (10 gp)'], itemMeta: { 'incense (10 gp)': { quantity: 1, notes: 'sticks' } } } },
+        { inventory: { backpack: [], itemMeta: { 'incense (10 gp)': { quantity: 0, notes: 'sticks' } } } },
+      ],
+      [
+        { name: 'Test Character', inventory: { backpack: ['Incense (10 gp)'], itemMeta: {} } },
+        { inventory: { backpack: [], itemMeta: {} } },
+      ],
+    ];
+
+    for (let i = 0; i < cases.length; i++) {
+      const [stats, expectedBody] = cases[i];
+      const result = await consumeMaterial(stats, 'Incense (10 gp)', 'test-campaign');
+      expect(result).toBe(true);
+      expect(JSON.parse(fetchMock.mock.calls[i][1].body)).toEqual(expectedBody);
+    }
+    expect(mockSetRuntimeValue).toHaveBeenCalledTimes(2);
+  });
+
+  it('composes two spends 2->1->0 without double-decrement or auto-refund', async () => {
+    const stats = {
+      name: 'Test Character',
+      inventory: {
+        backpack: ['Diamond (300 gp)', 'Rations'],
+        itemMeta: { 'Diamond (300 gp)': { quantity: 2 } },
+      },
+    };
+
+    expect(await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign')).toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      inventory: { backpack: ['Diamond (300 gp)', 'Rations'], itemMeta: { 'Diamond (300 gp)': { quantity: 1 } } },
     });
 
-    it('returns null when spell is null', () => {
-      expect(getMaterialRequirementMessage(null)).toBeNull();
+    // Second cast pays against the PATCHed inventory, exactly as callers re-read it.
+    const stats2 = { name: 'Test Character', inventory: JSON.parse(fetchMock.mock.calls[0][1].body).inventory };
+    expect(await consumeMaterial(stats2, 'Diamond (300 gp)', 'test-campaign')).toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      inventory: { backpack: ['Rations'], itemMeta: { 'Diamond (300 gp)': { quantity: 0 } } },
     });
+  });
 
-    it('returns null when spell has no name', () => {
-      expect(getMaterialRequirementMessage({})).toBeNull();
-    });
+  it('PATCH failure and log failure are honest: consumed stands, both errors surface, nothing refunds', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce({ ok: false, text: () => Promise.resolve('Server error') });
+    mockAddEntry.mockRejectedValueOnce(new Error('Log error'));
+    const stats = { name: 'Test Character', inventory: { backpack: ['Diamond (300 gp)'] } };
 
-    it('returns formatted message for spells with material components', () => {
-      const message = getMaterialRequirementMessage(mockSpell('Animate Dead'));
-      expect(message).toBe('Animate Dead requires a drop of blood, a piece of flesh, and a pinch of bone dust, which the spell consumes.');
-    });
+    const result = await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign');
 
-    it('formats message correctly for Heroes Feast', () => {
-      const message = getMaterialRequirementMessage(mockSpell("Heroes' Feast"));
-      expect(message).toBe("Heroes' Feast requires a gem-encrusted bowl worth 1,000+ GP, which the spell consumes.");
-    });
+    expect(result).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockSetRuntimeValue.mock.calls).toEqual([
+      ['Test Character', 'inventory', { backpack: [] }, 'test-campaign'],
+    ]);
+    expect(consoleSpy.mock.calls).toHaveLength(2);
+    expect(consoleSpy.mock.calls[0]).toEqual(['[materialComponents] PATCH error body: Server error']);
+    expect(consoleSpy.mock.calls[1][0]).toBe('[materialComponents] Error logging material consumption:');
+    expect(consoleSpy.mock.calls[1][1] instanceof Error).toBe(true);
+    expect(consoleSpy.mock.calls[1][1].message).toBe('Log error');
+  });
 
-    it('formats message correctly for Create Undead', () => {
-      const message = getMaterialRequirementMessage(mockSpell('Create Undead'));
-      expect(message).toBe('Create Undead requires one 150+ GP black onyx stone for each corpse, which the spell consumes.');
-    });
+  it('sanitizes the character name into the JSON filename byte-exactly', async () => {
+    const stats = { name: 'Char @ # $ %', inventory: { backpack: ['Diamond (300 gp)'] } };
 
-    it('includes spell name at the start of the message', () => {
-      const message = getMaterialRequirementMessage(mockSpell('True Resurrection'));
-      expect(message).toMatch(/^True Resurrection requires/);
-    });
+    expect(await consumeMaterial(stats, 'Diamond (300 gp)', 'test-campaign')).toBe(true);
 
-    it('ends message with a single "which the spell consumes." suffix', () => {
-      const message = getMaterialRequirementMessage(mockSpell('Clone'));
-      expect(message).toBe('Clone requires a diamond worth 1,000+ GP, which the spell consumes.');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/campaigns/test-campaign/Char________.json');
+    expect(mockSetRuntimeValue.mock.calls).toEqual([
+      ['Char @ # $ %', 'inventory', { backpack: [] }, 'test-campaign'],
+    ]);
+  });
+});
+
+describe('getMaterialRequirementMessage — requirement text builder', () => {
+  it('returns null for spells without a registry row', () => {
+    expect(getMaterialRequirementMessage(null)).toBeNull();
+    expect(getMaterialRequirementMessage({})).toBeNull();
+    expect(getMaterialRequirementMessage(diskRow(spells5e, 'Fireball'))).toBeNull();
+  });
+
+  it('formats exact messages for the consume-suffix present and absent classes', () => {
+    // Class A: registry text already says 'which the spell consumes' — only '.' appended.
+    expect(getMaterialRequirementMessage({ name: 'Revivify' }))
+      .toBe('Revivify requires a diamond worth 300+ GP, which the spell consumes.');
+    // Class A byte fidelity: apostrophe is U+0027 in key and message alike.
+    expect(getMaterialRequirementMessage({ name: "Heroes' Feast" }))
+      .toBe("Heroes' Feast requires a gem-encrusted bowl worth 1,000+ GP, which the spell consumes.");
+    // Class B: raw text does not consume, but the message appends the clause (quirk pin).
+    expect(getMaterialRequirementMessage({ name: 'Animate Dead' }))
+      .toBe('Animate Dead requires a drop of blood, a piece of flesh, and a pinch of bone dust, which the spell consumes.');
+    expect(getMaterialRequirementMessage({ name: 'Create Undead' }))
+      .toBe('Create Undead requires one 150+ GP black onyx stone for each corpse, which the spell consumes.');
+  });
+
+  it('every registry row renders exactly one "which the spell consumes" clause', () => {
+    for (const [name] of REGISTRY_ROWS) {
+      const message = getMaterialRequirementMessage({ name });
+      expect(message.startsWith(`${name} requires `)).toBe(true);
       expect(message.match(/which the spell consumes/g)).toHaveLength(1);
-    });
-
-    it('does not duplicate the consume suffix for Revivify', () => {
-      const message = getMaterialRequirementMessage(mockSpell('Revivify'));
-      expect(message).toBe('Revivify requires a diamond worth 300+ GP, which the spell consumes.');
-    });
+    }
   });
 });

@@ -1,18 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+// SERVICE lane (CLA-037 family): rules/spells/postCastRiderService.js — saves/spreads
+// and school/casting-time gates, NOT heals (postCastHeal twin owns heals, #1452).
+// Split vs automation/handlers/combat/postCastRiderService.test.js (declared in its
+// header): that twin owns uses-boundary(0/neg), `?? 1` default, usesKey splice,
+// throw-on-missing-array, null-result filtering, rider error rethrow, null metaCtx,
+// undefined spell — deliberately NOT re-pinned here. This file owns: selectors
+// (full-set identity), rider envelope shapes BOTH formats (inline unique producer —
+// save creation delegates to generic savePrompt lane via post_cast_rider →
+// handlePostCastRider, automation/index.js:363; this service stamps NO te.repeatSave),
+// soulstitch/bewitching gates + envelopes + modal bridges, spell_thief discovery
+// (deferred to here by spellThiefHandler.test.js:7) + CLA-325 inertness, and the
+// multi_target_spread disk-shape mismatch quirk.
+// Disk provenance (2024/classes.json): riderSave producer = Bard "Beguiling Magic"
+// (riderSave byte-faithful below); bewitching = Warlock automation[0]; soulstitch /
+// empowered_evocation = Wizard; spell_thief = Rogue automation (INT save — never
+// reached here, inert CLA-325). Top-level type 'multi_target_spread' and
+// 'post_cast_rider' have ZERO disk class rows (disk nests spellFilter under
+// passive_rule.multi_target_spread on Bard "Words of Creation") — custom-only
+// producers; pinned honestly below. No clock stored by this service: duration bytes
+// ('1_minute', '1_round') pass through verbatim to the handler lane.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { executeHandler } from '../../automation/index.js'
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import {
   getPostCastRiderSaves,
   getSpellThiefFeatures,
-
   getMultiTargetSpreads,
   getMultiTargetSpreadForSpell,
-
   triggerPostCastRiderSaves,
   getSoulstitchFeatures,
-
   triggerSoulstitchSpells,
   getEmpoweredEvocationFeatures,
-
   getEmpoweredEvocationIntModifier,
   triggerSpellThief,
   getBewitchingMagicFeatures,
@@ -28,587 +46,404 @@ vi.mock('../../automation/index.js', () => ({
   executeHandler: vi.fn(),
 }))
 
-vi.mock('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js', () => ({
-  isBlockedBySpellThief: vi.fn(() => false),
-}))
+const CAMP = 'camp'
+const MAP = 'map'
+const defaultPopup = () => ({ type: 'popup', payload: { ok: true } })
+
+// Real disk bytes: 2024 Bard "Beguiling Magic" automation row (riderSave producer).
+const diskBardRiderPassive = () => ({
+  type: 'passive_rule',
+  name: 'Beguiling Magic',
+  effect: 'always_prepared_spells',
+  spells: ['Charm Person', 'Mirror Image'],
+  riderSave: {
+    type: 'WIS',
+    condition: 'Charmed or Frightened',
+    duration: '1_minute',
+    after: 'enchantment_or_illusion_spell',
+    range: '60 ft',
+    recharge: 'long_rest',
+  },
+  casting_time: 'passive',
+})
 
 describe('postCastRiderService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getRuntimeValue.mockReturnValue(1)
+    executeHandler.mockImplementation(async () => defaultPopup())
   })
 
-  describe('getPostCastRiderSaves', () => {
-    it('returns passives with type post_cast_rider', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'post_cast_rider', name: 'Rider 1' },
-            { type: 'other', name: 'Other' },
-          ],
-        },
-      }
-      const result = getPostCastRiderSaves(stats)
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Rider 1')
-    })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
-    it('returns passives with type passive_rule and riderSave truthy', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'passive_rule', riderSave: { type: 'WIS' }, name: 'Rider 2' },
-            { type: 'passive_rule', name: 'Other' },
-          ],
-        },
-      }
-      const result = getPostCastRiderSaves(stats)
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Rider 2')
-    })
-
-    it('returns both post_cast_rider and riderSave passives together', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'post_cast_rider', name: 'Rider 1' },
-            { type: 'passive_rule', riderSave: true, name: 'Rider 2' },
-            { type: 'other', name: 'Other' },
-          ],
-        },
-      }
-      expect(getPostCastRiderSaves(stats)).toHaveLength(2)
+  describe('getPostCastRiderSaves selector', () => {
+    it('accepts post_cast_rider and passive_rule-with-truthy-riderSave only, order-stable, by identity', () => {
+      const custom = { type: 'post_cast_rider', name: 'Custom Rider' }
+      const bard = diskBardRiderPassive()
+      const plainRule = { type: 'passive_rule', name: 'Plain Rule' }
+      const falseSave = { type: 'passive_rule', riderSave: false, name: 'False Save' }
+      const noise = { type: 'empowered_evocation', name: 'Empowered' }
+      const result = getPostCastRiderSaves({ automation: { passives: [noise, custom, plainRule, bard, falseSave] } })
+      expect(result).toHaveLength(2)
+      expect(result[0]).toBe(custom)
+      expect(result[1]).toBe(bard)
     })
   })
 
-  describe('getSpellThiefFeatures', () => {
-    it('returns spell_thief reactions', () => {
-      const stats = {
-        automation: {
-          reactions: [
-            { type: 'spell_thief', name: 'Thief' },
-            { type: 'other', name: 'Other' },
-          ],
-        },
-      }
+  describe('getSpellThiefFeatures selector', () => {
+    it('scans reactions only, matching spell_thief type by identity', () => {
+      // Disk byte fidelity: 2024 Rogue "Spell Thief" automation row.
+      const thief = { type: 'spell_thief', name: 'Spell Thief', saveType: 'INT', saveDc: 'ability', saveAbility: 'INT', trigger: 'spell_cast', oncePerLongRest: true, casting_time: '1 reaction' }
+      const otherReaction = { type: 'opportunity_attack', name: 'OA' }
+      const passiveLookalike = { type: 'spell_thief', name: 'Passive Lane Thief' }
+      const stats = { automation: { reactions: [otherReaction, thief], passives: [passiveLookalike] } }
       const result = getSpellThiefFeatures(stats)
       expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Thief')
+      expect(result[0]).toBe(thief)
     })
   })
 
-  describe('getMultiTargetSpreads', () => {
-    it('returns multi_target_spread passives', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'multi_target_spread', spellFilter: ['Fireball'] },
-            { type: 'other' },
-          ],
-        },
-      }
-      const result = getMultiTargetSpreads(stats)
-      expect(result).toHaveLength(1)
-    })
-  })
-
-  describe('getMultiTargetSpreadForSpell', () => {
-    it('returns spread when spell matches filter', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'multi_target_spread', spellFilter: ['Fireball'], name: 'Spread 1' }],
-        },
-      }
-      expect(getMultiTargetSpreadForSpell(stats, 'Fireball')).toBeDefined()
-    })
-
-    it('returns the matching spread object', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'multi_target_spread', spellFilter: ['Iceball'], name: 'Spread A' },
-            { type: 'multi_target_spread', spellFilter: ['Fireball'], name: 'Spread B' },
-          ],
-        },
-      }
-      const result = getMultiTargetSpreadForSpell(stats, 'Fireball')
-      expect(result.name).toBe('Spread B')
-    })
-
-    it('returns null when no matching spread', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'multi_target_spread', spellFilter: ['Fireball'] }],
-        },
-      }
+  describe('multi_target_spread selection', () => {
+    it('filters top-level type, returns first exact-name match by identity, misses null, throws on missing spellFilter', () => {
+      const spreadA = { type: 'multi_target_spread', name: 'Spread A', spellFilter: ['Fireball', 'Power Word Heal'], range: '10 ft' }
+      const spreadB = { type: 'multi_target_spread', name: 'Spread B', spellFilter: ['Fireball'], range: '5 ft' }
+      const noise = { type: 'bewitching_magic', name: 'Bewitch' }
+      const stats = { automation: { passives: [noise, spreadA, spreadB] } }
+      expect(getMultiTargetSpreads(stats)).toHaveLength(2)
+      // first-match order (both contain Fireball): spreadA wins.
+      expect(getMultiTargetSpreadForSpell(stats, 'Fireball')).toBe(spreadA)
+      expect(getMultiTargetSpreadForSpell(stats, 'Power Word Heal')).toBe(spreadA)
+      // filter.includes is byte-exact — lowercase near-miss misses.
+      expect(getMultiTargetSpreadForSpell(stats, 'fireball')).toBeNull()
       expect(getMultiTargetSpreadForSpell(stats, 'Iceball')).toBeNull()
     })
 
-    it('throws when spread has no spellFilter', () => {
-      const stats = {
-        automation: {
-          passives: [{ type: 'multi_target_spread', name: 'NoFilter' }],
-        },
+    it('quirk pin: disk passive_rule.multi_target_spread nested shape never matches the type filter', () => {
+      // Real 2024 Bard "Words of Creation" row nests spellFilter under a
+      // multi_target_spread KEY of a passive_rule — no shipped disk class produces a
+      // top-level type 'multi_target_spread' passive, so this lane is custom-data-only.
+      const diskRow = {
+        type: 'passive_rule',
+        name: 'Words of Creation',
+        effect: 'always_prepared_spells',
+        spells: ['Power Word Heal', 'Power Word Kill'],
+        multi_target_spread: { spellFilter: ['Power Word Heal', 'Power Word Kill'], range: '10 ft' },
+        casting_time: 'passive',
       }
-      expect(() => getMultiTargetSpreadForSpell(stats, 'Fireball')).toThrow('Expected array')
+      expect(getMultiTargetSpreads({ automation: { passives: [diskRow] } })).toEqual([])
+      expect(getMultiTargetSpreadForSpell({ automation: { passives: [diskRow] } }, 'Power Word Kill')).toBeNull()
+    })
+
+    it('throws with console.error when a matching-passive lacks spellFilter', () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const noFilter = { type: 'multi_target_spread', name: 'NoFilter' }
+      expect(() => getMultiTargetSpreadForSpell({ automation: { passives: [noFilter] } }, 'Fireball')).toThrow('Expected array, got undefined')
+      expect(spy).toHaveBeenCalledWith('[postCastRiderService] Missing array:', undefined)
     })
   })
-
 
   describe('triggerPostCastRiderSaves', () => {
-    const enchantmentSpell = { name: 'Charm Person', school: 'enchantment' }
-    const evocationSpell = { name: 'Fireball', school: 'evocation' }
+    const stats = (passives) => ({ name: 'Player', automation: { passives } })
 
-    it('returns null for non-enchantment/illusion spell', async () => {
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
+    it('gates out non-enchantment/illusion schools and missing school before touching uses or handler', async () => {
+      const riders = stats([{ type: 'post_cast_rider', name: 'Rider' }])
+      for (const spell of [{ name: 'Fireball', school: 'evocation' }, { name: 'Cure Wounds', school: 'necromancy' }, { name: 'Unknown' }]) {
+        expect(await triggerPostCastRiderSaves(spell, { slotLevel: 1 }, riders, CAMP, MAP)).toBeNull()
       }
-      const result = await triggerPostCastRiderSaves(evocationSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('returns null when no spell slot used (metaCtx slotLevel 0, spell level 0)', async () => {
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 0 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('triggers when spell has level > 0 even with no slotLevel', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      const result = await triggerPostCastRiderSaves({ ...enchantmentSpell, level: 1 }, {}, stats, 'camp', 'map')
-      expect(result).toEqual([{ success: true }])
-    })
-
-    it('returns null when no rider saves', async () => {
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('skips riders with exhausted uses', async () => {
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(getRuntimeValue).mockReturnValue(0)
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(executeHandler).not.toHaveBeenCalled()
-      vi.mocked(getRuntimeValue).mockRestore()
-    })
-
-    it('calls executeHandler with correct action shape for post_cast_rider type', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider', saveType: 'CON', saveDc: 15 }] },
-      }
-      await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Rider',
-          automation: expect.objectContaining({
-            type: 'post_cast_rider',
-            saveType: 'CON',
-            saveDc: 15,
-          }),
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-    })
-
-    it('calls executeHandler with correct action shape for riderSave format', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = {
-        name: 'Player',
-        automation: {
-          passives: [{ type: 'passive_rule', name: 'RiderSave', riderSave: { type: 'WIS', condition: 'charmed' } }],
-        },
-      }
-      await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'RiderSave',
-          automation: expect.objectContaining({
-            saveType: 'WIS',
-            saveDc: 'ability',
-            saveAbility: 'CHA',
-            condition: 'charmed',
-          }),
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-    })
-
-    it('collects results from multiple riders', async () => {
-      executeHandler.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false })
-      const stats = {
-        name: 'Player',
-        automation: {
-          passives: [
-            { type: 'post_cast_rider', name: 'Rider A' },
-            { type: 'post_cast_rider', name: 'Rider B' },
-          ],
-        },
-      }
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toHaveLength(2)
-      expect(result[0]).toEqual({ success: true })
-      expect(result[1]).toEqual({ success: false })
-    })
-
-    it('does not call executeHandler when spell has no school property', async () => {
-      const stats = {
-        name: 'Player',
-        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
-      }
-      const result = await triggerPostCastRiderSaves({ name: 'Unknown Spell' }, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
+      expect(getRuntimeValue).not.toHaveBeenCalled()
       expect(executeHandler).not.toHaveBeenCalled()
     })
-  })
 
-  describe('getSoulstitchFeatures', () => {
-    it('returns soulstitch_spells passives', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'soulstitch_spells', name: 'Soulstitch' },
-            { type: 'other' },
-          ],
-        },
-      }
-      const result = getSoulstitchFeatures(stats)
+    it('gates out slot-less casts (slotLevel 0 AND spell.level 0) but fires for level>0 without slotLevel', async () => {
+      const riders = stats([{ type: 'post_cast_rider', name: 'Rider' }])
+      expect(await triggerPostCastRiderSaves({ name: 'Mind Sliver', school: 'enchantment', level: 0 }, { slotLevel: 0 }, riders, CAMP, MAP)).toBeNull()
+      expect(executeHandler).not.toHaveBeenCalled()
+      const result = await triggerPostCastRiderSaves({ name: 'Charm Person', school: 'enchantment', level: 1 }, {}, riders, CAMP, MAP)
       expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Soulstitch')
-    })
-  })
-
-
-  describe('triggerSoulstitchSpells', () => {
-    const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
-    const nonEvocationSpell = { name: 'Charm Person', school: 'Enchantment', dc: { dc_type: 'WIS' } }
-
-    it('returns null when no soulstitch features', async () => {
-      const result = await triggerSoulstitchSpells(evocationSpell, {}, { automation: { passives: [] } }, 'camp', 'map')
-      expect(result).toBeNull()
+      expect(executeHandler).toHaveBeenCalledTimes(1)
     })
 
-    it('returns null for non-evocation spell', async () => {
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const result = await triggerSoulstitchSpells(nonEvocationSpell, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
+    it('builds the full post_cast_rider action envelope (all fields copied) with (stats, camp, map) tuple', async () => {
+      const rider = {
+        type: 'post_cast_rider',
+        name: 'Custom Rider',
+        saveType: 'CON',
+        saveDc: 15,
+        saveAbility: 'CON',
+        condition: 'stunned',
+        duration: '1_round',
+        range: '60 ft',
+        spellSchools: ['enchantment'],
+        recharge: 'long_rest',
+      }
+      const ps = stats([rider])
+      const handlerResult = { type: 'save_prompt', promptId: 'p1' }
+      executeHandler.mockImplementation(async () => handlerResult)
+      const result = await triggerPostCastRiderSaves({ name: 'Charm Person', school: 'enchantment' }, { slotLevel: 1 }, ps, CAMP, MAP)
+      expect(executeHandler).toHaveBeenCalledTimes(1)
+      const [action, argStats, argCamp, argMap] = executeHandler.mock.calls[0]
+      expect(executeHandler.mock.calls[0]).toHaveLength(4)
+      expect(action).toStrictEqual({
+        name: 'Custom Rider',
+        automation: {
+          type: 'post_cast_rider',
+          saveType: 'CON',
+          saveDc: 15,
+          saveAbility: 'CON',
+          condition: 'stunned',
+          duration: '1_round',
+          range: '60 ft',
+          spellSchools: ['enchantment'],
+          recharge: 'long_rest',
+        },
+      })
+      expect(argStats).toBe(ps)
+      expect(argCamp).toBe(CAMP)
+      expect(argMap).toBe(MAP)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toBe(handlerResult)
     })
 
-    it('returns null when spell has no dc', async () => {
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const noDcSpell = { name: 'Fireball', school: 'Evocation' }
-      const result = await triggerSoulstitchSpells(noDcSpell, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
+    it('riderSave branch hardcodes saveDc=ability/saveAbility=CHA, drops after/effect, copies disk bytes verbatim', async () => {
+      const bard = diskBardRiderPassive()
+      const ps = stats([bard])
+      await triggerPostCastRiderSaves({ name: 'Charm Person', school: 'Enchantment' }, { slotLevel: 1 }, ps, CAMP, MAP)
+      const [action] = executeHandler.mock.calls[0]
+      expect(action).toStrictEqual({
+        name: 'Beguiling Magic',
+        automation: {
+          type: 'post_cast_rider',
+          saveType: 'WIS',
+          saveDc: 'ability',
+          saveAbility: 'CHA',
+          condition: 'Charmed or Frightened',
+          duration: '1_minute',
+          range: '60 ft',
+          recharge: 'long_rest',
+        },
+      })
     })
 
-    it('matches evocation school regardless of case', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const lowercaseSpell = { name: 'Fireball', school: 'evocation', dc: { dc_type: 'CON' } }
-      const result = await triggerSoulstitchSpells(lowercaseSpell, {}, stats, 'camp', 'map')
-      expect(result).not.toBeNull()
-    })
+    it('dispatches every non-exhausted rider, collects truthy results in order, null when all falsy', async () => {
+      const ps = stats([
+        { type: 'post_cast_rider', name: 'Loud Rider' },
+        { type: 'passive_rule', name: 'Beguiling Magic', riderSave: diskBardRiderPassive().riderSave },
+        { type: 'post_cast_rider', name: 'Silent Rider' },
+      ])
+      executeHandler.mockImplementation(async (action) => (action.name === 'Silent Rider' ? null : { id: action.name }))
+      const result = await triggerPostCastRiderSaves({ name: 'Charm Person', school: 'illusion' }, { slotLevel: 2 }, ps, CAMP, MAP)
+      expect(executeHandler).toHaveBeenCalledTimes(3)
+      expect(result).toEqual([{ id: 'Loud Rider' }, { id: 'Beguiling Magic' }])
 
-    it('returns null when spell has no school property', async () => {
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const result = await triggerSoulstitchSpells({ name: 'Unknown Spell' }, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('passes spellSlotLevel to executeHandler based on metaCtx slotLevel', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      await triggerSoulstitchSpells(evocationSpell, { slotLevel: 3 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          spellSlotLevel: 3,
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-    })
-
-    it('passes spellSlotLevel to executeHandler based on spell.level when metaCtx has no slotLevel', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const spell = { name: 'Fireball', school: 'Evocation', level: 3, dc: { dc_type: 'CON' } }
-      await triggerSoulstitchSpells(spell, {}, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          spellSlotLevel: 3,
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-    })
-
-    it('returns null when executeHandler returns non-result truthy value', async () => {
       executeHandler.mockResolvedValue(null)
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-      const result = await triggerSoulstitchSpells(evocationSpell, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
+      expect(await triggerPostCastRiderSaves({ name: 'Charm Person', school: 'illusion' }, { slotLevel: 2 }, ps, CAMP, MAP)).toBeNull()
     })
   })
 
-  describe('getEmpoweredEvocationFeatures', () => {
-    it('returns empowered_evocation passives', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'empowered_evocation', name: 'Empowered' },
-            { type: 'other' },
-          ],
-        },
+  describe('soulstitch lane (2024 Wizard)', () => {
+    const evocationSpell = () => ({ name: 'Fireball', school: 'Evocation', level: 3, dc: { dc_type: 'CON' } })
+    const soulstitchStats = () => ({ automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch Spells', casting_time: 'passive' }] } })
+
+    it('getSoulstitchFeatures filters type by identity', () => {
+      const feature = soulstitchStats().automation.passives[0]
+      const noise = { type: 'empowered_evocation', name: 'Empowered' }
+      const result = getSoulstitchFeatures({ automation: { passives: [noise, feature] } })
+      expect(result).toEqual([feature])
+      expect(result[0]).toBe(feature)
+    })
+
+    it('gates out no-features, non-evocation, missing school, and save-less spells before dispatch', async () => {
+      const cases = [
+        [evocationSpell(), { automation: { passives: [] } }],
+        [{ name: 'Charm Person', school: 'Enchantment', dc: { dc_type: 'WIS' } }, soulstitchStats()],
+        [{ name: 'Mystery', level: 3, dc: { dc_type: 'CON' } }, soulstitchStats()],
+        [{ name: 'Fireball', school: 'evocation', level: 3 }, soulstitchStats()],
+      ]
+      for (const [spell, ps] of cases) {
+        expect(await triggerSoulstitchSpells(spell, {}, ps, CAMP, MAP)).toBeNull()
       }
-      const result = getEmpoweredEvocationFeatures(stats)
-      expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Empowered')
+      expect(executeHandler).not.toHaveBeenCalled()
+    })
+
+    it('dispatches exact envelope with slot-level derivation (metaCtx wins, spell.level fallback, 0 default) and forwards non-modal results', async () => {
+      const cases = [
+        [{ slotLevel: 3 }, { ...evocationSpell(), level: 5 }, 3, 'evocation'],
+        [{}, evocationSpell(), 3, 'Evocation'],
+        [{ slotLevel: 0 }, { name: 'Fire Bolt', school: 'evocation', level: 0, dc: { dc_type: 'CON' } }, 0, 'evocation'],
+      ]
+      for (const [metaCtx, spell, expectedSlot, school] of cases) {
+        executeHandler.mockClear()
+        const ps = soulstitchStats()
+        const sentSpell = { ...spell, school }
+        const handlerResult = { type: 'popup', payload: { slot: expectedSlot } }
+        executeHandler.mockImplementation(async () => handlerResult)
+        const result = await triggerSoulstitchSpells(sentSpell, metaCtx, ps, CAMP, MAP)
+        expect(executeHandler).toHaveBeenCalledTimes(1)
+        const [action, argStats, argCamp, argMap] = executeHandler.mock.calls[0]
+        expect(executeHandler.mock.calls[0]).toHaveLength(4)
+        expect(action).toStrictEqual({
+          name: 'Soulstitch Spells',
+          automation: { type: 'soulstitch_spells', casting_time: 'passive' },
+          spell: sentSpell,
+          spellSlotLevel: expectedSlot,
+        })
+        // spell forwarded by reference, stats tuple exact.
+        expect(action.spell).toBe(sentSpell)
+        expect(argStats).toBe(ps)
+        expect(argCamp).toBe(CAMP)
+        expect(argMap).toBe(MAP)
+        expect(result).toBe(handlerResult)
+      }
+      executeHandler.mockResolvedValue(null)
+      expect(await triggerSoulstitchSpells(evocationSpell(), {}, soulstitchStats(), CAMP, MAP)).toBeNull()
+    })
+
+    it('modal result bridges to soulstitch-modal-show and resolves with selection, decline, or [] for non-array (CLA-321)', async () => {
+      const outcomes = [
+        [['A'], ['A']],
+        [[], []],
+        ['not-an-array', []],
+      ]
+      for (const [confirmValue, expected] of outcomes) {
+        executeHandler.mockClear()
+        const modalResult = { type: 'modal', payload: { options: ['A', 'B'] } }
+        executeHandler.mockReturnValue(Promise.resolve(modalResult))
+        const seen = []
+        let releaseModal
+        const modalShown = new Promise((resolve) => { releaseModal = resolve })
+        const listener = (e) => { seen.push(e.detail); releaseModal() }
+        window.addEventListener('soulstitch-modal-show', listener)
+        const triggerPromise = triggerSoulstitchSpells(evocationSpell(), {}, soulstitchStats(), CAMP, MAP)
+        await modalShown
+        // Event dispatched with the exact payload reference before the await seam.
+        expect(seen[0]).toBe(modalResult.payload)
+        confirmSoulstitchSelection(confirmValue)
+        expect(await triggerPromise).toEqual(expected)
+        window.removeEventListener('soulstitch-modal-show', listener)
+      }
+      // No pending resolver: second confirm is a harmless no-op.
+      expect(() => confirmSoulstitchSelection(['ghost'])).not.toThrow()
     })
   })
 
-  describe('getEmpoweredEvocationIntModifier', () => {
-    it('returns Intelligence bonus', () => {
-      const stats = { abilities: [{ name: 'Intelligence', bonus: 3 }] }
-      expect(getEmpoweredEvocationIntModifier(stats)).toBe(3)
+  describe('empowered_evocation selectors (both rulesets)', () => {
+    it('getEmpoweredEvocationFeatures filters type by identity', () => {
+      const feature = { type: 'empowered_evocation', name: 'Empowered Evocation', casting_time: 'passive' }
+      const noise = { type: 'soulstitch_spells', name: 'Soulstitch Spells' }
+      const result = getEmpoweredEvocationFeatures({ automation: { passives: [noise, feature] } })
+      expect(result).toHaveLength(1)
+      expect(result[0]).toBe(feature)
     })
 
-    it('returns 0 when Intelligence ability missing', () => {
-      const stats = { abilities: [{ name: 'Strength', bonus: 3 }] }
-      expect(getEmpoweredEvocationIntModifier(stats)).toBe(0)
-    })
-
-    it('returns 0 when abilities is empty', () => {
+    it('getEmpoweredEvocationIntModifier returns exact-name Intelligence bonus, 0 otherwise', () => {
+      expect(getEmpoweredEvocationIntModifier({ abilities: [{ name: 'Intelligence', bonus: 3 }] })).toBe(3)
+      expect(getEmpoweredEvocationIntModifier({ abilities: [{ name: 'intelligence', bonus: 5 }] })).toBe(0)
+      expect(getEmpoweredEvocationIntModifier({ abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Wisdom', bonus: 1 }] })).toBe(0)
       expect(getEmpoweredEvocationIntModifier({ abilities: [] })).toBe(0)
     })
   })
 
-  describe('triggerSpellThief', () => {
-    const spell = { name: 'Fireball' }
-
-    // CLA-325: the auto-path ran inside the caster's own cast context, forcing the
-    // thief to save against their own DC and steal from themselves (self-misfire).
-    // It is inert by design — the manual Reactions row drives the feature.
-    it('never fires in the casters own cast context (self-misfire removed, CLA-325)', async () => {
-      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
-      vi.mocked(getRuntimeValue).mockReturnValue(1)
-      const stats = { name: 'Player', automation: { reactions: [{ type: 'spell_thief', name: 'Spell Thief' }] } }
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
+  describe('spell_thief auto-lane (CLA-325)', () => {
+    it('stays inert even when the caster owns the disk Rogue spell_thief reaction', async () => {
+      const thiefReaction = { type: 'spell_thief', name: 'Spell Thief', saveType: 'INT', saveDc: 'ability', saveAbility: 'INT', trigger: 'spell_cast', oncePerLongRest: true, casting_time: '1 reaction' }
+      for (const reactions of [[thiefReaction], []]) {
+        expect(await triggerSpellThief({ name: 'Fireball' }, { slotLevel: 3 }, { name: 'Player', automation: { reactions } }, CAMP, MAP)).toBeNull()
+      }
       expect(executeHandler).not.toHaveBeenCalled()
-      vi.mocked(getRuntimeValue).mockRestore()
-    })
-
-    it('returns null when caster has no spell thief features', async () => {
-      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { reactions: [] } }, 'camp', 'map')
-      expect(result).toBeNull()
-      expect(executeHandler).not.toHaveBeenCalled()
+      expect(getRuntimeValue).not.toHaveBeenCalled()
     })
   })
 
-  describe('getBewitchingMagicFeatures', () => {
-    it('returns bewitching_magic passives', () => {
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'bewitching_magic', name: 'Bewitch' },
-            { type: 'other' },
-          ],
-        },
-      }
-      const result = getBewitchingMagicFeatures(stats)
+  describe('bewitching lane (2024 Warlock, CLA-037)', () => {
+    const baseSpell = { name: 'Charm Person', school: 'enchantment', level: 1, casting_time: '1 action' }
+    const bewitchStats = () => ({ automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitching Magic', casting_time: 'passive' }] } })
+
+    it('getBewitchingMagicFeatures filters type by identity', () => {
+      const feature = bewitchStats().automation.passives[0]
+      const noise = { type: 'soulstitch_spells', name: 'Soulstitch Spells' }
+      const result = getBewitchingMagicFeatures({ automation: { passives: [noise, feature] } })
       expect(result).toHaveLength(1)
-      expect(result[0].name).toBe('Bewitch')
-    })
-  })
-
-  describe('triggerBewitchingMagic', () => {
-    const enchantmentSpell = { name: 'Charm Person', school: 'enchantment', casting_time: '1 action' }
-
-    it('returns null for non-enchantment/illusion spell', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic({ ...enchantmentSpell, school: 'evocation' }, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
+      expect(result[0]).toBe(feature)
     })
 
-    it('returns null when no spell slot used', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic({ ...enchantmentSpell, level: 0 }, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('triggers when spell has level > 0 even without slotLevel', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic({ ...enchantmentSpell, level: 1 }, {}, stats, 'camp', 'map')
-      expect(result).toEqual([{ success: true }])
-    })
-
-    it('returns null when casting time is not 1 action', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic(
-        { ...enchantmentSpell, casting_time: '1 bonus action' },
-        { slotLevel: 1 },
-        stats,
-        'camp',
-        'map',
-      )
-      expect(result).toBeNull()
-    })
-
-    it('returns null when no bewitching features', async () => {
-      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    it('calls executeHandler with correct action shape', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Bewitch',
-          automation: expect.objectContaining({
-            type: 'bewitching_magic',
-            casting_time: 'passive',
-          }),
-        }),
-        stats,
-        'camp',
-        'map',
-      )
-    })
-
-    it('collects results from multiple bewitching features', async () => {
-      executeHandler.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false })
-      const stats = {
-        automation: {
-          passives: [
-            { type: 'bewitching_magic', name: 'Bewitch A' },
-            { type: 'bewitching_magic', name: 'Bewitch B' },
-          ],
-        },
-      }
-      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toHaveLength(2)
-    })
-
-    it('returns null when spell has no casting_time property', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      const result = await triggerBewitchingMagic({ name: 'Unknown Spell' }, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(result).toBeNull()
-    })
-
-    // CLA-037: 2024 spells.json spells casting_time 'Action' — the raw
-    // !== '1 action' gate never fired for 2024 data.
-    it('accepts 2024 "Action" casing (defect 1 regression pin)', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      for (const castingTime of ['Action', '1 Action', 'ACTION', ' Action ']) {
-        executeHandler.mockClear()
-        const result = await triggerBewitchingMagic({ ...enchantmentSpell, casting_time: castingTime }, { slotLevel: 1 }, stats, 'camp', 'map')
-        expect(result).toEqual([{ success: true }])
-      }
-    })
-
-    it('still excludes bonus action / reaction casings after normalization', async () => {
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      for (const castingTime of ['Bonus Action', '1 bonus action', 'Reaction', '1 reaction']) {
-        const result = await triggerBewitchingMagic({ ...enchantmentSpell, casting_time: castingTime }, { slotLevel: 1 }, stats, 'camp', 'map')
-        expect(result).toBeNull()
+    it('gates out school, slot-less cast, casting-time rejects, and no-features before dispatch', async () => {
+      const ps = bewitchStats()
+      const cases = [
+        [{ ...baseSpell, school: 'evocation' }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, school: undefined }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, level: 0 }, { slotLevel: 0 }, ps],
+        [{ ...baseSpell, casting_time: '1 bonus action' }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, casting_time: 'Bonus Action' }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, casting_time: '1 reaction' }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, casting_time: 'Reaction' }, { slotLevel: 1 }, ps],
+        [{ ...baseSpell, casting_time: '' }, { slotLevel: 1 }, ps],
+        [baseSpell, { slotLevel: 1 }, { automation: { passives: [] } }],
+      ]
+      for (const [spell, metaCtx, stats] of cases) {
+        expect(await triggerBewitchingMagic(spell, metaCtx, stats, CAMP, MAP)).toBeNull()
       }
       expect(executeHandler).not.toHaveBeenCalled()
     })
 
-    it('marks the auto-lane action with autoTrigger and forwards the spell school', async () => {
-      executeHandler.mockResolvedValue({ success: true })
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
-      await triggerBewitchingMagic({ ...enchantmentSpell, school: 'Illusion' }, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(executeHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ autoTrigger: true, school: 'Illusion' }),
-        stats,
-        'camp',
-        'map',
-      )
+    it('accepts every action-casting-time casing after trim+lowercase (5e "1 action" and 2024 "Action", CLA-037 regression pin)', async () => {
+      const ps = bewitchStats()
+      for (const castingTime of ['1 action', 'Action', '1 Action', 'ACTION', ' Action ']) {
+        executeHandler.mockClear()
+        const result = await triggerBewitchingMagic({ ...baseSpell, casting_time: castingTime }, { slotLevel: 1 }, ps, CAMP, MAP)
+        expect(executeHandler).toHaveBeenCalledTimes(1)
+        expect(result).toHaveLength(1)
+      }
     })
 
-    it('bridges a modal handler result to the bewitching-modal-show window event', async () => {
-      executeHandler.mockResolvedValue({ type: 'modal', modalName: 'stepsOfTheFeyTaunt', payload: { mode: 'bewitchingMagic', unlimited: true } })
-      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+    it('builds exact auto-lane envelope with autoTrigger and forwards raw school bytes; multiple features collect in order', async () => {
+      const featureA = { type: 'bewitching_magic', name: 'Bewitch A', casting_time: 'passive' }
+      const featureB = { type: 'bewitching_magic', name: 'Bewitch B', casting_time: 'passive' }
+      const ps = { automation: { passives: [featureA, featureB] } }
+      executeHandler.mockImplementation(async (action) => ({ id: action.name }))
+      const result = await triggerBewitchingMagic({ ...baseSpell, school: 'Illusion' }, { slotLevel: 1 }, ps, CAMP, MAP)
+      expect(executeHandler).toHaveBeenCalledTimes(2)
+      expect(executeHandler.mock.calls[0]).toHaveLength(4)
+      const [actionA, argStats, argCamp, argMap] = executeHandler.mock.calls[0]
+      expect(actionA).toStrictEqual({
+        name: 'Bewitch A',
+        automation: { type: 'bewitching_magic', casting_time: 'passive' },
+        school: 'Illusion',
+        autoTrigger: true,
+      })
+      expect(argStats).toBe(ps)
+      expect(argCamp).toBe(CAMP)
+      expect(argMap).toBe(MAP)
+      expect(executeHandler.mock.calls[1][0].name).toBe('Bewitch B')
+      expect(result).toEqual([{ id: 'Bewitch A' }, { id: 'Bewitch B' }])
+    })
+
+    it('bridges a modal handler result to bewitching-modal-show with the payload reference and still collects the result', async () => {
+      const modalResult = { type: 'modal', modalName: 'stepsOfTheFeyTaunt', payload: { mode: 'bewitchingMagic', unlimited: true } }
+      executeHandler.mockImplementation(async () => modalResult)
+      const ps = bewitchStats()
       const seen = []
       const listener = (e) => seen.push(e.detail)
       window.addEventListener('bewitching-modal-show', listener)
-      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      const result = await triggerBewitchingMagic(baseSpell, { slotLevel: 1 }, ps, CAMP, MAP)
       window.removeEventListener('bewitching-modal-show', listener)
       expect(seen).toHaveLength(1)
-      expect(seen[0].mode).toBe('bewitchingMagic')
+      expect(seen[0]).toBe(modalResult.payload)
       expect(result).toHaveLength(1)
+      expect(result[0]).toBe(modalResult)
     })
   })
 
-  describe('confirmSoulstitchSelection', () => {
-    it('resolves the pending promise and the trigger returns the applied selection', () => {
-      return new Promise((resolve) => {
-        // Use mockReturnValue so executeHandler resolves synchronously in the same microtask
-        // This ensures soulstitchResolve is set before confirmSoulstitchSelection is called
-        executeHandler.mockReturnValue(Promise.resolve({ type: 'modal', payload: { options: ['A', 'B'] } }))
-        const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-        const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
-
-        // Start the trigger - it will hit the modal path and wait for confirmation
-        const triggerPromise = triggerSoulstitchSpells(evocationSpell, {}, stats, 'camp', 'map')
-
-        // Give executeHandler time to resolve and set up the modal flow
-        Promise.resolve().then(() => {
-          // Simulate user selecting options
-          confirmSoulstitchSelection(['A'])
-
-          triggerPromise.then((result) => {
-            // CLA-321: trigger forwards the selection so savePath can flag the cast;
-            // the modal is the single writer of the stamp (deduped apply).
-            expect(result).toEqual(['A'])
-            resolve(null)
-          })
-        })
-      })
+  describe('async error propagation (not swallowed by soulstitch/bewitching lanes)', () => {
+    it('rejects and logs when executeHandler rejects (rider-lane rethrow owned by combat twin)', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const boom = new Error('handler broke')
+      executeHandler.mockRejectedValue(boom)
+      await expect(triggerSoulstitchSpells({ name: 'Fireball', school: 'evocation', dc: { dc_type: 'CON' } }, {}, { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch Spells' }] } }, CAMP, MAP)).rejects.toBe(boom)
+      await expect(triggerBewitchingMagic({ name: 'Charm Person', school: 'enchantment', level: 1, casting_time: '1 action' }, { slotLevel: 1 }, { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitching Magic' }] } }, CAMP, MAP)).rejects.toBe(boom)
+      expect(spy).toHaveBeenCalledWith('[soulstitch] Failed to execute Soulstitch Spells:', boom)
+      expect(spy).toHaveBeenCalledWith('[bewitchingMagic] Failed to execute Bewitching Magic:', boom)
     })
-
-    it('CLA-321: cancel (empty selection) resolves the trigger with no selection (no deadlock)', () => {
-      return new Promise((resolve) => {
-        executeHandler.mockReturnValue(Promise.resolve({ type: 'modal', payload: { options: ['A', 'B'] } }))
-        const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
-        const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
-
-        const triggerPromise = triggerSoulstitchSpells(evocationSpell, {}, stats, 'camp', 'map')
-
-        Promise.resolve().then(() => {
-          confirmSoulstitchSelection([])
-
-          triggerPromise.then((result) => {
-            expect(result).toEqual([])
-            resolve(null)
-          })
-        })
-      })
-    })
-
   })
 })

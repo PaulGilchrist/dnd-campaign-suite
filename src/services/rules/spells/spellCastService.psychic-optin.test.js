@@ -1,6 +1,14 @@
-// CLA-268: the Psychic Spells damage-type swap must be OPT-IN — it fires only when
-// the cast-time checkbox flag (_psychicSpellsOverride / usePsychicDamage) is truthy.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @maintained-by-ai
+// CLA-268: Psychic Spells (2024 classes.json Warlock majors[3] Great Old One lv3,
+// automation {type:'psychic_spells', damageType:'Psychic', componentReduction:['V','S'],
+// spellSchools:['enchantment','illusion']}) damage-type swap is OPT-IN at execution.
+// Live gate = computePsychicDamageType (execution/index.js:44): swaps only when the
+// caster holds the passive AND the cast-time checkbox flag is truthy —
+// _psychicSpellsOverride (prepareSpellCast lane) or usePsychicDamage (spell/cantrip
+// popup lane, always sent as an explicit boolean per SpellDetailPopup.castCantrip).
+// Gate-closed values (missing / false / 0) keep RAW. Swap is type-only: the formula
+// and the RAW spell log line stay untouched (CLA-194 family).
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { executeSpellCast } from './spellCastService.js'
 
@@ -91,9 +99,19 @@ vi.mock('../combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn((r) => (typeof r === 'number' ? r : 60)),
 }))
 
+const CAMPAIGN = 'test-campaign'
+
+// Disk-faithful: public/data/2024/classes.json Warlock majors[3] lv3.
 const psychicSpellsPassive = {
   type: 'psychic_spells',
   damageType: 'Psychic',
+  componentReduction: ['V', 'S'],
+  spellSchools: ['enchantment', 'illusion'],
+}
+
+// Same passive minus damageType — pins the RAW 'Psychic' fallback default.
+const psychicSpellsPassiveNoDamageType = {
+  type: 'psychic_spells',
   componentReduction: ['V', 'S'],
   spellSchools: ['enchantment', 'illusion'],
 }
@@ -144,51 +162,143 @@ function makeServices(overrides = {}) {
     attackerPos: null,
     targetPos: null,
     featEffects: {},
-    campaignName: 'testCampaign',
+    campaignName: CAMPAIGN,
     mapName: null,
     characters: [],
     ...overrides,
   }
 }
 
+// Exact key set handed to rollAttack by noSavePath.buildNoSaveAttackContext
+// (spread of the cast metaCtx included). No fabricated keys.
+const ATTACK_CTX_KEYS = [
+  'attackerName',
+  'attackName',
+  'autoDamageFormula',
+  'autoDamageName',
+  'autoDamageRollResult',
+  'autoDamageSchool',
+  'damageType',
+  'featsOfChaosArmedAtCast',
+  'finalFormula',
+  'isCantrip',
+  'metamagicHeighten',
+  'overchannelActive',
+  'overchannelSpellLevel',
+  'overchannelUseCount',
+  'playerStats',
+  'slotLevel',
+  'spellName',
+  'targetName',
+].sort()
+
+async function castFireBoltAndCaptureCtx(services, spellOverrides = {}) {
+  const spell = makeFireBolt(spellOverrides)
+  await executeSpellCast(spell, { slotLevel: 0 }, services)
+
+  expect(services.rollAttack).toHaveBeenCalledTimes(1)
+  const args = services.rollAttack.mock.calls[0]
+  expect(args).toHaveLength(3)
+  const [attackName, spellToHit, ctx] = args
+  expect(attackName).toBe('Fire Bolt')
+  expect(spellToHit).toBe(9)
+  expect(Object.keys(ctx).sort()).toEqual(ATTACK_CTX_KEYS)
+  expect(ctx.targetName).toBe('Ogre Zombie 1')
+  expect(ctx.attackerName).toBe('HexWarlock')
+  expect(ctx.isCantrip).toBe(true)
+  expect(ctx.playerStats).toBe(services.playerStats)
+  return ctx
+}
+
 describe('executeSpellCast — Psychic Spells opt-in damage type (CLA-268)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // lookupFullSpell traverses for any spell without area_of_effect — stub is
+    // URL-aware: only the 2024 ruleset catalog resolves, anything else 404s.
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: url === '/data/2024/spells.json',
+      json: async () => (url === '/data/2024/spells.json'
+        ? [{ name: 'Fire Bolt', level: 0, school: 'Evocation' }]
+        : []),
+    })))
   })
 
-  it('keeps RAW damage type (Fire) when the opt-in flag is absent', async () => {
-    const services = makeServices()
-    await executeSpellCast(makeFireBolt(), { slotLevel: 0 }, services)
-
-    expect(services.rollAttack).toHaveBeenCalled()
-    expect(services.rollAttack.mock.calls[0][2].damageType).toBe('Fire')
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
-  it('keeps RAW damage type (Fire) when usePsychicDamage is explicitly false', async () => {
-    const services = makeServices()
-    await executeSpellCast(makeFireBolt({ usePsychicDamage: false }), { slotLevel: 0 }, services)
+  it.each([
+    { label: 'flag absent', spell: {}, expected: 'Fire' },
+    { label: 'usePsychicDamage:false', spell: { usePsychicDamage: false }, expected: 'Fire' },
+    { label: 'usePsychicDamage:0', spell: { usePsychicDamage: 0 }, expected: 'Fire' },
+    { label: '_psychicSpellsOverride:false', spell: { _psychicSpellsOverride: false }, expected: 'Fire' },
+    { label: '_psychicSpellsOverride:true (prepareSpellCast lane)', spell: { _psychicSpellsOverride: true }, expected: 'Psychic' },
+    { label: 'usePsychicDamage:true (spell popup lane)', spell: { usePsychicDamage: true }, expected: 'Psychic' },
+    {
+      label: 'opt-in with passive lacking damageType falls back to RAW Psychic',
+      spell: { usePsychicDamage: true },
+      stats: makeWarlockStats([psychicSpellsPassiveNoDamageType]),
+      expected: 'Psychic',
+    },
+  ])('damageType is $expected when the opt-in gate is $label', async ({ spell, stats, expected }) => {
+    const services = makeServices(stats ? { playerStats: stats } : {})
+    const ctx = await castFireBoltAndCaptureCtx(services, spell)
 
-    expect(services.rollAttack.mock.calls[0][2].damageType).toBe('Fire')
-  })
-
-  it('swaps to Psychic when _psychicSpellsOverride is set (prepareSpellCast opt-in)', async () => {
-    const services = makeServices()
-    await executeSpellCast(makeFireBolt({ _psychicSpellsOverride: true }), { slotLevel: 0 }, services)
-
-    expect(services.rollAttack.mock.calls[0][2].damageType).toBe('Psychic')
-  })
-
-  it('swaps to Psychic when usePsychicDamage is set (cantrip popup opt-in)', async () => {
-    const services = makeServices()
-    await executeSpellCast(makeFireBolt({ usePsychicDamage: true }), { slotLevel: 0 }, services)
-
-    expect(services.rollAttack.mock.calls[0][2].damageType).toBe('Psychic')
+    expect(ctx.damageType).toBe(expected)
   })
 
   it('does not swap without the Psychic Spells passive even when opted in', async () => {
     const services = makeServices({ playerStats: makeWarlockStats([]) })
-    await executeSpellCast(makeFireBolt({ usePsychicDamage: true, _psychicSpellsOverride: true }), { slotLevel: 0 }, services)
+    const ctx = await castFireBoltAndCaptureCtx(services, {
+      usePsychicDamage: true,
+      _psychicSpellsOverride: true,
+    })
 
-    expect(services.rollAttack.mock.calls[0][2].damageType).toBe('Fire')
+    expect(ctx.damageType).toBe('Fire')
+  })
+
+  it('swap is type-only: formula unchanged, spell payload unpolluted, cast log keeps RAW Fire', async () => {
+    const services = makeServices()
+    const spell = makeFireBolt({ usePsychicDamage: true })
+    await executeSpellCast(spell, { slotLevel: 0 }, services)
+
+    expect(services.rollAttack).toHaveBeenCalledTimes(1)
+    const args = services.rollAttack.mock.calls[0]
+    expect(args).toHaveLength(3)
+    const [attackName, spellToHit, ctx] = args
+    expect(attackName).toBe('Fire Bolt')
+    expect(spellToHit).toBe(9)
+    expect(Object.keys(ctx).sort()).toEqual(ATTACK_CTX_KEYS)
+    expect(ctx.damageType).toBe('Psychic')
+    expect(ctx.autoDamageFormula).toBe('1d10')
+    expect(ctx.autoDamageSchool).toBe('Evocation')
+
+    // Purity: the executed spell object keeps RAW type/components after swap.
+    expect(spell.damage.damage_type).toBe('Fire')
+    expect(spell.components).toEqual(['V', 'S'])
+
+    // Cast log line keeps the RAW damage type (CLA-194 family): only the
+    // attack ctx receives the swap.
+    const { addEntry } = await import('../../ui/logService.js')
+    expect(addEntry).toHaveBeenCalledTimes(1)
+    const [logCampaign, entry] = addEntry.mock.calls[0]
+    expect(logCampaign).toBe(CAMPAIGN)
+    expect({ ...entry, timestamp: undefined }).toEqual({
+      type: 'spell',
+      characterName: 'HexWarlock',
+      targetName: 'Ogre Zombie 1',
+      spellName: 'Fire Bolt',
+      spellLevel: 0,
+      castingTime: '1 action',
+      damageType: 'Fire',
+      damageFormula: '1d10',
+      saveDC: null,
+      concentration: false,
+      description: null,
+      timestamp: undefined,
+    })
+    // Ruleset-aware lookup URL (2024 char -> /data/2024/spells.json).
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/data/2024/spells.json')
   })
 })

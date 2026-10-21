@@ -1,7 +1,21 @@
-// SP-026: generic harmful-spell enemy-target hook — casting a damaging spell on a
-// creature other than the Compelled Duel target ends the duel (te removal + end log);
-// casting on the duel target must NOT end it; no active duel = no-op; utility spells
-// (no damage formula) never reach the hook. Mocks mirror earlyReturns-generic.test.js.
+// @maintained-by-ai
+// SP-026 lane: the Compelled Duel EXPIRY caller edge on executeSpellCast's damage lane
+// (execution/index.js:643/731 expireCompelledDuelOnHarmfulCast). Raw break rule (5e +
+// 2024 spells.json, identical text): "The spell ends if ... you cast a spell on an enemy
+// other than the target". Expiry seam: cast-time break at the pre-range choke point —
+// NO wall-clock: duration is concentration/combat-scoped, and checkCompelledDuelAttackExpiry
+// fires BEFORE computeRange so even an auto-miss hostile cast breaks the duel.
+// Body ownership split (do not duplicate here):
+//  - checkCompelledDuelAttackExpiry/endCompelledDuel guard logic + store writes:
+//    compelledDuelHandler.test.js (handler lane).
+//  - triggerSpells.js:292/305/318 dominate/ray call sites + invocationCallOrder-before-trigger:
+//    spellCastService.noformula-utility.test.js / .noformula-services.test.js.
+//  - cast-time duel stamp (addExpiration te, concentration): compelledDuelService.test.js
+//    + compelledDuelHandler.test.js:163-218.
+// This lane runs the REAL handler via an importActual spy so the end-to-end caller→body
+// contract (exact arg tuple, formula gate, te removal payload incl. skipSync, removed log)
+// is verified, and pins source-keyed te filtering with a same-effect duel from ANOTHER
+// caster in the store. Mocks mirror earlyReturns-generic.test.js.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* ------------------------------------------------------------------ */
@@ -19,7 +33,6 @@ vi.mock('../../../../ui/logService.js', () => ({
 
 vi.mock('../../../../automation/index.js', () => ({
   executeHandler: vi.fn(),
-  checkCompelledDuelAttackExpiry: vi.fn(),
 }));
 
 vi.mock('../../../../automation/handlers/spells/compelledDuelHandler.js', async (importActual) => {
@@ -86,7 +99,7 @@ vi.mock('../../../features/invisibilityService.js', () => ({
   endInvisibilityOnHostileAction: vi.fn(),
 }));
 
-vi.mock('../../../../combat/buffs/buffService.js', () => ({
+vi.mock('../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
@@ -105,7 +118,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   hasRerollHealingOnes: vi.fn(() => false),
 }));
 
-vi.mock('../../../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
   rollExpressionMaximized: vi.fn(() => ({ total: 8, rolls: [8] })),
   applyHealingRerollOnes: vi.fn(() => ({ displayRolls: [5], originalRolls: [5] })),
@@ -215,7 +228,10 @@ vi.mock('./spellResolution.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }));
 
-vi.mock('../../../../../services/encounters/combatData.js', () => ({
+// Correct path: execution/index.js imports src/services/encounters/combatData.js
+// ('../../../../../services/encounters/...'); the old mock ('../../../../services/...')
+// resolved nowhere and was never applied — the real module loaded instead.
+vi.mock('../../../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
@@ -229,6 +245,7 @@ const { getRuntimeValue, setRuntimeValue } = await import('../../../../../hooks/
 const { addEntry } = await import('../../../../ui/logService.js');
 const { checkCompelledDuelAttackExpiry } = await import('../../../../automation/handlers/spells/compelledDuelHandler.js');
 const { resolveSpellDamageWithTypes } = await import('../../../core/spellDamageUtils.js');
+const { computeRange } = await import('./damageCalculation.js');
 
 /* ------------------------------------------------------------------ */
 /*  Factories                                                          */
@@ -237,6 +254,8 @@ const { resolveSpellDamageWithTypes } = await import('../../../core/spellDamageU
 const CAMPAIGN = 'test-campaign';
 const CASTING = { name: 'TestWizard', proficiency: 4, spellAbilities: { saveDc: 17, modifier: 5 }, automation: { passives: [] }, hitPoints: 100, level: 10 };
 const DUEL_TE = { target: 'Bandit 1', effect: 'compelled_duel', source: 'TestWizard', duration: 'concentration' };
+// Same effect, different source+target — must survive the duel-break filter untouched.
+const OTHER_CASTER_DUEL_TE = { target: 'Bandit 2', effect: 'compelled_duel', source: 'OtherPaladin', duration: 'concentration' };
 
 let teState = [];
 
@@ -258,53 +277,87 @@ function utilitySpell() {
   return { name: 'Guidance', level: 0, baseLevel: 0 };
 }
 
+const teWrites = () => setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
+const removedLogs = () => addEntry.mock.calls.map(c => c[1]).filter(e => e.type === 'condition' && e.action === 'removed');
+
 /* ------------------------------------------------------------------ */
 /*  Tests                                                              */
 /* ------------------------------------------------------------------ */
 
-describe('executeSpellCast — SP-026 generic harmful spell ends Compelled Duel', () => {
+describe('executeSpellCast — SP-026 Compelled Duel expiry hook on the damage lane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    teState = [DUEL_TE];
+    teState = [OTHER_CASTER_DUEL_TE, DUEL_TE];
     getRuntimeValue.mockImplementation((_scope, key) => (key === 'targetEffects' ? teState : []));
     resolveSpellDamageWithTypes.mockReturnValue({ formula: '1d8', primaryType: 'Fire' });
+    computeRange.mockReturnValue({});
   });
 
-  it('fires endCompelledDuel (te removal + condition removed log) for a harmful spell on a NON-duel enemy', async () => {
+  it('breaks the caster\'s duel on a harmful spell cast at a NON-duel enemy: exact tuple, skipSync te write preserving other casters\' duels, removed log keyed to the duel target', async () => {
+    await executeSpellCast(harmfulSpell(), { targetName: 'Bandit 2' }, services('Bandit 2'));
+
+    expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledTimes(1);
+    expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestWizard', 'Bandit 2', CAMPAIGN);
+
+    // Full-set te write: exactly one write, exact payload (other caster's duel survives),
+    // skipSync=true, fresh array (not the stored one).
+    expect(teWrites()).toEqual([['campaign', 'targetEffects', [OTHER_CASTER_DUEL_TE], CAMPAIGN, true]]);
+    expect(teWrites()[0][2]).not.toBe(teState);
+
+    // Exactly one condition-removed log: characterName is the DUEL target (Bandit 1),
+    // the note names the attacked creature (Bandit 2) that broke the duel.
+    const removed = removedLogs();
+    expect(removed).toHaveLength(1);
+    const { timestamp, ...entry } = removed[0];
+    expect(Number.isFinite(timestamp)).toBe(true);
+    expect(entry).toEqual({
+      type: 'condition',
+      action: 'removed',
+      characterName: 'Bandit 1',
+      condition: 'Compelled Duel',
+      reason: 'Compelled Duel ended',
+      note: 'TestWizard attacked or forced a saving throw against Bandit 2 instead of the duel target.',
+    });
+  });
+
+  it('breaks the duel before range adjudication — an out-of-range (auto-miss) hostile cast still ends it (expiry invocation precedes computeRange)', async () => {
+    computeRange.mockReturnValue({ isAutoMiss: true, rangeReason: 'out of range' });
+
     await executeSpellCast(harmfulSpell(), { targetName: 'Bandit 2' }, services('Bandit 2'));
 
     expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestWizard', 'Bandit 2', CAMPAIGN);
-    expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', [], CAMPAIGN, true);
-    const removed = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'removed' && e.condition === 'Compelled Duel');
-    expect(removed).toBeDefined();
-    expect(removed.note).toContain('TestWizard attacked or forced a saving throw against Bandit 2 instead of the duel target.');
+    expect(checkCompelledDuelAttackExpiry.mock.invocationCallOrder[0])
+      .toBeLessThan(computeRange.mock.invocationCallOrder[0]);
+    expect(teWrites()).toEqual([['campaign', 'targetEffects', [OTHER_CASTER_DUEL_TE], CAMPAIGN, true]]);
   });
 
-  it('does NOT end the duel when the harmful spell targets the duel target itself', async () => {
+  it('leaves the duel state untouched when the harmful spell targets the duel target itself, and when no duel is active', async () => {
+    // Arm 1: duel active, spell hits the duel target itself — check fires, body no-ops.
     await executeSpellCast(harmfulSpell(), { targetName: 'Bandit 1' }, services('Bandit 1'));
 
+    expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledTimes(1);
     expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestWizard', 'Bandit 1', CAMPAIGN);
-    const teWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-    expect(teWrites).toHaveLength(0);
-    const removed = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'removed' && e.condition === 'Compelled Duel');
-    expect(removed).toBeUndefined();
-  });
+    expect(teWrites()).toEqual([]);
+    expect(removedLogs()).toEqual([]);
 
-  it('is a te-gated no-op when no duel is active', async () => {
-    teState = [];
+    // Arm 2: no compelled_duel te from this caster in the store — check fires, no-op.
+    vi.clearAllMocks();
+    teState = [OTHER_CASTER_DUEL_TE];
     await executeSpellCast(harmfulSpell(), { targetName: 'Bandit 2' }, services('Bandit 2'));
 
+    expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledTimes(1);
     expect(checkCompelledDuelAttackExpiry).toHaveBeenCalledWith('TestWizard', 'Bandit 2', CAMPAIGN);
-    const teWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
-    expect(teWrites).toHaveLength(0);
-    const removed = addEntry.mock.calls.map(c => c[1]).find(e => e.type === 'condition' && e.action === 'removed');
-    expect(removed).toBeUndefined();
+    expect(teWrites()).toEqual([]);
+    expect(removedLogs()).toEqual([]);
   });
 
-  it('never reaches the hook for a utility spell with no damage formula', async () => {
+  it('never reaches the expiry hook for a spell with no damage formula (no-damage lane keeps the duel intact)', async () => {
     resolveSpellDamageWithTypes.mockReturnValue({ formula: null, primaryType: null });
+
     await executeSpellCast(utilitySpell(), { targetName: 'Bandit 2' }, services('Bandit 2'));
 
     expect(checkCompelledDuelAttackExpiry).not.toHaveBeenCalled();
+    expect(teWrites()).toEqual([]);
+    expect(removedLogs()).toEqual([]);
   });
 });
