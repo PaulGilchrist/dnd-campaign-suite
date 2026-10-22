@@ -2428,3 +2428,47 @@ run2#1482: execution/helpers-powerWordKill -> maintained (4->7) <=100 tie both d
 ## Batch #215 GREEN — run2#1468-#1482 (15 lanes, execution/ damage+early-chain+helpers-family closure)
 ## Batch #215 — PROGRESS: completed 2615 / remaining 67 (total 2682)
 - Suite: lint clean; 2750 files, 30,455 passed, exact canon pair + 3 expected = GREEN canon. No flake (clean 42nd consecutive; WATCH #3 silent 4th run -> cooling; #1/#2 silent). Evidence /tmp/batch215.log. Count held dead-even 30,455 vs #214 despite 15 heavy rewrites (massive purges offset by new first-covered faces: magicMissile +1 direct-zero, noDamage tables, helpers 5-lane rebuilds).
+
+run2#1483: helpers-regenerate -> maintained (10->7) dormant-service resolved; heal-point model BOTH rulesets (temp-HP steering claim refuted disk bytes); :477 stale hour-comment.
+run2#1484: index.genericHealFortified -> maintained (3->11) fortified latch ALIVE (3rd-instance flipped); dead spellResolution mock removed; :376 caster-maxHp clamp + rider double-fire cited.
+run2#1485: index.magicalAmbushTransport -> maintained (5->4) throws-vs-transport reconciled by bytes; fallback-lane consumer first coverage; order-hijack fixed; 23 mock holes closed.
+run2#1486: modalSpells.massSuggestion-pay-at-confirm -> maintained (2->4) pay-at-confirm producer REAL; defer-slot byte; declined zero-payment; disk castingTime verbatim.
+run2#1487: modalSpells.powerWordSpread -> maintained (5->15) CLA-392 shared-snapshot times(1)+toBe identity (old tests could not catch refetch); corpse-not-skipped pinned; heal-:10-vs-kill-:26 guard asymmetry gold.
+run2#1488: noSavePath -> maintained (10->9) bake-vs-roll CONFIRMED LIVE both bytes same ctx (1d10 formula + 2d10 roll); :61 swallow owned; formula arm disk-dead quantified.
+run2#1489: savePath-aoe-condition -> maintained (8->4) dc_type disk-UPPERCASE gold, lowercase fixtures purged; Grease/Slow fraud fixed; soulstitch tuple first-asserted.
+run2#1490: savePath-aoe-damage -> maintained (17->11) dead mocks removed + rangeValidation real-leaf; overlay/fetch faces delivered; dc_success-null-cannot-veto quirk; 5e-string-automation claim REFUTED census.
+run2#1491: savePath-aoe-empowered-evocation -> maintained (3->3 gates REAL) CLA-120 AoE fix identity 9f4a06ba6; mod-then-half RAW order confirmed; canned-mock hollowing fixed; negative clamp-twice cited.
+run2#1492: savePath-aoe-meta -> maintained (12->5) fabricated '0'/''/fail:[] disk-nonexistence census -> renamed kills-only probes; dead mocks removed; :167 dead-twin + :139 NaN-latent reported.
+run2#1493: savePath-aoe-overchannel -> maintained (6->2) both #1491/92 recs applied (EE-dup removed, dead mocks gone); Hunger-of-Hadar fraud purged; suffix-vs-flag mechanism disk text.
+run2#1494: savePath-single-target -> maintained (15->11) shared-roll consumption '2d10 + 3 [EE]' marker-count-1 pin; :248 soulstitch preserved->:360; lv0 passthrough NO ||1 unlike family.
+run2#1495: execution/spellCastService.featureTriggers -> maintained (7->7 rewritten) collector-live passives; 4 dead mocks purged; fabricated dispel fixture purged; :675 ambush-rejects-all-riders NEW 🔴.
+run2#1496: healingEdgeCases -> maintained (8->4) 3 owed redirects executed (bare-matchers 0; regen/missile/ambush/'max'/innate folds-to-owners; :402-451 hardened per fortified disown); ~30 mocks purged; :217 silent-mod-0 🔴.
+run2#1497: hexEffects -> maintained (6->3) hub->REAL-helper store bytes; te-keys registry-validated; 5e disk NO Hex row; rounds:600 NO-CLOCK 🔴 + concentration-never-written 🔴.
+run2#1498: spellCastService.powerWordHeal -> maintained (4->3) DEDUPE ADJUDICATION SETTLED: #1487 Row E stands + hub un-maskable gap>0 recorder pin; delta-0 masking mechanism confirmed; 4 dead mocks purged.
+run2#1499: spellResolution-log -> maintained (11->5) module-alive table: log fn DEAD-TWIN mirror of live index.js:225 (already diverged); 12-key ordered format cannot-regress; guard-bits kept.
+run2#1500: spellResolution.complex -> maintained (22->10) orphan-live-by-tests KEEP-as-guard-bits verdict; numeric-vs-control split vs base; :175 placeholder + :154 unawaited-IIFE reported.
+run2#1501: spellResolution.test -> maintained (36->19) :247/:464 bare-matchers PURGED per owed; bake-roll third-source NONE verified pass-through; all 7 incoming cites preserved w/ range map; 109 citing lanes green.
+
+## Batch #216 GREEN-with-WATCH — run2#1483-#1501 (19 lanes, savePath family + spellResolution trio CLOSED; cadence breach corrected)
+## Batch #216 — PROGRESS: completed 2634 / remaining 48 (total 2682)
+- Suite: lint clean; 2750 files, 30,394 passed + 3 expected; canon pair + NEW flake CharSheet.actionHandlers 'counterspell popup' (:538, undefined last-call under parallel load, file UNMODIFIED, 10/10 green isolated) = registered WATCH #4, reconfirm isolated, stabilize-on-2nd-recurrence. Tests 30,455->30,394 (-61 net: base 36->19, complex 22->10, healEdge 8->4, hexEffects 6->3, PWH 4->3 folding; offset complex/logs first-covered). Evidence /tmp/batch216.log.
+
+run2#1502: helpers-spellBreaker -> maintained (3->2) ungated refund table (fires-at-zero, silent null/-1); twin gated face cited #1478; CLA-322 disk bytes 2024-only.
+run2#1503: helpers.sp075-magicMissile-upcast -> maintained (3->3 rewritten) owed-report DISCHARGED x3: throwing queue-stub (T3 live-proven), 0 weak matchers, marker; disk ladder all 7 tiers, 2024 no-per-dart-rework; SP-075 identity 46d041dbb.
+run2#1504: helpers.test base -> maintained (16->5) 12-export owner table closes helpers.js ownership; residual hex+arcane here; missile-refs claim VERIFIED; DIVINATION_SCHOOL+getMagicMissileCount 🗑.
+run2#1505: index.generic-metaCtx -> maintained (1->4) :710 arity-1 envelope census; finalFormula temporal-absence pin; canned bake->REAL; legacy SP-092 marker normalized.
+run2#1506: spellStats -> maintained (10->6) computeSpellStats producer face THROUGH hub seams; suite-name-lie fixed; 13 vacuous expect.any(Object) purged; min-8 numeric guarantee pinned.
+run2#1507: triggerSpells.metaCtx -> maintained (4->3) fold contract: fresh-outer shared-inner; fabricated Prismatic-Spray automation purged to real 2024 row.
+run2#1508: triggerSpells.test base -> maintained (7->5 tables ~45 pins) gate truth-table reconciled vs family censuses; Blade-Ward fixture fraud fixed ('buff'->'blade_ward'); N=0-mock purity.
+run2#1509: spellLimits -> maintained (18->15) disk-verified slot legality; NEW 🔴x4: sparse class_levels index-as-level (AT lv3 gets lv7), level1 known/slots conflation, extraOptions ignored, corrupt-body cache poison.
+run2#1510: spellPrep.cla130-faithful-steed -> maintained (3->4) CLA-130 identity 9ff1d5544; LR null-rearm ??uses pin; paid/free single-channel exclusivity; vacuous-self-compute killed.
+run2#1511: spellPrep.cla138-fey-reinforcements -> maintained (6->5) noConcentration DESIGN (disk quote); paid-latch-dead-on-entry fixed; full Summon Fey row vs hand-trimmed fixture.
+run2#1512: spellPrep.incrementFreeCastResource -> maintained (9->6) rollback lane LIVE via useConfirmableFlow; NEW 🔴x3: Bewitching null-not-true, Favored uncapped+key-swap, Signature ===3 hardcode; null-vs-absent coalesce adjudicated.
+run2#1513: spellPrep.isFreeCastAuthorized -> maintained (38->17) oracle FREE_CAST_CHECKS full truth-table; fold-map to 11 siblings; fabricated lv fixes (Teleport 7/Eyebite 6); campaign-arity-asymmetry flagged.
+run2#1514: spellPrep.modifications -> maintained (13->9) 7 transforms byte-diff vs disk; fabricated EB level:1->lv0 flips verdict (:0-swallow lane); NEW 🔴: freeCastAuthorized payment-authoritative (freeCastUsed:true zero-payment), Psychic stamp ignores disk spellSchools gate.
+run2#1515: spellPrep.mysticArcanum -> maintained (5->10) real key-builder bytes; CLA-231 first-hit mutant twin-spent seed; read-vs-write censuses distinguished; 5e disk-text defect noted (L15 prose).
+run2#1516: spellPrep.quickRitual -> maintained (4->12 rows) FT-068 Ritual Master consume face; zero-transform verified; own inverted-census self-caught; consumeBaseSlot reads no-campaign 🔴 (resource-flow owner).
+
+## Batch #217 GREEN — run2#1502-#1516 (15 lanes honest cadence; helpers.js FULLY CLOSED + spellPreparation family 8 lanes)
+## Batch #217 — PROGRESS: completed 2649 / remaining 33 (total 2682)
+- Suite: lint clean; 2750 files, 30,353 passed, exact canon pair + 3 expected = GREEN canon. No flake (43rd consecutive clean; WATCH #4 silent first reconfirm, WATCH #3 silent 6th). 30,394->30,353 (-41 net: oracle 38->17, triggerSpells 7->5-tables, helpers base 16->5, spellLimits 18->15, mods 13->9 folded; offset arcanum 5->10, quickRitual 4->12-rows, first-covered seams). Evidence /tmp/batch217.log.

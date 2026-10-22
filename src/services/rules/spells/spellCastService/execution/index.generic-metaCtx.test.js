@@ -1,9 +1,56 @@
-// @new-for-SP-092
-// @mocks-copied-from earlyReturns-generic.test.js
+// @maintained-by-ai
+/* ------------------------------------------------------------------ */
+/*  OWNER (sole lane): what index.js :710 FORWARDS to handleGeneric-  */
+/*  Automation — the mock-boundary arg pin (earlyReturns-generic:10    */
+/*  hands this face HERE; the envelope is visible ONLY with trigger-    */
+/*  Spells mocked wholesale). Pinned contract: exact single-object      */
+/*  envelope {spell, executeHandler, playerStats, campaignName,         */
+/*  mapName, characters, metaCtx} — NOT the arity-5 tuple (that is the */
+/*  SECOND crossing inside the REAL handler, owned by earlyReturns-     */
+/*  generic:375/:462 — #1462 re-verified real signature :710 = env).   */
+/*  Also pinned: the :680 CLA-219 fold composition riding metaCtx       */
+/*  (#1470/:1485 stamp transport cited, not regrown), identity chain    */
+/*  (fresh folded metaCtx, shared inner refs, caller purity — #1487),  */
+/*  and the :710/712 `r.result || undefined` falsy collapse (observable */
+/*  only via mocked result bytes).                                      */
+/*                                                                     */
+/*  SPLIT-TABLE RECONCILIATION (owners cited, never re-grown):         */
+/*   - consumption-vs-rejection census 44/78 + :712 bypass: earlyReturns-generic:274 (#1470) */
+/*   - fold stamp riding REAL envelope + caller purity: earlyReturns-generic:424 */
+/*   - ambush THROW family :117-:120 + SP-002 throw: execution-early-resolutions:361-384 */
+/*   - CLA-399 lastActionSpellCast census ONCE FIRST :68: execution-early-resolutions:426 (#1498) */
+/*   - :702-:709 modal chain names/order: earlyReturns-modal */
+/*   - ambush fold TRANSPORT (dedicated/savePath/fallback): index.magicalAmbushTransport (#1485) */
+/*   - handleGenericAutomation internals (action shape, metaCtx spread): triggerSpells.metaCtx */
+/*   - deferChooserSlotPayment is a SPELL-level flag consumed at :230, never a metaCtx key —   */
+/*     it crosses :710 implicitly via the by-reference env.spell pin (#1486 answer).          */
+/*                                                                     */
+/*  Mock completeness (line-by-line vs index.js imports, 2026-10-21): every import mocked       */
+/*  EXCEPT justified REAL carries: psychicSpellsHandler.getPsychicSpellsConfig,                 */
+/*  castingTimeUtils.normalizeCastingTime, core/spellDamageUtils.resolveSpellDamageWithTypes    */
+/*  (pure — the canned '10d6' return is REMOVED per #1491 hollowing-ban; disk rows resolve     */
+/*  their own bytes), compelledDuelHandler (loaded, unreachable — cast returns at :712).       */
+/*  Dead twins DELETED (#1504): barrel key checkCompelledDuelAttackExpiry (direct-import edge   */
+/*  :6 owns it), helpers key executeMagicMissile, entire ./spellResolution.js mock (index.js    */
+/*  never imports it; spellResolution-log owns that module). No timers/clocks — forwarding is  */
+/*  instantaneous; invocationCallOrder unnecessary (exactly-one forward pinned).                 */
+/*  Security (#1446 kiro scan): none found in lane or fixtures.                                */
+/*  Fixtures: REAL disk rows BOTH rulesets + load-drift-throw (#1503/04); synthetic           */
+/*  non-impersonating caster (#1492); campaign lockdown 'test-campaign'.                        */
+/* ------------------------------------------------------------------ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { cloneDeep } from 'lodash';
+import spells5e from '../../../../../../public/data/spells.json';
+import spells2024 from '../../../../../../public/data/2024/spells.json';
+
+const diskRow5e = spells5e.find(s => s.name === 'Prismatic Spray');
+const diskRow2024 = spells2024.find(s => s.name === 'Burning Hands');
+if (!diskRow5e) throw new Error('disk drift: 5e Prismatic Spray row missing from public/data/spells.json');
+if (!diskRow2024) throw new Error('disk drift: 2024 Burning Hands row missing from public/data/2024/spells.json');
 
 /* ------------------------------------------------------------------ */
-/*  Mocks — all dependencies of execution/index.js                     */
+/*  Mocks — every mockable import of execution/index.js                */
 /* ------------------------------------------------------------------ */
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -17,7 +64,6 @@ vi.mock('../../../../ui/logService.js', () => ({
 
 vi.mock('../../../../automation/index.js', () => ({
   executeHandler: vi.fn(),
-  checkCompelledDuelAttackExpiry: vi.fn(),
 }));
 
 vi.mock('../../../features/healingWordService.js', () => ({
@@ -49,9 +95,6 @@ vi.mock('../../../../rules/spells/postCastRiderService.js', () => ({
   triggerBewitchingMagic: vi.fn(() => Promise.resolve()),
   triggerPostCastRiderSaves: vi.fn(() => Promise.resolve()),
   triggerSpellThief: vi.fn(() => Promise.resolve()),
-  triggerSoulstitchSpells: vi.fn(() => Promise.resolve()),
-  getEmpoweredEvocationFeatures: vi.fn(() => []),
-  getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }));
 
 vi.mock('../../../../automation/handlers/spells/sanctuaryHandler.js', () => ({
@@ -83,15 +126,11 @@ vi.mock('../../../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
 }));
 
-vi.mock('../../../core/spellDamageUtils.js', () => ({
-  resolveSpellDamageWithTypes: vi.fn(() => ({ formula: '10d6', primaryType: 'Fire' })),
-}));
-
 vi.mock('../../../features/confusionService.js', () => ({
   triggerConfusion: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../combat/automation/automationService.js', () => ({
+vi.mock('../../../../combat/automation/automationService.js', () => ({
   markFortifiedHealthUsedIfGranted: vi.fn(),
   resolveHealingBonusesWithDetails: vi.fn(() => ({ totalBonus: 0, details: [] })),
   hasHealingMaximizationForTarget: vi.fn(() => false),
@@ -113,7 +152,6 @@ vi.mock('./helpers.js', () => ({
   triggerDispelMagic: vi.fn(() => Promise.resolve()),
   triggerExpertDivination: vi.fn(() => Promise.resolve(null)),
   applyRegenerateSpell: vi.fn(),
-  executeMagicMissile: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('./blockChecks.js', () => ({
@@ -121,7 +159,6 @@ vi.mock('./blockChecks.js', () => ({
   checkForcecageBlocked: vi.fn(() => Promise.resolve(null)),
   checkBlockedBySpellcastingBuff: vi.fn(() => Promise.resolve(null)),
 }));
-
 
 vi.mock('./modalSpells.js', () => ({
   handlePowerWordHeal: vi.fn(() => Promise.resolve({ handled: false })),
@@ -205,79 +242,139 @@ vi.mock('./damageCalculation.js', () => ({
   computeOverchannel: vi.fn(() => ({ overchannelFormula: null, overchannelActive: false, overchannelUseCount: 0 })),
 }));
 
-vi.mock('./spellResolution.js', () => ({
-  getActiveBuffs: vi.fn(() => []),
-}));
-
 vi.mock('../../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
 /* ------------------------------------------------------------------ */
-/*  SUT import after mocks                                             */
+/*  SUT import after mocks (index.js hub REAL)                         */
 /* ------------------------------------------------------------------ */
 
 import { executeSpellCast } from './index.js';
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
+const { executeHandler } = await import('../../../../automation/index.js');
 const { handleGenericAutomation: mockGenericAutomation } = await import('./triggerSpells.js');
+const { handleSavePath } = await import('./savePath.js');
 
 /* ------------------------------------------------------------------ */
-/*  Test-data factories                                                */
+/*  Test-data factories (synthetic caster — non-impersonating, #1492) */
 /* ------------------------------------------------------------------ */
 
-function makePlayerStats() {
+function makePlayerStats(rules) {
   return {
     name: 'TestWizard',
+    rules,
     abilities: [{ name: 'Intelligence', bonus: 3 }],
     proficiency: 6,
-    spellAbilities: {
-      spellCastingAbility: 'Intelligence',
-      toHit: 9,
-      saveDc: 17,
-      modifier: 3,
-    },
+    spellAbilities: { spellCastingAbility: 'Intelligence', toHit: 9, saveDc: 17, modifier: 3 },
     automation: { passives: [] },
     hitPoints: 82,
     level: 20,
   };
 }
 
-function makePrismaticSpray() {
+function makeOpts(playerStats) {
   return {
-    name: 'Prismatic Spray',
-    level: 7,
-    automation: { type: 'prismatic_spray', saveType: 'DEX', damage: '10d6', saveDc: 'spell_save_dc' },
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+    playerStats,
+    getTargetInfo: async () => ({ name: 'Zombie 1' }),
+    campaignName: 'test-campaign',
+    mapName: 'test-map',
+    characters: [],
   };
 }
 
 /* ------------------------------------------------------------------ */
 
-describe('executeSpellCast routes metaCtx into handleGenericAutomation (SP-092)', () => {
+describe('executeSpellCast :710 forwarding — envelope + metaCtx composition handed to handleGenericAutomation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue([]);
     mockGenericAutomation.mockResolvedValue({ handled: true });
   });
 
-  it('passes the caller metaCtx (with selectedTargets) to handleGenericAutomation', async () => {
-    const metaCtx = { selectedTargets: ['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2'] };
+  it('forwards the exact single-object envelope (key census, arity 1) with by-reference spell/stats/characters, the barrel executeHandler function identity, a FRESH :680-folded metaCtx carrying caller selectedTargets by shared reference and the metamagicHeighten:false byte, no post-:741 stamps injected, and returns the handler result verbatim at :712', async () => {
+    const spell = cloneDeep(diskRow5e);
+    const opts = makeOpts(makePlayerStats('5e'));
+    const callerMetaCtx = { selectedTargets: ['Zombie 1', 'Zombie 2'] };
+    const SENTINEL = { automationPopup: { type: 'popup', payload: { type: 'result' } } };
+    mockGenericAutomation.mockResolvedValue({ handled: true, result: SENTINEL });
 
-    await executeSpellCast(makePrismaticSpray(), metaCtx, {
-      rollAttack: vi.fn(),
-      rollDamage: vi.fn(),
-      playerStats: makePlayerStats(),
-      getTargetInfo: async () => ({ name: 'Zombie 1' }),
-      campaignName: 'test-campaign',
-      mapName: 'map',
-      characters: [],
-    });
+    const result = await executeSpellCast(spell, callerMetaCtx, opts);
 
+    expect(executeSpellCast.length).toBe(3);
     expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
     const callArgs = mockGenericAutomation.mock.calls[0];
-    // CLA-219: the cast lane now folds the ambush/heighten transport key onto
-    // metaCtx at the choke point — visible caster control keeps it false.
-    expect(callArgs[0].metaCtx).toEqual({ ...metaCtx, metamagicHeighten: false });
-    expect(callArgs[0].metaCtx.selectedTargets).toEqual(['Zombie 1', 'Zombie 2', 'Archmage 1', 'Archmage 2']);
+    expect(callArgs).toHaveLength(1); // single envelope object — the 5-tuple is the SECOND crossing (earlyReturns-generic:375 owns it)
+    const [env] = callArgs;
+    expect(Object.keys(env)).toEqual(['spell', 'executeHandler', 'playerStats', 'campaignName', 'mapName', 'characters', 'metaCtx']);
+    expect(env.spell).toBe(spell); // spell-level flags (e.g. _deferChooserSlotPayment, #1486) ride by reference
+    expect(env.playerStats).toBe(opts.playerStats);
+    expect(env.characters).toBe(opts.characters);
+    expect(env.executeHandler).toBe(executeHandler); // chokepoint threading (#1357): the same barrel fn reference
+    expect(env.campaignName).toBe('test-campaign');
+    expect(env.mapName).toBe('test-map');
+    expect(env.metaCtx).not.toBe(callerMetaCtx); // :680 rebuilds the envelope metaCtx (fresh object, #1487)
+    expect(env.metaCtx).toStrictEqual({ selectedTargets: ['Zombie 1', 'Zombie 2'], metamagicHeighten: false }); // #1495 explicit false byte
+    expect(env.metaCtx.selectedTargets).toBe(callerMetaCtx.selectedTargets); // shallow fold — inner array shared by reference
+    expect(env.metaCtx).not.toHaveProperty('finalFormula'); // :741 second fold runs AFTER :710 — temporal pin
+    expect(env.metaCtx).not.toHaveProperty('featsOfChaosArmedAtCast');
+    expect(result).toBe(SENTINEL); // :712 pass-through identity
+  });
+
+  it('carries every caller metaCtx key across :710 verbatim on a real 2024 disk row — caller metamagicHeighten:true survives the CLA-219 fold unchanged, slotLevel threads as a number byte (#1503 form), explicit-null and implicit-undefined keys stay distinguished (toStrictEqual), and no keys are fabricated', async () => {
+    const spell = cloneDeep(diskRow2024);
+    const opts = makeOpts(makePlayerStats('2024'));
+    const callerMetaCtx = { slotLevel: 3, metamagicHeighten: true, selectedTargets: null, focusPending: undefined, deferChooserSlotPayment: false };
+
+    await executeSpellCast(spell, callerMetaCtx, opts);
+
+    expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
+    const [env] = mockGenericAutomation.mock.calls[0];
+    expect(Object.keys(env.metaCtx)).toEqual(['slotLevel', 'metamagicHeighten', 'selectedTargets', 'focusPending', 'deferChooserSlotPayment']);
+    expect(env.metaCtx).toStrictEqual(callerMetaCtx); // :680 fold recomputes metamagicHeighten false||!!true = true — byte-stable; undefined-present vs null preserved (#1499)
+    expect(env.metaCtx).not.toBe(callerMetaCtx);
+    expect(typeof env.metaCtx.slotLevel).toBe('number');
+    expect(callerMetaCtx).toStrictEqual({ slotLevel: 3, metamagicHeighten: true, selectedTargets: null, focusPending: undefined, deferChooserSlotPayment: false }); // caller purity (#1487 form)
+  });
+
+  it('survives an undefined caller metaCtx (:680 optional-chain guard) — :710 receives a stamped-only metaCtx of exactly {metamagicHeighten:false} forwarded exactly once', async () => {
+    const spell = cloneDeep(diskRow5e);
+    const opts = makeOpts(makePlayerStats('5e'));
+
+    await executeSpellCast(spell, undefined, opts);
+
+    expect(mockGenericAutomation).toHaveBeenCalledTimes(1);
+    const [env] = mockGenericAutomation.mock.calls[0];
+    expect(env.metaCtx).toStrictEqual({ metamagicHeighten: false });
+  });
+
+  it('collapses every falsy handled-result byte (null, 0, empty string, false, missing key) through the :710 "|| undefined" to an undefined resolution while truthy object and string results cross back by identity, and a consumed-but-empty result still bypasses the save lane', async () => {
+    const spell = cloneDeep(diskRow5e);
+    const TRUTHY_OBJ = { automationPopup: { type: 'popup' } };
+    const arms = [
+      { ret: { handled: true, result: null }, expected: undefined },
+      { ret: { handled: true, result: 0 }, expected: undefined },
+      { ret: { handled: true, result: '' }, expected: undefined },
+      { ret: { handled: true, result: false }, expected: undefined },
+      { ret: { handled: true }, expected: undefined },
+      { ret: { handled: true, result: TRUTHY_OBJ }, expected: TRUTHY_OBJ },
+      { ret: { handled: true, result: 'PASS' }, expected: 'PASS' },
+    ];
+    for (const arm of arms) {
+      mockGenericAutomation.mockResolvedValue(arm.ret);
+      const opts = makeOpts(makePlayerStats('5e'));
+      const forwardsBefore = mockGenericAutomation.mock.calls.length;
+      const result = await executeSpellCast(spell, {}, opts);
+      if (typeof arm.expected === 'object' && arm.expected !== null) {
+        expect(result, JSON.stringify(arm.ret)).toBe(arm.expected);
+      } else {
+        expect(result, JSON.stringify(arm.ret)).toStrictEqual(arm.expected);
+      }
+      expect(mockGenericAutomation.mock.calls.length - forwardsBefore, `one forward per cast (${JSON.stringify(arm.ret)})`).toBe(1);
+    }
+    expect(handleSavePath).not.toHaveBeenCalled(); // every arm consumed at :712 — bypass census owned by earlyReturns-generic:274 (#1470), this is the falsy-edge half
   });
 });
