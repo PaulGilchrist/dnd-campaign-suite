@@ -2472,3 +2472,43 @@ run2#1516: spellPrep.quickRitual -> maintained (4->12 rows) FT-068 Ritual Master
 ## Batch #217 GREEN — run2#1502-#1516 (15 lanes honest cadence; helpers.js FULLY CLOSED + spellPreparation family 8 lanes)
 ## Batch #217 — PROGRESS: completed 2649 / remaining 33 (total 2682)
 - Suite: lint clean; 2750 files, 30,353 passed, exact canon pair + 3 expected = GREEN canon. No flake (43rd consecutive clean; WATCH #4 silent first reconfirm, WATCH #3 silent 6th). 30,394->30,353 (-41 net: oracle 38->17, triggerSpells 7->5-tables, helpers base 16->5, spellLimits 18->15, mods 13->9 folded; offset arcanum 5->10, quickRitual 4->12-rows, first-covered seams). Evidence /tmp/batch217.log.
+
+run2#1517: spellPrep.resource-flow -> maintained (11->6/22cases) #1516 arity-hazard MADE HOME histogram {2:6,3:3}; store-faithful null fixed; psionic CLA-271 ledger unique lane; 'camp' fixed; exact-cost->0->slot-sequel seam.
+run2#1518: spellPrep.ritualAdept -> maintained (14->10) CLA-299 5d4cbafc9 ritual-consumed-slot fix; 4 payment-faces separate kill-set; fixtures 3 fabricated bytes fixed vs disk; vacuous ?? :239 found.
+run2#1519: spellPrep.ritualOnly -> maintained (8->5) CLA-234 493a84d34; unlimited-RAW ledger silence (zero writes+ZERO ladder reads); Speak-with-Animals artifact fixed.
+run2#1520: spellPrep.shadowArts -> maintained (10->6) CLA-308 monk-subclass vs FT-070 feat split; COUNTED long_rest exact-of-1; near-copy fixture -> byte-derived; useRuntimeState arity-2 campaign-discard CONFIRMED.
+run2#1521: spellPrep.shadowTouched -> maintained (13->9) FT-070 4e77ce64d twin-steal fix; two-prefix mystery RESOLVED (entry.name 'Shadow Magic'); OFF_LANE guard regex zero-pollution both directions.
+run2#1522: spellPrep.signatureUpcastPayment -> maintained (6->9cases) free=lv3-only paid=all-higher disk law; lv20 bank matrix distinguishable; CLA-323 cross-dup folded to Mastery.
+run2#1523: spellPrep.spellMasteryPayment -> maintained (9->4) lv18 spell_mastery disk law seized; #1522 pair-claim VERIFIED live here; unlimited exact-of-0 census.
+run2#1524: spellPrep.test BASE -> maintained (15->8) MASTER ownership table embedded (routes future lanes); concentration arms 4/4; Fireball concentration fabrication fixed; honest times(2) double-persist.
+run2#1525: spellPrep.uncovered.increment -> maintained (5->3) :77 anchor shift-reported; uses_expression exactly-1-usable census; Paladin's Smite first live rollback pin.
+run2#1526: spellPrep.uncovered.isFreeCastAuthorized -> maintained (24->13) loop-mechanics law pins (orderflip/halt-vs-continue/interleave); owed-sweep executed camp 24->0; type-filter split to dedicated sibling.
+run2#1527: spellPrep.uncovered.prepareSpellCast -> maintained (18->12) 4-claims dispositioned; :491 vacuous self-copy KEPT+strengthened (Q1); cousin found Signature arm no used-gate X1; disk-siblings verbatim runtime-freeze.
+run2#1528: spellPrep.uncovered.typeFiltering -> maintained (3->6) old trio VACUOUS-unplanted -> container-loop planted zero-read skips; Venn 3-way unowned-empty; NEW 🔴 :209 literal 'campaign' playerName.
+run2#1529: spellPrep.wildCompanion -> maintained (4->5) steering claim DISK-REFUTED: Druid lv2 feature not feat; shared-vs-perSpell topology table vs #1521; steal-canary; __fixtures__ barrel dead zero-consumers.
+run2#1530: spellValidation -> maintained (35its->22its/36rows) distinct advisory layer (cap at #1509); 6 NEW source bugs (uncond isSpellcaster :276, unfiltered capture junk :123, 5e feat parsing dead-inert :216, dead :432, vacuous filter :455, double-load :468); fixture-refuted synthetic class-lists.
+run2#1531: trackedResources -> maintained (51->17) 62-key registry golden byte-exact; Venn two-way executable (tranceOfOrder absent BOTH sides); NO-CLOCK grep-clean; 📌 computed-not-in-registry x2 + warPriest-seeds-all-classes.
+
+## Batch #218 GREEN — run2#1517-#1531 (15 lanes; spellPreparation domain FULLY CLOSED; trackedResources begins)
+## Batch #218 — PROGRESS: completed 2664 / remaining 18 (total 2682)
+- Suite: lint clean; 2750 files, 30,287 passed, exact canon pair + 3 expected = GREEN canon. No flake (44th consecutive clean; WATCH #3/#4 silent). 30,353->30,287 (-66 net: trackedResources 51->17, ritualAdept 14->8, oracle-uncovered 24->13, validation 35its->22its folded; offset signatureUpcast 6->9cases, typeFiltering 3->6, mastery-uncovered rows). Evidence /tmp/batch218.log.
+
+run2#1532: trackedResourcesAdditional -> maintained (55its->14) ownership-Venn embedded; disk-quoted formula pins + unclamped INT-2 arcaneWard row; NEW 🔴x4: NaturalRecovery floor-vs-'round up', darkOnesLuck both-rulesets, cosmicomen WIS-max, favoredEnemy no-Ranger-gate.
+run2#1533: trackedResourcesSubclass -> maintained (44->8) 8-adder table byte-verified fresh; zero gate-leaks in-span contrast; ruleset-drift pinned (5e names never fire); 'Hill Dwarf'->Goliath fixture refuted; Venn gap _Star_Map consequence.
+run2#1534: shared/buffApplier -> maintained (19->6) identity-corrected pure helper; 🗑 applyAbilityScoreIncreases dead-export inline-twin featBuffService:638; 'any' sentinel + 'ANY' quirk pinned; live mutants 16/16; 4 delegation-homes preserved.
+run2#1535: castingTimeUtils -> maintained (5->4) full 19-strings disk map; util does NOT split compounds; idempotence law passes; delegation-home preserved; 8 first-covered bytes.
+run2#1536: computePassiveSkills -> maintained (16->7) live via race-rules getSenses push-contract; isCreatureDead zero-pins-pre fix; rules-law disk-locked; '5'->'105' concat quirk honest; live 11/11.
+run2#1537: deduplicateAndSort -> maintained (17->9) twin-distinct vs mergeDeduplicated; two-branch sort-law (ASCII-vs-locale opposite-case); -0->+0 pinned; idempotence; live 7/7.
+run2#1538: featFinder -> maintained (9->6) name-match law (#1509 family N/A); feats census 42/71; 🔴 two-valued miss (paren-stripped undefined+no-log vs null+log); vacuous-chain; live 7/7.
+run2#1539: hpModifier -> maintained (23->35cases) isCreatureDead was ZERO-pinned -> 14; HP-alias-space crossings pinned all arms; falsy-zero survival proven; 🔴 :42 NaN-poison asymmetry; live 12/12.
+run2#1540: nameUtils -> maintained (11->6) delegation discharged #1538 regex-ownership; disk-corpus 323 names one-paren mapped; guard-asymmetry matrix; 🗑x10 stripNumericSuffix dead + 9-site inline regex dups.
+run2#1541: popupResponse -> maintained (6->6 gold) pure envelope builder identity; by-reference automation law; ||'' operator table; consumer-delegation home preserved; live 5/5.
+run2#1542: dataLoader -> maintained (43->37) disk-derived routing map incl 5e-absent lanes; cache law: loadData in-flight-dedupe DEAD (:116) #1509-root, loadSpells version-dedupe live; 🔴x5 home incl :193 pointBuy-always-null; 6 live kills.
+run2#1543: logService REAL-home -> maintained (8->6) stateless transport law vs 1317 mockers; exact URL/body bytes; throw-before-json; timer-clean verdict; live 8/8 w/ redo-proof; server spread-after-stamp report.
+run2#1544: musicConfig -> maintained (9->9) inline-config identity; DEFAULT_VOLUME was unpinned->fixed; sibling circular-anchor role; 🔴 lookalike-host accepts + live-ref catalogue mutation.
+run2#1545: sanitize -> maintained (13->13) attack-matrix 6-classes + mXSS fixed-point sweep; never-mock-real-sanitizer; order-of-ops proven; safe golden byte-exact; 📌 ADD_ATTR data-* inert; 4 live-config mutants.
+run2#1546: spellSectionUtils.spellBreaker -> maintained (4->5/9cases) stamped-passive-gate determination (5e-regression-gate genuine); case-exact + list-leak law live-kills; K1 honest-equivalent-declared.
+
+## Batch #219 GREEN — run2#1532-#1546 (15 lanes honest cadence; rules-root closed, services/shared + ui payload)
+## Batch #219 — PROGRESS: completed 2679 / remaining 3 (total 2682)
+- Suite: lint clean; 2750 files, 30,176 passed, exact canon pair + 3 expected = GREEN canon. No flake (45th consecutive clean; WATCH #3 silent 7th, WATCH #4 silent 2nd). 30,287->30,176 (-111 net: trackedResourcesAdditional 55->14, subclass 44->8, buffApplier 19->6, featFinder/nameUtils folded; offset hpModifier 23->35-cases, first-covered seams). Evidence /tmp/batch219.log.

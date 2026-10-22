@@ -1,10 +1,16 @@
+// @maintained-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import * as dataLoader from './dataLoader.js';
 import {
     loadClassData,
     loadRaceData,
     loadBackgroundData,
+    getCachedBackgroundData,
     loadFeatData,
     loadValidationRules,
+    getCachedPointBuyCosts,
     fetchClassData,
     fetchRaceData,
     fetchSubraceData,
@@ -14,526 +20,438 @@ import {
     loadEquipment,
     loadMonsters,
     loadMagicItems,
+    loadFightingStyles,
+    loadSpellData,
+    loadManeuvers,
     loadSpells,
     loadSkills,
-    loadManeuvers,
+    loadWildMagicSurgeTable,
     clearDataCache,
     getCacheState
 } from './dataLoader.js';
 
-// Silence console.error produced by the source's error logging
-const originalError = console.error;
-beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-});
-afterEach(() => {
-    console.error = originalError;
-});
+// ---------------------------------------------------------------------------
+// Disk census (fixture integrity): the routing map is derived from REAL disk
+// existence of public/data/ and public/data/2024/, never from memory. The
+// fetch stub is URL-aware and serves the actual file bytes (memoized), so a
+// route that points at the wrong file returns the wrong bytes and fails.
+// Paths absent from disk honestly 404 — no fabricated-disk-bytes (#1462).
+// ---------------------------------------------------------------------------
+const publicRoot = path.resolve(process.cwd(), 'public'); // vitest cwd = repo root
+const dataRoot = path.join(publicRoot, 'data');
+const sharedOnDisk = new Set(fs.readdirSync(dataRoot).filter(f => f.endsWith('.json')));
+const v2024OnDisk = new Set(fs.readdirSync(path.join(dataRoot, '2024')).filter(f => f.endsWith('.json')));
 
-// Helper to create a mock successful fetch response
-function mockSuccessResponse(data, contentType = 'application/json') {
+function existsOnDisk(url) {
+    if (url.startsWith('/data/2024/')) return v2024OnDisk.has(url.slice('/data/2024/'.length));
+    if (url.startsWith('/data/')) return sharedOnDisk.has(url.slice('/data/'.length));
+    return false;
+}
+
+const realBytesMemo = new Map();
+function realData(url) {
+    if (!realBytesMemo.has(url)) {
+        realBytesMemo.set(url, JSON.parse(fs.readFileSync(path.join(publicRoot, url), 'utf8')));
+    }
+    return realBytesMemo.get(url);
+}
+
+function jsonResponse(data) {
     return {
         ok: true,
         status: 200,
-        headers: new Map([['content-type', contentType]]),
+        headers: new Map([['content-type', 'application/json']]),
         json: async () => data
     };
 }
 
-// Helper to create a mock error fetch response
-function mockErrorResponse(status = 500, contentType = 'text/html') {
+function htmlResponse(status) {
     return {
         ok: false,
         status,
-        headers: new Map([['content-type', contentType]]),
-        json: async () => null
+        headers: new Map([['content-type', 'text/html']]),
+        json: async () => { throw new Error(`stub refuses to parse non-JSON body for ${status}`); }
     };
 }
 
 describe('dataLoader', () => {
+    let fetchMock;
+
     beforeEach(() => {
-        vi.spyOn(global, 'fetch').mockResolvedValue(mockErrorResponse(500));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        // URL-aware stub: exact-bytes-per-path, honest 404s off the disk census.
+        fetchMock = vi.fn(async (url) => (existsOnDisk(url) ? jsonResponse(realData(url)) : htmlResponse(404)));
+        vi.stubGlobal('fetch', fetchMock);
         clearDataCache();
     });
 
     afterEach(() => {
-        clearDataCache();
+        clearDataCache(); // protect sibling lanes from leaked disk-byte caches
+        vi.unstubAllGlobals();
         vi.restoreAllMocks();
     });
 
-    describe('loadClassData', () => {
-        it('returns class data and caches it', async () => {
-            const mockData = [{ name: 'Wizard', index: 'wizard' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
+    it('exports exactly the 24 loader/cache functions this service owns', () => {
+        expect(Object.keys(dataLoader).sort()).toStrictEqual([
+            'clearDataCache',
+            'fetchBackgroundData',
+            'fetchClassData',
+            'fetchFeatData',
+            'fetchRaceData',
+            'fetchSubraceData',
+            'getCachedBackgroundData',
+            'getCachedPointBuyCosts',
+            'getCacheState',
+            'loadAbilityScores',
+            'loadBackgroundData',
+            'loadClassData',
+            'loadEquipment',
+            'loadFightingStyles',
+            'loadFeatData',
+            'loadMagicItems',
+            'loadManeuvers',
+            'loadMonsters',
+            'loadRaceData',
+            'loadSkills',
+            'loadSpellData',
+            'loadSpells',
+            'loadValidationRules',
+            'loadWildMagicSurgeTable'
+        ].sort());
+    });
 
-            const result1 = await loadClassData('5e');
-            expect(result1).toEqual(mockData);
+    describe('routing law (getDataPath + fixed shared paths)', () => {
+        // Every routed filename is disk-existence-proven; per-URL bytes are
+        // distinguishable because each path serves only its own real file.
+        const ROUTE_TABLE = [
+            ['loadClassData() default ruleset', () => loadClassData(), '/data/classes.json'],
+            ['loadClassData("2024")', () => loadClassData('2024'), '/data/2024/classes.json'],
+            ['loadRaceData("5e")', () => loadRaceData('5e'), '/data/races.json'],
+            ['loadRaceData("2024")', () => loadRaceData('2024'), '/data/2024/races.json'],
+            ['loadFeatData("5e")', () => loadFeatData('5e'), '/data/feats.json'],
+            ['loadFeatData("2024")', () => loadFeatData('2024'), '/data/2024/feats.json'],
+            ['loadSpells("5e")', () => loadSpells('5e'), '/data/spells.json'],
+            ['loadSpells("2024")', () => loadSpells('2024'), '/data/2024/spells.json'],
+            ['loadBackgroundData("2024")', () => loadBackgroundData('2024'), '/data/2024/backgrounds.json'],
+            ['loadManeuvers("2024")', () => loadManeuvers('2024'), '/data/2024/maneuvers.json'],
+            ['loadAbilityScores()', () => loadAbilityScores(), '/data/ability-scores.json'],
+            ['loadEquipment() shared-only', () => loadEquipment(), '/data/equipment.json'],
+            ['loadMonsters() shared-only', () => loadMonsters(), '/data/monsters.json'],
+            ['loadMagicItems() shared-only', () => loadMagicItems(), '/data/magic-items.json'],
+            ['loadFightingStyles() shared-only', () => loadFightingStyles(), '/data/fighting-styles.json']
+        ];
 
-            const result2 = await loadClassData('5e');
-            expect(result2).toEqual(mockData);
+        it.each(ROUTE_TABLE)('%s requests its exact disk-proven URL and returns that file bytes', async (_label, call, url) => {
+            expect(existsOnDisk(url), `${url} must exist on disk`).toBe(true);
+            const result = await call();
+            expect(result).toBe(realData(url));
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(fetchMock).toHaveBeenCalledWith(url);
+            clearDataCache(); // next row must fetch its own path
+            fetchMock.mockClear();
         });
 
-        it('uses 2024 data path for 2024 ruleset', async () => {
-            const mockData = [{ name: 'Wizard', index: 'wizard' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
+        it('loadValidationRules unwraps the version-keyed wrapper file for each ruleset', async () => {
+            // Disk census: BOTH rules-validation.json files are top-keyed by ruleset.
+            const raw5e = realData('/data/rules-validation.json');
+            const raw24 = realData('/data/2024/rules-validation.json');
+            expect(Object.keys(raw5e).sort()).toStrictEqual(['2024', '5e']);
+            expect(Object.keys(raw24)).toStrictEqual(['2024']);
 
-            const result = await loadClassData('2024');
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/2024/classes.json');
+            const v5e = await loadValidationRules('5e');
+            expect(v5e).toBe(raw5e['5e']); // unwrapped identity, not the raw wrapper
+            expect(v5e).not.toBe(raw5e);
+            expect(Object.keys(v5e).sort()).toStrictEqual(['ability_score_max', 'background_languages', 'feats', 'level_range', 'point_buy']);
+
+            const v24 = await loadValidationRules('2024');
+            expect(v24).toBe(raw24['2024']);
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/rules-validation.json', '/data/2024/rules-validation.json']);
         });
 
-        it('falls back to 5e path for invalid or undefined version', async () => {
-            const mockData = [{ name: 'Wizard' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadClassData('invalid');
-            expect(result).toEqual(mockData);
-            expect(global.fetch).toHaveBeenCalledWith('/data/classes.json');
+        it('loadWildMagicSurgeTable parses real disk ranges to numbers (leading zeros) and caches the parse', async () => {
+            const raw = realData('/data/wild-magic-surge.json');
+            const table = await loadWildMagicSurgeTable();
+            expect(table).toHaveLength(raw.length);
+            // Disk head row is "01-04" -> Number coercion strips the leading zero.
+            expect(table[0]).toStrictEqual({ min: 1, max: 4, effect: raw[0].effect });
+            expect(table.every(e => typeof e.min === 'number' && typeof e.max === 'number' && typeof e.effect === 'string')).toBe(true);
+            expect(await loadWildMagicSurgeTable()).toBe(table); // cached shared reference
+            expect(fetchMock).toHaveBeenCalledTimes(1);
         });
 
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
+        it('collapses undefined / unknown / trailing-slash versions onto the 5e route via one cache entry', async () => {
+            const disk = realData('/data/classes.json');
+            expect(await loadClassData()).toBe(disk);           // undefined -> guard -> 5e
+            expect(await loadClassData('invalid')).toBe(disk);  // unknown version -> guard -> 5e
+            expect(await loadClassData('2024/')).toBe(disk);    // "2024/" !== "2024" -> guard -> 5e
+            expect(fetchMock).toHaveBeenCalledTimes(1);            // all three share the one 5e cache entry
+            expect(fetchMock).toHaveBeenCalledWith('/data/classes.json');
+        });
 
-            const result = await loadClassData('5e');
-            expect(result).toEqual([]);
+        it('loadSpells/loadManeuvers dereference the version cache unguarded (TypeError), unlike loadData lanes', async () => {
+            // Crash-twins asymmetry: loadData() recurses to 5e for unknown versions,
+            // but loadSpells/loadManeuvers read dataCache[version] without the guard.
+            await expect(loadSpells('invalid')).rejects.toThrow(TypeError);
+            await expect(loadSpells('2024/')).rejects.toThrow(TypeError);
+            await expect(loadManeuvers('invalid')).rejects.toThrow(TypeError);
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(console.error).not.toHaveBeenCalled(); // TypeError escapes before any catch/log
+            // maneuvers.json exists only in /data/2024/: the default '5e' route 404s
+            // (cache key exists so no TypeError) and resolves [] WITHOUT caching -> refetch.
+            expect(existsOnDisk('/data/maneuvers.json')).toBe(false);
+            expect(await loadManeuvers()).toStrictEqual([]);
+            expect(await loadManeuvers()).toStrictEqual([]);
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/maneuvers.json', '/data/maneuvers.json']);
+            expect(console.error).not.toHaveBeenCalled(); // non-ok-but-not-thrown 404: silent empty
+            await expect(loadClassData('invalid')).resolves.toBe(realData('/data/classes.json')); // contrast: guarded lane
         });
     });
 
-    describe('loadRaceData', () => {
-        it('returns race data and caches it', async () => {
-            const mockData = [{ name: 'Human', index: 'human' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadRaceData('5e');
-            expect(result).toEqual(mockData);
-
-            const cached = await loadRaceData('5e');
-            expect(cached).toEqual(mockData);
-        });
-
-        it('uses 2024 data path for 2024 ruleset', async () => {
-            const mockData = [{ name: 'Human' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            await loadRaceData('2024');
-            expect(global.fetch).toHaveBeenCalledWith('/data/2024/races.json');
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadRaceData('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadBackgroundData', () => {
-        it('loads background data when available', async () => {
-            const mockData = [{ name: 'Acolyte', index: 'acolyte' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadBackgroundData('2024');
-            expect(result).toEqual(mockData);
-        });
-
-        it('returns empty array on 404 (optional data)', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(404));
-
-            const result = await loadBackgroundData('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadFeatData', () => {
-        it('returns feat data and caches it', async () => {
-            const mockData = [{ name: 'Tough', index: 'tough' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadFeatData('5e');
-            expect(result).toEqual(mockData);
-
-            const cached = await loadFeatData('5e');
-            expect(cached).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadFeatData('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadValidationRules', () => {
-        it('returns data directly when not wrapped in version key', async () => {
-            const mockData = { level_range: { min: 1, max: 20 } };
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await loadValidationRules('5e');
-            expect(result).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadValidationRules('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('fetchClassData', () => {
-        it('finds class by name', async () => {
-            const mockData = [
-                { name: 'Wizard', index: 'wizard' },
-                { name: 'Sorcerer', index: 'sorcerer' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchClassData('Wizard', '5e');
-            expect(result).toEqual({ name: 'Wizard', index: 'wizard' });
-        });
-
-        it('returns null when class not found or className is empty', async () => {
-            const mockData = [
-                { name: 'Wizard', index: 'wizard' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchClassData('Fighter', '5e');
-            expect(result).toBeNull();
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-
-            const emptyResult = await fetchClassData('', '5e');
-            expect(emptyResult).toBeNull();
-            // Empty string returns null early without fetching
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('fetchRaceData', () => {
-        it('finds race by name or index (case-insensitive)', async () => {
-            const mockData = [
-                { name: 'Human', index: 'human' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchRaceData('Human', '5e');
-            expect(result).toEqual({ name: 'Human', index: 'human' });
-        });
-
-        it('returns null when race not found or raceName is empty', async () => {
-            const mockData = [
-                { name: 'Human', index: 'human' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchRaceData('Elf', '5e');
-            expect(result).toBeNull();
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-
-            const emptyResult = await fetchRaceData('', '5e');
-            expect(emptyResult).toBeNull();
-            // Empty string returns null early without fetching
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('fetchSubraceData', () => {
-        it('finds nested subrace in 2024 format', async () => {
-            const mockData = [
-                {
-                    name: 'Elf',
-                    subraces: [
-                        { name: 'High Elf', traits: [] }
-                    ]
-                }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchSubraceData('High Elf', '2024');
-            expect(result).toEqual({ name: 'High Elf', traits: [] });
-        });
-
-        it('finds top-level subrace in 5e format by name or index', async () => {
-            const mockData = [
-                { name: 'Human', index: 'human' },
-                { name: 'High Human', index: 'high-human' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchSubraceData('High Human', '5e');
-            expect(result).toEqual({ name: 'High Human', index: 'high-human' });
-        });
-
-        it('returns null when subrace not found or subraceName is empty', async () => {
-            const mockData = [
-                {
-                    name: 'Elf',
-                    subraces: [{ name: 'High Elf' }]
-                }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchSubraceData('Wood Elf', '2024');
-            expect(result).toBeNull();
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-
-            const emptyResult = await fetchSubraceData('', '2024');
-            expect(emptyResult).toBeNull();
-            // Empty string returns null early without fetching
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('fetchBackgroundData', () => {
-        it('finds background by name or index (case-insensitive)', async () => {
-            const mockData = [
-                { name: 'Acolyte', index: 'acolyte' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchBackgroundData('Acolyte', '2024');
-            expect(result).toEqual({ name: 'Acolyte', index: 'acolyte' });
-        });
-
-        it('returns null when background not found or backgroundName is empty', async () => {
-            const mockData = [
-                { name: 'Acolyte', index: 'acolyte' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchBackgroundData('Charlatan', '2024');
-            expect(result).toBeNull();
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-
-            const emptyResult = await fetchBackgroundData('', '2024');
-            expect(emptyResult).toBeNull();
-            // Empty string returns null early without fetching
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('fetchFeatData', () => {
-        it('finds feat by name or index (case-insensitive)', async () => {
-            const mockData = [
-                { name: 'Tough', index: 'tough' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchFeatData('Tough', '5e');
-            expect(result).toEqual({ name: 'Tough', index: 'tough' });
-        });
-
-        it('returns null when feat not found or featName is empty', async () => {
-            const mockData = [
-                { name: 'Tough', index: 'tough' }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result = await fetchFeatData('Resilient', '5e');
-            expect(result).toBeNull();
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-
-            const emptyResult = await fetchFeatData('', '5e');
-            expect(emptyResult).toBeNull();
-            // Empty string returns null early without fetching
-            expect(global.fetch).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('loadAbilityScores', () => {
-        it('loads ability scores and caches them', async () => {
-            const mockData = [
-                { full_name: 'Strength', skills: ['Athletics'] },
-                { full_name: 'Dexterity', skills: ['Acrobatics'] }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result1 = await loadAbilityScores();
-            expect(result1).toEqual(mockData);
-
-            const result2 = await loadAbilityScores();
-            expect(result2).toEqual(mockData);
-        });
-
-        it('returns fallback data on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
-
-            const result = await loadAbilityScores();
-
-            expect(result).toHaveLength(6);
-            expect(result[0].full_name).toBe('Strength');
-            expect(result[5].full_name).toBe('Charisma');
-        });
-    });
-
-    describe('loadEquipment', () => {
-        it('loads equipment and caches it', async () => {
-            const mockData = [{ name: 'Club', type: 'weapon' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result1 = await loadEquipment();
-            expect(result1).toEqual(mockData);
-
-            const result2 = await loadEquipment();
-            expect(result2).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadEquipment();
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadMonsters', () => {
-        it('loads monsters and caches them', async () => {
-            const mockData = [{ name: 'Goblin', cr: '1/4' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result1 = await loadMonsters();
-            expect(result1).toEqual(mockData);
-
-            const result2 = await loadMonsters();
-            expect(result2).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadMonsters();
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadMagicItems', () => {
-        it('loads magic items and caches them', async () => {
-            const mockData = [{ name: 'Bag of Holding' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result1 = await loadMagicItems();
-            expect(result1).toEqual(mockData);
-
-            const result2 = await loadMagicItems();
-            expect(result2).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadMagicItems();
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadSpells', () => {
-        it('caches spells independently per version', async () => {
-            const mockData5e = [{ name: 'Fireball', level: 3 }];
-            const mockData2024 = [{ name: 'Magic Missile', level: 1 }];
-            global.fetch
-                .mockResolvedValueOnce(mockSuccessResponse(mockData5e))
-                .mockResolvedValueOnce(mockSuccessResponse(mockData2024));
-
-            const result5e = await loadSpells('5e');
-            const result2024 = await loadSpells('2024');
-            expect(result5e).toEqual(mockData5e);
-            expect(result2024).toEqual(mockData2024);
-
-            // Re-fetching should use cache
-            const result5eAgain = await loadSpells('5e');
-            const result2024Again = await loadSpells('2024');
-            expect(result5eAgain).toEqual(mockData5e);
-            expect(result2024Again).toEqual(mockData2024);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadSpells('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('loadSkills', () => {
-        it('derives skills from ability scores', async () => {
-            const abilityData = [
-                { full_name: 'Strength', skills: ['Athletics'] },
-                { full_name: 'Intelligence', skills: ['Arcana', 'History'] }
-            ];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(abilityData));
-
-            const result = await loadSkills();
-
-            expect(result).toEqual([
-                { name: 'Athletics', ability: 'Strength' },
-                { name: 'Arcana', ability: 'Intelligence' },
-                { name: 'History', ability: 'Intelligence' }
+    describe('cache law', () => {
+        it('successful loads cache by shared reference: repeat calls fetch zero times and return the identical object', async () => {
+            const classes = await loadClassData('5e');
+            expect(classes).toBe(realData('/data/classes.json'));
+            expect(await loadClassData('5e')).toBe(classes);
+
+            const equipment = await loadEquipment();
+            expect(await loadEquipment()).toBe(equipment);
+
+            const monsters = await loadMonsters();
+            expect(await loadMonsters()).toBe(monsters);
+
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual([
+                '/data/classes.json',
+                '/data/equipment.json',
+                '/data/monsters.json'
             ]);
         });
 
-        it('returns fallback skills on network error', async () => {
-            global.fetch.mockRejectedValueOnce(new Error('Network error'));
+        it('pins the in-flight dedupe law: loadData double-fetches concurrent callers; spells dedupes per version', async () => {
+            // #1509 double-load: the dataPromises slot is nulled synchronously
+            // before the fetch resolves, so the dedupe check can never hit.
+            const [a, b] = await Promise.all([loadClassData('5e'), loadClassData('5e')]);
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            expect(a).toBe(b);
 
-            const result = await loadSkills();
+            fetchMock.mockClear();
+            const [s1, s2] = await Promise.all([loadSpells('5e'), loadSpells('5e')]);
+            expect(fetchMock).toHaveBeenCalledTimes(1); // live version-tagged dedupe here
+            expect(s1).toBe(s2);
+            expect(s1).toBe(realData('/data/spells.json'));
 
-            expect(result).toHaveLength(18);
-            expect(result[0]).toEqual({ name: 'Athletics', ability: 'Strength' });
-            expect(result[17]).toEqual({ name: 'Persuasion', ability: 'Charisma' });
+            clearDataCache();
+            fetchMock.mockClear();
+            const [v5, v24] = await Promise.all([loadSpells('5e'), loadSpells('2024')]);
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/spells.json', '/data/2024/spells.json']);
+            expect(v5).toBe(realData('/data/spells.json'));       // no wrong-file bleed
+            expect(v24).toBe(realData('/data/2024/spells.json'));
+            const [c5, c24] = await Promise.all([loadSpells('5e'), loadSpells('2024')]);
+            expect(c5).toBe(v5);
+            expect(c24).toBe(v24);
+            expect(fetchMock).toHaveBeenCalledTimes(2); // both versions cached independently
         });
-    });
 
-    describe('loadManeuvers', () => {
-        it('loads maneuvers and caches them', async () => {
-            const mockData = [{ name: 'Action Surge' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
-            const result1 = await loadManeuvers('5e');
-            expect(result1).toEqual(mockData);
-
-            const result2 = await loadManeuvers('5e');
-            expect(result2).toEqual(mockData);
-        });
-
-        it('returns empty array on error', async () => {
-            global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
-
-            const result = await loadManeuvers('5e');
-            expect(result).toEqual([]);
-        });
-    });
-
-    describe('clearDataCache', () => {
-        it('clears versioned cache entries', async () => {
-            const mockData = [{ name: 'Wizard' }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
-
+        it('clearDataCache resets the exact versioned shape and every lane refetches; getCacheState is a fresh deep clone', async () => {
             await loadClassData('5e');
+            await loadSpells('2024');
+            await loadEquipment();
 
-            const cacheState = getCacheState();
-            expect(cacheState['5e'].classes).toEqual(mockData);
+            const versionKeys = ['classes', 'races', 'backgrounds', 'feats', 'rules-validation', 'spells', 'maneuvers'];
+            const before = getCacheState();
+            // NB: '2024' is an integer-like key — JS enumerates it before '5e' regardless of insertion order.
+            expect(Object.keys(before).sort()).toStrictEqual(['2024', '5e']);
+            expect(Object.keys(before['5e'])).toStrictEqual(versionKeys);
+            expect(Object.keys(before['2024'])).toStrictEqual(versionKeys);
+            expect(before['5e'].classes).not.toBeNull();
+            expect(before['2024'].spells).not.toBeNull();
 
-            clearDataCache();
-
-            const clearedCache = getCacheState();
-            expect(clearedCache['5e'].classes).toBeNull();
-        });
-
-        it('clears shared data caches', async () => {
-            const mockAbilityData = [{ full_name: 'Strength', skills: ['Athletics'] }];
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockAbilityData));
-
-            await loadAbilityScores();
-            await loadSkills();
+            before['5e'].classes = 'POISON'; // mutating the clone must not poison the cache
+            expect(getCacheState()['5e'].classes).not.toBe('POISON');
 
             clearDataCache();
+            const after = getCacheState();
+            expect(after['5e']).toStrictEqual(Object.fromEntries(versionKeys.map(k => [k, null])));
+            expect(after['2024']).toStrictEqual(Object.fromEntries(versionKeys.map(k => [k, null])));
 
-            // After clearing, loading should trigger a fresh fetch
-            global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockAbilityData));
-            await loadAbilityScores();
-
-            expect(global.fetch).toHaveBeenCalledTimes(2);
+            fetchMock.mockClear();
+            expect(await loadClassData('5e')).toBe(realData('/data/classes.json'));
+            expect(await loadSpells('2024')).toBe(realData('/data/2024/spells.json'));
+            expect(await loadEquipment()).toBe(realData('/data/equipment.json'));
+            expect(await loadAbilityScores()).toBe(realData('/data/ability-scores.json'));
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual([
+                '/data/classes.json',
+                '/data/2024/spells.json',
+                '/data/equipment.json',
+                '/data/ability-scores.json'
+            ]);
         });
     });
 
+    describe('failure arms', () => {
+        it('non-optional HTTP 500: logs the exact failure bytes, resolves [], and never caches the failure', async () => {
+            fetchMock.mockImplementation(async () => htmlResponse(500));
+            expect(await loadClassData('5e')).toStrictEqual([]);
+            expect(console.error).toHaveBeenCalledTimes(1);
+            expect(console.error.mock.calls[0][0]).toBe('Error loading 5e classes.json:');
+            expect(console.error.mock.calls[0][1]).toBeInstanceOf(Error);
+            expect(console.error.mock.calls[0][1].message).toBe('Failed to load 5e classes.json from /data/classes.json');
+            expect(await loadClassData('5e')).toStrictEqual([]);
+            expect(fetchMock).toHaveBeenCalledTimes(2); // failure is a cache miss by law
+        });
+
+        it('network reject is logged verbatim and swallowed to [] — the loader promise never rejects', async () => {
+            const boom = new Error('network down');
+            fetchMock.mockImplementation(async () => { throw boom; });
+            await expect(loadClassData('5e')).resolves.toStrictEqual([]);
+            expect(console.error).toHaveBeenCalledWith('Error loading 5e classes.json:', boom);
+        });
+
+        it('optional backgrounds: real 404 for /data/backgrounds.json caches [] silently; HTTP 500 stays uncached', async () => {
+            expect(existsOnDisk('/data/backgrounds.json')).toBe(false); // disk census proof of the optional lane
+            const r1 = await loadBackgroundData('5e');
+            expect(r1).toStrictEqual([]);
+            expect(console.error).not.toHaveBeenCalled();
+            const r2 = await loadBackgroundData('5e');
+            expect(r2).toStrictEqual([]); // [] cached by VALUE (fresh literal each miss), proven only by fetch count
+            expect(fetchMock).toHaveBeenCalledTimes(1); // second call: cache hit, zero fetches
+
+            fetchMock.mockImplementation(async () => htmlResponse(500));
+            expect(await loadBackgroundData('2024')).toStrictEqual([]);
+            expect(console.error).toHaveBeenCalledWith('Error loading 2024 backgrounds.json:', expect.anything());
+            expect(await loadBackgroundData('2024')).toStrictEqual([]);
+            expect(fetchMock).toHaveBeenCalledTimes(3); // optional 500 not cached: refetch each call
+        });
+
+        it('Vite-style ok:true text/html: non-optional throws to [] uncached; optional caches []', async () => {
+            fetchMock.mockImplementation(async () => ({
+                ok: true,
+                status: 200,
+                headers: new Map([['content-type', 'text/html']]),
+                json: async () => { throw new Error('must never parse html body'); }
+            }));
+
+            expect(await loadClassData('5e')).toStrictEqual([]);
+            expect(console.error.mock.calls[0][0]).toBe('Error loading 5e classes.json:');
+            expect(console.error.mock.calls[0][1].message).toBe('Expected JSON but got text/html for 5e classes.json');
+            await loadClassData('5e');
+            expect(fetchMock).toHaveBeenCalledTimes(2); // non-optional HTML is not cached
+
+            fetchMock.mockClear();
+            console.error.mockClear();
+            const b1 = await loadBackgroundData('2024'); // optional lane caches [] on non-JSON
+            expect(b1).toStrictEqual([]);
+            expect(await loadBackgroundData('2024')).toStrictEqual([]); // cached by value; hit proven by fetch count
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(console.error).not.toHaveBeenCalled();
+        });
+
+        it('loadAbilityScores failure arm returns the full six-entry constant fallback fresh each refetch', async () => {
+            const boom = new Error('net down');
+            fetchMock.mockImplementation(async () => { throw boom; });
+            const r1 = await loadAbilityScores();
+            expect(r1).toStrictEqual([
+                { full_name: 'Strength', skills: ['Athletics'] },
+                { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
+                { full_name: 'Constitution', skills: [] },
+                { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Nature', 'Religion'] },
+                { full_name: 'Wisdom', skills: ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival'] },
+                { full_name: 'Charisma', skills: ['Deception', 'Intimidation', 'Performance', 'Persuasion'] }
+            ]);
+            expect(console.error).toHaveBeenCalledWith('Error loading ability scores:', boom);
+            const r2 = await loadAbilityScores();
+            expect(r2).not.toBe(r1); // failure never enters sharedDataCache: distinct array
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('entity lookups', () => {
+        const LOOKUPS = [
+            ['fetchClassData', fetchClassData, '/data/classes.json', '5e'],
+            ['fetchRaceData', fetchRaceData, '/data/races.json', '5e'],
+            ['fetchFeatData', fetchFeatData, '/data/feats.json', '5e'],
+            ['fetchBackgroundData', fetchBackgroundData, '/data/2024/backgrounds.json', '2024']
+        ];
+
+        it.each(LOOKUPS)('%s matches by exact name then by index, misses to null, empty arg fetches nothing', async (label, fn, url, version) => {
+            const entries = realData(url);
+            expect(await fn(entries[0].name, version)).toBe(entries[0]);   // name arm
+            expect(await fn(entries[1].index, version)).toBe(entries[1]);  // index arm (lowercase lookup string)
+            expect(await fn('NotAnEntityAtAll', version)).toBeNull();      // miss arm
+            const callsBefore = fetchMock.mock.calls.length;
+            expect(await fn('', version)).toBeNull();                        // falsy-name guard
+            expect(fetchMock).toHaveBeenCalledTimes(callsBefore);            // guard issued no fetch
+        });
+
+        it('fetchSubraceData searches nested 2024 subraces vs flat 5e top-level entries', async () => {
+            const r24 = realData('/data/2024/races.json');
+            const parent = r24.find(r => Array.isArray(r.subraces) && r.subraces.length > 0);
+            expect(parent, 'disk census: 2024 races must nest subraces').toBeTruthy();
+            expect(await fetchSubraceData(parent.subraces[0].name, '2024')).toBe(parent.subraces[0]); // nested arm
+            expect(await fetchSubraceData('NotASubrace', '2024')).toBeNull();                          // nested miss
+
+            const r5 = realData('/data/races.json');
+            expect(await fetchSubraceData(r5[0].name, '5e')).toBe(r5[0]);                              // flat arm: top-level find
+            expect(await fetchSubraceData('NotASubrace', '5e')).toBeNull();                            // flat miss
+            expect(await fetchSubraceData('', '2024')).toBeNull();                                     // falsy guard
+
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/2024/races.json', '/data/races.json']);
+        });
+
+        it('loadSpellData routes from playerStats.rules with a 5e default (falsy-map arms)', async () => {
+            expect(await loadSpellData({ rules: '2024' })).toBe(realData('/data/2024/spells.json'));
+            expect(await loadSpellData({})).toBe(realData('/data/spells.json'));        // rules undefined -> 5e
+            expect(await loadSpellData(undefined)).toBe(realData('/data/spells.json')); // ?. guard -> 5e
+            expect(await loadSpellData({ rules: '2024' })).toBe(realData('/data/2024/spells.json')); // cache hit
+            expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/2024/spells.json', '/data/spells.json']);
+        });
+    });
+
+    describe('sync cache getters', () => {
+        it('getCachedBackgroundData: null before load, disk bytes after 2024 load, [] passthrough after optional 404', async () => {
+            expect(getCachedBackgroundData('2024')).toBeNull(); // unloaded
+            expect(getCachedBackgroundData('bogus')).toBeNull(); // unknown version guard
+
+            const notFound = await loadBackgroundData('5e'); // real 404 lane caches []
+            expect(notFound).toStrictEqual([]);
+            expect(getCachedBackgroundData('5e')).toStrictEqual([]); // cached [] is a distinct literal from the returned one
+
+            await loadBackgroundData('2024');
+            expect(getCachedBackgroundData('2024')).toBe(realData('/data/2024/backgrounds.json'));
+        });
+
+        it('getCachedPointBuyCosts reads the raw wrapped cache and therefore never reaches point_buy (pinned source quirk)', async () => {
+            expect(getCachedPointBuyCosts()).toBeNull(); // default arg, unloaded
+            const raw = realData('/data/rules-validation.json');
+            await loadValidationRules('5e'); // populates the RAW (version-keyed) cache
+            // Raw cache is top-keyed by ruleset; the getter reads cached.point_buy
+            // without unwrapping, so the real disk costs are unreachable here.
+            // Consumers (src/config/utils.js getPointBuyCostsSync) silently fall
+            // back to DEFAULT_POINT_BUY_COSTS.
+            expect(raw.point_buy).toBeUndefined();
+            expect(raw['5e'].point_buy.costs).toStrictEqual({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 });
+            expect(getCachedPointBuyCosts('5e')).toBeNull();
+            expect(getCachedPointBuyCosts('bogus')).toBeNull();
+        });
+
+        it('loadSkills derives pairs from real ability bytes and from the constant fallback on network failure', async () => {
+            const derived = await loadSkills();
+            // Disk ability-scores.json opens with Strength:[Athletics] — head bytes
+            // distinguish the derived path from the alphabetical fallback head.
+            expect(derived[0]).toStrictEqual({ name: 'Athletics', ability: 'Strength' });
+            expect(derived.every(s => Object.keys(s).sort().join(',') === 'ability,name')).toBe(true);
+            expect(await loadSkills()).toBe(derived); // cached shared reference
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+
+            // Reject lane: loadAbilityScores swallows to its constant fallback and
+            // loadSkills still derives normally (its own catch stays unreachable).
+            clearDataCache(); // drop the byte caches so the reject actually hits fetch
+            fetchMock.mockImplementation(async () => { throw new Error('net down'); });
+            const offline = await loadSkills();
+            expect(offline).toHaveLength(18);
+            expect(offline[0]).toStrictEqual({ name: 'Athletics', ability: 'Strength' }); // derived from the constant ability fallback
+            expect(offline).not.toBe(derived); // freshly derived, not the cleared cache
+            expect(fetchMock).toHaveBeenCalledTimes(2); // 1 online ability fetch + 1 genuine rejected attempt
+        });
+    });
 });

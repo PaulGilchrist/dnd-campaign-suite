@@ -1,5 +1,5 @@
 # test-maintain state (updated 2026-10-21, run2 batch #214 flush)
-- Cursor: run2#1516 DONE. Batch #217 GREEN — 30,353 pass, exact canon pair + 3 expected, WATCH #4 silent 1st reconfirm, WATCH #3 silent 6th, 43rd clean (/tmp/batch217.log). Fresh recount 2649 marked / 2682 total / 33 remaining. Queue head: spellPreparationService.resource-flow.test.js (run2#1517). Cadence: next boundary #218 after run2#1531.
+- Cursor: run2#1546 DONE. Batch #219 GREEN — 30,176 pass, exact canon pair + 3 expected, WATCH #3/#4 silent, 45th clean (/tmp/batch219.log). Recount 2679 marked / 2682 total / 3 remaining. Queue: storage, utils, youtubePlayer (run2#1547-1549). Final boundary #220 at queue-empty. Owner standing rule: continue until zero.
 - NEXT dispatch after adjudication: run2#1468 = queue head from disk, verify with `sed -n '1p' .opencode/plans/test-maintain-queue.txt` — NEVER memory (#1383 phantom rule). (Queue head at flush: damageCalculation-cla120.test.js — execution/ roster continuing; CLA-120 emp-evoc adjacency owners cited in #1462 fold-map + .noformula-modals:35-37 disclaims.)
 - Batch discipline: anchor run2#1467; NEXT flush after run2#1481 (Batch #215) unless user requests earlier.
 - Counters at #214: completed 2610 / remaining 82 / total 2692 (verified ✓ 2610+82=2692; strict drop 96→82; both queue copies synced).
