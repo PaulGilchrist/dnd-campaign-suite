@@ -8,9 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 //       keying, result envelopes, 4-write order budgets.
 //   revivifyService.edge-cases.test.js — boundary rows (-8/-3 deltas), golden read
 //       census (:216), write-budget census (:291), summary-in-place persistence (:298-301),
-//       refusal-zero-log census (:359), addEntry-rejection swallow at :62 with same-Error
+//       refusal-zero-log census (:359), addEntry-rejection swallow at :115 with same-Error
 //       identity + exact console prefix (:364-391 — log-rejection already pinned there:
-//       NOT re-run here), :59 golden deref crash, disk canon + drift detector.
+//       NOT re-run here), caster/maxHp pre-consume guard refusals (#1407 fixed),
+//       disk canon + drift detector.
 // THIS lane: successful-revival LOG BYTES only — full-set addEntry census per outcome
 //       (PC vs monster), cross-input interpolation distinguishability (#1348/#1296),
 //       log-entry key order (#1400), survivor/dead-bystander silence in a MIXED summary
@@ -18,12 +19,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 //       (#1405/#1407 STAMP_MS form), input purity (#1395).
 // NO-CLOCK: Revivify's RAW "last minute" text is UNMODELED state-only (verified #1407);
 //       this fake seeds no time-like key, so a wall-clock read would THROW. The only
-//       Date.now() on this path is the log timestamp (:61), frozen at STAMP_MS and
+//       Date.now() on this path is the log timestamp (:114), frozen at STAMP_MS and
 //       asserted as an exact byte — never expect.any on time fields.
-// ZERO-DICE: revivify heals via the static `1 - oldHp` expression (revivifyService.js:46),
+// ZERO-DICE: revivify heals via the static `1 - oldHp` expression (revivifyService.js:103),
 //       popup rolls are [] and the log echoes no dice — no dice stub needed.
 // addEntry is a verbatim passthrough (logService.js:9-16 POSTs the entry unshaped), so a
-// full-call toEqual pins revivifyService.js:52-62's literal byte-for-byte.
+// full-call toEqual pins revivifyService.js:105-115 literal byte-for-byte.
 
 const CAMPAIGN = 'TestCampaign';
 const STAMP_MS = Date.UTC(2026, 9, 21, 12, 0, 0);
@@ -174,7 +175,7 @@ describe('triggerRevivify - log bytes', () => {
         vi.mocked(consumeMaterial).mockImplementation((stats, item, campaign) => fake.consume(stats, item, campaign));
         vi.mocked(global.fetch).mockImplementation((url, init) => fake.fetch(url, init));
         vi.useFakeTimers();
-        vi.setSystemTime(STAMP_MS); // freezes the only Date.now() on this path (:61)
+        vi.setSystemTime(STAMP_MS); // freezes the only Date.now() on this path (:114)
         consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
@@ -212,7 +213,7 @@ describe('triggerRevivify - log bytes', () => {
             note: 'Astral Renewal',
             timestamp: STAMP_MS,
         }]]);
-        // Key order of the revivifyService.js:52-62 literal (#1400 precedent);
+        // Key order of the revivifyService.js:105-115 literal (#1400 precedent);
         // addEntry is a passthrough (logService.js:9-16), so this IS the posted byte order.
         expect(Object.keys(fake.logs[0][1])).toEqual([
             'type', 'targetName', 'delta', 'currentHp', 'maxHp', 'isHealing', 'sourceName', 'note', 'timestamp',

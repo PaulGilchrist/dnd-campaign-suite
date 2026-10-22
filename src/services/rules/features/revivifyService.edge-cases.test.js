@@ -8,8 +8,9 @@ import fs from 'node:fs';
 //   revivifyService.logging.test.js — log-entry happy-path bytes for revivals.
 // THIS lane: boundary rows on both sides of every threshold — death-window (no clock),
 //   negative-HP heals vs the literal-total popup, retry-after-revive diamond guard,
-//   missing-field refusals, missing maxHp fallback swallow, log-rejection swallow,
-//   golden unguarded-deref, disk canon + drift detector.
+//   missing-field refusals, missing maxHp refuses PRE-CONSUME (#1407b fixed),
+//   log-rejection swallow, caster-guard refuses PRE-CONSUME (#1407a fixed),
+//   spend-log-never-lost blocked-heal arm, disk canon + drift detector.
 
 const CAMPAIGN = 'TestCampaign';
 const STAMP_MS = Date.UTC(2026, 9, 21, 12, 0, 0);
@@ -88,8 +89,9 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }));
 
 // consumeMaterial fake: exact diamond literal or THROWS (drift guard on the
-// hardcoded key). Tolerates undefined playerStats so the revivifyService.js:59
-// `playerStats.name` unguarded-deref quirk fails at its true site, not here.
+// hardcoded key). PlayerStats guard now runs BEFORE consume (validateBeforeConsume, revivifyService.js:28,
+// #1407a fix), so a malformed caster never reaches this fake — its strictness here
+// is a second-line drift trap, not the live failure site (it was pre-fix).
 vi.mock('../spells/materialComponents.js', () => ({
     consumeMaterial: vi.fn(async (stats, item, campaign) => {
         if (item !== 'Diamond (300 gp)') {
@@ -179,7 +181,7 @@ describe('triggerRevivify - edge cases', () => {
         net.diamondAvailable = true;
         vi.clearAllMocks(); // clears call records; vi.fn(impl) impls persist
         vi.useFakeTimers();
-        vi.setSystemTime(STAMP_MS); // freezes the only Date.now(): log timestamp (:61)
+        vi.setSystemTime(STAMP_MS); // freezes the only Date.now(): log timestamp (:114)
         consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
@@ -211,12 +213,16 @@ describe('triggerRevivify - edge cases', () => {
                 rawTotal: 1,
             },
         });
-        // Exact read-order census: isCreatureDead gate -> oldHp read -> heal-block seam
-        // -> modifyHitPoints (maxHp, oldHp) -> infernal-wound seam. Zero time-key reads.
+        // Exact read-order census: isCreatureDead gate -> hoisted oldHp+maxHp
+        // validation reads (#1407a/b validate-before-consume, pre-diamond) ->
+        // heal-block seam -> modifyHitPoints (maxHp, oldHp) -> infernal-wound
+        // seam. Zero time-key reads. The extra ['Ally','hitPoints'] here vs the
+        // pre-fix 7-row census is the validate-before-consume hoist's read.
         expect(rt.reads).toEqual([
             ['Ally', 'isDead'],
             ['Ally', 'currentHitPoints'],
             ['Ally', 'currentHitPoints'],
+            ['Ally', 'hitPoints'],
             ['campaign', 'targetEffects'],
             ['Ally', 'hitPoints'],
             ['Ally', 'currentHitPoints'],
@@ -235,7 +241,7 @@ describe('triggerRevivify - edge cases', () => {
         expect(consumeMaterial).toHaveBeenCalledTimes(1);
         expect(consumeMaterial.mock.calls[0][0]).toBe(caster); // identity, not objectContaining
         expect(net.diamondChecks).toEqual([['Cleric', 'Diamond (300 gp)']]);
-        // modifyHitPoints dispatches exactly once on non-zero delta (revivifyService.js:64).
+        // modifyHitPoints dispatches exactly once on non-zero delta (revivifyService.js:104).
         expect(events).toHaveLength(1);
         expect(events[0].type).toBe('combat-summary-updated');
         expect(events[0].detail).toBeNull();
@@ -361,7 +367,7 @@ describe('triggerRevivify - edge cases', () => {
         expect(events).toEqual([]);
     });
 
-    it('addEntry rejection is swallowed by the .catch at :62 — exact console prefix + same Error instance, revival persists, success envelope intact', async () => {
+    it('addEntry rejection is swallowed by the .catch at :115 — exact console prefix + same Error instance, revival persists, success envelope intact', async () => {
         seedPlayer('Ally', 0, 1, null);
         queueCombat(1, [{ name: 'Ally', maxHp: 30, currentHp: 0, type: 'player' }]);
         const logError = new Error('log down');
@@ -390,45 +396,109 @@ describe('triggerRevivify - edge cases', () => {
         expect(consumeMaterial).toHaveBeenCalledTimes(1);
     });
 
-    it('missing maxHp on the summary entry: no crash; applied.maxHp (undefined) swallows the ?? 0 fallback — log carries maxHp key with undefined', async () => {
-        seedPlayer('Ally', 0, 1, null); // hitPoints null -> modifyHitPoints maxHp undefined, clamp skipped
+    it('unresolvable maxHp (runtime null + no summary maxHp): refuses BEFORE the diamond is consumed — zero spend, zero writes, zero log, exact bytes', async () => {
+        seedPlayer('Ally', 0, 1, null); // hitPoints null AND summary entry carries no maxHp
         queueCombat(1, [{ name: 'Ally', currentHp: 0, type: 'player' }]); // no maxHp field
-
-        const result = await triggerRevivify(makeSpell('Revivify'), {}, makeCaster('Cleric'), CAMPAIGN, 'Ally');
-
-        expect(result.payload.finalHeal).toBe(1);
-        expect(result.payload.targetName).toBe('Ally');
-        expect(addEntry).toHaveBeenCalledTimes(1);
-        const entry = addEntry.mock.calls[0][1];
-        // Key is PRESENT but undefined: applied is truthy so the ternary at :50 never
-        // reaches `targetCreature.maxHp ?? 0` (fallback swallow — honest characterization).
-        expect(Object.keys(entry)).toEqual(['type', 'targetName', 'delta', 'currentHp', 'maxHp', 'isHealing', 'sourceName', 'note', 'timestamp']);
-        expect(entry.maxHp).toBeUndefined();
-        expect(entry.delta).toBe(1);
-        expect(entry.currentHp).toBe(1);
-        expect(consoleError).not.toHaveBeenCalled();
-    });
-
-    it('undefined playerStats: golden unguarded deref at :59 throws TypeError AFTER the HP commit — diamond spent, log lost, console untouched', async () => {
-        seedPlayer('Ally', 0, 1, null);
-        queueCombat(1, [{ name: 'Ally', maxHp: 30, currentHp: 0, type: 'player' }]);
         const { events, stop } = trackSummaryEvents();
 
-        await expect(
-            triggerRevivify(makeSpell('Revivify'), {}, undefined, CAMPAIGN, 'Ally'),
-        ).rejects.toThrow(TypeError);
+        const result = await triggerRevivify(makeSpell('Revivify'), {}, makeCaster('Cleric'), CAMPAIGN, 'Ally');
         await flush();
         stop();
 
-        // No try/catch in triggerRevivify: the error escapes to the caller unlogged.
-        expect(consoleError).not.toHaveBeenCalled();
-        // Half-commit quirk: diamond spent and HP/latch writes already landed...
-        expect(consumeMaterial).toHaveBeenCalledTimes(1);
-        expect(rt.writes).toHaveLength(4);
-        expect(rt.owners.Ally.currentHitPoints).toBe(1);
-        expect(events).toHaveLength(1);
-        // ...but the hp_change log row is lost forever.
+        // #1407b fixed: the old :50 ternary `applied ? applied.maxHp : (…) ?? 0`
+        // shipped maxHp:undefined in the stamped log after the diamond was spent.
+        // maxHp now resolves pre-consume (fix#5 parseHp law: refuse, never stamp
+        // undefined, never fabricate 0 — auraOfVitalityHandler.js:106 precedent).
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Revivify',
+                automationType: 'revivify',
+                description: 'Could not determine max HP for Ally. Revivify was refused and no diamond was consumed.',
+            },
+        });
+        expect(consumeMaterial).not.toHaveBeenCalled(); // spend never happens
+        expect(net.diamondChecks).toEqual([]);
+        expect(rt.writes).toEqual([]);
+        expect(rt.owners.Ally.currentHitPoints).toBe(0); // stays dead
         expect(addEntry).not.toHaveBeenCalled();
+        expect(net.summaryPosts).toEqual([]);
+        expect(events).toEqual([]);
+        expect(rt.reads).toEqual([
+            ['Ally', 'isDead'],
+            ['Ally', 'currentHitPoints'],
+            ['Ally', 'currentHitPoints'], // hoisted oldHp
+            ['Ally', 'hitPoints'],       // hoisted maxHp attempt -> null -> refuse
+        ]);
+        expect(consoleError.mock.calls).toEqual([
+            ['[revivify] Cannot determine maxHp for Ally (summary.maxHp=undefined, isPlayer=true) — refused, no diamond consumed'],
+        ]);
+    });
+
+    it('undefined playerStats: caster guard refuses BEFORE consume (#1407a fixed) — diamond untouched, no half-commit, exact bytes', async () => {
+        seedPlayer('Ally', 0, 1, 30);
+        queueCombat(1, [{ name: 'Ally', maxHp: 30, currentHp: 0, type: 'player' }]);
+        const { events, stop } = trackSummaryEvents();
+
+        // Pre-fix golden (flipped honest): the unguarded `playerStats.name` deref
+        // in the post-consume log-build threw TypeError AFTER the HP commit —
+        // diamond spent, writes landed, hp_change log lost forever, console silent.
+        // Validate-before-consume (fix#22) makes the post-consume throw impossible
+        // and the spend cannot outlive its audit: nothing is spent, so nothing to log.
+        const result = await triggerRevivify(makeSpell('Revivify'), {}, undefined, CAMPAIGN, 'Ally');
+        await flush();
+        stop();
+
+        expect(result).toEqual({
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Revivify',
+                automationType: 'revivify',
+                description: 'Revivify cannot run: the caster is unknown. No diamond was consumed.',
+            },
+        });
+        expect(consumeMaterial).not.toHaveBeenCalled(); // diamond NEVER spent
+        expect(net.diamondChecks).toEqual([]);
+        expect(rt.writes).toEqual([]); // no half-commit
+        expect(rt.owners.Ally.currentHitPoints).toBe(0); // stays dead
+        expect(addEntry).not.toHaveBeenCalled(); // no spend, no spend-audit owed
+        expect(events).toEqual([]); // no combat-summary dispatch
+        expect(consoleError.mock.calls).toEqual([
+            ['[revivify] Caster name missing (playerStats=undefined) — refused, no diamond consumed'],
+        ]);
+    });
+
+    it('spend-log-never-lost: heal-blocked after the diamond is spent — degraded store still lands the hp_change audit row exactly', async () => {
+        // Degraded-store fixture: 'no_healing' te blocks the revive HEAL but the
+        // diamond IS consumed (spend happened at :86) — the audit row must still
+        // land. Post-consume there are zero fallible derefs: every log slot is a
+        // pre-validated local or a proven-truthy applied row (healingBlock.js:40).
+        seedPlayer('Ally', 0, 1, 30);
+        rt.targetEffects = [{ target: 'Ally', effect: 'no_healing', source: 'Slaad' }];
+        queueCombat(1, [{ name: 'Ally', maxHp: 30, currentHp: 0, type: 'player' }]);
+        const { events, stop } = trackSummaryEvents();
+
+        const result = await triggerRevivify(makeSpell('Revivify'), {}, makeCaster('Cleric'), CAMPAIGN, 'Ally');
+        await flush();
+        stop();
+
+        expect(consumeMaterial).toHaveBeenCalledTimes(1); // spend is REAL
+        // addEntry census: healingBlock's refusal row, then revivify's audit row —
+        // the spend is never unlogged even though the heal was zeroed.
+        expect(addEntry).toHaveBeenCalledTimes(2);
+        expect(addEntry.mock.calls[0][1].type).toBe('automation');
+        expect(addEntry.mock.calls[0][1].automationType).toBe('healing_blocked');
+        expect(addEntry.mock.calls[1]).toEqual(['TestCampaign', {
+            type: 'hp_change', targetName: 'Ally', delta: 0, currentHp: 0, maxHp: 30,
+            isHealing: true, sourceName: 'Cleric', note: 'Revivify', timestamp: STAMP_MS,
+        }]);
+        // Blocked path: modifyHitPoints never runs -> no dispatch, no runtime writes.
+        expect(events).toEqual([]);
+        expect(rt.writes).toEqual([]);
+        expect(result.payload.type).toBe('heal'); // success-shape popup with honest 0 heal
+        expect(result.payload.finalHeal).toBe(0);
     });
 
     it('disk canon BOTH rulesets: Revivify lv3 V/S/M Instantaneous heal 1 HP; consume-key and popup formula are code-normalized literals, not disk bytes (drift detector)', () => {
@@ -453,7 +523,7 @@ describe('triggerRevivify - edge cases', () => {
         expect(rev24.heal_at_slot_level).toEqual({ 3: '1' }); // RAW floor matches literal total 1
 
         // Drift detector: the consumed-item key and popup formula are HARDCODED in
-        // revivifyService.js (:37, :74) and match neither disk material byte — an
+        // revivifyService.js (:86, :127) and match neither disk material byte — an
         // intentional app normalization ("Diamond (300 gp)"). If either moves, this fails.
         const src = fs.readFileSync('src/services/rules/features/revivifyService.js', 'utf8');
         const consumeKey = src.match(/consumeMaterial\(playerStats, '([^']+)'/)[1];

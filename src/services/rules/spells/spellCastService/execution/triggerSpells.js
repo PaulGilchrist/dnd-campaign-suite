@@ -384,7 +384,7 @@ async function handleFaerieFire({ spell, metaCtx, spellSaveDc, playerStats, camp
 }
 
 async function handleTashasHideousLaughter({ spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName }) {
-    if (spell.name && spell.name.toLowerCase() === "tasha's hideous laughter") {
+    if (spell.name && (spell.name.toLowerCase() === "tasha's hideous laughter" || spell.name.toLowerCase() === 'hideous laughter')) {
         const result = await triggerTashasHideousLaughter(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
         return { handled: true, result };
     }

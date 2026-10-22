@@ -5,8 +5,11 @@
 //     falsy, requireCreatures throw), target selection (caster exclusion, 2024
 //     disk cap-5, range filter, distance sort + stable ties + placedItems
 //     fallback), heal_at_slot_level ladder (:31-49) + casting-mod resolution,
-//     clamp application (:128-129), caster-stats-leak + maxHp fallback chain
-//     (:121), and the 2024 CONSUME-SIDE setRuntimeBatch stamp bytes (:136).
+//     clamp application (:128-129 zero-clamp, #1393(b) FIXED: actualHeal never
+//     negative — at-full rows log honest 0) + maxHp per-target resolution law
+//     (:121 caster-fallback DELETED, #1393(a) FIXED: players resolve from their
+//     own runtime 'hitPoints', loud-skip arm on unresolved ceilings)
+//     and the 2024 CONSUME-SIDE setRuntimeBatch stamp bytes (:136).
 //   - .results lane owns: 5e-twin (enforce=false) outcome shape, envelope bytes,
 //     delta-0 census, exact applyHealingToTarget 5e args, FH consumption,
 //     maximization routing, 5e disk cap-6 parity — NOT re-pinned here.
@@ -22,9 +25,10 @@
 // Disk canon (both rulesets, guarded by the disk-parity test): lv2, 30 ft,
 // Instantaneous, no concentration => NO CLOCK (latchStamp is the round counter
 // only — pinned as batch byte 7 with round:7, and :194 '|| 1' fallback).
-// HP-key census: reads ONLY canonical 'currentHitPoints' (:122) + latch key
-// (:116); strict argument-keyed store fake THROWS on unknown owner/key/
-// campaign/arity and records read order (#1372/84/93). Dice fixed-stub queues
+// HP-key census: reads canonical 'currentHitPoints' + latch key (:116) for every
+// kept target, plus 'hitPoints' ONLY for type:'player' rows (#1393 per-target
+// maxHp resolution — the caster pool is never read); strict argument-keyed store
+// fake THROWS on unknown owner/key/campaign/arity and records read order (#1372/84/93). Dice fixed-stub queues
 // THROW past the last stub (#1380). Fake timers freeze Date.now log bytes;
 // spies afterEach-restored (#1312/#1388).
 // Selection census: affiliation-blind (only c.name !== caster filters — the
@@ -139,8 +143,9 @@ function distanceFeet(a, b) {
 }
 
 // Strict keyed store fake (#1372): records read order, THROWS on unknown
-// owner/key/campaign/arity. 2024 lane touches ONLY latch (:116) + HP (:122).
-function seedStore(hpByTarget, { latched = [], allowLatch = true } = {}) {
+// owner/key/campaign/arity. 2024 lane touches latch (:116) + HP (:122) plus
+// 'hitPoints' ONLY for type:'player' creature rows (#1393 maxHp resolution).
+function seedStore(hpByTarget, { latched = [], allowLatch = true, maxHpByTarget = {} } = {}) {
     const reads = [];
     getRuntimeValue.mockImplementation(function (owner, key, campaign) {
         if (arguments.length !== 3) {
@@ -151,6 +156,11 @@ function seedStore(hpByTarget, { latched = [], allowLatch = true } = {}) {
             if (!allowLatch) throw new Error('non-enforce lane must not read the latch key');
             reads.push([owner, key]);
             return latched.includes(owner) ? 1 : undefined;
+        }
+        if (key === 'hitPoints') {
+            if (!(owner in maxHpByTarget)) throw new Error(`unseeded player maxHp '${key}' for ${owner}`);
+            reads.push([owner, key]);
+            return maxHpByTarget[owner];
         }
         if (key !== HP) throw new Error(`Unknown key '${key}' for ${owner}`);
         if (!(owner in hpByTarget)) throw new Error(`Unknown owner: ${owner}`);
@@ -607,42 +617,80 @@ describe('prayerOfHealingService (base, 2024 lane)', () => {
         expect(addEntry.mock.calls.every(c => c[1].characterName !== 'Ally1' && c[1].targetName !== 'Ally1')).toBe(true);
     });
 
-    it('maxHp fallback chain (:121): caster-stats leak clamps a maxHp-less ally, then 0, then empty-store', async () => {
-        const leakBoard = () => ({
-            players: [{ name: 'Cleric', gridX: 1, gridY: 1 }, { name: 'NoHpAlly', gridX: 2, gridY: 1 }],
-            creatures: [{ name: 'NoHpAlly' }], // no maxHp — the :121 producer path
+    it('#1393 maxHp law (:121): caster-fallback DELETED — per-target ceilings, loud-skip on unresolved, honest zero ledger', async () => {
+        // Phase A — caster-substitution capture-to-flip (#1348 independent caps):
+        // a 5-HP cleric prays on a player-type ally (runtime hitPoints 30, current
+        // 15). PRE-FIX bytes (captured via service.orig.js probe, 2026-10-22):
+        // maxHp fell back to caster hitPoints 5 -> actualHeal min(16, 5-15) = -10,
+        // hp row { delta: -10, currentHp: -5, maxHp: 5 }, totalHealed -10.
+        // POST-FIX: ceiling is the ally's OWN 30 — clamped there, never at the
+        // caster's pool, and the caster's hitPoints field is never read.
+        const ctxA = {
+            players: [{ name: 'Cleric', gridX: 1, gridY: 1 }, { name: 'AllyMax30', gridX: 2, gridY: 1 }],
+            creatures: [{ name: 'Cleric', maxHp: 60 }, { name: 'AllyMax30', type: 'player' }], // player rows are placeholders (pitfall 37) — no maxHp on the row
             placedItems: [],
             round: 1,
-        });
-
-        // Phase A — SOURCE BUG service:121 (reported, pinned as-is): the fallback
-        // reads the CASTER's hitPoints, so an 8-HP cleric silently caps another
-        // party member's heal at room 5. Flips-if-fixed: target-derived ceiling.
+        };
         clearCalls();
-        getCombatContext.mockResolvedValue(leakBoard());
-        seedStore({ NoHpAlly: 3 });
-        rollExpression.mockImplementation(seedDice([{ total: 8, rolls: [5, 3] }]));
+        getCombatContext.mockResolvedValue(ctxA);
+        const readsA = seedStore({ AllyMax30: 15 }, { maxHpByTarget: { AllyMax30: 30 } });
+        rollExpression.mockImplementation(seedDice([{ total: 16, rolls: [8, 8] }]));
 
-        const leaked = await triggerPrayerOfHealing(SPELL_2024, {}, { ...CLERIC, hitPoints: 8 }, CAMPAIGN_NAME, MAP_NAME);
+        const healed = await triggerPrayerOfHealing(SPELL_2024, {}, { ...CLERIC, hitPoints: 5 }, CAMPAIGN_NAME, MAP_NAME);
 
-        expect(leaked.targets).toEqual([{ targetName: 'NoHpAlly', healAmount: 5, rolls: [5, 3], rawTotal: 8 }]);
-        expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'NoHpAlly', 5, CAMPAIGN_NAME);
-        expect(addEntry.mock.calls.filter(c => c[1].type === 'hp_change').map(c => c[1].maxHp)).toEqual([8]);
+        // 15 room at 30, roll 16 -> clamped to 30 by the TARGET's own ceiling.
+        expect(healed.targets).toEqual([{ targetName: 'AllyMax30', healAmount: 15, rolls: [8, 8], rawTotal: 16 }]);
+        expect(healed.totalHealed).toBe(15);
+        expect(readsA).toEqual([
+            ['AllyMax30', LATCH],
+            ['AllyMax30', 'hitPoints'], // maxHp resolved from the target's store row BEFORE HP
+            ['AllyMax30', HP],
+        ]);
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+        expect(applyHealingToTarget).toHaveBeenCalledWith(ctxA, 'AllyMax30', 15, CAMPAIGN_NAME);
+        expect(addEntry.mock.calls).toEqual([
+            [CAMPAIGN_NAME, shortRestLog('AllyMax30')],
+            [CAMPAIGN_NAME, hpLog('AllyMax30', 15, 30, 30)],
+            [CAMPAIGN_NAME, advisoryLog(['AllyMax30'])],
+        ]);
+        expect(setRuntimeBatch).toHaveBeenCalledWith('AllyMax30', batchUpdates(1), CAMPAIGN_NAME);
+        expect(consoleSpy).not.toHaveBeenCalled();
 
-        // Phase B — nothing anywhere: maxHp 0 => negative clamp arithmetic
-        // healamount -3 leaks into the row + hp_change delta byte, but the
-        // :131 >0 gate silently skips the apply.
+        // Phase B — loud-skip arm: maxHp-less non-player row cannot be resolved.
+        // console.error + SKIP (no roll, no write, no log row, NO latch stamp —
+        // the skipped target stays eligible for a later cast); the healthy ally
+        // still heals (party spell must not die on one bad row). The strict
+        // store has NO BrokenAlly seed: any HP/maxHp read would THROW.
+        const ctxB = {
+            players: [{ name: 'Cleric', gridX: 1, gridY: 1 }, { name: 'BrokenAlly', gridX: 2, gridY: 1 }, { name: 'Ally1', gridX: 3, gridY: 1 }],
+            creatures: [{ name: 'BrokenAlly' }, { name: 'Ally1', maxHp: 50 }],
+            placedItems: [],
+            round: 2,
+        };
         clearCalls();
-        getCombatContext.mockResolvedValue(leakBoard());
-        seedStore({ NoHpAlly: 3 });
-        rollExpression.mockImplementation(seedDice([{ total: 8, rolls: [5, 3] }]));
+        consoleSpy.mockClear();
+        getCombatContext.mockResolvedValue(ctxB);
+        const readsB = seedStore({ Ally1: 10 });
+        rollExpression.mockImplementation(seedDice([{ total: 8, rolls: [4, 4] }])); // one roll only — a rolled skip would THROW past the queue
 
-        const zero = await triggerPrayerOfHealing(SPELL_2024, {}, CLERIC, CAMPAIGN_NAME, MAP_NAME);
+        const partial = await triggerPrayerOfHealing(SPELL_2024, {}, CLERIC, CAMPAIGN_NAME, MAP_NAME);
 
-        expect(zero.targets).toEqual([{ targetName: 'NoHpAlly', healAmount: -3, rolls: [5, 3], rawTotal: 8 }]);
-        expect(zero.totalHealed).toBe(-3);
-        expect(applyHealingToTarget).not.toHaveBeenCalled();
-        expect(addEntry.mock.calls.filter(c => c[1].type === 'hp_change').map(c => c[1])).toEqual([hpLog('NoHpAlly', -3, 0, 0)]);
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        expect(consoleSpy).toHaveBeenCalledWith('[prayerOfHealingService] Skipping BrokenAlly: unresolved maxHp (target.maxHp=undefined, type=undefined). No roll, no write, no latch.');
+        expect(partial.targets.map(t => t.targetName)).toEqual(['Ally1']);
+        expect(partial.totalHealed).toBe(8);
+        expect(rollExpression).toHaveBeenCalledTimes(1);
+        expect(readsB).toEqual([
+            ['BrokenAlly', LATCH], // refuse check (:116) precedes resolution
+            ['Ally1', LATCH], ['Ally1', HP],
+        ]);
+        expect(applyHealingToTarget.mock.calls).toEqual([[ctxB, 'Ally1', 8, CAMPAIGN_NAME]]);
+        expect(setRuntimeBatch.mock.calls.map(c => c[0])).toEqual(['Ally1']); // skip stamps NOTHING
+        expect(addEntry.mock.calls).toEqual([
+            [CAMPAIGN_NAME, shortRestLog('Ally1')],
+            [CAMPAIGN_NAME, hpLog('Ally1', 8, 18, 50)],
+            [CAMPAIGN_NAME, advisoryLog(['Ally1'])],
+        ]);
 
         // Phase C — stored '' (:123 dead-side): treated as "at max" => heal 0,
         // no apply, latch still stamped (zero-heal-stamp quirk again).
@@ -656,5 +704,23 @@ describe('prayerOfHealingService (base, 2024 lane)', () => {
         expect(empty.targets).toEqual([{ targetName: 'Ally1', healAmount: 0, rolls: [4, 4], rawTotal: 8 }]);
         expect(applyHealingToTarget).not.toHaveBeenCalled();
         expect(setRuntimeBatch).toHaveBeenCalledWith('Ally1', batchUpdates(1), CAMPAIGN_NAME);
+
+        // Phase D — #1393(b) over-cap ledger guard: a stored currentHp ABOVE the
+        // resolved ceiling yields zero-clamp headroom. PRE-FIX this emitted a
+        // NEGATIVE actualHeal (min(8, 50-55) = -5) straight into the hp_change
+        // delta byte and totalHealed. POST-FIX: honest 0 row, currentHp reported
+        // as-is (never silently downgraded), zero apply, latch still stamped.
+        clearCalls();
+        getCombatContext.mockResolvedValue(buildParty([['Cleric', 60], ['AllyOver', 50]], 3));
+        seedStore({ AllyOver: 55 });
+        rollExpression.mockImplementation(seedDice([{ total: 8, rolls: [4, 4] }]));
+
+        const over = await triggerPrayerOfHealing(SPELL_2024, {}, CLERIC, CAMPAIGN_NAME, MAP_NAME);
+
+        expect(over.targets).toEqual([{ targetName: 'AllyOver', healAmount: 0, rolls: [4, 4], rawTotal: 8 }]);
+        expect(over.totalHealed).toBe(0);
+        expect(applyHealingToTarget).not.toHaveBeenCalled();
+        expect(addEntry.mock.calls.filter(c => c[1].type === 'hp_change').map(c => c[1])).toEqual([hpLog('AllyOver', 0, 55, 50)]);
+        expect(setRuntimeBatch).toHaveBeenCalledWith('AllyOver', batchUpdates(3), CAMPAIGN_NAME);
     });
 });

@@ -8,7 +8,8 @@
 //   .test.js       — buff lookup gates (:57-62), distance gate/end (:67-75), SP-125 end envelopes
 //   .damage.test.js— HP arithmetic (:22-30), full hp_change envelopes, both caster HP paths (:78-80)
 //   .log.test.js   — hp_change payload bytes
-//   .edgeCases.test.js — wardDamage 0/-3 multi-buff artifacts (delta -0 byte lives there)
+//   .edgeCases.test.js — wardDamage 0 '-0' artifact, #1427 negative/NaN loud-refuse
+//     arms (delta -0 byte lives there) multi-buff first-match
 //   .errors.test.js — addEntry rejection console.error('[wardingBond] Error:', e)
 // DISK TEXT (both rulesets): public/data/spells.json + public/data/2024/spells.json 'Warding Bond':
 // concentration: false, duration '1 hour', "each time it takes damage, you take the same amount of

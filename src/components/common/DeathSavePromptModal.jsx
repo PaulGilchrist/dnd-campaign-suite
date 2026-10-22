@@ -88,6 +88,25 @@ function DeathSavePromptModal({ campaignName }) {
   const handleRoll = useCallback(() => {
     if (!current) return;
 
+    // #1400/#1403 voided-prompt guard (single-producer law): relentless rage
+    // (or any heal) can lift this target off 0 HP while their death-save
+    // prompt sits queued in this modal. The service commits HP >= 1 BEFORE
+    // clearing deathSaves/deathFailures (fix#105 order), so a fresh read of
+    // HP > 0 here means that reset has already landed — re-writing the
+    // pre-rage counters (or POSTing 'dead') from this stale prompt would
+    // resurrect saves on a standing creature (dual-producer last-writer).
+    // Void the prompt instead: clear + advance with NO counter writes.
+    // Key ownership: this modal remains the sole producer of death-save
+    // counter ACCUMULATION (interactive rolls); relentlessRageService writes
+    // only its one-shot coherent reset at rage activation.
+    const liveHp = Number(getRuntimeValue(current.targetName, 'currentHitPoints', campaignName)) || 0;
+    if (liveHp > 0) {
+      clearDeathSavePrompt(campaignName, current.targetName);
+      advance();
+      window.dispatchEvent(new CustomEvent('open-death-saving-throw', { detail: {} }));
+      return;
+    }
+
     const { currentSaves, currentFailures } = readDeathSaveState(current.targetName);
     const result = deathSaveRules.rollDeathSave(currentSaves, currentFailures);
     const { targetName, ...sendPayload } = buildDeathSaveOutcome(current, result);
@@ -114,7 +133,7 @@ function DeathSavePromptModal({ campaignName }) {
         ? { ...p, result: { ...result } }
         : p
     ));
-  }, [campaignName, current]);
+  }, [advance, campaignName, current]);
 
   const handleNext = useCallback(() => {
     advance();

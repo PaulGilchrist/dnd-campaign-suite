@@ -260,4 +260,34 @@ describe('useSpellMetamagicFlow — simple handlers', () => {
       });
     }
   });
+
+  // #1417 DUAL-PRODUCER census (2026-10-22): the runSlow bypass lane must
+  // route THROUGH the canonical slowHandler chokepoint (automation/index.js
+  // HANDLER_MAP slow: handleSlow) with the confirmed targets INTACT in
+  // metaCtx.targets, and must publish ZERO state itself. Single publisher of
+  // slow condition/meta/targetEffects is spells/slowHandler.js (its lane
+  // pins that metaCtx.targets is honored — selects exactly these names).
+  describe('Slow (#1417): bypass payload census', () => {
+    it('runSlow ships metaCtx.targets through executeHandler and writes no state itself', async () => {
+      const { result } = renderFlow();
+      await armPending(result, { spell: 'Slow', level: 3, key: 'Slow' });
+
+      await act(async () => {
+        await result.current.handleSlowConfirm(TARGETS);
+      });
+
+      expect(executeHandler).toHaveBeenCalledTimes(1);
+      const action = executeHandler.mock.calls[0][0];
+      expect(action).toMatchObject({
+        automation: { type: 'slow', saveType: 'WIS' },
+        metaCtx: { targets: TARGETS },
+      });
+      // No bypass-side state fields may ride the action (no inline publish).
+      expect(action.buff).toBeUndefined();
+      expect(action.targetEffects).toBeUndefined();
+      // Bypass call site performs zero direct store writes.
+      const { setRuntimeValue } = await import('../runtime/useRuntimeState.js');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+  });
 });

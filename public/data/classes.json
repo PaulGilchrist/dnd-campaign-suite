@@ -274,7 +274,7 @@
               "saveType": "CON",
               "saveDc": 10,
               "dcScaling": 5,
-              "healExpression": "2 * barbarian_level",
+              "healExpression": 1,
               "recharge": "short_or_long_rest",
               "casting_time": "passive"
             }

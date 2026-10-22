@@ -35,17 +35,22 @@
 // - one-shot listener: removeEventListener :153 fires BEFORE processing, so a
 //   replay of the same promptId is inert (mismatch/replay row; :152 guard runs
 //   on mismatch too).
-// - never-executed-guard fired honestly: log success fallback :186
-//   (result === 'stable'/'nat20') is unreachable with modal payloads because
-//   isSuccessResult already maps both to success:true (:10-11) — the malformed
-//   row feeds success:false + result:'stable' and pins the DIVERGENCE: the
-//   slot machine fails (:166 reads dsResult.success) while the log claims
-//   success. Real quirk, reported.
-// - declared-not-executed: :156-157 '||' guards falsy only; a truthy
-//   NON-ARRAY store value makes [...currentSaves] (:159) throw TypeError
-//   inside the jsdom listener (unguarded, :1360 class) — jsdom swallows
-//   listener exceptions so console discrimination is unreliable here; reported
-//   as a source hole instead.
+// FIXED #1400 (2026-10-22) — log faithfulness: the death_save log reports
+// dsResult.success === true EXACTLY (the old :186 `|| result==='stable' ||
+// result==='nat20'` fallback could claim success on a run whose slot machine
+// advanced a FAILURE slot because the branch at :166 reads dsResult.success).
+// The former honest-divergence quirk row is flipped to a consistency pin:
+// success:false + result:'stable' now logs FALSE and fails the slot machine —
+// log and outcome can never disagree. Modal producers (isSuccessResult maps
+// nat20/stable to success:true) are byte-unaffected.
+// - FIXED #1400 — truthy-non-array deathSaves/deathFailures: the old
+//   `|| [false,false,false]` guard only caught FALSY values, so 'locked'
+//   spread into ['l','o','c','k','e','d'] (silently dead counter, corrupted
+//   store) and {} / numbers threw a jsdom-swallowed TypeError (slot machine
+//   dead, zero console). Now: null/undefined = rules-defined empty track
+//   (defaults kept); any truthy NON-array LOUD-REFUSES (console.error, no
+//   writes) per the no-fallbacks law. The listener already self-removed at
+//   the match before the guard, so refusal never strands it.
 // - NO-CLOCK: clean census — relentlessRageService.js:1-206 contains zero
 //   Date.now/setTimeout/setInterval; all advancement is event-seam driven
 //   (save-result -> prompt -> one death-save-result). Assertions here are
@@ -398,7 +403,7 @@ describe('relentlessRageService - death save slot machine', () => {
     expect(store.state.currentHitPoints).toBe(-1);
   });
 
-  it('quirk pin: success:false + result:"stable" fails the slot machine while the log fallback :186 claims success', () => {
+  it('#1400 consistency pin: success:false + result:"stable" fails the slot machine AND the log now agrees (was :186 divergence)', () => {
     const store = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
       relentlessrageUses: 0,
@@ -409,15 +414,51 @@ describe('relentlessRageService - death save slot machine', () => {
 
     const r = triggerFailingSave(store, 5);
     const d = dispatchDeath(store, r.deathPromptId, { roll: 10, isNat20: false, isNat1: false, success: false, result: 'stable' });
-    // branch :166 reads dsResult.success -> else path advances a FAILURE
+    // branch reads dsResult.success -> else path advances a FAILURE
     expect(d.writes).toEqual([
       ['deathSaves', [false, false, false]],
       ['deathFailures', [true, false, false]],
     ]);
-    // log :186 fallback fires -> success:true (divergence; unreachable for modal producers)
+    // log mirrors the branch EXACTLY: success:false (pre-fix the :186
+    // `|| result==='stable'` fallback lied success:true — divergence deleted)
     expect(deathLogs()).toEqual([
-      { type: 'death_save', characterName: NAME, roll: 10, isNatural20: false, isNatural1: false, success: true },
+      { type: 'death_save', characterName: NAME, roll: 10, isNatural20: false, isNatural1: false, success: false },
     ]);
+  });
+
+  it('#1400 loud-refusal: truthy NON-array deathSaves/deathFailures stores advance nothing', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // 'locked' PRE-FIX spread into ['l','o','c','k','e','d'] — a silently
+      // dead counter on a corrupted store. {} PRE-FIX threw a jsdom-swallowed
+      // TypeError. Both now refuse once, zero writes, listener already gone.
+      const malformedRows = [
+        { seed: { deathSaves: 'locked', deathFailures: [false, false, false] } },
+        { seed: { deathSaves: [false, false, false], deathFailures: {} } },
+        { seed: { deathSaves: 7, deathFailures: 7 } },
+      ];
+      for (const { seed } of malformedRows) {
+        const store = makeStore({
+          activeBuffs: [{ name: 'Rage', effect: 'stance' }],
+          relentlessrageUses: 0,
+          currentHitPoints: -1,
+          ...seed,
+        });
+        const r = triggerFailingSave(store, 5);
+        const cBefore = consoleError.mock.calls.length;
+        const d = dispatchDeath(store, r.deathPromptId, { roll: 15, isNat20: false, isNat1: false, success: true, result: 'success' });
+        expect(d.writes).toEqual([]); // zero death-key writes on refusal
+        expect(deathLogs()).toHaveLength(0);
+        expect(consoleError.mock.calls.length).toBe(cBefore + 1);
+        expect(consoleError.mock.calls.at(-1)[0]).toBe('[relentlessRage] Refusing death-save advance: non-array deathSaves/deathFailures in store');
+        // replay of the consumed promptId: inert (removed at the match, before refusal)
+        const replay = dispatchDeath(store, r.deathPromptId, { roll: 15, isNat20: false, isNat1: false, success: true, result: 'success' });
+        expect(replay.writes).toEqual([]);
+        expect(consoleError.mock.calls.length).toBe(cBefore + 1);
+      }
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it('guards the prompt seam: mismatched promptId does nothing, the matching event consumes once, replay is inert', () => {

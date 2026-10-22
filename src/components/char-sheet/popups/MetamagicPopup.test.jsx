@@ -8,13 +8,14 @@ vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
   getMaxMetamagicPerSpell: vi.fn(),
   computeMetamagicCost: vi.fn(),
   hasArcaneApotheosis: vi.fn(),
+  consumeArcaneApotheosisWaiver: vi.fn(() => 7),
 }));
 
 vi.mock('../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
-import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../../services/rules/spells/metamagicRules.js';
+import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis, consumeArcaneApotheosisWaiver } from '../../../services/rules/spells/metamagicRules.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 
 // ── Fixtures ──
@@ -266,6 +267,8 @@ describe('MetamagicPopup', () => {
     const carefulRow = screen.getByText('Careful Spell').closest('.metamagic-option');
     expect(within(carefulRow).getByText('1 SP')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Apply & Cast/ })).toHaveTextContent('Apply & Cast (1 SP)');
+    // #1451(a): previewing (renders + toggles above) must NOT consume the waiver.
+    expect(consumeArcaneApotheosisWaiver).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledWith({
@@ -274,6 +277,22 @@ describe('MetamagicPopup', () => {
       twinTarget: null,
       psionicActive: false,
     });
+    // #1451(a): the waived confirm consumes the once-per-turn latch exactly once,
+    // at the confirm seam (disk 2024 L20 "on each of your turns").
+    expect(consumeArcaneApotheosisWaiver).toHaveBeenCalledTimes(1);
+    expect(consumeArcaneApotheosisWaiver).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Sorcerer' }), 'test-campaign',
+    );
+  });
+
+  it('#1451(a) a non-waived confirm never stamps the Apotheosis latch', () => {
+    // Apotheosis inactive (default hasArcaneApotheosis false, waivedName null):
+    // the paid path must leave the once-per-turn latch untouched.
+    const { onConfirm } = renderPopup();
+    fireEvent.click(checkboxFor('Careful Spell'));
+    fireEvent.click(screen.getByRole('button', { name: /Apply & Cast/ }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(consumeArcaneApotheosisWaiver).not.toHaveBeenCalled();
   });
 
   it('keeps combined Apotheosis + Psionic affordability honest in the total display and payload', () => {
@@ -305,6 +324,8 @@ describe('MetamagicPopup', () => {
       twinTarget: null,
       psionicActive: true,
     });
+    // #1451(a): waived + psionic combo still burns exactly one turn waiver.
+    expect(consumeArcaneApotheosisWaiver).toHaveBeenCalledTimes(1);
   });
 
   it('selects Psionic Sorcery at the exact SP budget, toggles off, and reports psionicActive both times', () => {

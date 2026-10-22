@@ -13,8 +13,11 @@
 // clear/expiration leg is pinned by clearExpirationEffects.weakening-breath
 // .test.js and the paralyzing twin by paralyzingBreathService.test.js
 // (#1390); THIS file pins the THIRD reader — applyWeakeningBreathTurnEnd's
-// own source-blind find (:26) / strip (:105) — honestly, in 'two dragons on
-// one target'. Do not duplicate those pins elsewhere.
+// #1431-FIXED readers: findWeakeningBreathEffects returns ALL distinct-source
+// instances (per-source ladder adjudication at each te's own dc) and
+// removeWeakeningBreathTe is the fix#93 AND-triple mirror (effect+target+
+// source) — honestly, in 'two dragons on one target'. Do not duplicate those
+// pins elsewhere.
 //
 // ENGINE verdict: bespoke, Tashas #1423 form — te carries NO repeatSave
 // descriptor, so the generic repeatSaveService (#1405) never ticks this
@@ -277,7 +280,7 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
             targetName: TARGET, saveType: 'STR', saveDc: 21, dcSuccess: 'none',
             disadvantage: true, condition: 'Weakening Breath (repeat save)',
         }]);
-        expect(r).toEqual({ handled: true, success: true, roll: 0, total: 0 });
+        expect(r).toEqual({ handled: true, results: [{ source: ATTACKER, success: true, roll: 0, total: 0 }] });
         // Write budget (#1341): exactly ONE campaign.targetEffects write,
         // producer-leg so skipSync stays UNSET (4 args, arity audited here).
         expect(writes).toHaveLength(1);
@@ -306,7 +309,7 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
         csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { str: 1 } }];
         stubDice([20, 11]); // min = 11; +1 = 12 < 21
         const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
-        expect(r).toEqual({ handled: true, success: false, roll: 11, total: 12 });
+        expect(r).toEqual({ handled: true, results: [{ source: ATTACKER, success: false, roll: 11, total: 12 }] });
         expect(writes).toEqual([]);
         expect(listenerCalls).toEqual([]);
         expect(runtimeStore['campaign.targetEffects']).toHaveLength(1);
@@ -327,7 +330,7 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
         csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { str: 1 } }];
         stubDice([20, 20]); // min = 20; +1 = 21 === fallback DC 21 → >= tie SUCCEEDS
         const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
-        expect(r).toEqual({ handled: true, success: true, roll: 20, total: 21 });
+        expect(r).toEqual({ handled: true, results: [{ source: ATTACKER, success: true, roll: 20, total: 21 }] });
         expect(runtimeStore['campaign.targetEffects']).toEqual([]);
         expect(logs[0].description).toBe(`${TARGET} succeeded its repeat Strength save (DC 21, rolled 20 + 1 = 21, disadvantage) — Weakening Breath ends.`);
     });
@@ -337,7 +340,7 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
         csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { STR: 10 } }];
         stubDice([20, 20]); // min 20 + (missed lookup → 0) = 20 < 21 → fail keeps te
         const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
-        expect(r).toEqual({ handled: true, success: false, roll: 20, total: 20 });
+        expect(r).toEqual({ handled: true, results: [{ source: ATTACKER, success: false, roll: 20, total: 20 }] });
         expect(runtimeStore['campaign.targetEffects']).toHaveLength(1);
         expect(logs[0].saveBonus).toBe(0);
     });
@@ -347,35 +350,119 @@ describe('MA-0102 applyWeakeningBreathTurnEnd', () => {
         csCreatures = [];
         stubDice([20, 20]); // 20 + 0 = 20 < 21
         const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
-        expect(r).toEqual({ handled: true, success: false, roll: 20, total: 20 });
+        expect(r).toEqual({ handled: true, results: [{ source: ATTACKER, success: false, roll: 20, total: 20 }] });
         expect(listenerCalls).toEqual([]);
         expect(logs[0].saveBonus).toBe(0);
     });
 
-    it('two dragons on one target (#1295-class, THIS lane): find reads the FIRST te ignoring te.source (foreign dc 24 invisible); success STRIPS BOTH rows — source-blind strip pinned honestly', async () => {
-        // Producers DO carry source (:36 positional #4, :49 payload — see grant
-        // lane); real registerTargetEffect dedups by target+effect+source, so
-        // two weakening rows on one target are reachable. Readers here filter
-        // effect+target ONLY (:26/:105). Clear-lane twin: #1295
+    it('two dragons on one target (#1431 FIXED, THIS lane): all-relevant per-source ladder — EACH te adjudicated at its OWN dc; success strips ONLY its own source row (fix#93 AND-triple mirror); Ancient dc 24 survives Adult dc 21 success', async () => {
+        // Producers carry source (:36-equiv positional #4, expiration payload —
+        // see grant lane); real registerTargetEffect dedups by target+effect+
+        // source (targetEffectDefinitions.js:1508-1509), so two weakening rows
+        // on one target are reachable. Readers now scope by te.source: the
+        // pre-fix capture (wrong-dc + collateral strip) was pinned honestly
+        // pre-fix at this slot — 20+1=21 adjudicated ONLY at Adult's dc 21,
+        // the dc-24 ladder never rolled, and BOTH rows vanished in ONE strip
+        // (writes spy: one write, value []). Clear-lane twin: #1295
         // clearExpirationEffects.weakening-breath.test.js; paralyzing twin: #1390.
         runtimeStore['campaign.targetEffects'] = [
             { target: TARGET, effect: WEAKENING_BREATH_TE, source: ATTACKER, saveType: 'Strength', dc: 21 },
             { target: TARGET, effect: WEAKENING_BREATH_TE, source: ANCIENT, saveType: 'Strength', dc: 24 },
         ];
         csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { str: 1 } }];
-        stubDice([20, 20]); // adjudicated at FIRST row's dc 21: 20+1 = 21 ≥ 21 → success
+        stubDice([20, 20, 20, 20]); // Adult leg: min 20 +1 = 21 ≥ 21 SUCCEEDS; Ancient leg: 21 < 24 FAILS
         const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
-        expect(r).toEqual({ handled: true, success: true, roll: 20, total: 21 });
-        expect(logs[0]).toEqual({
-            type: 'save_result', characterName: ATTACKER, rollType: 'save-weakening-repeat',
-            targetName: TARGET, saveDc: 21, saveType: 'Strength', success: true, roll: 20,
-            total: 21, saveBonus: 1, mode: 'disadvantage',
-            description: `${TARGET} succeeded its repeat Strength save (DC 21, rolled 20 + 1 = 21, disadvantage) — Weakening Breath ends.`,
-            timestamp: STAMP_MS,
-        }); // second dragon's DC 24 ladder silently adjudicated at Adult's 21
-        // Collateral strip: Ancient's row is gone too even though the save was
-        // against Adult's ladder — if reader source-scoping is ever fixed, THIS
-        // survivor assertion flips deliberately (#1295 form).
+        expect(r).toEqual({ handled: true, results: [
+            { source: ATTACKER, success: true, roll: 20, total: 21 },
+            { source: ANCIENT, success: false, roll: 20, total: 21 },
+        ] });
+        expect(logs).toEqual([
+            {
+                type: 'save_result', characterName: ATTACKER, rollType: 'save-weakening-repeat',
+                targetName: TARGET, saveDc: 21, saveType: 'Strength', success: true, roll: 20,
+                total: 21, saveBonus: 1, mode: 'disadvantage',
+                description: `${TARGET} succeeded its repeat Strength save (DC 21, rolled 20 + 1 = 21, disadvantage) — Weakening Breath ends.`,
+                timestamp: STAMP_MS,
+            },
+            {
+                type: 'condition', action: 'removed', characterName: TARGET, condition: 'Weakened',
+                reason: 'Weakening Breath ends (repeat save succeeded)', sourceName: ATTACKER,
+                timestamp: STAMP_MS,
+            },
+            {
+                type: 'save_result', characterName: ANCIENT, rollType: 'save-weakening-repeat',
+                targetName: TARGET, saveDc: 24, saveType: 'Strength', success: false, roll: 20,
+                total: 21, saveBonus: 1, mode: 'disadvantage',
+                description: `${TARGET} failed its repeat Strength save (DC 24, rolled 20 + 1 = 21, disadvantage) — remains Weakened (auto-succeeds after 1 minute).`,
+                timestamp: STAMP_MS,
+            },
+        ]);
+        // Source-scoped strip: exactly ONE gated write, carrying ONLY the
+        // surviving Ancient row — the collateral-strip capture is flipped.
+        expect(writes).toHaveLength(1);
+        expect(writes[0].argc).toBe(4);
+        expect(writes[0].skipSync).toBeUndefined();
+        expect(runtimeStore['campaign.targetEffects']).toEqual([
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ANCIENT, saveType: 'Strength', dc: 24 },
+        ]);
+        expect(errSpy).not.toHaveBeenCalled();
+    });
+
+    it('two dragons both succeed: two gated writes in store order, each strip source-scoped, store empties, per-source removed logs', async () => {
+        runtimeStore['campaign.targetEffects'] = [
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ATTACKER, saveType: 'Strength', dc: 21 },
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ANCIENT, saveType: 'Strength', dc: 24 },
+        ];
+        csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { str: 4 } }];
+        stubDice([20, 20, 20, 20]); // both legs: min 20 +4 = 24 ≥ 21 AND ≥ 24 → both succeed
+        const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
+        expect(r).toEqual({ handled: true, results: [
+            { source: ATTACKER, success: true, roll: 20, total: 24 },
+            { source: ANCIENT, success: true, roll: 20, total: 24 },
+        ] });
+        expect(writes).toHaveLength(2); // adult strip leaves [ancient]; ancient strip empties
+        expect(writes[0].value).toEqual([{ target: TARGET, effect: WEAKENING_BREATH_TE, source: ANCIENT, saveType: 'Strength', dc: 24 }]);
+        expect(writes[1].value).toEqual([]);
         expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(logs.filter(l => l.type === 'condition' && l.action === 'removed').map(l => l.sourceName)).toEqual([ATTACKER, ANCIENT]);
+        expect(errSpy).not.toHaveBeenCalled();
+    });
+
+    it('two dragons, PC target: TWO sequential DISADVANTAGE prompts, each at its own ladder dc (21 then 24), zero dice', async () => {
+        runtimeStore['campaign.targetEffects'] = [
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ATTACKER, saveType: 'Strength', dc: 21 },
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ANCIENT, saveType: 'Strength', dc: 24 },
+        ];
+        csCreatures = [{ name: TARGET, type: 'player' }];
+        listenerResolve = { roll: 20, saveBonus: 4, success: true };
+        stubDice([]); // PC legs never touch Math.random — exhaustion throws loud
+        const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
+        expect(listenerCalls).toEqual([
+            { targetName: TARGET, saveType: 'STR', saveDc: 21, dcSuccess: 'none', disadvantage: true, condition: 'Weakening Breath (repeat save)' },
+            { targetName: TARGET, saveType: 'STR', saveDc: 24, dcSuccess: 'none', disadvantage: true, condition: 'Weakening Breath (repeat save)' },
+        ]);
+        expect(r).toEqual({ handled: true, results: [
+            { source: ATTACKER, success: true, roll: 20, total: 24 },
+            { source: ANCIENT, success: true, roll: 20, total: 24 },
+        ] });
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+    });
+
+    it('legacy null-source twins (#1517 canon inherited from fix#93): strict === means both-null rows strip together; one-sided-null survivor stands', async () => {
+        runtimeStore['campaign.targetEffects'] = [
+            { target: TARGET, effect: WEAKENING_BREATH_TE, source: ATTACKER, saveType: 'Strength', dc: 21 },
+            { target: TARGET, effect: WEAKENING_BREATH_TE, saveType: 'Strength', dc: 21 }, // one-sided-null legacy row
+        ];
+        csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { str: 4 } }];
+        stubDice([20, 20, 20, 20]); // both legs succeed at 21
+        const r = await applyWeakeningBreathTurnEnd(CAMPAIGN, TARGET);
+        expect(r).toEqual({ handled: true, results: [
+            { source: ATTACKER, success: true, roll: 20, total: 24 },
+            { source: undefined, success: true, roll: 20, total: 24 },
+        ] });
+        // ATTACKER strip cannot match the null row (strict ===); null strip
+        // matches ONLY its own null row — no cross-source collateral.
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(writes).toHaveLength(2);
     });
 });

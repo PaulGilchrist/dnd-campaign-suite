@@ -20,8 +20,32 @@ function endWardingBond(targetName, casterName, campaignName, reason) {
 }
 
 function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, casterHp, wardDamage, creature, campaignName }) {
+    // #1427(c) validation gate inside the bond's sole damage executor (fix#39 strict-
+    // presence-before-coercion family + fix#5 refuse-shape: loud console.error, ZERO
+    // write/log/state on BOTH legs — no half-baked state). RAW law, both rulesets
+    // verbatim — public/data/spells.json 'Warding Bond': "each time it takes damage,
+    // you take the same amount of damage" and public/data/2024/spells.json:14391 the
+    // identical clause: the bond mirrors DAMAGE, and damage is >= 0. Non-finite input
+    // (undefined/NaN/null/string) poisoned caster HP and the runtime store with NaN
+    // (old :25/:40); negative input HEALED the caster UNCAPPED (:25 Math.max clamps
+    // only at 0 — captured 5/-10 -> 15 on a maxHp-10 caster). Producer census: sole
+    // production caller applyDamage.js:821 dispatches ONLY under the wardDamage > 0
+    // gate at :900 — invalid input reaching this executor is an upstream programming
+    // error, so REFUSE LOUD, never clamp-fold. (Caster reads in applyWardingBond
+    // precede this gate by design — pure lookups, no writes.)
+    if (!Number.isFinite(wardDamage)) {
+        console.error(`[wardingBond] Invalid wardDamage (${String(wardDamage)}): non-finite input refused — no HP write, no log.`);
+        return;
+    }
+    if (wardDamage < 0) {
+        console.error(`[wardingBond] Invalid wardDamage (${wardDamage}): negative damage is not damage (RAW: bond shares damage, never heals) — no HP write, no log.`);
+        return;
+    }
     const sharedDamage = wardDamage;
     const oldHp = casterHp;
+    // #1427(a): sharedDamage is finite and >= 0 here — applyWardingBond refuses
+    // negative/NaN at the entry gate, so this mirror can never heal (old bytes
+    // casterHp - sharedDamage on negative input ADDED HP uncapped by :31-33 maxHp).
     const newHp = Math.max(0, casterHp - sharedDamage);
     if (casterIsPlayer) {
         setRuntimeValue(casterName, 'currentHitPoints', newHp, campaignName);
@@ -34,13 +58,20 @@ function shareWardingBondDamage({ casterName, casterCreature, casterIsPlayer, ca
     const concentration = casterIsPlayer
         ? getRuntimeValue(casterName, 'concentration', campaignName)
         : casterCreature.concentration;
+    const delta = -(oldHp - newHp);
     addEntry(campaignName, {
         type: 'hp_change',
         targetName: casterName,
-        delta: -(oldHp - newHp),
+        delta,
         currentHp: newHp,
         maxHp: casterMaxHp,
-        isHealing: false,
+        // #1427(b) sign-convention compliance: delta is the SIGNED HP change
+        // (damage lane emits negative) and the flag must match its sign — canonical
+        // producer law CharHitPoints.jsx:35 `isHealing: delta > 0`; renderer decides
+        // polarity from delta too (fix#49 home, LogHpHealingEntry.jsx:90-91
+        // `isDamage = entry.delta < 0` / `isZero = entry.delta === 0` fourth arm).
+        // Post-gate delta <= 0 always, so isHealing is structurally honest.
+        isHealing: delta > 0,
         isUnconscious: newHp <= 0,
         abilityName: 'Warding Bond',
     }).catch((e) => { console.error("[wardingBond] Error:", e); });

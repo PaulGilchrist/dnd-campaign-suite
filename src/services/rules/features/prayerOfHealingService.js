@@ -106,6 +106,30 @@ function buildHealFormula(healExpression, bonusDetails) {
     return formulaParts.join(' + ');
 }
 
+// #1393: parse-or-null law (fix#5 HealingIllusionModal shape) — unset/blank/
+// non-numeric NEVER coerces to a fabricated ceiling.
+function parseMaxHp(value) {
+    if (value == null || value === '') return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+}
+
+// #1393: canonical PER-TARGET maxHp resolution — mirrors the write chokepoint
+// this service delegates through (hpModifier.js:28-30 modifyHitPoints) and the
+// heal-family loud-skip sibling (auraOfVitalityHandler.js:49-55): players resolve
+// from their OWN runtime 'hitPoints' row (PlayerStats is the PC single source of
+// truth — combatSummary player rows are placeholders, pitfall 37), creatures from
+// their combatSummary row. The old ':121' tail `|| playerStats.hitPoints || 0`
+// substituted the CASTER's current HP — a low-HP caster silently capped every
+// party member's heal; DELETED. Unresolvable stays unresolvable (null) so the
+// caller skips the target LOUDLY instead of healing against a borrowed ceiling.
+function resolveTargetMaxHp(target, campaignName) {
+    if (target.type === 'player') {
+        return parseMaxHp(getRuntimeValue(target.name, 'hitPoints', campaignName) ?? target.maxHp);
+    }
+    return parseMaxHp(target.maxHp);
+}
+
 // Heals one target in the prayer: rolls (maximized per target/global flag), applies,
 // logs, and stamps the once-per-Long-Rest affected latch (+ canonical short-rest
 // benefit) via the shared prayerOfHealingLatch seam. Returns null when refused/skipped.
@@ -118,7 +142,15 @@ async function healPrayerTarget(target, ctx) {
         return null;
     }
 
-    const maxHp = target.maxHp || playerStats.hitPoints || 0;
+    const maxHp = resolveTargetMaxHp(target, campaignName);
+    if (maxHp == null) {
+        // Loud-skip arm (#1393): an unresolvable per-target ceiling skips THIS
+        // target and the party loop continues — the spell must not die on one
+        // bad row, and must not heal against a caster-derived fake. No roll,
+        // no write, no log row, no latch: the skipped target stays eligible.
+        console.error(`[prayerOfHealingService] Skipping ${targetName}: unresolved maxHp (target.maxHp=${JSON.stringify(target.maxHp)}, type=${JSON.stringify(target.type)}). No roll, no write, no latch.`);
+        return null;
+    }
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
     const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
     const targetMaximize = hasHealingMaximizationForTarget(playerStats, targetName, campaignName);
@@ -126,7 +158,11 @@ async function healPrayerTarget(target, ctx) {
     if (!rollResult) return null;
 
     const targetHealAmount = rollResult.total + bonusHeal;
-    const actualHeal = Math.min(targetHealAmount, maxHp - currentHp);
+    // #1393(b): non-negative actualHeal (canonical zero-clamp family,
+    // auraOfVitalityHandler.js:130). An over-heal or an odd over-cap stored row
+    // logs an honest 0 ('No HP Change' fourth-arm, fix#49 census) instead of a
+    // negative delta polluting the log roll-up and totalHealed.
+    const actualHeal = Math.max(0, Math.min(targetHealAmount, maxHp - currentHp));
 
     if (actualHeal > 0) {
         applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
@@ -136,7 +172,9 @@ async function healPrayerTarget(target, ctx) {
         await applyPrayerOfHealingShortRestBenefit(targetName, casterName, campaignName, ctx.latchStamp);
     }
 
-    const newHp = Math.min(maxHp, currentHp + actualHeal);
+    // Non-decreasing by construction (actualHeal >= 0): an over-cap stored row
+    // is reported as-is, never silently downgraded in the log.
+    const newHp = currentHp + actualHeal;
 
     addEntry(campaignName, {
         type: 'hp_change',

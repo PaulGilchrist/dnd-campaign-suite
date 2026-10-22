@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../../services/rules/spells/metamagicRules.js';
+import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis, consumeArcaneApotheosisWaiver } from '../../../services/rules/spells/metamagicRules.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import './MetamagicPopup.css';
 
@@ -86,7 +86,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   const creatureTargets = getCreatureTargets(campaignName);
 
   const apotheosisActive = hasArcaneApotheosis(playerStats, playerStatsName);
-  const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStatsName);
+  const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStatsName, campaignName);
 
   const { grandTotalCost, remainingAfter, canAffordGrand, psionicAffordable } = computePsionicState({ psionicActive, psionicCost, totalCost, currentSP });
   const canSelectMore = selected.length < maxPerSpell;
@@ -118,6 +118,13 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
 
   const handleConfirm = useCallback(() => {
     if (needsTwinTarget) return;
+    // #1451(a): this is the seam where a waived cost becomes a real free Metamagic
+    // use — disk 2024 Arcane Apotheosis grants the waiver once per TURN, so latch it
+    // here (never in computeMetamagicCost, which the preview re-runs every render).
+    // Turn-seam latch, re-armed at round wrap (navigationHandlers / Initiative).
+    if (waivedName) {
+      consumeArcaneApotheosisWaiver(playerStats, campaignName);
+    }
     // CLA-271: confirmed totalCost is the Metamagic-options cost ONLY — the
     // Psionic Sorcery SP payment is paid downstream (prepareSpellCast pays + skips
     // the slot + logs psionic_sorcery; the Actions-bar confirm handler pays when
@@ -128,7 +135,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
       twinTarget: hasTwinned && creatureTargets.length > 0 ? twinTarget : null,
       psionicActive,
     });
-  }, [selected, totalCost, twinTarget, hasTwinned, needsTwinTarget, creatureTargets.length, onConfirm, psionicActive]);
+  }, [selected, totalCost, waivedName, playerStats, campaignName, twinTarget, hasTwinned, needsTwinTarget, creatureTargets.length, onConfirm, psionicActive]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -145,7 +152,7 @@ export default function MetamagicPopup({ spell, playerStats, campaignName, onCon
   const isAffordable = (opt) => {
        if (apotheosisActive) {
            const nextSelection = selected.includes(opt.name) ? [...selected] : [...selected, opt.name];
-           return computeMetamagicCost(nextSelection, options, playerStats, playerStatsName).totalCost + (psionicActive ? psionicCost : 0) <= currentSP;
+           return computeMetamagicCost(nextSelection, options, playerStats, playerStatsName, campaignName).totalCost + (psionicActive ? psionicCost : 0) <= currentSP;
          }
     const costSoFar = selected
        .filter(n => n !== opt.name)

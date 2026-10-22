@@ -34,14 +34,14 @@
 // (ours :30 returns 1 where the clone would TypeError). Its rows belong to
 // that handler's lane, not here.
 //
-// DATA BUG surfaced producer-side (#1399 red flag), pinned honestly:
-// BOTH rulesets' disk Relentless Rage automation carries
-// healExpression: '2 * barbarian_level', but the 5e classes.json feature
-// TEXT says "you drop to 1 hit point instead". This evaluator turns that
-// disk literal into 22 (lv11) / 40 (lv20) — NOT 1. Rows below pin the
-// evaluated numbers; the text-vs-automation contradiction is reported, the
-// disk bytes stay untouched (byte verification of the automation object is
-// check lane :246-252's face — only the literal extraction happens here).
+// #1399 DATA BUG RESOLVED producer-side (fixed 2026-10-22): the 5e disk row
+// now carries healExpression 1 (numeric literal — matching its text "you drop
+// to 1 hit point instead"); the 2024 row keeps '2 * barbarian_level' matching
+// ITS text "change to a number equal to twice your Barbarian level". This
+// evaluator maps the numeric literal verbatim via the :29 typeof arm, and the
+// STRING-shaped '1' via the new numeric-literal arm (pre-fix it silently fell
+// through to the level fallback — a fabricated 11-HP heal). Rows below pin
+// both rulesets' disk bytes against their own descriptions.
 //
 // Quirk census (byte evidence):
 // - :0-swallow spectrum: unknown-field ternary (:25 `resolve ? resolve(...)
@@ -145,12 +145,16 @@ describe('evaluateHealExpression (relentlessRageService.js:28-41, pure)', () => 
     }
   });
 
-  it("disk-canon literal evaluates to 2 x Barbarian class level, NOT 1 (5e text contradiction, reported)", () => {
+  it('#1399 disk literals: 5e numeric 1 (drop-to-1, text-faithful), 2024 evaluates 2 x Barbarian level', () => {
     const literals = diskRows.map(f => f.automation.healExpression);
-    expect(literals).toEqual(['2 * barbarian_level', '2 * barbarian_level']);
-    // Producer-side value of the disputed literal: lv11 -> 22, lv20 -> 40
-    // (mutually distinguishable; 40 also kills any constant-22 mutation).
-    expect(evaluateHealExpression(literals[0], barbarian(11))).toBe(22);
+    expect(literals).toEqual([1, '2 * barbarian_level']);
+    // 5e: numeric literal passes the :29 typeof arm VERBATIM — 1 at lv11,
+    // 1 at lv20: no level-scaling, no fabricated heal (the pre-fix row
+    // carried the 2024 formula and produced 22/40 against drop-to-1 text).
+    expect(evaluateHealExpression(literals[0], barbarian(11))).toBe(1);
+    expect(evaluateHealExpression(literals[0], barbarian(20))).toBe(1);
+    // 2024: producer-side value of the scaled literal — lv11 -> 22 (via the
+    // class-chain row below), lv20 -> 40 (kills any constant-22 mutation).
     expect(evaluateHealExpression(literals[1], barbarian(20))).toBe(40);
     // Class level beats character level (:12-14 find wins over :14 ||level).
     expect(evaluateHealExpression('2 * barbarian_level',
@@ -158,6 +162,17 @@ describe('evaluateHealExpression (relentlessRageService.js:28-41, pure)', () => 
     // Case/whitespace tolerance of the hardcoded regex (:33 /i and \s*).
     expect(evaluateHealExpression('2*BARBARIAN_LEVEL', barbarian(11))).toBe(22);
     expect(evaluateHealExpression('2 \t *   barbarian_level', barbarian(11))).toBe(22);
+  });
+
+  it('#1399 numeric-LITERAL STRING arm: \'1\' returns 1, NOT the level fallback', () => {
+    // Pre-fix, quoted digit literals fell through every regex to the :40
+    // level fallback — a '1' row evaluated to 11 HP at lv11 (unlawful).
+    // The new Number(text) arm pins literal shapes exactly.
+    expect(evaluateHealExpression('1', barbarian(11))).toBe(1);
+    expect(evaluateHealExpression('3', barbarian(11))).toBe(3);
+    expect(evaluateHealExpression(' 1 ', barbarian(11))).toBe(1);
+    // Distinguishable non-literals still fall through to :40 level — co-pinned
+    // against the unrecognizable-text row ('1d8+CON' at lv7 is 7, not 0/NaN).
   });
 
   it('UNANCHORED :33 regex swallows surrounding text: multiplier and suffix are discarded', () => {

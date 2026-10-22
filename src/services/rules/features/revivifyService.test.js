@@ -18,14 +18,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // FETCH: route-aware fake (no never-resolving floats — the old global.fetch =
 //   new Promise(() => {}) float is replaced; unknown routes REJECT explicitly).
 // NO-CLOCK: death-time stays UNMODELED state-only (#1407 verdict). The only
-//   Date.now() on this path is the log timestamp (:61); timers are frozen at
+//   Date.now() on this path is the log timestamp (:114); timers are frozen at
 //   STAMP_MS for stamp determinism only, never for gating.
 // ZERO-DICE: revivify heals via the static `1 - oldHp` expression
-//   (revivifyService.js:46); popup rolls are [] — no dice stub needed.
+//   (revivifyService.js:103); popup rolls are [] — no dice stub needed.
 // FIXTURE DISTINCTNESS (#1348): every name/number here is unique across the three
 //   lanes (edge: Ally/Goblin 30/7, logging: Torvin/Gribble 47/9) so no byte is
-//   accidentally re-pinned; the hardcoded '300+ GP' refusal text is pinned once,
-//   behind a CUSTOM spell name, in test 3.
+//   accidentally re-pinned; the 300+ GP refusal text is pinned once, with the spell
+//   name INTERPOLATED from the payload behind a CUSTOM spell name, in test 3 (#1409d).
 
 const CAMPAIGN = 'TestCampaign';
 const STAMP_MS = Date.UTC(2026, 9, 21, 12, 0, 0);
@@ -187,7 +187,7 @@ describe('triggerRevivify', () => {
         net.rejectNextChangeData = false;
         vi.clearAllMocks(); // clears call records/order; factory impls persist
         vi.useFakeTimers();
-        vi.setSystemTime(STAMP_MS); // freezes the only Date.now(): log timestamp (:61)
+        vi.setSystemTime(STAMP_MS); // freezes the only Date.now(): log timestamp (:114)
         consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
@@ -292,7 +292,7 @@ describe('triggerRevivify', () => {
         expect(consoleError).not.toHaveBeenCalled();
     });
 
-    it('refuses when the diamond is unavailable: nothing consumed past the gate, zero writes/logs/POST, hardcoded 300 GP text survives a custom spell name', async () => {
+    it('refuses when the diamond is unavailable: nothing consumed past the gate, zero writes/logs/POST, refusal text interpolates the custom spell name (#1409d)', async () => {
         net.diamondAvailable = false;
         seedDeadPC('Mourne', 0, null, 24);
         queueSummary(1, [{ name: 'Mourne', maxHp: 24, currentHp: 1, type: 'player' }]);
@@ -300,15 +300,16 @@ describe('triggerRevivify', () => {
         const result = await triggerRevivify(makeSpell('Ghostly Revival'), {}, makeCaster('Brother Aldous'), CAMPAIGN, 'Mourne');
         await flush();
 
-        // Full refusal envelope: payload.name interpolates the custom spell while the
-        // description stays the hardcoded 'Revivify requires...' literal.
+        // Full refusal envelope: BOTH name and description interpolate the custom
+        // spell (#1409d fixed: description was a hardcoded 'Revivify requires...'
+        // literal). With a disk-stamped 'Revivify' the bytes equal the old literal.
         expect(result).toEqual({
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: 'Ghostly Revival',
                 automationType: 'revivify',
-                description: 'Revivify requires a diamond worth 300+ GP, which the spell consumes.',
+                description: 'Ghostly Revival requires a diamond worth 300+ GP, which the spell consumes.',
             },
         });
         expect(net.diamondChecks).toEqual([['Brother Aldous', 'Diamond (300 gp)']]);

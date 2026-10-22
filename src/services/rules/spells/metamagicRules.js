@@ -1,5 +1,6 @@
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 export const METAMAGIC_EFFECTS = {
   CAREFUL: 'ally_auto_succeed_save',
@@ -63,7 +64,10 @@ export const METAMAGIC_OPTIONS = [
   },
 ];
 
-const PRE_CAST_OPTIONS = METAMAGIC_OPTIONS.filter(o => o.effect !== METAMAGIC_EFFECTS.EMPOWERED);
+// #1451(c): isPreCastOption is the single source of this split — the popup's
+// selectable lane is pre-cast options only; Empowered is post-roll (damage-dice
+// reride, empoweredSpellService.js) and must never appear in the chooser.
+const PRE_CAST_OPTIONS = METAMAGIC_OPTIONS.filter(isPreCastOption);
 
 export function getMetamagicCost(option, spellLevel) {
   if (option.cost === 'spell_level') {
@@ -107,15 +111,50 @@ export function hasArcaneApotheosis(stats, playerName) {
     return buffs.some(b => b.name === 'Innate Sorcery');
  }
 
-export function computeMetamagicCost(selectedOptionNames, optionsList, stats, playerName) {
+// #1451(a) DISK LAW (public/data/2024/classes.json [9]/class_levels[19]/features[0],
+// level 20): "While your Innate Sorcery feature is active, you can use one Metamagic
+// option on each of your turns without spending Sorcery Points on it." — once PER
+// TURN, not per cast. Pre-fix computeMetamagicCost waived its highest-cost option on
+// EVERY call, so a Quickened double-cast turn got the waiver twice. The waiver is now
+// latched per turn: _Arcane_Apotheosis_usedRound (fix#63/_War_Magic_usedRound house
+// naming, warMagicCantripHandler.js:17; numeric-round stamp + `=== currentRound` gate
+// per CLA-381 warMagicCantripHandler.js:54-55; consumed at the waived-cast confirm
+// seam in MetamagicPopup.jsx handleConfirm via consumeArcaneApotheosisWaiver;
+// re-armed at round wrap / initiative roll in navigationHandlers.js
+// PLAYER_ROUND_LATCH_KEYS + Initiative.jsx clearPlayerRoundFlags). NO-CLOCK POLICY:
+// turn-seam latch matured only at initiative seams — zero timers, zero Date.now.
+export const ARCANE_APOTHEOSIS_USED_ROUND_KEY = '_Arcane_Apotheosis_usedRound';
+
+export function isArcaneApotheosisWaiverSpent(playerName, campaignName) {
+  const usedRound = Number(getRuntimeValue(playerName, ARCANE_APOTHEOSIS_USED_ROUND_KEY) ?? 0);
+  return usedRound === getCurrentCombatRound(campaignName);
+}
+
+export function consumeArcaneApotheosisWaiver(playerStats, campaignName) {
+  const stamp = getCurrentCombatRound(campaignName);
+  setRuntimeValue(playerStats.name, ARCANE_APOTHEOSIS_USED_ROUND_KEY, stamp, campaignName);
+  return stamp;
+}
+
+export function computeMetamagicCost(selectedOptionNames, optionsList, stats, playerName, campaignName) {
     if (selectedOptionNames.length === 0) return { totalCost: 0, waivedName: null };
 
     const costs = selectedOptionNames.map(name => {
         const opt = optionsList.find(o => o.name === name);
-        return { name, cost: opt?.resolvedCost || 0 };
+        // #1451(b): no `|| 0` silent-free arm — an unresolvable cost row is invalid
+        // input; refuse loudly via the file's own console.error + throw house arm
+        // (see getPsionicSpellsList :138). A fabricated 0 here = free casting.
+        if (!opt || typeof opt.resolvedCost !== 'number' || !Number.isFinite(opt.resolvedCost)) {
+            console.error('[metamagicRules] Unknown Metamagic option (no cost row):', name);
+            throw new Error('Unknown Metamagic option: ' + name);
+        }
+        return { name, cost: opt.resolvedCost };
     });
 
-    if (hasArcaneApotheosis(stats, playerName)) {
+    // #1451(a): waiver is once per TURN (disk law above) — spent latches do not waive.
+    // Read-only here (preview-safe: the popup calls this every render); the stamp lives
+    // at the confirm seam via consumeArcaneApotheosisWaiver.
+    if (hasArcaneApotheosis(stats, playerName) && !isArcaneApotheosisWaiverSpent(playerName, campaignName)) {
         const maxCost = Math.max(...costs.map(c => c.cost));
         const waivedIdx = costs.findIndex(c => c.cost === maxCost);
         const waivedName = costs[waivedIdx].name;

@@ -19,15 +19,26 @@
 // disk-faithful. No apostrophe/punctuation in any option name (case gates are
 // plain exact-byte). NO-CLOCK POLICY: source has zero setTimeout/Date.now — SP
 // recovery is long-rest-owner (buffService/rest seams, #1302-#1312), cited only.
-// Apotheosis drift (report-only): disk 2024 L20 Arcane Apotheosis says "one free
-// Metamagic option on each of your turns"; code models "waive highest-cost option
-// per cast while Innate Sorcery buff active" — pinned as CODE STANCE below.
+// Apotheosis per-turn law (#1451 FIXED): disk 2024 L20 Arcane Apotheosis says
+// "one Metamagic option on each of your turns without spending Sorcery Points";
+// computeMetamagicCost no longer waives per CAST — the waiver is latched in
+// _Arcane_Apotheosis_usedRound (CLA-381 _War_Magic_usedRound family), consumed at
+// MetamagicPopup.handleConfirm, re-armed at round wrap (navigationHandlers +
+// Initiative clearPlayerRoundFlags). #1451(b): unknown option names no longer cost
+// 0 (`|| 0` cut) — console.error + throw, house arm of this file. #1451(c):
+// isPreCastOption WIRED as the single source of the PRE_CAST_OPTIONS split (:70).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Only the runtime store is mocked (network side-effect); abilityLookup is REAL —
-// getChaModifier's delegation is behavior under test, not a mock echo.
+// Only the runtime store + combat round reader are mocked (network side-effect /
+// cache determinism); abilityLookup is REAL — getChaModifier's delegation is
+// behavior under test, not a mock echo.
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => undefined),
+  setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../encounters/combatData.js', () => ({
+  getCurrentCombatRound: vi.fn(() => 7),
 }));
 
 import {
@@ -39,21 +50,40 @@ import {
   getMaxMetamagicPerSpell,
   isPreCastOption,
   hasArcaneApotheosis,
+  ARCANE_APOTHEOSIS_USED_ROUND_KEY,
+  isArcaneApotheosisWaiverSpent,
+  consumeArcaneApotheosisWaiver,
   computeMetamagicCost,
   getPsionicSpellsList,
   isPsionicSpell,
   hasPsionicSorcery,
 } from './metamagicRules.js';
 
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 const buffs = vi.mocked(getRuntimeValue);
+const writes = vi.mocked(setRuntimeValue);
+const round = vi.mocked(getCurrentCombatRound);
 
 const SORCERER = { class: { name: 'Sorcerer' } };
+const CAMPAIGN = 'test-campaign';
+const APOTHEOSIS_STATS = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
+
+// Latch-aware store stub: 'activeBuffs' -> innate, latch key -> stored round.
+function stubStore({ latch, innate = true }) {
+  buffs.mockImplementation((_name, key) => {
+    if (key === ARCANE_APOTHEOSIS_USED_ROUND_KEY) return latch;
+    return innate ? [{ name: 'Innate Sorcery' }] : [];
+  });
+}
 
 beforeEach(() => {
   buffs.mockClear();
   buffs.mockReturnValue(undefined);
+  writes.mockClear();
+  round.mockReset();
+  round.mockReturnValue(7);
 });
 
 // ── Catalog goldens (drift pins; byte-for-byte vs disk census above) ─────────
@@ -85,13 +115,16 @@ describe('catalog goldens', () => {
     ]);
   });
 
-  it('isPreCastOption excludes exactly Empowered across the real catalog (zero production callers — dormant export pin)', () => {
+  it('isPreCastOption excludes exactly Empowered across the real catalog (#1451(c) WIRED: sole source of PRE_CAST_OPTIONS / getPreCastOptions)', () => {
     const preCast = METAMAGIC_OPTIONS.filter(isPreCastOption);
     expect(preCast.map((o) => o.name)).toEqual([
       'Careful Spell', 'Distant Spell', 'Extended Spell', 'Heightened Spell',
       'Quickened Spell', 'Subtle Spell', 'Twinned Spell',
     ]);
     expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.EMPOWERED })).toBe(false);
+    // wiring pin: the popup chooser lane (getPreCastOptions) IS this filter's output —
+    // the pre-cast/post-cast split has a live consumer (MetamagicPopup.jsx:78).
+    expect(getPreCastOptions(SORCERER, 6, 1).map((o) => o.name)).toEqual(preCast.map((o) => o.name));
     // golden unguarded-deref (never-executed-guard census: no optional chaining here)
     expect(() => isPreCastOption(undefined)).toThrow(TypeError);
   });
@@ -224,48 +257,129 @@ describe('hasArcaneApotheosis', () => {
 describe('computeMetamagicCost', () => {
   const opts = (pairs) => pairs.map(([name, resolvedCost]) => ({ name, resolvedCost }));
 
-  it('empty selection costs nothing; unknown names silently cost 0; null selection throws', () => {
-    expect(computeMetamagicCost([], [], {}, 'player')).toEqual({ totalCost: 0, waivedName: null });
-    // :0-swallow quirk pin — option missing from optionsList contributes 0, still listed in selection
-    expect(computeMetamagicCost(['Unknown'], opts([['Careful Spell', 1]]), {}, 'player'))
-      .toEqual({ totalCost: 0, waivedName: null });
-    expect(() => computeMetamagicCost(null, [], {}, 'player')).toThrow(TypeError);
+  it('empty selection costs nothing; null selection throws', () => {
+    expect(computeMetamagicCost([], [], {}, 'player', CAMPAIGN)).toEqual({ totalCost: 0, waivedName: null });
+    expect(() => computeMetamagicCost(null, [], {}, 'player', CAMPAIGN)).toThrow(TypeError);
+  });
+
+  it('#1451(b) FREE-CAST KILLER (#1348 lane): unknown option names are refused loudly, never silently 0-cost', () => {
+    // Pre-fix pin flipped: `opt?.resolvedCost || 0` fabricated a free cast for
+    // garbage option names. House invalid-input arm (getPsionicSpellsList :135):
+    // console.error + throw. The cast path must never proceed on a fabricated cost.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => computeMetamagicCost(['Unknown'], opts([['Careful Spell', 1]]), {}, 'player', CAMPAIGN))
+      .toThrow('Unknown Metamagic option: Unknown');
+    expect(spy).toHaveBeenCalledWith('[metamagicRules] Unknown Metamagic option (no cost row):', 'Unknown');
+    // option row present but cost unresolved -> same refusal, no silent 0
+    expect(() => computeMetamagicCost(['Mystery Spell'], [{ name: 'Mystery Spell' }], {}, 'player', CAMPAIGN))
+      .toThrow('Unknown Metamagic option: Mystery Spell');
+    expect(() => computeMetamagicCost(['NaN Spell'], opts([['NaN Spell', NaN]]), {}, 'player', CAMPAIGN))
+      .toThrow('Unknown Metamagic option: NaN Spell');
+    expect(writes).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('sums all resolved costs without waiver when Apotheosis is inactive, including zero-cost options', () => {
     expect(computeMetamagicCost(
       ['Careful Spell', 'Distant Spell', 'Heightened Spell'],
       opts([['Careful Spell', 1], ['Distant Spell', 1], ['Heightened Spell', 3]]),
-      {}, 'player',
+      {}, 'player', CAMPAIGN,
     )).toEqual({ totalCost: 5, waivedName: null });
     expect(computeMetamagicCost(
       ['Careful Spell', 'Heightened Spell'],
       opts([['Careful Spell', 0], ['Heightened Spell', 3]]),
-      {}, 'player',
-    )).toEqual({ totalCost: 3, waivedName: null });
+      {}, 'player', CAMPAIGN,
+    )).toEqual({ totalCost: 3, waivedName: null }); // zero-is-data: a real 0-cost row stays 0
   });
 
-  it('waives exactly the highest-cost selected option when active, down to a 0 total for a lone option', () => {
-    buffs.mockReturnValue([{ name: 'Innate Sorcery' }]);
-    const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
+  it('#1451(a) waives exactly the highest-cost selected option when active, down to a 0 total for a lone option', () => {
+    stubStore({ latch: undefined });
     expect(computeMetamagicCost(
       ['Careful Spell', 'Heightened Spell'],
       opts([['Careful Spell', 1], ['Heightened Spell', 3]]),
-      stats, 'player',
+      APOTHEOSIS_STATS, 'player', CAMPAIGN,
     )).toEqual({ totalCost: 1, waivedName: 'Heightened Spell' });
     expect(computeMetamagicCost(
-      ['Heightened Spell'], opts([['Heightened Spell', 3]]), stats, 'player',
+      ['Heightened Spell'], opts([['Heightened Spell', 3]]), APOTHEOSIS_STATS, 'player', CAMPAIGN,
     )).toEqual({ totalCost: 0, waivedName: 'Heightened Spell' });
   });
 
+  it('#1451(a) waiver is READ-ONLY here: repeated preview computations stay identical and write nothing (preview-safe)', () => {
+    stubStore({ latch: undefined });
+    const list = opts([['Heightened Spell', 3], ['Careful Spell', 1]]);
+    const first = computeMetamagicCost(['Careful Spell', 'Heightened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN);
+    const second = computeMetamagicCost(['Careful Spell', 'Heightened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN);
+    expect(first).toEqual(second); // checkbox-toggle churn must not consume the waiver
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it('#1451(a) PER-TURN law: once the latch is stamped for this round, later same-turn casts pay FULL cost (no waiver)', () => {
+    stubStore({ latch: undefined });
+    const list = opts([['Heightened Spell', 3]]);
+    // Cast 1 (turn open): waived per disk "one Metamagic option ... without spending".
+    expect(computeMetamagicCost(['Heightened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN))
+      .toEqual({ totalCost: 0, waivedName: 'Heightened Spell' });
+    // Waived cast confirms — consume stamps the latch at the current round (7).
+    consumeArcaneApotheosisWaiver({ name: 'player' }, CAMPAIGN);
+    expect(writes).toHaveBeenCalledWith('player', ARCANE_APOTHEOSIS_USED_ROUND_KEY, 7, CAMPAIGN);
+    // Store reflects the stamp; cast 2 SAME TURN (e.g. Quickened bonus + action):
+    // disk grants the waiver once per TURN -> pays 3, waivedName null.
+    stubStore({ latch: 7 });
+    expect(computeMetamagicCost(['Heightened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN))
+      .toEqual({ totalCost: 3, waivedName: null });
+  });
+
+  it('#1451(a) stale-round latch re-arms the waiver (turn seam, not permanent burn)', () => {
+    stubStore({ latch: 6 }); // previous round; CLA-381 `=== currentRound` gate
+    expect(computeMetamagicCost(
+      ['Heightened Spell'], opts([['Heightened Spell', 3]]), APOTHEOSIS_STATS, 'player', CAMPAIGN,
+    )).toEqual({ totalCost: 0, waivedName: 'Heightened Spell' });
+  });
+
+  it('#1451(a) spent-latch UI honesty: with the waiver burned, multi-option casts sum every cost', () => {
+    stubStore({ latch: 7 });
+    expect(computeMetamagicCost(
+      ['Careful Spell', 'Heightened Spell'],
+      opts([['Careful Spell', 1], ['Heightened Spell', 3]]),
+      APOTHEOSIS_STATS, 'player', CAMPAIGN,
+    )).toEqual({ totalCost: 4, waivedName: null });
+  });
+
   it('breaks cost ties by first-in-selection-order, not optionsList order', () => {
-    buffs.mockReturnValue([{ name: 'Innate Sorcery' }]);
-    const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } };
+    stubStore({ latch: undefined });
     const list = opts([['Quickened Spell', 3], ['Heightened Spell', 3]]); // optionsList order reversed
-    expect(computeMetamagicCost(['Heightened Spell', 'Quickened Spell'], list, stats, 'player'))
+    expect(computeMetamagicCost(['Heightened Spell', 'Quickened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN))
       .toEqual({ totalCost: 3, waivedName: 'Heightened Spell' });
-    expect(computeMetamagicCost(['Quickened Spell', 'Heightened Spell'], list, stats, 'player'))
+    expect(computeMetamagicCost(['Quickened Spell', 'Heightened Spell'], list, APOTHEOSIS_STATS, 'player', CAMPAIGN))
       .toEqual({ totalCost: 3, waivedName: 'Quickened Spell' });
+  });
+});
+
+// ── #1451(a) per-turn waiver latch helpers ─────────────────────────────────────
+
+describe('arcane apotheosis waiver latch', () => {
+  it('the latch key follows the fix#63/_War_Magic_usedRound house naming', () => {
+    expect(ARCANE_APOTHEOSIS_USED_ROUND_KEY).toBe('_Arcane_Apotheosis_usedRound');
+  });
+
+  it('isArcaneApotheosisWaiverSpent: exact-round match is spent; stale/absent stamps are not', () => {
+    stubStore({ latch: 7 });
+    expect(isArcaneApotheosisWaiverSpent('player', CAMPAIGN)).toBe(true);
+    stubStore({ latch: 6 });
+    expect(isArcaneApotheosisWaiverSpent('player', CAMPAIGN)).toBe(false);
+    stubStore({ latch: undefined });
+    expect(isArcaneApotheosisWaiverSpent('player', CAMPAIGN)).toBe(false); // ?? 0, round 7
+    stubStore({ latch: '7' }); // numeric coercion, numericRound family
+    expect(isArcaneApotheosisWaiverSpent('player', CAMPAIGN)).toBe(true);
+    expect(buffs).toHaveBeenLastCalledWith('player', ARCANE_APOTHEOSIS_USED_ROUND_KEY);
+    expect(round).toHaveBeenLastCalledWith(CAMPAIGN);
+  });
+
+  it('consumeArcaneApotheosisWaiver stamps the current round once, read-only gate unchanged', () => {
+    const stamp = consumeArcaneApotheosisWaiver({ name: 'player' }, CAMPAIGN);
+    expect(stamp).toBe(7);
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(writes).toHaveBeenCalledWith('player', ARCANE_APOTHEOSIS_USED_ROUND_KEY, 7, CAMPAIGN);
   });
 });
 

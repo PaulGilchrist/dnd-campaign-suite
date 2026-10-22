@@ -21,20 +21,20 @@
 // - HP-gate asymmetry under log failure: HP>0 suppresses the death prompt
 //   (PRESERVED-CITED-BY: relentlessRageService.deathSaves.test.js:7-8 cites
 //   this row, formerly :116 — HP>0 no-spawn); HP<=0 spawns it.
-// - Unguarded awaited store writes (the silent-hole census): :101 and :194
-//   sit OUTSIDE any try/catch — a never-settling write (stalled POST, the
-//   production shape) truncates handleSaveResult there, skips everything
-//   downstream, and NEVER reaches console (golden bytes: console census stays
-//   empty #1360/86 form). :195 removeEventListener then never runs; the
-//   stranded-listener replay rows prove the leak. A genuine REJECTION would
-//   additionally leak an unhandled rejection of the listener Promise (vitest
-//   fails the file on those) — reported as a source hole, pinned as stall.
+// - Fixed #1401/#1400 (2026-10-22): the awaited store writes (:101 heal, :194-era
+//   uses bump) now sit INSIDE a try/catch (console.error '[relentlessRage] Error:'
+//   + no rethrow into void, fix#9 shape) and handleSaveResult EAGERLY unsubscribes
+//   at the promptId match (same id variable guards and deregisters, fix#42 family,
+//   mirroring the ds listener's remove-before-process). A genuine REJECTION is
+//   surfaced once on console and the consumed promptId can never be replayed. A
+//   never-settling write (stalled POST) still truncates the chain mid-await — that
+//   half is structurally unavoidable — but the listener is no longer stranded: the
+//   replay rows below now pin INERTNESS (zero extra writes/logs).
 //
 // :0-swallow census: addEntry sites all carry .catch (zero bare swallows);
-// setRuntimeValue death-save writes :165/:177/:178 are fire-and-forget with
-// NO catch — reported as a source hole (never exercised with a rejection
-// here, to keep the suite rejection-free; the synchronous writes land before
-// the death log is even attempted, pinned by the sync census below).
+// the slot machine's fire-and-forget HP/deathSaves/deathFailures writes now also
+// carry .catch (the former reported hole is closed) — normal-path censuses below
+// are unchanged because resolved promises never reach the catch.
 //
 // Determinism #1312/#1366: vitest-4 clearAllMocks RETAINS implementations —
 // save-prompt ids and death-guids come from monotonic module-level counters
@@ -401,11 +401,11 @@ describe('relentlessRageService - error paths', () => {
     expect(consoleError.mock.calls[0][1]).toBe(rejected[0]);
   });
 
-  it('heal-write that never settles truncates the success path silently and strands the listener (:101 unguarded)', async () => {
-    // Never-settling write (a stalled network POST is the production shape
-    // of this unguarded await). A genuine REJECTION here would surface as an
-    // unhandled rejection of handleSaveResult — pinned as a source hole in
-    // the header, not exercised, so the suite stays rejection-free.
+  it('heal-write that never settles truncates the success chain but the eager-consumed listener never replays (#1401/#1400 fixed)', async () => {
+    // Never-settling write (a stalled network POST). The listener is already
+    // self-removed AT the promptId match (eager consume), so the truncation no
+    // longer strands it: the replay below is inert. A genuine REJECTION row sits
+    // underneath — both shapes now reach console or stay silent WITHOUT a leak.
     const HANG = () => new Promise(() => { });
     const store = makeStore(
       { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, activeConditions: ['unconscious'] },
@@ -418,27 +418,53 @@ describe('relentlessRageService - error paths', () => {
     await flush();
 
     // Truncation: only the stalled heal attempt exists — no clears, no uses
-    // bump, no success log (:114 never reached), no summary event.
+    // bump, no success log (:114-era never reached), no summary event.
     expect(store.writes).toEqual([['currentHitPoints', 22]]);
     expect(store.reads).toEqual(['activeBuffs', 'relentlessrageUses']);
     expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, TRIGGER_LOG(promptId)]]);
     expect(combatSpy).not.toHaveBeenCalled();
-    // Golden silent-hole bytes #1360/86: awaited store writes have NO catch —
-    // console.error must stay byte-empty, unlike every addEntry row above.
+    // Stalled await never reaches the catch — console stays byte-empty (#1360/86).
     expect(consoleError).not.toHaveBeenCalled();
 
-    // Stranded listener (:195 removeEventListener never ran): replaying the
-    // SAME promptId is re-processed, doubling the heal-write attempts.
+    // Eager consume: the consumed promptId is already deregistered — replay inert.
     dispatchSaveResult(promptId, true);
     await flush();
-    expect(store.writes).toEqual([
-      ['currentHitPoints', 22],
-      ['currentHitPoints', 22],
-    ]);
+    expect(store.writes).toEqual([['currentHitPoints', 22]]);
     expect(logService.addEntry.mock.calls.length).toBe(1);
   });
 
-  it('uses-bump stall on the failure path truncates AFTER the log has landed (:194 unguarded)', async () => {
+  it('heal-write REJECTION is surfaced once and consumes the prompt exactly once (#1401 unguarded-await fixed)', async () => {
+    // fix#9 house shape: catch -> console.error exact prefix + SAME Error instance
+    // (#1385 identity), no rethrow into void, zero unhandled rejections escape
+    // (vitest fails the file on any that did).
+    const err = new Error('heal-store-down');
+    const store = makeStore(
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0 },
+      { currentHitPoints: () => Promise.reject(err) },
+    );
+
+    checkRelentlessRage(makeCreature(), makePlayerComputed(), CAMPAIGN);
+    const promptId = lastPromptId();
+    dispatchSaveResult(promptId, true);
+    await flush();
+
+    // Heal attempt recorded; every downstream write skipped — the latch is NOT
+    // bumped on a failed commit (no phantom consumption).
+    expect(store.writes).toEqual([['currentHitPoints', 22]]);
+    expect(logService.addEntry.mock.calls).toEqual([[CAMPAIGN, TRIGGER_LOG(promptId)]]);
+    expect(combatSpy).not.toHaveBeenCalled();
+    expect(consoleError.mock.calls.length).toBe(1);
+    expect(consoleError.mock.calls[0][0]).toBe(PREFIX);
+    expect(consoleError.mock.calls[0][1]).toBe(err);
+
+    // Eager consume: replay of the consumed promptId is inert.
+    dispatchSaveResult(promptId, true);
+    await flush();
+    expect(store.writes).toEqual([['currentHitPoints', 22]]);
+    expect(consoleError.mock.calls.length).toBe(1);
+  });
+
+  it('failed save: uses-bump stall still logs-then-stalls, but the consumed promptId never replays (#1400 eager consume)', async () => {
     const HANG = () => new Promise(() => { });
     const store = makeStore(
       { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, currentHitPoints: 5 },
@@ -450,25 +476,48 @@ describe('relentlessRageService - error paths', () => {
     dispatchSaveResult(promptId, false);
     await flush();
 
-    // store-write-fails-still-logs (falsifying half vs row above): the
-    // failure log (:130) precedes the uses bump (:194) and is already in
-    // the log census when the latch write stalls; it never lands for real.
+    // store-write-fails-still-logs: the failure log precedes the uses bump and
+    // is already in the log census when the latch write stalls; it never lands.
     expect(logService.addEntry.mock.calls).toEqual([
       [CAMPAIGN, TRIGGER_LOG(promptId)],
       [CAMPAIGN, FAIL_LOG],
     ]);
     expect(store.writes).toEqual([['relentlessrageUses', 1]]);
     expect(sendDeathSavePrompt).not.toHaveBeenCalled();
-    expect(consoleError).not.toHaveBeenCalled(); // silent hole — no retry, no report
+    expect(consoleError).not.toHaveBeenCalled(); // stall suspends before the catch
 
-    // Listener stranded again (:195 skipped): replay doubles the log and the
-    // failed latch attempt.
+    // Eager consume: the listener deregistered at the match — replay is inert
+    // (the pre-fix strand doubled the log and the latch attempt).
     dispatchSaveResult(promptId, false);
     await flush();
-    expect(logService.addEntry.mock.calls.length).toBe(3);
-    expect(store.writes).toEqual([
-      ['relentlessrageUses', 1],
-      ['relentlessrageUses', 1],
+    expect(logService.addEntry.mock.calls.length).toBe(2);
+    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
+  });
+
+  it('uses-bump REJECTION is surfaced once; a failed commit does not phantom-bump twice (#1401)', async () => {
+    const err = new Error('uses-store-down');
+    const store = makeStore(
+      { activeBuffs: [{ name: 'Rage', effect: 'stance' }], relentlessrageUses: 0, currentHitPoints: 5 },
+      { relentlessrageUses: () => Promise.reject(err) },
+    );
+
+    checkRelentlessRage(makeCreature(), makePlayerComputed(), CAMPAIGN);
+    const promptId = lastPromptId();
+    dispatchSaveResult(promptId, false);
+    await flush();
+
+    expect(store.writes).toEqual([['relentlessrageUses', 1]]); // attempt recorded, never landed
+    expect(logService.addEntry.mock.calls).toEqual([
+      [CAMPAIGN, TRIGGER_LOG(promptId)],
+      [CAMPAIGN, FAIL_LOG],
     ]);
+    expect(consoleError.mock.calls.length).toBe(1);
+    expect(consoleError.mock.calls[0][0]).toBe(PREFIX);
+    expect(consoleError.mock.calls[0][1]).toBe(err); // #1385 identity
+
+    dispatchSaveResult(promptId, false);
+    await flush();
+    expect(store.writes).toEqual([['relentlessrageUses', 1]]);
+    expect(consoleError.mock.calls.length).toBe(1);
   });
 });

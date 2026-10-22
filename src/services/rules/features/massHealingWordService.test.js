@@ -16,14 +16,18 @@
  *    'Mass Healing Word'; log note + console prefixes '[massHealingWordService]'
  *    (requireCreatures :57) and '[massHealingWord]' (floating addEntry
  *    catch :103 — twin has no such catch, its log-rejection lane is unique).
- *  - SHARED SHAPE (pinned here verbatim): first-6 affiliation-blind slice
- *    :129-130, one roll per target :141, clamp Math.min :83, stored-HP
- *    `!= null && !== ''` guard :77, heal-apply-before-log :86 vs :91,
- *    Fortified-Health latch :149-151, delta-0/negative over-log :91.
+ *  - SHARED SHAPE (post-#1385, pinned here verbatim): selectLawfulTargets
+ *    (:122-131, called :155) filters candidates through canonical
+ *    isWithinRange(casterName, name, rangeToFeet(spell.range)) then
+ *    slice(0, maxTargets) (range read off disk; maxTargets off
+ *    automation.maxTargets :6794 else disk-text default 6), one roll per
+ *    target :86, clamp Math.min :90, stored-HP `!= null && !== ''` guard
+ *    :84, heal-apply-before-log :93 vs :98, Fortified-Health latch
+ *    :173-175, delta-0/negative over-log :98.
  *
  * Producer vs forwarder verdict (#1335): this lane computes its own heals —
- * resolveHealExpression ladder (:28-52) + MOD substitute (:47-49), dice per
- * target (:79), clamp per target (:83). It OWNS its numbers.
+ * resolveHealExpression ladder (:35-58) + MOD substitute (:55), dice per
+ * target (:86), clamp per target (:90). It OWNS its numbers.
  *
  * LIVE export: triggerMassHealingWord — sole export; live caller
  * triggerSpells.js handleMassHealingWord :421-423 (imports :37). Dead-export
@@ -40,23 +44,26 @@
  *       heal_at_slot_level 3:'2d4 + MOD' ... 9:'8d4 + MOD'.
  *  Cross-ruleset divergence at the SAME lv3 slot (1d4 vs 2d4) pinned.
  *
- * BUG CLASSES re-checked from twin #1384 (all EXIST here, pinned as quirks):
- *  (1) :129-130 heals FIRST 6 creatures in array order, affiliation-blind —
- *      hostiles in the list get healed; disk 60ft range never enforced
- *      (source imports no range util — old vi.mock of rangeValidation was
- *      already absent here).
- *  (2) :91 over-log: every processed creature logs hp_change even with
- *      delta 0, and :83 lets negative actualHeal (storedHp > maxHp) reach
- *      the log and the returned totals (:105/:146).
- *  (3) :11 gate case-sensitive while caller triggerSpells.js:422 gates on
- *      lowercased name — case-drift passes caller, silently nulls here.
- *  (4) :19 ability found but bonus undefined -> MOD never substituted;
- *      dice receives literal '1d4 + MOD' bytes (:47 guard).
- *  (5) stored HP ''/string coercion guard shape :77 — '' and null/undefined
+ * BUG CLASSES re-checked from twin #1384:
+ *  (1) :122-131/:155 selection — FIXED #1385: candidates now pass canonical
+ *      isWithinRange(casterName, name, rangeToFeet(spell.range)); disk range
+ *      '60 feet' enforced, no hardcoded feet. Choice-clause verdict: disk
+ *      :6760 'up to six creatures of your choice that you can see within
+ *      range' — 'of your choice', no friendly/allies wording -> hostiles
+ *      are RAW-legal, affiliation deliberately unfiltered. Law arms pinned
+ *      in the '#1385 selection law' describe below.
+ *  (2) :98 over-log: every processed creature logs hp_change even with
+ *      delta 0, and :90 lets negative actualHeal (storedHp > maxHp) reach
+ *      the log and the returned totals (:112/:180).
+ *  (3) :17 gate (used :135) case-sensitive while caller triggerSpells.js:422
+ *      gates on lowercased name — case-drift passes caller, silently nulls.
+ *  (4) :25 ability found but bonus undefined -> MOD never substituted;
+ *      dice receives literal '1d4 + MOD' bytes (:55 guard).
+ *  (5) stored HP ''/string coercion guard shape :84 — '' and null/undefined
  *      mean full HP; numeric strings coerce via Number.
- *  (6) heal-then-log ordering :86 before :91 — pinned via call order.
- *  :0-swallow census (#1374): :113 slotLevel||level||3 coerces (not NaN,
- *  not throw), and :122 prof||0 / level||1 — both pinned.
+ *  (6) heal-then-log ordering :93 before :98 — pinned via call order.
+ *  :0-swallow census (#1374): :139 slotLevel||level||3 coerces (not NaN,
+ *  not throw), and :148 prof||0 / level||1 — both pinned.
  *
  * Store audit: getRuntimeValue reads ONLY key 'currentHitPoints' per target
  * at CAMPAIGN — strict fake throws on any other key/campaign (#1371).
@@ -106,12 +113,27 @@ vi.mock('../../combat/automation/automationService.js', () => ({
     markFortifiedHealthUsed: vi.fn(),
 }));
 
+// #1385 range boundary: canonical isWithinRange (rules/combat/rangeCheck.js).
+// Pre-fix the service imports NO range util and never reaches this module
+// (capture arms prove selection ignores it). Post-fix the service imports it
+// and every candidate must pass this seam; rangeValidation.js links through
+// this mock via its own isDistanceInRange import, so provide both exports.
+let outOfRange; // names the fixture map places beyond the disk range
+vi.mock('../combat/rangeCheck.js', () => ({
+    isWithinRange: vi.fn(async (_source, targetName, ft) => {
+        if (ft == null) return true; // canonical null = unrestricted
+        return !outOfRange.has(targetName);
+    }),
+    isDistanceInRange: vi.fn((dist, rangeFt) => rangeFt == null || dist == null || dist <= rangeFt),
+}));
+
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
+import { isWithinRange } from '../combat/rangeCheck.js';
 
 // ── Canon helpers ─────────────────────────────────────────────
 
@@ -176,6 +198,7 @@ beforeEach(() => {
     diceQ = [];
     reads = [];
     store = new Map();
+    outOfRange = new Set();
     const pop = (mode) => {
         const e = diceQ.shift();
         if (!e) throw new Error(`unstubbed dice: ${mode} roll has no queued entry`);
@@ -516,5 +539,87 @@ describe('massHealingWordService.triggerMassHealingWord', () => {
         expect(dispatchSpy).toHaveBeenCalledTimes(1);
         // prefix '[massHealingWord]' (no 'Service') is unique to this lane vs twin's '[massCureWounds]'
         expect(consoleSpy).toHaveBeenCalledWith('[massHealingWord] Error:', new Error('boom'));
+    });
+});
+
+// ── #1385 AoE selection law (range enforced, affiliation per disk verdict) ──
+// DISK (public/data/spells.json 'Mass Healing Word'):
+//   :6760 'As you call out words of restoration, up to six creatures of your
+//          choice that you can see within range regain hit points equal to
+//          1d4 + your spellcasting ability modifier.'  <- choice clause is
+//          OF YOUR CHOICE: no friendly/allies wording -> hostile selection is
+//          RAW-legal; affiliation filtering would be product stance, not law.
+//   :6765 range '60 feet' (enforced from caster via canonical isWithinRange)
+//   :6794 automation.maxTargets 6 (read from disk, not hardcoded).
+describe('massHealingWordService #1385 selection law', () => {
+    it('PRE-FIX CAPTURE / POST-FIX LAW: hostile 5ft in AoE is selected (of your choice -> lawful); ally 100ft out is NEVER selected (range law)', async () => {
+        getCombatContext.mockResolvedValue(cs([
+            { name: 'Goblin', maxHp: 7 },   // hostile, 5ft inside AoE
+            { name: 'FarAlly', maxHp: 50 }, // ally, 100ft out (beyond disk 60ft)
+            { name: 'Cleric', maxHp: 50 },  // caster
+        ]));
+        seedHp('Goblin', 5);
+        seedHp('FarAlly', 40);
+        seedHp('Cleric', 10);
+        outOfRange.add('FarAlly');
+        roll('normal', 20, [20]);
+        roll('normal', 20, [20]);
+        roll('normal', 20, [20]); // 3rd stays queued post-fix (FarAlly rejected); consumed by the pre-fix defect
+        const result = await trigger(mhw5e, { slotLevel: 3 });
+        // FarAlly: out-of-range never selected (post-fix); pre-fix it was included.
+        expect(result.targets.map(t => t.targetName)).toEqual(['Goblin', 'Cleric']);
+        // range seam consulted per candidate with the disk feet value, caster-centric
+        expect(isWithinRange).toHaveBeenCalledTimes(3);
+        expect(isWithinRange).toHaveBeenCalledWith('Cleric', 'FarAlly', 60);
+        // affiliation arm: hostile in range stays eligible (disk-verdict lawful)
+        expect(applyHealingToTarget).toHaveBeenCalledWith(expect.anything(), 'Goblin', 2, CAMPAIGN);
+    });
+
+    it('exactly-6 cap holds on the LAWFUL pool in array order; out-of-range candidates open no dice slot', async () => {
+        const many = Array.from({ length: 8 }, (_, i) => ({ name: `C${i}`, maxHp: 100 }));
+        many[7] = { name: 'Far7', maxHp: 100 };
+        getCombatContext.mockResolvedValue(cs(many));
+        many.forEach(c => seedHp(c.name, 50));
+        outOfRange.add('C4');
+        outOfRange.add('Far7');
+        // lawful pool = C0,C1,C2,C3,C5,C6 -> slice(0,6) consumes every lawful name
+        for (let i = 0; i < 6; i++) roll('normal', 10, [10]);
+        const result = await trigger(mhw5e, { slotLevel: 3 });
+        expect(result.targets.map(t => t.targetName)).toEqual(['C0', 'C1', 'C2', 'C3', 'C5', 'C6']);
+        expect(rollExpression).toHaveBeenCalledTimes(6); // lawful pool exhausted at cap
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(6);
+    });
+
+    it('#1348 single-target edges: one lawful target heals exactly it; sole candidate out-of-range -> noTargets, zero dice, zero dispatch', async () => {
+        getCombatContext.mockResolvedValue(cs([{ name: 'Near', maxHp: 100 }]));
+        seedHp('Near', 90);
+        roll('normal', 15, [7, 8]);
+        const one = await trigger(mhw5e, { slotLevel: 3 });
+        expect(one.targets.map(t => t.targetName)).toEqual(['Near']);
+        expect(one.totalHealed).toBe(10);
+
+        getCombatContext.mockResolvedValueOnce(cs([{ name: 'Beyond', maxHp: 100 }]));
+        seedHp('Beyond', 95);
+        outOfRange.add('Beyond');
+        roll('normal', 15, [7, 8]); // stays queued post-fix; consumed by the pre-fix range-blind defect
+        const none = await trigger(mhw5e, { slotLevel: 3 });
+        expect(none).toEqual({ noTargets: true });
+        expect(rollExpression).toHaveBeenCalledTimes(1);
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(isWithinRange).toHaveBeenCalledWith('Cleric', 'Beyond', 60);
+    });
+
+    it('maxTargets read from disk: real row pins automation.maxTargets 6; synthetic row override 2 proves no hardcode', async () => {
+        expect(mhw5e.automation.maxTargets).toBe(6); // disk truth byte (:6794)
+        const spell = { ...mhw5e, automation: { ...mhw5e.automation, maxTargets: 2 } };
+        const many = Array.from({ length: 4 }, (_, i) => ({ name: `C${i}`, maxHp: 100 }));
+        getCombatContext.mockResolvedValue(cs(many));
+        many.forEach(c => seedHp(c.name, 50));
+        // 4 queued: post-fix consumes 2 (disk override); pre-fix consumes all 4 and
+        // its 4-name target list fails the assertion — the no-disk-read capture.
+        for (let i = 0; i < 4; i++) roll('normal', 10, [10]);
+        const result = await trigger(spell, { slotLevel: 3 });
+        expect(result.targets.map(t => t.targetName)).toEqual(['C0', 'C1']); // disk override honored, no hardcode
     });
 });

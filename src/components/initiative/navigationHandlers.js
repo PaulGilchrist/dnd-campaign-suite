@@ -71,6 +71,9 @@ const PLAYER_ROUND_LATCH_KEYS = [
     '_Branches_of_the_Tree_usedRound',
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
     '_War_Magic_usedRound',
+    // #1451: Arcane Apotheosis free-Metamagic waiver is once per TURN (disk 2024 L20) —
+    // consumed at the waived-cast confirm (MetamagicPopup), re-arms at round wrap.
+    '_Arcane_Apotheosis_usedRound',
     // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
     '_Reactive_Spell_usedRound',
     // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.

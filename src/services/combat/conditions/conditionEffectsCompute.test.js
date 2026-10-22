@@ -148,6 +148,9 @@ describe('computeConditionEffects — registry te census (bare te, exact diff)',
     // but addUniqueReason skips the undefined ability.
     hex_ability_check_disadvantage: { abilityCheckDisadvantageAbilities: [] },
     dex_save_disadvantage: { slowDexSaveDisadvantage: true, saveDisadvantage: ['dex'] },
+    // #1373(b): newly registered Heroism companion te — bare fold pushes WIS +
+    // count, reason falls back to 'Heroism' when the te carries no source.
+    wisdom_save_advantage: { saveAdvantageAbilities: ['WIS'], saveAdvantageCount: 1, saveAdvantageReasons: ['Heroism'] },
     disadvantage_perception_checks: { abilityCheckDisadvantage: true },
     // Same empty-list footgun as the hex sibling (:528 creates before guard).
     enhance_ability: { abilityCheckAdvantageAbilities: [] },

@@ -21,9 +21,18 @@ function lower(value) {
     return String(value ?? '').toLowerCase();
 }
 
-function findWeakeningBreathEffect(targetName, campaignName) {
+// #1431 reader fix (a): ALL relevant instances, not first-match. RAW (monsters.json
+// :2259/:4170): "each creature that isn't currently affected by THIS breath ...
+// repeats the save at the end of each of its turns, ending the effect on ITSELF
+// on a success" — two dragons = two coexisting instances (registry dedups by
+// target+effect+source, targetEffectDefinitions.js:1508-1509; fix#93 clear lane
+// :482-484 already guards a sibling's clock). Verdict: all-relevant — every
+// distinct-source te adjudicates its OWN ladder at its OWN dc. Pre-fix source-blind
+// `.find` picked the FIRST row and silently adjudicated the second dragon's dc-24
+// ladder at Adult's dc-21.
+function findWeakeningBreathEffects(targetName, campaignName) {
     const effects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
-    return effects.find(te => te.effect === WEAKENING_BREATH_TE && te.target === targetName) || null;
+    return effects.filter(te => te.effect === WEAKENING_BREATH_TE && te.target === targetName);
 }
 
 // Failed-save grant (cone picker NPC auto-leg and PC prompt leg both route
@@ -100,9 +109,15 @@ async function resolveWeakeningBreathRepeatSave(csCreature, targetName, saveType
 }
 
 
-function removeWeakeningBreathTe(targetName, campaignName) {
+// #1431 reader fix (b): strip ONLY THIS dragon's te — exact fix#93 AND-triple
+// mirror (clearExpirationEffects.js:490: effect && target && source, strict ===;
+// both-null legacy twins expire together, one-sided-null survives — #1517 null
+// canon; disk census: zero weakening_breath rows in public/campaigns). Pre-fix
+// source-blind strip collateral-stripped a second dragon's te when the FIRST
+// dragon's repeat save succeeded.
+function removeWeakeningBreathTe(targetName, campaignName, source) {
     const effects = [...(getRuntimeValue('campaign', 'targetEffects', campaignName) || [])];
-    const filtered = effects.filter(te => !(te.effect === WEAKENING_BREATH_TE && te.target === targetName));
+    const filtered = effects.filter(te => !(te.effect === WEAKENING_BREATH_TE && te.target === targetName && te.source === source));
     if (filtered.length !== effects.length) {
         setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
     }
@@ -110,53 +125,63 @@ function removeWeakeningBreathTe(targetName, campaignName) {
 
 
 // Turn-END consumer (navigationHandlers.applyOutgoingTurnEndPasses seam —
-// beside applyFrightfulPresenceTurnEnd / applySleepTurnEnd). Success strips
-// the te (effect ends on itself); failure keeps it (the 10-round clock still
-// auto-succeeds after 1 minute).
+// beside applyFrightfulPresenceTurnEnd / applySleepTurnEnd). #1431: the caller
+// seam carries NO dragon identity (campaignName + outgoing creature only), so
+// the ladder is adjudicated PER SOURCE INSTANCE — each weakening_breath te on
+// the target repeats its own save at its own dc/saveType; success strips that
+// instance's own te (fix#93 AND-triple mirror at removeWeakeningBreathTe) and
+// logs its own source; failure keeps it (that source's 10-round clock still
+// auto-succeeds after 1 minute). Instances process sequentially in store order;
+// a PC under two dragons gets two queued prompts, each waiting indefinitely
+// (turn-based, no-clock compliant).
 export async function applyWeakeningBreathTurnEnd(campaignName, targetName) {
-    const te = findWeakeningBreathEffect(targetName, campaignName);
-    if (!te) return { handled: false };
+    const tes = findWeakeningBreathEffects(targetName, campaignName);
+    if (!tes.length) return { handled: false };
 
-    const saveDc = te.dc ?? 21;
-    const saveType = te.saveType || 'Strength';
-    const attackerName = te.source;
     const cs = getCombatSummary(campaignName);
     const csCreature = cs?.creatures?.find(c => c.name === targetName);
 
-    const { roll, saveBonus, success, mode } = await resolveWeakeningBreathRepeatSave(csCreature, targetName, saveType, saveDc, campaignName);
-    const total = roll + saveBonus;
+    const results = [];
+    for (const te of tes) {
+        const saveDc = te.dc ?? 21;
+        const saveType = te.saveType || 'Strength';
+        const attackerName = te.source;
 
-    await addEntry(campaignName, {
-        type: 'save_result',
-        characterName: attackerName,
-        rollType: 'save-weakening-repeat',
-        targetName,
-        saveDc,
-        saveType,
-        success,
-        roll,
-        total,
-        saveBonus,
-        mode,
-        description: success
-            ? `${targetName} succeeded its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}, disadvantage) — Weakening Breath ends.`
-            : `${targetName} failed its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}, disadvantage) — remains Weakened (auto-succeeds after 1 minute).`,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error('[weakeningBreathService:repeat-result]', e); });
+        const { roll, saveBonus, success, mode } = await resolveWeakeningBreathRepeatSave(csCreature, targetName, saveType, saveDc, campaignName);
+        const total = roll + saveBonus;
 
-    if (success) {
-        removeWeakeningBreathTe(targetName, campaignName);
         await addEntry(campaignName, {
-            type: 'condition',
-            action: 'removed',
-            characterName: targetName,
-            condition: 'Weakened',
-            reason: 'Weakening Breath ends (repeat save succeeded)',
-            sourceName: attackerName,
+            type: 'save_result',
+            characterName: attackerName,
+            rollType: 'save-weakening-repeat',
+            targetName,
+            saveDc,
+            saveType,
+            success,
+            roll,
+            total,
+            saveBonus,
+            mode,
+            description: success
+                ? `${targetName} succeeded its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}, disadvantage) — Weakening Breath ends.`
+                : `${targetName} failed its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}, disadvantage) — remains Weakened (auto-succeeds after 1 minute).`,
             timestamp: Date.now(),
-        }).catch((e) => { console.error('[weakeningBreathService:repeat-removed]', e); });
-        return { handled: true, success: true, roll, total };
+        }).catch((e) => { console.error('[weakeningBreathService:repeat-result]', e); });
+
+        if (success) {
+            removeWeakeningBreathTe(targetName, campaignName, attackerName);
+            await addEntry(campaignName, {
+                type: 'condition',
+                action: 'removed',
+                characterName: targetName,
+                condition: 'Weakened',
+                reason: 'Weakening Breath ends (repeat save succeeded)',
+                sourceName: attackerName,
+                timestamp: Date.now(),
+            }).catch((e) => { console.error('[weakeningBreathService:repeat-removed]', e); });
+        }
+        results.push({ source: attackerName, success, roll, total });
     }
 
-    return { handled: true, success: false, roll, total };
+    return { handled: true, results };
 }

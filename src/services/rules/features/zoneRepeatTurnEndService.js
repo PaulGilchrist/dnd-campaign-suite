@@ -29,7 +29,7 @@ import { cloneDeep } from 'lodash';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { loadCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
+import { getCombatSummary, loadCombatSummary, setCombatSummaryCache } from '../../encounters/combatData.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
 import { getEffectDefinition } from '../../combat/conditions/targetEffectDefinitions.js';
 import storage from '../../ui/storage.js';
@@ -107,7 +107,8 @@ function victimMaxHp({ csCreature, targetName, campaignName }) {
 
 // Untyped direct-HP loss (whirlwind/MA-0367 idiom): PC → runtime
 // currentHitPoints; monster → detached combatSummary through the
-// serialized write queue.
+// serialized write queue. Post-#1434 the caller passes the LIVE cached
+// summary (cs: liveCs), so each per-tick clone carries prior ticks' HP.
 async function applyZoneHpLoss({ cs, csCreature, targetName, newHp, campaignName }) {
     if (csCreature.type === 'player') {
         await setRuntimeValue(targetName, 'currentHitPoints', newHp, campaignName);
@@ -131,7 +132,19 @@ async function tickOneZone({ campaignName, targetName, te, cs, round }) {
         console.error(`[zoneRepeatTurnEnd] armed te "${te.effect}" on ${targetName} lacks dice or save/dc — skipping (GM-enforced residual). te=${JSON.stringify(te)}`);
         return null;
     }
-    const csCreature = (cs.creatures || []).find(c => c.name === targetName);
+    // #1434 fix: `cs` is loaded ONCE per apply (applyZoneRepeatTurnEnd :210) —
+    // re-resolving the victim off that frozen snapshot re-based EVERY armed te on
+    // the SAME start HP, so with multiple recurring-damage tes on one monster the
+    // later te's clone-and-write OVERWROTE the earlier's (15→12 then stale 13,
+    // not sequential 10). Reroute the monster base to the LIVE combatSummary cache
+    // per tick (fix#77 getCombatSummary canon; the cache is a read-your-write
+    // in-memory Map — setCombatSummaryCache writes it at applyZoneHpLoss :122,
+    // twin of useRuntimeState.js:99 — so te2 sees te1's write without any network
+    // refresh: mid-loop the store IS the fresher source). Mirrors the PC lane's
+    // fresh runtime re-read in victimHp (:99). `|| cs` is load-derived (the same
+    // object seeded at :210), never a fabricated fallback.
+    const liveCs = getCombatSummary(campaignName) || cs;
+    const csCreature = (liveCs.creatures || []).find(c => c.name === targetName);
     if (!csCreature) return null;
     const currentHp = victimHp({ csCreature, targetName, campaignName });
     if (!(currentHp > 0)) return null;
@@ -143,7 +156,7 @@ async function tickOneZone({ campaignName, targetName, te, cs, round }) {
     const raw = rolled ? Number(rolled.total) : 0;
     const damage = success ? Math.floor(raw / 2) : raw;
     const newHp = Math.max(0, currentHp - damage);
-    if (damage > 0) await applyZoneHpLoss({ cs, csCreature, targetName, newHp, campaignName });
+    if (damage > 0) await applyZoneHpLoss({ cs: liveCs, csCreature, targetName, newHp, campaignName });
 
     await logZoneTick({ campaignName, targetName, te, save, die, roll, saveBonus, success, raw, damage, newHp, csCreature });
     return { effect: te.effect, success, raw, damage, newHp };

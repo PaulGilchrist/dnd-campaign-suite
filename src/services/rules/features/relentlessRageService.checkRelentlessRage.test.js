@@ -4,8 +4,9 @@
 // zero-HP interceptor predicate (relentlessRageService.js:52) invoked by
 // applyDamage.js ZERO_HP_INTERCEPTORS at ordinal 4 (applyDamage.js:599,
 // chain orchestration owned by the applyDamage lane). The predicate decides
-// whether a raging Barbarian at 0 HP gets a CON save (canon: 2024 Barbarian
-// lv11 'Relentless Rage' — success heals 2 * barbarian_level), requests the
+// whether a raging Barbarian at 0 HP gets a CON save (canon per-ruleset,
+// #1399 adjudicated: 5e TEXT drop-to-1 → disk healExpression 1; 2024 TEXT
+// twice-your-Barbarian-level → disk '2 * barbarian_level'), requests the
 // save prompt, and returns {intercepted}/{awaitingSave} bytes.
 //
 // LATCH PAIR: this predicate is the READER of 'relentlessrageUses'
@@ -243,14 +244,27 @@ describe('relentlessRageService.checkRelentlessRage', () => {
     }
   });
 
-  it('drives the predicate directly from disk canon in both rulesets', () => {
+  it('drives the predicate from disk canon and enforces the #1399 per-ruleset text-vs-expression law', () => {
     const diskRows = [classes5e, classes2024].map(data =>
       data.find(c => c.name === 'Barbarian').class_levels[10].features
         .find(f => f.name === 'Relentless Rage')
     );
-    // Tripwire: the two ruleset rows must stay identical; if either
-    // diverges, every DC/heal pin in this suite needs re-derivation.
-    expect(diskRows[0].automation).toEqual(diskRows[1].automation);
+    // #1399 FIX (2026-10-22): the two rulesets legitimately DIFFER on
+    // healExpression — 5e PHB text says "you drop to 1 hit point instead"
+    // (lawful byte: numeric literal 1, evaluated verbatim by BOTH consumers'
+    // typeof-number arms), while 2024 text says "change to a number equal to
+    // twice your Barbarian level" (lawful byte: '2 * barbarian_level').
+    // Tripwire: every OTHER automation key stays identical across rulesets.
+    const { healExpression: hp5e, ...rest5e } = diskRows[0].automation;
+    const { healExpression: hp24, ...rest24 } = diskRows[1].automation;
+    expect(rest5e).toEqual(rest24);
+    expect(hp5e).toBe(1);
+    expect(hp24).toBe('2 * barbarian_level');
+    // Text-vs-expression pairing — each row's automation must match ITS OWN
+    // description text (the pre-fix 5e row carried the 2024 formula under the
+    // drop-to-1 text; that fabrication is what #1399 closed).
+    expect(diskRows[0].description).toContain('you drop to 1 hit point instead');
+    expect(diskRows[1].description).toContain('twice your Barbarian level');
 
     for (const feature of diskRows) {
       const { saveDc, dcScaling, saveType } = feature.automation;

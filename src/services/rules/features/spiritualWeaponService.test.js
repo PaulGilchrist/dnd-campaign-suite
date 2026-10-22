@@ -1,5 +1,5 @@
 // @maintained-by-ai
-// SP-112: Spiritual Weapon force record + duration clock + later-turn move/attack.
+// SP-112: Spiritual Weapon force record + combat-scoped expiry (#1420) + later-turn move/attack.
 // Producer-vs-forwarder: this lane PRODUCES a persisted force-record buff and an
 // attack DESCRIPTOR; dice rolling belongs to the attackCalc lane (consumed via
 // CharBonusActions.jsx -> rollAttack). No rolls happen here — envelope pins only.
@@ -12,12 +12,16 @@
 //        damage 2: '1d8 + 3' (Force) — caster modifier baked into disk bytes.
 // Case-split casting_time (#1391 class) confirmed on disk.
 //
-// :0-swallow quirk (#1345 class, pinned as-is): parseDurationRounds returns 0 —
-// the DOCUMENTED encounter-scoped marker (durationParser.js L9-10) — for both disk
-// duration strings, but the service's `parseDurationRounds(...) || DEFAULT` coerces
-// 0 to rounds: 10 on EVERY cast. Every addExpiration stamp here is therefore
-// rounds: 10 regardless of the duration text. Seam/clock ownership: expiration
-// queue lane; rounds mature at initiative seams only (no wall-clock here).
+// :0-swallow FIXED (#1420, was #1345-class pinned-as-is): parseDurationRounds returns
+// 0 — the DOCUMENTED encounter-scoped marker (durationParser.js L9-10) — for both disk
+// duration strings; the service no longer coerces it with `|| DEFAULT_DURATION_ROUNDS`.
+// Lawful arms: 0 -> combat-scoped stamp (rounds: Infinity, until: 'combat',
+// zoneDurationClock.js:102 canonical — no-clock policy per AGENTS.md: authored >=1
+// minute never a round countdown, swept at a new initiative roll / short / long rest);
+// explicit N_rounds -> rounds: N; unparseable/absent -> console.error, NO expiry armed
+// (no-fallbacks / MA-1215 never-fabricate-a-clock).
+// Shared-reference law (#1420, fix#1536 family): the move lane CLONES the store-read
+// buff before latching lastMoveRound — the live store ref is never mutated in place.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -53,6 +57,7 @@ import { getCombatContext } from '../combat/damageUtils.js';
 import { isWithinRange } from '../combat/rangeCheck.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
+import { parseDurationRounds } from '../effects/durationParser.js';
 
 const campaignName = 'test-campaign';
 const OWNER = 'Divine_Cleric';
@@ -201,16 +206,18 @@ describe('activateSpiritualWeaponForce', () => {
         expect(store.writes[0].id).toBe(`${OWNER}|activeBuffs`);
         expect(store.writes[0].value[0]).toBe(buff);
 
-        // :0-swallow pinned as-is: disk duration parses to 0 (encounter-scoped
-        // per durationParser.js docs) but `|| DEFAULT_DURATION_ROUNDS` stamps
-        // rounds: 10 every cast.
+        // #1420 flipped pin (was :0-swallow pinned-as-is): disk duration parses to
+        // the documented encounter-scope 0 (durationParser.js L9-10) and the zero
+        // SURVIVES — combat-scoped stamp rounds: Infinity + until: 'combat'
+        // (zoneDurationClock.js:102 canonical), never the resurrected rounds: 10.
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith({
             attackerName: OWNER,
             targetName: OWNER,
             effects: [{ type: 'remove_active_buff', buffName: BUFF_NAME }],
             campaignName,
-            rounds: 10,
+            rounds: Infinity,
+            until: 'combat',
         });
 
         // Exact log bytes incl em-dash and armed-target tail.
@@ -220,7 +227,7 @@ describe('activateSpiritualWeaponForce', () => {
             characterName: OWNER,
             summonName: BUFF_NAME,
             summonSource: 'spell',
-            description: `${OWNER} casts ${BUFF_NAME} (slot level 3) — a floating spectral force appears within 60 feet (${MARKER}). Force lasts until 10 rounds elapse or concentration breaks. Target within 5 ft of the force gate: checked.`,
+            description: `${OWNER} casts ${BUFF_NAME} (slot level 3) — a floating spectral force appears within 60 feet (${MARKER}). Force is combat-scoped (authored 1 minute — no-clock policy): it lasts the whole combat, ended by a new initiative roll, a rest, or concentration breaking. Target within 5 ft of the force gate: checked.`,
             summonedCreatures: [MARKER],
             timestamp: STAMP_MS,
         });
@@ -274,7 +281,7 @@ describe('activateSpiritualWeaponForce', () => {
                 characterName: OWNER,
                 summonName: BUFF_NAME,
                 summonSource: 'spell',
-                description: `${OWNER} casts ${BUFF_NAME} (slot level 2) — a floating spectral force appears within 60 feet (${MARKER}). Force lasts until 10 rounds elapse or concentration breaks. ${row.tail}`,
+                description: `${OWNER} casts ${BUFF_NAME} (slot level 2) — a floating spectral force appears within 60 feet (${MARKER}). Force is combat-scoped (authored 1 minute — no-clock policy): it lasts the whole combat, ended by a new initiative roll, a rest, or concentration breaking. ${row.tail}`,
                 summonedCreatures: [MARKER],
                 timestamp: STAMP_MS,
             });
@@ -282,9 +289,50 @@ describe('activateSpiritualWeaponForce', () => {
         }
     });
 
+    it('#1420 zero-survives: the three duration arms are mutually distinguishable (0->combat-scoped, N_rounds->finite, absent->loud no-stamp)', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            // Disk-law pin: BOTH ruleset disk durations parse to the documented 0
+            // (durationParser.js L9-10) — proof the old `|| 10` swallowed real bytes.
+            expect(parseDurationRounds('1 minute')).toBe(0);
+            expect(parseDurationRounds('Concentration, up to 1 minute')).toBe(0);
+
+            // Arm 1 — lawful encounter-scope 0: combat-scoped stamp, never rounds: 10.
+            armStore();
+            [addExpiration].forEach((m) => m.mockClear());
+            await activateSpiritualWeaponForce(spell5eDisk, playerStats, campaignName, { slotLevel: 2, formula: '1d8 + 3' });
+            expect(addExpiration, 'zero-survives arm').toHaveBeenCalledTimes(1);
+            expect(addExpiration).toHaveBeenCalledWith({
+                attackerName: OWNER,
+                targetName: OWNER,
+                effects: [{ type: 'remove_active_buff', buffName: BUFF_NAME }],
+                campaignName,
+                rounds: Infinity,
+                until: 'combat',
+            });
+
+            // Arm 2 — explicit rounds duration passes through: rounds: 3, NO until marker.
+            [addExpiration].forEach((m) => m.mockClear());
+            armStore();
+            await activateSpiritualWeaponForce({ ...spell5eDisk, duration: '3_rounds' }, playerStats, campaignName, { slotLevel: 2, formula: '1d8 + 3' });
+            expect(addExpiration, 'explicit-rounds arm').toHaveBeenCalledTimes(1);
+            expect(addExpiration.mock.calls[0][0].rounds).toBe(3);
+            expect(addExpiration.mock.calls[0][0]).not.toHaveProperty('until');
+
+            // Arm 3 — absent/unparseable duration: LOUD, no expiry armed (no-fallbacks).
+            [addExpiration].forEach((m) => m.mockClear());
+            armStore();
+            await activateSpiritualWeaponForce({ ...spell5eDisk, duration: 'Instantaneous' }, playerStats, campaignName, { slotLevel: 2, formula: '1d8 + 3' });
+            expect(addExpiration, 'loud-absent arm').not.toHaveBeenCalled();
+            expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[spiritualWeaponService:duration-unparseable]'));
+        } finally {
+            errSpy.mockRestore();
+        }
+    });
+
     it('recast on a stateful store: drops only the queued force expiry (survivor preserved), writes before the buff write, and second recast skips the no-op expiry write', async () => {
         const survivor = { target: 'Thug 1', effects: [{ type: 'remove_condition', condition: 'Prone' }] };
-        const forceExpiry = { target: OWNER, effects: [{ type: 'remove_active_buff', buffName: BUFF_NAME }], expiryRounds: 10 };
+        const forceExpiry = { target: OWNER, effects: [{ type: 'remove_active_buff', buffName: BUFF_NAME }], expiryRounds: Infinity, until: 'combat' };
         const unrelated = { name: 'Bless', effect: 'bless' };
         armStore({ expirations: [forceExpiry, survivor], buffs: [unrelated] });
 
@@ -464,10 +512,14 @@ describe('resolveSpiritualWeaponMoveAndAttack', () => {
         expect(written[0]).toBe(unrelated);
         expect(written[1]).not.toBe(force);
 
-        // Quirk pinned as-is: the service mutates the buff object handed out by
-        // the store read before writing the cloned map (source L179) — the read
-        // ref gains lastMoveRound. Drift detector if the mutation is removed.
-        expect(force.lastMoveRound).toBe(2);
+        // #1420 flipped pin (shared-reference law, fix#1536 family): the service
+        // used to mutate the store-read buff object in place pre-clone (old :179).
+        // It now clones FIRST — the live store ref (strict store.get hands back
+        // state[id] by identity) stays UNTOUCHED, and the latch lands only on the
+        // cloned object persisted via the setRuntimeValue map write.
+        expect(force.lastMoveRound).toBeUndefined();
+        expect(store.state[`${OWNER}|activeBuffs`][1]).not.toBe(force);
+        expect(store.state[`${OWNER}|activeBuffs`][1]).toEqual({ ...force, lastMoveRound: 2 });
 
         expect(isWithinRange).toHaveBeenCalledTimes(1);
         expect(isWithinRange).toHaveBeenCalledWith('Thug 1', MARKER, 5);

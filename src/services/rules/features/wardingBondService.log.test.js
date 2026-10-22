@@ -15,9 +15,11 @@
 //   .damage.test.js — HP arithmetic (:22-30), full hp_change numeric envelopes as
 //                    arithmetic outputs (:134-142, :170-179, :233-242), delta=actual-loss
 //                    clamp quirk (:40), store-wins, caster-hp-0 gate (:81)
-//   .edgeCases      — '-0' delta artifact (:40), negative damage QUIRK-1 (positive
-//                    delta logged with isHealing:false — .edgeCases :246-254), NaN
-//                    poison numeric bytes (:205-214), multi-buff first-match (:59-60)
+//   .edgeCases      — '-0' delta artifact, #1427 FIXED verdict rows: negative damage
+//                    loud-refused (never heals — old heal bytes 5/-10->15 captured
+//                    pre-fix in the #1427 record), NaN/null invalid inputs loud-refused
+//                    at the entry gate (fix#39/fix#5 shapes), sign-convention compliance
+//                    rows (isHealing derived from delta), multi-buff first-match
 //   .errors         — addEntry REJECTION console arms: '[wardingBond] Error:' (:46)
 //                    and '[wardingBond] Break log error:' (:19), rejection-console
 //                    ownership (#1382/#1385/#1388/#1428) — cited, never cloned here.
@@ -36,11 +38,12 @@
 // addEntry is `async function addEntry(campaignName, entry)` (arity 2, returns
 // response.json()). Arity-2 census pinned below against the real signature.
 // QUIRK SCAN (this face's verdicts): (1) #1427 positive-delta isHealing:false heal
-// path — NO message-side manifestation on this lane: hp_change has NO
-// message/description key (exact key-set asserted), so there is no heal TEXT to pin;
-// the heal BYTES live at .edgeCases :246-254 — cited. (2) NaN-poison: no free-text
-// fields means no 'NaN' interpolation on this face; numeric poison is .edgeCases —
-// cited. (3) zero-shape 'still emits' (0-damage log, #1427): .edgeCases :145-177 —
+// path — FIXED at the service entry gate (negative/NaN now loud-refused before any
+// addEntry), and isHealing is now DERIVED `delta > 0` (canonical CharHitPoints.jsx:35
+// law; renderer polarity fix#49 LogHpHealingEntry.jsx:90-91). This lane only ever
+// feeds POSITIVE damage, so its settled hp_change bytes are unchanged: negative delta
+// + isHealing:false stays sign-honest. (2) NaN-poison: refused loud — .edgeCases —
+// cited. (3) zero-shape 'still emits' (0-damage log, #1427 fourth arm): .edgeCases —
 // cited. (4) golden unguarded-deref: N/A on settled rows — every field resolves
 // defined here; the throwing store fake is the unexpected-read guard.
 // NO-CLOCK: zero timers, zero Date.now() gates on this face; hp_change entries carry

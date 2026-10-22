@@ -21,9 +21,11 @@
 // Disk identity (verified both rulesets): lv2, no save, 30 ft, Instantaneous,
 // non-concentration => NO CLOCK (latchStamp is a round-counter stamp, never a
 // countdown; 5e lane performs zero latch writes anyway).
-// HP-key census: reads only canonical 'currentHitPoints' (service:122); strict
-// keyed store fake throws on any other owner/key/campaign/arity — a wrong-key
-// refactor breaks here. Dice fixed-stub queues THROW past the last stub.
+// HP-key census: reads canonical 'currentHitPoints' (service:122) for kept
+// targets; 'hitPoints' would be read ONLY for type:'player' rows (#1393
+// per-target maxHp law) — this lane's creature rows carry maxHp directly, so
+// the strict keyed store fake throws on any other owner/key/campaign/arity — a
+// wrong-key refactor breaks here. Dice fixed-stub queues THROW past the last stub.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { triggerPrayerOfHealing } from './prayerOfHealingService.js';
 
@@ -392,4 +394,52 @@ describe('prayerOfHealingService results lane (5e twin outcome shape)', () => {
         expect(consoleSpy).toHaveBeenCalledTimes(2);
         expect(consoleSpy.mock.calls.every(c => c[0] === '[prayerOfHealing] Error:')).toBe(true);
     });
+
+    it('#1393 twin: maxHp-less ally is skipped LOUDLY while the rest heal — ledger stays non-negative, caster pool inert', async () => {
+        // PRE-FIX capture (service.orig.js probe, 2026-10-22): maxHp fell back to
+        // the CASTER's hitPoints 5 -> NoMaxAlly row healAmount min(10, 5-0)... the
+        // strict store below had NO NoMaxAlly seed at all, and a 5-HP caster capped
+        // any unresolved row at its own pool; negative deltas (5-HP caster healing a
+        // wounded 20-HP ally => -bytes) polluted totalHealed. POST-FIX: skip +
+        // console.error, healthy ally clamps on its OWN maxHp, zero negative bytes.
+        const ctx = {
+            players: [{ name: 'Cleric', gridX: 1, gridY: 1 }, { name: 'NoMaxAlly', gridX: 2, gridY: 1 }, { name: 'Ally1', gridX: 3, gridY: 1 }],
+            creatures: [{ name: 'NoMaxAlly' }, { name: 'Ally1', maxHp: 20 }],
+            placedItems: [],
+            round: 1,
+        };
+        clearCalls2();
+        getCombatContext.mockResolvedValue(ctx);
+        const reads = seedStore({ Ally1: 10 }); // strict: any NoMaxAlly store read THROWS
+        rollExpression.mockImplementation(seedDice([{ total: 15, rolls: [7, 8] }])); // one roll only
+
+        const result = await triggerPrayerOfHealing(SPELL_LV2, {}, { ...CLERIC_STATS, hitPoints: 5 }, CAMPAIGN_NAME, MAP_NAME);
+
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        expect(consoleSpy).toHaveBeenCalledWith('[prayerOfHealingService] Skipping NoMaxAlly: unresolved maxHp (target.maxHp=undefined, type=undefined). No roll, no write, no latch.');
+        // Ally1 rolls 15 into room 10 => clamped to its OWN 20 (never the caster's 5).
+        expect(result).toEqual({
+            targets: [{ targetName: 'Ally1', healAmount: 10, rolls: [7, 8], rawTotal: 15 }],
+            formula: '2d8 + 3',
+            totalHealed: 10,
+            rolls: [7, 8],
+            rawTotal: 15,
+        });
+        expect(reads).toEqual([['Ally1', 'currentHitPoints']]);
+        expect(rollExpression).toHaveBeenCalledTimes(1); // skipped target rolled NOTHING
+        expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+        expect(applyHealingToTarget).toHaveBeenCalledWith(ctx, 'Ally1', 10, CAMPAIGN_NAME);
+        const rows = addEntry.mock.calls.map(c => c[1]);
+        expect(rows).toHaveLength(1); // skip produced NO log row
+        expect(rows[0]).toEqual({ type: 'hp_change', targetName: 'Ally1', delta: 10, currentHp: 20, maxHp: 20, isHealing: true, sourceName: 'Cleric', note: 'Prayer of Healing', formula: '2d8 + 3', bonusDetails: undefined, timestamp: FIXED_TS });
+        expect(rows.every(r => r.delta >= 0)).toBe(true);
+        // 5e twin write-budget unchanged: zero runtime writes.
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(setRuntimeBatch).not.toHaveBeenCalled();
+    });
 });
+
+function clearCalls2() {
+    [getCombatContext, rollExpression, rollExpressionMaximized, applyHealingToTarget, addEntry, getRuntimeValue]
+        .forEach(m => m.mockClear());
+}

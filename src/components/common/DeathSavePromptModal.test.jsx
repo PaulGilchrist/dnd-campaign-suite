@@ -334,4 +334,75 @@ describe('DeathSavePromptModal', () => {
       });
     }
   });
+
+  // ── #1400 voided-prompt guard (single-producer law, 2026-10-22) ──
+  // relentlessRageService (and heals) may lift a target off 0 HP while a
+  // death-save prompt sits queued HERE. The service commits HP >= 1 BEFORE
+  // clearing deathSaves/deathFailures (fix#105 order, pinned by the
+  // saveResults lane's writes[0] census). A roll clicked after that point
+  // is VOID: this modal must not resurrect counters (or POST the outcome)
+  // onto a standing creature. Key ownership: modal = sole producer of
+  // counter ACCUMULATION on live dying targets; service = one-shot reset.
+
+  describe('#1400 voided-prompt guard', () => {
+    it('rolls normally while the target is at 0 HP — counters written exactly once each', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'currentHitPoints') return 0; // still dying: valid prompt
+        return null;
+      });
+      await renderWithPrompt('target1');
+      await rollAndWaitForResult();
+
+      // Full-state complete writes at own write-time (#1348 shape):
+      const counterWrites = setRuntimeValue.mock.calls.filter(
+        c => c[1] === 'deathSaves' || c[1] === 'deathFailures'
+      );
+      expect(counterWrites).toEqual([
+        ['target1', 'deathSaves', [true, false, false], CAMPAIGN],
+        ['target1', 'deathFailures', [false, false, false], CAMPAIGN],
+      ]);
+      expect(sendDeathSaveResult).toHaveBeenCalledTimes(1);
+    });
+
+    it('voids the roll when rage/heal already lifted HP above 0 — ZERO counter writes, no POST, prompt cleared', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'currentHitPoints') return 1; // relentless rage landed
+        return null;
+      });
+      const opens = [];
+      const collectOpen = (e) => opens.push(e.detail);
+      window.addEventListener('open-death-saving-throw', collectOpen);
+
+      await renderWithPrompt('target1');
+      fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
+
+      // No roll is consumed and NOTHING is written to foreign-state keys:
+      expect(deathSaveRules.rollDeathSave).not.toHaveBeenCalled();
+      expect(sendDeathSaveResult).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      // The stale prompt is cleared and the queue advances with no result view.
+      expect(clearDeathSavePrompt).toHaveBeenCalledWith(CAMPAIGN, 'target1');
+      // Queue advanced: the modal is gone and NO result view was rendered.
+      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Roll:/i)).not.toBeInTheDocument();
+      expect(opens.length).toBeGreaterThan(0);
+
+      window.removeEventListener('open-death-saving-throw', collectOpen);
+    });
+
+    it('does not stamp isDead from a voided prompt even when the queued roll outcome would be dead', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'currentHitPoints') return 5; // healed past dying
+        return null;
+      });
+      deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult({
+        result: 'dead', newFailures: [true, true, true],
+      }));
+      await renderWithPrompt('target1');
+      fireEvent.click(screen.getByRole('button', { name: 'Roll Death Save' }));
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(screen.queryByText('DEAD')).not.toBeInTheDocument();
+    });
+  });
 });

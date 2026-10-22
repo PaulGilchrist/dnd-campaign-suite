@@ -36,22 +36,27 @@
 // write-budget VALUES driven through :95's composition (distinguishable
 // #1348: Barbarian lv13 behind a lying bare level:3 → 26, never the
 // canonical 22 literal #1296, never the bare-level 3), the unknown-field
-// literal ZERO propagated VERBATIM to currentHitPoints (no caller-side
-// :0-swallow at :95/:101 — helpers :47-49 owns the evaluator, the WRITE of
-// its 0 is owned here), promptId-guard :93, one-shot removal :195 after a
-// RESOLVED success (errors covers only the stalled-half), and the exact
-// success/failure ability_use log bytes.
-// HP-key census: heal is a raw overwrite (:101) — NO clamp arithmetic and
-// NO maxHp read anywhere in the module (grep 'maxHp|max_hp': zero), so the
-// caster-maxHp leak class (#1393/94) cannot occur here; the zero-heal row
-// pins the overwrite is value-faithful down to 0.
+// literal ZERO CLAMPED at the write (#1403: evaluator owns the 0, the WRITE
+// floors it at 1 and the log mirrors the clamped value), promptId-guard :93,
+// eager one-shot removal at the match (errors lane owns the stall/reject
+// halves), and the exact success/failure ability_use log bytes.
+// HP-key census (#1403 FIXED 2026-10-22): the heal write is now a CLAMPED
+// overwrite — Math.max(1, evaluated): the raw overwrite previously propagated
+// the evaluator's 0 straight into currentHitPoints while death saves sat
+// cleared — the illegal alive-at-0 state. Positive values ride through
+// byte-faithful (26 stays 26); 0 and negatives floor at 1, and the
+// hpGained/description log bytes mirror the CLAMPED committed value, never
+// the pre-clamp evaluation. NO maxHp read anywhere in the module stays true
+// (grep 'maxHp|max_hp': zero) — the caster-maxHp leak class (#1393/94)
+// remains structurally absent.
 //
-// QUIRK SCAN: zero try/catch spans :92-196 — handleSaveResult is fully
-// unguarded (the :101 unguarded-await face is errors lane's stall pin,
-// cited above); rows here use settled collaborators only. Never-executed
+// QUIRK SCAN (#1401 UPDATED): handleSaveResult is now GUARDED — eager
+// removeEventListener AT the promptId match (same id variable as the guard,
+// fix#42 family) + try/catch console.error; the stall/reject halves live in
+// the errors lane. Rows here use settled collaborators only. Never-executed
 // guards hunted in this lane's span: ZERO found — every branch
-// (guard :93, success/failure :100/:129, HP-gate :144, filter :111) has a
-// row. clearDeathSavePrompt was a DEAD mock in the old file (the service
+// (guard :93, success/failure, HP-gate, filter) has a row.
+// clearDeathSavePrompt was a DEAD mock in the old file (the service
 // imports only sendDeathSavePrompt, :3 — live-vs-dead verdict: dead) and the
 // dead 'hitPoints' seed is deleted, both per #1370 caller evidence.
 // NO-CLOCK: clean — relentlessRageService.js:1-206 contains zero
@@ -315,10 +320,10 @@ describe('relentlessRageService - save result handling', () => {
     expect(logService.addEntry.mock.calls.length).toBe(2);
     expect(combatSpy.mock.calls.length).toBe(1);
 
-    // :0-swallow falsifier at the caller: helpers turn '5 * charisma' into
-    // literal 0 (helpers :47-49); the WRITE of that 0 is owned here — no
-    // ||/?? guard may rescue it at :95/:101. Byte-faithful overwrite, and
-    // an untouched non-unconscious condition list rides through unchanged.
+    // #1403 clamp falsifier at the caller: helpers turn '5 * charisma' into
+    // literal 0 (and 0 * level into 0); the WRITE of that 0 is owned here and
+    // floors it at 1 — relentless rage never lands its creature alive-at-0
+    // with cleared death saves. Log bytes mirror the CLAMPED committed value.
     const zeroStore = makeStore({
       activeBuffs: [{ name: 'Rage', effect: 'stance' }],
       relentlessrageUses: 0,
@@ -330,19 +335,36 @@ describe('relentlessRageService - save result handling', () => {
     window.dispatchEvent(new CustomEvent('save-result', { detail: SUCCESS_DETAIL(zeroPromptId) }));
     await flush();
     expect(zeroStore.writes).toEqual([
-      ['currentHitPoints', 0],
+      ['currentHitPoints', 1],
       ['deathSaves', [false, false, false]],
       ['deathFailures', [false, false, false]],
       ['isDead', 0],
       ['activeConditions', ['stunned']],
       ['relentlessrageUses', 1],
     ]);
-    expect(zeroCreature.currentHp).toBe(0);
+    expect(zeroCreature.currentHp).toBe(1);
     expect(logService.addEntry.mock.calls.slice(2)).toEqual([
       [CAMPAIGN, TRIGGER_LOG(zeroPromptId, 10)],
-      [CAMPAIGN, SUCCESS_LOG(0, 10)],
+      [CAMPAIGN, SUCCESS_LOG(1, 10)],
     ]);
     expect(zeroStore.reads).toEqual(['activeBuffs', 'relentlessrageUses', 'activeConditions']);
+    expect(consoleError).not.toHaveBeenCalled();
+
+    // #1348 clamp arm: negative evaluation floors at 1 too (distinguishable
+    // from the 0 arm only via the store — both commit the identical lawful 1).
+    const negStore = makeStore({
+      activeBuffs: [{ name: 'Rage', effect: 'stance' }],
+      relentlessrageUses: 0,
+      activeConditions: [],
+    });
+    const negCreature = makeCreature();
+    checkRelentlessRage(negCreature, makeComputed(13, -5), CAMPAIGN);
+    const negPromptId = lastPromptId();
+    window.dispatchEvent(new CustomEvent('save-result', { detail: SUCCESS_DETAIL(negPromptId) }));
+    await flush();
+    expect(negStore.writes[0]).toEqual(['currentHitPoints', 1]);
+    expect(negCreature.currentHp).toBe(1);
+    expect(logService.addEntry.mock.calls.at(-1)).toEqual([CAMPAIGN, SUCCESS_LOG(1, 10)]);
     expect(consoleError).not.toHaveBeenCalled();
   });
 

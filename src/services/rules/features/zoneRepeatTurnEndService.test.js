@@ -34,30 +34,39 @@
 //
 // QUIRK PINS (byte evidence from zoneRepeatTurnEndService.js):
 //   • dice precedence te.recurringDie > stamp.damage > null-skip with the
-//     exact console.error at :131 — dice lowercased at :52/:54.
+//     exact console.error at :132 — dice lowercased at :52/:54.
 //   • save precedence dc = te.dc ?? stamp.saveDc (:60) but saveType =
 //     stamp.saveType || te.saveType (:61) — dc prefers te, type prefers
 //     stamp (asymmetric; pinned live in 'precedence' suite).
 //   • NPC save full-word key with 3-letter fallback (:83) — live in every
 //     monster row (stamp saveType 'Constitution' vs bonuses {con}).
 //   • tie is success: (roll+bonus) >= dc (:85).
-//   • rollExpression(:142) is the inline-dup chokepoint; the stamp key is
+//   • rollExpression(:155) is the inline-dup chokepoint; the stamp key is
 //     read TWICE per tick (:53/:59) — ordered read census pins it.
 //   • stampLatch (:71) merges prior latch keys and stamps BEFORE the save
 //     resolves: a hung PC prompt would still leave the round stamped.
-//   • dead-victim census (:137): HP guard runs BEFORE stampLatch and
+//   • dead-victim census (:150): HP guard runs BEFORE stampLatch and
 //     before any dice/save roll.
-//   • damage<=0 (:172): save_result still logs, hp_change suppressed, no
+//   • damage<=0 (:185): save_result still logs, hp_change suppressed, no
 //     HP write (:0-swallow family).
-//   • label fallback registry-first (:92/:153); unregistered effect
+//   • label fallback registry-first (:92/:166); unregistered effect
 //     degrades to underscores→spaces (or 'Zone' in the PC condition).
 //   • DEAD GUARD (zero-production, declared not asserted): applyZoneHpLoss
-//     :118 `if (!row) return` — the row was just found in the same
-//     cs.creatures array at :134, so the clone always holds it.
+//     :119 `if (!row) return` — the row was just found in the same
+//     liveCs.creatures array at :147, so the clone always holds it.
 //   • NO-CLOCK POLICY: no setTimeout/setInterval in source; Date.now
-//     appears ONLY as log timestamps (:169/:183) — stamped here under
+//     appears ONLY as log timestamps (:182/:196) — stamped here under
 //     fake timers, never a game-state expiry. Duration/expiry clocks
 //     belong to zoneDurationClock/expireStaleEffects (#1332), READ-only.
+//   • #1434 FIXED (stale-cs snapshot): tickOneZone reroutes the monster HP
+//     base through the LIVE combatSummary cache (getCombatSummary, fix#77
+//     canon; read-your-write twin of useRuntimeState.js:99) per tick, so
+//     multi-te rounds walk SEQUENTIAL truth (15→12→10, not stale 13) —
+//     mirroring the PC lane's victimHp(:99) fresh runtime re-read, which was
+//     always immune. Merged-write-once (fix#86 canon) REJECTED: per-te
+//     save_result+hp_change logs carry per-te running HP (LogHpHealingEntry
+//     .jsx:81 renders entry.currentHp/maxHp per line) and the PC lane writes
+//     per tick — batching would desync the two lanes.
 //   • exports: applyZoneRepeatTurnEnd (navigationHandlers:243),
 //     isZonesEnforced (SaveAttackAoeModal.jsx:13), ZONE_REPEAT_LATCH_KEY
 //     (source + here) — all live with caller evidence.
@@ -119,7 +128,14 @@ vi.mock('../../ui/logService.js', () => ({
 vi.mock('../../encounters/combatData.js', () => ({
     loadCombatSummary: vi.fn(async (campaignName) => {
         if (campaignName !== 'test-campaign') throw new Error(`[mock] unexpected cs campaign: ${campaignName}`);
-        return cachedCs ?? csState;
+        // REAL loadCombatSummary seeds the cache with its loaded summary (combatData.js:41);
+        // the mock mirrors it WITHOUT polluting cacheWrites (the HP-write-lane probe).
+        cachedCs = cachedCs ?? csState;
+        return cachedCs;
+    }),
+    getCombatSummary: vi.fn((campaignName) => { // #1434 fix lane: live cache read-your-write store
+        if (campaignName !== 'test-campaign') throw new Error(`[mock] unexpected cs campaign: ${campaignName}`);
+        return cachedCs;
     }),
     setCombatSummaryCache: vi.fn((cs, campaignName) => {
         if (campaignName !== 'test-campaign') throw new Error(`[mock] unexpected cs campaign: ${campaignName}`);
@@ -443,23 +459,71 @@ describe('multi-round compose — deterministic tick / idempotent replay / monot
             handled: true,
             results: [
                 { effect: 'lair_insect_cloud', success: true, raw: 6, damage: 3, newHp: 15 }, // 15-1=14 ≥ 13 ⇒ half
-                { effect: 'test_web', success: false, raw: 5, damage: 5, newHp: 13 }, // 18-5=13
+                { effect: 'test_web', success: false, raw: 5, damage: 5, newHp: 10 }, // 15−5=10 SEQUENTIAL off te1's write
             ],
         });
         expect(store.get('Goblin 1::' + LATCH)).toEqual({ lair_insect_cloud: 4, test_web: 4 }); // stampLatch merge
-        // STALE-CS QUIRK (pinned as-is, reported): cs loads ONCE per apply (:197) and every
-        // monster tick clones that same snapshot (:116), so the second te computes 18−5=13 and
-        // its cache write OVERWRITES the cloud's 15 — sequential truth would be 15−5=10. The
-        // PC lane is immune (victimHp re-reads runtime per tick). Single-te-per-target rounds are exact.
-        expect(monsterRow(cachedCs).currentHp).toBe(13); // monotonic across rounds 30→18→15→(13)
+        // #1434 FIXED (was STALE-CS QUIRK pinned-as-reported): cs loaded ONCE per apply no longer
+        // rebases every monster tick on the same start HP — tickOneZone reroutes the monster base
+        // through the live combatSummary cache (getCombatSummary, fix#77 canon; read-your-write Map
+        // twin of useRuntimeState.js:99), so te2 computes 15−5=10 instead of stale 18−5=13 and
+        // its write no longer clobbers the cloud's 15. The PC lane was always immune
+        // (victimHp re-reads runtime per tick) — the monster lane now mirrors that fresh-read shape.
+        expect(monsterRow(cachedCs).currentHp).toBe(10); // monotonic across rounds 30→18→15→10
+        expect(cacheWrites.map((cs) => monsterRow(cs).currentHp)).toEqual([18, 15, 10]); // zero-clobber: every write carries the running total
         expect(diceExprs).toEqual(['2d6', '2d6', '4d8']); // p1 + p3(cloud,web); replay p2 consumed nothing
-        expect(logs.filter((l) => l.type === 'hp_change').map((l) => l.currentHp)).toEqual([18, 15, 13]);
+        expect(logs.filter((l) => l.type === 'hp_change').map((l) => l.currentHp)).toEqual([18, 15, 10]);
         // input purity through the whole compose
         expect(store.get('campaign::targetEffects')).toEqual([ARMED_TE, webTe]);
     });
 });
 
-describe('addEntry-reject resilience (own .catch lines :170/:184)', () => {
+describe('multi-te same-seam sequential truth (#1434 stale-cs fix)', () => {
+    const WEB_TE = Object.freeze({ target: 'Goblin 1', effect: 'test_web', source: 'Black Dragon', dc: 11, saveType: 'Constitution', recurringDie: '1d4', repeatTurnEnd: true });
+
+    it('two armed tes rebase off the LIVE row: 15 −3 = 12 then 12 −2 = 10 (stale-cs clone wrote 13)', async () => {
+        seed({ enforcement: { mode: 'on', zones: true }, tes: [ARMED_TE, WEB_TE] });
+        monsterRow(csState).currentHp = 15;
+        monsterRow(csState).hit_points.current = 15;
+        saveRolls = [20, 1]; // cloud: 20 + (-1) = 19 ≥ 13 ⇒ success; web: 1 + (-1) = 0 < 11 ⇒ fail
+        diceQueue = [7, 2]; // cloud floor(7/2)=3 ⇒ 12; web 2 ⇒ 10
+        const r = await applyZoneRepeatTurnEnd(CAMPAIGN, 'Goblin 1');
+        expect(r).toEqual({
+            handled: true,
+            results: [
+                { effect: 'lair_insect_cloud', success: true, raw: 7, damage: 3, newHp: 12 },
+                { effect: 'test_web', success: false, raw: 2, damage: 2, newHp: 10 },
+            ],
+        });
+        // zero-clobber census: each cache write carries the running total — te2's clone is
+        // based on te1's 12 (never the start-15), and no earlier write is resurrected.
+        expect(cacheWrites.map((cs) => monsterRow(cs).currentHp)).toEqual([12, 10]);
+        expect(monsterRow(cachedCs).currentHp).toBe(10);
+        expect(monsterRow(cachedCs).hit_points.current).toBe(10); // HP-key double-write on the final row
+        expect(storageSets.length).toBe(2); // per-te serialized writes preserved (per-te logs need per-te running HP — LogHpHealingEntry.jsx:81)
+        expect(storageSets.map((s) => monsterRow(s.value).currentHp)).toEqual([12, 10]);
+        expect(logs.filter((l) => l.type === 'hp_change').map((l) => l.currentHp)).toEqual([12, 10]);
+        expect(logs.filter((l) => l.type === 'save_result').length).toBe(2);
+        expect(store.get('Goblin 1::' + LATCH)).toEqual({ lair_insect_cloud: 3, test_web: 3 }); // stampLatch merge both effects
+    });
+
+    it('te1 kills (HP→0) ⇒ te2 fresh-reads the dead row and never rolls, stamps, writes or revives', async () => {
+        seed({ enforcement: { mode: 'on', zones: true }, tes: [ARMED_TE, WEB_TE] });
+        monsterRow(csState).currentHp = 2;
+        monsterRow(csState).hit_points.current = 2;
+        saveRolls = [1, 1]; // second save-roll must NEVER be consumed
+        diceQueue = [2, 1]; // cloud fail: 2 dmg ⇒ exactly 0; web's 1-die is the revive probe (stale base 2 − 1 = 1)
+        const r = await applyZoneRepeatTurnEnd(CAMPAIGN, 'Goblin 1');
+        expect(r.results).toEqual([{ effect: 'lair_insect_cloud', success: false, raw: 2, damage: 2, newHp: 0 }]);
+        expect(diceExprs).toEqual(['2d6']); // web skipped before rollExpression — stale-cs rebase would have revived to 2−dmg
+        expect(saveRolls.length).toBe(1);
+        expect(monsterRow(cachedCs).currentHp).toBe(0); // no resurrection through the cache lane
+        expect(store.get('Goblin 1::' + LATCH)).toEqual({ lair_insect_cloud: 3 }); // dead-victim guard precedes stampLatch — web unstamped
+        expect(logs.filter((l) => l.type === 'hp_change').map((l) => l.currentHp)).toEqual([0]);
+    });
+});
+
+describe('addEntry-reject resilience (own .catch lines :183/:197)', () => {
     it('log pipeline down ⇒ damage still applied, exact prefixed console.errors on the same Error instance', async () => {
         seed({ enforcement: { mode: 'on', zones: true } });
         saveRolls = [1]; diceQueue = [12];

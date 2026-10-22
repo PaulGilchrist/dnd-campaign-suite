@@ -1,5 +1,5 @@
 # test-maintain state (updated 2026-10-21, run2 batch #214 flush)
-- Cursor: FIX-PASS 82 lanes dispatched (fixes #1-#82 incl pair-folds, 1 dead-code removal, 1 doc-converge, 1 already-fixed verify). fixcheck82 RUNNING (/tmp/fixcheck82.log) - NO DISPATCH until adjudicated. Zero-red baseline held since fix#50; checks: 49/50/59/71/77 all EXIT:0. Unfixed-reds pre-83: run awk census after adjudication. Queue continues into ⚠/🗑/📌 sections blanket-approved.
+- Cursor: FIX-PASS 115 lanes dispatched (fixes #1-#115). Zero-red baseline held since fix#50; checks: 49/50/59/71/77/82/101 all EXIT:0; fixcheck115 RUNNING (NO DISPATCH until adjudicated). Unfixed-reds after #115: run awk census. Blanket-approved: 84 warns / 108 trash / 309 pins remain after reds. Mid-pass: 4 annotation races caught+backfilled (fix#79/#82/#92/#100); fix#73 counted ALREADY-FIXED.
 - NEW CANON (2026-10-22, fix#50+#51): ZERO unexplained failures. Former FIXME pair RETIRED — Players dragging :41 playerId-gate green, steps-config languageWarnings supplied green. Expected-fail remains 3 (test-design). Any NEW red = regression, halt-and-arbitrate before dispatch.
 - Batch discipline: anchor run2#1467; NEXT flush after run2#1481 (Batch #215) unless user requests earlier.
 - Counters at #214: completed 2610 / remaining 82 / total 2692 (verified ✓ 2610+82=2692; strict drop 96→82; both queue copies synced).

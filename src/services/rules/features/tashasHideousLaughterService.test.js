@@ -24,10 +24,12 @@
 // clearExpirationEffects.test.js:428-440) — this file owns ONLY the envelope bytes it stamps.
 //
 // DISK/NAME FIDELITY (#1362, both rulesets read programmatically): 2024 spells.json name
-// "Tasha's Hideous Laughter" (straight apostrophe U+0027) with mangled index 'tashas-hIDEOUS-LAUGHTER';
-// 5e spells.json name 'Hideous Laughter' lv1 — its bytes FAIL the caller gate at triggerSpells.js:387
-// even though SERVICE_HANDLED_SPELLS :53 lists 'hideous laughter' (source-side report, this lane pins
-// the echo only, T2). dc_type WIS on disk in BOTH — saveType:'WIS' byte pin is disk-faithful (T1).
+// "Tasha's Hideous Laughter" (straight apostrophe U+0027) with index 'tashas-hideous-laughter'
+// (the byte-mangled 'tashas-hIDEOUS-LAUGHTER' — sole uppercase index in the table since the first
+// import — repaired #1423, census pinned in spellCastService.special.test.js);
+// 5e spells.json name 'Hideous Laughter' lv1 — the caller gate at triggerSpells.js:387 is now
+// the dual-literal canonical set ("tasha's hideous laughter" || 'hideous laughter'), so BOTH real
+// disk names route (#1423 fix; SERVICE_HANDLED_SPELLS :53 literals were live from day one). dc_type WIS on disk in BOTH — saveType:'WIS' byte pin is disk-faithful (T1).
 //
 // COERCION CENSUS (#1374 six-way): '||'-COERCION member, identical family to suggestion #1422:
 // :2 `metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2)`
@@ -102,7 +104,7 @@ describe('tashasHideousLaughterService', () => {
     describe('name echo (no gate here — gate owner is triggerSpells.js:387)', () => {
         it.each([
             ["Tasha's Hideous Laughter", 'real 2024 disk name, straight apostrophe'],
-            ['Hideous Laughter', 'real 5e disk name — would FAIL the caller gate; this copy still echoes'],
+            ['Hideous Laughter', 'real 5e disk name — routes via the second canonical literal at :387; this copy echoes'],
             ['tasha’s hideous laughter', 'curly-apostrophe variant — punctuation class survives untouched'],
         ])('echoes "%s" into action.name byte-identical with the automation stamp constant (%s)', async (inputName) => {
             const result = await triggerTashasHideousLaughter({ name: inputName, level: 1 }, {}, playerStats, campaignName, mapName);

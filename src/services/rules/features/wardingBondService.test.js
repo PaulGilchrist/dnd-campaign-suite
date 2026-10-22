@@ -14,7 +14,8 @@
 //                     the exact em-dash end byte 'Warding Bond ends — Paladin dropped to
 //                     0 hit points.' (:200-202 there), Date.now() :18 sentinel (#1428)
 //   .log            — settled hp_change payload bytes field-by-field (:95, :193-203 there)
-//   .edgeCases      — '-0' delta artifact, negative damage, NaN poison, multi-buff
+//   .edgeCases      — '-0' delta artifact, #1427 negative/NaN loud-refuse arms (bond
+//                     never heals — fix verified), NaN-invalid refuse rows, multi-buff
 //                     first-match SWAP census (#1427) — every gate row here is SINGLE-buff;
 //                     the swapped-order pin is deliberately NOT duplicated (GATE shape only)
 //   .errors         — rejection console arms '[wardingBond] Error:' (:46) and

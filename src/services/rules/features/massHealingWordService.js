@@ -1,11 +1,18 @@
 import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
+import { isWithinRange } from '../combat/rangeCheck.js';
+import { rangeToFeet } from '../combat/rangeValidation.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { resolveHealingBonusesWithDetails, hasHealingMaximization, hasHealingMaximizationForTarget, markFortifiedHealthUsed } from '../../combat/automation/automationService.js';
 
 const MASS_HEALING_WORD_NAME = 'Mass Healing Word';
+// Disk 5e spells.json:6760 'up to six creatures of your choice that you can
+// see within range' — 'of your choice' with no friendly/allies wording, so
+// hostile selection is RAW-legal (#1385 choice-clause verdict). Fallback for
+// rows without automation.maxTargets only; disk value wins (:6794 = 6).
+const DEFAULT_MAX_TARGETS = 6;
 
 function isMassHealingWord(spell) {
     return (spell.name || '') === MASS_HEALING_WORD_NAME;
@@ -105,6 +112,25 @@ function healMassTarget(combatSummary, target, ctx) {
     return { targetName, healAmount: actualHeal, rolls: rollResult.rolls, rawTotal: rollResult.total + bonusHeal };
 }
 
+// #1385 selection law: candidates pass canonical isWithinRange(caster, name,
+// rangeToFeet(spell.range)) — disk '60 feet' enforced, no hardcoded feet.
+// Choice clause (:6760) says 'up to six creatures of your choice that you
+// can see within range' — 'of your choice' with no friendly/allies wording,
+// so hostiles are RAW-legal and affiliation is deliberately unfiltered.
+// maxTargets reads automation.maxTargets (:6794 = 6) else disk-text default.
+// Lawful pool keeps combatSummary array order.
+async function selectLawfulTargets(spell, combatSummary, casterName) {
+    const maxTargets = spell.automation?.maxTargets || DEFAULT_MAX_TARGETS;
+    const rangeFt = rangeToFeet(spell.range);
+    const lawful = [];
+    for (const creature of requireCreatures(combatSummary)) {
+        if (await isWithinRange(casterName, creature.name, rangeFt)) {
+            lawful.push(creature);
+        }
+    }
+    return lawful.slice(0, maxTargets);
+}
+
 export async function triggerMassHealingWord(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isMassHealingWord(spell)) {
         return null;
@@ -126,8 +152,7 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
     }
 
     const casterName = playerStats.name;
-    const maxTargets = 6;
-    const targets = requireCreatures(combatSummary).slice(0, maxTargets);
+    const targets = await selectLawfulTargets(spell, combatSummary, casterName);
 
     if (targets.length === 0) {
         return { noTargets: true };

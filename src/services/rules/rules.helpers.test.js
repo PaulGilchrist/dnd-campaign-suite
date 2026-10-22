@@ -3,6 +3,8 @@
 // Fey/Shadow runtime seed, rules-type writer, GENERIC merge contract) plus the
 // string-row/guard ownership cited by four neighbors. Incoming-cite map (old -> new):
 //   :176-201  2024 string bonusActions/reactions passthrough (#1435/#1444) -> :222-239
+//             FLIPPED #1455(a): channels now canonicalize string rows via
+//             normalizeActionRows (rules-actions.js) — no silent uniqBy drop.
 //   :226-267  5e getActions four-channel not-array throws (#1435 twin cite) -> :197-220
 //   :237-260  5e twin bonusActions/reactions throws (rules-2024-actions :73) -> :197-220 (loop rows 2-3)
 //   :287      'Missing object: class.major' guard (#1440/#1441/#1442 collector-guard form) -> :250 (table :241-275)
@@ -98,18 +100,37 @@ describe('rules-helpers.js ruleset selection', () => {
     expect(is2024({}, { rules: '5e' })).toBe(false)
   })
 
-  it('applyRulesType rewrites rules from the SUMMARY alone — playerStats.rules is ignored (quirk)', () => {
+  it('applyRulesType EXPLICIT-WINS (#1455(b) flipped from the old summary-clobbers quirk pin): stats.rules is the owner choice and is never overwritten', () => {
     const fromSummary = {}
     applyRulesType(fromSummary, { rules: '2024' })
     expect(fromSummary).toStrictEqual({ rules: '2024' })
 
-    // Quirk: unlike getRulesType, an existing playerStats.rules is CLOBBERED by the
-    // summary fallback — stats:'2024' + summary without rules lands on '5e' (:46).
-    const clobbered = { rules: '2024' }
-    applyRulesType(clobbered, {})
-    expect(clobbered).toStrictEqual({ rules: '5e' })
+    // #1455(b): unlike the old :46 behavior, an explicit playerStats.rules is
+    // NEVER clobbered by the summary fallback nor by a conflicting summary stamp —
+    // same precedence getRulesType enforces on every READ (:8-10). Pre-fix winner
+    // bytes captured: {rules:'2024'} + {} -> {"rules":"5e"}; {rules:'2024'} +
+    // {rules:'5e'} -> {"rules":"5e"} (summary clobber). Both flip to '2024'.
+    const pinned = { rules: '2024' }
+    applyRulesType(pinned, {})
+    expect(pinned).toStrictEqual({ rules: '2024' })
 
-    // Golden unguarded deref (#1360 family): playerSummary is required, console untouched.
+    const conflict = { rules: '2024' }
+    applyRulesType(conflict, { rules: '5e' })
+    expect(conflict).toStrictEqual({ rules: '2024' })
+
+    // Agreement is idempotent passthrough.
+    const agreed = { rules: '5e' }
+    applyRulesType(agreed, { rules: '5e' })
+    expect(agreed).toStrictEqual({ rules: '5e' })
+
+    // Truthiness gate matches getRulesType :8 (falsy stats.rules falls through):
+    // '' and null on stats yield to an explicit summary stamp.
+    const empty = { rules: '' }
+    applyRulesType(empty, { rules: '2024' })
+    expect(empty).toStrictEqual({ rules: '2024' })
+
+    // Golden unguarded deref (#1360 family) preserved: no stats.rules + undefined
+    // summary reads playerSummary.rules unoptional (:58) — TypeError, console untouched.
     const errSpy = spyConsoleError()
     expect(() => applyRulesType({}, undefined)).toThrow(TypeError)
     expect(errSpy).not.toHaveBeenCalled()
@@ -194,7 +215,7 @@ describe('mergeAutomationSpecialActions generic contract (rules-helpers.js:21-30
   })
 })
 
-describe('getActions 5e guard table (rules-actions.js:85-106)', () => {
+describe('getActions 5e guard table (rules-actions.js:94-100 via shared requireArray :12-19)', () => {
   it('throws Missing array with exact byte per channel, logs console.error first, first guard wins', () => {
     // Cited: rules-2024-actions.test.js:5 ("all four channels") and :73
     // (bonusActions/reactions twins of the 2024 tolerance test).
@@ -207,9 +228,9 @@ describe('getActions 5e guard table (rules-actions.js:85-106)', () => {
       expect(() => getActions(stats, {})).toThrow(new Error(`Missing array: ${channel} for Guard5e`))
       expect(errSpy.mock.calls).toEqual([[`rules: expected ${channel} to be an array for`, 'Guard5e']])
     }
-    // Provider seam ran once per invocation BEFORE the guards dispatch (rules-actions.js:10-12).
+    // Provider seam ran once per invocation BEFORE the guards dispatch (rules-actions.js:26-28).
     expect(classRules.getFeatures).toHaveBeenCalledTimes(channels.length)
-    // Short-circuit order (:88->:106): actions guard fires before bonusActions.
+    // Short-circuit order (:97->:100): actions guard fires before bonusActions.
     errSpy.mockClear()
     expect(() => getActions({ name: 'Guard5e', rules: '5e', actions: 'bad', bonusActions: 'bad' }, {}))
       .toThrow(new Error('Missing array: actions for Guard5e'))
@@ -219,21 +240,74 @@ describe('getActions 5e guard table (rules-actions.js:85-106)', () => {
   })
 })
 
-describe('getActions 2024 string channels (cited :176-201 -> here)', () => {
-  it('2024 leaves string bonusActions/reactions UNmapped (no string coercion on these two channels) and uniqBy collapses multi-string rows', () => {
-    // Distinct from the coercion channels (actions/specialActions mapped to
-    // {name, description:'', details:null}) owned by core/rules-actions.test.js:159.
+describe('getActions 2024 string channels (cited :176-201 -> here; #1455(a) flipped: canonicalize-then-dedupe)', () => {
+  it('2024 canonicalizes string bonusActions/reactions into house rows — distinct strings ALL survive, true dupes collapse, garbage rows are loud (#1455(a))', () => {
+    // Pre-fix quirk (old :59-64 uniqBy(...,'name') keyed EVERY raw string row
+    // to undefined): bonusActions ['Alpha','Bravo'] -> ['Alpha'], Bravo silently
+    // dropped with ZERO console output. Fix: normalizeActionRows (rules-actions.js
+    // :35-48) joins the fix#115 coercion family, so dedupe keys on real names.
     const stats = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Haste'], reactions: ['Reaction Attack'], specialActions: [] }
     const [, bonusActions, reactions] = getActions(stats, {})
-    expect(bonusActions).toStrictEqual(['Haste']) // raw string survives :47 uniqBy untouched
-    expect(reactions).toStrictEqual(['Reaction Attack'])
+    expect(bonusActions).toStrictEqual([{ name: 'Haste', description: '', details: null }])
+    expect(reactions).toStrictEqual([{ name: 'Reaction Attack', description: '', details: null }])
 
-    // Quirk (:47-52): uniqBy(...,'name') on string rows maps EVERY row to undefined,
-    // so the 2nd+ string silently drops — silent-row-loss, no console output.
     const errSpy = spyConsoleError()
+    // Distinct strings ALL survive (#1348 arm 1) — pre-fix winner: ['Alpha'].
     const two = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Alpha', 'Bravo'], reactions: [], specialActions: [] }
-    expect(getActions(two, {})[1]).toStrictEqual(['Alpha']) // Bravo silently dropped
-    expect(errSpy).not.toHaveBeenCalled() // silent drop — new member of the #1374 :0-swallow census
+    expect(getActions(two, {})[1]).toStrictEqual([
+      { name: 'Alpha', description: '', details: null },
+      { name: 'Bravo', description: '', details: null },
+    ])
+    expect(errSpy).not.toHaveBeenCalled()
+
+    // True duplicates collapse to one row, distinct names all survive (#1348 arm 2):
+    // ['Attack','Dash','Dash'] -> Attack + Dash (pre-fix capture: ['Attack'] only,
+    // 2 rows silently gone, 0 stderr bytes).
+    const dupes = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Attack', 'Dash', 'Dash'], reactions: [], specialActions: [] }
+    expect(getActions(dupes, {})[1]).toStrictEqual([
+      { name: 'Attack', description: '', details: null },
+      { name: 'Dash', description: '', details: null },
+    ])
+    expect(errSpy).not.toHaveBeenCalled()
+
+    // Mixed string + object rows: house coercion bytes identical to the fix#115
+    // actions-channel shape (:73-75); dedupe is cross-shape by canonical name,
+    // first-wins keeps the earlier row (#1435(b) player-first law preserved).
+    const mixed = { name: 'Str2024', rules: '2024', actions: [], bonusActions: ['Haste', { name: 'Haste', description: 'quickened' }], reactions: [], specialActions: [] }
+    const [, mixedBonus] = getActions(mixed, {})
+    expect(mixedBonus).toStrictEqual([{ name: 'Haste', description: '', details: null }])
+
+    // Loud garbage arm (#1348 arm 3, no-silent-drop law): rows with no usable
+    // name console.error and drop — null, number, ''-string, nameless object.
+    errSpy.mockClear()
+    const garbage = { name: 'Str2024', rules: '2024', actions: [], bonusActions: [null, 42, '', {}, 'Haste'], reactions: [], specialActions: [] }
+    expect(getActions(garbage, {})[1]).toStrictEqual([{ name: 'Haste', description: '', details: null }])
+    expect(errSpy.mock.calls).toEqual([
+      ['rules: dropping bonusActions row without a name for', 'Str2024', null],
+      ['rules: dropping bonusActions row without a name for', 'Str2024', 42],
+      ['rules: dropping bonusActions row without a name for', 'Str2024', ''],
+      ['rules: dropping bonusActions row without a name for', 'Str2024', {}],
+    ])
+    errSpy.mockRestore()
+  })
+
+  it('5e twin (#1455(a)): string rows canonicalize in ALL four channels too — same normalizeActionRows contract both arms', () => {
+    const errSpy = spyConsoleError()
+    const stats = { name: 'Str5e', rules: '5e', actions: ['Attack'], bonusActions: ['Cunning Action', 'Second Wind'], reactions: [], specialActions: ['Rally'] }
+    const [actions, bonusActions, , specialActions] = getActions(stats, {})
+    expect(actions).toStrictEqual([{ name: 'Attack', description: '', details: null }])
+    expect(bonusActions).toStrictEqual([
+      { name: 'Cunning Action', description: '', details: null },
+      { name: 'Second Wind', description: '', details: null },
+    ])
+    expect(specialActions).toStrictEqual([{ name: 'Rally', description: '', details: null }])
+    expect(errSpy).not.toHaveBeenCalled() // lawful strings: canonicalized, not dropped
+
+    // Garbage rows loud in the 5e arm as well.
+    errSpy.mockClear()
+    expect(getActions({ ...stats, bonusActions: ['Haste', null] }, {})[1])
+      .toStrictEqual([{ name: 'Haste', description: '', details: null }])
+    expect(errSpy.mock.calls).toEqual([['rules: dropping bonusActions row without a name for', 'Str5e', null]])
     errSpy.mockRestore()
   })
 })

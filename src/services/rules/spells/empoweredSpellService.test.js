@@ -29,9 +29,9 @@ vi.mock('../combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-// REAL applyDamageToTarget is async (applyDamage.js:991) resolving
-// { finalDamage, oldHp, newHp, ... } — lane always stubs a Promise so the
-// un-awaited call at empoweredSpellService.js:159 is not masked.
+// REAL applyDamageToTarget is async (applyDamage.js:1008) resolving
+// { finalDamage, oldHp, newHp, ... } — lane stubs a resolved Promise
+// faithfully; source AWAITs it at empoweredSpellService.js:159 (fix#1443).
 vi.mock('../combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
@@ -355,7 +355,7 @@ describe('executeEmpoweredReroll — 5e arbitration', () => {
         rerolledDice: new Set([1, 3]),
         originalDice: [5, 2, 4, 1],
         newDice: [5, 6, 4, 3],
-        targetCurrentHp: undefined, // SOURCE BUG pin: applyDamageToTarget is async but un-awaited at :159
+        targetCurrentHp: 5, // awaited applyResult.newHp (was undefined while :159 floated un-awaited)
       },
     });
     expect(evRest).toEqual({ ...lastEvent, rawDamage: 19, rolls: [5, 6, 4, 3] });
@@ -384,9 +384,12 @@ describe('executeEmpoweredReroll — 5e arbitration', () => {
       ignoreResistance: false,
       attackerName: 'Xander',
     });
-    // Invisibility-break is DEAD in production: :159 does not await, so
-    // applyResult.finalDamage is undefined and :162 never fires (#1382 lane).
-    expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+    // fix#1443: :159 awaits applyDamageToTarget, so the :161 guard reads the
+    // RESOLVED finalDamage (7 > 0) and the invisibility-break fires — strictly
+    // after damage lands (order ledger pin below).
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Xander', CAMPAIGN);
+    expect(applyDamageToTarget.mock.invocationCallOrder[0])
+      .toBeLessThan(endInvisibilityOnHostileAction.mock.invocationCallOrder[0]);
     expect(lastEvent.rolls).toEqual([5, 2, 4, 1]); // input purity
     expect(cloneDeep(lastEvent).rawDamage).toBe(12);
   });
@@ -419,6 +422,9 @@ describe('executeEmpoweredReroll — 5e arbitration', () => {
       'Goblin', -4, ['Fire'],
       { campaignName: CAMPAIGN, characters: undefined, ignoreResistance: false, attackerName: 'Xander' },
     );
+    // resolved finalDamage 0 fails the :161 guard — invisibility must stay intact
+    expect(result.popupState.result.targetCurrentHp).toBe(20); // awaited applyResult.newHp
+    expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
   });
 
   it('chaMod=0 quirk: spends 1 SP rerolling ZERO dice — diverges from disk RAW minimum-of-one (classes.json:10280), pinned as-is', async () => {
@@ -488,7 +494,7 @@ describe('executeEmpoweredReroll — 2024 arbitration (CLA-122)', () => {
       rerolledDice: new Set([0, 1]),
       originalDice: [1, 2, 3, 5],
       newDice: [4, 6, 3, 5],
-      targetCurrentHp: undefined, // async-un-awaited pin
+      targetCurrentHp: 3, // awaited applyResult.newHp (mockResolvedValue({ finalDamage: 7, newHp: 3 }))
     });
     expect(result.popupState.currentSP).toBe(1);
     expect(result.logEntries).toEqual([{
@@ -506,6 +512,9 @@ describe('executeEmpoweredReroll — 2024 arbitration (CLA-122)', () => {
     }]);
     expect(spendSorceryPoints).toHaveBeenCalledWith('Xander', 1, CAMPAIGN, 5);
     expect(logMetamagicUse).toHaveBeenCalledWith(CAMPAIGN, 'Xander', 'Fire Bolt', ['Empowered Spell'], 1);
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Xander', CAMPAIGN);
+    expect(applyDamageToTarget.mock.invocationCallOrder[0])
+      .toBeLessThan(endInvisibilityOnHostileAction.mock.invocationCallOrder[0]);
   });
 
   it('5e with the same rolls rerolls only the chaMod-lowest single die (ruleset branch byte)', async () => {
@@ -528,6 +537,51 @@ describe('executeEmpoweredReroll — 2024 arbitration (CLA-122)', () => {
     expect(result.popupState.result.rerolledDice).toEqual(new Set([0])); // tie: first 1 wins
     expect(result.popupState.result.newDice).toEqual([6, 2, 1, 5]);
     expect(result.popupState.result.newTotal).toBe(14);
+  });
+});
+
+// ── fix#1443 MISSING-AWAIT ledger — damage-before-invisibility ordering ───
+
+describe('executeEmpoweredReroll — awaited damage seam (fix#1443)', () => {
+  function setupSeam(applyImpl) {
+    const parsed = { count: 3, sides: 6, modifier: 0 };
+    const lastEvent = makeEvent({ damageFormula: '3d6', rolls: [1, 4, 6], rawDamage: 11 });
+    parseExpression.mockReturnValue(parsed);
+    getMaxSorceryPoints.mockReturnValue(5);
+    getCurrentSorceryPoints.mockReturnValue(3);
+    getCombatContext.mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin' }] });
+    applyImpl(applyDamageToTarget);
+    stubDice([3]); // index 0 (the 1) rerolled to 3 → newTotal 13, delta +2
+    return lastEvent;
+  }
+
+  const invoke = (lastEvent) => executeEmpoweredReroll({
+    campaignName: CAMPAIGN,
+    playerStats: makePlayerStats(),
+    lastEvent,
+    chaMod: 1,
+  });
+
+  it('order ledger: applyDamageToTarget resolves BEFORE endInvisibilityOnHostileAction fires', async () => {
+    const lastEvent = setupSeam((mock) => mock.mockResolvedValue({ finalDamage: 4, newHp: 0 }));
+
+    const result = await invoke(lastEvent);
+
+    expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
+    expect(result.popupState.result.targetCurrentHp).toBe(0); // resolved newHp consumed
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledTimes(1);
+    expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('Xander', CAMPAIGN);
+    // invocationCallOrder ledger pin — stealth-break follows the hit, never leads it
+    expect(applyDamageToTarget.mock.invocationCallOrder[0])
+      .toBeLessThan(endInvisibilityOnHostileAction.mock.invocationCallOrder[0]);
+  });
+
+  it('rejection of the async callee propagates to the awaiting caller (no unhandled floating Promise)', async () => {
+    const lastEvent = setupSeam((mock) => mock.mockRejectedValue(new Error('damage seam boom')));
+
+    await expect(invoke(lastEvent)).rejects.toThrow('damage seam boom');
+    // the :161 guard never sees a resolved result — invisibility must not break
+    expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
   });
 });
 

@@ -50,10 +50,15 @@ import spells2024 from '../../../../public/data/2024/spells.json'
 /*  must dispatch to the SAME service with the SAME stamped tuple, and */
 /*  despite their raw disk automation.type they must NEVER be hijacked */
 /*  by :710 (SERVICE_HANDLED_SPELLS shield, triggerSpells.js:42-57).  */
-/*  #1423 gate-mismatch family discriminator: 5e disk name is 'Hideous */
-/*  Laughter' but the Tasha span gate (:387) is the SINGLE literal     */
-/*  "tasha's hideous laughter" — the 5e row slips past its own span    */
-/*  (pinned negative below; 2024 full-name positive in same test).     */
+/*  #1423 gate-mismatch FIXED (#1423 resolution): the Tasha span gate   */
+/*  (:387) is now the DUAL-literal canonical set "tasha's hideous         */
+/*  laughter" || 'hideous laughter' — 5e disk 'Hideous Laughter' and 2024 */
+/*  disk "Tasha's Hideous Laughter" BOTH route to the same span with the   */
+/*  same stamped tuple (per-ruleset real-name arm table below; mirrors     */
+/*  the Otto :210 / sphere :218 edition-rename idiom). 2024 disk index      */
+/*  corruption 'tashas-hIDEOUS-LAUGHTER' (only uppercase index in the      */
+/*  whole table, present since the first 2024 import) repaired to           */
+/*  'tashas-hideous-laughter' — index-format census pinned below.         */
 /*                                                                     */
 /*  Consume/discard per routed row HERE: Otto/sphere span = swallow   */
 /*  (index.js:75 → res exactly undefined, #1441 silent-null); Tasha   */
@@ -184,6 +189,7 @@ import { triggerResilientSphere } from '../features/resilientSphereService.js'
 import { triggerTashasHideousLaughter } from '../features/tashasHideousLaughterService.js'
 import { triggerForcecage } from '../features/forcecageService.js'
 import { triggerHypnoticPattern } from '../features/hypnoticPatternService.js'
+import { handleTashasHideousLaughter } from './spellCastService/execution/triggerSpells.js'
 
 /* ------------------------------------------------------------------ */
 /*  Fixtures — REAL disk rows only (fabricated envelopes banned,      */
@@ -323,44 +329,90 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
   })
 
   // ------------------------------------------------------------------
-  // #1423 gate-mismatch discriminator — unique to this lane:
-  // 5e disk row is named 'Hideous Laughter'; the span gate
-  // (triggerSpells.js:387) matches only "tasha's hideous laughter",
-  // so the 5e disk-named cast slips past its OWN span. The name is
-  // still SERVICE_HANDLED (:54) so the :710 hijack spares it too —
-  // the row reaches neither lane. The 2024 full-name row routes
-  // (positive control; RAW-forward quirk, triggerSpells.js:389).
+  // #1423 RESOLVED dual-name lane — was the gate-mismatch discriminator.
+  // The span gate (triggerSpells.js:387) is now the dual-literal
+  // canonical set "tasha's hideous laughter" || 'hideous laughter' —
+  // the house edition-rename idiom (mirrors Otto :210 / sphere :218).
+  // RAW disk names of BOTH rulesets open the :314 span with the SAME
+  // stamped tuple and RAW-forward identity (triggerSpells.js:389).
+  // SERVICE_HANDLED (:53) already carried both literals — post-fix they
+  // are LIVE shields for the routed 5e cast, not inert entries.
   // ------------------------------------------------------------------
-  it(`'Hideous Laughter' (real 5e disk name) slips past the single-literal Tasha span and the generic hijack, while "Tasha's Hideous Laughter" (real 2024 disk name) routes and raw-forwards its payload`, async () => {
-    // Negative half — the live gate-mismatch.
-    const negative = diskRow('Hideous Laughter', '5e')
-    const services = makeServices()
-    const negRes = await executeSpellCast(negative, { slotLevel: 1 }, services)
-
-    expect(triggerTashasHideousLaughter).not.toHaveBeenCalled()
-    expect(automation.executeHandler).not.toHaveBeenCalled()
-    expect(negRes?.automationPopup).toBeUndefined()
-    expect(errSpy).not.toHaveBeenCalled() // exact-case lookup finds the 5e disk row
-
-    // Positive control — same gate, matching name.
-    vi.clearAllMocks()
-    fetchCalls = []
-    const sentinel = { type: 'popup', payload: { type: 'automation_info', name: 'Tasha', description: 'down you go' } }
+  it.each([
+    ['Hideous Laughter', '5e', 'real 5e disk name — second literal, previously slipped'],
+    ["Tasha's Hideous Laughter", '2024', 'real 2024 disk name — first literal'],
+  ])('#1423 fixed: %s (%s) opens the Tasha modal span, exact stamped tuple, RAW-forward', async (name, ruleset) => {
+    const envelope = diskRow(name, ruleset)
+    const services = makeServices({ playerStats: makePlayerStats({ rules: ruleset }) })
+    const callerMetaCtx = { slotLevel: 1 }
+    const sentinel = { type: 'modal', modalName: 'tashasLaughter', payload: { note: `${name}: down you go` } }
     triggerTashasHideousLaughter.mockResolvedValue(sentinel)
-    const positive = diskRow("Tasha's Hideous Laughter", '2024')
-    const services2024 = makeServices({ playerStats: makePlayerStats({ rules: '2024' }) })
-    const posRes = await executeSpellCast(positive, { slotLevel: 1 }, services2024)
+
+    const res = await executeSpellCast(envelope, callerMetaCtx, services)
 
     expect(triggerTashasHideousLaughter).toHaveBeenCalledTimes(1)
     expect(triggerTashasHideousLaughter).toHaveBeenCalledWith(
-      positive,
-      { ...stamped({ slotLevel: 1 }), spellSaveDc: SAVE_DC },
-      services2024.playerStats, CAMPAIGN, MAP,
+      envelope,
+      { ...stamped(callerMetaCtx), spellSaveDc: SAVE_DC },
+      services.playerStats, CAMPAIGN, MAP,
     )
-    expect(posRes).toBe(sentinel) // RAW-forward quirk identity (index.js :314 lane)
-    expect(automation.executeHandler).not.toHaveBeenCalled() // protected name
-    expect(errSpy).not.toHaveBeenCalled()
-    expect(fetchCalls).toStrictEqual(['/data/2024/spells.json'])
+    expect(triggerTashasHideousLaughter.mock.calls[0][0]).toBe(envelope) // envelope identity
+    expect(res).toBe(sentinel) // RAW-forward quirk identity (index.js :314 lane)
+    expect(automation.executeHandler).not.toHaveBeenCalled() // SERVICE_HANDLED :53 shields both names
+    expect(errSpy).not.toHaveBeenCalled() // real disk names: zero lookup misses
+    expect(fetchCalls).toStrictEqual([ruleset === '2024' ? '/data/2024/spells.json' : '/data/spells.json'])
+  })
+
+  // Case-variance arms run the REAL gate DIRECT (triggerSpells.js:387,
+  // mocked leaf) — the hub's lookupFullSpell (:179) is exact-case, so
+  // non-disk casing would trip its console.error trail, not the gate.
+  it.each([
+    ['Hideous Laughter', 'real 5e disk bytes'],
+    ['hideous laughter', 'all-lowercase 5e variant'],
+    ['HIDEOUS LAUGHTER', 'all-uppercase 5e variant'],
+    ["Tasha's Hideous Laughter", 'real 2024 disk bytes'],
+    ["tasha's HIDEOUS laughter", 'mixed-case 2024 variant'],
+  ])('#1423 case-arm: gate at :387 accepts "%s" (%s)', async (name) => {
+    vi.clearAllMocks()
+    const gateRes = await handleTashasHideousLaughter({
+      spell: { name, level: 1 }, metaCtx: {}, spellSaveDc: SAVE_DC,
+      playerStats: makePlayerStats(), campaignName: CAMPAIGN, mapName: MAP,
+    })
+
+    expect(gateRes.handled).toBe(true)
+    expect(triggerTashasHideousLaughter).toHaveBeenCalledTimes(1)
+    expect(triggerTashasHideousLaughter.mock.calls[0][0].name).toBe(name) // envelope echoed verbatim (T2)
+  })
+
+  it.each([
+    ['Hex', '2024'], ['Command', '5e'], ['Crown of Madness', '2024'], ['Faerie Fire', '5e'],
+  ])('#1348 non-target control: gate declines "%s" (%s disk row), zero dispatch', async (name, ruleset) => {
+    vi.clearAllMocks()
+    const gateRes = await handleTashasHideousLaughter({
+      spell: diskRow(name, ruleset), metaCtx: {}, spellSaveDc: SAVE_DC,
+      playerStats: makePlayerStats(), campaignName: CAMPAIGN, mapName: MAP,
+    })
+
+    expect(gateRes).toStrictEqual({ handled: false })
+    expect(triggerTashasHideousLaughter).not.toHaveBeenCalled()
+  })
+
+  // #1423 disk-index corruption census: 'tashas-hIDEOUS-LAUGHTER' was the
+  // ONLY uppercase index in the whole 2024 table (corruption, present since
+  // the first import 65513839d), breaking every index-form lookup
+  // (spellValidation.js:422 / spellLimits.js:366 find arms) against the
+  // canonical 'tashas-hideous-laughter' carried by classes.json:12725.
+  // Repaired to lowercase-hyphen sibling format (cf. tashas-bubbling-cauldron).
+  it('#1423 index-format census: every disk index in BOTH tables is lowercase-hyphen; the row carries the canonical index', () => {
+    const row2024 = spells2024.find((s) => s.name === "Tasha's Hideous Laughter")
+    expect(row2024.index).toBe('tashas-hideous-laughter')
+    expect(row2024.index).toBe(row2024.index.toLowerCase()) // sibling format pin
+    const upper = [...spells5e, ...spells2024]
+      .filter((s) => /[A-Z]/.test(s.index ?? ''))
+      .map((s) => `${s.index}`)
+    expect(upper).toStrictEqual([]) // zero uppercase bytes across both tables
+    const findByIndex = (n) => spells2024.find((s) => s.name === n || s.index === n)
+    expect(findByIndex('tashas-hideous-laughter')).toBe(row2024) // classes.json ref resolves
   })
 
   // ------------------------------------------------------------------

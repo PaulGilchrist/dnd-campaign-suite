@@ -9,7 +9,8 @@
 //                       census + em-dash byte (:174-203 there); player in-place mutate no write-back
 //                       QUIRK (:147-172 there)
 //   .log              — hp_change payload/message bytes field-by-field
-//   .edgeCases        — wardDamage 0 '-0' delta artifact, negative damage, multi-buff first-match
+//   .edgeCases        — wardDamage 0 '-0' delta artifact, #1427 negative/NaN loud-refuse
+//                       arms + sign-convention rows, multi-buff first-match
 //   .errors           — addEntry rejection console.error('[wardingBond] Error:', e)
 // MIRRORED DAMAGE IS FULL, NOT HALF (disk RAW, both rulesets):
 // public/data/spells.json + public/data/2024/spells.json 'Warding Bond':

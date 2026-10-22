@@ -11,14 +11,15 @@ import { getCurrentCombatRound } from '../../encounters/combatData.js';
 // (sacredWeaponHandler precedent: buff + addExpiration 'remove_active_buff'),
 // keyed by the spell name so existing consumers clean it up automatically:
 //   - concentration loss → concentrationService.cleanupBuffsByName('Spiritual Weapon')
-//   - 1-minute clock     → clearExpirationEffects 'remove_active_buff'
+//   - combat-scoped    → until: 'combat' swept at a new initiative roll, short rest,
+//                        or long rest (no-clock policy: authored >=1 minute never a
+//                        round countdown — #1420)
 // Token position is not grid-modeled (psychic teleportation pool-only precedent);
 // the 5-ft-from-force gate goes through isWithinRange (gridless → lenient §7).
 
 const FORCE_BUFF_NAME = 'Spiritual Weapon';
 const FORCE_EFFECT = 'spiritual_weapon_force';
 const FORCE_MARKER_NAME = 'Spiritual Weapon';
-const DEFAULT_DURATION_ROUNDS = 10; // 1 minute = 10 rounds (naturesSanctuaryHandler precedent)
 const MOVE_RANGE_FT = 20;
 const ATTACK_RANGE_FT = 5;
 const APPEARS_RANGE_FT = 60;
@@ -87,17 +88,38 @@ export async function activateSpiritualWeaponForce(spell, playerStats, campaignN
     const buffs = Array.isArray(stored) ? stored : [];
     await setRuntimeValue(casterName, 'activeBuffs', [...buffs.filter(b => b.name !== FORCE_BUFF_NAME), buff], campaignName);
 
-    const rounds = parseDurationRounds(spell.duration) || DEFAULT_DURATION_ROUNDS;
-    addExpiration({ attackerName: casterName, targetName: casterName, effects: [
-        { type: 'remove_active_buff', buffName: FORCE_BUFF_NAME },
-    ], campaignName, rounds });
+    // #1420 falsy-zero law (fix#5/fix#58 family): parseDurationRounds DOCUMENTS 0
+    // as the encounter-scoped marker (durationParser.js L9-10) and both disk rows
+    // hit it ('1 minute' 5e spells.json:9331, 'Concentration, up to 1 minute' 2024
+    // spells.json:12294). The old `parseDurationRounds(...) || DEFAULT` resurrected
+    // a 10-round clock stamped EVERY cast — a fabricated minutes×10 countdown the
+    // NO-CLOCK policy forbids (AGENTS.md: authored >=1 minute is combat-scoped,
+    // cleared by a new initiative roll, short rest, or long rest). 0 now flows
+    // lawful: rounds Infinity + until: 'combat' (zoneDurationClock.js:102 canonical;
+    // initiative seam clearAllExpirationEffects also drains it unconditionally).
+    // Unparseable/absent duration is LOUD (no-fallbacks, MA-1215 never-fabricate)
+    // with no expiry armed — the initiative/rest cleanup still drops the buff.
+    const parsedRounds = parseDurationRounds(spell.duration);
+    const expiryEffects = [{ type: 'remove_active_buff', buffName: FORCE_BUFF_NAME }];
+    if (parsedRounds === undefined) {
+        console.error(`[spiritualWeaponService:duration-unparseable] "${spell.duration}" — no expiration armed (force drops at initiative/rest cleanup).`);
+    } else if (parsedRounds === 0) {
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: expiryEffects, campaignName, rounds: Infinity, until: 'combat' });
+    } else {
+        addExpiration({ attackerName: casterName, targetName: casterName, effects: expiryEffects, campaignName, rounds: parsedRounds });
+    }
+    const lastsNote = parsedRounds === undefined
+        ? 'Force lasts until concentration breaks or the next initiative roll.'
+        : parsedRounds === 0
+            ? 'Force is combat-scoped (authored 1 minute — no-clock policy): it lasts the whole combat, ended by a new initiative roll, a rest, or concentration breaking.'
+            : `Force lasts until ${parsedRounds} rounds elapse or concentration breaks.`;
 
     addEntry(campaignName, {
         type: 'summons',
         characterName: casterName,
         summonName: FORCE_BUFF_NAME,
         summonSource: 'spell',
-        description: `${casterName} casts ${FORCE_BUFF_NAME} (slot level ${buff.slotLevel}) — a floating spectral force appears within ${APPEARS_RANGE_FT} feet (${forceMarkerName}). Force lasts until ${rounds} rounds elapse or concentration breaks. ${targetName ? `Target within 5 ft of the force gate: ${appearsInRange ? 'checked' : 'out of range'}.` : 'No target armed — immediate melee spell attack skipped until a target is armed.'}`,
+        description: `${casterName} casts ${FORCE_BUFF_NAME} (slot level ${buff.slotLevel}) — a floating spectral force appears within ${APPEARS_RANGE_FT} feet (${forceMarkerName}). ${lastsNote} ${targetName ? `Target within 5 ft of the force gate: ${appearsInRange ? 'checked' : 'out of range'}.` : 'No target armed — immediate melee spell attack skipped until a target is armed.'}`,
         summonedCreatures: [forceMarkerName],
         timestamp: Date.now(),
     }).catch((e) => { console.error('[spiritualWeaponService:cast-log-error]', e); });
@@ -148,10 +170,16 @@ async function checkNearForce(targetName, force) {
 
 export async function resolveSpiritualWeaponMoveAndAttack(playerStats, campaignName) {
     const casterName = playerStats.name;
-    const force = getSpiritualWeaponForce(playerStats, campaignName);
-    if (!force) {
+    const storedForce = getSpiritualWeaponForce(playerStats, campaignName);
+    if (!storedForce) {
         return refusal(casterName, campaignName, `${casterName} has no active Spiritual Weapon force — cast Spiritual Weapon first.`);
     }
+    // #1420 shared-reference law (fix#1536 family): a runtime-store read may hand
+    // back the LIVE store object (fix#27 census: read-your-write keeps in-memory
+    // identity), so `force.lastMoveRound = currentRound` mutated the STORE's buff
+    // in place pre-clone — silent reference leak with no broadcast. CLONE FIRST
+    // (house spread idiom, cf. the cloned-map write below), then mutate the clone.
+    const force = { ...storedForce };
 
     const currentRound = getCurrentCombatRound(campaignName);
     if (force.lastMoveRound === currentRound) {
@@ -175,7 +203,9 @@ export async function resolveSpiritualWeaponMoveAndAttack(playerStats, campaignN
     }
 
     // Move up to 20 ft — pool-only model (no grid token consumer, psychic
-    // teleportation precedent), logged as the force's movement.
+    // teleportation precedent), logged as the force's movement. Latches the
+    // CLONE only (#1420) — the store ref is never touched; persistence goes
+    // through the cloned-map write below.
     force.lastMoveRound = currentRound;
     const stored = getRuntimeValue(casterName, 'activeBuffs', campaignName);
     const buffs = Array.isArray(stored) ? stored : [];

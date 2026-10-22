@@ -40,8 +40,20 @@ export function applyFeyShadowTouchedSpells(playerStats) {
 }
 
 /**
- * Preserve rules type for downstream dispatch
+ * Preserve rules type for downstream dispatch.
+ *
+ * #1455(b) EXPLICIT-WINS precedence (flips the old summary-clobbers-stats
+ * quirk at :46): an explicit stats-side rules field is the character owner's
+ * choice — AGENTS.md dual-ruleset law ("each character has a `rules` field
+ * ('5e' or '2024')", both rulesets coexist in one campaign). This write now
+ * matches the READ precedence getRulesType enforces at :8-10: stats first,
+ * summary is fallback context metadata, '5e' only when both are silent.
+ * Pre-fix winner bytes (captured): stats:{rules:'2024'} + summary:{rules:'5e'}
+ * clobbered to {"rules":"5e"}; stats:{rules:'2024'} + summary:{} also clobbered
+ * to {"rules":"5e"}. Both now keep '2024'. Golden unguarded deref preserved:
+ * no stats.rules + undefined summary still throws TypeError, console untouched.
  */
 export function applyRulesType(playerStats, playerSummary) {
+    if (playerStats.rules) return;
     playerStats.rules = playerSummary.rules || '5e';
 }

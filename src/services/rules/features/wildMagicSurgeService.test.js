@@ -25,10 +25,31 @@
 //   producers: surge :389, tamed :401, feats :412 (condition defaults
 //   'feats_of_chaos_active' at :418). metaCtx.featsOfChaosArmedAtCast is
 //   produced at execution/index.js:741 (CLA-134).
-// - 5e disk-deadness pin: 2014 origin ships automation.type 'auto_effect'
-//   trigger 'roll_1_on_wild_magic_d20' — getWildMagicSurgeFeatures filters
-//   type 'wild_magic_surge' (2024-builder shape), so raw 2014 disk bytes
-//   yield a silent null here. Row pinned honestly, reported as drift.
+// - #1433(a) FIXED 2026-10-22 (was disk-deadness drift pin): 2014 origin
+//   ships automation.type 'auto_effect' trigger 'roll_1_on_wild_magic_d20'
+//   effect 'wild_magic_surge_table' (public/data/classes.json:11353-11360) —
+//   a type-only filter never saw those bytes. Verdict: FILTER-side gap, disk
+//   stays authoritative (trigger names the 2014 nat-1 die rule verbatim;
+//   overwriting it to the 2024 'after_sorcerer_spell_slot' form would lie
+//   about the ruleset). Finder now accepts the engine's own fingerprint for
+//   that disk form — automation/index.js:679 resolveHandler already routes
+//   type 'auto_effect' + effect 'wild_magic_surge_table' to
+//   handleWildMagicSurge; the execution side spoke disk long before the
+//   finder did. Disk-vs-filter trigger census pinned below from disk bytes.
+// - #1433(b) FIXED: RAW class gate — surge only when cast BY a Sorcerer.
+//   Disk: classes.json:11352 "immediately after you cast a sorcerer spell of
+//   1st level or higher" / 2024 classes.json:11391 "immediately after you
+//   cast a Sorcerer spell with a spell slot" — both rows live IN THE
+//   SORCERER CLASS BLOCK, so "you" is the Sorcerer feature-holder. The old
+//   spell.classes branch let a Wizard casting a Sorcerer-listed spell surge;
+//   gate is now caster-class-only (house form: automationInfoBuilder/
+//   damage.js:23 playerStats.class?.name === 'Ranger').
+// - #1433(c) FIXED: spell:null golden trio (was: Wizard-null TypeError at
+//   spell.classes, Sorcerer-null TypeError at spell.level, Sorcerer-null +
+//   slotLevel:1 phantom surge dispatch) → null/undefined spell now loud-
+//   refuses '[wildMagicSurgeService] Missing spell:' with ZERO dispatch for
+//   sorcerers (house miss-guard form) and stays class-gate-silent for
+//   non-sorcerers (the seam runs on every caster's post-cast path).
 // - FT-082: markOncePerTurn stamps {round, playerStats.name}; the combat
 //   mirror is deliberately stale in the stub and must never reach a write.
 // - Producer arity quirk pinned by census: checkOncePerTurn reads
@@ -39,18 +60,20 @@
 //   (nonexistent src/rules/) so a REAL jsdom fetch ran per latch check;
 //   correct path mocked here and console must stay silent on all pass lanes.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { triggerWildMagicSurge } from './wildMagicSurgeService.js';
+import fs from 'node:fs';
+import { coreHandlers } from '../../combat/automation/automationInfoBuilder/core-handlers.js';
+import { triggerWildMagicSurge, getWildMagicSurgeFeatures, getControlledChaosFeature, getTamedSurgeFeature } from './wildMagicSurgeService.js';
 
 const H = vi.hoisted(() => {
     const CAMPAIGN = 'TestCampaign';
     const MAP = 'testMap';
     // exact (owner,key) -> allowed arity of producer reads / writes
+    // #1433(b): non-Sorcerer owners REMOVED from the allowance maps — any
+    // read/write past the caster-class gate now throws unexpected-read.
     const READERS = {
         'Sorcerer.tamedSurgeUses': 3,
         'Sorcerer.featsOfChaosActive': 3,
         'Sorcerer.surgeUsedRound': 2, // checkOncePerTurn: 2-arg read, no campaign
-        'Zosime.featsOfChaosActive': 3,
-        'Zosime.surgeUsedRound': 2,
     };
     const WRITERS = {
         'Sorcerer.wildMagicDoubleRoll': 5, // skipSync=true
@@ -181,6 +204,7 @@ const featWrite = (key, value) => ({ owner: 'Sorcerer', key, value, arity: 5, sk
 const ROLL_READS = ['featsOfChaosActive/arity3', 'surgeUsedRound/arity2'];
 const TAMED_READ = 'tamedSurgeUses/arity3';
 const MISS_GUARD = '[wildMagicSurgeService] Missing array:';
+const SPELL_GUARD = '[wildMagicSurgeService] Missing spell:';
 
 const ROWS = [
     // ---- gate lane: silent null, zero dispatch/read/write ----------
@@ -189,13 +213,17 @@ const ROWS = [
     { lane: 'gate', label: 'Wizard caster, non-Sorcerer spell → silent', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }) },
     { lane: 'gate', label: 'Wizard caster near-miss classes:["Wizard"] → silent', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }), spell: { ...SPELL, classes: ['Wizard'] } },
     { lane: 'gate', label: 'cantrip (slotLevel 0, level 0) → silent before any feature read', stats: mkStats([SURGE_2024, TAMED]), spell: { name: 'Fire Bolt', level: 0 }, metaCtx: { slotLevel: 0 } },
-    { lane: 'gate', label: '5e-disk auto_effect surge passive (classes.json:11353) matches no finder → silent', stats: mkStats([SURGE_5E_DISK]) },
+    // #1433(b): caster-class gate — the spell's class list is NOT the gate.
+    { lane: 'gate', label: '#1433(b) FIXED: Wizard casting Sorcerer-listed spell → silent (was dispatch — RAW surge only BY a Sorcerer)', stats: mkStats([SURGE_2024], { name: 'Zosime', class: { name: 'Wizard' } }), spell: { ...SPELL, classes: ['Sorcerer'] } },
+    { lane: 'gate', label: '#1433(b): Fighter + Sorcerer-listed spell + SURGE_5E_DISK live passive → still silent (class gate upstream of finder)', stats: mkStats([SURGE_5E_DISK], { name: 'Zosime', class: { name: 'Fighter' } }), spell: { ...SPELL, classes: ['Sorcerer'] } },
+    { lane: 'gate', label: '#1433(c): Wizard + null spell → class-gate silent BEFORE spell deref (was TypeError at spell.classes)', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }), spell: null },
+    { lane: 'gate', label: '#1433(c): Wizard + undefined spell → class-gate silent (was TypeError at spell.classes)', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }), spell: undefined },
+    { lane: 'gate', label: '#1433(c): Sorcerer + null spell, no slotLevel → loud refuse, zero dispatch (was TypeError at spell.level)', stats: mkStats([SURGE_2024]), spell: null, metaCtx: {}, errByte: SPELL_GUARD, errArg: null },
+    { lane: 'gate', label: '#1433(c): Sorcerer + null spell + slotLevel:1 → loud refuse, ZERO dispatch (was phantom surge dispatched)', stats: mkStats([SURGE_2024]), spell: null, errByte: SPELL_GUARD, errArg: null },
+    { lane: 'gate', label: '#1433(c): Sorcerer + undefined spell + slotLevel:1 → loud refuse, ZERO dispatch', stats: mkStats([SURGE_2024]), spell: undefined, errByte: SPELL_GUARD, errArg: undefined },
     { lane: 'gate', label: 'executeHandler resolves null → null normalized, latch NOT stamped (result && markOnce)', stats: mkStats([SURGE_2024]), result: null, reads: ROLL_READS, writes: [], dispatches: 1 },
     { lane: 'gate', label: 'surgeUsedRound stamp at current round → null, no re-stamp', stats: mkStats([SURGE_2024]), seed: [['Sorcerer.surgeUsedRound', { round: 1, activeCreature: 'Sorcerer' }]], reads: ROLL_READS },
-    // ---- golden unguarded-deref crash sites + guard throws (console census) ----------
-    { lane: 'reject', label: 'Wizard + null spell crashes at spell.classes', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }), spell: null, msg: "Cannot read properties of null (reading 'classes')" },
-    { lane: 'reject', label: 'Wizard + undefined spell crashes at spell.classes', stats: mkStats([SURGE_2024], { class: { name: 'Wizard' } }), spell: undefined, msg: "Cannot read properties of undefined (reading 'classes')" },
-    { lane: 'reject', label: 'Sorcerer + null spell + no slotLevel crashes at spell.level', stats: mkStats([SURGE_2024]), spell: null, metaCtx: {}, msg: "Cannot read properties of null (reading 'level')" },
+    // ---- golden guards: missing-array throws, junk passives TypeError (console census) ----------
     { lane: 'reject', label: 'automation missing → first getter guard throws before any read', stats: { name: 'Sorcerer', class: { name: 'Sorcerer' }, wildMagicSurgeTable: SURGE_TABLE }, msg: 'Expected array, got undefined', errByte: MISS_GUARD, errArg: undefined },
     { lane: 'reject', label: 'automation.passives null → guard throws', stats: mkStats(null), msg: 'Expected array, got null', errByte: MISS_GUARD, errArg: null },
     { lane: 'reject', label: 'passives non-array 42 → == null guard does not cover junk, TypeError, console untouched', stats: mkStats(42), msg: 'passives.find is not a function' },
@@ -203,12 +231,12 @@ const ROWS = [
     { lane: 'reject', label: 'wildMagicSurgeTable undefined variant', stats: mkStats([SURGE_2024], { wildMagicSurgeTable: undefined }), reads: ROLL_READS, writes: [], msg: 'Expected array, got undefined', errByte: MISS_GUARD, errArg: undefined },
     { lane: 'reject', label: 'executeHandler rejects → rethrow + exact log byte, latch NOT stamped', stats: mkStats([SURGE_2024]), reject: new Error('Handler failed'), reads: ROLL_READS, writes: [], actions: 1, msg: 'Handler failed', errByte: '[wildMagicSurge] Failed to execute surge for Wild Magic Surge:', errArgOwn: true },
     // ---- roll lane: exact action envelope + full read/write censuses ----------
-    { lane: 'dispatch', label: 'Sorcerer + null spell but slotLevel:1 → dispatches (spell read only at gate)', stats: mkStats([SURGE_2024]), spell: null, action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
+    // ---- dispatch lanes (post-fix: sorcerer + real spell slot casts only) ----------
+    { lane: 'dispatch', label: '#1433(a) FIXED: 5e-disk auto_effect surge passive (classes.json:11355 trigger roll_1_on_wild_magic_d20 effect wild_magic_surge_table) LIVE via fingerprint (automation/index.js:679 precedent); disk carries no oncePerTurn byte → envelope false, 2014 once-per-turn RAW enforced by surgeUsedRound latch', stats: mkStats([SURGE_5E_DISK]), action: { name: 'Wild Magic Surge', automation: rollAutomation(false), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
     { lane: 'dispatch', label: '2024 disk passive oncePerTurn:true byte', stats: mkStats([SURGE_2024]), action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
     { lane: 'dispatch', label: 'legacy passive: oncePerTurn || false, trigger hardcoded over empty byte', stats: mkStats([SURGE_LEGACY]), action: { name: 'Wild Surge', automation: rollAutomation(false), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
     { lane: 'dispatch', label: 'metaCtx {} falls back to spell.level 3', stats: mkStats([SURGE_2024]), metaCtx: {}, spell: { ...SPELL, level: 3 }, action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
     { lane: 'dispatch', label: 'slotLevel:0 + spell.level:1 OR-gate dispatches (slot 0 does not :0-swallow a leveled spell)', stats: mkStats([SURGE_2024]), metaCtx: { slotLevel: 0 }, action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
-    { lane: 'dispatch', label: 'Wizard casting Sorcerer-listed spell fires (isSorcererSpell spell-classes branch)', stats: mkStats([SURGE_2024], { name: 'Zosime', class: { name: 'Wizard' } }), spell: { ...SPELL, classes: ['Sorcerer'] }, action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite('Zosime')] },
     { lane: 'dispatch', label: 'near-miss passives skipped; first wild_magic_surge wins ([0]); no double-roll write without exact effect key', stats: mkStats([AUTO_NOISE, FEATS_WRONG_COND, SURGE_2024, SURGE_SECOND]), action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
     { lane: 'dispatch', label: 'Controlled Chaos writes wildMagicDoubleRoll(skipSync=true) BEFORE latch write', stats: mkStats([SURGE_2024, CONTROLLED_CHAOS]), action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [featWrite('wildMagicDoubleRoll', true), rollWrite()] },
     { lane: 'dispatch', label: 'feats passive armed=false → normal lane, no feats writes, no autoSurge byte', stats: mkStats([SURGE_2024, FEATS]), seed: [['Sorcerer.featsOfChaosActive', false]], action: { name: 'Wild Magic Surge', automation: rollAutomation(true), wildMagicSurgeTable: SURGE_TABLE }, reads: ROLL_READS, writes: [rollWrite()] },
@@ -319,4 +347,70 @@ describe('wildMagicSurgeService.triggerWildMagicSurge', () => {
             assertConsole(row);
         });
     });
+});
+
+// #1433(a): DISK TRIGGER-VOCABULARY CENSUS — reads the REAL bytes of both
+// ruleset classes.json files, pushes every Sorcerer wild-magic feature
+// through the REAL collector producer (automationInfoBuilder/core-handlers.js
+// auto_effect :17) and pins which disk rows the service finders see. Any
+// future disk format drift or finder narrowing flips here.
+// Paths are cwd-relative: vitest's jsdom rewrites import.meta.url to an
+// http URL (non-file scheme), so URL-based resolution is unavailable.
+describe('wildMagicSurgeService #1433 disk trigger census (real disk bytes → real finders)', () => {
+    const DISK = {
+        legacy: {
+            file: 'public/data/classes.json',
+            surgeTuples: [{ type: 'auto_effect', trigger: 'roll_1_on_wild_magic_d20', effect: 'wild_magic_surge_table' }],
+            rawQuote: 'immediately after you cast a sorcerer spell of 1st level or higher',
+        },
+        current: {
+            file: 'public/data/2024/classes.json',
+            surgeTuples: [{ type: 'wild_magic_surge', trigger: 'after_sorcerer_spell_slot' }],
+            rawQuote: 'immediately after you cast a Sorcerer spell with a spell slot',
+        },
+    };
+
+    function sorcererWildMagicPassives(file) {
+        const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const sorcerer = (Array.isArray(data) ? data : data.classes || Object.values(data))
+            .find(c => c && (c.index === 'sorcerer' || c.name === 'Sorcerer'));
+        if (!sorcerer) throw new Error('no Sorcerer row on disk — census fixture drifted');
+        const features = [];
+        const walk = o => {
+            if (Array.isArray(o)) return o.forEach(walk);
+            if (o && typeof o === 'object') {
+                if (o.name && o.automation && /wild_magic/.test(JSON.stringify(o.automation))) features.push(o);
+                Object.values(o).forEach(walk);
+            }
+        };
+        walk(sorcerer);
+        // Collector producer fidelity: core-handlers dispatches on automation.type.
+        return {
+            passives: features.map(f => coreHandlers[f.automation.type](f)),
+            features,
+        };
+    }
+
+    for (const [ruleset, spec] of Object.entries(DISK)) {
+        it(`${ruleset}: every disk wild-magic surge row matches the finder; near-miss rows stay out; RAW 'you cast' quote present`, () => {
+            const { passives, features } = sorcererWildMagicPassives(spec.file);
+            expect(passives.length).toBeGreaterThan(0);
+            const surgeRows = getWildMagicSurgeFeatures({ automation: { passives } });
+            expect(surgeRows.map(p => ({ type: p.type, trigger: p.trigger, effect: p.effect })))
+                .toEqual(spec.surgeTuples);
+            // RAW law byte-check: the surge feature text is second-person,
+            // living INSIDE the Sorcerer class block — 'you' is the Sorcerer.
+            const surgeFeature = features.find(f => /wild_magic_surge|roll_1_on_wild_magic/.test(JSON.stringify(f.automation)) && !/double_roll/.test(JSON.stringify(f.automation)));
+            expect(surgeFeature.description).toContain(spec.rawQuote);
+            if (ruleset === 'current') {
+                expect(getTamedSurgeFeature({ automation: { passives } })).toMatchObject({ type: 'wild_magic_tamed' });
+            } else {
+                expect(getTamedSurgeFeature({ automation: { passives } })).toBeUndefined();
+            }
+            // Controlled Chaos (auto_effect + wild_magic_double_roll) is found
+            // by its own effect-fingerprint finder in BOTH rulesets and is
+            // never swept into the surge finder's result set above.
+            expect(getControlledChaosFeature({ automation: { passives } })).toMatchObject({ type: 'auto_effect', effect: 'wild_magic_double_roll' });
+        });
+    }
 });

@@ -97,6 +97,9 @@ function clearPlayerRoundFlags(creatureName, campaignName) {
     setRuntimeValue(creatureName, '_Branches_of_the_Tree_usedRound', null, campaignName)
     // CLA-381: War Magic cantrip-replacement once-per-turn latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_War_Magic_usedRound', null, campaignName)
+    // #1451: Arcane Apotheosis free-Metamagic waiver latch re-arms on initiative roll /
+    // combat reset (once-per-turn waiver, disk 2024 L20 — consumed at waived-cast confirm).
+    setRuntimeValue(creatureName, '_Arcane_Apotheosis_usedRound', null, campaignName)
     // FT-099: War Caster Reactive Spell once-per-round reaction latch re-arms at round wrap.
     setRuntimeValue(creatureName, '_Reactive_Spell_usedRound', null, campaignName)
     // FT-094: Telekinetic Shove once-per-turn latch re-arms at round wrap.

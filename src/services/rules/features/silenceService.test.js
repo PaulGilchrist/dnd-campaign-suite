@@ -1,15 +1,18 @@
 // @maintained-by-ai
 /**
  * silenceService — zone-membership / targetEffects store accessor.
- * Lane map (verified 2026-10-21):
+ * Lane map (verified 2026-10-22):
  *   - LIVE production surface: getSilenceSource + isCreatureInSilenceZone
  *     (Verbal gate: execution/index.js:136-137 + spellResolution.js:54-55;
  *     thunder side: applyDamage.js:294), addSilencedTarget
  *     (SilenceModal.jsx:115), removeSilencedTargets (silenceHandler.js:79).
  *   - DEAD in production (grep-verified, zero callers outside test mocks):
  *     triggerSilence, getSilencedTargets. The live cast popup is built inline
- *     by modalSpells.js handleSilence:231 — triggerSilence is pinned here as
+ *     by modalSpells.js handleSilence — triggerSilence is pinned here as
  *     a DRIFT DETECTOR for that inline duplicate (#1357 class).
+ *     RESIDUAL (REPORTED, not owned here): modalSpells.js:234-239 keeps the
+ *     OLD defective regex pair — same numeric-.match crash + plural-feet
+ *     silent-120 — its lane owns that twin fix.
  *   - Zone STORE WRITES (silenceCaster/silenceCenter/silenceRadius triple):
  *     SilenceModal.test.jsx. clear_silence_zone expiry seam:
  *     clearExpirationEffects_additional_types.test.js ("Cited by" — verbatim:
@@ -28,13 +31,35 @@
  *   strict-true flag + concentration te, cleared at addExpiration seams.
  *   This lane stamps no countdown, no minutes×N, no Date.now. CLEAN.
  * Zero dice — no RNG seam needed (RAW: Silence has no saving throw).
- * Quirks pinned as-is (see SOURCE BUGS in pass report):
- *   Q1 exact-match name gate vs modalSpells lowercase gate (case-gate split),
- *   Q2 numeric area_of_effect.size (5e disk canon 20) → (20).match TypeError,
- *   Q3 /(\d+)-?foot/ never parses plural 'feet' disk forms — silent 120,
- *   Q4 center JSON.parse unguarded vs combatSummary parse guarded with warn,
- *   Q5 combatSummary read is campaign-blind (getRuntimeValue('campaign',
- *      'combatSummary') — 2-arg, campaignName param ignored).
+ * Quirks (#1413 FOUR-FIX, 2026-10-22):
+ *   Q1 case-gate split vs modalSpells lowercase gate — STILL PINNED AS-IS.
+ *   Q2 FIXED (a): numeric-.match crash — 5e disk size is NUMBER on all 89
+ *      aoe rows (Silence size:20); typeof-number arm first, RAW rows dispatch.
+ *   Q3 FIXED (b): plural 'feet' silent-drop -> 120 — feet/mile token set
+ *      parses every lawful disk form; garbage LOUD-refuses (console.error).
+ *   Q4 FIXED (c): center JSON.parse guarded — corrupt string LOUD
+ *      (console.error) then documented no-center arm (caster stands at center).
+ *   Q5 FIXED (d): combatSummary rerouted to campaign-keyed
+ *      encounters/combatData.getCombatSummary(campaignName) (fix#77/#1074
+ *      ARM-B family); runtime-store 'campaign|combatSummary' read is now
+ *      TRIPWIRED in this fake — exact-arg campaign pin below. Underlying
+ *      arity-2 store blindness stays deferred infra #1520.
+ * #1348 ARM TABLES (coverage contract):
+ *   range arm table:            absent->120 silent | '120 feet'->120 |
+ *                               '60 feet'->60 | '5 feet'->5 | '25-foot radius'->25 |
+ *                               '60 ft.'->60 | '1 mile'->5280 | 'Self'->LOUD+120 |
+ *                               garbage->LOUD+120
+ *   area size arm table:      absent->20 silent | number 20->20 | number 50->50
+ *                               exact | number 0->LOUD+20 |
+ *                               number NaN->LOUD+20 | '20-foot-radius'->20 |
+ *                               '30-foot-radius'->30 | '10-foot radius'->10 |
+ *                               'irregular'->LOUD+20
+ *   center arm table:         null->caster-only | JSON string->geometry |
+ *                               plain object->geometry | '{oops'->LOUD+caster-only |
+ *                               JSON non-center string '{}'->caster-only
+ *   summary arm table:        cache miss(null)->false | object->geometry |
+ *                               JSON string->geometry | '{oops'->WARN+false |
+ *                               exact campaign arg on every read
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -75,6 +100,11 @@ function getRuntimeValueSpy(owner, key, campaignName) {
     if (campaignName !== undefined && !ALLOWED_CAMPAIGNS.has(campaignName)) {
         throw new Error(`runtime fake: unexpected campaign "${campaignName}"`);
     }
+    if (key === 'combatSummary') {
+        // #1413(d) tripwire: combatSummary must NEVER be read through the
+        // campaign-blind runtime store — rerouted to combatData (Q5 FIXED).
+        throw new Error('runtime fake: combatSummary must be read via campaign-scoped combatData.getCombatSummary (#1413d)');
+    }
     const pair = `${owner}|${key}`;
     reads.push({ owner, key, arity: arguments.length });
     if (!runtimeState.has(pair)) return null; // real getRuntimeValue defaults missing keys to null
@@ -105,16 +135,28 @@ vi.mock('../combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
 
+// #1413(d): campaign-scoped combatData fake (fix#77/#1074 ARM-B mirror) —
+// every read must carry CAMPAIGN exactly; OFF-target campaigns bleed-throw.
+vi.mock('../../encounters/combatData.js', () => ({
+    getCombatSummary: vi.fn(),
+}));
+
 const { executeHandler } = await import('../../automation/index.js');
 const { getDistanceFeet } = await import('../combat/rangeValidation.js');
+const { getCombatSummary } = await import('../../encounters/combatData.js');
+
+let summaryCacheValue = null; // stands in for cachedCombatSummaries.get(campaignName)
+function seedSummary(value) {
+    summaryCacheValue = value;
+}
 
 // RAW disk canon — verbatim bytes:
 // public/data/spells.json:8902ff  level 2, range "120 feet",
-//   area_of_effect { type:"sphere", size:20 }, duration "Up to 10 minutes",
-//   concentration true
+//   area_of_effect { type:"sphere", size:20 }  <- NUMBER (5e disk law, 89 aoe rows)
+//   duration "Up to 10 minutes", concentration true
 // public/data/2024/spells.json:11724ff  same, duration
 //   "Concentration, up to 10 minutes", area_of_effect
-//   { shape:"sphere", size:"20-foot-radius" }
+//   { shape:"sphere", size:"20-foot-radius" }  <- STRING (2024 disk law)
 const DISK_5E = {
     index: 'silence',
     name: 'Silence',
@@ -138,6 +180,13 @@ const DISK_2024 = {
 
 beforeEach(() => {
     vi.resetAllMocks();
+    summaryCacheValue = null;
+    getCombatSummary.mockImplementation((campaignName) => {
+        if (!ALLOWED_CAMPAIGNS.has(campaignName)) {
+            throw new Error(`combatData fake: unexpected campaign "${campaignName}"`);
+        }
+        return summaryCacheValue;
+    });
     setRuntimeValueSpy.mockImplementation((...args) => {
         const [owner, key, value, campaignName] = args;
         if (args.length !== 4) throw new Error(`runtime fake: set arity ${args.length}`);
@@ -196,33 +245,94 @@ describe('triggerSilence (dead export — drift pin vs modalSpells inline builde
         expect(executeHandler).not.toHaveBeenCalled();
     });
 
-    it('coercion spec: slot precedence, plural-"feet" silent 120 (Q3), radius regex + default (Q2 numeric size THROWS)', async () => {
+    it('coercion arm table: slot precedence, feet/mile range parsing, numeric + string sizes (Q2/Q3 FIXED)', async () => {
         executeHandler.mockResolvedValue({ success: true });
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         await triggerSilence({ name: 'Silence', level: 2 }, { slotLevel: 5 }, playerStats, CAMPAIGN, 'm');
         expect(executeHandler.mock.calls[0][0].automation.slotLevel).toBe(5);
         expect(executeHandler.mock.calls[0][0].spellSlotLevel).toBe(5);
 
+        // absent range/aoe: documented Silence RAW defaults, SILENT (120ft / 20ft sphere)
         await triggerSilence({ name: 'Silence' }, {}, playerStats, CAMPAIGN, 'm');
         expect(executeHandler.mock.calls[1][0].automation.slotLevel).toBe(2);
+        expect(executeHandler.mock.calls[1][0].automation.range).toBe(120);
+        expect(executeHandler.mock.calls[1][0].automation.aoeRadius).toBe(20);
 
-        // Q3: disk canonical plural "feet" NEVER matches /(\d+)-?foot/ —
-        // every plural range silently coerces to 120.
+        // Q3 FIXED: disk-canonical plural "feet" now parses — no more silent 120.
         await triggerSilence({ name: 'Silence', range: '60 feet' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[2][0].automation.range).toBe(120);
+        expect(executeHandler.mock.calls[2][0].automation.range).toBe(60);
 
+        await triggerSilence({ name: 'Silence', range: '5 feet' }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[3][0].automation.range).toBe(5);
+
+        // string arms intact
         await triggerSilence({ name: 'Silence', range: '25-foot radius' }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[3][0].automation.range).toBe(25);
+        expect(executeHandler.mock.calls[4][0].automation.range).toBe(25);
 
-        // 2024 canonical string size parses; garbage falls to 20
+        // abbreviation + mile arms from the disk token census
+        await triggerSilence({ name: 'Silence', range: '60 ft.' }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[5][0].automation.range).toBe(60);
+        await triggerSilence({ name: 'Silence', range: '1 mile' }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[6][0].automation.range).toBe(5280);
+
+        // loud-drop arm: lawful NON-feet word 'Self' (x68/x94 on disk, impossible
+        // for real Silence rows) must be HEARD, not silently 120'd.
+        consoleError.mockClear();
+        await triggerSilence({ name: 'Silence', range: 'Self' }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[7][0].automation.range).toBe(120);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Unrecognized range token "Self" — not a foot/mile count; Silence RAW default 120ft applies.',
+        );
+        consoleError.mockClear();
+        await triggerSilence({ name: 'Silence', range: 'nonsense' }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[8][0].automation.range).toBe(120);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Unrecognized range token "nonsense" — not a foot/mile count; Silence RAW default 120ft applies.',
+        );
+
+        // 2024 canonical string sizes
         await triggerSilence({ name: 'Silence', area_of_effect: { size: '30-foot-radius' } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[4][0].automation.aoeRadius).toBe(30);
-        await triggerSilence({ name: 'Silence', area_of_effect: { size: 'irregular' } }, {}, playerStats, CAMPAIGN, 'm');
-        expect(executeHandler.mock.calls[5][0].automation.aoeRadius).toBe(20);
+        expect(executeHandler.mock.calls[9][0].automation.aoeRadius).toBe(30);
+        await triggerSilence({ name: 'Silence', area_of_effect: { size: '10-foot radius' } }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[10][0].automation.aoeRadius).toBe(10);
 
-        // Q2: RAW 5e disk canon size is NUMBER 20 — unguarded (20).match TypeError.
-        await expect(triggerSilence(DISK_5E, {}, playerStats, CAMPAIGN, 'm')).rejects.toThrow(TypeError);
-        expect(executeHandler).toHaveBeenCalledTimes(6); // throw happens BEFORE dispatch
+        // garbage string size: LOUD + 20ft default
+        consoleError.mockClear();
+        await triggerSilence({ name: 'Silence', area_of_effect: { size: 'irregular' } }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[11][0].automation.aoeRadius).toBe(20);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Unrecognized area_of_effect.size "irregular" — not a feet count; 20ft sphere default.',
+        );
+
+        // Q2 FIXED: RAW 5e disk canon size is NUMBER — numeric arm accepts the
+        // exact radius, lane DISPATCHES instead of TypeError-rejecting real rows.
+        consoleError.mockClear();
+        const raw5e = await triggerSilence(DISK_5E, {}, playerStats, CAMPAIGN, 'm');
+        expect(raw5e).toEqual({ success: true });
+        expect(executeHandler.mock.calls[12][0].automation.aoeRadius).toBe(20);
+        expect(executeHandler.mock.calls[12][0].automation.range).toBe(120);
+        expect(consoleError).not.toHaveBeenCalled(); // honest RAW shape: silent-OK arm
+
+        await triggerSilence({ name: 'Silence', area_of_effect: { size: 50 } }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[13][0].automation.aoeRadius).toBe(50); // numeric arm EXACT radius
+
+        // numeric garbage arms: LOUD + 20ft sphere default
+        consoleError.mockClear();
+        await triggerSilence({ name: 'Silence', area_of_effect: { size: 0 } }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[14][0].automation.aoeRadius).toBe(20);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Non-positive/non-finite numeric area_of_effect.size 0 — 20ft sphere default.',
+        );
+        consoleError.mockClear();
+        await triggerSilence({ name: 'Silence', area_of_effect: { size: NaN } }, {}, playerStats, CAMPAIGN, 'm');
+        expect(executeHandler.mock.calls[15][0].automation.aoeRadius).toBe(20);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Non-positive/non-finite numeric area_of_effect.size NaN — 20ft sphere default.',
+        );
+
+        consoleError.mockRestore();
+        expect(executeHandler).toHaveBeenCalledTimes(16); // every arm dispatches — zero lane-rejects
     });
 
     it('handler rejection: exact console.error bytes, swallows to null (survives)', async () => {
@@ -283,6 +393,7 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
 
         expect(isCreatureInSilenceZone('Target', 'Caster', CAMPAIGN)).toBe(false);
         expect(reads).toEqual([{ owner: 'Caster', key: 'silenceCaster', arity: 3 }]);
+        expect(getCombatSummary).not.toHaveBeenCalled();
     });
 
     it('manual-picker te membership admits the exact triple; near-misses fall through to center logic', () => {
@@ -320,7 +431,7 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
         seed('Caster', 'silenceCaster', true);
         seed('campaign', 'targetEffects', []);
         seed('Caster', 'silenceCenter', JSON.stringify({ gridX: 5, gridY: 5 }));
-        seed('campaign', 'combatSummary', {
+        seedSummary({
             players: [{ name: 'Caster', gridX: 5, gridY: 5 }],
             creatures: [
                 { name: 'Near', gridX: 6, gridY: 5 },
@@ -340,28 +451,31 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
 
         // center stored as plain object is also handled; players-array lookup
         seed('Caster', 'silenceCenter', { gridX: 5, gridY: 5 });
-        seed('campaign', 'combatSummary', {
+        seedSummary({
             players: [{ name: 'Player1', gridX: 6, gridY: 5 }],
             creatures: [],
         });
         getDistanceFeet.mockReturnValueOnce(5);
         expect(isCreatureInSilenceZone('Player1', 'Caster', CAMPAIGN)).toBe(true);
 
-        // radius stored as numeric string '25': edge at 20ft now IN (would be boundary), far at 25 IN
+        // radius stored as numeric string '25': far at 25ft now IN
         seed('Caster', 'silenceRadius', '25');
-        seed('campaign', 'combatSummary', {
+        seedSummary({
             players: [],
             creatures: [{ name: 'Far', gridX: 10, gridY: 5 }],
         });
         getDistanceFeet.mockReturnValueOnce(25);
         expect(isCreatureInSilenceZone('Far', 'Caster', CAMPAIGN)).toBe(true);
+
+        // every summary read carried CAMPAIGN exactly (campaign-scoped accessor)
+        expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
     });
 
     it('default radius 20 when radius key absent; unknown/coordinateless targets and missing summary are false', () => {
         seed('Caster', 'silenceCaster', true);
         seed('campaign', 'targetEffects', []);
         seed('Caster', 'silenceCenter', JSON.stringify({ gridX: 5, gridY: 5 }));
-        seed('campaign', 'combatSummary', {
+        seedSummary({
             players: [{ name: 'Edge', gridX: 9, gridY: 5 }],
             creatures: [{ name: 'Unplaced' }],
         });
@@ -371,15 +485,15 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
         expect(isCreatureInSilenceZone('Unplaced', 'Caster', CAMPAIGN)).toBe(false);
         expect(isCreatureInSilenceZone('Ghost', 'Caster', CAMPAIGN)).toBe(false);
 
-        seed('campaign', 'combatSummary', null);
+        seedSummary(null); // campaign cache miss
         expect(isCreatureInSilenceZone('Edge', 'Caster', CAMPAIGN)).toBe(false);
     });
 
-    it('stored-summary string parses; malformed summary warns with exact bytes and reads as no-zone (Q4/Q5)', () => {
+    it('stored-summary string parses; malformed summary warns with exact bytes and reads as no-zone; every read campaign-exact (Q4-guard/Q5 FIXED)', () => {
         seed('Caster', 'silenceCaster', true);
         seed('campaign', 'targetEffects', []);
         seed('Caster', 'silenceCenter', JSON.stringify({ gridX: 5, gridY: 5 }));
-        seed('campaign', 'combatSummary', JSON.stringify({
+        seedSummary(JSON.stringify({
             players: [],
             creatures: [{ name: 'Near', gridX: 6, gridY: 5 }],
         }));
@@ -387,7 +501,7 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
         expect(isCreatureInSilenceZone('Near', 'Caster', CAMPAIGN)).toBe(true);
 
         const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        seed('campaign', 'combatSummary', '{oops');
+        seedSummary('{oops');
         expect(isCreatureInSilenceZone('Near', 'Caster', CAMPAIGN)).toBe(false);
         expect(consoleWarn).toHaveBeenCalledWith(
             '[silence] Stored combat summary unavailable:',
@@ -395,25 +509,47 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
         );
         consoleWarn.mockRestore();
 
-        // Q5 spec: the summary read is campaign-blind — exactly 2 args, no campaignName.
-        const summaryRead = reads.filter(r => r.key === 'combatSummary').at(-1);
-        expect(summaryRead).toEqual({ owner: 'campaign', key: 'combatSummary', arity: 2 });
+        // Q5 FIXED spec: campaign-scoped exact-arg — every summary read is
+        // getCombatSummary(CAMPAIGN), never a current-context fallback; and
+        // the campaign-blind runtime-store read is excised (fake tripwires it).
+        expect(getCombatSummary.mock.calls).toEqual([[CAMPAIGN], [CAMPAIGN]]);
+        expect(reads.filter(r => r.key === 'combatSummary')).toEqual([]);
     });
 
-    it('malformed center string: JSON.parse SyntaxError escapes uncaught — unlike the guarded summary parse (Q4)', () => {
+    it('malformed center string: LOUD console.error then documented no-center arm (Q4 FIXED)', () => {
         seed('Caster', 'silenceCaster', true);
         seed('campaign', 'targetEffects', []);
         seed('Caster', 'silenceCenter', '{oops');
+        seedSummary({ players: [], creatures: [{ name: 'Near', gridX: 6, gridY: 5 }] });
 
-        expect(() => isCreatureInSilenceZone('Target', 'Caster', CAMPAIGN)).toThrow(SyntaxError);
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        // no-center arm: caster stands at the zone center — nobody else joins.
+        expect(isCreatureInSilenceZone('Target', 'Caster', CAMPAIGN)).toBe(false);
+        expect(isCreatureInSilenceZone('Caster', 'Caster', CAMPAIGN)).toBe(true);
+        expect(consoleError).toHaveBeenCalledWith(
+            '[silence] Corrupt stored silenceCenter (producer resolveSilenceCenter always JSON.stringify) — no-center arm:',
+            expect.any(SyntaxError),
+        );
+        // geometry never ran: distance untouched, summary never consulted
+        expect(getDistanceFeet).not.toHaveBeenCalled();
+        expect(getCombatSummary).not.toHaveBeenCalled();
+        consoleError.mockRestore();
+
+        // JSON-parseable-but-centerless string falls in the same honest arm
+        consoleError.mockClear();
+        seed('Caster', 'silenceCenter', '{}');
+        expect(isCreatureInSilenceZone('Target', 'Caster', CAMPAIGN)).toBe(false);
+        expect(isCreatureInSilenceZone('Caster', 'Caster', CAMPAIGN)).toBe(true);
+        expect(consoleError).not.toHaveBeenCalled(); // parse succeeded: not corruption
+        consoleError.mockRestore();
     });
 
-    it('read-order census: caster flag -> campaign te -> center -> radius -> campaign summary', () => {
+    it('read-order census: caster flag -> campaign te -> center -> radius -> campaign-scoped summary cache (exact arg)', () => {
         seed('Caster', 'silenceCaster', true);
         seed('campaign', 'targetEffects', []);
         seed('Caster', 'silenceCenter', JSON.stringify({ gridX: 5, gridY: 5 }));
         seed('Caster', 'silenceRadius', null); // falsy still consumes a read before the || 20 default
-        seed('campaign', 'combatSummary', { players: [], creatures: [] });
+        seedSummary({ players: [], creatures: [] });
         getDistanceFeet.mockReturnValue(0);
 
         expect(isCreatureInSilenceZone('Caster', 'Caster', CAMPAIGN)).toBe(false);
@@ -422,8 +558,10 @@ describe('isCreatureInSilenceZone (owned by applyDamage.silence.test.js citation
             { owner: 'campaign', key: 'targetEffects', arity: 3 },
             { owner: 'Caster', key: 'silenceCenter', arity: 3 },
             { owner: 'Caster', key: 'silenceRadius', arity: 3 },
-            { owner: 'campaign', key: 'combatSummary', arity: 2 },
         ]);
+        // summary via campaign-keyed cache, exact arg, once (Q5 FIXED)
+        expect(getCombatSummary).toHaveBeenCalledTimes(1);
+        expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN);
     });
 });
 

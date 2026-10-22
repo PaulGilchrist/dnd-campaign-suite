@@ -1,8 +1,8 @@
 // @maintained-by-ai
-// Lane: rules-actions.js getActions2024 divergences vs the 5e twin (same file,
-// getActions5e) — the half of the guard table and dedup precedence the 5e lanes
-// do NOT cover:
-//   - 5e throws on all four channels not-an-array: rules.helpers.test.js:226-267
+// Lane: rules-actions.js getActions2024 vs the 5e twin (same file, getActions5e).
+// #1435 CLOSED: both arms now share requireArray (rules-actions.js:12-19) and the
+// player-first uniqBy order, so this lane pins 2024-side PARITY of the guard table:
+//   - 5e throws on all four channels not-an-array: rules.helpers.test.js:197-220
 //     and core/rules-error-handling.test.js:38-61 (both fixtures are rules:'5e').
 //   - 2024 magic/utilize/craft folding + full-set dedup/sort: core/rules-actions.test.js:127
 //   - 2024 string normalization all five channels: core/rules-actions.test.js:159, rules.helpers.test.js:176-201
@@ -48,7 +48,7 @@ const stats = (overrides = {}) => ({
   ...overrides,
 });
 
-describe('rules.getActions 2024 guard + precedence divergence from 5e twin', () => {
+describe('rules.getActions 2024 guard + precedence parity with 5e twin (#1435 closed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     classRules.getFeatures.mockReturnValue(emptyCats());
@@ -60,8 +60,10 @@ describe('rules.getActions 2024 guard + precedence divergence from 5e twin', () 
   it.each`
     field
     ${'actions'}
+    ${'bonusActions'}
+    ${'reactions'}
     ${'specialActions'}
-  `('2024: required-array guard fires on $field for null and undefined (the untested half of the 5e throw table)', ({ field }) => {
+  `('#1435 fixed: 2024 required-array guard fires on $field for null and undefined — parity with the 5e throw table (rules.helpers.test.js:197-220)', ({ field }) => {
     for (const bad of [null, undefined]) {
       const playerStats = stats({ rules: '2024' });
       delete playerStats[field];
@@ -70,26 +72,59 @@ describe('rules.getActions 2024 guard + precedence divergence from 5e twin', () 
     }
   });
 
-  it('2024-only tolerance: falsy bonusActions/reactions fall back to [] instead of throwing (5e twin throws — rules.helpers.test.js:237-260)', () => {
-    const [actions, bonusActions, reactions, specialActions, characterAdvancement] = rules.getActions(
+  it.each`
+    field
+    ${'actions'}
+    ${'bonusActions'}
+    ${'reactions'}
+    ${'specialActions'}
+  `('#1348 both-arms throw matching text shape: truthy-non-array $field now THROWS at the boundary in BOTH rulesets (was: 2024 ternary guard-hole passing garbage downstream)', ({ field }) => {
+    for (const garbage of ['not an array', {}, () => {}, new Map()]) {
+      for (const ruleset of ['2024', '5e']) {
+        const playerStats = stats({ rules: ruleset });
+        playerStats[field] = garbage;
+        expect(() => rules.getActions(playerStats, {})).toThrow(`Missing array: ${field} for TestCharacter`);
+      }
+    }
+  });
+
+  it('2024 falsy bonusActions/reactions THROW (flipped from the old :73-90 tolerance pin — 5e parity, guard-hole closed #1435); optional magic/utilize/craft channels still default to []', () => {
+    expect(() => rules.getActions(
+      stats({ rules: '2024', bonusActions: null }), {},
+    )).toThrow(new Error('Missing array: bonusActions for TestCharacter'));
+    expect(() => rules.getActions(
+      stats({ rules: '2024', reactions: undefined }), {},
+    )).toThrow(new Error('Missing array: reactions for TestCharacter'));
+
+    // magic/utilize/craft remain OPTIONAL (no 5e-twin counterpart): absent is []-by-contract,
+    // pinned by core/rules-actions.test.js:127 folding.
+    const [actions, bonusActions, reactions] = rules.getActions(
       stats({
         rules: '2024',
         actions: [{ name: 'Attack' }],
-        bonusActions: null,
-        reactions: undefined,
         magicActions: [{ name: 'Cast a Spell' }],
-        specialActions: [],
       }),
       {},
     );
     expect(actions.map((a) => a.name)).toEqual(['Attack', 'Cast a Spell']);
     expect(bonusActions).toEqual([]);
     expect(reactions).toEqual([]);
-    expect(specialActions).toEqual([]);
-    expect(characterAdvancement).toEqual([]);
   });
 
-  it('2024: duplicate-name conflict in specialActions resolves to the FEATURE row while actions resolve to the PLAYER row — inverted vs 5e where the player row wins both', () => {
+  it('#1435 valid-array parity: 2024 merge/dedup/sort unchanged by the shared strict guard', () => {
+    classRules2024.getFeatures.mockReturnValue({
+      ...emptyCats(),
+      bonusActions: [{ name: 'Second Wind' }, { name: 'Cunning Action' }],
+    });
+    const [, bonusActions, reactions] = rules.getActions(
+      stats({ rules: '2024', bonusActions: [{ name: 'Cunning Action' }], reactions: [{ name: 'Opportunity Attack' }] }),
+      {},
+    );
+    expect(bonusActions).toEqual([{ name: 'Cunning Action' }, { name: 'Second Wind' }]);
+    expect(reactions).toEqual([{ name: 'Opportunity Attack' }]);
+  });
+
+  it('#1435(b) FIXED precedence: duplicate-name special action resolves to the PLAYER row in 2024 too — player-first is disk-law in all four channels, both rulesets', () => {
     classRules.getFeatures.mockReturnValue({
       ...emptyCats(),
       actions: [{ name: 'Attack', description: '5e feature attack' }],
@@ -101,30 +136,35 @@ describe('rules.getActions 2024 guard + precedence divergence from 5e twin', () 
       specialActions: [{ name: 'Rally', description: '2024 feature rally' }],
     });
 
-    // 2024: actions list player-mapped first (rules-actions.js:38) but specialActions
-    // list features first and player LAST (rules-actions.js:70-74) — uniqBy first-wins
-    // therefore keeps the FEATURE special, the opposite of the player-first 5e path.
-    const [actions2024, , , specialActions2024] = rules.getActions(
+    // 2024: player-mapped rows list FIRST in actions (:49-:50) AND specialActions
+    // (:79-:80) — uniqBy first-wins keeps the PLAYER row in both channels. The pre-fix
+    // features-first ordering (:71-:74 old bytes, feature 'Rally' beat 'player rally')
+    // was the documented inversion; captured pre-fix winner: {"name":"Rally","description":"2024 feature rally"}.
+    const [actions2024, bonusActions2024, , specialActions2024] = rules.getActions(
       stats({
         rules: '2024',
         actions: [{ name: 'Attack', description: 'player attack' }],
+        bonusActions: [{ name: 'Quickened', description: 'player quick' }],
         specialActions: [{ name: 'Rally', description: 'player rally' }],
       }),
       {},
     );
     expect(actions2024).toEqual([{ name: 'Attack', description: 'player attack' }]);
-    expect(specialActions2024).toEqual([{ name: 'Rally', description: '2024 feature rally' }]);
+    expect(bonusActions2024).toEqual([{ name: 'Quickened', description: 'player quick' }]);
+    expect(specialActions2024).toEqual([{ name: 'Rally', description: 'player rally' }]);
 
-    // 5e twin, same names: player row wins in BOTH channels (rules-actions.js:107,110).
-    const [actions5e, , , specialActions5e] = rules.getActions(
+    // 5e twin, same names: player row wins in ALL channels (rules-actions.js:101-:104).
+    const [actions5e, bonusActions5e, , specialActions5e] = rules.getActions(
       stats({
         rules: '5e',
         actions: [{ name: 'Attack', description: 'player attack' }],
+        bonusActions: [{ name: 'Quickened', description: 'player quick' }],
         specialActions: [{ name: 'Rally', description: 'player rally' }],
       }),
       {},
     );
     expect(actions5e).toEqual([{ name: 'Attack', description: 'player attack' }]);
+    expect(bonusActions5e).toEqual([{ name: 'Quickened', description: 'player quick' }]);
     expect(specialActions5e).toEqual([{ name: 'Rally', description: 'player rally' }]);
   });
 });
