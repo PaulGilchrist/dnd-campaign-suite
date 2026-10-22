@@ -5,10 +5,14 @@
 // lower flows with all slot/list gating messages, and the feedback lifecycle.
 // Proficiency CAP refusal (FT-002) is owned by WizardStepSkills.skill-cap.test.jsx
 // — never restated here.
-// #390 contract note: elevating a NON-proficient skill is refused purely by the
-// disabled Elevate button (click is inert; the component's internal
-// "select proficient first" feedback branch is unreachable from the UI). The
-// disabled-button pin below is the honest contract test for that lane.
+// #390/#391 contract note: elevating a NON-proficient skill is refused purely by
+// the disabled Elevate button + its 'Select proficient first' tooltip — by design:
+// the guard and the disabled attribute were born in the SAME commit (c45bdf94e) and
+// cf74986e7 deliberately narrowed disabled to proficiency-only ("only requires
+// proficiency"). The component's internal "Please select ... as proficient first"
+// feedback branch was unreachable dead code (React suppresses onClick on disabled
+// buttons — verified jsdom probe) and was REMOVED at #391 verdict-b. The
+// disabled-inert pins below are the honest contract for that lane.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSkills from './WizardStepSkills.jsx';
@@ -310,6 +314,58 @@ describe('WizardStepSkills', () => {
       expect(box).toBeInTheDocument();
       expect(box).toHaveClass(called ? 'success' : 'error');
       expect(box.textContent).toMatch(feedback);
+    });
+
+    it('#391(b) non-proficient Elevate is disabled-inert while a proficient row stays live (mutual pair)', async () => {
+      const { onSkillExpertiseToggle } = await renderStep({
+        formData: { skillProficiencies: ['Acrobatics'], expertSkills: [] },
+      });
+
+      // Non-proficient row: disabled control + tooltip IS the designed feedback.
+      const insight = expertiseButtonFor('Insight');
+      expect(insight.disabled).toBe(true);
+      expect(insight).toHaveTextContent('Elevate');
+      expect(insight).toHaveAttribute('title', 'Select proficient first');
+      expect(insight).not.toHaveClass('active');
+
+      // React suppresses onClick on disabled buttons (verified by probe), so even a
+      // dispatched click is inert: no toggle, no feedback box, no removed-branch bytes.
+      fireEvent.click(insight);
+      expect(onSkillExpertiseToggle).not.toHaveBeenCalled();
+      expect(document.querySelector('.expertise-feedback')).not.toBeInTheDocument();
+      expect(screen.queryByText(/as proficient first/i)).not.toBeInTheDocument();
+      expect(insight.disabled).toBe(true);
+
+      // Mutually distinguishable #1348: proficient row in the same render is live.
+      const acrobatics = expertiseButtonFor('Acrobatics');
+      expect(acrobatics.disabled).toBe(false);
+      expect(acrobatics).toHaveAttribute('title', 'Click to elevate to Expert');
+      fireEvent.click(acrobatics);
+      expect(onSkillExpertiseToggle).toHaveBeenCalledWith('Acrobatics', true);
+      const box = document.querySelector('.expertise-feedback');
+      expect(box).toHaveClass('success');
+      expect(box.textContent).toBe('Acrobatics is now Expert!');
+    });
+
+    it('#391(b) Elevate enables the moment the skill becomes proficient, then elevates', async () => {
+      const props = makeProps({ formData: { skillProficiencies: [], expertSkills: [] } });
+      const { rerender } = render(<WizardStepSkills {...props} />);
+      await waitFor(() => expect(screen.getAllByRole('checkbox')).toHaveLength(SKILLS.length));
+
+      const before = expertiseButtonFor('Perception');
+      expect(before.disabled).toBe(true);
+      fireEvent.click(before);
+      expect(props.onSkillExpertiseToggle).not.toHaveBeenCalled();
+
+      rerender(<WizardStepSkills {...props} formData={{ skillProficiencies: ['Perception'], expertSkills: [] }} />);
+      const after = expertiseButtonFor('Perception');
+      expect(after.disabled).toBe(false);
+      expect(after).toHaveAttribute('title', 'Click to elevate to Expert');
+      fireEvent.click(after);
+      expect(props.onSkillExpertiseToggle).toHaveBeenCalledWith('Perception', true);
+      const box = document.querySelector('.expertise-feedback');
+      expect(box).toHaveClass('success');
+      expect(box.textContent).toBe('Perception is now Expert!');
     });
 
     it('removes expertise immediately and shows no feedback when deselecting an expert skill', async () => {

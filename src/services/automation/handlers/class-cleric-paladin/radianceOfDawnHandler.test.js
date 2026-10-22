@@ -36,7 +36,8 @@ vi.mock('../../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
-vi.mock('../../../rules/combat/applyDamage.js', () => ({
+vi.mock('../../../rules/combat/applyDamage.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   applyDamageToTarget: vi.fn((cs, name, dmg) => ({ finalDamage: dmg, newHp: 30 - dmg })),
   computeDamageAfterSave: (rawDamage, saveSuccess, dcSuccess) => {
     if (!saveSuccess) return rawDamage;

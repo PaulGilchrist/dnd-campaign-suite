@@ -159,11 +159,12 @@ describe('useInitiativeEffects - concentration clearing at the initiative seam',
                 renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
                 rollInitiative();
 
-                // One skipSync=true write holding every survivor byte-exactly: any wrong
+                // One 4-arg POST write (exact store signature, useRuntimeState.js:78)
+                // holding every survivor byte-exactly: any wrong
                 // spell→key row, source-filter slip, or over-clear breaks these bytes.
                 const survivors = [allySameKey, ...allyOtherKeys, ownUnrelated];
                 expect(teWrites()).toEqual([
-                    ['campaign', TE, survivors, campaignName, true],
+                    ['campaign', TE, survivors, campaignName],
                 ]);
                 expect(storedTE()).toEqual(survivors);
                 // Combat summary persists once with only TestMonk's concentration nulled

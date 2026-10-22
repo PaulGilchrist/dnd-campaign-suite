@@ -25,13 +25,17 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollDice: vi.fn((count, _die) => ({ total: count * 8, rolls: Array(count).fill(8) })),
 }));
 
-vi.mock('../../services/rules/effects/restRules.js', () => ({
-  getHitDieSize: vi.fn(() => 8),
-  computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
-  SHORT_REST_RESOURCES: ['spell_slots_level_1', 'spell_slots_level_2'],
-  getShortRestResourceLabels: vi.fn(() => []),
-  applyShortRest: vi.fn(async () => ({})),
-}));
+// REAL static-data producer for labels (restRules-constants.js passthrough); only the
+// lane's deterministic stand-ins remain mocked.
+vi.mock('../../services/rules/effects/restRules.js', async () => {
+  const constants = await import('../../services/rules/effects/restRules-constants.js');
+  return {
+    getHitDieSize: vi.fn(() => 8),
+    computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
+    getShortRestResourceLabels: vi.fn((playerStats) => constants.getShortRestResourceLabels(playerStats)),
+    applyShortRest: vi.fn(async () => ({})),
+  };
+});
 
 vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({})),

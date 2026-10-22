@@ -446,7 +446,7 @@ const CharActions = function CharActions({ playerStats, campaignName, exhaustion
         return null;
     }, [playerStats.name, campaignName]);
 
-    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, popupHtml, setPopupHtml);
+    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats, campaignName, popupHtml, setPopupHtml);
 
     const {
         pendingActionMetamagic,

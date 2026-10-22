@@ -3,7 +3,7 @@ import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { registerPendingSavePrompt } from '../../../combat/auras/pendingSaveRegistry.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadCombatSummary } from '../../../encounters/combatData.js';
-import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/combat/applyDamage.js';
+import { applyDamageToTarget, computeDamageAfterSave, normalizeSaveType } from '../../../rules/combat/applyDamage.js';
 import { hasIgnoreResistance } from '../../../combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
@@ -66,7 +66,7 @@ async function processRadianceNpcTarget(combatSummary, target, targetName, ctx) 
     const { saveType, saveDc, dcSuccess, damageType, totalDamage, damageExpression, rolls, modifier, playerName, featureName, campaignName, playerStats, ignoreResistance } = ctx;
 
     // Roll save for NPC
-    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
     const saveRoll = Math.floor(Math.random() * 20) + 1;
     const saveTotal = saveRoll + saveBonus;
     const success = saveTotal >= saveDc;

@@ -4,7 +4,7 @@ import FeatItemDetails from './FeatItemDetails.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { validateFeats, getFeatLimits, getRaceFeatChoices } from '../../services/character/featValidation.js';
 
-function RepeatableFeatActions({ isRepeatable, isSelected, itemCount, isPreSelected, onToggle, onRemove }) {
+function RepeatableFeatActions({ isRepeatable, isSelected, itemCount, isPreSelected, onAdd, onRemove }) {
   if (!isRepeatable || !isSelected) return null;
   return (
     <div className="repeatable-feat-actions">
@@ -13,7 +13,7 @@ function RepeatableFeatActions({ isRepeatable, isSelected, itemCount, isPreSelec
         className="add-another-btn"
         onClick={(e) => {
           e.stopPropagation();
-          onToggle();
+          onAdd();
         }}
       >
         <i className="fa-solid fa-plus" /> Add Another
@@ -81,6 +81,13 @@ function WizardStepFeats({ stepNumber, formData, allFeats, onArrayFieldChange, p
   const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onRemove, onToggleExpand, itemCount = 0 }) => {
     const isRepeatable = repeatableFeats.some(f => f.name === feat.name);
     const showCountBadge = isRepeatable && itemCount > 1;
+    // "Add Another" appends exactly one instance via onArrayFieldChange — the same
+    // append expression SelectableList uses for a first add (SelectableList.jsx:201).
+    // It must NOT route through onToggle: SelectableList's handleItemToggle
+    // remove-ALLs every instance of an already-selected repeatable feat.
+    const handleAddAnother = () => {
+      onArrayFieldChange('feats', [...(formData.feats || []), feat.name]);
+    };
         return (
             <div
                 key={feat.index || index}
@@ -118,7 +125,7 @@ function WizardStepFeats({ stepNumber, formData, allFeats, onArrayFieldChange, p
                                 isSelected={isSelected}
                                 itemCount={itemCount}
                                 isPreSelected={isPreSelected}
-                                onToggle={onToggle}
+                                onAdd={handleAddAnother}
                                 onRemove={onRemove}
                             />
                         </div>

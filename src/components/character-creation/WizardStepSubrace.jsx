@@ -6,9 +6,14 @@ function getSubraceTraits(selectedSubrace) {
   if (!selectedSubrace) return [];
   const traits = [];
   if (selectedSubrace.damage_resistance) {
+    // Disk shapes are mixed (races.json): Earth/Water Genasi carry arrays,
+    // all other subraces strings. Render both via the house human-list join.
+    const resistanceList = Array.isArray(selectedSubrace.damage_resistance)
+      ? selectedSubrace.damage_resistance.join(', ')
+      : selectedSubrace.damage_resistance;
     traits.push({
       name: 'Damage Resistance',
-      description: `You have resistance to ${selectedSubrace.damage_resistance} damage.`
+      description: `You have resistance to ${resistanceList} damage.`
     });
   }
   if (selectedSubrace.traits) {

@@ -845,7 +845,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         setSelectedBonusSpell(spell);
      };
 
-    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats.name, campaignName, popupHtml, setPopupHtml);
+    const handleSimpleDamageRoll = useSimpleDamageRoll(playerStats, campaignName, popupHtml, setPopupHtml);
 
     const { resolvePositions: resolveBonusSpellPositions, cachedPosRef: cachedBonusCastPosRef } = useSpellPositionResolver(campaignName, mapName, playerStats.name);
 

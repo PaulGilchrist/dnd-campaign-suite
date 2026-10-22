@@ -157,9 +157,19 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
 
     fireEvent.click(baseLaneCheckbox('Goblin A'));
+    // #226 setState-during-render pin (flipped from the old "row content
+    // intentionally NOT pinned" note): renderActions' in-render setSummary drew
+    // React's cross-component setState-during-render warning while allResolved
+    // flipped early on the base's own empty selected (shadowed by
+    // extraState.selected at AreaEffectTargetModalBase.jsx:214). The commit seam
+    // now lives in the base's post-commit onAllResolved effect: no such warning
+    // may ever appear on this lane.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Fireball \(1 target\)/ }));
     });
+    expect(errorSpy.mock.calls.map(c => String(c[0])).filter(m => m.includes('Cannot update a component'))).toEqual([]);
+    errorSpy.mockRestore();
 
     // Failed save (rolled 1 + 2 vs DC 15) pays the FULL 12 — honest dice.
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
@@ -179,14 +189,15 @@ describe('SaveAttackAoeModal - overlay targeting path', () => {
     const rollbackRow = damageRollback.addTargetResult.mock.calls.map(c => c[1]).find(r => r && r.targetName === 'Goblin A');
     expect(rollbackRow).toMatchObject({ saveResult: 'failure', roll: 1, total: 3, appliedDamage: 12 });
 
-    // Results view replaces the base picker; Close dismisses.
-    // NOTE (source bug filed 2026-10-17, not enshrined): the summary ROWS do
-    // not render on this lane — extraState overrides ctx.selected with the
-    // parent's Set (AreaEffectTargetModalBase.jsx:214) so the base's internal
-    // selected stays empty, allResolved flips true on the setProcessing(true)
-    // flush, and renderActions commits setSummary with results still []. The
-    // header + Close seam is asserted; row content is intentionally NOT pinned.
+    // Results view replaces the base picker, and post-#226-fix it carries the
+    // FULL row set: the base's post-commit onAllResolved effect is now the commit
+    // seam, so the header arrives atomically with exactly 1 honest row. A
+    // zero-row render on this lane is now a hard failure, not documented behavior.
     await waitFor(() => expect(screen.getByText(/Fireball — Results/)).toBeInTheDocument());
+    const summaryRows = [...document.querySelectorAll('.abjure-results-list .abjure-result')];
+    expect(summaryRows).toHaveLength(1);
+    expect(summaryRows[0].textContent).toBe('Goblin A: Failed — takes 12 Fire damage (rolled 1)');
+    expect(document.querySelector('.abjure-result-pending')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });

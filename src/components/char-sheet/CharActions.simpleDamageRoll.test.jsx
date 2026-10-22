@@ -215,8 +215,12 @@ describe('CharActions simple damage roll (weapon damage cell, no target)', () =>
 
     await waitFor(() => {
       expect(addEntry).toHaveBeenCalledTimes(1);
-      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      // Exact entry contract: characterName must be the player's name (regression
+      // pin for the double-.name defect — callers previously passed a string into
+      // useSimpleDamageRoll, which re-reads .name and logged characterName: undefined).
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', {
         type: 'roll',
+        characterName: 'TestCharacter',
         rollType: 'damage',
         name: 'Dagger',
         formula: '1d4+3',
@@ -225,7 +229,7 @@ describe('CharActions simple damage roll (weapon damage cell, no target)', () =>
         modifier: 0,
         damageType: 'Piercing',
         note: 'Direct damage roll (no target)',
-      }));
+      });
       // The popup ends on the new damage result (any prior popup is replaced).
       expect(setPopupHtml).toHaveBeenLastCalledWith(expect.objectContaining({
         type: 'damage',

@@ -35,9 +35,9 @@ import useInitiativeEffects from './useInitiativeEffects.js';
 //     (#346) covers automation null/{passives,actions:undefined} with real
 //     completion assertions; `.not.toThrow()` around dispatchEvent is vacuous
 //     anyway (jsdom reports listener exceptions instead of rethrowing them).
-// Known source defect (CLA backlog, not enshrined here): restoreCalmEmotions
-// multi-condition clobber (useInitiativeEffects.js:163-171) — no fixture in this
-// file exercises multi-condition restore per effect.
+// Fixed + pinned 2026-10-22: restoreCalmEmotions multi-condition clobber
+// (useInitiativeEffects.js:163-171) — one merged write per effect-target now;
+// multi-suppressedConditions byte pins live in concentrationClearing2.test.js.
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     // Exactly the four exports live in this import graph: useInitiativeEffects.js:2
     // and its loaded collaborator boonOfCombatProwess.js:2 import

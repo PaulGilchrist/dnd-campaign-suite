@@ -70,7 +70,7 @@ function findCombatCreatureSaveBonus(targetName, saveType, campaignName) {
   const creature = combatSummary?.creatures?.find(
     c => utils.getName(c.name) === utils.getName(targetName)
   );
-  return creature ? (creature.saveBonuses?.[saveType?.toLowerCase()] ?? 0) : 0;
+  return creature ? (creature.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0) : 0;
 }
 
 function resolveTargetSaveBonus(current, characters, campaignName) {

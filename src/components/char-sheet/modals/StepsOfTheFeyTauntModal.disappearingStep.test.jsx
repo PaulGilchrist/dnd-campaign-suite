@@ -7,10 +7,13 @@
 // addExpiration toHaveBeenCalled. Cancel no-op is covered by the shared
 // handleCancel in refreshingStep.test.jsx; overlay/close seams live in
 // integration.test.jsx; choice-step copy in render.test.jsx.
+// Regression: both accept branches now log the resolution to the campaign log
+// exactly once with full bytes (previously unlogged — app rule violation).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../services/ui/logService.js';
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 
 vi.mock('../../../services/automation/common/savePrompt.js', () => ({
@@ -81,6 +84,16 @@ const expectedExpiration = {
     expireOnCreatureName: 'FeyTrickster',
 };
 
+// Exact campaign-log entry applyDisappearingStep must emit at the resolution
+// seam (previously silent — app rule "every automation must log").
+const expectedLogEntry = {
+    type: 'ability_use',
+    characterName: 'FeyTrickster',
+    abilityName: 'Disappearing Step',
+    description: "FeyTrickster cast Misty Step for free via Steps of the Fey — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Disappearing Step: FeyTrickster has the Invisible condition until the start of FeyTrickster's next turn.",
+    timestamp: expect.any(Number),
+};
+
 function openDisappearingConfirm(props) {
     render(<StepsOfTheFeyTauntModal {...baseProps} {...(props || {})} />);
     fireEvent.click(screen.getByText('Disappearing Step'));
@@ -102,6 +115,7 @@ describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
         expect(setRuntimeValue).not.toHaveBeenCalled();
         expect(addExpiration).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole('button', { name: /Disappear/ }));
 
@@ -114,6 +128,11 @@ describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', 2, 'test-campaign');
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expectedExpiration);
+        // Regression: the resolution logs exactly once, after the state writes.
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expectedLogEntry);
+        expect(setRuntimeValue.mock.invocationCallOrder.at(-1)).toBeLessThan(addEntry.mock.invocationCallOrder.at(-1));
+        expect(addExpiration.mock.invocationCallOrder.at(-1)).toBeLessThan(addEntry.mock.invocationCallOrder.at(-1));
         expect(document.querySelector('.sp-body').textContent).toContain('2 remaining');
         expect(document.querySelector('.sp-body').textContent).toContain('Invisible condition until the start of your next turn.');
     });
@@ -137,5 +156,9 @@ describe('StepsOfTheFeyTauntModal - Disappearing Step', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', 2, 'test-campaign');
         expect(addExpiration).toHaveBeenCalledTimes(1);
         expect(addExpiration).toHaveBeenCalledWith(expectedExpiration);
+        // The already-invisible branch still resolves and still logs — exactly once, after the writes.
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', expectedLogEntry);
+        expect(addExpiration.mock.invocationCallOrder.at(-1)).toBeLessThan(addEntry.mock.invocationCallOrder.at(-1));
     });
 });

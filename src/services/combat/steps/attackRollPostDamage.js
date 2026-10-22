@@ -711,7 +711,12 @@ export function buildToppleMasteryStep() {
 export function buildMasteryDoneStep() {
   return {
     name: 'masteryDone',
-    subscribe: 'cleave:check',
+    // Mastery tail rides 'mastery:done' — emitted by toppleMastery (:667), the chain's
+    // last mastery handler — so pipeline:complete is guaranteed strictly AFTER mastery
+    // resolution. The old 'cleave:check' subscription was unreachable: the single-path
+    // runner (actionPipeline.run → steps.find) routes 'cleave:check' to cleaveMastery
+    // (:520) and never returns to it, so the marker never fired at all.
+    subscribe: 'mastery:done',
     emit: 'pipeline:complete',
     condition: () => true,
     handler: async () => {

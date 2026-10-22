@@ -12,17 +12,30 @@ function parseChallengeRating(crString) {
     return parseFloat(crString) || 0;
 }
 
-function filterBeastSpeeds(beastSpeeds, limitations) {
+// wildShapeLimitations is prose from classRules.getDruidFeatures / classRules2024.getDruidFeatures:
+// an "X only" clause enumerates the ALLOWED movement modes and a trailing
+// "(no ...)" clause enumerates FORBIDDEN ones, e.g. 'walk only (no swim or fly)',
+// 'walk or swim only (no fly)', 'walk, swim, or fly'. A mode is therefore allowed
+// unless the no-clause names it, or an only-clause exists and excludes it.
+const MOVEMENT_MODES = ['climb', 'swim', 'fly', 'burrow'];
+
+function isSpeedAllowed(limitations, mode) {
+    if (new RegExp(`\\bno\\b[^)]*\\b${mode}\\b`).test(limitations)) return false;
+    const allowedClause = limitations.match(/^(.*?)\s+only\b/);
+    return allowedClause ? allowedClause[1].includes(mode) : true;
+}
+
+// Named export exists so the limitation-polarity contract can be pinned with
+// exact toEqual (test file); DOM lanes in both test files cover render.
+// eslint-disable-next-line react-refresh/only-export-components
+export function filterBeastSpeeds(beastSpeeds, limitations) {
     if (!beastSpeeds) return {};
     if (!limitations) return beastSpeeds;
     const filtered = {};
     if (beastSpeeds.walk) filtered.walk = beastSpeeds.walk;
-    const hasFly = limitations.includes('fly');
-    const hasSwim = limitations.includes('swim');
-    if (beastSpeeds.swim && hasSwim) filtered.swim = beastSpeeds.swim;
-    if (beastSpeeds.fly && hasFly) filtered.fly = beastSpeeds.fly;
-    if (beastSpeeds.climb && hasSwim) filtered.climb = beastSpeeds.climb;
-    if (beastSpeeds.burrow && hasSwim) filtered.burrow = beastSpeeds.burrow;
+    MOVEMENT_MODES.forEach(mode => {
+        if (beastSpeeds[mode] && isSpeedAllowed(limitations, mode)) filtered[mode] = beastSpeeds[mode];
+    });
     return filtered;
 }
 

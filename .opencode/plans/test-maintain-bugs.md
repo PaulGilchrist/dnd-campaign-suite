@@ -60,6 +60,7 @@ honestly — after a fix, the pinning test must be updated in the same commit).
 - 🔴 **`CharActions.jsx:449` + `CharBonusActions.jsx:848` double-`.name`** — call
   sites pass `playerStats.name` (string) into `useSimpleDamageRoll`, which re-reads
   `.name` → every simple damage log gets `characterName: undefined` (run2 #12).
+  **FIXED fix#1 2026-10-22**: hook contract kept (derefs `.name`, param named playerStats, 2 callers both wrong); both call sites now pass the OBJECT; weak objectContaining pin flipped to exact `characterName:'TestCharacter'` + call-site regression added to BonusActions lane; bite-verified cp-revert 3-fail then cmp-restored; scoped 18/18 + eslint clean.
 
 ## ⚠ Suspected / needs adjudication
 
@@ -152,13 +153,16 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 MoonlightStepResourceModal.jsx:28-31 — currentUses unclamped from runtime; stale value renders "Current uses: 5/2". (pass #145)
 - 📌 OpenHandTechniqueModal.jsx:25 — handler resolving null silently re-renders selection UI, no error feedback (pinned honestly). (pass #149)
 - 🔴 PolymorphSelectionModal.jsx:20-25 — filterBeastSpeeds gates on limitations.includes('fly'/'swim'); matches NEGATED default "walk only (no swim or fly)" so swim/climb/burrow render under walk-only limits (Wolf shows Swim 20). (pass #150)
+  **FIXED fix#2 2026-10-22 (with next item)**: isSpeedAllowed parses prose law (no-clause forbids, '...only' clause restricts, else allowed); disk contract cited classRules.js:124/126/128 + 2024:293; climb/burrow now own keywords; fixtures disk-derived drift-throw (hand-copies retired); mutants old-gate 4-fail + polarity-flip 6-fail, cmp-restored; 21/21 + eslint clean. NOTE ledger claim 'Wolf shows Swim 20' came from drifted fixture — live defect surfaced Crocodile Swim/Climb instead, now pinned on real rows.
 - 🔴 PolymorphSelectionModal.jsx:24-25 — climb/burrow gated on hasSwim instead of own limitation keywords. (pass #150)
+  **FIXED fix#2** (same pass — MOVEMENT_MODES loop, per-mode keyword gate).
 - 📌 rec PolymorphSelectionModal.test.jsx — mockMonsters copy-pasted from features lane (drifted); extract shared fixture module. (pass #150)
 ## Pass run2#152 (PolymorphSelectionModal.test.jsx)
 - 📌 rec: features lane 'Walk 20' speed-display assertion + local fixture duplication in both Polymorph lanes — revisit when 🔴 PolymorphSelectionModal.jsx:20-25 fix lands; extract shared fixture then (new helper file needed — deferred).
 - ⚠ flake watch: CampaignAdmin.data-management.test.jsx URL-encoding test fails under full-suite parallel load (green 3/3 isolated, batches #134). Not load-adjacent to maintained lanes; watch at batch #135.
 ## Batch #135 flush (runs #152-#165)
 - 🔴 ResourcePoolModal.jsx:215-223 — handleArchdruidConvert never calls addEntry; Nature Magician conversions invisible in campaign log (violates every-automation-logs rule). Honestly pinned in test. (pass #161)
+  **FIXED fix#3 2026-10-22**: addEntry inserted at seam matching handleForward/handleReverse pattern (:184-190/:202-208, ability_use + .catch console); honest not.toHaveBeenCalled pin flipped to exact-payload toHaveBeenCalledWith + plural-uses added + blocked-guard negative kept; mutant-kill 1-fail restored cmp; 16/16 + eslint clean. Follow-on (untouched): clearAllExpirationEffects.js:164 logs unnamed 'effects end.' opposite-polarity same-class.
 - 🗑 AOEConditionModal.advanced.test.jsx — vacuous expect(true) placeholder; DELETE on its turn (queued line 29). (pass #164)
 - 📌 AOEConditionModal.test.jsx + advanced.test.jsx headers cite integration.test.jsx for coverage now owned by save-flow.test.jsx — fix pointers when those lanes are processed. (pass #164)
 - 📌 PrimalCompanionSummonModal.jsx:59 — renders literal "AC undefined" if companion type lacks acFormula (real data always supplies). (pass #156)
@@ -177,17 +181,24 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 AreaEffectTargetModalBase.jsx:73-143 — four structurally identical get*Blocked callbacks; parameterize to one helper. (pass #171)
 ## Pass run2#185 (FearModal.player-saves.test.jsx) — URGENT cross-file bugs (recorded immediately, apply at owning turns)
 - 🔴 FearModal.jsx:146-147 — careful-protected PLAYER targets: buildCarefulPlayerSaveResult pushed to results but addTargetResult/logSaveResultEntry never called; auto-success unrecorded (NPC leg logs fine via resolveNpcCarefulSave).
+  **FIXED fix#4 2026-10-22 (with :229-234)**: mirrored resolveNpcCarefulSave pair (AreaEffectSaveFlow.utils.js:126-168) inline :147-162; honest zero-length pin flipped to exact save_result object + addTargetResult tuple; revert-mutant RED-verified. SAME-CLASS queue (untouched): HypnoticPatternModal:112, CalmEmotionsModal:78-81, SaveAttackAoeModal:274-277.
 - 🔴 FearModal.jsx:229-234 — confirm with zero resulting prompts (all targets careful-protected) leaves modal stuck open: setPendingPrompts([]) never triggers dropPendingPrompt, no onClose path.
+  **FIXED fix#4**: onClose() after setPendingPrompts when prompts empty (skip-path mechanism :235-237), deps updated; new onClose-times-1 regression; remove-mutant RED-verified; 22/22 across 4 files + eslint clean. SAME-CLASS queue (untouched): AOEConditionModal:459/538, HypnoticPatternModal:198, TashasLaughterModal:303, SaveAttackAoeModal:1818/1870, CalmEmotionsModal:231, MassSuggestionModal:339.
 - 🔴 HealingIllusionModal.jsx:20-21 — custom-target maxHp silent-fallback to 0 when runtime hitPoints unset; Math.min(0, currentHp+heal) sets currentHitPoints to 0 (heal becomes damage). Violates no-fallbacks convention. (pass #189)
+  **FIXED fix#5 2026-10-22**: parseHp() null-for-unset; unresolved -> console.error + ZERO write/log/close (refuse path); canonical clamp reused healingRoll.js:58; defect confirmed live pre-fix (wrote 0 / negative actualHeal); 3 pins added incl genuine-0-HP guard; mutant re-plant RED, cmp-restored; 14/14 + 10/10 consumer + eslint clean. SAME-CLASS queue (untouched): hpModifier.js:34 ??0, healingRoll.js:49-52 at-full fabricate, beguilingDefenses:48/searingVengeance:188 benign-display.
 ## Pass run2#191 (HypnoticPatternModal.metamagic.test.jsx)
 - 🔴 HypnoticPatternModal.jsx:112-113 — careful-protected PLAYER target leaves no audit trail (in-memory result only; no addEntry/addTargetResult), NPC careful leg logs properly. Same defect family as FearModal.jsx:146-147 (#185). Honestly pinned (saveEntriesFor('PlayerAlly')=0).
+  **FIXED fix#6 2026-10-22**: mirrored fixed FearModal :147-164 pair (logCarefulSpellProtectedSave + addTargetResult, roll:null->0 file convention, import position identical); honest zero-length pin flipped exact-entry + exact tuple; mutant RED, cmp-restored; 15/15 + eslint clean. Residual same-class: SaveAttackAoeModal:274-277 still open (queued); CalmEmotions cited span drifted — its careful leg appears to log now, owner verdict pending.
 - 📌 rec SaveAttackAoeModal.* family — ~100-line CreatureSelectionModal row-markup mock copy-pasted verbatim in >=6 test files (blocking-effects, damage-edge-cases, overlay, creature-selection, damage-resolution...); extract shared test-util (precedent: SaveAttackHealModal.test-utils.js) when those lanes are processed.
 ## Batch #137 flush (runs #181-#194)
 - 🔴 CreatureSelectionModal.jsx:57 — heighten toggle-to-null unreachable (browsers no change event on checked radio); dead branch, deselect impossible via UI. (pass #182)
+  **FIXED fix#7 2026-10-22**: onPointerDown checked-snapshot + gated onClick -> existing handleHeightenSelect (onChange untouched for fresh selects); pre-fix jsdom probe zero-calls reproduced; 3 pins added (null-tuple, controlled-parent null render, single-select guard); mutant RED both deselect pins, cmp-restored; 99/99 + eslint clean. SAME-CLASS queue: RecklessAttackModal:82 (:204 below) + AreaEffectTargetModalBase.utils:8 + AOEConditionModal.subcomponents:77 (newly sighted).
 - 🔴 HandOfHealingModal.jsx:82 — sourceName template unclosed paren -> "Monk1 (Monk" in campaign log (only pin = test #188). (pass #187/#188)
+  **FIXED fix#8 2026-10-22**: closer restored per blame e6bfd0f82 (authored dropped paren, no lost interpolation) + sibling convention cites; pin flipped exact 'Monk1 (Monk)' pre-fix-39-pass then 44/44 post + eslint clean; same-class grep: sole instance repo-wide.
 - 📌 CombatStanceModal.jsx — inline style props violate no-inline-styles convention. (pass #181)
 - 📌 HealingIllusionModal.jsx — description literal vs spell-data (design note only). (pass #194)
 - 🔴 HypnoticPatternShakeModal.jsx:33-39 — executeHandler rejection: catch rethrows before setProcessing(false)/onClose(); modal stuck "Shaking target free..." + unhandled rejection. Deliberately unpinned. (pass #195)
+  **FIXED fix#9 2026-10-22**: throw e removed (house idiom HandOfHealing:180/CombatStance:38 + own intent bc17510c0 'log but don't throw'); caller-catch proven absent (onClick void, SecondaryModals:480 supplies onClose only); new 9th pin pre-fix RED stuck+escape then GREEN 9/9 + unhandledrejection probe + exact console bytes; success path bytes unchanged; eslint clean.
 ## Pass run2#196 (MassSuggestionModal.pay-at-confirm.test.jsx)
 - 📌 rec MassSuggestionModal.test.jsx — 6x hand-rolled select→confirm snippets -> shared helper; merge charmed-on-fail + persistAndNotify + storeSpellLastAttack (one path); merge pending-prompts vs save-prompt pair. 6->~3-4. (pass #196)
 - 📌 rec MassSuggestionModal.saveResults.test.jsx — null/empty-detail + unknown-promptId guard rows -> parameterize. (pass #196)
@@ -202,6 +213,8 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - ⚠ SaveAttackAoeModal.creature-selection.test.jsx — asserts .careful-flag class invented by its local CreatureSelectionModal mock; real modal never renders it → test verifies mock, not app. Rework with real modal on its turn.
 ## Pass run2#206 (SaveAttackAoeModal.cold-gale.test.jsx) — 🔴 SYSTEMIC saveBonuses key-mismatch
 - 🔴 encounterToInitiative.js:12-16 writes saveBonuses with ABBREV keys (dex/s Wis etc); full-name readers get silent +0: SaveAttackAoeModal.jsx:47, SavePromptModal.jsx:73, MassSuggestionModal.jsx:93, AOEConditionModal.jsx:113, SaveAttackHealModal.jsx:150, SetConditionModal.jsx:88, ElementalAttunementModal.jsx:397, radianceOfDawnHandler.js:69. applyDamage.js:135-136 falls back BOTH ways (canonical normalizer exists!). Probe evidence: Guard saveBonuses.dex=7 → saveBonus:0 logged. Fix at producer (write full keys) or normalize once at read. Tests pass because they pin raw rolls — real gameplay affected.
+  **REGRESSION+REPAIR fix#10r 2026-10-22**: new applyDamage imports broke 9 lanes (7 EA partial-mock Proxy holes + CalmEmotions transitive automation/index->calmEmotionsHandler.handle eval-time throw). Repair: importOriginal spread 2 lines/lane, overrides byte-preserved zero-weakened; fix#10 pins intact; full suite 30,198 exact CANON pair again. WARNING: lanes fully-mocking applyDamage + saveBonuses fixtures, or handler-mocks under transitive automation/index, need same proactively (EA elemental-data+base short-circuit-lucky today).
+  **FIXED fix#10 2026-10-22 (read-side arm — producer-full REJECTED by census: CLA-303 lowercase contract + 16+ legit abbrev consumers + round-trip)**: 9 reader files/10 lines normalizeSaveType (sanctioned one-expression-each) + producer input-hardened (found+fixed second bug: full-name-keyed saving_throws rows fell to ability-modifier, Dracolich dex +6->2); probes pre 0 post 7; pins added 2 lanes + mock-accommodations zero-weakened; 143/143 final + eslint 14 files clean. FOLLOW-ONS (owner lanes): truePolymorphService:345 duplicate private getMonsterSaveBonuses; SaveAttackAoeModal:52 dex-gate full-name miss; npcClickFormHandlers:192 round-trip abbrev-only vs 16 full-name rows.
 ## Pass run2#208 (SaveAttackAoeModal.creature-selection.test.jsx)
 - ✅ .careful-flag mock-artifact rec (#201) APPLIED — file reworked onto real CreatureSelectionModal; dead base stub + 7 unused mocks removed.
 - 🗑 SaveAttackAoeModal.test.jsx — pure expect(true) placeholder w/ stale pointer comment; DELETE on its turn.
@@ -212,8 +225,10 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 ## Pass run2#210 (SaveAttackAoeModal.damage-resolution.test.jsx)
 - 📌 rec SaveAttackAoeModal.overlay.test.jsx — carries dishonest computeDamageAfterEvasion (halves even on failed saves) + unused computeDamageAfterSave export; honest-mock pass at its turn.
 - 🔴 SaveAttackAoeModal.jsx:595 — ma0610TeDescriptors spreads recurringDie: zoneTe.recurringDie||undefined AFTER :610 derives recurringDie from zoneTe.damage → clobbers to undefined. Verified live: armed lair_insect_cloud tes lack recurringDie despite repeatTurnEnd+damage:'3d6'. Turn-end consumers see nothing. (pass #217)
+  **FIXED fix#11 2026-10-22**: clobber lived one level up (armZoneTargets :595 unconditional recurringDie AFTER :610 derived spread — authored-wins spread now conditional-key ...(zoneTe.recurringDie?{...}:{})); consumer census authoritative (zoneRepeatTurnEndService:48-55 te-carrier canon, whirlwind authored still wins); full-set armed-te pins incl recurringDie 3d6 pre-fix RED undefined + negative no-fabrication pin; 5 lanes 17 green eslint clean.**
 - 📌 rec saveProcessing.ma0875-thp-grant.test.js:137-148 — standing-pool stacking re-tests tempHpBuffHandler.bolsteringTreats.test.js:146 owner semantics; trim to clause-channel proof at its turn. (pass #218)
 - 🔴 AreaEffectTargetModalBase.jsx:173+214 / SaveAttackAoeModal.jsx:1934-1938 — overlay apply race: base allResolved reads its own selected (shadowed by extraState.selected → always empty), setSummary fires with ctx.results still empty one microtask before setResults lands; results panel renders header with ZERO rows. Reproduced live (pass #226, now non-vacuously pinned). Also triggers setState-during-render warning.
+  **FIXED fix#12 2026-10-22**: base reads effectiveSelected ("selected" in extraState merged expr, no new state); in-render setSummary branch replaced by handleAllResolved post-commit effect (functional prev===null guard); overlay pin flipped header-only->exact-rows+zero-warnings, NEW interactions one-microtask pin; 59 files/276 green, eslint 4 clean. ADJACENT report: SaveAttackAoeModal:1733 handleSaveResultOverride reads consumer pendingPrompts while overlay stores in BASE ctx — overlay-lane PC replies early-return (two-homes-for-state family, owner pass); consumer:1939 inline-style debt untouched.
 ## Pass run2#234 (SaveAttackAoeModal.staged-petrify.test.jsx)
 - ⚠ SaveAttackAoeModal.jsx:1298,:1995 — buildPickerCopy never receives stagedPetrify; armed Gorgon picker shows MA-0063 flat "Petrified, Restrained." copy (:1313) contradicting ladder fail#1=Restrained-only enforced on store. Copy-cosmetic.
 - ⚠ SaveAttackAoeModal.jsx:1189 — resultRowText lacks staged-petrify branch; damageless staged fail renders generic "Failed the save" prose (sleep/paralysis have theirs at :1197).
@@ -225,6 +240,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 rec SaveAttackHealModal.test.jsx:33-36 — dead applyHealingDirectly mock (no consumer in import graph; verified fixed in saveFlows #241); trim at its turn. (pass #241)
 ## Pass run2#244 (SetConditionModal.sideEffects.test.jsx)
 - 🔴 SetConditionModal.jsx:144-147 — failed player save WITH immunity: addConditionToCreature (immunity-checked internally) + logCondition + addExpiration called unconditionally → immune player logged "applied Frightened" + phantom expiration clock, no condition. Phantom visible in T1 control diff.
+  **FIXED fix#13 2026-10-22**: applyConditionToCreature returns applied|immune|missing (consumes addCondition {suppressed} contract conditionSaveService.js:127-157); expiration+applied-log gated on landed subset; honest immunity advisory per saveProcessing:801-809 + charmSpellUtils:98 template (condition_immune_advisory via automation type — renders); pre-fix phantom captured then pinned away; 26/26 lanes + eslint clean. SAME-CLASS QUEUED: BlindnessDeafnessModal.jsx:40-62 identical unconditional trio (player immune logs applied + phantom expiration + phantom effectKey :44).**
 - 🔴 SetConditionModal.jsx:149 — player log formula saveBonus !== 0 check renders '1d20+undefined' when saveBonus absent (other fields coalesce ?? but formula doesn't).
 - 📌 rec SetConditionModal.test.jsx — drop 2nd-render Roll:10+2=12 display dup (T3 #244 owns math); weak 'renders npc/player labels' getAllByText(/npc/)≥1 near-vacuous — strengthen or remove at its turn.
 ## Pass run2#247 (StealthAttackModal.test.jsx)
@@ -232,6 +248,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 StealthAttackModal.jsx:41 — cost hardcoded '{costD6}d6' vs derived d{value} available: cosmetic inconsistency if per-level key ever materializes (handler also hardcodes d6).
 ## Pass run2#249 (TashasLaughterModal.player-saves.test.jsx)
 - 🔴 TashasLaughterModal.jsx:40 — buildLaughterSaveResultEntry guards saveBonus !== 0 only; undefined bonus leaks "rolled 0 + undefined = 0" into logged description (honestly pinned in sparse-detail test).
+  **FIXED fix#14 2026-10-22**: guard (detail.saveBonus ?? 0) !== 0 — undefined never interpolates; house omit-plus form per savePrompt.js:148/66; honest pin flipped to exact fixed bytes (old pin fails new code = strong); 27/27 3 lanes + eslint clean. SAME-GUARD-FAMILY QUEUE: BlindnessDeafnessModal:139, SaveAttackHealModal:195, SetConditionModal:181 (ledger :149 sibling), DivineSparkModal:204 — all raw !==0 with sparse-payload +undefined leak risk.**
 - ⚠ TashasLaughterModal.jsx:91 — Math.max(1, undefined)=NaN when spellSlotLevel missing → selection unlimited via NaN-tolerant guards; harmless with current callers, fragile.
 ## Pass run2#251 (ShieldBashChoiceModal.test.jsx)
 - 📌 ShieldBashChoiceModal.jsx:50-66 — inline styles (no-inline-styles rule); "Push 5 feet" copy hardcoded, ignores caller action.options values (component hardcodes options, forwards action verbatim :15/:76).
@@ -245,6 +262,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 StepsOfTheFeyTauntModal.jsx:368-395 — inline styles in renderChoiceStep. (pass #254)
 ## Pass run2#257 (StepsOfTheFeyTauntModal.dreadfulStep.test.jsx)
 - 🔴 StepsOfTheFeyTauntModal.jsx:129 — handleSkip modeLabel from mode not choice: skipping Dreadful Step in normal mode logs "<b>Taunting Step:</b> No targets selected." wrong label.
+  **FIXED fix#15 2026-10-22**: modeLabel from choice (in-scope, always taunting|dreadful at skip site); mirror-defect also fixed (Taunting-in-mistyEscape said Dreadful); pins upgraded toExact full-string, pre-fix RED ledger bytes; :99-108 deliberately untouched (fix#16); 8 lanes 24 green + eslint clean.**
 - ⚠ StepsOfTheFeyTauntModal.jsx:278-289 (+taunt twin :176-187) — save-result window listeners removed only on event arrival; closing modal with pending saves leaks listeners + resolves against unmounted state (cross-modal clobber class).
 - 📌 rec noUses/refreshingStep tests — same dishonest createSaveListener arg-destructure + shared prompt-<name> ids latent collision; honest-mock treatment at their turns. (pass #257)
 ## Pass run2#258 (StepsOfTheFeyTauntModal.integration.test.jsx)
@@ -254,6 +272,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 rec StepsOfTheFeyTauntModal.render.test.jsx:73-78 + :114-118 header-title dupes consolidate; :101-112 skip-label merge. (pass #259)
 ## Pass run2#260 (StepsOfTheFeyTauntModal.refreshingStep.test.jsx)
 - 🔴 StepsOfTheFeyTauntModal.jsx:99-108 — applyRefreshingStep never addEntry: refreshing free-cast resolution unlogged (app rule "every automation must log"); same gap :110-126 disappearing lane. Not pinned to avoid cementing.
+  **FIXED fix#16 2026-10-22 (with :110-126 disappearing)**: ability_use entries at resolution seams per handleFreeCastSkip/logFreeCast template (:25-35/:138-151), names disk-verified classes.json:12167/:12181, writes-before-log order pinned, exact-entry + inert-cancel tests added both lanes, composes clean on fix#15; 8/24 green eslint clean.**
 - 📌 rec render.test.jsx — dishonest createSaveListener arg-0 mock (uninvoked there) + 7 single-assert tests consolidate to ~3. (pass #260)
 ## Pass run2#262 (StepsOfTheFeyTauntModal.tauntingStep.test.jsx)
 - ✅ COVERAGE GAP CLOSED (flagged #258): taunting confirm lane rebuilt as 2 real tests (upsert/save_result/expiration/indefinite-wait pins). Gap entry resolved.
@@ -272,6 +291,8 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 WeaponMasteryChoiceModal.jsx — inline styles throughout (convention). (pass #278)
 ## Pass run2#279 (WeaponMasteryModal.test.jsx)
 - 🔴 WeaponMasteryModal.jsx:78 — selection body <p> interpolates `against <b>${targetName}</b>` as plain JSX text (no dangerouslySetInnerHTML) → UI shows literal <b> markup. Cosmetic; honestly tolerated in tests.
+  **FIXED fix#17 2026-10-22**: JSX fragment children (no DSI per #1545 law); regex-tolerant pin flipped exact-textContent + not.toContain('<b>') + real b-element assert; DOM proof before/after captured; 12/12 + eslint clean. Same-class grep: ~40 sites ALL sanctioned HTML sinks (verified) — sole plain-text instance repo-wide was this one.
+  **FIXED fix#16 2026-10-22 (with :110-126 disappearing)**: ability_use entries at resolution seams per handleFreeCastSkip/logFreeCast template (:25-35/:138-151), names disk-verified classes.json:12167/:12181, writes-before-log order pinned, exact-entry + inert-cancel tests added both lanes, zero count-extensions needed, composes clean on fix#15; 8/24 green + eslint clean.**
 ## Pass run2#282 (ZealousPresenceModal.test.jsx)
 - 📌 SearingVengeanceModal.test.jsx:6 cites now-nonexistent "ZealousPresenceModal precedent" real-modal rendering — stale comment; reword at its turn. (pass #282)
 ## Pass run2#283 (normalizeAutoDamage.test.js)
@@ -303,6 +324,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 rename candidate ShortRestModal.coverage.test.jsx -> ShortRestModal.memorizeSwap.test.jsx (contents now CLA-226-only). rec base ShortRestModal.test.jsx:26 unimported rollExpression mock cleanup. ✅ coverage:414 vacuous removed (rec #294 consumed). (pass #295)
 ## Pass run2#296 (ShortRestModal.naturalRecovery.test.jsx)
 - 🔴 ShortRestModal.jsx:175-179 — collectRestoredResources resourceLabels.find(r => r.key === key) but getShortRestResourceLabels returns STRINGS (restRules-constants.js:41 .map(e=>e.label)) → never matches; base-class restored-resource labels silently absent from short-rest log/UI. Dead branch, masked by string-array mock in tests.
+  **FIXED fix#18 2026-10-22**: no keyed sibling exists (constants private, consumer census forbids shape change) -> modal consumes producer class-filtered strings minus the three dedicated-collector labels (byte-verified equivalence per class); dead SHORT_REST_RESOURCES import dropped; FIVE lying canned mocks replaced REAL-constants passthrough; absence-pins upgraded to exact-content; pre-fix RED = missing-export unmask + length-0; 97 lane + 441 blast-radius green + eslint clean.**
 ## Pass run2#297 (ShortRestModal.test.jsx)
 - ⚠ ShortRestModal.jsx:688 vs :788 — replenishingMeals decremented at roll time AND again at completion from fresh runtime value; possible double-decrement. Probe in completionFlow lane (already marked; needs re-touch for probe) or restRules lane.
 - 📌 rec completionFlow: plain-cleric getShortRestResourceLabels:()=>[] mocks hide :175-179; add one producer-shaped ['Channel Divinity'] completion test pinning missing log-label at message layer. (pass #297)
@@ -310,24 +332,29 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 cantripBonuses.js grantCantripTempHp modal-interrupt branch pinned by NO lane (step-internal); candidate for dedicated steps/features/cantripBonuses.test.js. (pass #298)
 ## Pass run2#299 (useAttackDamageResolution.automationDamage.test.js)
 - 🔴 useAttackDamageResolution.js:361,366 — leftover [sw-debug] console.log in production source, fires every damage pass (debug litter, removal candidate).
+  **FIXED fix#20 2026-10-22**: sites :361/:366 deleted (args pure-read verified, byte-diff 2-deletions); no liveness pins existed to flip; NEW absence pin at hook seam (seam-liveness via rollDamage + zero sw-debug bytes); 20 lanes/158 green eslint clean. SAME-TOKEN REPORT: sacredWeapon.js:11/16/18 three unconditional per-invocation [sw-debug] litter, ledger-scope-forced untouched - NEW queue entry warranted.**
 - 🗑 attackRollBonuses.js:85-86 — silently drops non-canonical flat frenzy expressions ('rage_damage'); harmless (registry canon rage_damage_d6) but silent-zero class. (pass #299)
 ## Pass run2#300 (useAttackDamageResolution.automations.test.jsx)
 - 📌 attackRollDamageSteps-automationBonuses.test.js heavily duplicates -weaponHitBonuses + -natural20-celestial + colossusSlayer step tests (~40 redundant step-level its) — queue merge consideration. (pass #300)
 ## Pass run2#301 (useAttackDamageResolution.classFeatures.test.js)
 - 🔴 superiorHuntersPrey.js:74-79 — async applyDamageToTarget NOT awaited: damage log finalDamage=undefined + popup spreadFinalDamage/spreadTargetCurrentHp=undefined (honestly pinned in hook lane).
+  **FIXED fix#19 2026-10-22**: one-token await (enclosing already async, zero caller edits, contract applyDamage.js:991/1052 cited); root-cause-green-mask was SYNC-mocked applyDamageToTarget contradicting real async -> faithful-async mocks fix#10r-compliant; pre-fix RED captured 3 lanes, pins exact-bytes flipped; 46 scoped + 5,288 collateral sweep green; eslint clean.**
 ## Pass run2#306 (useAttackDamageResolution.maneuvers.test.js)
 - 🗑 rec useAttackDamageResolution.skipManeuver.test.js:111-121 — weak legs superseded by maneuvers skip fold here; candidates for deletion at its turn (verify mock-pipeline setup serves no other purpose). ✅ :439-456 drop consumed (#305 rec).
 ## Pass run2#307 (useAttackDamageResolution.mn014.test.js)
 - ⚠ handleAttackRiderManeuverUse gates precision miss on mounted popupHtml prop not popupHtmlData arg: miss w/ null mount-popup silently routes hit post-resolution path (by-design-ish, damage lands safely). (pass #307)
 ## Pass run2#309 (useAttackDamageResolution.opportunity-transport.test.js)
 - 🔴 useAttackDamageResolution.js:371-383 — hook-path proceedWithDamage minimalCtx omits isOpportunityAttack while standalone twin includes it (:57): OA marker dropped if OA resolves w/o buildCtxSync → Charger/Sentinel gates mis-fire. Reachability unverified; review.
+  **FIXED fix#21 2026-10-22**: reachability LATENT-proven (single production mount, buildCtxSync always truthy CharActions:221; falsy-branch test-mount-only today) — parity key added anyway mirroring twin :57 byte-exact (FT-101 comment cites handlePlainDamage:379 Halt gate); NEW 4-test transport lane incl. cross-path equality + merge-branch ride; mutant-drop RED cmp-restored; else-branch full-set pins x3 extended isOpportunityAttack:false; 162+216 green eslint clean. Fold note standalone:168-285 deliberately untouched.**
 - 🗑 rec standalone.test.js:168-285 proceedWithDamage/ctx-defaults twin describes near-identical — fold it.each at its turn (alongside existing 🗑 :288-481).
 ## Pass run2#310 (useAttackDamageResolution.optionSelect.test.js)
 - 🔴 useAttackDamageResolution.js:555-562 — validation-after-mutation: maneuver-less payload closes modal + latches _brutalStrikeActive/_brutalStrikeEffects BEFORE rejecting → stuck latch (unreachable from InlineChoiceModals which always supplies maneuver; honest pin in lane).
+  **FIXED fix#22 2026-10-22**: option lookup hoisted before close+latch (house order resumeAttackPipeline:511-514 + own null-branch precedent; validate-before-mutate, no-console pattern); stuck-latch honest pin flipped 3-branch faithful-store exact negatives + new partial-maneuver branch; mutant-drop RED cmp-restored; fix#10r spreads applied (combatSuperiorityHandler hole); 20 lanes/163 green eslint clean.**
 - ⚠ useAttackDamageResolution.js:588 — speed-reduction log hardcodes "15 feet" ignoring option.value distance (cosmetic log).
 - 🗑 rec skipManeuver.test.js:124-152 — describe('handleAttackRiderOptionSelect') block strictly weaker dups of optionSelect core lane; delete block at its turn. (pass #310)
 ## Pass run2#316 (useAttackDamageResolution.tacticalMaster.test.js)
 - 🔴 attackRollPostDamage.js:713-714 — masteryDone marker step subscribes 'cleave:check' but sits after toppleMastery (emits 'mastery:done'); fires early, pipeline:complete precedes mastery resolution. Harmless today, latent ordering defect.
+  **FIXED fix#23 2026-10-22**: event-chain model proven (run() steps.find single-path) -- defect WORSE: marker NEVER fired (cleave:check consumed by cleaveMastery :520; mastery:done subscriberless; pipeline:complete dead). subscribe mastery:done (toppleMastery :667 guarantee); NEW terminal lane invocationCallOrder + cleave-less kill-probe 4-fail; golden census row updated; 16 files/136 green eslint clean.**
 ## Pass run2#318 (useCharActionModals.additional.test.js)
 - 📌 rec useCharActionModals.maneuverHandlers.test.js — 3 typeof+callable smokes subsumed by own identity test; collapse to 1. integration.test.js — :183 typeof->toBe identity, fold objectContaining args byte-exact. modalState.test.js — falsy-clear it.each fold candidate. (pass #318)
 ## Pass run2#319 (useCharActionModals.integration.test.js)
@@ -355,29 +382,35 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 computeStealthBonus :52 stealthSkill?.bonus ?? 0 - exhaustionPenalty precedence smell (benign today); :53 constant-false includes('Stealth') oddity (outside lane). (pass #337)
 ## Pass run2#338 (useCharActionsHideAction.test.js)
 - 🔴 useCharActionsBaseActions.js:52 — `bonus ?? (0 - penalty)` precedence: listed Stealth bonus silently skips exhaustion subtraction.
+  **FIXED fix#24 2026-10-22**: (stealthSkill?.bonus ?? 0) - exhaustionPenalty; rule law disk conditions.json:26 d20-test reduction + producer chain cited; sibling computeGrappleCheckBonus:171 -= form mirrored; pre-fix repro eval 5 + lane RED row; 8-row matrix 5-row-RED-then-green, sign-interpolation bytes intact, old bonus-absent rows byte-preserved; 57/57 5 lanes eslint clean; same-class grep: no other ?? - arithmetic sites.**
 - 🗑 useCharActionsBaseActions.js:53-58 — statically-false includes('Stealth') (wisCheckReplace unreachable for Hide) + tautology 'Stealth'==='Stealth' — vestigial generic conditions. (pass #338)
 ## Pass run2#340 (useCharActionsModalHandlers.buffs.test.js)
 - 📌 rec useCharActionsModalHandlers.inspiration.test.js — same bloat pattern: 14 mocks -> routed trio, triples fold 3->2 per handler (mirror #339/#340). healing/combatSuperiority siblings — audit mock preambles at own turns. (pass #340)
 ## Pass run2#341 (useCharActionsModalHandlers.combatSuperiority.test.js)
 - 🔴 useCharActionsModalHandlers.js:65-80 — handleCommanderStrikeChoiceConfirm never flushes result.logEntries (commander_superiority grant log from combatSuperiorityUtils.js:298 silently dropped — same class as fixed MN-002). Add flush table row when fixed.
+  **FIXED fix#28 2026-10-22**: MN-002 = direct helper flush (ce88d90f5, mirror handleRallyChoiceConfirm:99-101; ledger flush-table = test lane it.each); +5-line flush at correct seam order (util-await->popup->flush->modal-clear); test table row byte-exact per util :284-289 + times(1) strengthening all rows; pre-fix silence captured 0-calls RED; 41+ lanes green eslint clean.**
 ## Pass run2#343 (useCharActionsModalHandlers.inspiration.test.js)
 - 📌 rec useCharActionsModalHandlers.test.js base — bardic/reactionBonus mock block redundant overlap (never routes them); trim at own turn. rec oceanicGift lane mirror #339-#343 canon when queued. (pass #343)
 ## Pass run2#346 (useInitiativeEffects.activeStateClearing.test.js)
 - 🔴 useInitiativeEffects.js:324,330 — clearLivingLegend invoked twice same handler (doubled writes/SSE churn, dead dup).
+  **FIXED fix#25 2026-10-22**: dup proven byte-identical same straight-line pass (arrival: 1c54eb4f2 copy-paste, preserved-fold 0bf564099); 4 redundant writes/SSE per roll eliminated; helper idempotent-value confirmed so single call final-state identical; new times(1)+write-bytes pin pre-fix doubled capture; 108/108 11 lanes eslint clean.**
 - ⚠ useInitiativeEffects.js:152 — vow lane re-writes target activeBuffs unconditionally (no only-if-changed guard like clearActiveBuffsWhere) — SSE echo churn.
 ## Pass run2#347 (useInitiativeEffects.batchResets.test.js)
 - 🗑 useInitiativeEffects.js:410 — dead guard Object.keys(updates).length>0 always true (builder unconditionally sets >=8 keys).
 - 🗑 rec useInitiativeEffects.edgeCases.test.js:406-423 weak FT-007 find-in-updates (subsumed byte-exact here); buffClearing:444-456 guard restatement. (pass #347)
 ## Pass run2#348 (useInitiativeEffects.buffClearing.test.js)
 - 🔴 useInitiativeEffects.js:111 — setRuntimeValue called with 5th skipSync arg; signature takes 4 (useRuntimeState.js:78) — silently ignored, writes always POST (misleading vs AGENTS.md skipSync guidance).
+  **FIXED fix#26 2026-10-22**: arm(a) verdict — callee store setRuntimeValue arity-4 runtime-pinned, 5th arg never honored since 20d9582ac; local-origin owner-gated clear SHOULD POST -> dead arg deleted BOTH sites (:111+:175) + forbid-re-add comments; 12 tuple pins flipped exact-4arg (length-enforced); NEW live-store POST lane byte-exact single-fetch + zero-POST guards; 112 green. SAME-PATTERN REPORT: turnEndConditionRemoval:36, combatSuperiorityUtils:312-314, restRules-family sites — owner lanes.**
 - 🗑 rec useInitiativeEffects.initiativeRolled.test.js:636-658 superior-defense restatement (weaker, no final-state). (pass #348)
 ## Pass run2#350 (useInitiativeEffects.concentrationClearing.test.js)
 - 🗑 rec useInitiativeEffects.edgeCases.test.js:426-453 + :324 — same concentration guard/undefined-spell paths now covered here with seeded-store tables; consolidate at edgeCases turn. (pass #350)
 ## Pass run2#351 (useInitiativeEffects.concentrationClearing2.test.js)
 - 🔴 useInitiativeEffects.js:163-171 — restoreCalmEmotions captures conditions once per effect: multi-suppressedConditions (['Frightened','Charmed']) second write clobbers first restore (fake-store reproduced).
+  **FIXED fix#27 2026-10-22**: root = per-effect stale snapshot not store latency; producer-normal multi-item arrays (calmEmotionsHandler:170-172); ONE merged write per target per producer §39 canon + filter-write-once helpers; restore-sibling reuse REFUTED (conditionSaveService channel corrupts raw-restore bytes); pre-fix clobber byte-capture; 3-row it.each merged-write pins; 12 lanes/115 green. SAME-CLASS FOUND: concentrationService.js:207-218 verbatim stale loop (owner follow-on lane).**
 - 🗑 rec edgeCases.test.js:244,274,297 Calm guard dups (weaker than guard table here); :324 overlap. (pass #351)
 ## Pass run2#357 (useModalHandlers-damage.test.js)
 - 🔴 useModalHandlers.js:102 — damageType formula bracket rewrite runs unconditionally: annotation replaced even when _damageTypeModifier absent (label altered, resource unspent). Latent; UI likely always supplies.
+  **FIXED fix#29 2026-10-22**: ternary guard on _damageTypeModifier (producer attackRollPostDamage:99-101 stamps only when spent; label-mutation now atomically coupled to guarded spend block :97-101); pre-fix repro absent-modifier bracket-mutate captured RED; kill-pair #1348 identical-input presence-differing-output; only bracket-rewrite site repo-wide (grep-clean); 5 lanes/59 green eslint clean.**
 ## Pass run2#358 (useModalHandlers-features.test.js)
 - 🗑 rec useModalHandlers.test.js:70 — fold ref-passthrough twin into test 1 (same path). useModalHandlers-simple.test.js:47 — fold mastery-name no-op into clear-modal test. (pass #358)
 ## Pass run2#359 (useModalHandlers-flurry.test.js)
@@ -402,9 +435,11 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 WizardStepBasic.jsx:8-10 — fetch never checks response.ok before .json() (404 HTML -> misleading parse-error in catch; handled). (pass #380)
 ## Pass run2#381 (WizardStepClass.test.jsx)
 - 🔴 ClassDetailCard.jsx:13 — 5e proficiencies (includes Armor/Shields disk data) rendered under label 'Weapon Proficiencies' — mislabel on 5e cards.
+  **FIXED fix#30 2026-10-22**: disk truth 5e proficiencies = mixed container 12/12, 2024 split-fields keys absent-5e; flat relabel Proficiencies per CharSummary:275/FeatItemDetails:50 house precedent (no house splitter exists); pre-fix Fighter armor-under-Weapon-header captured; disk-import it.each byte-pins + absent-guards, all old assertions retained; 17/17 eslint clean. Label family scan: sole mislabel repo-wide.**
 - 🗑 WizardStepClass accepts+ignores classSubtypes prop (dead surface; wizard passes it down generically). (pass #381)
 ## Pass run2#382 (WizardStepFeats.test.jsx)
 - 🔴 WizardStepFeats.jsx:16 — 'Add Another' calls onToggle → SelectableList toggle removes ALL instances of repeatable feat instead of adding (pinned honest-flip test in lane).
+  **FIXED fix#31 2026-10-22**: SelectableList has NO add API (read full) -> wizard-level append mirroring its own first-add expr (:201/:205) via existing local onArrayFieldChange (no server writes); onToggle->onAdd prop rename, checkbox lane untouched; repeat-rule disk feats.json:28/:79 + gate :44/:82/:224 cited; honest-flip pinned removal pre-fix then flipped 4-test never-destructive matrix; 37/37 incl SelectableList lane intact.**
 - 📌 FeatItemDetails.jsx:13 — dict prerequisites render raw JSON (cosmetic). (pass #382)
 ## Pass run2#387 (WizardStepRace.test.jsx)
 - 🗑 sign-off candidate: CascadingSelect.jsx + .test.jsx orphan pair confirmed (wizard renders plain select) — recommend delete pair.
@@ -413,6 +448,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 rec WizardStepSkills.test.jsx:340 mislabeled non-feedback test (dup of :168-181); double-render splits :79-85/:100-105/:548 split scenarios. (pass #390)
 ## Pass run2#391 (WizardStepSkills.test.jsx)
 - 🔴 WizardStepSkills.jsx:255-257 — 'select proficient first' feedback unreachable: Elevate disabled :352 blocks click reaching guard (dead branch). (pass #391)
+  **FIXED fix#33 2026-10-22 verdict(b)-by-removal**: guard+disabled+tooltip born SAME commit c45bdf94e (disable never broke guard); narrowed-by-design cf74986e7 kept proficient clause; RAW elevation-requires-proficiency = hard-disable correct, tooltip IS the feedback; guard boolean-complement of disabled structurally dead removed -5 per orphan-code rule; disabled-click inert pins + proficiency-journey + mutual-pair live path 32 tests; identical-clause audit elsewhere: sole occurrence.**
 ## Pass run2#392 (WizardStepSpecial.test.jsx)
 - 📌 WizardStepSpecial.jsx:29 — comment claims duplicate-name check; none exists (misleading, unimplemented intent). (pass #392)
 ## Pass run2#393 (WizardStepSpells.feature-touched.test.jsx)
@@ -420,15 +456,18 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 rec WizardStepSpells.test.jsx summary-header test subsumed by breakdown test — trim at own turn. (pass #393)
 ## Pass run2#394 (WizardStepSpells.ritual-master.test.jsx)
 - 🔴 WizardStepSpells.jsx:105 — ritualMasterChosenCount .length on non-array (string 'Alarm' -> bogus 'Edit Ritual Spells (5)' banner post-close; live-verified).
+  **FIXED fix#34 2026-10-22**: cardinality array-law (producer RitualMasterModal:37 always-array, disk array rows, zero string-writer repo-wide -> string=legacy single); pre-fix bogus (5) captured live-sequence RED; house Array.isArray ternary (spellCalc2024:407/488 form); falsy-triple complete, multi (2) exact; 41/41 eslint clean. FAMILY REPORT: WizardStepSpells:260 auto-open inconsistent w string, RitualMasterModal:11 reopen-empty, spellCalc2024 string->silent-empty (owner lanes).**
 - 📌 RitualMasterModal.jsx — NO test lane exists (save contract :37 + ritual filter uncovered) — queue dedicated lane when surfaced. (pass #394)
 ## Pass run2#397 (WizardStepSubrace.test.jsx)
 - 🔴 WizardStepSubrace.jsx:11 — array damage_resistance interpolates join-less ('Bludgeoning,Piercing,Slashing damage.'); real disk Genasi data, cosmetic misformat. (pass #397)
+  **FIXED fix#35 2026-10-22**: shape census Genasi mixed (Earth/Water arrays :495/:567, Fire/Air strings) -> Array.isArray join-comma-space ternary w string passthrough; house dominant join idiom 6-site cited no conjunction form; pre-fix byte captures both Genasis; disk-import pins + period-placement exact + not.toContain negative + string-shape guard intact; 15/15 eslint clean; sole join-less site repo-wide.**
 ## Pass run2#398 (WizardStepTools.test.jsx)
 - 🗑 computeSkilledToolUsage (toolValidation.services.js) dead export (local dup in skilled-pool.js) — wire or delete; WizardStepTools.jsx:46-64 toolsFromSkilled computed-never-rendered. (pass #398)
 ## Pass run2#399 (EncounterBuilder.additional-interactions.test.jsx)
 - 🗑 rec DELETE-outright x4: EncounterBuilder.{interactions,modal-flows,modal-interactions,gameplay-flows}.test.jsx all vacuous expect(true) zero-importer placeholders; .rendering.test.jsx dup-candidate. (pass #399)
 ## Pass run2#401 (EncounterBuilder.helpers.test.jsx)
 - 🔴 EncounterFilterPanel.jsx:7 — onEnvironmentChange received, no control rendered (_alias): filter.environment unreachable from UI (legacy localStorage only).
+  **FIXED fix#32 2026-10-22**: RESTORE verdict (added 2d54ff265, lost in-flight b0b431903 migration with alias-suppression fingerprint); Environment select mirrors Difficulty sibling block; options RUNTIME-derived from mounted bestiary (disk 12 unique + fixture-added proves non-hardcode; retired list was stale missing planar); props contract half-wired fixed w additive environmentOptions consumer line; 13-option exact matrix + controlled-reflection + builder-narrowing e2e; zero new CSS house classes; 49/49 lanes eslint clean.**
 - 📌 encounterConfig.js:39 — stale comment '/ multiplier' vs builder '*' at EncounterBuilder.jsx:246. (pass #401)
 ## Pass run2#403 (EncounterBuilder.load-encounter.test.jsx)
 - 📌 Encounters test utils: createManagement/renderWithLoadEncounter verbatim-cloned across reset-encounter:377-427/panel-interactions/remaining/rendering/uncovered-handlers — extract shared encounterTestUtils.js candidate.
@@ -439,7 +478,9 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 EncounterBuilder.test-utils.jsx ORPHANCONFIRMED (remaining also off it) — delete candidate; reset-encounter/rendering/uncovered-handlers carry replica-mock blocks (#406 rebuild pattern); additional-interactions header stale claims (retired @#407). (pass #407)
 ## Pass run2#410 (EncounterBuilder.uncovered-handlers.test.jsx)
 - 🔴 EncounterModal.jsx:55 + EncounterBuilder.jsx:416 — double delete-confirm dialogs per user delete.
+  **FIXED fix#36 2026-10-22**: stack = modal :55 formatted-name + builder raw-name (both b0cab1579, blame non-attributing -> 8-sibling leaf-ownership canon + rename/load straight-dispatcher parity); builder guard removed, modal byte-intact owner; NEW real-builder+modal lane pre-fix captured times(2) real double-fire, post times(1)+raw-name-negative; retired-stub pins moved passthrough honest; 51/51 10 lanes clean. NEW QUEUE: CharSummary:626 + useCharacterManagement:78 character-delete double-confirm (appended below).**
 - 🔴 EncounterModal.jsx:145 vs :95 — rename UI unreachable: pen sets modal-local renameTarget but form renders only prop mode==='rename'; builder passes only save|load — handleRenameEncounter dead in prod UI. (pass #410)
+  **FIXED fix#38 2026-10-22**: 4-gate local-state arm added (seed/header/form/list mutual-exclusion), prop arm preserved verbatim, pen trio born-unit b0cab1579 broken-link-from-birth verdict, mode-rename never-passed archaeology, builder untouched, NEW full-stack rename-flow lane + discriminating pre/post capture, zero-confirm parity held; 11 files 61 green eslint clean.**
 ## Pass run2#412 (EncounterGeneratorModal.test.jsx)
 - 🗑 EncounterGeneratorModal.jsx:49-61 — generating flag set true/false around SYNCHRONOUS call in one handler: spinner branch (:128) dead UI. (pass #412)
 ## Pass run2#416 (EncounterSummaryPanel.test.jsx)
@@ -460,6 +501,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 🗑 rec: monsterLairActions.test.js:1075/:2787 duplicate parseBanishTransportClause→null legs — fold to one at own turn. (pass #499)
 ## Pass run2#500 (MonsterCardHelpers.berserk-lashing.test.js)
 - 🔴 MonsterCardHelpers.js:2529-2532 — attackReactionFoldCheck Number(attack_bonus) maps null→0 (finite!), attack_bonus:null + rollable dice slips isFinite guard, folds false +0 auto-hit (violates MA-0286 :521 promise). Pinned as labeled TRIPWIRE row in fold table; test-only, source unfixed.
+  **FIXED fix#39 2026-10-22**: strict-presence-before-coercion (String(raw??).trim()!=="" guard, house idioms npcStatBlockUtils:23/monsterLegendaryUses:161/saveProcessing:869); MA-0286 three-quote verdict refuse-does-not-fold; disk census null-x41 authored-zero-x75 preserved byte-exact; tripwire hinge flipped + 5-arm distinguishable table; pre-fix +0-autohit captured; 910 tests 114 files clean. SAME-CLASS Number() report with per-site risk: :377/:2227/:623 LOW-risk latent, rest SAFE.**
 - 🗑 rec: monsterLairActions.test.js:1075/:2787 duplicate parseBanishTransportClause→null legs fold to one. (pass #500)
 ## Pass run2#501 (MonsterCardHelpers.both-outcomes.test.js)
 - 🗑 rec: legendary-arcane-prowl-sphinx:205-206 + valor:197-198 + monsterLairActions:4442-4444 re-assert parseBothOutcomesClause→null — subsumed by guardrail scan; drop at own turns. (pass #501)
@@ -527,6 +569,7 @@ infoBuilder.test-utils stale-fabricated alignment if it re-surfaces.
 - 📌 REC cross-file: legendary-uses.test.jsx:256-263 thunderclap-subsume droppable post-#782 full-row lock; also still pending :747+:996 latch dups (#753)
 - 📌 Cite drift: terrifying-presence-dracolich:18 points thunderclap :183 -> now :197 (#782)
 - 🔴 BUG src/components/hex-map/EventDialog.jsx:60 event.encounter.monsters.map unguarded — encounter object without monsters array crashes dialog render (#790)
+  **FIXED fix#40 2026-10-22**: legal-shape verdict (runtime-restored state + sanctioned monsters-less accept lane HexMap:283/its tests) -> silent guard w house omit-block idiom no console.error; one-token ?.map populated-path byte-identical; pre-fix TypeError exact-site capture; absent/null/[] arms empty-bytes-identical pins + populated rows pin; 68 green; hex-map chain census clean.**
 - 🔴 BUG useMapLoader.js:161 isInitialized.current guard never resets -> mapName prop change never reloads (deps :186 dead); Map.jsx:351 renders <HexMap> with NO key -> outdoor->outdoor switch shows stale map (VERIFIED by orchestrator). Fix at source-owner turn: key={mapName} at Map.jsx OR reset guard. Canary exists useMapLoader.api.test.jsx (unmount late-resolve) (#798-run)
 - ⚠ BUG useMapLoader.js:210 save guard compares hexMapNameRef.current (:151, never updated) -> saves silently stop forever if mapName changes in place (#798-run)
 - ⚠ BUG useMapLoader.js:178 silent catch(_err) swallows load errors, no console.error — violates no-silent-fallback convention (#798-run)
@@ -1046,3 +1089,14 @@ recs #1080/#1081/#1082 vrock ALL APPLIED #1083 (refusal+cycle deleted->framework
 - 📌 hpModifier.js:29/:42 maxHp/max naming split runtime-vs-summary alias space systemic (arms pinned) (#1539)
 - 📌 featFinder.js:10 allFeats?.slice vacuous chain (:4 pre-deref) (#1538)
 - ✅ spellValidation :216/:276/:123 family + popupResponse contract home + castingTimeUtils delegation-home ratified prior batches
+
+## Batch #220 (final flush, run2#1547-#1549 — QUEUE COMPLETE 2682/2682)
+- 🗑 storage.js:63/:75 getProperty/setProperty dead exports (zero prod callers; referenced only by server-route error text) (#1547)
+- 🗑 youtubePlayer.js subscribe/isPlayingNow zero production callers (MusicPlayer uses runtime store) (#1549)
+- 📌 youtubePlayer.js:59 post-stop handleError logs 'for video undefined' (queue cleared first) — benign pinned quirk (#1549)
+- 📌 youtubePlayer.js:160-168 stop() preserves pendingVolumePct (volume intent survives stop) — likely intentional, pinned (#1549)
+- 📌 youtubePlayer.js:52/:60/:66 defensive guards unreachable given queue-clearing invariants — owner cleanup candidates (#1549)
+- ✅ musicConfig.js:89 lookalike-host trust defect CONFIRMED STILL LIVE at final lane (carried #1544; fix-recipe recorded there)
+- ✅ storage localStorage-audit CLEAN: zero game state in localStorage repo-wide at this lane's census (module is HTTP transport; theme/filters correctly bypass to local)
+- 🔴 CharSummary.jsx:626 + useCharacterManagement.js:78 — character delete double-confirm: leaf confirms, hook confirms AGAIN (stacked dialogs per click). Found during fix#36 same-class scan; owner = leaf per 8-sibling house canon, hook guard goes. (fix#36 report)
+  **FIXED fix#37 2026-10-22**: consumer map proves sole production path leaf-protected (App:314/:598->CharSheet->CharSummary), zero unconfirmed bypass dispatchers -> hook guard removed straight-dispatcher (fix#36 builder style), leaf byte-intact owner; NEW integration lane pre-fix times(2) double-fire captured then flipped times(1)+exact-leaf-bytes+roster-intact-cancel; retired hook pins passthrough-moved honest; 49+113 lanes + 668-folder sweep + eslint clean.**

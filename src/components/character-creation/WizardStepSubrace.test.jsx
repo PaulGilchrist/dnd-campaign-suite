@@ -20,6 +20,14 @@ const DRAGONBORN_5E = races5e.find(r => r.name === 'Dragonborn');
 const ELF_5E = races5e.find(r => r.name === 'Elf');
 const RED_5E = DRAGONBORN_5E.subraces.find(s => s.name === 'Red Dragonborn');
 const CLOUD_2024 = races2024.find(r => r.name === 'Goliath').subraces.find(s => s.name === 'Cloud Giant');
+// Disk census races.json Genasi subraces: mixed damage_resistance shapes —
+// Earth Genasi (:495-499) and Water Genasi (:567-570) are ARRAYS; Fire/Air
+// (:521, :543) and all Dragonborn/2024 rows are STRINGS. Both shapes must
+// render as the house human list join(', ') (ClassDetailCard.jsx:20,
+// SpellDetails.jsx:10), never the join-less 'Bludgeoning,Piercing' form.
+const GENASI_5E = races5e.find(r => r.name === 'Genasi');
+const EARTH_5E = GENASI_5E.subraces.find(s => s.name === 'Earth Genasi');
+const WATER_5E = GENASI_5E.subraces.find(s => s.name === 'Water Genasi');
 
 // Fresh props (incl. fresh vi.fn) per test — no shared mock state (#362).
 function makeProps({ formData, errors = {}, racesData = races5e } = {}) {
@@ -101,6 +109,8 @@ describe('WizardStepSubrace', () => {
 
   it.each([
     ['5e Red Dragonborn', races5e, 'Dragonborn', 'Red Dragonborn', true, ['Damage Resistance'], 'You have resistance to Fire damage.'],
+    ['5e Earth Genasi (array disk shape)', races5e, 'Genasi', 'Earth Genasi', true, ['Damage Resistance'], `You have resistance to ${EARTH_5E.damage_resistance.join(', ')} damage.`],
+    ['5e Water Genasi (array disk shape)', races5e, 'Genasi', 'Water Genasi', true, ['Damage Resistance'], `You have resistance to ${WATER_5E.damage_resistance.join(', ')} damage.`],
     ['2024 Cloud Giant', races2024, 'Goliath', 'Cloud Giant', true, ['Cloud\'s Jaunt'], CLOUD_2024.traits[0].description],
     ['5e High Elf', races5e, 'Elf', 'High Elf', true, [], null],
     ['2024 Hill Dwarf', races2024, 'Dwarf', 'Hill Dwarf', false, [], null], // disk: empty description
@@ -113,6 +123,23 @@ describe('WizardStepSubrace', () => {
     if (verbatimTrait) {
       expect(traitItems()[0].querySelector('.trait-description').textContent).toBe(verbatimTrait);
     }
+  });
+
+  it('formats the Earth Genasi array damage_resistance byte-exact with house join(", ") — never the join-less disk-array stringification', () => {
+    // Disk fixture (imported, not retyped): races.json:495-499 → ["Bludgeoning","Piercing","Slashing"].
+    // Pre-fix the raw array interpolated to 'You have resistance to Bludgeoning,Piercing,Slashing damage.'
+    renderStep({ formData: { race: { name: 'Genasi', subrace: { name: 'Earth Genasi' } } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
+    const desc = traitItems()[0].querySelector('.trait-description').textContent;
+    expect(desc).toBe(`You have resistance to ${EARTH_5E.damage_resistance.join(', ')} damage.`);
+    expect(desc).toBe('You have resistance to Bludgeoning, Piercing, Slashing damage.');
+    expect(desc).not.toContain('Bludgeoning,Piercing'); // join-less misformat banned
+  });
+
+  it('renders string-shaped damage_resistance unchanged (Fire Genasi, disk string)', () => {
+    renderStep({ formData: { race: { name: 'Genasi', subrace: { name: 'Fire Genasi' } } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Details' }));
+    expect(traitItems()[0].querySelector('.trait-description').textContent).toBe('You have resistance to Fire damage.');
   });
 
   it('changing race repopulates options from the new race and drops the stale detail card', () => {

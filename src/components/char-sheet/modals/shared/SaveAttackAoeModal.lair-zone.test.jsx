@@ -9,6 +9,8 @@
 // the arm (fail full / success half). Non-zone rows write zero zone state.
 // Family map (#216): save-less pure arm → lair-darkness (#215); damageless
 // save+zone composite → lair-sand-cloud; zoneTe data-pins → MonsterCardModal.
+// MA-0610 #217 clobber-fix: pinned here — repeat-row arms must carry the
+// H3 damage-derived recurringDie on every armed te (full-set + absent pins).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -144,6 +146,38 @@ describe('MA-0042 area picker persisting-zone arm', () => {
       && t.saveType === 'Constitution'
     ))).toBe(true);
 
+    // MA-0610 #217 clobber-fix, strongest form: exact full-set on EVERY armed
+    // zone te — the H3 damage-derived recurringDie '3d6' (from zoneTe.damage,
+    // insect-cloud's ONLY authored die) must SURVIVE the ma0610TeDescriptors
+    // spread. Pre-fix the unconditional `recurringDie: zoneTe.recurringDie ||
+    // undefined` key spread AFTER h3TeRepeatDescriptors clobbered it to
+    // undefined, so zoneRepeatTurnEndService.resolveZoneDice saw nothing on
+    // the te. toEqual treats the still-inert undefined recurringType/
+    // repeatSave/noun keys as absent — identical to the on-disk JSON shape.
+    const armedByName = Object.fromEntries(tes.map(t => [t.target, t]));
+    expect(armedByName['Thug 1']).toEqual({
+      target: 'Thug 1',
+      effect: 'lair_insect_cloud',
+      source: 'Adult Black Dragon 1',
+      duration: 'until_end_of_zone',
+      dc: 15,
+      radiusFt: 20,
+      repeatTurnEnd: true,
+      saveType: 'Constitution',
+      recurringDie: '3d6',
+    });
+    expect(armedByName['Thug 2']).toEqual({
+      target: 'Thug 2',
+      effect: 'lair_insect_cloud',
+      source: 'Adult Black Dragon 1',
+      duration: 'until_end_of_zone',
+      dc: 15,
+      radiusFt: 20,
+      repeatTurnEnd: true,
+      saveType: 'Constitution',
+      recurringDie: '3d6',
+    });
+
     // Caster tracking blob for any future zone consumer.
     const tracking = runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1'];
     expect(tracking).toMatchObject({
@@ -170,6 +204,28 @@ describe('MA-0042 area picker persisting-zone arm', () => {
     expect(byTarget['Thug 2']).toBe(5);
     const logs = addEntry.mock.calls.map(c => c[1]).filter(e => e.rollType === 'save-damage');
     expect(logs.map(l => [l.targetName, l.saveResult, l.finalDamage].join(':')).sort()).toEqual(['Thug 1:failure:10', 'Thug 2:success:5']);
+  });
+
+  // MA-0610 #217 negative (bytes that ship): repeat zoneTe WITHOUT damage
+  // and WITHOUT recurringDie ⇒ recurringDie key stays ABSENT on every armed
+  // te (never fabricated; pre-fix it was present-as-undefined, which is
+  // JSON-invisible on disk but contradicted the te-carried contract). The
+  // consumer chain (zoneRepeatTurnEndService.resolveZoneDice) then falls
+  // back to the caster tracking stamp and, unresolvable there too, skips
+  // with a loud console.error — never invents a die.
+  it('repeat zoneTe with no damage and no recurringDie → recurringDie stays absent, repeat contract keys still ride', async () => {
+    const { getByText } = renderCloud({ zoneTe: { ...ZONE_TE, damage: null } });
+    await waitFor(() => expect(seenTargets.current.length).toBe(2));
+    fireEvent.click(getByText('Confirm'));
+    await waitFor(() => expect(applyDamageToTarget).toHaveBeenCalledTimes(2));
+    const tes = runtime.store['campaign.targetEffects'].filter(t => t.effect === 'lair_insect_cloud');
+    expect(tes).toHaveLength(2);
+    tes.forEach(t => {
+      expect(t).not.toHaveProperty('recurringDie');
+      expect(t.repeatTurnEnd).toBe(true);
+      expect(t.saveType).toBe('Constitution');
+    });
+    expect(runtime.store['Adult Black Dragon 1._lair_insect_cloud_Adult_Black_Dragon_1'].damage).toBeNull();
   });
 
   it('zoneTe null (all other consumers) → zero zone state written, ordinary save/damage flow intact', async () => {

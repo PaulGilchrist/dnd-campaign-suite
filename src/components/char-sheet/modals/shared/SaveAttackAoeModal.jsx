@@ -44,7 +44,7 @@ function fireBewitchingRider(action, playerStats, campaignName, storeLastAttack)
 // Decide the NPC's save roll against the AoE DC, honouring heighten / rider / slow disadvantage.
 function computeNpcSave(targetName, ctx) {
     const { target, saveType, saveDc, heightenTarget } = ctx;
-    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
     const isHeightenTarget = heightenTarget === targetName;
     const targetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const hasRiderDisadvantage = targetEffects.some(te => te.target === targetName && te.effect === 'disadvantage_on_next_save');
@@ -135,7 +135,7 @@ function getTargetDefenses(combatSummary, targetName) {
 }
 
 function npcSaveBonus(target, saveType) {
-    return target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    return target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
 }
 
 // Resolve an NPC target's save/damage, performing all writes, and return the results row.
@@ -589,10 +589,17 @@ function maybeStoreLastAttack(enabled, campaignName, cfg) {
 // repeat damage + "until dismissed" duration stay advisory (CLA-325).
 // MA-0610: recurring-damage + repeat-save descriptors ride the te to the
 // turn-start tick (whirlwindService) + generic turn-END repeat-save roller
-// (repeatSaveService). Byte-inert undefined on every existing zone row.
+// (repeatSaveService). Byte-inert on every existing zone row.
+// #217 clobber fix: recurringDie emits ONLY when zoneTe authored it. The
+// old unconditional `zoneTe.recurringDie || undefined` key spread AFTER
+// h3TeRepeatDescriptors (armZoneTargets) overwrote the H3 damage-derived die
+// to undefined — armed lair_insect_cloud tes reached zoneRepeatTurnEndService
+// with no die despite repeatTurnEnd + damage:'3d6'. Authored die still wins
+// (this spread stays last); derived die survives when unauthored; nothing is
+// fabricated when both are absent. Other keys byte-identical.
 function ma0610TeDescriptors(zoneTe) {
     return {
-        recurringDie: zoneTe.recurringDie || undefined,
+        ...(zoneTe.recurringDie ? { recurringDie: zoneTe.recurringDie } : {}),
         recurringType: zoneTe.recurringType || undefined,
         repeatSave: zoneTe.repeatSave || undefined,
         noun: zoneTe.noun || undefined,
@@ -1819,6 +1826,19 @@ function SaveAttackAoeModal({
         }
     }, [summary, campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSavesAndDamage]);
 
+    // #226 overlay apply race — commit seam. This used to be a setSummary call
+    // inside renderActions (a setState during the base's render, which drew
+    // React's "Cannot update a component ... while rendering a different
+    // component" warning and, with allResolved reading the base's empty
+    // shadowed selected, fired one microtask early with ctx.results still []).
+    // It now rides the base's post-commit onAllResolved effect — the same
+    // effect-driven commit the picker lane uses at :1563 — which only fires
+    // once allResolved holds against the effective (extraState-merged)
+    // selection with the results array carrying every resolved row.
+    const handleAllResolved = useCallback(({ results: resolvedResults, selected: resolvedSelected }) => {
+        setSummary(prev => (prev === null ? { results: [...resolvedResults], selected: resolvedSelected } : prev));
+    }, []);
+
     const combatSummary = getCombatSummary(campaignName);
     const isOverlayTargeted = playerStats.targetName?.startsWith('overlay-');
 
@@ -1930,13 +1950,8 @@ function SaveAttackAoeModal({
             );
         }
 
-        if (ctx.allResolved && ctx.pendingPrompts.length === 0 && summary === null) {
-            setSummary({
-                results: [...ctx.results],
-                selected: ctx.selected,
-            });
-        }
-
+        // All-resolved commits the summary via the base's onAllResolved effect
+        // (see handleAllResolved above) — never setState during the base render.
         return null;
     };
 
@@ -1986,6 +2001,7 @@ function SaveAttackAoeModal({
                 handleApplyOverride={handleApply}
                 handleSaveResultOverride={handleSaveResult}
                 extraState={extraState}
+                onAllResolved={handleAllResolved}
                 renderBody={renderBody}
                 renderActions={renderActions}
             />

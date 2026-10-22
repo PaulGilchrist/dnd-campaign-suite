@@ -163,7 +163,7 @@ describe('HypnoticPatternModal - Metamagic', () => {
             expect(rowFor('Orc').textContent).not.toContain('Careful Spell protected');
         });
 
-        it('resolves careful-protected targets without touching the save lanes: NPC logs an auto-success and is recorded, player gets no prompt, neither gains conditions', async () => {
+        it('resolves careful-protected targets without touching the save lanes: NPC and player both log an auto-success and are recorded, player gets no prompt, neither gains conditions', async () => {
             getAllyList.mockReturnValue(['Goblin', 'PlayerAlly']);
             render(<HypnoticPatternModal {...makeProps({ metamagicCareful: true })} />);
 
@@ -183,6 +183,34 @@ describe('HypnoticPatternModal - Metamagic', () => {
                     saveResult: 'success',
                     conditions: [],
                 }));
+                // Careful-protected players must leave the same audit trail as the
+                // NPC careful leg (mirrors the fixed FearModal player-careful leg):
+                // a save_result log entry plus a clean addTargetResult stamp.
+                expect(saveEntriesFor('PlayerAlly').length).toBe(1);
+            });
+
+            const playerEntries = saveEntriesFor('PlayerAlly');
+            expect(playerEntries[0]).toMatchObject({
+                type: 'save_result',
+                characterName: 'Wizard1',
+                targetName: 'PlayerAlly',
+                saveDc: 14,
+                saveType: 'WIS',
+                success: true,
+                roll: 0,
+                total: 0,
+                saveBonus: 0,
+            });
+            expect(playerEntries[0].description).toBe('PlayerAlly succeeded on WIS save (DC 14, rolled 0 + 0 = 0) — Careful Spell protected');
+            expect(typeof playerEntries[0].timestamp).toBe('number');
+
+            expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+                targetName: 'PlayerAlly',
+                saveResult: 'success',
+                roll: 0,
+                total: 0,
+                conditions: [],
+                appliedDamage: 0,
             });
 
             // Careful-protected targets never enter the prompt/condition machinery.
@@ -193,7 +221,6 @@ describe('HypnoticPatternModal - Metamagic', () => {
                 expect.any(Array),
                 campaignName,
             );
-            expect(saveEntriesFor('PlayerAlly')).toHaveLength(0);
             expect(conditionWritesFor('Goblin')).toHaveLength(0);
             expect(conditionWritesFor('PlayerAlly')).toHaveLength(0);
             expect(addExpiration).not.toHaveBeenCalled();

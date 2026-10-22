@@ -464,16 +464,28 @@ describe('useAttackDamageResolution - class features', () => {
                 total: 4,
                 damageType: 'Force',
                 targetName: 'Orc',
-                // honest pin: applyDamageToTarget is async but the step does
-                // NOT await it, so the ledger logs finalDamage: undefined
-                // (source defect in steps/features/superiorHuntersPrey.js)
-                finalDamage: undefined,
+                // FIXED (was honest pin finalDamage: undefined — the step did
+                // NOT await the async applyDamageToTarget, so the ledger logged
+                // undefined; source :72 now awaits, real mock bytes flow through)
+                finalDamage: 10,
             }));
             expect(callsForKey('_Superior_Hunters_Prey_UsedRound')).toEqual([
                 ['TestRogue', '_Superior_Hunters_Prey_UsedRound', 1, 'test-campaign'],
             ]);
             expect(mockSetModalState).toHaveBeenCalledWith({ secondaryTargetModal: null });
-            expect(mockSetPopupHtml).toHaveBeenCalled();
+            // FIXED popup spread bytes (were spreadFinalDamage/spreadTarget-
+            // CurrentHp: undefined through the un-awaited Promise): exact
+            // resolved values from the faithful async applyDamage mock.
+            const spreadPopup = mockSetPopupHtml.mock.calls
+                .map(([updater]) => (typeof updater === 'function' ? updater({ keep: 1 }) : updater))
+                .find((out) => out && 'spreadTargetName' in out);
+            expect(spreadPopup).toEqual({
+                keep: 1,
+                spreadTargetName: 'Orc',
+                spreadFinalDamage: 10,
+                spreadTargetCurrentHp: 50,
+                spreadTargetMaxHp: 30,
+            });
         });
     });
 

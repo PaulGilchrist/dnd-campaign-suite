@@ -101,6 +101,14 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         const tempHpRoll = Math.floor(Math.random() * 10) + 1;
         setTempHp(playerName, tempHpRoll, campaignName);
 
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Refreshing Step',
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Refreshing Step: ${playerName} gained ${tempHpRoll} Temporary Hit Points.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[stepsOfTheFey] Error logging refreshing step:', e); });
+
         const remaining = newCount - 1;
         const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Refreshing Step:</b> Gained ${tempHpRoll} Temporary Hit Points.`;
         setResult({ description });
@@ -119,6 +127,14 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
             { type: 'condition', condition: 'invisible' }
         ], campaignName, rounds: undefined, expireOnCreatureName: playerName });
 
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Disappearing Step',
+            description: `${playerName} cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Disappearing Step: ${playerName} has the Invisible condition until the start of ${playerName}'s next turn.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[stepsOfTheFey] Error logging disappearing step:', e); });
+
         const remaining = newCount - 1;
         const description = `${featureName}: Cast Misty Step without expending a spell slot (${remaining} remaining).<br/><br/><b>Disappearing Step:</b> You have the Invisible condition until the start of your next turn.`;
         setResult({ description });
@@ -126,7 +142,10 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     };
 
     const handleSkip = () => {
-        const modeLabel = mode === 'mistyEscape' ? 'Dreadful Step' : 'Taunting Step';
+        // Label the feature actually being acted on: the skipped CHOICE
+        // (handleSkip is only reachable from the taunting/dreadful choosers),
+        // mirroring the hardcoded labels in handleTauntConfirm/handleDreadfulConfirm.
+        const modeLabel = choice === 'dreadful' ? 'Dreadful Step' : 'Taunting Step';
         const description = `${featureName}: Cast Misty Step without expending a spell slot (${newCount} remaining).<br/><br/><b>${modeLabel}:</b> No targets selected.`;
         setResult({ description });
         setApplied(true);

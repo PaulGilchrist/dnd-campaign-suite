@@ -75,7 +75,7 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
                     <i className="fa-solid fa-crosshairs"></i> Weapon Mastery — {attackName}
                 </div>
                 <div className="sp-body">
-                    <p>Choose a mastery property to activate{targetName ? ` against <b>${targetName}</b>` : ''}:</p>
+                    <p>Choose a mastery property to activate{targetName ? <> against <b>{targetName}</b></> : ''}:</p>
                     <div style={{ textAlign: 'left', marginTop: '12px' }}>
                         {allMasteries.map((m, i) => {
                             const effect = MASTERY_EFFECTS[m.name];

@@ -10,7 +10,7 @@ const INFO_ITEMS = [
   { key: 'saving_throws', label: 'Saving Throws', join: true },
   { key: 'weapon_proficiencies', label: 'Weapon Proficiencies' },
   { key: 'armor_training', label: 'Armor Training' },
-  { key: 'proficiencies', label: 'Weapon Proficiencies', join: true },
+  { key: 'proficiencies', label: 'Proficiencies', join: true },
   { key: 'tool_proficiencies', label: 'Tool Proficiencies', fullWidth: true },
 ];
 

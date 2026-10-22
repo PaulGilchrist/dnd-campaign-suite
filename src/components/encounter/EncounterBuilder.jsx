@@ -223,6 +223,14 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
   };
 
   // --- Derived values ---
+  // Environment filter options derived from the loaded bestiary (/data/monsters.json),
+  // never retyped — stays in sync with the environments actually present in the data.
+  const environmentOptions = useMemo(() => {
+    const envs = new Set();
+    (monsters || []).forEach(m => (m.environments || []).forEach(e => envs.add(e)));
+    return [...envs].sort();
+  }, [monsters]);
+
   const totalThreshold = useMemo(
     () => calculateXPThreshold(filter.playerLevels, filter.difficulty),
     [filter.playerLevels, filter.difficulty]
@@ -412,10 +420,13 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
     setDescription('');
     };
 
+  // Fix#410: no confirm here — the leaf EncounterModal owns the single delete
+  // prompt (:55, formatted display name). This is a straight dispatcher, mirroring
+  // handleRenameEncounter below; confirming at both layers stacked two dialogs
+  // per click. House pattern: leaf components confirm at the click point
+  // (Notes, Factions, Sessions, Quests, Settlements, NPCs, PartyInventory, CharSummary).
   const handleDeleteEncounter = async (name) => {
-    if (window.confirm(`Delete "${name}"?`)) {
-      await deleteEncounterAction(name);
-    }
+    await deleteEncounterAction(name);
   };
 
   const handleRenameEncounter = async (oldName, newName) => {
@@ -582,6 +593,7 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
             }}
            onDifficultyChange={handleDifficultyChange}
            onEnvironmentChange={handleEnvironmentChange}
+           environmentOptions={environmentOptions}
            onAddPlayer={handleAddPlayer}
            onRemovePlayer={handleRemovePlayer}
            onPlayerLevelChange={handlePlayerLevelChange}

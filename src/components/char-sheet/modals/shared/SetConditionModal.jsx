@@ -6,14 +6,22 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import { playerIsImmuneToCondition } from '../../../../services/combat/automation/automationService.js';
 import utils from '../../../../services/ui/utils.js';
 import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
+import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { addCondition } from '../../../../services/combat/conditions/conditionSaveService.js';
 
 function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, monsters, channelDivinityCharges, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds, shape, attackerGridX, attackerGridY, includeCaster = false, maxTargets = Infinity }) {
+    // Application outcome is reported so callers keep the log ledger honest:
+    // 'applied' only when the condition truly lands (addCondition returns
+    // { suppressed } per conditionSaveService — "skip their own 'applied' log
+    // when suppressed", conditionSaveService.js:127-128).
     const applyConditionToCreature = useCallback((targetName, saveDcValue, condName, ctx) => {
         const creature = ctx.combatSummary.creatures.find(c => c.name === targetName);
-        if (!creature) return;
+        if (!creature) {
+            console.error(`[SetConditionModal] Cannot apply ${condName}: ${targetName} not found in combatSummary`);
+            return 'missing';
+        }
 
         const condKey = condName.toLowerCase();
 
@@ -25,31 +33,34 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             getRuntimeValue,
             campaignName,
         })) {
-            return;
+            return 'immune';
         }
 
         const conditionDef = { key: condKey, label: condName.charAt(0).toUpperCase() + condName.slice(1) };
-        addCondition({ combatSummary: ctx.combatSummary, creatureName: targetName, conditionDef, dc: saveDcValue, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats });
+        const result = addCondition({ combatSummary: ctx.combatSummary, creatureName: targetName, conditionDef, dc: saveDcValue, ability: saveType, getRuntimeValue, setRuntimeValue, campaignName, playerStats: targetStats });
+        return result?.suppressed === true ? 'immune' : 'applied';
     }, [campaignName, characters, saveType]);
 
+    // Returns { applied, immune } so both save legs gate their logs on the REAL
+    // outcome; the expiration clock is only registered for conditions that land.
     const addConditionToCreature = useCallback((targetName, saveDcValue, ctx) => {
-        applyConditionToCreature(targetName, saveDcValue, conditionName, ctx);
+        const names = [conditionName, ...(additionalCondition ? [additionalCondition] : [])];
+        const applied = [];
+        const immune = [];
+        names.forEach(name => {
+            const outcome = applyConditionToCreature(targetName, saveDcValue, name, ctx);
+            if (outcome === 'applied') applied.push(name);
+            else if (outcome === 'immune') immune.push(name);
+        });
 
-        if (additionalCondition) {
-            applyConditionToCreature(targetName, saveDcValue, additionalCondition, ctx);
+        if (applied.length > 0) {
+            addExpiration({ attackerName, targetName, effects: applied.map(name => ({ type: name.toLowerCase(), condition: name.toLowerCase() })), campaignName, rounds: durationRounds });
         }
-
-        addExpiration({ attackerName, targetName, effects: [
-            { type: conditionName.toLowerCase(), condition: conditionName.toLowerCase() },
-            ...(additionalCondition ? [{ type: additionalCondition.toLowerCase(), condition: additionalCondition.toLowerCase() }] : []),
-        ], campaignName, rounds: durationRounds });
+        return { applied, immune };
     }, [attackerName, campaignName, conditionName, additionalCondition, durationRounds, applyConditionToCreature]);
 
-    const logCondition = useCallback((targetName, saveDcValue) => {
-        const conditions = [conditionName.charAt(0).toUpperCase() + conditionName.slice(1)];
-        if (additionalCondition) {
-            conditions.push(additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1));
-        }
+    const logCondition = useCallback((targetName, saveDcValue, landedConditions) => {
+        const conditions = landedConditions.map(name => name.charAt(0).toUpperCase() + name.slice(1));
         addEntry(campaignName, {
             type: 'condition',
             action: 'applied',
@@ -60,7 +71,25 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             sourceName: attackerName,
             timestamp: Date.now(),
         }).catch((e) => { console.error('[SetConditionModal] Error:', e); });
-    }, [campaignName, attackerName, conditionName, additionalCondition, saveType]);
+    }, [campaignName, attackerName, saveType]);
+
+    // Honest immunity advisory for a failed save whose condition never lands.
+    // Shape: saveProcessing.js:801-809 (automation + <name>_immune_advisory +
+    // abilityName + sourceName); wording: charmSpellUtils.js:98 ("... failed
+    // ... save against ... but is immune to ... — condition not applied."),
+    // same "condition not applied" tail as auraConditionImmunity.js:44.
+    const logImmunity = useCallback((targetName, immuneConditions) => {
+        const labels = immuneConditions.map(name => name.charAt(0).toUpperCase() + name.slice(1)).join(' & ');
+        addEntry(campaignName, {
+            type: 'automation',
+            automationType: 'condition_immune_advisory',
+            characterName: targetName,
+            sourceName: attackerName,
+            abilityName: featureName,
+            description: `${targetName} failed ${saveType} save against ${featureName} but is immune to ${labels} — condition not applied.`,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error('[SetConditionModal] Error:', e); });
+    }, [campaignName, attackerName, featureName, saveType]);
 
     const handleApplyOverride = useCallback((ctx) => {
         if (ctx.selected.size === 0) return;
@@ -85,7 +114,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             const isPlayer = target && target.type === 'player';
 
             if (!isPlayer) {
-                const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+                const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
                 const roll1 = rollD20();
                 const total = roll1 + saveBonus;
                 const success = total >= saveDc;
@@ -99,11 +128,12 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                     rawRolls: [roll1, roll1],
                 });
 
+                let outcomes = null;
                 if (!success) {
-                    addConditionToCreature(targetName, saveDc, ctx);
+                    outcomes = addConditionToCreature(targetName, saveDc, ctx);
                 }
 
-                npcResults.push({ targetName, success, roll: roll1, total, saveBonus });
+                npcResults.push({ targetName, success, roll: roll1, total, saveBonus, outcomes });
 
                 logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total, rolls: [roll1], bonus: saveBonus, formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}` });
             } else {
@@ -122,13 +152,14 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         persistAndNotify(ctx.combatSummary, campaignName);
 
-        npcResults.filter(r => !r.success).forEach(r => {
-            logCondition(r.targetName, saveDc);
+        npcResults.filter(r => !r.success && r.outcomes).forEach(r => {
+            if (r.outcomes.applied.length > 0) logCondition(r.targetName, saveDc, r.outcomes.applied);
+            if (r.outcomes.immune.length > 0) logImmunity(r.targetName, r.outcomes.immune);
         });
 
         ctx.setResults(npcResults);
         ctx.setPendingPrompts(playerPrompts);
-    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition, channelDivinityCharges, conditionName]);
+    }, [campaignName, attackerName, saveDc, saveType, featureName, addConditionToCreature, logCondition, logImmunity, channelDivinityCharges, conditionName]);
 
     const handleSaveResultOverride = useCallback((event, ctx) => {
         const detail = event.detail;
@@ -142,8 +173,9 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         const success = detail.success;
 
         if (!success) {
-            addConditionToCreature(targetName, saveDc, ctx);
-            logCondition(targetName, saveDc);
+            const outcomes = addConditionToCreature(targetName, saveDc, ctx);
+            if (outcomes.applied.length > 0) logCondition(targetName, saveDc, outcomes.applied);
+            if (outcomes.immune.length > 0) logImmunity(targetName, outcomes.immune);
         }
 
         logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: detail.saveBonus ?? 0, formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}` });
@@ -152,7 +184,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         ctx.setResults(prev => [...prev, { targetName, success, roll: detail.roll ?? 0, total: detail.total ?? 0, saveBonus: detail.saveBonus ?? 0 }]);
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-    }, [campaignName, attackerName, saveDc, featureName, saveType, addConditionToCreature, logCondition]);
+    }, [campaignName, attackerName, saveDc, featureName, saveType, addConditionToCreature, logCondition, logImmunity]);
 
     const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1)
         + (additionalCondition ? ' & ' + additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1) : '');

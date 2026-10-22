@@ -217,7 +217,7 @@ describe('useCharacterManagement', () => {
       delete window.confirm;
     });
 
-    it('confirms, deletes via campaignService, and removes the character from state', async () => {
+    it('dispatches WITHOUT confirming — leaf CharSummary owns the prompt (fix#36 queue)', async () => {
       const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
@@ -230,19 +230,27 @@ describe('useCharacterManagement', () => {
         result.current.handleDeleteCharacter('Frodo');
       });
 
-      expect(window.confirm).toHaveBeenCalledWith(
-        "Are you sure you want to delete 'Frodo'? This cannot be undone."
-      );
+      // Retired-guard pin: the old hook-level dialog
+      // ("Are you sure you want to delete 'Frodo'? This cannot be undone.")
+      // is gone — confirming here stacked two dialogs per click. This hook
+      // is now a straight dispatcher.
+      expect(window.confirm).not.toHaveBeenCalled();
       expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'frodo.json');
       expect(result.current.characters).toEqual([{ name: 'Sam' }]);
     });
 
-    it('does not delete when user cancels confirmation', async () => {
+    it('is no longer gated on window.confirm — cancel protection lives at the leaf', async () => {
+      // Honest passthrough of the former "does not delete when user cancels"
+      // pin: ownership moved. At this layer a rejected dialog must NOT stop
+      // dispatch (proving the guard is gone); the cancel-never-dispatches
+      // contract is pinned at the confirming leaf in
+      // CharSummary-Display.test.jsx:157 and end-to-end in
+      // CharSummary-DeleteConfirm.test.jsx.
       const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       window.confirm = vi.fn(() => false);
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters(chars);
       });
@@ -251,9 +259,9 @@ describe('useCharacterManagement', () => {
         result.current.handleDeleteCharacter('Frodo');
       });
 
-      expect(window.confirm).toHaveBeenCalled();
-      expect(deleteCharacter).not.toHaveBeenCalled();
-      expect(result.current.characters).toEqual(chars);
+      expect(window.confirm).not.toHaveBeenCalled();
+      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'frodo.json');
+      expect(result.current.characters).toEqual([{ name: 'Sam' }]);
     });
 
     it('switches activeCharacter to next character when deleting active', async () => {

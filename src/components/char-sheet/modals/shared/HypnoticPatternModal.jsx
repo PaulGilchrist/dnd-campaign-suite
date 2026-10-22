@@ -18,6 +18,7 @@ import {
     logAbilityUseSelection,
     resolveAllSavesPreamble,
     resolveNpcCarefulSave,
+    logCarefulSpellProtectedSave,
     resolveNpcSaveSuccess,
     resolveNpcSaveFailure,
     dropPendingPrompt,
@@ -110,7 +111,23 @@ function HypnoticPatternModal({
                 const carefulSpellProtected = isCarefulSpell && isCarefulAlly(targetName);
 
                 if (carefulSpellProtected) {
-                    results.push(buildCarefulPlayerSaveResult(targetName));
+                    // Careful Spell auto-success for a player must leave the same audit
+                    // trail as the NPC careful leg (resolveNpcCarefulSave): a save_result
+                    // log entry plus an addTargetResult stamp. No roll occurs; buildCareful-
+                    // PlayerSaveResult carries roll:null, coalesced to 0 here (the numeric
+                    // convention this file already uses), with the careful-protection suffix
+                    // as the honest auto-success marker.
+                    const result = buildCarefulPlayerSaveResult(targetName);
+                    await logCarefulSpellProtectedSave(campaignName, { casterName, targetName, saveDc, saveType, roll: result.roll ?? 0, total: result.total, saveBonus: result.saveBonus, logPrefix: '[HypnoticPatternModal]' });
+                    addTargetResult(campaignName, {
+                        targetName,
+                        saveResult: 'success',
+                        roll: result.roll ?? 0,
+                        total: result.total,
+                        conditions: [],
+                        appliedDamage: 0,
+                    });
+                    results.push(result);
                 } else {
                     prompts.push(issuePlayerSavePrompt(campaignName, { targetName, saveType, saveDc, casterName }));
                 }

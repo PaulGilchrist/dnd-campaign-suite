@@ -4,6 +4,7 @@ import { sendSavePrompt } from '../../../../services/combat/conditions/savePromp
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
+import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import { logConditionApplied } from './saveResultLogging.js';
 
 // Shared save-flow building blocks for the condition AoE modals
@@ -60,7 +61,7 @@ export function mapCreatureTargets(eligibleTargets) {
 }
 
 export function rollNpcSave(target, saveType, saveDc, disadvantage) {
-  const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+  const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
   const saveRoll = disadvantage ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
   const saveTotal = saveRoll + saveBonus;
   const success = saveTotal >= saveDc;

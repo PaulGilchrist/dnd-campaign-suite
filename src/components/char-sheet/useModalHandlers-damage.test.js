@@ -246,6 +246,57 @@ describe('useModalHandlers - damage type handlers', () => {
             });
         });
 
+        // Guard-table pair (#1348): two pendings differing ONLY in _damageTypeModifier
+        // presence must produce DIFFERING formula outputs. The bracket rewrite is legal
+        // only alongside the modifier spend (useModalHandlers.js:97-101). Identical
+        // bracketed input '1d8 [slashing]': absent-modifier keeps bytes untouched,
+        // present-modifier rewrites the first annotation to '[cold]'.
+        it('with a bracketed formula and NO _damageTypeModifier leaves formula bytes untouched (no spend, no label mutation)', () => {
+            const pending = {
+                attack: { name: 'Some Attack', damageType: 'slashing' },
+                formula: '1d8 [slashing]',
+                total: 5,
+                rolls: [5],
+                modifier: 0,
+            };
+            const deps = createDeps({ pendingDamage: pending });
+            useModalHandlers(deps).handleDamageTypeModifierChoice('cold');
+            expect(pending.attack.damageType).toBe('slashing');
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
+            // Pre-fix defect mutated this to '1d8 [cold]' while nothing was spent.
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: pending.attack,
+                formula: '1d8 [slashing]',
+                total: 5,
+                rolls: [5],
+                modifier: 0,
+            });
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('with the same bracketed formula and _damageTypeModifier present rewrites the first annotation to [cold] and spends', () => {
+            const pending = {
+                attack: { name: 'Some Attack', damageType: 'slashing' },
+                formula: '1d8 [slashing]',
+                total: 5,
+                rolls: [5],
+                modifier: 0,
+                _damageTypeModifier: { name: 'Empowered Strikes' },
+            };
+            const deps = createDeps({ pendingDamage: pending });
+            useModalHandlers(deps).handleDamageTypeModifierChoice('cold');
+            expect(pending.attack.damageType).toBe('cold');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Empowered_Strikes_usedRound', 4, 'test-campaign');
+            expect(deps.setPendingDamage).toHaveBeenCalledWith(null);
+            expect(deps.proceedWithDamage).toHaveBeenCalledWith({
+                attack: pending.attack,
+                formula: '1d8 [cold]',
+                total: 5,
+                rolls: [5],
+                modifier: 0,
+            });
+        });
+
         it('without _damageTypeModifier leaves damageType untouched and spends nothing', () => {
             const pending = {
                 attack: { name: 'Some Attack', damageType: 'fire' },

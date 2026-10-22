@@ -1,105 +1,96 @@
 // @maintained-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import PolymorphSelectionModal from './PolymorphSelectionModal.jsx';
+import { readFileSync } from 'node:fs';
+import PolymorphSelectionModal, { filterBeastSpeeds } from './PolymorphSelectionModal.jsx';
+import { getClassFeatures } from '../../../services/character/classFeatures.js';
 
 // Core lane: loading, list filtering/sorting, search, selection, confirm/cancel,
-// and CLA-391 load-effect dep stability. Customization props (title/actionLabel),
-// allowAnyCreature / object_into_creature modes, excludeTypes display, CR display,
-// and class-feature fallbacks live in PolymorphSelectionModal.features.test.jsx.
+// CLA-391 load-effect dep stability, and the filterBeastSpeeds limitation contract.
+// Customization props (title/actionLabel), allowAnyCreature / object_into_creature
+// modes and CR display live in PolymorphSelectionModal.features.test.jsx.
 //
-// Fixture is deliberately local: the features lane suggested a shared fixture module,
-// but that would require a new helper file (out of scope here), and the two fixtures
-// intentionally differ (this one needs Rat for the maxCR-0 path and both Eagle and
-// Ghast for the exclusion smoke assertion). classFeatures is NOT mocked here —
-// real 5e druid level 4 yields 'walk only (no swim or fly)' limitations.
-//
-// NOTE: beast-row speed display is intentionally not asserted — source filtering of
-// climb/burrow/swim via limitation substrings is a known defect in the bug ledger
-// ('walk only (no swim or fly)'.includes('fly') === true). Row retention keys only
-// off walk speed, so the name-list assertions below are stable.
+// Fixtures are derived from REAL disk rows (public/data/monsters.json and the
+// druid rows of public/data/classes.json) with drift-throws — the previous
+// hand-copied mockMonsters had drifted speeds (numbers instead of the disk's
+// "40 ft." strings) per the bug ledger. classFeatures is NOT mocked here:
+// real getClassFeatures on disk-derived druid levels yields the authoritative
+// limitation strings (classRules.js:124-128; same vocabulary in
+// classRules2024.js:293). The strings are prose where the clause before "only"
+// enumerates ALLOWED modes and "(no ...)" enumerates FORBIDDEN ones —
+// 'walk only (no swim or fly)' must NOT surface swim/climb/burrow
+// (the old limitations.includes('fly'/'swim') gate did, pass #150).
 
-const mockMonsters = [
-    {
-        index: 'wolf',
-        name: 'Wolf',
-        type: 'Beast',
-        size: 'Medium',
-        challenge_rating: '1/4',
-        speed: { walk: 40, climb: 20, swim: 20 },
-        actions: [{ name: 'Bite' }, { name: 'Dash' }],
-    },
-    {
-        index: 'spider',
-        name: 'Giant Spider',
-        type: 'Beast',
-        size: 'Medium',
-        challenge_rating: '1',
-        speed: { walk: 20, climb: 20 },
-        actions: [{ name: 'Bite' }, { name: 'Net' }],
-    },
-    {
-        index: 'crocodile',
-        name: 'Crocodile',
-        type: 'Beast',
-        size: 'Large',
-        challenge_rating: '1',
-        speed: { walk: 20, swim: 10 },
-        actions: [{ name: 'Bite' }, { name: 'Grapple' }, { name: 'Swallow' }],
-    },
-    {
-        index: 'panther',
-        name: 'Panther',
-        type: 'Beast',
-        size: 'Small',
-        challenge_rating: '1/4',
-        speed: { walk: 40, climb: 20 },
-        actions: [{ name: 'Bite' }],
-    },
-    {
-        index: 'eagle',
-        name: 'Eagle',
-        type: 'Beast',
-        size: 'Small',
-        challenge_rating: '1/4',
-        speed: { fly: 50 },
-        actions: [{ name: 'Beak' }, { name: 'Talons' }],
-    },
-    {
-        index: 'ghast',
-        name: 'Ghast',
-        type: 'Undead',
-        size: 'Medium',
-        challenge_rating: '2',
-        speed: { walk: 40 },
-        actions: [{ name: 'Claws' }],
-    },
-    {
-        index: 'brown_bear',
-        name: 'Brown Bear',
-        type: 'Beast',
-        size: 'Large',
-        challenge_rating: '1',
-        speed: { walk: 40, climb: 20 },
-        actions: [{ name: 'Bite' }, { name: 'Multiattack' }, { name: 'Dash' }],
-    },
-    {
-        index: 'rat',
-        name: 'Rat',
-        type: 'Beast',
-        size: 'Tiny',
-        challenge_rating: '0',
-        speed: { walk: 20 },
-        actions: [],
-    },
-];
+const diskMonsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
+
+function diskMonster(name) {
+    const found = diskMonsters.find(m => m.name.toLowerCase() === name.toLowerCase());
+    if (!found) throw new Error(`Fixture drift: '${name}' no longer exists in public/data/monsters.json`);
+    return found;
+}
+
+const WOLF = diskMonster('Wolf');
+const PANTHER = diskMonster('Panther');
+const CROCODILE = diskMonster('Crocodile');
+const EAGLE = diskMonster('Eagle');
+const RAT = diskMonster('Rat');
+const GIANT_SPIDER = diskMonster('Giant Spider');
+const BROWN_BEAR = diskMonster('Brown Bear');
+const BADGER = diskMonster('Badger');
+const GHAST = diskMonster('Ghast');
+
+// Drift-throw: pin the exact disk bytes the assertions below depend on.
+const EXPECTED_DISK_SPEEDS = {
+    wolf: { speed: { walk: '40 ft.' }, challenge_rating: '0.25', type: 'Beast' },
+    panther: { speed: { walk: '50 ft.', fly: '', swim: '', climb: '40 ft.', burrow: '', other: [] }, challenge_rating: '0.25', type: 'Beast' },
+    crocodile: { speed: { walk: '20 ft.', swim: '30 ft.' }, challenge_rating: '0.5', type: 'Beast' },
+    eagle: { speed: { walk: '10 ft.', fly: '60 ft.' }, challenge_rating: '0', type: 'beast' },
+    rat: { speed: { walk: '20 ft.', fly: '', swim: '', climb: '20 ft.', burrow: '', other: [] }, challenge_rating: '0', type: 'Beast' },
+    'giant spider': { speed: { walk: '30 ft.', climb: '30 ft.' }, challenge_rating: '1', type: 'Beast' },
+    'brown bear': { speed: { walk: '40 ft.', climb: '30 ft.' }, challenge_rating: '1', type: 'Beast' },
+    badger: { speed: { walk: '20 ft.', burrow: '5 ft.' }, challenge_rating: '0', type: 'Beast' },
+    ghast: { speed: { walk: '30 ft.' }, challenge_rating: '2', type: 'Undead' },
+};
+for (const [name, expected] of Object.entries(EXPECTED_DISK_SPEEDS)) {
+    const m = diskMonster(name);
+    if (JSON.stringify(m.speed) !== JSON.stringify(expected.speed)
+        || String(m.challenge_rating) !== expected.challenge_rating
+        || m.type !== expected.type) {
+        throw new Error(`Fixture drift: '${name}' disk row changed - ${JSON.stringify(m)} (expected speed ${JSON.stringify(expected.speed)}, cr ${expected.challenge_rating}, type ${expected.type})`);
+    }
+}
+
+const mockMonsters = [WOLF, PANTHER, CROCODILE, EAGLE, RAT, GIANT_SPIDER, BROWN_BEAR, BADGER, GHAST];
 
 vi.mock('../../../services/ui/dataLoader.js', () => ({
     loadMonsters: vi.fn(async () => mockMonsters),
 }));
 
+// Authoritative limitation contract, derived from REAL disk rows through the real
+// rules engine, with drift-throws if the prose grammar ever changes.
+const diskDruid = (JSON.parse(readFileSync('public/data/classes.json', 'utf8')).results
+    || JSON.parse(readFileSync('public/data/classes.json', 'utf8'))).find(c => c.index === 'druid');
+if (!diskDruid) throw new Error('Fixture drift: druid class no longer exists in public/data/classes.json');
+
+function diskLimitationsAt(level) {
+    return getClassFeatures({ rules: '5e', level, class: { name: 'Druid', class_levels: diskDruid.class_levels } })?.wildShapeLimitations;
+}
+
+const WALK_ONLY = diskLimitationsAt(2);
+const WALK_OR_SWIM = diskLimitationsAt(4);
+const WALK_SWIM_FLY = diskLimitationsAt(8);
+for (const [actual, expected] of [
+    [WALK_ONLY, 'walk only (no swim or fly)'],
+    [WALK_OR_SWIM, 'walk or swim only (no fly)'],
+    [WALK_SWIM_FLY, 'walk, swim, or fly'],
+]) {
+    if (actual !== expected) {
+        throw new Error(`Limitation contract drift: expected '${expected}' from disk druid levels, got '${actual}' - re-verify classRules.js getDruidFeatures prose against the filterBeastSpeeds parser`);
+    }
+}
+
 const baseProps = {
-    playerStats: { class: { name: 'Druid' }, level: 4, rules: '5e' },
+    playerStats: { rules: '5e', level: 2, class: { name: 'Druid', class_levels: diskDruid.class_levels } },
     maxCR: 1,
     campaignName: 'test-campaign',
     onConfirm: vi.fn(),
@@ -134,6 +125,13 @@ function findBeastItem(beastName) {
         item.querySelector('.wild-shape-beast-name').textContent.includes(beastName)) || null;
 }
 
+function speedTextOf(beastName) {
+    const item = findBeastItem(beastName);
+    if (!item) throw new Error(`Beast row missing: ${beastName}`);
+    const spans = item.querySelectorAll('.wild-shape-beast-stats span');
+    return spans[spans.length - 1].textContent;
+}
+
 function getSelectedItemNames() {
     return Array.from(document.querySelectorAll('.wild-shape-beast-item.selected')).map(beastNameOf);
 }
@@ -143,6 +141,44 @@ function waitForBeastsLoaded() {
         expect(document.querySelectorAll('.wild-shape-beast-item').length).toBeGreaterThan(0);
     });
 }
+
+describe('filterBeastSpeeds (limitation polarity)', () => {
+    it('under walk-only limits keeps walk and excludes swim/climb/fly/burrow (exact)', () => {
+        // Wolf regression: disk Wolf is walk-only, so its row is the
+        // permitted-speeds-retained case; Crocodile/Panther/Eagle/Badger carry
+        // the exclusions (the old gate surfaced Wolf's Swim 20 only because the
+        // drifted hand-written fixture gave it a fabricated swim speed).
+        expect(filterBeastSpeeds(WOLF.speed, WALK_ONLY)).toEqual({ walk: '40 ft.' });
+        expect(filterBeastSpeeds(CROCODILE.speed, WALK_ONLY)).toEqual({ walk: '20 ft.' });
+        expect(filterBeastSpeeds(PANTHER.speed, WALK_ONLY)).toEqual({ walk: '50 ft.' });
+        expect(filterBeastSpeeds(EAGLE.speed, WALK_ONLY)).toEqual({ walk: '10 ft.' });
+        expect(filterBeastSpeeds(BADGER.speed, WALK_ONLY)).toEqual({ walk: '20 ft.' });
+    });
+
+    it('under walk-or-swim-only limits swim is allowed and climb/fly/burrow excluded (exact)', () => {
+        // Positive-polarity carrier (kills an inverted-polarity mutant) and the
+        // own-keyword gate: climb/burrow used to ride hasSwim, so Giant Spider
+        // showed Climb and Badger showed Burrow under "walk or swim only".
+        expect(filterBeastSpeeds(CROCODILE.speed, WALK_OR_SWIM)).toEqual({ walk: '20 ft.', swim: '30 ft.' });
+        expect(filterBeastSpeeds(GIANT_SPIDER.speed, WALK_OR_SWIM)).toEqual({ walk: '30 ft.' });
+        expect(filterBeastSpeeds(BADGER.speed, WALK_OR_SWIM)).toEqual({ walk: '20 ft.' });
+        expect(filterBeastSpeeds(EAGLE.speed, WALK_OR_SWIM)).toEqual({ walk: '10 ft.' });
+    });
+
+    it('under walk-swim-or-fly all enumerated and unnamed extra modes are allowed (exact)', () => {
+        // Post-Fly-talent prose has no "only"/"no" clause: the beast keeps every
+        // real (non-empty) speed it has, including climb; empty-string modes
+        // from disk stay filtered out.
+        expect(filterBeastSpeeds(EAGLE.speed, WALK_SWIM_FLY)).toEqual({ walk: '10 ft.', fly: '60 ft.' });
+        expect(filterBeastSpeeds(CROCODILE.speed, WALK_SWIM_FLY)).toEqual({ walk: '20 ft.', swim: '30 ft.' });
+        expect(filterBeastSpeeds(PANTHER.speed, WALK_SWIM_FLY)).toEqual({ walk: '50 ft.', climb: '40 ft.' });
+    });
+
+    it('returns {} without speeds and the full speeds without limitations', () => {
+        expect(filterBeastSpeeds(undefined, WALK_ONLY)).toEqual({});
+        expect(filterBeastSpeeds(CROCODILE.speed, null)).toEqual(CROCODILE.speed);
+    });
+});
 
 describe('PolymorphSelectionModal (core)', () => {
     beforeEach(() => {
@@ -159,15 +195,17 @@ describe('PolymorphSelectionModal (core)', () => {
         expect(screen.queryByPlaceholderText('Search beasts...')).not.toBeInTheDocument();
     });
 
-    it('lists exactly the CR<=1 walking beasts, sorted by CR then name, with wild shape copy', async () => {
+    it('lists exactly the CR<=1 beasts, sorted by CR then name, with wild shape copy', async () => {
         render(<PolymorphSelectionModal {...baseProps} />);
         await waitForBeastsLoaded();
 
         expect(screen.getByText('Choose a beast form (CR 1 or lower)')).toBeInTheDocument();
-        // Type filter (no Ghast), CR filter, and no-walk filter (no Eagle) in one
-        // exact-list assertion, plus CR-then-name sort order.
+        // Type filter (no Ghast), CR filter and no-walk filter in one exact-list
+        // assertion, plus CR-then-name sort order. Every disk beast has a walk
+        // speed, so Eagle (CR 0) and Badger (CR 0) legitimately remain listed —
+        // with their forbidden extra modes hidden (see speed regression below).
         expect(getBeastNames()).toEqual([
-            'Rat', 'Panther', 'Wolf', 'Brown Bear', 'Crocodile', 'Giant Spider',
+            'Badger', 'Eagle', 'Rat', 'Panther', 'Wolf', 'Crocodile', 'Brown Bear', 'Giant Spider',
         ]);
 
         const movement = Array.from(document.querySelectorAll('.wild-shape-info'))
@@ -175,12 +213,30 @@ describe('PolymorphSelectionModal (core)', () => {
         expect(movement).toHaveTextContent('walk only');
     });
 
+    it('renders only walk speeds on every row under walk-only limitations', async () => {
+        render(<PolymorphSelectionModal {...baseProps} />);
+        await waitForBeastsLoaded();
+
+        // Exact rendered speed lists: no swim/climb/fly/burrow may surface under
+        // 'walk only (no swim or fly)' (pass #150 polarity defect).
+        expect(speedTextOf('Wolf')).toBe('Walk 40 ft.');
+        expect(speedTextOf('Crocodile')).toBe('Walk 20 ft.');
+        expect(speedTextOf('Panther')).toBe('Walk 50 ft.');
+        expect(speedTextOf('Eagle')).toBe('Walk 10 ft.');
+        expect(speedTextOf('Badger')).toBe('Walk 20 ft.');
+        expect(speedTextOf('Giant Spider')).toBe('Walk 30 ft.');
+        expect(speedTextOf('Brown Bear')).toBe('Walk 40 ft.');
+        for (const span of Array.from(document.querySelectorAll('.wild-shape-beast-stats span'))) {
+            expect(span.textContent).not.toMatch(/Swim|Climb|Fly|Burrow/);
+        }
+    });
+
     it('honors the maxCR prop when listing beasts', async () => {
         render(<PolymorphSelectionModal {...baseProps} maxCR={0} />);
         await waitForBeastsLoaded();
 
         expect(screen.getByText('Choose a beast form (CR 0 or lower)')).toBeInTheDocument();
-        expect(getBeastNames()).toEqual(['Rat']);
+        expect(getBeastNames()).toEqual(['Badger', 'Eagle', 'Rat']);
     });
 
     it('search filters by name case-insensitively, shows no-results copy, and restores on clear', async () => {
@@ -208,7 +264,7 @@ describe('PolymorphSelectionModal (core)', () => {
         fireEvent.change(input, { target: { value: '' } });
         await waitFor(() => {
             expect(getBeastNames()).toEqual([
-                'Rat', 'Panther', 'Wolf', 'Brown Bear', 'Crocodile', 'Giant Spider',
+                'Badger', 'Eagle', 'Rat', 'Panther', 'Wolf', 'Crocodile', 'Brown Bear', 'Giant Spider',
             ]);
         });
     });

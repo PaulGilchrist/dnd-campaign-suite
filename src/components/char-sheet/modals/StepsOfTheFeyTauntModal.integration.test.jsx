@@ -136,9 +136,15 @@ describe('StepsOfTheFeyTauntModal - Integration', () => {
             expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
 
-        expect(screen.getByText(/Taunting Step:/)).toBeInTheDocument();
-        expect(screen.getByText(/No targets selected/)).toBeInTheDocument();
-        expect(screen.getByText(/5 remaining/)).toBeInTheDocument();
+        const body = screen.getByRole('button', { name: 'Done' }).closest('.sp-modal').querySelector('.sp-body');
+        // Exact bytes: skipped choice is 'taunting', so the bold label must
+        // be Taunting Step regardless of modal mode (derivation source: choice).
+        expect(body.textContent).toBe(
+            'Steps of the Fey: Cast Misty Step without expending a spell slot (5 remaining).Taunting Step: No targets selected.'
+        );
+        expect(body.innerHTML).toBe(
+            'Steps of the Fey: Cast Misty Step without expending a spell slot (5 remaining).<br><br><b>Taunting Step:</b> No targets selected.'
+        );
         expect(createSaveListener).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
     });

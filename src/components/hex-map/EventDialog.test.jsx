@@ -99,6 +99,38 @@ describe('EventDialog', () => {
         expect(screen.getByText('Goblin Boss')).toBeInTheDocument();
     });
 
+    // #790 regression: pendingEvent rides the persisted campaign runtime store
+    // ('travel-pendingEvent'), and a combat event WITHOUT encounter.monsters is a
+    // legal shape — HexMap.jsx's accept lane already guards it (evt.encounter?.monsters,
+    // pinned by HexMap.additional.test.jsx "starts a bare encounter when the event has
+    // no monsters"). The dialog must render its own empty state, never throw.
+    const monstersAbsentArms = {
+        'monsters key absent': { difficultyLabel: 'Hard', totalXP: 400 },
+        'monsters null': { difficultyLabel: 'Hard', totalXP: 400, monsters: null },
+        'monsters empty': { difficultyLabel: 'Hard', totalXP: 400, monsters: [] },
+    };
+
+    it.each(Object.entries(monstersAbsentArms))(
+        'completes the render with an empty monster list when %s', (_arm, encounter) => {
+            const { container } = renderDialog({ ...baseEvent, encounter });
+            expect(screen.getByText('Hard')).toBeInTheDocument();
+            expect(screen.getByText('400 XP')).toBeInTheDocument();
+            expect(screen.getByText('Goblin Ambush')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /accept/i })).toBeEnabled();
+            const list = container.querySelector('.event-monster-list');
+            expect(list).toBeInTheDocument();
+            expect(list.innerHTML).toBe('');
+        },
+    );
+
+    it('renders the populated monster rows unchanged alongside the guard', () => {
+        const { container } = renderDialog(eventWithEncounter);
+        const rows = container.querySelectorAll('.event-monster-item');
+        expect(rows).toHaveLength(2);
+        expect(rows[0].textContent).toContain('3x');
+        expect(rows[1].textContent).toContain('Goblin Boss');
+    });
+
     it('keeps re-roll enabled with count and tooltip while re-rolls remain', () => {
         renderDialog(baseEvent, 2);
         const reroll = screen.getByRole('button', { name: /re-roll/i });

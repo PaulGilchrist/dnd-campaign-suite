@@ -145,6 +145,20 @@ describe('SetConditionModal - Side Effects', () => {
     await waitFor(() => expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument());
     // …yet immunity means the condition never reaches the apply seam.
     expect(conditionSaveService.addCondition).not.toHaveBeenCalled();
+    // Denied conditions mint no ledger: no expiration clock, no 'applied' log —
+    // only the honest immunity advisory (phantom pin, bug ledger SetConditionModal:144-147).
+    expect(expirations.addExpiration).not.toHaveBeenCalled();
+    expect(entriesOf('condition')).toHaveLength(0);
+    expect(logService.addEntry.mock.calls.map(c => c[1]).filter(e => e?.action === 'applied')).toHaveLength(0);
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'automation',
+      automationType: 'condition_immune_advisory',
+      characterName: 'Player Ally',
+      sourceName: 'Attacker',
+      abilityName: 'Abjure Foes',
+      description: 'Player Ally failed WIS save against Abjure Foes but is immune to Frightened — condition not applied.',
+      timestamp: expect.any(Number),
+    });
     view.unmount();
 
     // Positive leg gating the denial above: same failed prompt, not immune → applied once.
@@ -164,6 +178,23 @@ describe('SetConditionModal - Side Effects', () => {
       ability: 'WIS',
       campaignName: 'test-campaign',
     }));
+    // Applied leg keeps the full ledger: one expiration clock, one 'applied' log, no advisory.
+    expect(expirations.addExpiration).toHaveBeenCalledTimes(1);
+    expect(expirations.addExpiration).toHaveBeenCalledWith(expect.objectContaining({
+      attackerName: 'Attacker',
+      targetName: 'Player Ally',
+      effects: [{ type: 'frightened', condition: 'frightened' }],
+    }));
+    const appliedLogs = entriesOf('condition');
+    expect(appliedLogs).toHaveLength(1);
+    expect(appliedLogs[0]).toEqual(expect.objectContaining({
+      action: 'applied',
+      characterName: 'Player Ally',
+      condition: 'Frightened',
+      dc: 14,
+      sourceName: 'Attacker',
+    }));
+    expect(entriesOf('automation')).toHaveLength(0);
   });
 
   // ── Channel Divinity charge spend ──

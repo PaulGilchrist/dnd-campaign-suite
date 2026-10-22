@@ -74,11 +74,14 @@ function useCharacterManagement(campaignName) {
     inputRef.current.click();
   };
 
+  // Fix#36-queue: no confirm here — the leaf CharSummary owns the single
+  // delete prompt (:626, generic house message). This is a straight
+  // dispatcher mirroring the App.jsx :598 wrapper above it; confirming at
+  // both layers stacked two dialogs per click. House pattern: leaf
+  // components confirm at the click point (Notes, Factions, Sessions,
+  // Quests, Settlements, NPCs, PartyInventory, CharSummary). Sole production
+  // caller is that wrapper, always reached through the confirming leaf.
   const handleDeleteCharacter = async (characterName) => {
-    if (!window.confirm(`Are you sure you want to delete '${characterName}'? This cannot be undone.`)) {
-      return;
-    }
-
     if (!campaignName) throw new Error('No campaign selected');
 
     const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;

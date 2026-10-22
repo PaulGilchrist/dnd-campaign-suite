@@ -36,7 +36,8 @@ vi.mock('./AreaEffectTargetModalBase.utils.jsx', () => ({
     persistAndNotify: vi.fn(),
 }));
 
-vi.mock('../../../../services/automation/handlers/spells/calmEmotionsHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/spells/calmEmotionsHandler.js', async (importOriginal) => ({
+    ...await importOriginal(),
     applyCalmEmotionsImmunity: vi.fn().mockResolvedValue(undefined),
     applyCalmEmotionsIndifferent: vi.fn().mockResolvedValue(undefined),
     resolveCalmEmotionsEligibility: vi.fn().mockImplementation(async ({ creatures }) => ({

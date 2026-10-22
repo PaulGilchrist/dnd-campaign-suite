@@ -166,10 +166,11 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             ]);
             expect(store.get(`Enemy1|${CONDS}`)).toEqual(['Frightened', 'Charmed']);
             expect(store.get(`Enemy2|${CONDS}`)).toEqual(['Charmed']);
-            // One skipSync=true strip holding every survivor byte-exactly: an
+            // One 4-arg POST write (exact store signature, useRuntimeState.js:78)
+            // holding every survivor byte-exactly: an
             // over-clear (allyCalm) or under-clear breaks these bytes.
             const survivors = [allyCalm, unrelated];
-            expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName, true]]);
+            expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName]]);
             expect(storedTE()).toEqual(survivors);
             // Buff sweep: exactly two writes (cs order TestMonk, Ally1; Ally2 holds no match).
             expect(buffWrites()).toEqual([
@@ -183,6 +184,43 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
                 { name: 'Ally1' },
                 { name: 'Ally2' },
             ]);
+        });
+
+        // Multi-suppressedConditions pin (fix #1517 clobber): the producer
+        // (calmEmotionsHandler.js applyCalmEmotionsImmunity :170-172) stamps ONE effect
+        // per target with suppressedConditions potentially holding BOTH conditions.
+        // Pre-fix, the per-effect snapshot captured before the inner loop let the
+        // second per-condition write rebuild from the stale array and clobber the
+        // first restore. The fix accumulates and performs ONE merged write per
+        // effect-target — house §39 canon (calmEmotionsHandler.js:190-194: un-awaited
+        // per-key writes to the same endpoint reorder network-side).
+        it.each([
+            ['capitalized restore bytes', ['Frightened', 'Charmed'], ['Other'], ['Other', 'Frightened', 'Charmed']],
+            ['producer-lowercase bytes preserved', ['charmed', 'frightened'], ['poisoned'], ['poisoned', 'charmed', 'frightened']],
+            ['one condition already re-applied', ['Frightened', 'Charmed'], ['Frightened'], ['Frightened', 'Charmed']],
+        ])('restores %s in ONE merged 4-arg write, final store byte-exact', (_label, suppressed, seed, expected) => {
+            concentrate('Calm Emotions');
+            const calmMulti = { effect: 'calm_emotions', source: 'TestMonk', mode: 'immunity', suppressedConditions: suppressed, target: 'Enemy1' };
+            const unrelated = { effect: 'other_effect', source: 'Ally' };
+            store.set(`campaign|${TE}`, [calmMulti, unrelated]);
+            // Post-suppression store: the producer's filter already removed the
+            // suppressed conditions at cast time; seed holds only the survivors.
+            store.set(`Enemy1|${CONDS}`, seed);
+
+            renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
+            rollInitiative();
+
+            // Exact write tuple list: one merged restore per target, campaign byte exact,
+            // no second write that could clobber, no skipSync 5th arg.
+            expect(condWrites()).toEqual([
+                ['Enemy1', CONDS, expected, campaignName],
+            ]);
+            // Final store value exact: every suppressed condition restored, survivor intact,
+            // no duplicates, no clobber residue.
+            expect(store.get(`Enemy1|${CONDS}`)).toEqual(expected);
+            // Strip still one 4-arg POST write holding every survivor byte-exactly.
+            expect(teWrites()).toEqual([['campaign', TE, [unrelated], campaignName]]);
+            expect(storedTE()).toEqual([unrelated]);
         });
 
         // Guard branch (useInitiativeEffects.js:162-163): malformed/satisfied effects
@@ -206,7 +244,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             expect(condWrites()).toHaveLength(0);
             expect(storageService.default.set).toHaveBeenCalledTimes(1);
             expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
-            expect(teWrites()).toEqual([['campaign', TE, [unrelated], campaignName, true]]);
+            expect(teWrites()).toEqual([['campaign', TE, [unrelated], campaignName]]);
             expect(storedTE()).toEqual([unrelated]);
         });
     });
@@ -226,7 +264,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             renderHook(() => useInitiativeEffects(playerStats, campaignName, vi.fn()));
             rollInitiative();
 
-            expect(teWrites()).toEqual([['campaign', TE, [allySameKey, unrelated], campaignName, true]]);
+            expect(teWrites()).toEqual([['campaign', TE, [allySameKey, unrelated], campaignName]]);
             expect(storedTE()).toEqual([allySameKey, unrelated]);
             expect(buffWrites()).toEqual([
                 ['TestMonk', BUFFS, [PRESERVED], campaignName],
@@ -244,7 +282,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             ['Compulsion', 'compulsion'],
             ['Enhance Ability', 'enhance_ability'],
         ])(
-            'losing %s concentration removes only TestMonk-sourced %s, byte-exact, with skipSync',
+            'losing %s concentration removes only TestMonk-sourced %s, byte-exact, via a 4-arg POST write',
             (spell, effectKey) => {
                 const cs = concentrate(spell);
                 const own = { effect: effectKey, source: 'TestMonk', target: 'Enemy' };
@@ -256,7 +294,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
                 rollInitiative();
 
                 const survivors = [allySameKey, ownUnrelated];
-                expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName, true]]);
+                expect(teWrites()).toEqual([['campaign', TE, survivors, campaignName]]);
                 expect(storedTE()).toEqual(survivors);
                 expect(storageService.default.set).toHaveBeenCalledTimes(1);
                 expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
@@ -284,7 +322,7 @@ describe('useInitiativeEffects - spell-specific concentration clearing (Calm Emo
             rollInitiative();
 
             // Positive leg: the Compulsion clear itself happened...
-            expect(teWrites()).toEqual([['campaign', TE, otherLaneEffects, campaignName, true]]);
+            expect(teWrites()).toEqual([['campaign', TE, otherLaneEffects, campaignName]]);
             expect(storageService.default.set).toHaveBeenCalledTimes(1);
             expect(cs.creatures[0]).toEqual({ name: 'TestMonk', concentration: null, hp: 30 });
             // ...so these absences are spell-gating, not a dead seam: no calm restore,

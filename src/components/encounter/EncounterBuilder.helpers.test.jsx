@@ -164,6 +164,31 @@ describe('filter persistence (localStorage key encounterFilter-2024)', () => {
 });
 
 describe('monster table filtering', () => {
+  it('narrows rows by environment via the filter panel Environment select, offered options derived from the mounted bestiary', () => {
+    const { container } = mountBuilder({ monsters: MONSTERS, characters: thorinLv5 });
+
+    const env = screen.getByLabelText('Environment');
+    // Options are disk-shaped (unique sorted environments of the loaded monsters) —
+    // 'sky' exists ONLY on the fixture Cloud, so a hardcoded list could never show it.
+    expect([...env.querySelectorAll('option')].map((o) => o.value)).toEqual([
+      '', 'forest', 'hill', 'mountain', 'sky', 'underdark',
+    ]);
+    expect(env).toHaveValue('');
+
+    fireEvent.change(env, { target: { value: 'underdark' } });
+    expect(rowNames(container)).toEqual(['Kobold', 'Kobold Captain', 'Shadow']);
+
+    // Multi-environment monsters match on any of their environments.
+    fireEvent.change(env, { target: { value: 'forest' } });
+    expect(rowNames(container)).toEqual(['Goblin', 'Rat']);
+
+    // The blank sentinel restores the full table.
+    fireEvent.change(env, { target: { value: '' } });
+    expect(rowNames(container)).toEqual([
+      'Cloud', 'Goblin', 'Kobold', 'Kobold Captain', 'Orc', 'Rat', 'Shadow', 'Young Dragon',
+    ]);
+  });
+
   it('narrows rows by search text on name, subtype, and type, case-insensitively', () => {
     const { container } = mountBuilder({ monsters: MONSTERS, characters: thorinLv5 });
     expect(rowNames(container)).toEqual([

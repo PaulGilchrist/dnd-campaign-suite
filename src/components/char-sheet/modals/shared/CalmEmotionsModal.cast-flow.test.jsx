@@ -43,6 +43,9 @@ vi.mock('../../../../services/automation/handlers/spells/calmEmotionsHandler.js'
     })),
     logCalmEmotionsEligibility: vi.fn().mockResolvedValue(undefined),
     registerCalmEmotionsExpiration: vi.fn(),
+    // Module-graph stub: AreaEffectSaveFlow.utils -> applyDamage -> automation/index
+    // references this dispatcher export; the lane never exercises it.
+    handle: vi.fn(),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';

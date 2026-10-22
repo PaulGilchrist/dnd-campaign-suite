@@ -64,7 +64,8 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(() => ({ total: 5, rolls: [5], modifier: 0 })),
 }));
 
-vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
+vi.mock('../../../services/rules/combat/applyDamage.js', async (importOriginal) => ({
+    ...await importOriginal(),
     computeDamageAfterSave: vi.fn((damage, success, dcSuccess) => {
         if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
         return damage;

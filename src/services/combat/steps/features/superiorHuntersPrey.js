@@ -69,7 +69,11 @@ export const superiorHuntersPrey = {
 
         const cs2 = await loadCombatSummary(ctx.campaignName);
         const characters = getRuntimeValue('characters', 'characters', ctx.campaignName) || [];
-        const app = cs2 ? applyDamageToTarget(cs2, targetName, r.total, ['Force'], { campaignName: ctx.campaignName, characters: characters, ignoreResistance: false, attackerName: ctx.playerStats.name }) : null;
+        // await: applyDamageToTarget is async (applyDamage.js:991) and resolves
+        // {finalDamage, oldHp, newHp, ...} (:1052). Without the await, app is a
+        // pending Promise — truthy at the popup guard — and both the damage log
+        // and the popup spread carried finalDamage/newHp: undefined.
+        const app = cs2 ? await applyDamageToTarget(cs2, targetName, r.total, ['Force'], { campaignName: ctx.campaignName, characters: characters, ignoreResistance: false, attackerName: ctx.playerStats.name }) : null;
         addEntry(ctx.campaignName, { type: 'roll', characterName: ctx.playerStats.name, rollType: 'damage', name: "Superior Hunter's Prey", formula: `${die} [Superior Hunters Prey]`, rolls: r.rolls, total: r.total, modifier: 0, damageType: 'Force', targetName, finalDamage: app?.finalDamage }).catch((e) => { console.error("[superiorHuntersPrey:log-error]", e); });
         if (app && ctx.setPopupHtml) {
           const target = cs.creatures?.find(c => c.name === targetName);

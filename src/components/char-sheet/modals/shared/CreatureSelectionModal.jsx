@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './SecondaryTargetModal.css';
 import { getCurrentOverlayTarget, getCreaturesInsideOverlay, getTargetMapStatuses, distanceBadgeText } from '../../../../services/maps/spellOverlayService.js';
 
@@ -23,6 +23,11 @@ export default function CreatureSelectionModal({
 }) {
     const [selected, setSelected] = useState(defaultSelected || []);
     const [mapStatuses, setMapStatuses] = useState(null);
+    // Snapshot of the Heighten radio's native checkedness at pointerdown, before the
+    // click completes. Radio change events never fire on an already-checked radio, so
+    // re-click deselect is gated on this snapshot (and stays inert when the same click
+    // newly selected the radio, since browsers dispatch change before click).
+    const heightenWasCheckedRef = useRef(false);
 
     useEffect(() => {
         if (!campaignName || !attackerName || targets.length === 0) return undefined;
@@ -118,7 +123,15 @@ export default function CreatureSelectionModal({
                                                 type="radio"
                                                 name="heightenTarget"
                                                 checked={heightenTarget === name}
+                                                onPointerDown={(e) => { heightenWasCheckedRef.current = e.currentTarget.checked; }}
                                                 onChange={(e) => { e.stopPropagation(); handleHeightenSelect(name); }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (heightenWasCheckedRef.current) {
+                                                        handleHeightenSelect(name); // was checked; no change event fires here -> toggle back to null
+                                                    }
+                                                    heightenWasCheckedRef.current = false;
+                                                }}
                                                 title="Select this target for Heightened Spell disadvantage"
                                             />
                                             Heighten

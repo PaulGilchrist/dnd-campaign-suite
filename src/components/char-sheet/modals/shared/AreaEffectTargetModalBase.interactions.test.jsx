@@ -178,4 +178,42 @@ describe('AreaEffectTargetModalBase - Interactions', () => {
       pendingPrompts: [],
     }));
   });
+
+  it('allResolved consults the overlay-shadowed effective selection (#226 race): setProcessing alone never commits onAllResolved with empty results, and the payload carries the extraState selected set', () => {
+    // SaveAttackAoeModal's overlay lane shadows base `selected` with the
+    // parent's Set via extraState (spread onto ctx at :214). The base predicate
+    // must read that same merged value: with base's own Set left empty,
+    // `results.length >= selected.size` was trivially true and allResolved
+    // flipped on the setProcessing(true) flush — one microtask before
+    // setResults landed — committing an empty results summary.
+    const onAllResolved = vi.fn();
+    const overlaySelected = new Set(['Goblin', 'Orc']);
+    let ctx;
+    const renderActions = (c) => {
+      ctx = c;
+      return null;
+    };
+    render(
+      <AreaEffectTargetModalBase
+        {...baseProps}
+        renderActions={renderActions}
+        onAllResolved={onAllResolved}
+        extraState={{ selected: overlaySelected }}
+      />
+    );
+
+    act(() => { ctx.setProcessing(true); });
+    expect(ctx.allResolved).toBe(false); // 0 results < 2 effective-selected
+    expect(onAllResolved).not.toHaveBeenCalled();
+
+    act(() => { ctx.setResults([{ targetName: 'Orc', success: false }, { targetName: 'Goblin', success: true }]); });
+    expect(ctx.allResolved).toBe(true);
+    expect(onAllResolved).toHaveBeenCalledTimes(1);
+    expect(onAllResolved).toHaveBeenCalledWith(expect.objectContaining({
+      results: [{ targetName: 'Orc', success: false }, { targetName: 'Goblin', success: true }],
+      selected: overlaySelected,
+      pendingPrompts: [],
+      processing: true,
+    }));
+  });
 });

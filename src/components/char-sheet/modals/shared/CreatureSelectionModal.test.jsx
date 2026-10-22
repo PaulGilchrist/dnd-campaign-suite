@@ -1,6 +1,8 @@
 // @maintained-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 
 const mockGetCurrentOverlayTarget = vi.fn();
 const mockGetCreaturesInsideOverlay = vi.fn();
@@ -177,6 +179,51 @@ describe('CreatureSelectionModal', () => {
     expect(radios[0].checked).toBe(false);
     expect(radios[1].checked).toBe(true);
     expect(radios[2].checked).toBe(false);
+  });
+
+  // Deselect regression: browsers (and jsdom) never fire change on a re-click of an
+  // already-checked radio, so click-to-deselect must ride the click event. A
+  // pointerdown snapshot of native checkedness keeps the deselect inert when the same
+  // click newly selected the radio (browsers dispatch change before click).
+
+  it('deselects the Heighten target (null to parent) when the checked radio is clicked again', () => {
+    render(<CreatureSelectionModal {...makeProps({ metamagicHeighten: true, setHeightenTarget: mockSetHeightenTarget, heightenTarget: 'Goblin B' })} />);
+    const radios = heightenRadios();
+    expect(radios[1].checked).toBe(true);
+    fireEvent.pointerDown(radios[1]);
+    fireEvent.click(radios[1]);
+    expect(mockSetHeightenTarget).toHaveBeenCalledTimes(1);
+    expect(mockSetHeightenTarget).toHaveBeenCalledWith(null);
+  });
+
+  it('propagates deselect through a real parent: heighten state becomes null and every radio renders unchecked', async () => {
+    function Harness() {
+      const [heighten, setHeighten] = useState('Goblin B');
+      return (
+        <>
+          <CreatureSelectionModal {...makeProps({ metamagicHeighten: true, heightenTarget: heighten, setHeightenTarget: setHeighten })} />
+          <span data-testid="heighten-state">{heighten === null ? 'null' : heighten}</span>
+        </>
+      );
+    }
+    render(<Harness />);
+    expect(heightenRadios()[1].checked).toBe(true);
+    await act(async () => {
+      fireEvent.pointerDown(heightenRadios()[1]);
+      fireEvent.click(heightenRadios()[1]);
+    });
+    expect(screen.getByTestId('heighten-state').textContent).toBe('null');
+    heightenRadios().forEach(radio => expect(radio.checked).toBe(false));
+  });
+
+  it('keeps single-select: clicking a different unchecked radio selects it without a spurious null', () => {
+    render(<CreatureSelectionModal {...makeProps({ metamagicHeighten: true, setHeightenTarget: mockSetHeightenTarget, heightenTarget: 'Goblin A' })} />);
+    const radios = heightenRadios();
+    fireEvent.pointerDown(radios[1]);
+    fireEvent.click(radios[1]);
+    expect(mockSetHeightenTarget).toHaveBeenCalledTimes(1);
+    expect(mockSetHeightenTarget).toHaveBeenCalledWith('Goblin B');
+    expect(mockSetHeightenTarget).not.toHaveBeenCalledWith(null);
   });
 
   // ── Selection behavior ──

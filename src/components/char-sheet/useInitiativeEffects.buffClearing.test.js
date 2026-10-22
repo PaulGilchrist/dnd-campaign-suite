@@ -214,7 +214,7 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
     });
 
     describe('starry_form campaign targetEffects (clearSourceEffects)', () => {
-        it('clears the buff and caster-sourced starry_form effects, skipSync=true byte-exact', () => {
+        it('clears the buff and caster-sourced starry_form effects, byte-exact via a 4-arg POST write', () => {
             store.set(`TestMonk|${BUFFS_KEY}`, [buff('Starry Form', 'starry_form'), PRESERVED]);
             store.set(`campaign|${TE_KEY}`, [OWN_STARRY_TE, ALLY_STARRY_TE]);
             renderHookWithStats();
@@ -222,8 +222,10 @@ describe('useInitiativeEffects - buff clearing mechanics', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestMonk', BUFFS_KEY, [PRESERVED], campaignName
             );
+            // Exact 4-arg tuple: the dead 5th skipSync arg must never reappear
+            // (store arity is 4, useRuntimeState.js:78) — local clears POST.
             expect(targetEffectsWrites()).toEqual([
-                ['campaign', TE_KEY, [ALLY_STARRY_TE], campaignName, true],
+                ['campaign', TE_KEY, [ALLY_STARRY_TE], campaignName],
             ]);
         });
 

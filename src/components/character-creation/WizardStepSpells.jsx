@@ -102,7 +102,11 @@ function MagicalSecretsSection({ chosenCount, poolCount, active, onToggle }) {
 // Edit banners shown when a feat is selected, configured, and its modal is closed
 function getEditBannerDescriptors({ formData, modals }) {
   const feats = formData.feats || [];
-  const ritualMasterChosenCount = (formData.ritualMasterSpells || []).length;
+  // Fix#34: normalize before counting — payloads arrive as arrays (RitualMasterModal
+  // save, HexWarlock.json:135) but a single-value STRING ('Alarm') reaches this site
+  // too; raw .length there counted characters ('Alarm' -> 5) into the banner.
+  const ritualMasterRaw = formData.ritualMasterSpells;
+  const ritualMasterChosenCount = Array.isArray(ritualMasterRaw) ? ritualMasterRaw.length : (ritualMasterRaw ? 1 : 0);
   const descriptors = [];
   if (feats.some(f => featNameMatches(f, 'Magic Initiate')) && !modals.magicInitiate) {
     descriptors.push({ id: 'magic-initiate', modal: 'magicInitiate', icon: 'fa-hat-wizard', label: 'Edit Magic Initiate' });

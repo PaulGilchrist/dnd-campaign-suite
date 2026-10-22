@@ -282,19 +282,60 @@ describe('FearModal player saves', () => {
         expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('careful spell protected player is skipped entirely — no prompt, no condition, no save logging', async () => {
+    it('careful spell protected player auto-succeeds and is recorded — no prompt, no condition, but full save audit trail', async () => {
         getAllyList.mockReturnValue(['PlayerAlly']);
+        const onClose = vi.fn();
 
-        await castAtRows([2], { expectedPrompts: 0, metamagicCareful: true });
+        await castAtRows([2], { expectedPrompts: 0, metamagicCareful: true, onClose });
 
-        // Protected player is never prompted and never carries any save residue.
+        // Protected player is never prompted and never carries the condition.
         expect(sendSavePrompt).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'PlayerAlly', 'activeConditions', expect.anything(), expect.anything());
         expect(addExpiration).not.toHaveBeenCalled();
-        expect(entriesOf(e => e.type === 'save_result')).toHaveLength(0);
-        // The cast itself still completes and persists.
+
+        // But the auto-success IS recorded, matching the NPC careful leg
+        // (resolveNpcCarefulSave): a save_result log entry with the same bytes…
+        const saveEntry = entriesOf(e =>
+            e.type === 'save_result' && e.targetName === 'PlayerAlly' && e.success === true
+        )[0];
+        expect(saveEntry).toBeDefined();
+        expect(saveEntry).toMatchObject({
+            type: 'save_result',
+            characterName: 'Wizard1',
+            targetName: 'PlayerAlly',
+            saveDc: 14,
+            saveType: 'CHA',
+            success: true,
+            roll: 0,
+            total: 0,
+            saveBonus: 0,
+        });
+        expect(saveEntry.description).toContain('Careful Spell protected');
+
+        // …and a clean success target result.
+        expect(addTargetResult).toHaveBeenCalledWith(campaignName, {
+            targetName: 'PlayerAlly',
+            saveResult: 'success',
+            roll: 0,
+            total: 0,
+            conditions: [],
+            appliedDamage: 0,
+        });
+
+        // The cast still completes and persists.
         expect(persistAndNotify).toHaveBeenCalledWith(baseCombatSummary, campaignName);
+    });
+
+    it('careful spell protected player cast leaves zero prompts and closes the modal (no stuck-open)', async () => {
+        getAllyList.mockReturnValue(['PlayerAlly']);
+        const onClose = vi.fn();
+
+        await castAtRows([2], { expectedPrompts: 0, metamagicCareful: true, onClose });
+
+        // All targets careful-protected → no prompts remain → the confirm must
+        // close the modal rather than leaving it stuck open on an empty pending list.
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('ignores save-result events with no detail or an unknown promptId', async () => {

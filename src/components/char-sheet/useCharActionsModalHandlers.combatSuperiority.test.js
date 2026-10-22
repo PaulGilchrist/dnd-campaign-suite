@@ -2,7 +2,7 @@
 // Routing-seam lane: combat-superiority maneuver-choice modal confirms in useCharActionsModalHandlers.
 // Pins arg-gate refusals (isolated falsy legs), byte-exact dispatch payloads + arity to the
 // combatSuperiorityHandler execute* services, popup surfacing on result.payload only,
-// logEntries flush to the campaign log on the bait-and-switch/rally lanes (MN-002/MN-016),
+// logEntries flush to the campaign log on the bait-and-switch/commander-strike/rally lanes (MN-002/MN-016),
 // and modalState clears.
 // Handler/service internals are owned by combatSuperiorityHandler.test.js,
 // combatSuperiorityChoices.test.js and combatSuperiorityUtils tests; modal UI wiring
@@ -184,7 +184,9 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
   );
 
   // MN-002 / MN-016: maneuver grants must reach the campaign log, keyed by the
-  // modalData campaignName — only bait-and-switch and rally flush logEntries.
+  // modalData campaignName — bait-and-switch, commander-strike and rally all
+  // flush logEntries (commander-strike row added with the same-class fix: the
+  // ability_use grant from combatSuperiorityUtils.js executeCommanderStrikeChoice).
   it.each([
     {
       m: MANEUVERS[1],
@@ -193,6 +195,15 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
         characterName: 'TestChar',
         abilityName: 'Bait and Switch',
         description: 'Bait and Switch: Orc gains +7 AC until the start of TestChar\'s next turn.',
+      },
+    },
+    {
+      m: MANEUVERS[2],
+      entry: {
+        type: 'ability_use',
+        characterName: 'TestChar',
+        abilityName: 'Commander Strike',
+        description: 'Commander Strike: Ally1 will add 12 to their next attack\'s damage roll.',
       },
     },
     {
@@ -211,6 +222,8 @@ describe('useCharActionsModalHandlers - combat superiority routing', () => {
     const data = m.data(m.target);
     await m.invoke(handlers, m.target, data);
     expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, entry);
+    // Exact flush count: one entry in, one addEntry out — no duplicates.
+    expect(addEntry).toHaveBeenCalledTimes(1);
     expect(setPopupHtml).toHaveBeenCalledWith('<p>Applied</p>');
     expect(setModalState).toHaveBeenCalledWith({ [m.clearKey]: null });
   });

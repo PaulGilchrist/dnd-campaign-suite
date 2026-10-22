@@ -3,7 +3,10 @@
 // Coverage ownership (CharSummary family delegation):
 //   - Character header area: name, header action buttons, and the delete-confirm
 //     flow (onDeleteCharacter fires ONLY when window.confirm is accepted) —
-//     no sibling touches onDeleteCharacter/window.confirm on CharSummary.
+//     no sibling touches onDeleteCharacter/window.confirm on CharSummary
+//     except CharSummary-DeleteConfirm.test.jsx, which owns the cross-layer
+//     single-dialog count with the REAL useCharacterManagement behind the
+//     leaf (fix#36 queue: hook-level guard removed, leaf is sole owner).
 //   - Subtitle-row fallbacks (no subrace / no race type / no subclass). The
 //     exact full-line grammar of the untouched fixture is pinned (fixture-
 //     derived) by CharSummary-FixtureContract.test.jsx; XP/milestone suffix

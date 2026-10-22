@@ -4,7 +4,8 @@
 // byte-exact popup/log canon and Invisible + advantage_on_stealth stamping
 // (+ dedupe/preserve), checkContext channel resolution (dis/hex/advantage/peerless
 // precedence, Skulker gate), Stealth bonus arithmetic (exhaustion, Pass Without
-// Trace, Jack of All Trades), and Skulker fog-of-war copy on both legs.
+// Trace, Jack of All Trades, listed-bonus-minus-penalty matrix), and Skulker
+// fog-of-war copy on both legs.
 // Naturally Stealthy trait branches are owned by
 // useCharActionsHideAction.naturallyStealthy.test.js; Hide/Dodge button click
 // wiring is owned by CharActions.baseActionsHide.test.jsx — not restated here.
@@ -20,6 +21,19 @@ function grv({ conditions = [], lastAttack = null, buffs = [] } = {}) {
         if (key === 'activeBuffs') return buffs;
         return undefined;
     });
+}
+
+// Base abilities layout with a listed Stealth skill total on the Dexterity entry
+// (the channel findStealthSkill reads: abilities[].skills[].bonus).
+function stealthAbilities(bonus) {
+    return [
+        { name: 'Strength', bonus: 4, skills: [] },
+        { name: 'Dexterity', bonus: 2, skills: [{ name: 'Stealth', bonus }] },
+        { name: 'Wisdom', bonus: 1, skills: [] },
+        { name: 'Constitution', bonus: 3, skills: [] },
+        { name: 'Intelligence', bonus: 0, skills: [] },
+        { name: 'Charisma', bonus: 0, skills: [] },
+    ];
 }
 
 describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () => {
@@ -195,5 +209,68 @@ describe('useCharActionsBaseActions — handleHideAction (base Hide lane)', () =
         await useCharActionsBaseActions(hooks).handleHideAction();
 
         expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expected, {});
+    });
+
+    // Exhaustion x listed-bonus combination matrix (2024 PHB Exhaustion: "When you
+    // make a D20 Test, the roll is reduced by 2 times your Exhaustion level",
+    // public/data/conditions.json; penalty produced at CharSheet.conditionEffects.js:277
+    // `exhausted = 2 * exhaustionLevel`). The exhaustionPenalty term must apply in
+    // EVERY branch — including when a listed abilities[].skills Stealth bonus exists
+    // (canonical combine mirrored from computeGrappleCheckBonus's `checkBonus -=
+    // exhaustionPenalty` after listed-or-fallback selection). basePlayerStats carries
+    // NO abilities[].skills Stealth entry, so every row above is bonus-absent; these
+    // rows are mutually distinguishable across (listed bonus, penalty):
+    // both-present, bonus-zero, bonus-negative, penalty-dominant, and
+    // listed-bonus-intact control.
+    it.each([
+        { name: 'listed bonus minus penalty (5 - 2)', listed: 5, exhaustionPenalty: 2, expected: 3 },
+        { name: 'listed bonus intact at zero penalty (5 - 0)', listed: 5, exhaustionPenalty: 0, expected: 5 },
+        { name: 'listed ZERO bonus still pays the penalty (0 - 2)', listed: 0, exhaustionPenalty: 2, expected: -2 },
+        { name: 'listed ZERO bonus at zero penalty stays zero (0 - 0)', listed: 0, exhaustionPenalty: 0, expected: 0 },
+        { name: 'listed negative bonus stacks with the penalty (-1 - 2)', listed: -1, exhaustionPenalty: 2, expected: -3 },
+        { name: 'penalty outweighs listed bonus into negative territory (2 - 4)', listed: 2, exhaustionPenalty: 4, expected: -2 },
+        { name: 'listed high bonus at max penalty (11 - 12)', listed: 11, exhaustionPenalty: 12, expected: -1 },
+        { name: 'bonus absent and penalty absent is zero (no listed skill)', listed: null, exhaustionPenalty: 0, expected: 0 },
+    ])(
+        'listed Stealth bonus and exhaustion penalty combine: $name',
+        async ({ listed, exhaustionPenalty, expected }) => {
+            const stats = listed === null
+                ? { ...basePlayerStats, abilities: basePlayerStats.abilities.map(a => ({ ...a, skills: [] })), skills: [] }
+                : { ...basePlayerStats, abilities: stealthAbilities(listed) };
+            const hooks = createHooks({
+                getRuntimeValue: grv({ lastAttack: { total: 18, d20: 12 } }),
+                playerStats: stats,
+                exhaustionPenalty,
+            });
+            await useCharActionsBaseActions(hooks).handleHideAction();
+
+            expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', expected, {});
+        }
+    );
+
+    // Sign-convention byte pin: a negative combined modifier flows into the popup/log
+    // template unchanged ('+ -2'), preserving the existing display shape.
+    it('renders the combined negative modifier byte-exact in popup and log (2 - 4 = -2)', async () => {
+        const srw = vi.fn().mockResolvedValue(undefined);
+        const hooks = createHooks({
+            getRuntimeValue: grv({ lastAttack: { total: 11, d20: 13 } }),
+            setRuntimeValue: srw,
+            playerStats: { ...basePlayerStats, abilities: stealthAbilities(2) },
+            exhaustionPenalty: 4,
+        });
+        await useCharActionsBaseActions(hooks).handleHideAction();
+
+        expect(mockRollSkillCheck).toHaveBeenCalledWith('Stealth', -2, {});
+        expect(mockSetPopupHtml).toHaveBeenCalledWith({
+            type: 'automation_info',
+            name: 'Hide',
+            description: 'Hide failed! (d20: 13 + -2 = 11) You remain visible.',
+        });
+        expect(mockAddEntry).toHaveBeenCalledWith(campaignName, {
+            type: 'ability_use',
+            characterName: 'TestFighter',
+            abilityName: 'Hide',
+            description: 'Stealth check: 11 (d20: 13 + -2) vs DC 15 — Failure. Did not gain the Invisible condition.',
+        });
     });
 });

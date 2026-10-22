@@ -71,7 +71,8 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
 
 // LIVE applyDamage: mutates the fixture's currentHp so aggregate damage landing on MULTIPLE
 // creatures is proven on the summary object itself, not on a call-args echo.
-vi.mock('../../../services/rules/combat/applyDamage.js', () => ({
+vi.mock('../../../services/rules/combat/applyDamage.js', async (importOriginal) => ({
+    ...await importOriginal(),
     computeDamageAfterSave: vi.fn((damage, success, dcSuccess) => {
         if (dcSuccess === 'half') return success ? Math.floor(damage / 2) : damage;
         return damage;

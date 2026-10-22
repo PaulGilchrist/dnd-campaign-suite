@@ -99,7 +99,11 @@ export default function useModalHandlers({
             const usedKey = `_${_damageTypeModifier.name.replace(/\s+/g, '_')}_usedRound`;
             setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(campaignName), campaignName);
         }
-        const newFormula = formula.replace(/\[[^\]]+\]/, `[${chosenType.toLowerCase()}]`);
+        // Guard (#1348): rewrite the bracket annotation ONLY when the modifier is present —
+        // absence means nothing was spent, so the displayed label must stay byte-untouched.
+        const newFormula = _damageTypeModifier
+            ? formula.replace(/\[[^\]]+\]/, `[${chosenType.toLowerCase()}]`)
+            : formula;
         setModalState({ damageTypeChoice: null });
         setPendingDamage(null);
         proceedWithDamage({ attack, formula: newFormula, total, rolls, modifier });

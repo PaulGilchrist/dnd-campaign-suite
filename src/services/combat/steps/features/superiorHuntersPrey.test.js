@@ -66,8 +66,11 @@ vi.mock('../../../encounters/combatData.js', () => ({
   loadCombatSummary: vi.fn(),
 }));
 
+// Faithful to the real async contract (applyDamage.js:991 resolves
+// {finalDamage, oldHp, newHp, ...} at :1052) — a sync mock would mask
+// a missing await at source :72 (fix#10r lesson).
 vi.mock('../../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(),
+  applyDamageToTarget: vi.fn(async () => ({})),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -140,7 +143,7 @@ describe('superiorHuntersPrey', () => {
     rollExpression.mockImplementation((formula) =>
       formula === '1d10' ? { total: 9, rolls: [9], modifier: 0, formula: '1d10' }
         : { total: 4, rolls: [4], modifier: 0, formula: '1d6' });
-    applyDamageToTarget.mockImplementation((_cs, _name, amount) => ({ finalDamage: amount, newHp: 1 }));
+    applyDamageToTarget.mockImplementation(async (_cs, _name, amount) => ({ finalDamage: amount, newHp: 1 }));
     addEntry.mockResolvedValue(undefined);
     loadCombatSummary.mockResolvedValue({ creatures: [] });
   });

@@ -1,8 +1,9 @@
 // @maintained-by-ai
 /* Lane — builder↔server delete/rename seam (EncounterBuilder.jsx:415-423, wired at :641-642).
  * OWNED HERE (per lane map #407/#409 — "KEEP those strongest"):
- *   • handleDeleteEncounter: prompts with the raw encounter name and dispatches
- *     deleteEncounterAction ONLY on confirmation (confirm/cancel twins folded it.each).
+ *   • handleDeleteEncounter: dispatches deleteEncounterAction(raw name) straight
+ *     through — unconfirmed since fix#410 (the leaf EncounterModal.jsx:55 owns the
+ *     single delete prompt; full-stack count pinned in delete-confirmation.test.jsx).
  *   • handleRenameEncounter: dispatches renameEncounterAction(oldName, newName)
  *     straight through — no second confirm, no delete side-effect.
  * NOT mocked-replicated here (#406/#407 pattern — former hand-written panel-replica
@@ -12,8 +13,9 @@
  * onDelete/onRename contract with the same aria-labels as the real modal and nothing
  * else. Modal internals (its own delete prompt, rename form, Enter-submit, sorting)
  * are owned by EncounterModal.test.jsx. The real modal is deliberately not mounted
- * here: it re-confirms deletes itself (EncounterModal.jsx:55) and its rename UI is
- * unreachable in 'load' mode, which would blur the builder-level pins below.
+ * here: its rename UI is unreachable in 'load' mode, which would blur the
+ * builder-level rename pin below (its delete prompt confirms exactly once since
+ * fix#410 — stacked-dialog regression is pinned in delete-confirmation.test.jsx).
  * Owned elsewhere — do NOT duplicate: sort/Join/save-modal commit/thresholds (#399
  * additional-interactions), XP summary (#400 gameplay-flows), localStorage/filter/bands
  * (#401 helpers), load hydrate/reconcile (#403 load-encounter), row chrome/clear-all
@@ -137,24 +139,23 @@ describe('EncounterBuilder - delete/rename server seam', () => {
     vi.restoreAllMocks();
   });
 
-  it.each([
-    { confirmed: true, expectedDispatches: 1 },
-    { confirmed: false, expectedDispatches: 0 },
-  ])('dispatches deleteEncounterAction $expectedDispatches time(s) when confirm returns $confirmed', async ({ confirmed, expectedDispatches }) => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(confirmed);
+  // Fix#410 (2026-10-22): the builder-side guard `if (window.confirm(...))` at old
+  // :424 was REMOVED — it stacked a second raw-name dialog behind the leaf modal's
+  // prompt (EncounterModal.jsx:55 owns confirmation; full-stack single-confirm is
+  // pinned by EncounterBuilder.delete-confirmation.test.jsx). This seam now pins the
+  // dispatcher contract, mirroring the rename passthrough below.
+  it('dispatches deleteEncounterAction straight through with the raw name, unconfirmed — the builder never re-confirms', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
     mountBuilder();
     await openLoadModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete test-encounter' }));
 
-    // Builder prompts with the RAW encounter name (its own guard at :416),
-    // then dispatches the raw name to the management hook on confirmation.
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy).toHaveBeenCalledWith('Delete "test-encounter"?');
-    expect(h.deleteEncounterAction).toHaveBeenCalledTimes(expectedDispatches);
-    if (expectedDispatches === 1) {
+    await waitFor(() => {
       expect(h.deleteEncounterAction).toHaveBeenCalledWith('test-encounter');
-    }
+    });
+    expect(h.deleteEncounterAction).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(h.renameEncounterAction).not.toHaveBeenCalled();
   });
 

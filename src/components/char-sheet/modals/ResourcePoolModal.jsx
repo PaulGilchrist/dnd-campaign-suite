@@ -219,6 +219,13 @@ function ResourcePoolModal({ playerStats, campaignName, automation, onClose }) {
       [`spell_slots_level_${archdruidTargetLevel}`]: Math.min(maxSlots[archdruidTargetLevel], currentSlots[archdruidTargetLevel] + 1),
     }
     setRuntimeBatch(name, updates, campaignName)
+    addEntry(campaignName, {
+      type: 'ability_use',
+      characterName: name,
+      abilityName: 'Nature Magician',
+      description: `${name} expended ${archdruidUses} Wild Shape use${archdruidUses > 1 ? 's' : ''} to regain a level ${archdruidTargetLevel} spell slot.`,
+      timestamp: Date.now(),
+    }).catch((e) => { console.error('[resourcePoolModal:log-error]', e) })
     onClose()
   }
 

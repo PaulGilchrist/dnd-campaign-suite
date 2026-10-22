@@ -230,7 +230,13 @@ describe('WeaponMasteryModal', () => {
 
     await renderModal();
 
-    await screen.findByText(/against.*Ogre/);
+    // Fixed form: target name renders as a real <b> element, no literal markup in text.
+    const prompt = await screen.findByText(/Choose a mastery property to activate/);
+    expect(prompt.textContent).toBe('Choose a mastery property to activate against Ogre:');
+    expect(prompt.textContent).not.toContain('<b>');
+    const boldTarget = prompt.querySelector('b');
+    expect(boldTarget).not.toBeNull();
+    expect(boldTarget.textContent).toBe('Ogre');
     expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Throg');
 
     await selectAndActivate('Advantage');

@@ -31,8 +31,7 @@ function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeF
                 }).catch((e) => { console.error("[HypnoticPatternShakeModal] Error:", e); });
             }
         } catch (e) {
-            console.error('[HypnoticPatternShake] Failed:', e);
-            throw e;
+            console.error('[HypnoticPatternShakeModal] Shake failed for target:', selected, e);
         }
 
         setProcessing(false);

@@ -4,6 +4,7 @@ import { sendSavePrompt } from '../../../../services/combat/conditions/savePromp
 import { addEntry } from '../../../../services/ui/logService.js';
 import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { getAllyList } from '../../../../hooks/useAllySelection.js';
+import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
@@ -110,7 +111,7 @@ function buildSaveResultRecord(targetName, success, detail) {
 }
 
 async function resolveNpcTarget({ campaignName, casterName, targetName, target, saveType, saveDc, heightenTarget, conditionList, conditionLabel, carefulSpellProtected, applyConditionsToTarget, registerConditionExpiry }) {
-    const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+    const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
     const saveRoll = heightenTarget === targetName ? Math.min(Math.floor(Math.random() * 20) + 1, Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
     const saveTotal = saveRoll + saveBonus;
     const success = saveTotal >= saveDc;

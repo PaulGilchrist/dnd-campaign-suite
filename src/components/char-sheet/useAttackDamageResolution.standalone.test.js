@@ -154,11 +154,12 @@ describe('resolveAttackDamageStandalone — pipeline seam', () => {
 });
 
 describe('resolveAttackDamageStandalone — proceedWithDamage minimalCtx at rollDamage seam', () => {
-    // KNOWN DEFECT (asymmetry, not masked): the hook-path proceedWithDamage minimalCtx
-    // (useAttackDamageResolution.js:371-383) omits isOpportunityAttack, so that branch
-    // can never carry the FT-101 OA marker to the rollDamage seam even though the
-    // standalone twin includes it (source:57). Pinned honestly below as the false
-    // default at this seam; OA-TRUE transport canon is .opportunity-transport.test.js.
+    // FT-101 PARITY FIXED (fix#OA-parity 2026-10-22): the hook-path proceedWithDamage
+    // minimalCtx (useAttackDamageResolution.js:369-383) previously omitted
+    // isOpportunityAttack while this standalone twin included it; the hook branch now
+    // mirrors this byte (`isOpportunityAttack: o.isOpportunityAttack || false`,
+    // same pendingCtxOverrides/ctxOverrides source). Hook-path pins live in
+    // .opportunity-transport.test.js; the false-default pin below stays intact.
     const innerAttack = { name: 'Rapier', damageType: 'piercing' };
     let rollDamage;
 

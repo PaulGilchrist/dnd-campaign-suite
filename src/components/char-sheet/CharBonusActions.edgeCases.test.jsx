@@ -267,6 +267,12 @@ describe('CharBonusActions - Edge Cases', () => {
       const stats = createStats({ attacks: [bonusActionAttack] });
       render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={vi.fn()} cannotAct={cannotAct} exhaustionPenalty={0} />);
 
+      // Call-site contract pin (run2 #12): useSimpleDamageRoll must receive the
+      // playerStats OBJECT — the hook re-reads .name internally, so passing the
+      // name string logged characterName: undefined.
+      const [statsArg] = vi.mocked(useSimpleDamageRoll).mock.calls[vi.mocked(useSimpleDamageRoll).mock.calls.length - 1];
+      expect(statsArg).toEqual(expect.objectContaining({ name: 'TestCharacter' }));
+
       const hitCell = screen.getByText('+5');
       expect(hitCell).toHaveClass('clickable');
       if (cannotAct) {

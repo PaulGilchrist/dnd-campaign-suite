@@ -369,4 +369,27 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
             );
         });
     });
+
+    describe('proceedWithDamage logging contract', () => {
+        // Regression pin for the removal of leftover unconditional per-pass
+        // [sw-debug] console.log litter in the hook-path proceedWithDamage
+        // (entry line + buildCtxSync .then line). Called DIRECTLY so the pin
+        // covers this seam only — sacredWeapon.js pipeline-step litter is a
+        // separate file, reported elsewhere, not owned here.
+        it('drives the rollDamage seam emitting zero [sw-debug] console bytes', async () => {
+            const logSpy = vi.spyOn(console, 'log');
+            const { hook, rollDamage } = UseAttackDamageResolution(basePlayerStats);
+
+            hook.proceedWithDamage({
+                attack: baseAttack, formula: '1d8+3', total: 11, rolls: [8],
+                modifier: 3, critLabels: {}, pipelineCtx: {},
+            });
+            await flush();
+
+            expect(rollDamage).toHaveBeenCalledTimes(1);
+            const litter = logSpy.mock.calls.filter(call =>
+                call.some(arg => String(arg).includes('[sw-debug]')));
+            expect(litter).toEqual([]);
+        });
+    });
 });

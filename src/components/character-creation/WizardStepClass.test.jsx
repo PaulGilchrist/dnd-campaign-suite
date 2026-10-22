@@ -2,6 +2,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import WizardStepClass from './WizardStepClass.jsx';
+import classesDisk5e from '../../../public/data/classes.json';
 
 // Fixtures are disk-faithful excerpts of public/data/classes.json (5e) and
 // public/data/2024/classes.json (descriptions are verbatim first-paragraph prefixes).
@@ -156,9 +157,19 @@ describe('WizardStepClass', () => {
       info: {
         'Hit Die': 'd12',
         'Saving Throws': 'STR, CON',
-        'Weapon Proficiencies': 'Light Armor, Medium Armor, Shields, Simple Weapons, Martial Weapons',
+        'Proficiencies': 'Light Armor, Medium Armor, Shields, Simple Weapons, Martial Weapons',
       },
-      absent: ['Tool Proficiencies'],
+      absent: ['Tool Proficiencies', 'Weapon Proficiencies'],
+    },
+    {
+      name: 'Wizard', ruleset: '5e', allClassesData: classes5e,
+      description: 'A scholarly magic-user capable of manipulating the structures of reality',
+      info: {
+        'Hit Die': 'd6',
+        'Saving Throws': 'INT, WIS',
+        'Proficiencies': 'Daggers, Quarterstaffs, Darts, Slings',
+      },
+      absent: ['Tool Proficiencies', 'Weapon Proficiencies'],
     },
     {
       name: 'Barbarian', ruleset: '2024', allClassesData: classes2024,
@@ -194,6 +205,20 @@ describe('WizardStepClass', () => {
     for (const label of absent) {
       expect(screen.queryByText(label)).not.toBeInTheDocument();
     }
+  });
+
+  // Disk-truth pin (public/data/classes.json, byte-exact via import — not retyped):
+  // 5e `proficiencies` carries mixed armor/shields/weapons/tools, so ClassDetailCard
+  // must render it under the honest flat label 'Proficiencies' (house precedent:
+  // CharSummary.jsx:275 and FeatItemDetails.jsx:50), never 'Weapon Proficiencies'.
+  it.each(['Fighter', 'Cleric', 'Rogue'])('5e %s: disk-mixed proficiencies render under exact label Proficiencies', (name) => {
+    const diskClass = classesDisk5e.find((c) => c.name === name);
+    renderStep({ name, allClassesData: classesDisk5e });
+    fireEvent.click(document.querySelector('.detail-card-header'));
+    expect(screen.getByText('Proficiencies')).toBeInTheDocument();
+    expect(screen.getByText(diskClass.proficiencies.join(', '))).toBeInTheDocument();
+    expect(screen.queryByText('Weapon Proficiencies')).not.toBeInTheDocument();
+    expect(screen.queryByText('Armor Training')).not.toBeInTheDocument();
   });
 
   it('toggle button cycles details collapsed → expanded → collapsed', () => {

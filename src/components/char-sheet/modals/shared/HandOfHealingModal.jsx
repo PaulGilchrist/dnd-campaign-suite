@@ -79,7 +79,7 @@ function PhysiciansTouchSection({ targetName, healName, monkName, campaignName, 
             characterName: targetName,
             condition: conditionName,
             action: 'broken',
-            sourceName: `${monkName} (${healName}`,
+            sourceName: `${monkName} (${healName})`,
             timestamp: Date.now(),
         }).catch((e) => { console.error("[HandOfHealingModal] Error:", e); });
 

@@ -170,13 +170,21 @@ function AreaEffectTargetModalBase({
     });
   }, [maxTargets]);
 
-  const allResolved = processing && pendingPrompts.length === 0 && results.length >= selected.size;
+  // Overlay consumers shadow the base selection with extraState.selected
+  // (spread onto ctxRef below — the same merged value renderBody/renderActions
+  // consume). Consult that effective value here: the base's own `selected`
+  // stays empty forever on those lanes, so reading it made
+  // `results.length >= selected.size` trivially true and flipped allResolved
+  // on the setProcessing(true) flush — committing empty-result summaries
+  // (#226 zero-row race).
+  const effectiveSelected = 'selected' in extraState ? extraState.selected : selected;
+  const allResolved = processing && pendingPrompts.length === 0 && results.length >= effectiveSelected.size;
 
   useEffect(() => {
     if (onAllResolved && allResolved) {
-      onAllResolved({ results, selected, processing, pendingPrompts });
+      onAllResolved({ results, selected: effectiveSelected, processing, pendingPrompts });
     }
-  }, [allResolved, onAllResolved, results, selected, processing, pendingPrompts]);
+  }, [allResolved, onAllResolved, results, effectiveSelected, processing, pendingPrompts]);
 
   const handleApplyOverrideRef = useRef(() => {});
   // eslint-disable-next-line server-first/no-local-game-state

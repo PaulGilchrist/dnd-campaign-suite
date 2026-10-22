@@ -6,14 +6,24 @@
  * pins cite it — formatEncounterName('dragon-lair') === 'Dragon Lair' while payloads
  * stay raw. MarkdownPreview is a lightweight stub (sanitize/markdown rendering is owned
  * by its own lane); this file only pins the `enc.description &&` conditional (:129).
- * KNOWN DEFECTS (#410, report-not-fix, pinned honestly here):
- *   1) :55 the modal confirms deletes itself; EncounterBuilder confirms first too, so
- *      users see two dialogs. Tests below pin the modal-side prompt ONLY — the
- *      builder-side confirm is owned by EncounterBuilder.uncovered-handlers.test.jsx.
- *   2) :95 the rename FORM renders only when prop mode==='rename', but the sole caller
- *      (EncounterBuilder.jsx:635, mode from useEncounterManagement) ever sets
- *      'save' | 'load' — :145's pen sets modal-local renameTarget which renders nothing.
- *      handleRename is dead in the prod UI, so no rename-mode tests live here.
+ * KNOWN DEFECTS (#410) — status:
+ *   1) FIXED fix#410 2026-10-22: :55 is now the SINGLE owner of the delete confirm.
+ *      EncounterBuilder.handleDeleteEncounter used to confirm again with the raw name
+ *      (two stacked dialogs per click); it is a straight dispatcher now. The
+ *      full-stack one-dialog-per-click pin lives in
+ *      EncounterBuilder.delete-confirmation.test.jsx; the builder no-re-confirm pin
+ *      lives in EncounterBuilder.uncovered-handlers.test.jsx.
+ *   2) FIXED fix#38 2026-10-22: :95 the rename FORM rendered only when prop
+ *      mode==='rename', but the sole caller (EncounterBuilder.jsx:647, mode from
+ *      useEncounterManagement — ever only 'save' | 'load') never set it, so :145's
+ *      pen set modal-local renameTarget which rendered nothing: handleRename dead in
+ *      the prod UI (pre-fix unreachable captured verbatim pass #410). Repair is the
+ *      render-side link the b0cab1579 pen+local-state+handler trio was designed with:
+ *      form (and seeded input) now also render on local renameTarget; the prop
+ *      mode==='rename' arm is preserved byte-equivalent for renameTargetProp consumers.
+ *      Prod-path pins below; full-stack campaign-exact bytes in
+ *      EncounterModal.rename-flow.test.jsx; rename stays no-confirm (fix#36 sibling
+ *      parity, builder handleRenameEncounter is a straight dispatcher).
  * The overlay (:61) has no onClick, so backdrop/content clicks structurally cannot
  * close — no vacuous "does not close" pins for them.
  * Owned elsewhere: builder Save-commit #399, load-hydrate #403, action seam #410. */
@@ -29,6 +39,7 @@ const mockOnClose = vi.fn();
 const mockOnSave = vi.fn(() => Promise.resolve());
 const mockOnLoad = vi.fn();
 const mockOnDelete = vi.fn();
+const mockOnRename = vi.fn(() => Promise.resolve());
 
 const createProps = (overrides = {}) => ({
     isOpen: true,
@@ -164,8 +175,8 @@ describe('EncounterModal', () => {
         expect(mockOnLoad).toHaveBeenCalledWith('dragon-lair');
     });
 
-    // Modal-side pin of the double-confirm defect #410: the builder confirms BEFORE
-    // calling onDelete, so users see this prompt as a SECOND dialog in prod.
+    // Fix#410: this modal-side prompt at :55 is the ONLY delete dialog — the leaf
+    // owns confirmation (house pattern); the builder's duplicate raw-name guard is gone.
     it('confirms deletes with the formatted name and calls onDelete with the raw name only when confirmed', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const encounters = [encounter('goblin-ambush'), encounter('dragon-lair')];
@@ -173,6 +184,7 @@ describe('EncounterModal', () => {
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Delete goblin-ambush' }));
         });
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
         expect(confirmSpy).toHaveBeenCalledWith('Delete "Goblin Ambush"?');
         expect(mockOnDelete).toHaveBeenCalledWith('goblin-ambush');
 
@@ -180,5 +192,111 @@ describe('EncounterModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Delete dragon-lair' }));
         expect(confirmSpy).toHaveBeenLastCalledWith('Delete "Dragon Lair"?');
         expect(mockOnDelete).toHaveBeenCalledTimes(1);
+    });
+
+    // ── fix#38 (#410): the pen at :145 is the production rename entry point.
+    // These render with EXACTLY the props the sole caller passes (mode 'load' from
+    // useEncounterManagement — never 'rename'): the pre-fix gate rendered nothing
+    // here (captured verbatim pre-fix: form absent, onRename never called).
+    describe('rename prod path — pen sets local renameTarget (fix#38)', () => {
+        const renameEncounters = () => [
+            encounter('goblin-ambush', { effectiveXP: 100 }),
+            encounter('dragon-lair', { effectiveXP: 1500 }),
+        ];
+
+        it('pen click in load mode opens the rename form pre-seeded with the raw name, titled Rename Encounter, list yielding', () => {
+            render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            expect(screen.getByRole('heading', { name: 'Rename Encounter' })).toBeInTheDocument();
+            expect(screen.queryByRole('heading', { name: 'Load Encounter' })).not.toBeInTheDocument();
+            const input = screen.getByLabelText('New Name');
+            expect(input).toHaveValue('goblin-ambush');
+            expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+            // Form replaces the list; handleRename's setRenameTarget(null) restores it.
+            expect(screen.queryByRole('button', { name: 'Load dragon-lair' })).not.toBeInTheDocument();
+            expect(mockOnRename).not.toHaveBeenCalled();
+        });
+
+        it('submit dispatches onRename(old, new.trim()) exactly once, closes the form, restores the list, closes nothing, confirms nothing', async () => {
+            const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+            render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
+            fireEvent.change(screen.getByLabelText('New Name'), { target: { value: '  Goblin Remix  ' } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+            });
+            expect(mockOnRename).toHaveBeenCalledTimes(1);
+            expect(mockOnRename).toHaveBeenCalledWith('dragon-lair', 'Goblin Remix');
+            // Rename lane is no-confirm: straight dispatch (fix#36 delete-ownership sibling parity).
+            expect(confirmSpy).not.toHaveBeenCalled();
+            // Honest post-commit shape per handleRename bytes: form gone, load list
+            // restored, modal itself stays open (only onClose callers close it).
+            expect(screen.queryByLabelText('New Name')).not.toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Load Encounter' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Load goblin-ambush' })).toBeInTheDocument();
+            expect(mockOnClose).not.toHaveBeenCalled();
+            expect(mockOnDelete).not.toHaveBeenCalled();
+        });
+
+        it('Enter submits the rename exactly once and trims', async () => {
+            render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            const input = screen.getByLabelText('New Name');
+            fireEvent.change(input, { target: { value: '  Goblin Remix  ' } });
+            await act(async () => {
+                fireEvent.keyDown(input, { key: 'Enter' });
+            });
+            expect(mockOnRename).toHaveBeenCalledTimes(1);
+            expect(mockOnRename).toHaveBeenCalledWith('goblin-ambush', 'Goblin Remix');
+            expect(screen.queryByLabelText('New Name')).not.toBeInTheDocument();
+        });
+
+        it.each(['', '   '])('blank new name "%s" shows the inline error, never dispatches, form stays open', async (value) => {
+            render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.change(screen.getByLabelText('New Name'), { target: { value } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+            });
+            expect(screen.getByText('New name is required')).toBeInTheDocument();
+            expect(mockOnRename).not.toHaveBeenCalled();
+            expect(screen.getByLabelText('New Name')).toBeInTheDocument();
+        });
+
+        it('a second pen click after commit retargets the form to the freshly seeded name', async () => {
+            render(<EncounterModal {...createProps({ mode: 'load', encounters: renameEncounters(), onRename: mockOnRename })} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Rename goblin-ambush' }));
+            fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'First Rename' } });
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+            });
+            expect(mockOnRename).toHaveBeenCalledWith('goblin-ambush', 'First Rename');
+            // List restored; take the OTHER row's pen this time.
+            fireEvent.click(screen.getByRole('button', { name: 'Rename dragon-lair' }));
+            expect(screen.getByLabelText('New Name')).toHaveValue('dragon-lair');
+        });
+    });
+
+    // Prop-mode arm preserved byte-equivalent by fix#38 (no prod caller uses it —
+    // consumer census: EncounterBuilder passes 'save'|'load' only). Prop key is
+    // renameTarget, destructured to the renameTargetProp alias at :6.
+    it('prop mode="rename" + renameTarget prop still renders the seeded form and dispatches with the prop name (:51 precedence intact)', async () => {
+        render(
+            <EncounterModal
+                {...createProps({
+                    mode: 'rename',
+                    renameTarget: encounter('old-prop'),
+                    onRename: mockOnRename,
+                })}
+            />
+        );
+        expect(screen.getByRole('heading', { name: 'Rename Encounter' })).toBeInTheDocument();
+        expect(screen.getByLabelText('New Name')).toHaveValue('old-prop');
+        fireEvent.change(screen.getByLabelText('New Name'), { target: { value: 'New Prop' } });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+        });
+        expect(mockOnRename).toHaveBeenCalledTimes(1);
+        expect(mockOnRename).toHaveBeenCalledWith('old-prop', 'New Prop');
     });
 });

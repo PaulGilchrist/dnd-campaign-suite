@@ -108,7 +108,11 @@ function clearCampaignEffectsWith(predicate, campaignName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const filtered = storedEffects.filter(predicate);
     if (filtered.length !== storedEffects.length) {
-        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName, true);
+        // 4-arg store call (useRuntimeState.js:78) — the clear originates on THIS
+        // client at the owner's local initiative roll, so it MUST POST to persist
+        // and broadcast. A 5th skipSync arg here was silently ignored (that flag
+        // belongs to setRuntimeObject's 4th position only) — do not re-add.
+        setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
     }
 }
 
@@ -163,16 +167,26 @@ function restoreCalmEmotions(playerName, campaignName) {
         const storedConditions = getRuntimeValue(effect.target, 'activeConditions') || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
         const lowerConditions = conditions.map(c => String(c).toLowerCase());
+        const restored = [...conditions];
         for (const suppressedCond of effect.suppressedConditions) {
             const lowerSuppressed = String(suppressedCond).toLowerCase();
             if (!lowerConditions.includes(lowerSuppressed)) {
-                setRuntimeValue(effect.target, 'activeConditions', [...conditions, suppressedCond], campaignName);
+                restored.push(suppressedCond);
+                lowerConditions.push(lowerSuppressed);
             }
+        }
+        if (restored.length !== conditions.length) {
+            // ONE merged write per effect-target (house §39 canon, mirrors the producer's
+            // merged write at calmEmotionsHandler.js:190-194): per-condition writes rebuilt
+            // from this effect's single snapshot let iteration 2 clobber iteration 1's
+            // restore for multi suppressedConditions (['Frightened','Charmed']).
+            setRuntimeValue(effect.target, 'activeConditions', restored, campaignName);
         }
     }
     const cleanedEffects = storedEffects.filter(te => !(te.effect === 'calm_emotions' && te.source === playerName));
     if (cleanedEffects.length !== storedEffects.length) {
-        setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName, true);
+        // 4-arg store call — local-origin clear, must POST (see clearCampaignEffectsWith).
+        setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
     }
     // Remove "Calm Emotions" activeBuffs from all creatures
     clearBuffsFromAllCreatures('Calm Emotions', campaignName);
@@ -325,9 +339,6 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
 
             // FT-007: Boon of Combat Prowess round latch + Stroke of Luck reset
             // are covered by buildInitiativeUpdates (batched at the end of handler).
-
-            // Clear Living Legend active state on initiative roll (new combat)
-            clearLivingLegend(playerStats.name, campaignName);
 
             // Clear Holy Nimbus active state on initiative roll (new combat)
             setRuntimeValue(playerStats.name, 'holyNimbusActive', null, campaignName);

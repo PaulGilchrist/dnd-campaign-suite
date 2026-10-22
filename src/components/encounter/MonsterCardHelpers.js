@@ -2526,9 +2526,20 @@ export function attackReactionSlamRow({ action, combatant }) {
 }
 
 export function attackReactionFoldCheck(slamRow) {
-  const attackBonus = Number(slamRow?.attack_bonus);
-  const formula = slamRow?.damage_dice_primary != null ? String(slamRow.damage_dice_primary) : null;
   if (!slamRow) return { reason: 'fold', message: 'no Slam row on the combatant — refused.' };
+  // MA-0286 fix#39 hinge: Number(null)===0 is FINITE, so the old isFinite-
+  // only guard let attack_bonus:null (and ''/whitespace) slip through and fold
+  // a false +0 auto-hit — the exact outcome :2518-2522 and MA-0286 (:560-566,
+  // "NO authored numeric attack_bonus must never expose a clickable damage chip
+  // … never bake a false +0 auto-hit") promise to refuse. Strict presence-
+  // before-coercion (house idiom: npcStatBlockUtils.js:23 trim-presence;
+  // monsterLegendaryUses.js:161 != null before isFinite): only an authored
+  // numeric literal folds — number or numeric-string, authored 0 INCLUDED
+  // (MA-0762 Gas Spore Touch arms attack_bonus:0: zero is a real bonus,
+  // absent is not). Missing/non-numeric bonus keeps the row unfolded.
+  const rawBonus = slamRow.attack_bonus;
+  const attackBonus = String(rawBonus ?? '').trim() !== '' ? Number(rawBonus) : NaN;
+  const formula = slamRow.damage_dice_primary != null ? String(slamRow.damage_dice_primary) : null;
   if (!Number.isFinite(attackBonus)) return { reason: 'fold', message: 'Slam attack_bonus is unfolded — summon via the cast path. Refused.' };
   if (!formula || !canRollExpression(formula)) return { reason: 'fold', message: `Slam damage "${formula}" is unfolded — no rollable dice. Refused.` };
   return { attackBonus, formula, damageType: slamRow.damage_type_primary || 'Bludgeoning' };

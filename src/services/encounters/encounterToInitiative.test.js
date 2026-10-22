@@ -159,6 +159,24 @@ describe('expandMonstersToCreatures', () => {
     })).toEqual({ str: 2, dex: 1, con: 5, int: 0, wis: 0, cha: 0 });
   });
 
+  // saveBonuses store contract (CLA-303): producer emits EXACTLY six
+  // lowercase-abbreviation keys. Readers normalize incoming saveType
+  // ('Dexterity' | 'DEX' | 'dex') into this shape via normalizeSaveType()
+  // from applyDamage.js. If this pin fails, fix the readers — do not
+  // retype it.
+  it('saveBonuses contract: exactly six lowercase-abbreviation keys, full-name bytes harvested to the canonical shape (#CLA-303 family)', () => {
+    const bonuses = getMonsterSaveBonuses({ saving_throws: { dex: { modifier: 7 } } });
+    expect(bonuses).toEqual({ str: 0, dex: 7, con: 0, int: 0, wis: 0, cha: 0 });
+    expect(Object.keys(bonuses).sort()).toEqual(['cha', 'con', 'dex', 'int', 'str', 'wis']);
+  });
+
+  it('harvests full-name-keyed saving_throws disk bytes (Adult Blue Dracolich shape) — no silent ability-modifier substitution', () => {
+    expect(getMonsterSaveBonuses({
+      saving_throws: { dexterity: { modifier: 6 }, constitution: { modifier: 12 }, wisdom: { modifier: 8 }, charisma: { modifier: 10 } },
+      ability_score_modifiers: { str: 1, dex: 2, con: 3, int: 4, wis: 5, cha: 6 },
+    })).toEqual({ str: 1, dex: 6, con: 12, int: 4, wis: 8, cha: 10 });
+  });
+
   it.each([
     ['Bestial Spirit', 21, 10],
     ['Fey Spirit', 20, 10],

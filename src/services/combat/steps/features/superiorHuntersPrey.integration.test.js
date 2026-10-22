@@ -45,8 +45,11 @@ vi.mock('../../../dice/diceRoller.js', () => ({
   ),
 }));
 
+// Async mock — real applyDamageToTarget is async (applyDamage.js:991); a
+// sync mock masked the source's missing await at :72 (exact pins below are
+// the regression guard: finalDamage/spread bytes go undefined without await).
 vi.mock('../../../rules/combat/applyDamage.js', () => ({
-  applyDamageToTarget: vi.fn(() => ({ finalDamage: 4, newHp: 1 })),
+  applyDamageToTarget: vi.fn(async () => ({ finalDamage: 4, newHp: 1 })),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({

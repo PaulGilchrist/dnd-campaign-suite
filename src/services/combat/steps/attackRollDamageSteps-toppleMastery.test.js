@@ -7,13 +7,13 @@
 // announces a save_result (success:null), and on a failed save applies prone via the REAL
 // addCondition + stamps activeConditionMeta (handleToppleFailure :638-661). Save-driven, not
 // auto-on-hit: a saved target stays untouched. Topple must be baseMastery — extra/choice-list
-// Topple still refuses (:679). masteryDone (:711-721) is the terminal { _pipelineComplete:true }.
+// Topple still refuses (:679). masteryDone (:711-726) is the terminal { _pipelineComplete:true } riding 'mastery:done'.
 // Consulted bytes census: getRuntimeValue('campaign','lastAttack',campaign); collectWeaponMastery(
 // lastAttack.attackName, playerStats) — NOT ctx.attack.name (byte-source swap pinned in t3);
 // writes via addCondition: setRuntimeValue(target,'activeConditions',[...,'prone']) + 'activeConditionMeta'.
 // Never calls applyMasteryEffect (weaponMasteryHandler owns that lane — weaponMasteryHandler.test.js).
 // Family map — cited, not re-pinned here:
-// - Structure (name / subscribe 'tactical:done' / emit 'mastery:done' / masteryDone 'cleave:check'
+// - Structure (name / subscribe 'tactical:done' / emit 'mastery:done' / masteryDone 'mastery:done'
 //   -> 'pipeline:complete' / index order): attackRollDamageSteps.test.js structure lane (:228-247 owner).
 // - Tactical-master auto-apply exclusion of Topple: attackRollDamageSteps-tacticalMaster.test.js (#1036).
 // - Cleave offer/resolve: attackRollDamageSteps-cleaveMastery.test.js (#1031).

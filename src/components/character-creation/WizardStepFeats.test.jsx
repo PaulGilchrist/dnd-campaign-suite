@@ -203,17 +203,73 @@ describe('WizardStepFeats', () => {
     }
   });
 
-  // Pins CURRENT wiring defect: "Add Another" routes through SelectableList's generic
-  // toggle, which REMOVES all instances of an already-selected repeatable instead of
-  // adding one. When the defect is fixed this pin must flip to expect another copy added.
-  it('Add Another currently re-toggles instead of adding — clicking it drops the whole repeatable selection', () => {
+  // FIXED pin (was: honest-flip documenting the defect that "Add Another" routed
+  // through SelectableList's generic toggle, which REMOVED all instances of an
+  // already-selected repeatable — pre-fix capture: feats ['Magic Initiate',
+  // 'Ability Score Improvement'] + one click dispatched ['Magic Initiate'], i.e.
+  // the single ASI instance dropped to 0). Add Another now appends one instance
+  // directly via onArrayFieldChange; the checkbox onToggle lane (above) keeps its
+  // remove-all semantics untouched.
+  it('Add Another appends exactly one instance at the end, leaving other feats bytes and order untouched', () => {
     const onArrayFieldChange = vi.fn();
     renderComponent({
       formData: { ...baseFormData(), feats: ['Magic Initiate', 'Ability Score Improvement'] },
       onArrayFieldChange,
     });
     fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
-    expect(onArrayFieldChange).toHaveBeenCalledWith('feats', ['Magic Initiate']);
+    expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
+    expect(onArrayFieldChange).toHaveBeenCalledWith('feats', ['Magic Initiate', 'Ability Score Improvement', 'Ability Score Improvement']);
+  });
+
+  it('Add Another is never destructive: each click across re-renders increments the count by exactly one', () => {
+    const onArrayFieldChange = vi.fn();
+    const { rerender } = renderComponent({
+      formData: { ...baseFormData(), feats: ['Ability Score Improvement'] },
+      onArrayFieldChange,
+    });
+
+    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
+    expect(onArrayFieldChange).toHaveBeenLastCalledWith('feats', ['Ability Score Improvement', 'Ability Score Improvement']);
+
+    rerender(
+      <WizardStepFeats
+        stepNumber={8}
+        formData={{ ...baseFormData(), feats: ['Ability Score Improvement', 'Ability Score Improvement'] }}
+        allFeats={DISK_FEATS}
+        onArrayFieldChange={onArrayFieldChange}
+        preSelectedFeats={[]}
+      />,
+    );
+    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
+    expect(onArrayFieldChange).toHaveBeenCalledTimes(2);
+    expect(onArrayFieldChange).toHaveBeenLastCalledWith('feats', ['Ability Score Improvement', 'Ability Score Improvement', 'Ability Score Improvement']);
+  });
+
+  it('Add Another on a pre-selected repeatable feat appends (only non-repeatables lack the control)', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats: ['Ability Score Improvement'] },
+      preSelectedFeats: ['Ability Score Improvement'],
+      onArrayFieldChange,
+    });
+    fireEvent.click(featRow('Ability Score Improvement').querySelector('.add-another-btn'));
+    expect(onArrayFieldChange).toHaveBeenCalledTimes(1);
+    expect(onArrayFieldChange).toHaveBeenCalledWith('feats', ['Ability Score Improvement', 'Ability Score Improvement']);
+  });
+
+  // Render-gate verdict: RepeatableFeatActions returns null unless isRepeatable &&
+  // isSelected, so the append path is unreachable for non-repeatable feats — hidden,
+  // per existing control logic (no new visibility rules invented).
+  it('non-repeatable feats never render Add Another, so the append click path cannot fire for them', () => {
+    const onArrayFieldChange = vi.fn();
+    renderComponent({
+      formData: { ...baseFormData(), feats: ['Alert', 'Lucky'] },
+      onArrayFieldChange,
+    });
+    ['Alert', 'Lucky'].forEach((name) => {
+      expect(featRow(name).querySelector('.add-another-btn')).toBeNull();
+    });
+    expect(onArrayFieldChange).not.toHaveBeenCalled();
   });
 
   it('summarizes computedBuffs by category, filtering "any" ASI choices, and omits the section when everything is empty', () => {

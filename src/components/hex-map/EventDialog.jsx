@@ -57,7 +57,7 @@ function EventDialog({ event, rerollsRemaining, onAccept, onSkip, onReroll }) {
                 <span className="event-encounter-xp">{event.encounter.totalXP} XP</span>
               </div>
               <ul className="event-monster-list">
-                {event.encounter.monsters.map((m, i) => (
+                {event.encounter.monsters?.map((m, i) => (
                   <li key={i} className="event-monster-item">
                     <i className="fa-solid fa-skull"></i>
                     <span className="event-monster-qty">{m.qty}x</span>

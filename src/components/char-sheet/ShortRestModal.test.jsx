@@ -32,16 +32,20 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollDice: vi.fn((count, _die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
 }));
 
-// Producer shapes mirrored from restRules-constants.js: labels are plain strings
-// (restRules-constants.js:41), computeHitDieRecovery clamps at 1, SHORT_REST_RESOURCES
-// are runtime keys.
-vi.mock('../../services/rules/effects/restRules.js', () => ({
-  getHitDieSize: vi.fn(() => 8),
-  computeHitDieRecovery: vi.fn((roll, conBonus) => Math.max(1, roll + conBonus)),
-  SHORT_REST_RESOURCES: ['channelDivinityCharges', 'wildShapeUses'],
-  getShortRestResourceLabels: vi.fn(() => ['Channel Divinity']),
-  applyShortRest: vi.fn(async () => ({})), // no celestialResilienceAllies → picker never opens
-}));
+// REAL static-data producer for labels: passthrough to restRules-constants.js
+// (the canned ['Channel Divinity'] array previously here coincidentally matched a
+// plain Cleric but lied for every other fixture class). Labels are plain strings
+// (restRules-constants.js:41); getShortRestResourceLabels stays a spy so lanes can
+// still override once. Dice/rest math/applyShortRest remain deterministic stand-ins.
+vi.mock('../../services/rules/effects/restRules.js', async () => {
+  const constants = await import('../../services/rules/effects/restRules-constants.js');
+  return {
+    getHitDieSize: vi.fn(() => 8),
+    computeHitDieRecovery: vi.fn((roll, conBonus) => Math.max(1, roll + conBonus)),
+    getShortRestResourceLabels: vi.fn((playerStats) => constants.getShortRestResourceLabels(playerStats)),
+    applyShortRest: vi.fn(async () => ({})), // no celestialResilienceAllies → picker never opens
+  };
+});
 
 // Level-5 bard/sorcerer stand-in: song d6, full sorcery pool 5.
 vi.mock('../../services/character/classFeatures.js', () => ({
@@ -341,11 +345,10 @@ describe('ShortRestModal', () => {
       expect(restLogs).toHaveLength(1);
       expect(restLogs[0].message).toContain('Thorin takes a short rest.');
       expect(restLogs[0].message).toContain('Hit Dice: 0 used');
-      // KNOWN DEFECT (ShortRestModal.jsx:175-179): getShortRestResourceLabels returns
-      // strings (restRules-constants.js:41) but collectRestoredResources looks up r.key,
-      // so the producer's 'Channel Divinity' can NEVER reach this log line.
-      // This pin documents broken behavior — flip to toContain when the defect is fixed.
-      expect(restLogs[0].message).not.toContain('Channel Divinity');
+      // FIXED (was ShortRestModal.jsx:175-179 dead branch): getShortRestResourceLabels
+      // returns strings (restRules-constants.js:41); collectRestoredResources now consumes
+      // them directly, so the producer's 'Channel Divinity' reaches this log line.
+      expect(restLogs[0].message).toContain('Resources restored: Channel Divinity');
     });
 
     it('writes the exact sorcery pool and consumes the use on completion', async () => {

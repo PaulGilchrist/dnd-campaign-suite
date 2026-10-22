@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { rollExpression } from '../../../services/dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { computeDamageAfterSave, computeDamageAfterResistancesWithDetails, applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { computeDamageAfterSave, computeDamageAfterResistancesWithDetails, applyDamageToTarget, normalizeSaveType } from '../../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 import { getAffectedCreatures } from '../../../services/rules/combat/aoeService.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
@@ -394,7 +394,7 @@ function ElementalAttunementModal({ action, playerStats, campaignName, mapName, 
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+            const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
 
             if (isNpc) {
                 const saveRoll = Math.floor(Math.random() * 20) + 1;

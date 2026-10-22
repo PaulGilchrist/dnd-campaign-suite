@@ -6,6 +6,7 @@ import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import { storeSpellLastAttack, addTargetResult } from '../../../../services/automation/common/damageRollback.js';
 import { addExpiration } from '../../../../services/rules/effects/expirations.js';
 import { prepareSpellCast, isFreeCastAuthorized } from '../../../../services/rules/spells/spellPreparationService.js';
+import { normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import CreatureSelectionModal from './CreatureSelectionModal.jsx';
 import { persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 import { logConditionApplied, logSaveResultEntry } from './saveResultLogging.js';
@@ -90,7 +91,7 @@ function MassSuggestionModal({
             if (!target) continue;
 
             const isNpc = target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+            const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
 
             if (isNpc) {
                 const saveRoll = Math.floor(Math.random() * 20) + 1;

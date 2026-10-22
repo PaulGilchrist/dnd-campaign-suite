@@ -31,7 +31,10 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasTwoWeaponFighting: vi.fn(),
 }));
 
-vi.mock('../../services/rules/combat/applyDamage.js', () => ({
+// fix#10r spread: un-mocked applyDamage exports stay real for the unmocked
+// steps/index.js transitive graph (partial-mock Proxy holes hazard).
+vi.mock('../../services/rules/combat/applyDamage.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     applyDamageToTarget: vi.fn(),
 }));
 
@@ -39,7 +42,10 @@ vi.mock('../../services/rules/core/attackCalc.js', () => ({
     parseMagicItemName: vi.fn((name) => ({ baseName: name })),
 }));
 
-vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', () => ({
+// fix#10r spread: automation/index (real, via applyDamage) reads `handle`
+// from this module — partial-mock Proxy hole eval-throw (CalmEmotions precedent).
+vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     executeAttackRiderManeuver: vi.fn(),
     applyManeuveringAllyGrant: vi.fn(),
 }));
@@ -200,29 +206,40 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
     });
 
     it.each([
-        { branch: 'null modalPayload', payload: null, mutatesBeforeThrow: false },
+        { branch: 'null modalPayload', payload: null },
         {
             branch: 'payload without maneuver',
             payload: { targetName: TARGET, description: 'Test description' },
-            // Honest pin: modal close + flag latch execute BEFORE the
-            // maneuver.automation access throws (validation-after-mutation).
-            mutatesBeforeThrow: true,
         },
-    ])('rejects on invalid payload ($branch)', async ({ payload, mutatesBeforeThrow }) => {
+        {
+            branch: 'maneuver without automation.options',
+            payload: { maneuver: { name: 'Brutal Strike' }, targetName: TARGET, description: 'Test description' },
+        },
+    ])('rejects on invalid payload ($branch) with ZERO mutation — latch never minted, modal stays open', async ({ payload }) => {
         const { resume, resumeRef } = stashAtManeuvers();
         const { api, deps } = Harness({ resumeRef });
+        // Faithful store, #1517-null-canon: real Map-backed runtime state —
+        // reads reflect exactly what writes minted; unwritten keys stay dark
+        // (null on read, absent from the ledger).
+        const store = new Map();
+        getRuntimeValue.mockImplementation((key, prop) => store.get(`${key}:${prop}`) ?? null);
+        setRuntimeValue.mockImplementation((key, prop, value) => { store.set(`${key}:${prop}`, value); });
 
+        // Rejection consumed without escape — same TypeError shape as the
+        // destructure at :555 always had, now raised by the hoisted lookup.
         await expect(api.handleAttackRiderOptionSelect('Some Option', payload))
             .rejects.toThrow(TypeError);
 
+        // Exact runtime-state negative: the brutal-strike latch was NEVER
+        // written (fix: validation precedes close+latch — stuck-latch gone).
+        expect(store.has(`${CHAR}:_brutalStrikeActive`)).toBe(false);
+        expect(store.has(`${CHAR}:_brutalStrikeEffects`)).toBe(false);
+        expect([...store.keys()]).toEqual([]);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        // Modal state unchanged: zero setModalState writes — the options
+        // modal stays open on invalid input (no close-before-reject).
+        expect(deps.setModalState).not.toHaveBeenCalled();
         expect(resume).not.toHaveBeenCalled();
         expect(deps.setPopupHtml).not.toHaveBeenCalled();
-        if (mutatesBeforeThrow) {
-            expect(deps.setModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
-            expect(setRuntimeValue).toHaveBeenCalledTimes(2);
-        } else {
-            expect(deps.setModalState).not.toHaveBeenCalled();
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        }
     });
 });

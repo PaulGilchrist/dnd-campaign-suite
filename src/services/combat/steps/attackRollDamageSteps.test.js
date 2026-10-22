@@ -52,12 +52,14 @@ const GOLDEN_STEPS = [
   ['overchannel', 'dmg_type:modified', 'damage:ready'],
   ['proceedToDamage', 'damage:ready', 'damage:applied'],
   ['stalkersFlurryPostDamage', 'damage:applied', 'cleave:check'],
-  // Mastery tail: 'cleave:check' has TWO subscribers by design (idx 20 chooser,
-  // idx 23 terminal), and topple's 'mastery:done' is terminal — pinned as-is.
+  // Mastery tail: 'cleave:check' has ONE live subscriber in the single-path runner
+  // (idx 20 chooser — idx 23 previously rode 'cleave:check' too but was unreachable:
+  // steps.find never returns it after the chooser consumes the event). masteryDone now
+  // rides topple's 'mastery:done' so pipeline:complete fires strictly after mastery.
   ['cleaveMastery', 'cleave:check', 'cleave:done'],
   ['tacticalMaster', 'cleave:done', 'tactical:done'],
   ['toppleMastery', 'tactical:done', 'mastery:done'],
-  ['masteryDone', 'cleave:check', 'pipeline:complete'],
+  ['masteryDone', 'mastery:done', 'pipeline:complete'],
 ];
 
 describe('buildAttackRollDamageSteps — composition contract', () => {

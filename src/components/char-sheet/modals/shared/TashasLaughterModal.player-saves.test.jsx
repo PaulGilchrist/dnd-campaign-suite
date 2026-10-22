@@ -305,15 +305,15 @@ describe('TashasLaughterModal - Player Saves', () => {
         await waitFor(() => {
             expect(saveResultsFor('PlayerAlly')).toHaveLength(1);
         });
-        // NOTE (reported source defect, TashasLaughterModal.jsx:40): the
-        // description omits the bonus only when it is exactly 0, so a missing
-        // bonus leaks "+ undefined". Numeric fields still default to 0.
+        // Fixed (TashasLaughterModal.jsx:40): a missing bonus coalesces to 0
+        // before the omit-plus guard (house form, savePrompt.js:148 — bonus
+        // coalesced at savePrompt.js:66), so the term is omitted, never "+ undefined".
         expect(saveResultsFor('PlayerAlly')[0]).toMatchObject({
             success: false,
             roll: 0,
             total: 0,
             saveBonus: 0,
-            description: 'PlayerAlly failed WIS save (DC 14, rolled 0 + undefined = 0) and is Prone and Incapacitated.',
+            description: 'PlayerAlly failed WIS save (DC 14, rolled 0 = 0) and is Prone and Incapacitated.',
         });
         // The failure leg still lands with the sparse detail.
         expect(conditionWritesFor('PlayerAlly')).toHaveLength(1);

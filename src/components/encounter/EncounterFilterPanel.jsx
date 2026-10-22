@@ -3,12 +3,13 @@ import './EncounterBuilder.css';
 function EncounterFilterPanel({
   filter,
   onDifficultyChange,
-  onEnvironmentChange: _onEnvironmentChange,
+  onEnvironmentChange,
   onAddPlayer,
   onRemovePlayer,
   onPlayerLevelChange,
+  environmentOptions = [],
 }) {
-  const { difficulty, playerLevels, totalThreshold, difficultyIndex, difficultyLabels, difficultyColors } = filter;
+  const { difficulty, playerLevels, totalThreshold, environment, difficultyIndex, difficultyLabels, difficultyColors } = filter;
 
   const thresholdColor = difficultyColors && difficultyColors[difficultyIndex]
      ? difficultyColors[difficultyIndex]
@@ -35,7 +36,23 @@ function EncounterFilterPanel({
          </select>
        </div>
 
-        {/* Player Levels */}
+       {/* Environment Dropdown */}
+       <div>
+         <label className="encounter-label" htmlFor="environment-select">Environment</label>
+         <select
+          id="environment-select"
+          className="encounter-select"
+          value={environment || ''}
+          onChange={onEnvironmentChange}
+         >
+           <option value="">All Environments</option>
+           {environmentOptions.map(env => (
+             <option key={env} value={env}>{env.charAt(0).toUpperCase() + env.slice(1)}</option>
+           ))}
+         </select>
+       </div>
+
+         {/* Player Levels */}
        <div>
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
            <span className="encounter-label" style={{ marginBottom: 0 }}>Party</span>

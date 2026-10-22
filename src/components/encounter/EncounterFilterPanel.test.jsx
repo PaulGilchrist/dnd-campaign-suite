@@ -3,18 +3,29 @@
 // callback payloads. Filter STATE / filterMonsters lives in EncounterBuilder.helpers
 // (#401); builder-level filter-change dispatch wiring lives in builder lanes
 // (#399/#403/#406/#407) — do not duplicate those here.
-// NOTE (verified): EncounterFilterPanel.jsx:6 receives onEnvironmentChange but renders
-// NO environment control, so no env callback prop is even passed in this fixture.
+// NOTE (fixed 2026-10-22): the environment dropdown removed in b0b431903 (filter-row
+// refactor kept Type/Size/CR in the table but dropped Environment with no replacement)
+// is restored here; options arrive via the environmentOptions prop, disk-derived from
+// /data/monsters.json in EncounterBuilder (see EncounterBuilder.helpers.test.jsx lane).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
 
 // Fixture mirrors the props EncounterBuilder.jsx passes verbatim
 // (difficultyLabels at EncounterBuilder.jsx:20, colors at :581).
+// environmentOptions mirrors the sorted unique set derived from /data/monsters.json
+// (verified 2026-10-22 via python: 12 values incl. 'planar', absent from the
+// retired hardcoded ENVIRONMENTS list — disk-derived, never retyped).
+const DISK_ENVIRONMENTS = [
+  'arctic', 'coastal', 'desert', 'forest', 'grassland', 'hill',
+  'mountain', 'planar', 'swamp', 'underdark', 'underwater', 'urban',
+];
+
 const defaultFilter = {
   difficulty: 2,
   playerLevels: [5, 5],
   totalThreshold: 600,
+  environment: 'forest',
   difficultyIndex: 2,
   difficultyLabels: ['Easy', 'Medium', 'Hard', 'Deadly'],
   difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
@@ -27,9 +38,11 @@ describe('EncounterFilterPanel', () => {
     props = {
       filter: defaultFilter,
       onDifficultyChange: vi.fn(),
+      onEnvironmentChange: vi.fn(),
       onAddPlayer: vi.fn(),
       onRemovePlayer: vi.fn(),
       onPlayerLevelChange: vi.fn(),
+      environmentOptions: DISK_ENVIRONMENTS,
     };
   });
 
@@ -65,6 +78,49 @@ describe('EncounterFilterPanel', () => {
     // restores the select to the unchanged prop value after dispatch.
     fireEvent.change(select, { target: { value: '3' } });
     expect(emitted).toEqual(['3']);
+  });
+
+  it('renders the environment select (accessible name "Environment") with the All Environments default, exact-value options mirroring the difficulty sibling, reflecting the current filter.environment', () => {
+    render(<EncounterFilterPanel {...props} />);
+    const select = screen.getByRole('combobox', { name: 'Environment' });
+    const options = select.querySelectorAll('option');
+    // 1 blank "All" sentinel + every disk-derived value, verbatim and sorted.
+    expect(options).toHaveLength(DISK_ENVIRONMENTS.length + 1);
+    expect([...options].map((o) => [o.value, o.textContent])).toEqual([
+      ['', 'All Environments'],
+      ['arctic', 'Arctic'],
+      ['coastal', 'Coastal'],
+      ['desert', 'Desert'],
+      ['forest', 'Forest'],
+      ['grassland', 'Grassland'],
+      ['hill', 'Hill'],
+      ['mountain', 'Mountain'],
+      ['planar', 'Planar'],
+      ['swamp', 'Swamp'],
+      ['underdark', 'Underdark'],
+      ['underwater', 'Underwater'],
+      ['urban', 'Urban'],
+    ]);
+    // Controlled reflection, same fidelity as the difficulty select.
+    expect(select).toHaveValue('forest');
+  });
+
+  it('emits onEnvironmentChange with the exact option bytes and follows new filter.environment props', () => {
+    const emitted = [];
+    props.onEnvironmentChange = vi.fn((e) => emitted.push(e.target.value));
+    const { rerender } = render(<EncounterFilterPanel {...props} />);
+
+    // Same read-inside-handler pattern as the difficulty select: the panel is
+    // controlled, so React restores the unchanged prop value after dispatch.
+    fireEvent.change(screen.getByRole('combobox', { name: 'Environment' }), { target: { value: 'planar' } });
+    expect(emitted).toEqual(['planar']);
+
+    rerender(<EncounterFilterPanel {...props} filter={{ ...props.filter, environment: 'planar' }} />);
+    expect(screen.getByRole('combobox', { name: 'Environment' })).toHaveValue('planar');
+
+    // The blank sentinel resets the filter to "all".
+    fireEvent.change(screen.getByRole('combobox', { name: 'Environment' }), { target: { value: '' } });
+    expect(emitted).toEqual(['planar', '']);
   });
 
   it('renders no party rows for an empty party, and pins the remove button disabled with one player left', () => {

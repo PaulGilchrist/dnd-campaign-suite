@@ -237,7 +237,7 @@ describe('ResourcePoolModal archdruid conversion', () => {
     expect(getSlotRows().length).toBe(4);
   });
 
-  it('converts one use into a level 2 slot (from the runtime value), spends the use, and closes', () => {
+  it('converts one use into a level 2 slot (from the runtime value), spends the use, logs Nature Magician, and closes', () => {
     setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_2: 1 });
     const { handleClose } = renderModal(makePlayerStats(), ARCH);
 
@@ -251,9 +251,38 @@ describe('ResourcePoolModal archdruid conversion', () => {
       }),
       'test-campaign'
     );
-    // Honest pin: unlike Wild Resurgence fwd/rev, Nature Magician currently logs nothing.
-    expect(logService.addEntry).not.toHaveBeenCalled();
+    // Full-payload equality: Nature Magician conversions must log like the fwd/rev handlers do.
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'Druid1',
+      abilityName: 'Nature Magician',
+      description: 'Druid1 expended 1 Wild Shape use to regain a level 2 spell slot.',
+      timestamp: expect.any(Number),
+    });
     expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('logs the plural use count when converting more than one Wild Shape use', () => {
+    setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_2: 1, spell_slots_level_4: 1 });
+    const stats = makePlayerStats({
+      spellAbilities: {
+        ...makePlayerStats().spellAbilities,
+        spell_slots_level_4: 1,
+      },
+    });
+    renderModal(stats, ARCH);
+
+    const row2 = getSlotRows()[1]; // 2 uses -> level 4
+    fireEvent.click(row2.querySelector('input[type="radio"]'));
+    fireEvent.click(screen.getByRole('button', { name: /Convert 2 Wild Shape.*Level 4 Slot/i }));
+
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', {
+      type: 'ability_use',
+      characterName: 'Druid1',
+      abilityName: 'Nature Magician',
+      description: 'Druid1 expended 2 Wild Shape uses to regain a level 4 spell slot.',
+      timestamp: expect.any(Number),
+    });
   });
 
   it('does not convert into a level with no available slots', () => {
@@ -270,6 +299,7 @@ describe('ResourcePoolModal archdruid conversion', () => {
     fireEvent.click(button);
 
     expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    expect(logService.addEntry).not.toHaveBeenCalled();
     expect(handleClose).not.toHaveBeenCalled();
   });
 });

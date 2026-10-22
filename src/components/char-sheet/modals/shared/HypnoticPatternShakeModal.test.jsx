@@ -149,4 +149,43 @@ describe('HypnoticPatternShakeModal', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('recovers from a rejected shake automation: logs, clears the processing state, closes, and never rethrows', async () => {
+    const err = new Error('shake automation boom');
+    executeHandler.mockRejectedValue(err);
+    const onClose = vi.fn();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let unhandledReason = null;
+    const probe = (event) => { unhandledReason = event.reason; };
+    window.addEventListener('unhandledrejection', probe);
+    try {
+      render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
+      fireEvent.click(screen.getAllByRole('radio')[0]);
+      fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
+
+      // Processing message shows while the (doomed) automation is in flight.
+      expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
+
+      // Rejection must unstick the modal: processing text gone, onClose called exactly once.
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+      expect(screen.queryByText('Shaking target free...')).not.toBeInTheDocument();
+
+      // Flush microtasks so an escaping rejection would have been reported to the probe.
+      await act(async () => { await Promise.resolve(); });
+      expect(unhandledReason).toBeNull();
+
+      // Actionable console.error bytes: modal name + target + error, and no log entry on failure.
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[HypnoticPatternShakeModal] Shake failed for target:',
+        'Orc Warrior',
+        err
+      );
+      expect(addEntry).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('unhandledrejection', probe);
+      errorSpy.mockRestore();
+    }
+  });
 });

@@ -3,7 +3,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { setTempHp } from '../../services/automation/handlers/buffs/tempHpService.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
-import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels, applyShortRest } from '../../services/rules/effects/restRules.js'
+import { getHitDieSize, computeHitDieRecovery, getShortRestResourceLabels, applyShortRest } from '../../services/rules/effects/restRules.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js'
 import { addEntry } from '../../services/ui/logService.js'
@@ -170,12 +170,24 @@ function buildNaturalRecoveryDetail(playerStats, naturalRecoveryApplied, natural
     return null;
 }
 
+// Labels in restRules-constants SHORT_REST_RESOURCE_LABELS whose keys are NOT in
+// SHORT_REST_RESOURCES — applyShortRest's getShortRestResources null loop
+// (restRules-shortRest.js) does not re-arm them unconditionally; their recovery is
+// conditional there and their labels ride the dedicated honest collectors below
+// (secondWindUses → collectFighterResourceLabel, naturalRecoverySlots →
+// buildNaturalRecoveryDetail, arcaneRecoveryLevels → pushRequestedRestorationLabel).
+// Strings byte-verified against restRules-constants.js:17,24,25. New SHORT_REST_
+// RESOURCE_LABELS entries keyed OUTSIDE SHORT_REST_RESOURCES must be added here.
+const CONDITIONALLY_RESTORED_LABELS = ['Second Wind', 'Natural Recovery (Spell Slots)', 'Arcane Recovery (Spell Slots)'];
+
 function collectRestoredResources(playerStats, campaignName, ctx) {
     const restoredResources = [];
-    const resourceLabels = getShortRestResourceLabels(playerStats);
-    SHORT_REST_RESOURCES.forEach(key => {
-        const label = resourceLabels.find(r => r.key === key);
-        if (label) restoredResources.push(label.label);
+    // getShortRestResourceLabels returns STRINGS (restRules-constants.js:41) already
+    // filtered to this character's classes — consume them directly. The former keyed
+    // `.find(r => r.key === key)` over a SHORT_REST_RESOURCES loop could never match,
+    // silently dropping every base-class restored-resource label from the log.
+    getShortRestResourceLabels(playerStats).forEach(label => {
+        if (!CONDITIONALLY_RESTORED_LABELS.includes(label)) restoredResources.push(label);
     });
     collectClassResourceLabels(playerStats, campaignName, restoredResources);
     collectFeatureRestorationLabels(playerStats, campaignName, ctx, restoredResources);

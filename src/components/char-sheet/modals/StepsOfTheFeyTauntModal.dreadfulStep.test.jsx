@@ -5,8 +5,9 @@
 // touches applyDamageToTarget). Choice-step copy lives in render.test.jsx,
 // overlay/close seams and the free-cast skip in integration.test.jsx, no-uses
 // blocking in noUses.test.jsx.
-// Note: handleSkip mislabels this lane "Taunting Step" in normal mode —
-// reported source bug; un-pinned here (only correct substrings asserted).
+// handleSkip derives its modeLabel from the user's choice (fix: was derived
+// from the modal's mode, mislabeling this lane "Taunting Step" in normal
+// mode); the skip result copy is pinned here to exact bytes.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
@@ -119,8 +120,14 @@ describe('StepsOfTheFeyTauntModal - Dreadful Step', () => {
             expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
         });
         const body = screen.getByText('Done').closest('.sp-modal').querySelector('.sp-body');
-        expect(body.textContent).toContain('No targets selected');
-        expect(body.textContent).toContain('3 remaining');
+        // Fix pin: modeLabel derives from the skipped CHOICE ('dreadful'),
+        // not the modal's mode — exact bytes of the full result description.
+        expect(body.textContent).toBe(
+            'Steps of the Fey: Cast Misty Step without expending a spell slot (3 remaining).Dreadful Step: No targets selected.'
+        );
+        expect(body.innerHTML).toBe(
+            'Steps of the Fey: Cast Misty Step without expending a spell slot (3 remaining).<br><br><b>Dreadful Step:</b> No targets selected.'
+        );
         expect(createSaveListener).not.toHaveBeenCalled();
     });
 

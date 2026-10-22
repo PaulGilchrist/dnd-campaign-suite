@@ -147,7 +147,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         for (const targetName of targets) {
             const target = combatSummary.creatures.find(c => c.name === targetName);
             const isNpc = !target || target.type === 'npc';
-            const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
+            const saveBonus = target?.saveBonuses?.[normalizeSaveType(saveType).toLowerCase()] ?? 0;
 
             if (isNpc) {
                 lastNpcResult = resolveHealNpcTarget({ combatSummary, campaignName, featureName, attackerName, saveDc, saveType, damageExpression, damageType, characters, targetName, saveBonus });

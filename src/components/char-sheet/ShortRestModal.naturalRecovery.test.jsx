@@ -23,15 +23,17 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollDice: vi.fn((count, _die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
 }));
 
-// Producer shapes mirrored from restRules-constants.js: labels are strings,
-// computeHitDieRecovery clamps at 1. This lane never asserts rest math.
-vi.mock('../../services/rules/effects/restRules.js', () => ({
-  getHitDieSize: vi.fn(() => 8),
-  computeHitDieRecovery: vi.fn((roll, conBonus) => Math.max(1, roll + conBonus)),
-  SHORT_REST_RESOURCES: ['channelDivinityCharges', 'wildShapeUses'],
-  getShortRestResourceLabels: vi.fn(() => []),
-  applyShortRest: vi.fn(async () => ({})), // no celestialResilienceAllies -> picker never opens
-}));
+// REAL static-data producer for labels (restRules-constants.js passthrough — labels are
+// strings, restRules-constants.js:41). This lane never asserts rest math.
+vi.mock('../../services/rules/effects/restRules.js', async () => {
+  const constants = await import('../../services/rules/effects/restRules-constants.js');
+  return {
+    getHitDieSize: vi.fn(() => 8),
+    computeHitDieRecovery: vi.fn((roll, conBonus) => Math.max(1, roll + conBonus)),
+    getShortRestResourceLabels: vi.fn((playerStats) => constants.getShortRestResourceLabels(playerStats)),
+    applyShortRest: vi.fn(async () => ({})), // no celestialResilienceAllies -> picker never opens
+  };
+});
 
 vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({})),

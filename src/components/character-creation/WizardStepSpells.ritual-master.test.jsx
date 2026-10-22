@@ -100,4 +100,47 @@ describe('WizardStepSpells — FT-068 Ritual Master wiring', () => {
     expect(screen.queryByTestId('ritual-master-modal')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit Ritual Spells/ })).not.toBeInTheDocument();
   });
+
+  // Fix#34 (pass #394): WizardStepSpells.jsx:105 counted with .length on a raw
+  // payload — a STRING 'Alarm' (single-value disk/feature shape, live-verified)
+  // yielded 'Alarm'.length = 5 -> bogus 'Edit Ritual Spells (5)' banner post-close.
+  // Cardinality verdict: producer RitualMasterModal.jsx:37 writes arrays only;
+  // disk row public/campaigns/test-campaign/HexWarlock.json:135 is an array; a
+  // string payload is a SINGLE spell, never a comma-list (no join-writer exists;
+  // consumer spellCalc2024.js:407/488 normalizes non-array without splitting).
+  it('counts a single-value STRING payload as 1 spell, not its character count', () => {
+    render(<WizardStepSpells {...makeProps({
+      feats: ['Ritual Master'],
+      ritualMasterSpells: 'Alarm',
+    })} />);
+
+    // String fails the auto-open guard's Array.isArray check — modal opens first;
+    // closing it (the live sequence) must show the banner with count 1.
+    fireEvent.click(screen.getByRole('button', { name: 'CloseRitualModal' }));
+    expect(screen.queryByTestId('ritual-master-modal')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Ritual Spells (5)' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Ritual Spells (1)' })).toBeInTheDocument();
+  });
+
+  it.each([
+    { label: 'empty string', spells: '' },
+    { label: 'absent', spells: undefined },
+  ])('shows no banner once closed with an empty/absent payload ($label)', ({ spells }) => {
+    const formData = spells === undefined
+      ? { feats: ['Ritual Master'] }
+      : { feats: ['Ritual Master'], ritualMasterSpells: spells };
+    render(<WizardStepSpells {...makeProps(formData)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'CloseRitualModal' }));
+    expect(screen.queryByRole('button', { name: /Edit Ritual Spells/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the array cardinality exact for the multi-spell shape (2 spells -> (2))', () => {
+    render(<WizardStepSpells {...makeProps({
+      feats: ['Ritual Master'],
+      ritualMasterSpells: ['Alarm', 'Detect Magic'],
+    })} />);
+
+    expect(screen.getByRole('button', { name: 'Edit Ritual Spells (2)' })).toBeInTheDocument();
+  });
 });

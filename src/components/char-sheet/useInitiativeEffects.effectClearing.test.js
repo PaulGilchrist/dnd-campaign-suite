@@ -135,15 +135,17 @@ describe('useInitiativeEffects - wholesale campaign targetEffects sweep', () => 
         rollInitiative();
 
         // One write per table key, shrinking byte-exactly in table order; every
-        // call pins campaign scoping and the skipSync=true flag (5th arg).
+        // call pins campaign scoping with the exact 4-arg store signature
+        // (useRuntimeState.js:78) — a 5th arg is ignored by the callee and must
+        // never reappear; these clears originate locally and must POST/broadcast.
         expect(teWrites()).toEqual([
-            ['campaign', TE, [SURVIVOR, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR, CAGE, ANTI, REGEN, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR, ANTI, REGEN, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR, REGEN, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR, BEACON], campaignName, true],
-            ['campaign', TE, [SURVIVOR], campaignName, true],
+            ['campaign', TE, [SURVIVOR, BLUR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, GLOBE, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, CAGE, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, ANTI, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, REGEN, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR, BEACON], campaignName],
+            ['campaign', TE, [SURVIVOR], campaignName],
         ]);
     });
 

@@ -358,12 +358,10 @@ export default function useAttackDamageResolution({
     let pendingCtxOverrides = {};
 
     const proceedWithDamage = ({ attack, formula, total, rolls, modifier, critLabels, pipelineCtx }) => {
-        console.log('[sw-debug] proceedWithDamage attack.damageType=', attack?.damageType, 'formula=', formula);
         if (buildCtxSync) {
             // WM-008: damage-phase ctx rebuild must NOT consume one-shot attack te.
             (mapName ? buildCtx(attack, { consumeAttackTe: false }) : buildCtxSync(attack, { consumeAttackTe: false })).then(ctx => {
                 const merged = mergeDamagePipelineCtx(ctx, pendingCtxOverrides, pipelineCtx);
-                console.log('[sw-debug] rollDamage ctx.damageType=', merged.damageType);
                 rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: { ...merged, ...critLabels } });
             }).catch((e) => { console.error("[useAttackDamageResolution] Error:", e); });
         } else {
@@ -380,6 +378,9 @@ export default function useAttackDamageResolution({
                 saveType: o.saveType || null,
                 dcSuccess: o.dcSuccess || null,
                 tavernBrawlerRerolls: pipelineCtx?.tavernBrawlerRerolls || null,
+                // FT-101 parity (standalone twin :57): OA marker must reach the plain-damage
+                // seam — the handlePlainDamage Sentinel (Halt) gate reads context.isOpportunityAttack.
+                isOpportunityAttack: o.isOpportunityAttack || false,
             };
             rollDamage({ name: attack.name, formula: formula, total: total, rolls: rolls, modifier: modifier, context: minimalCtx });
         }
@@ -552,6 +553,12 @@ export default function useAttackDamageResolution({
 
     const handleAttackRiderOptionSelect = async (optionName, modalPayload) => {
         const { maneuver, targetName, description } = modalPayload;
+        // Validate-before-mutate (house order — cf. resumeAttackPipeline :511-514,
+        // guards first, mutations last): resolving the option throws on a
+        // maneuver-less payload BEFORE the modal close + brutal-strike latch,
+        // so an invalid payload can never strand _brutalStrikeActive stuck true.
+        const option = maneuver.automation.options.find(o => o.name === optionName);
+
         setModalState({ attackRiderOptionsModal: null });
 
         // Set brutal strike flags for damage step processing
@@ -559,7 +566,6 @@ export default function useAttackDamageResolution({
         await setRuntimeValue(playerStats.name, '_brutalStrikeEffects', [optionName], campaignName);
 
         // Apply immediate effects (push, speed reduction, etc.)
-        const option = maneuver.automation.options.find(o => o.name === optionName);
         let logDescription = description;
         if (option) {
             if (option.effect === 'push_15ft' && targetName) {

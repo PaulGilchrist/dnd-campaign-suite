@@ -2,7 +2,9 @@
 // Refreshing Step lane: confirmation copy + Cancel round-trip (chooser restored,
 // inert until confirmed) and the accept dispatch with Math.random pinned — exact
 // setTempHp payload (d10 bounds), exact decrement write with freeCastCountKey
-// present, exact result copy, Done closes. The null-freeCastCountKey guard is
+// present, exact campaign-log entry (free cast + THP outcome — previously unlogged,
+// violating the app-wide "every automation must log" rule), exact result copy,
+// Done closes. The null-freeCastCountKey guard is
 // owned by integration.test.jsx; chooser copy by render.test.jsx; zero-use
 // gating by noUses.test.jsx; other steps' payloads by their own lane files.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -10,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import StepsOfTheFeyTauntModal from './StepsOfTheFeyTauntModal.jsx';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../services/ui/logService.js';
 import { setTempHp } from '../../../services/automation/handlers/buffs/tempHpService.js';
 
 // Honest savePrompt mock: source calls createSaveListener(campaignName, opts) —
@@ -89,9 +92,10 @@ describe('StepsOfTheFeyTauntModal - Refreshing Step', () => {
         expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
 
-        // Inert before confirmation — nothing applied, no result view.
+        // Inert before confirmation — nothing applied, no log, no result view.
         expect(setTempHp).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -100,6 +104,7 @@ describe('StepsOfTheFeyTauntModal - Refreshing Step', () => {
         expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
         expect(setTempHp).not.toHaveBeenCalled();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
         expect(baseProps.onClose).not.toHaveBeenCalled();
     });
 
@@ -121,6 +126,19 @@ describe('StepsOfTheFeyTauntModal - Refreshing Step', () => {
         expect(setTempHp).toHaveBeenCalledWith('FeyTrickster', tempHp, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledTimes(1);
         expect(setRuntimeValue).toHaveBeenCalledWith('FeyTrickster', 'stepsRemaining', expectedRemaining, 'test-campaign');
+        // Regression: the resolution must log to the campaign log exactly once
+        // with full bytes (app rule "every automation must log"); the temp-HP
+        // and decrement writes precede the log.
+        expect(addEntry).toHaveBeenCalledTimes(1);
+        expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+            type: 'ability_use',
+            characterName: 'FeyTrickster',
+            abilityName: 'Refreshing Step',
+            description: `FeyTrickster cast Misty Step for free via ${featureName} — no spell slot consumed — teleporting up to 30 feet to an unoccupied space they can see (GM-positioned). Refreshing Step: FeyTrickster gained ${tempHp} Temporary Hit Points.`,
+            timestamp: expect.any(Number),
+        });
+        expect(setTempHp.mock.invocationCallOrder.at(-1)).toBeLessThan(addEntry.mock.invocationCallOrder.at(-1));
+        expect(setRuntimeValue.mock.invocationCallOrder.at(-1)).toBeLessThan(addEntry.mock.invocationCallOrder.at(-1));
         expect(document.querySelector('.sp-body').innerHTML).toBe(
             `${featureName}: Cast Misty Step without expending a spell slot (${expectedRemaining} remaining).<br><br><b>Refreshing Step:</b> Gained ${tempHp} Temporary Hit Points.`
         );

@@ -261,7 +261,7 @@ describe('HandOfHealingModal', () => {
   });
 
   describe('condition log entry', () => {
-    it('posts a condition log entry (pins current sourceName with unclosed paren — known bug)', async () => {
+    it('posts a condition log entry with complete sourceName label', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
       await waitFor(() => {
@@ -278,9 +278,7 @@ describe('HandOfHealingModal', () => {
         characterName: 'Goblin',
         condition: 'Blinded',
         action: 'broken',
-        // KNOWN SOURCE BUG (HandOfHealingModal.jsx: missing closing paren):
-        // honest pin — update to 'Monk1 (Monk)' with closing paren when fixed.
-        sourceName: 'Monk1 (Monk',
+        sourceName: 'Monk1 (Monk)',
       });
       expect(body.timestamp).toBeTypeOf('number');
     });

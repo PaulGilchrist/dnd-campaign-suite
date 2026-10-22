@@ -49,7 +49,11 @@ function jackOfAllTradesStealthAdjust(playerStats) {
 function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
     const ce = conditionEffects || {};
     const stealthSkill = findStealthSkill(playerStats);
-    let stealthBonus = stealthSkill?.bonus ?? 0 - exhaustionPenalty;
+    // 2024 PHB Exhaustion: every d20 test is reduced by the exhaustion penalty
+    // (CharSheet.conditionEffects: exhausted = 2 * exhaustionLevel). The penalty
+    // subtracts unconditionally AFTER the listed-or-zero bonus is selected —
+    // mirrors computeGrappleCheckBonus's `checkBonus -= exhaustionPenalty`.
+    let stealthBonus = (stealthSkill?.bonus ?? 0) - exhaustionPenalty;
     const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
     if (ce.wisCheckReplace && isCharismaSkill) {
         stealthBonus = resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty);

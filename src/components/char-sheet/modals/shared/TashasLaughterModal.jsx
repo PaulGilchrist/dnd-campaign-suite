@@ -37,7 +37,7 @@ function buildLaughterSaveResultEntry({ casterName, targetName, saveDc, saveType
         roll: detail.roll ?? 0,
         total: detail.total ?? 0,
         saveBonus: detail.saveBonus ?? 0,
-        description: `${targetName} ${success ? 'succeeded on' : 'failed'} ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${detail.saveBonus !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})${success ? '' : ' and is Prone and Incapacitated.'}`,
+        description: `${targetName} ${success ? 'succeeded on' : 'failed'} ${saveType} save (DC ${saveDc}, rolled ${detail.roll ?? 0}${(detail.saveBonus ?? 0) !== 0 ? ' + ' + detail.saveBonus : ''} = ${detail.total ?? 0})${success ? '' : ' and is Prone and Incapacitated.'}`,
         timestamp: Date.now(),
     };
 }

@@ -13,7 +13,10 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
     if (mode === 'save') {
       setName('');
       setError('');
-    } else if (mode === 'rename' && renameTarget) {
+    } else if (renameTarget) {
+      // Fix#38 (#410): the pen (:145) sets modal-local renameTarget while the
+      // sole caller's prop mode stays 'load' — seed the form from local state so
+      // the rename UI is reachable in the prod path (was mode === 'rename' only).
       setNewName(renameTarget.name);
       setError('');
     }
@@ -63,8 +66,8 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
         <div className="encounter-modal-header">
           <h3>
             {mode === 'save' && 'Save Encounter'}
-            {mode === 'load' && 'Load Encounter'}
-            {mode === 'rename' && 'Rename Encounter'}
+            {mode === 'load' && !renameTarget && 'Load Encounter'}
+            {(mode === 'rename' || renameTarget) && 'Rename Encounter'}
           </h3>
           <button className="encounter-modal-close" onClick={onClose} aria-label="Close">
             &times;
@@ -92,7 +95,9 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
             </div>
           )}
 
-          {mode === 'rename' && (
+          {/* Fix#38 (#410): reachable via local renameTarget (pen click) OR prop
+              mode==='rename' (prop path preserved for renameTargetProp consumers). */}
+          {(mode === 'rename' || renameTarget) && (
             <div className="encounter-modal-rename">
               <label htmlFor="encounter-rename">New Name</label>
               <input
@@ -109,7 +114,7 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
             </div>
           )}
 
-          {mode === 'load' && (
+          {mode === 'load' && !renameTarget && (
             <div className="encounter-modal-load">
               {loading ? (
                 <div className="encounter-modal-loading">Loading...</div>

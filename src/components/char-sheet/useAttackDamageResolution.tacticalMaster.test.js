@@ -192,6 +192,8 @@ describe('useAttackDamageResolution — Tactical Mastery choice→resume complet
         saveType: null,
         dcSuccess: null,
         tavernBrawlerRerolls: null,
+        // fix#OA-parity: else-branch minimalCtx now carries the FT-101 OA marker (false default here).
+        isOpportunityAttack: false,
       },
     });
 

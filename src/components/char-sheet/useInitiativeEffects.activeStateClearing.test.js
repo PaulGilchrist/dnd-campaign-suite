@@ -167,6 +167,26 @@ describe('useInitiativeEffects - active state clearing', () => {
         });
     });
 
+    it('clears Living Legend exactly once per initiative roll (single setRuntimeValue per key)', () => {
+        renderHookWithStats();
+        dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+
+        // Regression pin: the handler once invoked clearLivingLegend twice in
+        // the same straight-line pass (copy-paste seam from 1c54eb4f2, folded
+        // into two identical clearLivingLegend calls by 0bf564099), doubling
+        // these writes and their SSE broadcast. Exactly one of each, byte-exact.
+        const legendWrites = allWrites().filter(
+            ([, key]) => key === 'livingLegendActive'
+        );
+        const strikeWrites = allWrites().filter(
+            ([, key]) => key === 'unerringStrikeUsed'
+        );
+        expect(legendWrites).toHaveLength(1);
+        expect(strikeWrites).toHaveLength(1);
+        expect(legendWrites[0]).toEqual(['TestMonk', 'livingLegendActive', null, campaignName]);
+        expect(strikeWrites[0]).toEqual(['TestMonk', 'unerringStrikeUsed', null, campaignName]);
+    });
+
     it('removes vow_of_enmity from the target creature and clears vow state', () => {
         getRuntimeValue.mockImplementation((name, key) => {
             if (key === 'vowOfEnmityTarget' && name === 'TestMonk') return 'EnemyTarget';

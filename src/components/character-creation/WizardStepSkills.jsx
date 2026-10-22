@@ -251,12 +251,10 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ stepNumber, form
 			return;
 		}
 
-		// Elevating to expertise
-		if (!(formData.skillProficiencies || []).includes(skill)) {
-			showExpertiseFeedbackFor(`Please select ${skill} as proficient first`);
-			return;
-		}
-
+		// Elevating to expertise. Non-proficient skills never reach this handler:
+		// the Elevate control is disabled until proficient and its tooltip carries
+		// the 'Select proficient first' feedback (expertiseButtonTitle). The old
+		// guard branch here was unreachable dead code (#391 verdict-b, cf74986e7).
 		const blockReason = getExpertiseBlockReason(skill, expertiseData, expertiseLimits);
 		if (blockReason) {
 			showExpertiseFeedbackFor(blockReason);

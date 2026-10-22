@@ -11,9 +11,17 @@ import { sweepNewCombatClocks } from '../rules/effects/zoneDurationClock.js';
 export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
   const bonuses = {};
-  for (const [abbr] of Object.entries(map)) {
-    if (monster.saving_throws?.[abbr]?.modifier != null) {
-      bonuses[abbr] = monster.saving_throws[abbr].modifier;
+  // OUTPUT contract: exactly six lowercase-abbreviation keys (CLA-303) —
+  // hardcoded readers (applyDamage, sleepHandler, npcStatBlockUtils,
+  // npcClickFormHandlers round-trip) all key off this shape; saveType
+  // callers normalize to it via normalizeSaveType(). INPUT saving_throws
+  // rows are split-shape on disk (58 rows 'dex', 16 rows 'dexterity' —
+  // e.g. Adult Blue Dracolich): read both so a real save modifier is never
+  // silently replaced by the raw ability modifier.
+  for (const [abbr, full] of Object.entries(map)) {
+    const saves = monster.saving_throws?.[abbr] ?? monster.saving_throws?.[full.toLowerCase()];
+    if (saves?.modifier != null) {
+      bonuses[abbr] = saves.modifier;
     } else if (monster.ability_score_modifiers?.[abbr] != null) {
       bonuses[abbr] = monster.ability_score_modifiers[abbr];
     } else {

@@ -1,3 +1,0 @@
-src/services/ui/storage.test.js
-src/services/ui/utils.test.js
-src/services/ui/youtubePlayer.test.js

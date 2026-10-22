@@ -19,13 +19,19 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollDice: vi.fn((count, _die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
 }));
 
-vi.mock('../../services/rules/effects/restRules.js', () => ({
-  getHitDieSize: vi.fn(() => 8),
-  computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
-  SHORT_REST_RESOURCES: ['channelDivinityCharges', 'wildShapeUses'],
-  getShortRestResourceLabels: vi.fn(() => []),
-  applyShortRest: vi.fn(async () => ({})),
-}));
+// REAL static-data producer: getShortRestResourceLabels passes through
+// restRules-constants.js untouched (canned [] mocks masked the :175-179 dead-branch
+// defect — the producer returns STRINGS, restRules-constants.js:41). Only dice and
+// applyShortRest stay stubbed for determinism.
+vi.mock('../../services/rules/effects/restRules.js', async () => {
+  const constants = await import('../../services/rules/effects/restRules-constants.js');
+  return {
+    getHitDieSize: vi.fn(() => 8),
+    computeHitDieRecovery: vi.fn((roll, conBonus) => roll + conBonus),
+    getShortRestResourceLabels: vi.fn((playerStats) => constants.getShortRestResourceLabels(playerStats)),
+    applyShortRest: vi.fn(async () => ({})),
+  };
+});
 
 vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({})),
@@ -151,8 +157,25 @@ describe('ShortRestModal - Completion Flow', () => {
     expect(message).toContain('Thorin takes a short rest.');
     expect(message).toContain('Hit Dice: 1d8 (4→6) = 6 HP recovered');
     expect(message).toContain('Current HP: 30 → 36');
-    // Plain Cleric with nothing restored — nothing may claim a resource line.
-    expect(message).not.toContain('Resources restored');
+    // Plain Cleric: channelDivinityCharges IS in SHORT_REST_RESOURCES (applyShortRest
+    // null re-arm), so the real producer label is an honest claim, not a phantom.
+    expect(message).toContain('Resources restored: Channel Divinity');
+    // Features the Cleric does not own must never appear.
+    expect(message).not.toContain('Second Wind');
+    expect(message).not.toContain('Arcane Recovery');
+  });
+
+  // Producer-shaped completion pin (test-maintain-bugs plan): plain Cleric through the
+  // REAL constants producer must expose 'Channel Divinity' in the message layer.
+  // Pre-fix this was RED — collectRestoredResources keyed find over string output
+  // never matched and the resources line was absent entirely.
+  it('plain Cleric completion exposes the producer base-class label in the restored-resources line', async () => {
+    renderModal();
+    await completeRest();
+
+    const { message } = shortRestEntry();
+    expect(message).toContain('Hit Dice: 0 used');
+    expect(message).toContain('Resources restored: Channel Divinity');
   });
 
   it('logs a zero-dice rest honestly and every resting feature label in one completion', async () => {
@@ -175,43 +198,42 @@ describe('ShortRestModal - Completion Flow', () => {
       desc: 'logs Second Wind for a Fighter below max',
       stats: { class: { name: 'Fighter', major: { name: 'Fighter' }, class_levels: [{ level: 5, second_wind: 1 }] } },
       runtime: { secondWindUses: 0 },
-      label: 'Second Wind',
-      want: true,
+      // Real producer labels: ['Second Wind','Action Surge']; 'Action Surge' rides the
+      // unconditional SHORT_REST_RESOURCES re-arm, 'Second Wind' the conditional collector.
+      resources: 'Action Surge, Second Wind',
     },
     {
       desc: 'omits Second Wind when the Fighter is already at max',
       stats: { class: { name: 'Fighter', major: { name: 'Fighter' }, class_levels: [{ level: 5, second_wind: 1 }] } },
       runtime: { secondWindUses: 1 },
-      label: 'Second Wind',
-      want: false,
+      resources: 'Action Surge',
+      absent: 'Second Wind',
     },
     {
       desc: 'logs Rage for a 2024 Barbarian below max',
       stats: { rules: '2024', class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ level: 5, rages: 2 }] } },
       runtime: { ragePoints: 0 },
-      label: 'Rage (2024)',
-      want: true,
+      resources: 'Rage (2024)',
     },
     {
       desc: 'omits Rage for a 5e Barbarian (2024-only gate)',
       stats: { rules: '5e', class: { name: 'Barbarian', major: { name: 'Barbarian' }, class_levels: [{ level: 5, rages: 2 }] } },
       runtime: { ragePoints: 0 },
-      label: 'Rage (2024)',
-      want: false,
+      resources: null,
     },
-  ])('$desc', async ({ stats, runtime, label, want }) => {
+  ])('$desc', async ({ stats, runtime, resources, absent }) => {
     setupGetRuntimeValue(runtime);
     renderModal(stats);
     await completeRest();
 
     const { message } = shortRestEntry();
     expect(message).toContain('takes a short rest.');
-    if (want) {
-      expect(message).toContain(`Resources restored: ${label}`);
+    if (resources) {
+      expect(message).toContain(`Resources restored: ${resources}`);
     } else {
-      expect(message).not.toContain(label.split(' (')[0]);
       expect(message).not.toContain('Resources restored');
     }
+    if (absent) expect(message).not.toContain(absent);
   });
 
   // CLA-145: the Font of Inspiration label must ride applyShortRest's write output,
