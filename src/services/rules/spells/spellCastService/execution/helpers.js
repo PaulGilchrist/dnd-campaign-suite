@@ -62,14 +62,25 @@ function applyHexEffects(spell, playerStats, campaignName, targetName, ability) 
 
     setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
 
-    // CLA-107: arm ONE merged remove_target_effect clock (§37 hours×600 — Hex
-    // is concentration, up to 1 hour) so both hex tes clear on duration
-    // expiry; concentration-break purges them via cleanupConcentrationEffects.
+    // CLA-107 / #1497 (fix#108 mirror): arm ONE merged remove_target_effect
+    // expiry so both hex tes clear at the combat boundaries. Hex is
+    // 'Concentration, up to 1 hour' (2024 spells.json:7143, concentration:true)
+    // — authored ≥1 minute is COMBAT-SCOPED per the NO-CLOCK duration policy;
+    // the old §37 hours×600 (rounds:600) fabricated round countdown is retired.
+    // Canonical combat-scoped stamp: rounds Infinity + until: 'combat'
+    // (zoneDurationClock.js:102; fix#108 twin at spiritualWeaponService.js:107)
+    // — no round seam matures it (processExpirationList: appliedRound+Infinity
+    // never expires), sweepCombatScopedExpirations drains it at the rest seams
+    // (restRules-shortRest/longRest → sweepRestClocks, zoneDurationClock.js:139),
+    // clearAllExpirationEffects (initiativeProcessing.js:36) unconditionally
+    // drains the caster store at every new initiative roll, and
+    // cleanupConcentrationEffects purges the tes on a concentration break —
+    // concentration stays concentration, never a clock.
     const expiryEffects = [{ type: 'remove_target_effect', effectKey: 'hex_ability_check_disadvantage', source: playerStats.name, target: targetName }];
     if (hasEldritchHex) {
         expiryEffects.push({ type: 'remove_target_effect', effectKey: 'hex_save_disadvantage', source: playerStats.name, target: targetName });
     }
-    addExpiration({ attackerName: playerStats.name, targetName, effects: expiryEffects, campaignName, rounds: 600 });
+    addExpiration({ attackerName: playerStats.name, targetName, effects: expiryEffects, campaignName, rounds: Infinity, until: 'combat' });
 }
 
 async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {
@@ -217,15 +228,22 @@ function powerWordHealDamage({ combatSummary, targetName, playerStats, campaignN
     }));
 }
 
-function powerWordHealConditions(targetName, campaignName) {
-    const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
+// #1481 validate-before-mutate (fix#22 lineage, useAttackDamageResolution.js
+// :511-:514 hoist class): hoisted out of powerWordHealConditions so the cast
+// REFUSES an invalid activeConditions payload BEFORE powerWordHealDamage's
+// heal + log + popup dispatch — never again "HP restored, then throw".
+function validateActiveConditions(targetName, campaignName) {
     // SP-002 sibling: a target with no activeConditions key has nothing to strip — [] is empty, not fatal.
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
     if (storedConditions != null && !Array.isArray(storedConditions)) {
         console.error('[spellCast] applyPowerWordHealToTarget: activeConditions is not an array');
         throw new Error('activeConditions must be an array');
     }
-    const conditions = storedConditions == null ? [] : storedConditions;
+    return storedConditions == null ? [] : storedConditions;
+}
+
+function powerWordHealConditions(targetName, campaignName, conditions) {
+    const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
     const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {
@@ -270,8 +288,13 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName,
         ? (getRuntimeValue(targetName, 'currentHitPoints') ?? creature.currentHp ?? maxHp)
         : (creature.currentHp ?? maxHp);
 
+    // #1481 validate-first: activeConditions is read + validated BEFORE any
+    // mutation (heal at powerWordHealDamage, condition writes after). An
+    // invalid payload throws here — HP never touched, popup never dispatched.
+    const conditions = validateActiveConditions(targetName, campaignName);
+
     powerWordHealDamage({ combatSummary, targetName, playerStats, campaignName, maxHp, currentHp });
-    powerWordHealConditions(targetName, campaignName);
+    powerWordHealConditions(targetName, campaignName, conditions);
 }
 
 async function applyPowerWordKillToTarget(targetName, playerStats, campaignName, sharedCombatSummary) {
@@ -313,7 +336,10 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
                 damageType: 'Psychic',
             },
         }));
-    } else {
+    } else if (playerStats.rules === '2024') {
+        // #1482 2024-only disk law (public/data/2024/spells.json:10210):
+        // "Otherwise, it takes 12d12 Psychic damage." + damage_at_slot_level
+        // {"9":"12d12"} Psychic. The fallback lives ONLY on the 2024 row.
         const damageFormula = '12d12';
         const damageResult = rollExpression(damageFormula);
         const totalDamage = damageResult?.total ?? 0;
@@ -330,6 +356,19 @@ async function applyPowerWordKillToTarget(targetName, playerStats, campaignName,
                 formula: damageFormula,
             },
         }));
+    } else {
+        // #1482 5e disk law (public/data/spells.json:7588): "If the creature
+        // you choose has 100 hit points or fewer, it dies. Otherwise, the
+        // spell has no effect." — NO roll, NO damage, NO popup for 5e casts
+        // (house selector fix#98: only playerStats.rules === '2024' grants
+        // the fallback; unset rules default to 5e per rulesFactory). Loud
+        // campaign log per AGENTS.md: every automation logs when triggered.
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: 'Power Word Kill',
+            description: `Power Word Kill on ${targetName}: target has ${currentHp} hit points (more than 100) — the spell has no effect.`,
+        }).catch((e) => { console.error("[spellCast] Error:", e); });
     }
 }
 
@@ -520,7 +559,19 @@ function resolveIgnoreResistance(playerStats) {
 }
 
 function applyMissileDamage({ combatSummary, targetName, totalTargetDamage, damageType, campaignName, characters, casterName, playerStats }) {
-    const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
+    // #1456 RAW gate: Magic Missile immunity belongs ONLY to the Shield SPELL buff.
+    // Disk law (public/data/spells.json:8779): "Until the start of your next turn, you
+    // have a +5 bonus to AC, including against the triggering attack, and you take no
+    // damage from magic missile." — full immunity to THIS spell only, never to missiles
+    // generally, and never to a bare AC-stamp. The PC Shield-spell buff is persisted by
+    // shieldHandler.js:36-41 via toggleBuff (name 'Shield', effect 'shield', NO oneShot);
+    // monster Shield reactions stamp effect 'shield' WITH oneShot:true and an acBonus vs
+    // ONE named triggering attack (MonsterCardHelpers.js:1888-1899 buildShieldBuff, MA-1170:
+    // "oneShot:true marks the MONSTER reaction stamp"). A oneShot stamp therefore grants
+    // "+5 AC against the triggering attack" in the attack lane — NOT immunity to a whole
+    // auto-hit volley: darts flow through to applyDamageToTarget below.
+    const shieldBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.filter(b => b?.effect === 'shield');
+    const isShieldActive = shieldBuffs?.some(b => b.oneShot !== true);
     if (isShieldActive) {
         return { finalDamage: 0, damageReduced: true, isShieldActive };
     }

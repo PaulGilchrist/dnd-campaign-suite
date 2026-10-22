@@ -363,7 +363,15 @@ function expectAscending(mocks) {
 }
 
 const FIRST_TAIL = [mockHeroism, mockHolyAura, mockLongstrider, mockSpareTheDying, mockEnhanceAbility];
-const MASS_ARMS = [mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife];
+// fix#121(c) (#1463, FIXED): the hub :328 chain shed its Mass Healing Word / Prayer
+// of Healing legs — disk rows carry automation.type on both rulesets and are consumed
+// EARLIER at :710 handleGenericAutomation; the only shape that ever reached the legs
+// (lightweight {name, level, baseLevel}) carries no heal ladder, so the forwarded
+// services resolved null and produced nothing (massHealingWordService.js:141-145,
+// prayerOfHealingService.js:210-212). LIVE chain arms: massCure + falseLife. The
+// retired legs stay mocked as landmines — pinned times(0) by runRow below.
+const MASS_ARMS = [mockMassCureWounds, mockFalseLife];
+const RETIRED_HEAL_LEGS = [mockMassHealingWord, mockPrayerOfHealing];
 const TAIL_ARMS = [mockProtectionFromEnergy, mockProtectionFromPoison, mockRemoveCurse, mockResistance];
 // Lanes that every handled no-damage arm must bypass (index.js :337/:341/:724/:730/:754).
 const HEAL_LANE_INERT = [rollExpression, resolveHealingBonusesWithDetails, applyHealingToTarget, markFortifiedHealthUsedIfGranted];
@@ -414,6 +422,8 @@ async function runRow(row) {
 
   for (const m of row.before) expect(m).toHaveBeenCalledTimes(1);
   for (const m of row.after) expect(m).toHaveBeenCalledTimes(0);
+  // fix#121(c) landmine: the retired :330/:331 hub legs never dispatch, from any row.
+  for (const m of RETIRED_HEAL_LEGS) expect(m).toHaveBeenCalledTimes(0);
   expectAscending(row.order);
 
   // :341 Healing-Word fire-and-forget: skipped by :322/:334 returns on the
@@ -472,33 +482,21 @@ describe('executeSpellCast — noDamage heal chain: swallow arms consume before 
     },
     // :710-hijacked disk names -> documented lightweight payload (real
     // second-caller shape) is the ONLY production route to these arms.
-    {
-      spell: lightweight(diskRow(spells5e, 'Mass Healing Word')), lane: 'swallow', arm: mockMassHealingWord, tuple: posHeal,
-      before: [...FIRST_TAIL, mockMassCureWounds],
-      after: [mockPrayerOfHealing, mockFalseLife, ...TAIL_ARMS],
-      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, triggerWildMagicSurge],
-      wordBefore: false,
-    },
-    {
-      spell: lightweight(diskRow(spells5e, 'Prayer of Healing')), lane: 'swallow', arm: mockPrayerOfHealing, tuple: posHeal,
-      before: [...FIRST_TAIL, mockMassCureWounds, mockMassHealingWord],
-      after: [mockFalseLife, ...TAIL_ARMS],
-      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, triggerWildMagicSurge],
-      wordBefore: false,
-    },
+    // fix#121(c) (#1463): the massHW/prayer rows of this table were RETIRED together
+    // with their hub legs — replaced by the fall-through census below.
     // REAL disk bytes, both rulesets (False Life stores automation null).
     {
       spell: diskRow(spells5e, 'False Life'), lane: 'swallow', arm: mockFalseLife, tuple: posHeal,
-      before: [...FIRST_TAIL, ...MASS_ARMS.slice(0, 3)],
+      before: [...FIRST_TAIL, mockMassCureWounds],
       after: [...TAIL_ARMS],
-      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife, triggerWildMagicSurge],
+      order: [mockGenericAutomation, mockMassCureWounds, mockFalseLife, triggerWildMagicSurge],
       wordBefore: false,
     },
     {
       spell: diskRow(spells2024, 'False Life'), rules: '2024', lane: 'swallow', arm: mockFalseLife, tuple: posHeal,
-      before: [...FIRST_TAIL, ...MASS_ARMS.slice(0, 3)],
+      before: [...FIRST_TAIL, mockMassCureWounds],
       after: [...TAIL_ARMS],
-      order: [mockGenericAutomation, mockMassCureWounds, mockMassHealingWord, mockPrayerOfHealing, mockFalseLife, triggerWildMagicSurge],
+      order: [mockGenericAutomation, mockMassCureWounds, mockFalseLife, triggerWildMagicSurge],
       wordBefore: false,
     },
   ];
@@ -506,6 +504,32 @@ describe('executeSpellCast — noDamage heal chain: swallow arms consume before 
   for (const row of rows) {
     it(`:328-334 swallow lane — ${row.rules ?? '5e'} "${row.spell.name}" intercepts at its chain position, skips :337/:341, resolves undefined, riders run post-payment`, async () => {
       await runRow(row);
+    });
+  }
+
+  // fix#121(c) fall-through census (#1463) — the retired spans stay silent and the
+  // names produce nothing on the lightweight shape (same zero the retired legs
+  // produced: service refused without a heal ladder). Disk bytes are consumed at
+  // :710 — census owned by aoeHealingSpecial.test.js:498 + earlyReturns-generic :274.
+  for (const name of ['Mass Healing Word', 'Prayer of Healing']) {
+    it(`fix#121(c) — lightweight "${name}" misses the trimmed :328 chain and the ladder-less :337, fires :341 once, produces zero heals, and runs merged post-cast riders once`, async () => {
+      const services = makeServices(makePlayerStats());
+
+      const result = await executeSpellCast(lightweight(diskRow(spells5e, name)), { slotLevel: name === 'Mass Healing Word' ? 3 : 2 }, services);
+
+      for (const m of RETIRED_HEAL_LEGS) expect(m).toHaveBeenCalledTimes(0); // spans deleted — never dispatch
+      expect(mockMassCureWounds).toHaveBeenCalledTimes(1); // name-missed, chain passed
+      expect(mockFalseLife).toHaveBeenCalledTimes(1); // name-missed — chain no longer short-circuits at the retired positions
+      expect(mockGenericAutomation).toHaveBeenCalledTimes(1); // declined here (mocked); REAL disk bytes ARE consumed there (#1463 hijack)
+      for (const m of FIRST_TAIL) expect(m).toHaveBeenCalledTimes(1); // declined first-chain arms
+      expect(triggerHealingWord).toHaveBeenCalledTimes(1); // :341 reachable post-deletion (was skipped by the retired legs)
+      for (const m of TAIL_ARMS) expect(m).toHaveBeenCalledTimes(1); // declined tail
+      for (const m of HEAL_LANE_INERT) expect(m).toHaveBeenCalledTimes(0); // zero heal production — no ladder on the lightweight envelope
+      expect(handleSavePath).toHaveBeenCalledTimes(0); // disk dc null
+      expect(handleNoSavePath).toHaveBeenCalledTimes(1); // :767 no-dc damage tail (inert mocked consumer)
+      expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1); // one merge, :771 tail
+      expect(result).toBeNull();
+      expect(consoleError).toHaveBeenCalledTimes(0);
     });
   }
 });

@@ -36,14 +36,15 @@ import spells2024 from '../../../../../../public/data/2024/spells.json';
 /*  :7 invisibility✓ :8 resolveSpellDamageWithTypes✓(pinned null —    */
 /*  numerics ride complex) :9 castingTimeUtils REAL — zero dead mocks.*/
 /*                                                                      */
-/*  Bake-roll third-source VERDICT: NONE. Module's only level input   */
-/*  is spell.level||1 (:108) fed to resolveSpellDamageWithTypes       */
-/*  (:109); playerStats.level is NEVER read (grep:0). #1454/:53       */
-/*  ladder vs #1488/:13 baked pair stays in the damage lanes; this    */
-/*  lane joins the table as pass-through, falsy-zero cantrip row      */
-/*  pinned (T2). NOTE quantified twin: :108 falsy level||1 vs log      */
-/*  lane :202 spell.level||0 — different falsy defaults, same source  */
-/*  byte; log lane owned by spellResolution-log.test.js.               */
+/*  Bake-roll third-source VERDICT SUPERSEDED by #1501: was "NONE"     */
+/*  over :108 spell.level||1 (playerStats.level NEVER read, grep:0)    */
+/*  vs log lane :202 spell.level||0 — two independent falsy defaults    */
+/*  on one source byte, divergent falsy outputs (#1501). Both legs now  */
+/*  call ONE resolveCantripLevel (:130, mirrors live index.js:59         */
+/*  fix#121 damageLevel idiom + index.js:272 display): displayLevel 0   */
+/*  for cantrip/undefined pinned in T2; damageLevel (cantrip->caster    */
+/*  ladder, undefined->min-slot 1) pinned at the consumer boundary in   */
+/*  the complex lane; log byte owned by spellResolution-log.test.js.   */
 /*                                                                      */
 /*  Quirk censuses (disk, 2026-10-21): needsLookup lattice over REAL  */
 /*  disks = 5e 249 true / 3 false / 79 undefined-of-331; 2024 = 289 / */
@@ -58,9 +59,10 @@ import spells2024 from '../../../../../../public/data/2024/spells.json';
 /*  te-keys: lane writes no targetEffects (registry n/a).              */
 /*                                                                      */
 /*  Kill-matrix declared: block-return-after-side-effects → T4/T6     */
-/*  downstream-absence+census; drop ||1 → T2; cantrip-0 swallowed →   */
-/*  T2; needsLookup branch reorder/short-circuit → T3 rows; IIFE      */
-/*  ?.name||null → T11 falsy rows; rejection honesty → T11 rejects;   */
+/*  downstream-absence+census; drop resolver displayLevel → T2;         */
+/*  cantrip-0 swallowed to 1 (retired) → T2 flipped-record-0; needsLookup */
+/*  branch reorder/short-circuit → T3 rows; IIFE ?.name||null → T11     */
+/*  falsy rows; rejection honesty → T11 rejects;                          */
 /*  gate toLowerCase/byte-case removal → T7 lowercase + T14 'FRIENDS' */
 /*  ; arg swaps → exact tuples everywhere; order swap → invocation-    */
 /*  CallOrder pins T4/T6/T14; refusalType replace bytes → T5 B/C;     */
@@ -232,17 +234,22 @@ describe('spellResolution — control-flow lane', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  /* ---- T2 spellLevel single source (bake-roll verdict) ---- */
+  /* ---- T2 spellLevel single source (flipped by #1501) ---- */
 
-  it('spellLevel: single-source spell.level passthrough; falsy undefined AND falsy-zero cantrip both swallow to 1 (:108)', () => {
+  it('spellLevel: single-source resolveCantripLevel displayLevel — falsy undefined AND falsy-zero cantrip both record RAW 0; leveled passthrough intact (:138-139)', () => {
     expect(resolve(makeSpell({ level: 5 }), makePlayerStats()).spellLevel).toBe(5);
-    expect(resolve(makeSpell({ level: undefined }), makePlayerStats()).spellLevel).toBe(1);
-    // cantrip level 0 hits the SAME ||1 swallow — bake-roll VERDICT: this
-    // module offers NO third level source (playerStats.level never read);
-    // :108 is the only input handed to resolveSpellDamageWithTypes (:109).
+    expect(resolve(makeSpell({ level: undefined }), makePlayerStats()).spellLevel).toBe(0);
+    // #1501 FLIP: the retired :108 `spell.level || 1` conflated cantrip-0
+    // and undefined into damage-tier 1 (real Fire Bolt lv20 baked to '1d10'
+    // pre-fix) while the log lane :202 (`|| 0`, live twin index.js:272)
+    // recorded cantrip 0 — two independent falsy defaults on one source
+    // byte. Both legs now ride ONE resolver (resolveCantripLevel :130):
+    // display 0 pinned here; the damageLevel arg (cantrip -> caster level,
+    // undefined -> min-slot 1) is pinned at the consumer boundary in
+    // spellResolution.complex.test.js — one ladder, one level source.
     const cantrip = resolve({ ...light5 }, makePlayerStats());
     expect(light5.level).toBe(0); // disk drift alarm
-    expect(cantrip.spellLevel).toBe(1);
+    expect(cantrip.spellLevel).toBe(0);
   });
 
   /* ---- T3 needsLookup lattice, real disks, quantified census ---- */

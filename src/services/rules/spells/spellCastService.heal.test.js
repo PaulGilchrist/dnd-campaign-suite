@@ -277,11 +277,11 @@ describe('executeSpellCast — hub heal lane (heal path + regenerate + power wor
       }])
       // Generic heal never writes conditions; caster lastActionSpellCast stamp is early-resolutions-lane-owned (cited).
       expect(vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => key === 'activeConditions')).toEqual([])
-      // QUIRK pin (#1357/58 inline-dup; riders #1452 cited): the heal path fires
-      // self-heal riders in runGenericHealPath AND again via runPostCastTriggers.
-      expect(vi.mocked(healRider.triggerPostCastSelfHeals)).toHaveBeenCalledTimes(2)
+      // fix#121(b) (#1455 FIXED): the self-heal rider fires ONCE — producer
+      // runGenericHealPath only; the merged block defers flagged heal riders.
+      // (Was the #1357/58 inline-dup times(2) quirk.)
+      expect(vi.mocked(healRider.triggerPostCastSelfHeals)).toHaveBeenCalledTimes(1)
       expect(vi.mocked(healRider.triggerPostCastSelfHeals).mock.calls.map(([, ctx]) => ctx)).toEqual([
-        { slotLevel: 6, metamagicHeighten: false, targetNames: ['Target'] },
         { slotLevel: 6, metamagicHeighten: false, targetNames: ['Target'] },
       ])
       expect(consoleError).not.toHaveBeenCalled()
@@ -374,7 +374,7 @@ describe('executeSpellCast — hub heal lane (heal path + regenerate + power wor
   })
 
   describe('Power Word Heal via hub early chain (index.js:702 -> modalSpells CLA-392 spread)', () => {
-    it('spreads FIRST + multiTarget through ONE shared snapshot, runtime HP beats snapshot HP, emits one healing-popup per target, bypasses post-cast riders', async () => {
+    it('spreads FIRST + multiTarget through ONE shared snapshot, runtime HP beats snapshot HP, emits one healing-popup per target, then merged post-cast riders run once (fix#121(a))', async () => {
       // 2024 disk row — Power Word Heal is absent from the 5e disk (#1450);
       // rules:'2024' routes lookupFullSpell to the tier where it resolves,
       // pinning honest zero-console-noise handling.
@@ -412,9 +412,11 @@ describe('executeSpellCast — hub heal lane (heal path + regenerate + power wor
         // Empty stored conditions -> no condition writes; strip bytes owned by
         // helpers-powerWordHeal.test.js / spellCastService.powerWordHeal.test.js (cited).
         expect(vi.mocked(runtime.setRuntimeValue).mock.calls).toEqual([['TestCaster', 'lastActionSpellCast', 1, CAMPAIGN]])
-        // Early-chain handled casts return undefined and bypass runPostCastTriggers.
+        // fix#121(a): early-chain handled casts MERGE the post-cast block —
+        // the lane still resolves undefined, but the self-heal rider now lands
+        // exactly once (retired bypass, #1455).
         expect(result).toBeUndefined()
-        expect(vi.mocked(healRider.triggerPostCastSelfHeals)).not.toHaveBeenCalled()
+        expect(vi.mocked(healRider.triggerPostCastSelfHeals)).toHaveBeenCalledTimes(1)
         expect(consoleError).not.toHaveBeenCalled()
       } finally {
         window.removeEventListener('healing-popup', onPopup)

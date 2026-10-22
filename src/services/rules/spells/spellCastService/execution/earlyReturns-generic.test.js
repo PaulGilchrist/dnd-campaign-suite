@@ -10,12 +10,15 @@
 /*  :710 mock-boundary arg pin lives in index.generic-metaCtx.test.js */
 /*  and earlyReturns-modal.test.js owns :702-:709 names).              */
 /*                                                                     */
-/*  #1455 (pinned, NOT fixed): a cast consumed at :710 returns at     */
-/*  :712 directly — runPostCastTriggersMerged (:720/:727/:751/:759)   */
-/*  never runs, so Wild Magic Surge and post-cast riders are           */
-/*  structurally unreachable on generic-handled casts. This suite      */
-/*  locks that behavior in both directions: consumed rows bypass the   */
-/*  post-cast block; declined rows reach it exactly once.              */
+/*  #1455 FIXED (fix#121(a)): a cast consumed at :710 no longer returns  */
+/*  at :712 directly — it threads runPostCastTriggersMerged exactly once  */
+/*  (mirroring :720/:727/:751/:759), so Wild Magic Surge and the         */
+/*  post-cast riders fire on generic-handled casts while the lane keeps   */
+/*  its own visible picker/popup precedence (:583). This suite locks       */
+/*  both directions: consumed rows run the post-cast block ONCE           */
+/*  (surge + riderSaves + once; massHealUtils-routed heals defer the     */
+/*  self rider — fix#121(b) healRidersRun); declined rows still reach it  */
+/*  exactly once.                                                           */
 /*                                                                     */
 /*  Fixtures are REAL disk rows (#1455/57/58/68 fabricated-shape     */
 /*  ban): automation.effects is an object on every disk row — never    */
@@ -101,6 +104,9 @@ vi.mock('../../../features/silenceService.js', () => ({
 
 vi.mock('../../../features/friendsService.js', () => ({
   endFriendsOnHostileAction: vi.fn(),
+  // full-disk census reaches the REAL handleFriends trigger (triggerSpells.js) —
+  // mock surface must cover its production import or the cast throws at the seam.
+  triggerFriends: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../../features/invisibilityService.js', () => ({
@@ -217,6 +223,15 @@ function diskRow(name, dataset) {
   return cloneDeep(row);
 }
 
+// Name-gated early arms (:741-:743, :762) fire on spell NAME, not automation —
+// e.g. Power Word Kill 5e carries no automation.type on disk. Same disk-truth
+// guard, without the automation requirement.
+function nameRow(name, dataset) {
+  const row = dataset.find(s => s.name === name);
+  if (!row) throw new Error(`disk row missing: ${name} (fabricated fixture guard)`);
+  return cloneDeep(row);
+}
+
 function makePlayerStats(overrides = {}) {
   return {
     name: 'TestWizard',
@@ -254,10 +269,13 @@ function makeOpts(playerStats, extra = {}) {
 /*  beforeEach                                                         */
 /* ------------------------------------------------------------------ */
 
-describe('executeSpellCast — generic automation lane (:710 consumption / :712 bypass)', () => {
+describe('executeSpellCast — generic automation lane (:710 consumption / :712 merge)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue([]);
+    // clearAllMocks keeps implementations — re-arm the declined surge default so
+    // a census test that armed mockResolvedValue(SURGE) cannot leak into later lanes.
+    triggerWildMagicSurge.mockResolvedValue(null);
     // lookupFullSpell (index.js:170) fetches the disk dataset — serve the same
     // real JSON so no test ever hits the network and fullSpell stays disk-truth.
     globalThis.fetch = vi.fn(async (url) => ({
@@ -271,7 +289,7 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
   /*  gate. Counts pinned as of the 2026-10-21 disk state.           */
   /* ---------------------------------------------------------------- */
 
-  it('consumes EVERY real-gate-passing automation.type disk row at :710 — exact census 44 (5e) + 78 (2024), and every consumed cast bypasses the post-cast block (:712, #1455/#1459/#1463)', async () => {
+  it('consumes EVERY real-gate-passing automation.type disk row at :710 — exact census 44 (5e) + 78 (2024), and every consumed cast runs the merged post-cast block exactly once (:712 merge, fix#121(a), #1459/#1463)', async () => {
     // Declines are the SERVICE_HANDLED-name rows (real triggerSpells.js set)
     // and the effects.fail/success rows. Exact list, not just counts, so a
     // disk row silently gaining/losing generic consumption fails loudly.
@@ -322,8 +340,9 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
           // :710 envelope contract: { automationPopup: <handlerResult verbatim> }.
           expect(result).toEqual({ automationPopup: POPUP });
           expect(result.automationPopup).toBe(POPUP);
-          // #1455 pinned bypass: this consumed cast never touched post-cast.
-          expect(triggerWildMagicSurge).not.toHaveBeenCalled();
+          // fix#121(a): the consumed cast threads the merged post-cast block once —
+          // surge rolled AFTER :710, lane popup preserved by :583 precedence.
+          expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
         } else {
           // Declined at the real :455 gate: no generic dispatch; the cast falls
           // through and reaches the post-cast block exactly once (:720/:771).
@@ -342,10 +361,119 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
   });
 
   /* ---------------------------------------------------------------- */
+  /*  Zero-bypass census — #1470 CLOSED by the :784 merge             */
+  /*  (fix#119/#121(a)). Fresh run 2026-10-22 on current bytes:      */
+  /*  every disk row, both rulesets, every lane (early chain :741-    */
+  /*  :771 → :784 merge, noDamage :793, marked-target :800, auto-     */
+  /*  miss :824, save-path :832, tail :844) fires the post-cast       */
+  /*  rider block exactly once. Roster derived at runtime from disk — */
+  /*  never retyped. A zero-surge cast (the #1470 signature) names    */
+  /*  itself in `violations` and fails loudly. Only blocked casts     */
+  /*  (:711/:722 guards, slot unpaid) may skip the block — every      */
+  /*  guard is declined-null in this lane, so zero skips are legal.  */
+  /* ---------------------------------------------------------------- */
+
+  it('zero-bypass census (#1470 CLOSED): EVERY disk row of BOTH rulesets runs the post-cast rider block exactly once — zero surge-less, zero rider-less casts, roster derived at runtime', async () => {
+    executeHandler.mockResolvedValue(POPUP);
+    const violations = [];
+    let castCount = 0;
+
+    for (const { rules, rows } of [
+      { rules: undefined, rows: spells5e },
+      { rules: '2024', rows: spells2024 },
+    ]) {
+      const playerStats = makePlayerStats(rules ? { rules } : {});
+      for (const row of rows) {
+        vi.clearAllMocks(); // clears calls only — factory declined-defaults stay armed
+        executeHandler.mockResolvedValue(POPUP);
+        triggerWildMagicSurge.mockResolvedValue(null);
+        getRuntimeValue.mockReturnValue([]);
+        const spell = cloneDeep(row);
+
+        try {
+          await executeSpellCast(spell, { targetName: 'Goblin' }, makeOpts(playerStats));
+        } catch (e) {
+          violations.push(`${rules || '5e'}/${row.name}: threw ${e?.message}`);
+          continue;
+        }
+        castCount++;
+        if (triggerWildMagicSurge.mock.calls.length !== 1) {
+          violations.push(`${rules || '5e'}/${row.name}: surge calls=${triggerWildMagicSurge.mock.calls.length}`);
+        }
+        if (triggerPostCastRiderSaves.mock.calls.length !== 1) {
+          violations.push(`${rules || '5e'}/${row.name}: riderSaves calls=${triggerPostCastRiderSaves.mock.calls.length}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+    // Every disk row cast, both rulesets — runtime count, not a retype.
+    expect(castCount).toBe(spells5e.length + spells2024.length);
+  });
+
+  /* ---------------------------------------------------------------- */
+  /*  Early-chain arm census — extension of fix#119's flipped pins   */
+  /*  (earlyReturns-generic :274 consumes at the :771 generic arm;    */
+  /*  earlyReturns-modal #1471 pins exact envelopes per arm). Here:    */
+  /*  EVERY dedicated early arm (:741-:763) consuming a REAL disk row */
+  /*  rides the :784 runPostCastTriggersMerged — surge rolled once,   */
+  /*  riderSaves once, and CLA-389 payload precedence holds: a lane    */
+  /*  popup wins over the surge popup, an undefined-lane cast returns */
+  /*  the surge popup. healRidersRun stays undefined on these rows    */
+  /*  (none is a MASS_HEAL_CONFIRM_AUTOMATION_TYPES — fix#121(b)      */
+  /*  flags untouched).                                                 */
+  /* ---------------------------------------------------------------- */
+
+  it('early-chain census (#1470): every dedicated early arm consuming at :741-:763 threads the :784 merge — surge once, payload precedence per CLA-389', async () => {
+    const modalSpells = await import('./modalSpells.js');
+    const SURGE = { type: 'popup', payload: { surge: true } };
+    const LANED = { automationPopup: POPUP };
+
+    // Arm shapes mirror modalSpells producers' real return shapes (earlyReturns-
+    // modal #1471 pins those bytes): PWH/PWK handled-with-no-result (async),
+    // sync arms plain envelopes, Confusion carries an awaited Promise (:752-:761).
+    const ARMS = [
+      { name: 'Power Word Heal', rules: '2024', fn: modalSpells.handlePowerWordHeal, shape: { handled: true }, async: true, expected: SURGE },
+      { name: 'Power Word Kill', rules: '5e', fn: modalSpells.handlePowerWordKill, shape: { handled: true }, async: true, expected: SURGE },
+      { name: 'Mass Suggestion', rules: '5e', fn: modalSpells.handleMassSuggestion, shape: { handled: true, result: LANED }, async: false, expected: LANED },
+      { name: 'Calm Emotions', rules: '5e', fn: modalSpells.handleCalmEmotions, shape: { handled: true, result: LANED }, async: false, expected: LANED },
+      { name: 'Hypnotic Pattern', rules: '5e', fn: modalSpells.handleHypnoticPatternEarly, shape: { handled: true, result: LANED }, async: false, expected: LANED },
+      { name: 'Confusion', rules: '5e', fn: modalSpells.handleConfusionEarly, shape: { handled: true, result: Promise.resolve(undefined) }, async: false, expected: SURGE },
+      { name: 'Shapechange', rules: '5e', fn: modalSpells.handleShapechange, shape: { handled: true, result: LANED }, async: false, expected: LANED },
+      { name: 'Sleep', rules: '5e', fn: modalSpells.handleSleep, shape: { handled: true, result: LANED }, async: false, expected: LANED },
+    ];
+
+    for (const arm of ARMS) {
+      vi.clearAllMocks();
+      executeHandler.mockResolvedValue(POPUP);
+      triggerWildMagicSurge.mockResolvedValue(SURGE);
+      getRuntimeValue.mockReturnValue([]);
+      const spell = nameRow(arm.name, arm.rules === '2024' ? spells2024 : spells5e);
+      if (arm.async) arm.fn.mockResolvedValueOnce(arm.shape);
+      else arm.fn.mockReturnValueOnce(arm.shape);
+
+      const result = await executeSpellCast(spell, { targetName: 'Goblin' }, makeOpts(makePlayerStats(arm.rules ? { rules: arm.rules } : {})));
+
+      expect(arm.fn, `${arm.name} arm reached`).toHaveBeenCalledTimes(1);
+      // :710 generic arm never runs — consumed at the earlier arm (#1463 contrast).
+      expect(executeHandler, `${arm.name} not generic-hijacked`).not.toHaveBeenCalled();
+      // The bypass signature (#1470): zero surge. Structural impossibility now —
+      // the ONLY exit is :784 runPostCastTriggersMerged.
+      expect(triggerWildMagicSurge, `${arm.name} surge rolled once`).toHaveBeenCalledTimes(1);
+      expect(triggerPostCastRiderSaves, `${arm.name} riders once`).toHaveBeenCalledTimes(1);
+      if (arm.expected === SURGE) {
+        expect(result, `${arm.name} surge popup wins (no lane payload)`).toBe(SURGE);
+      } else {
+        expect(result, `${arm.name} lane popup wins (:638 precedence)`).toEqual(LANED);
+      }
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
   /*  Consumption unwrap + bypass (#1455 pinned, not fixed)          */
   /* ---------------------------------------------------------------- */
 
-  it('returns the handler popup wrapped verbatim (:710 envelope, :712 identity) and bypasses every downstream lane and post-cast trigger', async () => {
+  it('returns the handler popup wrapped verbatim (:710 envelope, :712 identity) and bypasses every downstream damage/save lane while running the post-cast rider block exactly once (fix#121(a))', async () => {
     executeHandler.mockResolvedValue(POPUP);
     const playerStats = makePlayerStats();
     const spell = diskRow('Barkskin', spells5e);
@@ -360,19 +488,21 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
     expect(handleSavePath).not.toHaveBeenCalled();
     expect(handleNoSavePath).not.toHaveBeenCalled();
     expect(checkCompelledDuelAttackExpiry).not.toHaveBeenCalled();
-    // The bypass: post-cast block is structurally unreachable (:712).
-    expect(triggerWildMagicSurge).not.toHaveBeenCalled();
-    expect(triggerPostCastRiderSaves).not.toHaveBeenCalled();
-    expect(triggerPostCastSelfHeals).not.toHaveBeenCalled();
-    expect(triggerPostCastAllyHeals).not.toHaveBeenCalled();
-    expect(triggerInspiringSmite).not.toHaveBeenCalled();
-    expect(triggerSmiteOfProtection).not.toHaveBeenCalled();
-    expect(triggerSpellThief).not.toHaveBeenCalled();
-    expect(triggerBewitchingMagic).not.toHaveBeenCalled();
-    expect(endSanctuary).not.toHaveBeenCalled();
+    // fix#121(a): the post-cast block is reachable on consumed casts now (:712 merge) —
+    // every rider exactly once; Barkskin is not an automation-routed heal, so the
+    // self/ally pair fires here (fix#121(b) guards only the mass-heal types).
+    expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+    expect(triggerPostCastRiderSaves).toHaveBeenCalledTimes(1);
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
+    expect(triggerInspiringSmite).toHaveBeenCalledTimes(1);
+    expect(triggerSmiteOfProtection).toHaveBeenCalledTimes(1);
+    expect(triggerSpellThief).toHaveBeenCalledTimes(1);
+    expect(triggerBewitchingMagic).toHaveBeenCalledTimes(1);
+    expect(endSanctuary).not.toHaveBeenCalled(); // no sanctuary te in the store
   });
 
-  it('consumes the cast even when the handler returns null (triggerSpells.js:466) — resolves undefined yet still bypasses post-cast; executeHandler gets the exact arity-5 tuple (:462, #1461)', async () => {
+  it('consumes the cast even when the handler returns null (triggerSpells.js:466) — resolves undefined yet still runs the merged post-cast block once (fix#121(a)); executeHandler gets the exact arity-5 tuple (:462, #1461)', async () => {
     executeHandler.mockResolvedValue(null);
     const playerStats = makePlayerStats({ rules: '2024' });
     const characters = [{ name: 'Goblin' }];
@@ -390,8 +520,9 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
     expect(call[2]).toBe('test-campaign');
     expect(call[3]).toBe('test-map');
     expect(call[4]).toBe(characters);
-    // Bypass still holds for the no-result shape (#1455).
-    expect(triggerWildMagicSurge).not.toHaveBeenCalled();
+    // fix#121(a): consumed-no-result shape now threads the merge — surge once,
+    // save/damage lanes still unreachable (:712 consumed before :714).
+    expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
     expect(handleNoSavePath).not.toHaveBeenCalled();
   });
 

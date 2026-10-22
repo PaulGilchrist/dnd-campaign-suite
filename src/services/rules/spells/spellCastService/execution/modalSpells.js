@@ -7,7 +7,11 @@ import { getCombatContext } from '../../../combat/damageUtils.js';
 // the first when a second was chosen. The 10-ft second-target gate has no
 // live position seam on this chooser path (gridless lenient pass — adjudicated).
 async function handlePowerWordHeal({ spell, metaCtx, getTargetInfo, playerStats, campaignName, applyPowerWordHealToTarget }) {
-    if (spell.name.toLowerCase() === 'power word heal') {
+    // #1471 guard-first law: this was the file's sole unguarded name deref
+    // (:10-vs-:26 asymmetry) — a nameless envelope TypeError-killed the arm
+    // at the head of the hub trigger chain (execution/index.js:741 runs this
+    // FIRST, before the guarded kill twin), dying the whole cast flow.
+    if (spell.name && spell.name.toLowerCase() === 'power word heal') {
         const target = await getTargetInfo();
         const firstTargetName = target?.name || null;
         const sharedCombatSummary = (firstTargetName || metaCtx?.multiTarget) ? await getCombatContext(campaignName) : null;
@@ -228,15 +232,54 @@ function handleConjureVolley(spell, fullSpell) {
     return { handled: false };
 }
 
+// fix#107 parity mirror (#1471 twin closure, ledger residual 'modalSpells:234-239
+// old-regex-pair twin QUEUED'): silenceService.js :30-:71 owns the fixed law
+// (FEET_TOKEN_RE/MILE_TOKEN_RE + numeric-first aoeRadiusFromSize) but those
+// consts/helpers are module-private THERE (not exported), so these bytes
+// MIRROR the source verbatim: numeric-first size (RAW 5e disk spells.json
+// area_of_effect.size is NUMBER on ALL 89 aoe rows — the retired
+// aoeSize.match(/(\d+)-foot-radius/) threw TypeError on it), plural feet/mile
+// token set (retired /(\d+)-?foot/ matched ZERO plural forms), and LOUD
+// refuse of out-of-contract tokens to the documented Silence RAW defaults
+// 120ft range / 20ft sphere (no-fallbacks law — the gate is name==='silence'
+// whose range is '120 feet' on BOTH disks, so any unmatched token here must
+// be heard, not swallowed).
+const FEET_TOKEN_RE = /^(\d+)\s*-?\s*(?:feet|foot|ft\.?)(?![a-z])/i;
+const MILE_TOKEN_RE = /^(\d+)\s*-?\s*(?:miles|mile|mi\.?)(?![a-z])/i;
+const RADIUS_TOKEN_RE = /^(\d+)\s*-?\s*(?:feet|foot|ft\.?)(?![a-z])/i;
+
+function silenceRangeToFeet(rangeStr) {
+    if (!rangeStr) return 120; // documented default: Silence RAW range = 120 feet (both disks)
+    const token = String(rangeStr).trim();
+    const feet = token.match(FEET_TOKEN_RE);
+    if (feet) return parseInt(feet[1], 10);
+    const miles = token.match(MILE_TOKEN_RE);
+    if (miles) return parseInt(miles[1], 10) * 5280;
+    console.error(`[modalSpells.silence] Unrecognized range token "${rangeStr}" — not a foot/mile count; Silence RAW default 120ft applies.`);
+    return 120;
+}
+
+function silenceAoeRadiusFromSize(size) {
+    if (size == null) return 20; // documented default: Silence is a 20-ft sphere
+    if (typeof size === 'number') {
+        if (Number.isFinite(size) && size > 0) return size;
+        console.error(`[modalSpells.silence] Non-positive/non-finite numeric area_of_effect.size ${size} — 20ft sphere default.`);
+        return 20;
+    }
+    if (typeof size === 'string') {
+        const m = size.trim().match(RADIUS_TOKEN_RE);
+        if (m) return parseInt(m[1], 10);
+        console.error(`[modalSpells.silence] Unrecognized area_of_effect.size "${size}" — not a feet count; 20ft sphere default.`);
+        return 20;
+    }
+    console.error(`[modalSpells.silence] Unexpected area_of_effect.size type ${typeof size} — 20ft sphere default.`);
+    return 20;
+}
+
 function handleSilence({ spell, metaCtx, playerStats, campaignName, getCombatSummary }) {
     if (spell.name && spell.name.toLowerCase() === 'silence') {
-        const rangeFeet = (() => {
-            const match = String(spell.range || '120 feet').match(/(\d+)-?foot/);
-            return match ? parseInt(match[1], 10) : 120;
-        })();
-        const aoeSize = spell.area_of_effect?.size || '20-foot-radius';
-        const aoeMatch = aoeSize.match(/(\d+)-foot-radius/);
-        const aoeRadius = aoeMatch ? parseInt(aoeMatch[1], 10) : 20;
+        const rangeFeet = silenceRangeToFeet(spell.range);
+        const aoeRadius = silenceAoeRadiusFromSize(spell.area_of_effect?.size);
         const slotLevel = metaCtx?.slotLevel || spell.level || 2;
 
         const combatSummary = getCombatSummary(campaignName) || { creatures: [], players: [] };

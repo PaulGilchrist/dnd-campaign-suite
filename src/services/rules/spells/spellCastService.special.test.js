@@ -65,8 +65,8 @@ import spells2024 from '../../../../public/data/2024/spells.json'
 /*  span = RAW forward (triggerSpells.js:389, identity === sentinel);  */
 /*  Forcecage span = forward, null trigger → handled-discard           */
 /*  (res undefined, slot paid, riders run once via :720 CLA-389);     */
-/*  hypnotic EARLY modal + generic hijack = direct :709 return, riders*/
-/*  NEVER run (:712 early-chain bypass).                              */
+/*  hypnotic EARLY modal + generic hijack = :712 merge — riders run    */
+/*  exactly once post-payment (fix#121(a); retired :712 bypass).        */
 /*  Case-gate trail (#1457/59): span gates lowercase while lookupFull- */
 /*  Spell (:179) is exact-case — every envelope below is a REAL disk   */
 /*  row, so console.error must stay silent (anti-fabrication proof).   */
@@ -424,7 +424,7 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
   // Folded owners: earlyReturns-modal :386 (modalName only, mocked
   // producer); .noformula-services :521 (modalName + dead twin).
   // ------------------------------------------------------------------
-  it('hypnotic pattern opens the exact early-modal from the real disk row with saveDc 17, +1 under innate sorcery, zero rolls, zero hijack, zero post-cast riders, and its dead span twin silent', async () => {
+  it('hypnotic pattern opens the exact early-modal from the real disk row with saveDc 17, +1 under innate sorcery, zero rolls, zero hijack, post-cast riders run once via the fix#121(a) :712 merge, and its dead span twin silent', async () => {
     const envelope = diskRow('Hypnotic Pattern', '5e')
     const services = makeServices()
 
@@ -449,7 +449,7 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
     expect(res.automationPopup.payload.playerStats).toBe(services.playerStats)
     expect(triggerHypnoticPattern).not.toHaveBeenCalled() // dead span twin (#1457)
     expect(automation.executeHandler).not.toHaveBeenCalled() // early :706 precedes :710 despite raw automation.type
-    expect(rider.triggerPostCastRiderSaves).not.toHaveBeenCalled() // :712 early-chain bypass
+    expect(rider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1) // fix#121(a): :712 merge runs the post-cast block once
     expect(services.rollDamage).not.toHaveBeenCalled()
     expect(services.rollAttack).not.toHaveBeenCalled()
     expect(fetchCalls).toStrictEqual(['/data/spells.json']) // automation+no-effects envelope forces the merge lookup
@@ -500,7 +500,7 @@ describe('executeSpellCast - special lane (edition-rename alias gates, tasha gat
     expect(automation.executeHandler.mock.calls[0].length).toBe(5) // arity vs REAL (:462)
     expect(triggerForcecage).not.toHaveBeenCalled() // span :309 unreachable while automation rides
     expect(rawRes).toStrictEqual({ automationPopup: hijackPopup })
-    expect(rider.triggerPostCastRiderSaves).not.toHaveBeenCalled() // :712 bypass
+    expect(rider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1) // fix#121(a): hijacked casts now merge post-cast once
 
     // (b) automation-free span — the documented caller strip.
     vi.clearAllMocks()

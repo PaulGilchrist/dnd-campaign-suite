@@ -458,14 +458,15 @@ describe('executeSpellCast - execution lane (real chain via facade)', () => {
   /*  noSavePath.js via metaCtx.finalFormula (single bake, CLA-120),  */
   /*  and the CLA-134 featsOfChaosArmedAtCast stamp crossing the      */
   /*  rollAttack seam. noSavePath.test.js owns the module internals.  */
-  /*  NOTE (quirk pinned honestly, see report): the hub resolves the  */
-  /*  cantrip formula at `spell.level || 1` (index.js:53 -> 1d10)     */
-  /*  while noSavePath rolls it at caster level (resolveSpellDamageAt */
-  /*  Level -> '2d10' for CL10); the CL5+ divergent pair is asserted. */
+  /*  fix#121(e) (#1454/#1462 FIXED): the hub resolves the cantrip    */
+  /*  formula at CHARACTER level (index.js:53 now mirrors               */
+  /*  resolveSpellDamageAtLevel(spell, playerStats.level) — for CL10   */
+  /*  both sides bake AND roll '2d10'; the retired spell.level || 1    */
+  /*  baked the level-1 tier and stood in RED mismatch with the roll. */
   /*  Kills: stamp dropped, double-bake, toHit transport failure.     */
   /* ---------------------------------------------------------------- */
 
-  it('routes a no-DC Fire Bolt through real handleNoSavePath: rollAttack receives computed toHit, the single-baked empowered formula stamp, and the raw character-level roll formula', async () => {
+  it('routes a no-DC Fire Bolt through real handleNoSavePath: rollAttack receives computed toHit, the single-baked empowered formula stamp at the caster-level tier, and the raw character-level roll formula — bake and roll agree (fix#121(e))', async () => {
     rider.getEmpoweredEvocationFeatures.mockReturnValue([{ name: 'Empowered Evocation', type: 'empowered_evocation' }])
     rider.getEmpoweredEvocationIntModifier.mockReturnValue(5)
     const spell = makeFireBoltPayload()
@@ -486,7 +487,7 @@ describe('executeSpellCast - execution lane (real chain via facade)', () => {
       targetName: 'Goblin1',
       attackerName: 'TestWizard',
       damageType: 'Fire',
-      autoDamageFormula: '1d10 + 5 [Empowered Evocation]',
+      autoDamageFormula: '2d10 + 5 [Empowered Evocation]',
       autoDamageName: 'Fire Bolt',
       spellName: 'Fire Bolt',
       autoDamageSchool: 'Evocation',
@@ -496,13 +497,15 @@ describe('executeSpellCast - execution lane (real chain via facade)', () => {
       autoDamageRollResult: { total: 10, rolls: [1, 2, 3, 4], modifier: 0 },
       slotLevel: 0,
       metamagicHeighten: false,
-      finalFormula: '1d10 + 5 [Empowered Evocation]',
+      finalFormula: '2d10 + 5 [Empowered Evocation]',
       featsOfChaosArmedAtCast: false,
       isCantrip: true,
     })
-    // The roll itself rides the caster-scaled raw formula (no double bake).
+    // The roll rides the caster-scaled raw formula and the bake now agrees with
+    // its level source (fix#121(e)) — no double bake, no tier divergence.
     expect(dice.rollExpression).toHaveBeenCalledTimes(1)
     expect(dice.rollExpression).toHaveBeenCalledWith('2d10')
+    expect(services.rollAttack.mock.calls[0][2].autoDamageFormula).toBe('2d10 + 5 [Empowered Evocation]') // bake == roll tier
     expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
     // No-save spells never reach the save DC adjudication — no rollDamage.
     expect(services.rollDamage).not.toHaveBeenCalled()

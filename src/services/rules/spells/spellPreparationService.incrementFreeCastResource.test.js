@@ -162,6 +162,28 @@ function statsWith(...entries) {
   return makePlayerStats({ automation: { actions: entries, bonusActions: [], specialActions: [], passives: [] } });
 }
 
+// Bewitching Magic runtime passive form (passiveCollector output): the 2024 disk feature's
+// automation is an ARRAY [{type:'bewitching_magic', casting_time:'passive'}] — the SAME
+// store key '_Bewitching_Magic_freeCast' the Bewitching consume/rollback ledgers gate on
+// (postCastRiderService.js:239-247 filters playerStats.automation.passives by type).
+// Disk drift throws rather than fabricating bytes (lane streak form).
+function bewitchingPassive() {
+  const data = JSON.parse(readFileSync(CLS2024, 'utf8'));
+  let automation = null;
+  const walk = (o) => {
+    if (automation || !o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    if (o.name === 'Bewitching Magic') {
+      automation = [].concat(o.automation || []).find(a => a && a.type === 'bewitching_magic') || null;
+      return;
+    }
+    Object.values(o).forEach(walk);
+  };
+  walk(data);
+  if (!automation) throw new Error('disk drift: 2024 Bewitching Magic automation row missing — #1512 rollback feature-gate depends on it');
+  return { name: 'Bewitching Magic', ...JSON.parse(JSON.stringify(automation)) };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   seed({});
@@ -240,32 +262,61 @@ describe('incrementFreeCastResource — restore lane (rollback twin of the #1510
     }
   });
 
-  it('Bewitching Magic rollback: armed(true)+Misty Step writes explicit null; falsy triple and wrong-spell gate inert', () => {
-    const stats = makePlayerStats();
-    seed({ '_Bewitching_Magic_freeCast': true });
-    incrementFreeCastResource(PLAYER, 'Misty Step', 2, stats, CAMPAIGN);
-    // quirk pinned verbatim: rollback DROPS the arm (writes null, not true) —
-    // after a consume already nulled it, the truthy gate reads false and this
-    // lane writes nothing at all (rollback cannot resurrect a consumed arm).
-    expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, '_Bewitching_Magic_freeCast', null, CAMPAIGN]]);
-    for (const armed of [false, null, undefined]) {
-      vi.clearAllMocks(); seed({ '_Bewitching_Magic_freeCast': armed });
-      incrementFreeCastResource(PLAYER, 'Misty Step', 2, stats, CAMPAIGN);
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    }
+  it('Bewitching rollback #1512 FIXED: cancelled free-cast RESTORES the armed latch — consumed-null re-arms TRUE (pre-fix byte: no write, arm permanently spent); intact arm never nulled (pre-fix byte: null-drop); false/wrong-spell/featureless inert', () => {
+    const bewitchStats = makePlayerStats({ automation: { actions: [], bonusActions: [], specialActions: [], passives: [bewitchingPassive()] } });
+    // consumed-null (consume :502-504 already nulled) + cancel -> re-arm TRUE:
+    seed({ '_Bewitching_Magic_freeCast': null });
+    incrementFreeCastResource(PLAYER, 'Misty Step', 2, bewitchStats, CAMPAIGN);
+    expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, '_Bewitching_Magic_freeCast', true, CAMPAIGN]]);
+    // absent-store parity (REAL useRuntimeState answers null for missing keys):
+    vi.clearAllMocks(); seed({});
+    incrementFreeCastResource(PLAYER, 'Misty Step', 2, bewitchStats, CAMPAIGN);
+    expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, '_Bewitching_Magic_freeCast', true, CAMPAIGN]]);
+    // cancel-before-consume: the arm is still TRUE — rollback leaves it byte-intact
+    // (pre-fix this row wrote explicit null, erasing the feature state entirely):
     vi.clearAllMocks(); seed({ '_Bewitching_Magic_freeCast': true });
-    incrementFreeCastResource(PLAYER, 'Thunderous Smite', 2, stats, CAMPAIGN);
+    incrementFreeCastResource(PLAYER, 'Misty Step', 2, bewitchStats, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    // explicit false (sheet-disarmed byte, != null strict) stays disarmed — rollback never revives:
+    vi.clearAllMocks(); seed({ '_Bewitching_Magic_freeCast': false });
+    incrementFreeCastResource(PLAYER, 'Misty Step', 2, bewitchStats, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    // wrong-spell gate:
+    vi.clearAllMocks(); seed({ '_Bewitching_Magic_freeCast': null });
+    incrementFreeCastResource(PLAYER, 'Thunderous Smite', 2, bewitchStats, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    // featureless caster: rollback never fabricates an arm it cannot verify:
+    vi.clearAllMocks(); seed({ '_Bewitching_Magic_freeCast': null });
+    incrementFreeCastResource(PLAYER, 'Misty Step', 2, makePlayerStats(), CAMPAIGN);
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('used-flag rollbacks: Signature Spells gated spellLevel === 3 (5/7/9 selections inert), Divination Savant ungated by level — both write exactly false', () => {
+  it('used-flag rollbacks: Signature Spells restore is LEVEL-FREE #1512 FIXED (pre-fix quirk: hardcoded spellLevel===3, lv5/7/9 cancelled casts never restored) — restore-merge refunds CONSUMED latches only; Divination Savant unchanged', () => {
     const stats = makePlayerStats();
-    seed({ 'SignatureSpells_selection': ['Teleportation Circle'] });
+    // consumed latch (consume :512-516 stamped true) at the paid lv3 — restored to false:
+    seed({ 'SignatureSpells_selection': ['Teleportation Circle'], 'SignatureSpells_Teleportation_Circle_used': true });
     incrementFreeCastResource(PLAYER, 'Teleportation Circle', 3, stats, CAMPAIGN);
     expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'SignatureSpells_Teleportation_Circle_used', false, CAMPAIGN]]);
+    // lv5/7/9 cancels of a CONSUMED signature latch now restore (pre-fix bytes: zero writes):
+    for (const lv of [5, 7, 9]) {
+      vi.clearAllMocks();
+      seed({ 'SignatureSpells_selection': ['Teleportation Circle'], 'SignatureSpells_Teleportation_Circle_used': true });
+      incrementFreeCastResource(PLAYER, 'Teleportation Circle', lv, stats, CAMPAIGN);
+      expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'SignatureSpells_Teleportation_Circle_used', false, CAMPAIGN]]);
+    }
+    // fresh latches (null = LR-batch re-arm byte / false / absent): zero writes —
+    // the restore-merge guard (fix#27 family) refunds only what consume actually stamped:
+    for (const fresh of [null, false, undefined]) {
+      vi.clearAllMocks();
+      seed({ 'SignatureSpells_selection': ['Teleportation Circle'], 'SignatureSpells_Teleportation_Circle_used': fresh });
+      incrementFreeCastResource(PLAYER, 'Teleportation Circle', 3, stats, CAMPAIGN);
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    }
+    // off-list spell never touches a consumed foreign latch:
     vi.clearAllMocks();
-    incrementFreeCastResource(PLAYER, 'Teleportation Circle', 5, stats, CAMPAIGN);
-    expect(setRuntimeValue).not.toHaveBeenCalled(); // hardcoded === 3 quirk: upcast rollback inert
+    seed({ 'SignatureSpells_selection': ['Teleportation Circle'], 'SignatureSpells_Counterspell_used': true });
+    incrementFreeCastResource(PLAYER, 'Counterspell', 3, stats, CAMPAIGN);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
 
     seed({ '_Divination_Savant_selection': ['Warding Bond'] });
     incrementFreeCastResource(PLAYER, 'Warding Bond', 2, stats, CAMPAIGN);

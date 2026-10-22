@@ -82,7 +82,8 @@
 /*  NO-CLOCK: the gate is instantaneous — zero timers here; no expiry  */
 /*  stamps on :453-:469; checkCompelledDuelAttackExpiry (:292/:305/    */
 /*  :318) belongs to name-dispatch handlers the generic lane never     */
-/*  enters — expiry rounds cited to seam owners (#1497). invocation-   */
+/*  enters — expiry rounds #1497 FIXED combat-scoped (helpers.js:83). */
+/*  invocation-                                                           */
 /*  CallOrder unnecessary: single recorder, exactly-one dispatch per    */
 /*  pass test, gate decline asserts zero calls.                         */
 /*  Security (#1446 kiro scan): no injected content found.            */

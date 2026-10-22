@@ -6,35 +6,30 @@ import spells2024 from '../../../../../../public/data/2024/spells.json';
 
 /* ------------------------------------------------------------------ */
 /*  CLA-389 owner lane: runPostCastTriggersMerged (:597-:601) and    */
-/*  its call sites :720/:727/:751/:759 — the post-payment rider seam */
-/*  (#1470/#1472/#1473). The :712 early-chain bypass that keeps     */
-/*  riders structurally unreachable on consumed casts (#1455 🔴) is  */
-/*  pinned by earlyReturns-generic.test.js/:712 + earlyReturns-      */
-/*  modal.test.js — never-fires there, merged-once here.              */
+/*  its call sites :720/:727/:751/:759 + the fix#121(a) :712 early-  */
+/*  chain merge — the post-payment rider seam (#1470/#1472/#1473).   */
+/*  The :712 early-chain bypass that kept riders structurally         */
+/*  unreachable on consumed casts (#1455 🔴) is FIXED by fix#121(a):  */
+/*  consumed casts merge once here; the per-arm pins live in          */
+/*  earlyReturns-generic.test.js/:712 + earlyReturns-modal.test.js.  */
 /*  Cross-file REPORT (not touched): the merged auto-miss/tail lanes */
 /*  in execution-post-cast.test.js use bare toHaveBeenCalled() and   */
 /*  own the sanctuary-pair + CLA-200 tail faces (:492/:572-:635).   */
-/*  #1455 dedupe verdict (READ of :472/:475 vs :519/:522): the      */
-/*  merge does NOT dedupe producer-fired riders — on the :337        */
-/*  generic-heal lane triggerPostCastSelfHeals/AllyHeals fire TWICE  */
-/*  (producer runGenericHealPath + merge runPostCastTriggers).       */
-/*  Pinned below as CURRENT behavior; if #1452's producer owner       */
-/*  dedupes, the times(2) pins fail loudly.                          */
-/*  #1475-form fix: checkCompelledDuelAttackExpiry is imported at    */
-/*  its DIRECT path (index.js:6) — the barrel-only mock let the REAL */
-/*  handler execute on every damage-lane cast; now mocked at :6.     */
-/*  Vestigial './spellResolution.js' mock removed (index.js imports   */
-/*  no live binding from it). castingTimeUtils/psychicSpellsHandler   */
-/*  stay REAL: inert pure readers on passives:[] fixtures.            */
-/*  Kill-matrix: M1 merge skipped at :720/:727/:751/:759 -> surge    */
-/*  times(0)+result-identity flips fail; M2 rider reorder inside     */
-/*  :505-:556 -> invocationCallOrder ascension fails; M3 swallow<->  */
-/*  passThrough swap on :299 -> laneValue undefined vs popup flips;  */
-/*  M4 hasVisibleCastPayload drop of targetName check (:587) -> T4   */
-/*  result identity flips to surge; M5 :514 Hex/HM skip removed ->  */
-/*  applyHexEffects times(0) pin fails; M6 dedupe added (#1452 fix) */
-/*  -> T4 times(2) fails. No game clocks anywhere (surge fires only  */
-/*  at the cast seam; rest-seam owners #1302-#1312).                 */
+/*  #1455 dedupe FIXED (fix#121(b)): producers flag healRidersRun   */
+/*  ('pair' from runGenericHealPath :470/:473, 'self' from the       */
+/*  massHealUtils.confirmFn-routed automations at :710/:329) and      */
+/*  runPostCastTriggers defers exactly those legs — every heal rider  */
+/*  lands EXACTLY ONCE per cast; merge-only riders stay single-fire. */
+/*  Kill-matrix: M1 merge skipped at :712/:720/:727/:751/:759 ->     */
+/*  surge times(0)+result-identity flips fail; M2 rider reorder inside */
+/*  :505-:556 -> invocationCallOrder ascension fails; M3 swallow<->   */
+/*  passThrough swap on :299 -> laneValue undefined vs popup flips;   */
+/*  M4 hasVisibleCastPayload drop of targetName check (:587) -> T4    */
+/*  result identity flips to surge; M5 :514 Hex/HM skip removed ->    */
+/*  applyHexEffects times(0) pin fails; M6 heal-rider guard removed   */
+/*  -> T4 self/ally times(1) pins fail loudly (fix#121(b)). No game   */
+/*  clocks anywhere (surge fires only at the cast seam; rest-seam      */
+/*  owners #1302-#1312).                                                */
 /* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
@@ -484,10 +479,10 @@ describe('executeSpellCast CLA-389 runPostCastTriggersMerged (:597) — post-pay
     expect(mockTriggerWildMagicSurge).toHaveBeenCalledWith(fireball, { slotLevel: 3, metamagicHeighten: false, finalFormula: null, featsOfChaosArmedAtCast: false }, playerStats, 'test-campaign', undefined);
   });
 
-  it('#1455 dedupe verdict — the :337 generic-heal producer fires self/ally riders and the :720 merge REFIRES them (no dedupe): both fire exactly twice, the visible heal payload outranks the surge, and the heal result is byte-exact', async () => {
-    // Cure Wounds rides :337 runGenericHealPath (producer self :472/ally :475),
-    // then :720 merges into runPostCastTriggers (self :519/ally :522) — the merge
-    // has NO dedupe: that is the pinned current behavior, not an accident of fixture.
+  it('#1455 dedupe FIXED (fix#121(b)) — the :337 generic-heal producer fires self/ally riders and flags healRidersRun:"pair"; the :720 merge DEFERS those legs: each rider fires exactly once, the visible heal payload outranks the surge, and the heal result is byte-exact', async () => {
+    // Cure Wounds rides :337 runGenericHealPath (producer self/ally riders, flagged
+    // 'pair'), then :720 merges into runPostCastTriggers — the heal-rider pair is
+    // deferred (:553/:559 guards); merge-only riders still run once each there.
     const spell = diskRow(spells5e, 'Cure Wounds');
     const playerStats = makePlayerStats();
     resolveSpellDamageWithTypes.mockReturnValue({ formula: null, primaryType: null }); // disk CW has no damage
@@ -504,24 +499,22 @@ describe('executeSpellCast CLA-389 runPostCastTriggersMerged (:597) — post-pay
     });
 
     const stamped = { slotLevel: 1, targetName: 'Goblin', metamagicHeighten: false };
-    // Double-fire: producer + merge, each rider exactly twice, identical tuples.
-    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
+    // Single-fire: producer only, merge defers the flagged pair.
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
     expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(spell, { ...stamped, targetNames: ['Goblin'] }, playerStats, 'test-campaign', undefined);
-    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
     expect(triggerPostCastAllyHeals).toHaveBeenCalledWith(spell, stamped, playerStats, 'test-campaign', undefined);
     // Merge-only riders stay single-fire (:712 chain never ran — generic heal is :338).
     expect(triggerPostCastRiderSaves).toHaveBeenCalledTimes(1);
     expect(triggerInspiringSmite).toHaveBeenCalledTimes(1);
     expect(mockTriggerWildMagicSurge).toHaveBeenCalledTimes(1); // gate rolled once; popup suppressed by precedence
     expect(triggerHealingWord).toHaveBeenCalledTimes(0); // :341 skipped — :338 handled
-    // Provenance order: producer batch strictly before merge batch, surge inside merge.
+    // Provenance order: producer pair strictly before merge riders, surge inside merge.
     ascends([
       triggerPostCastSelfHeals.mock.invocationCallOrder[0],
       triggerPostCastAllyHeals.mock.invocationCallOrder[0],
       triggerPostCastRiderSaves.mock.invocationCallOrder[0],
       applyHexEffects.mock.invocationCallOrder[0],
-      triggerPostCastSelfHeals.mock.invocationCallOrder[1],
-      triggerPostCastAllyHeals.mock.invocationCallOrder[1],
       mockTriggerWildMagicSurge.mock.invocationCallOrder[0],
     ]);
     // :587 targetName != null → lane outranks surge: exact heal bytes, not the popup.

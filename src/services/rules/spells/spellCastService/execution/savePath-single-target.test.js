@@ -80,10 +80,14 @@
 /*  overchannelSpellLevel `metaCtx?.slotLevel || spell.level`        */
 /*  swallows slotLevel 0 to spell.level — NO `|| 1` fallback unlike */
 /*  the #1454/:53 family; lv0 disk rows survive as 0 (:228).         */
-/*  Golden crash: spell.dc AND fullSpell.dc both absent → TypeError  */
-/*  at :222 (unguarded deref, console untouched #1360) — LIVE caller */
-/*  index.js:755 gate `spell.dc || fullSpell.dc` makes this          */
-/*  unreachable through the hub; pinned module-direct only.           */
+/*  Golden crash RETIRED by fix#1494 guard-first decline: a cast with */
+/*  no spell.dc and no fullSpell.dc able to resolve BOTH chain bytes  */
+/*  (:222 dc_type truthy + :223 dc_success non-nullish) now           */
+/*  console.errors LOUD and resolves null — never a TypeError, never a */
+/*  fake 0-DC save prompt. Hub gate `spell.dc || fullSpell.dc`        */
+/*  (index.js:887 + auto-miss :716) remains the first line; this seam  */
+/*  guard is the exported-module contract for direct callers (the      */
+/*  LIVE crash surface pinned by ledger #1494).                        */
 /*  Roller-falsy null → rollDamage silently skipped (:260).          */
 /*                                                                      */
 /*  DISK: fixtures loaded programmatically from BOTH rulesets         */
@@ -427,9 +431,10 @@ describe('savePath.js — single-target save lane', () => {
     expect(ctx.dcSuccess).toBe('half'); // null cannot veto — disk spell.dc supplies
 
     // Arm 3 (2024 disk divergence, #1365 both rulesets): disk 2024 Ray of
-    // Sickness carries NO dc — it is gated out at index.js:755 live and never
-    // reaches here (noSavePath lane owns it; the :222 unguarded-deref crash
-    // twin is pinned separately below).
+    // Sickness carries NO dc — it is gated out at the hub (index.js:887
+    // live) and never reaches here (noSavePath lane owns it; the :222
+    // unguarded-deref crash twin is declined loud at the seam — #1494
+    // guard arms pinned in the decline suite below).
   });
 
   it('saveDc carries the innate-sorcery +1 only when armed; metamagicHeighten rides hasInvisible; spellSchool stamp falls back fullSpell→spell→null', async () => {
@@ -479,18 +484,96 @@ describe('savePath.js — single-target save lane', () => {
     expect(leveled.rollDamage.mock.calls[0][0].context.isCantrip).toBe(false);
   });
 
-  it('golden crash: spell.dc AND fullSpell.dc both absent → TypeError at :222 with console untouched (unreachable live via index.js:755 gate)', async () => {
+  /* ---------------------------------------------------------------- */
+  /*  #1494 guard-first decline suite (flips the pre-fix golden     */
+  /*  TypeError pin at old :482). Pre-fix capture, verbatim, run    */
+  /*  against the unguarded :222-:223 bytes:                        */
+  /*    TypeError: Cannot read properties of undefined (reading      */
+  /*    'dc_type')   ← :222, both-dc-absent and dc:{}/partial arms  */
+  /*    TypeError: Cannot read properties of undefined (reading      */
+  /*    'dc_success') ← :223, dc_type-only arm                      */
+  /*  Hub-path face stays byte-intact: disk census 260/260 dc rows */
+  /*  carry both fields, and every surviving arm above runs          */
+  /*  untouched (#1348 hub-gate path preservation).                  */
+  /* ---------------------------------------------------------------- */
+
+  it('#1494 both dc absent → LOUD console.error + resolve null — no TypeError, no picker, no roll, no fake 0-DC prompt', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const args = makeArgs({
       spell: { ...diskSpell('Hellish Rebuke'), dc: undefined },
       fullSpell: { ...diskSpell('Hellish Rebuke'), dc: undefined },
     });
 
-    await expect(handleSavePath(args)).rejects.toThrow(TypeError);
+    const result = await handleSavePath(args);
 
-    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(result).toBe(null); // house decline shape: falsy → hub :889 falls through to post-cast triggers
+    expect(consoleSpy).toHaveBeenCalledTimes(1); // guard must be loud BEFORE refusing
+    expect(consoleSpy.mock.calls[0][0]).toMatch(/no save dc on spell or fullSpell/);
+    expect(consoleSpy.mock.calls[0][1]).toBe('Hellish Rebuke');
+    expect(args.getTargetInfo).not.toHaveBeenCalled(); // guard precedes the target picker — no side effects
     expect(rollExpression).not.toHaveBeenCalled();
     expect(args.rollDamage).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('#1494 residual crash arms: spell.dc absent + fullSpell.dc cannot resolve BOTH chain bytes → decline each (dc:{} crashes :222 pre-fix; dc_type-only and explicit-null dc_success crash :223 pre-fix)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const partialRows = [
+      { label: 'dc:{} — :222 `||` fallthrough derefs spell.dc', dc: {} },
+      { label: 'dc_type only — :223 `??` fallthrough derefs spell.dc', dc: { dc_type: 'CON' } },
+      { label: 'explicit-null dc_success — ?? treats null as MISSING', dc: { dc_type: 'CON', dc_success: null } },
+      { label: 'dc:null — optional chain yields undefined on both rungs', dc: null },
+    ];
+
+    for (const row of partialRows) {
+      const args = makeArgs({
+        spell: { ...diskSpell('Hellish Rebuke'), dc: undefined },
+        fullSpell: { ...diskSpell('Hellish Rebuke'), dc: row.dc },
+      });
+      const result = await handleSavePath(args);
+      expect(result, row.label).toBe(null);
+      expect(consoleSpy, row.label).toHaveBeenCalledTimes(1);
+      expect(args.rollDamage, row.label).not.toHaveBeenCalled();
+      consoleSpy.mockClear();
+    }
+    consoleSpy.mockRestore();
+  });
+
+  it('#1494 guard does NOT over-reach: fullSpell.dc resolves both chain bytes → spell survives and ships the fullSpell dc rungs (chooser-row-supplied-by-disk hub shape)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rollExpression.mockReturnValue(rollerResult(10, [5, 5], 0, '2d10'));
+    const args = makeArgs({
+      spell: { ...diskSpell('Hellish Rebuke'), dc: undefined }, // lightweight chooser row shape (fix#119 census)
+      fullSpell: diskSpell('Hellish Rebuke'), // disk-resolved full row: dc {dc_type:'DEX', dc_success:'half'}
+    });
+
+    const result = await handleSavePath(args);
+
+    expect(result).toBeUndefined(); // success lane shape unchanged (handleSingleTargetSave resolves undefined)
+    expect(consoleSpy).not.toHaveBeenCalled();
+    const ctx = args.rollDamage.mock.calls[0][0].context;
+    expect(ctx.saveType).toBe('DEX'); // :222 fullSpell first arm, byte-intact
+    expect(ctx.dcSuccess).toBe('half'); // :223 fullSpell arm, byte-intact
+    consoleSpy.mockRestore();
+  });
+
+  it('#1494 guard is dc-ABSENCE-scoped, not field-validation-scoped: spell.dc present-but-empty object survives with undefined rungs (pre-fix quirk, unchanged)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    rollExpression.mockReturnValue(rollerResult(10, [5, 5], 0, '2d10'));
+    const args = makeArgs({
+      spell: { ...diskSpell('Hellish Rebuke'), dc: {} },
+      fullSpell: { ...diskSpell('Hellish Rebuke'), dc: {} },
+    });
+
+    const result = await handleSavePath(args);
+
+    expect(result).toBeUndefined();
+    expect(consoleSpy).not.toHaveBeenCalled(); // bare derefs on PRESENT objects were never the #1494 crash surface
+    const ctx = args.rollDamage.mock.calls[0][0].context;
+    expect(ctx.saveType).toBeUndefined();
+    expect(ctx.dcSuccess).toBeUndefined();
+    expect(args.rollDamage).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
 });

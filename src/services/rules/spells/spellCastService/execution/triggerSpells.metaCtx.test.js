@@ -44,7 +44,8 @@
 /*  NO-CLOCK: dispatch is instantaneous; triggerSpells.js stamps no    */
 /*  expiry rounds on this span; expiry delegates (checkCompelledDuel-  */
 /*  AttackExpiry :292/:305/:318) are name-dispatch handlers owned      */
-/*  elsewhere — rounds:600 standing 🔴 cited to seam owners (#1497).  */
+/*  elsewhere — rounds:600 retired, #1497 FIXED fix#108-mirror        */
+/*  rounds:Infinity+until:'combat' (helpers.js:83).  */
 /*  invocationCallOrder unnecessary: exactly-one dispatch per test.     */
 /*                                                                     */
 /*  Fixtures: REAL disk rows BOTH rulesets, existence-first +          */

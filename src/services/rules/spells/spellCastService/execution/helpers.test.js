@@ -10,8 +10,9 @@
 /*   applyHexEffects :17-73       THIS lane — hexEffects.test.js:11  */
 /*     VERBATIM: 'helpers.test.js owns applyHexEffects DIRECT unit    */
 /*     bytes (guards, stamps, merged expiry legs)'; :351 VERBATIM    */
-/*     'rounds byte itself owned by helpers.test.js' — rounds:600     */
-/*     lives here (old :233 -> new :113/:127).                        */
+/*     'rounds byte itself owned by helpers.test.js' — the clock      */
+/*     stamp lives here (#1497 FIXED: rounds:Infinity +               */
+/*     until:'combat' combat-scoped canonical, fix#108 mirror).        */
 /*   triggerArcaneWard :75-100    SPLIT: seam happy-path exact        */
 /*     5-tuple + gate near-misses school/slotless-cantrip/             */
 /*     passive_rule-MISMATCH/empty = #1495                            */
@@ -59,19 +60,22 @@
 /*  campaign arg that the :63 write carries — tuple pin, not bug.   */
 /*  :89 `|| spell.level` fallback bytes pinned at 2 both disks.     */
 /*  NO-CLOCK: expiry arms here are CLA-107 removal clocks (game-     */
-/*  state-free registration face); rounds:600 standing per #1497.    */
+/*  state-free registration face); #1497 FIXED — retired hours×600  */
+/*  recipe replaced by canonical rounds:Infinity+until:'combat'.     */
 /*                                                                    */
 /*  KILL-MATRIX (declared analytically; LIVE cp-backup only, NEVER   */
 /*  git checkout): 'always-add-save-te' killed by arm-1 exact 1-set  */
 /*  + guard-table; 'push-not-replace' killed by positional bystander */
 /*  equality; 'stale-ability-survives' killed by ability:DEX byte;   */
 /*  'clock-drops-save-leg' killed by arm-2 exact effects census;     */
-/*  'rounds-mutant' killed by rounds:600; 'name-lowercase-accepts'   */
+/*  'rounds-mutant' killed by rounds:Infinity+until:'combat' exact  */
+/*  tuple (never numeric 600); 'name-lowercase-accepts' killed by    */
 /*  killed by case trail; 'throws-removed-at-:77' killed by rejects; */
 /*  'rejection-rethrows' killed by A2; 'passive_rule-arm-dropped'    */
 /*  killed by A3 r1; ':89 fallback dropped' killed by A3 r3 byte 2.  */
 /*                                                                    */
-/*  Old->new map: 16 tests -> 5 (basic+Eldritch+both clock rows+     */
+/*  Old->new map: 16 tests -> 6 (basic+Eldritch+both clock rows+     */
+/*  both replace rows folded into H1 two-arm full-set table and      */
 /*  both replace rows folded into H1 two-arm full-set table and      */
 /*  H2 guard table; arcane happy-path folded out — #1495 seam owns   */
 /*  it). Campaign lockdown: test-campaign.                            */
@@ -181,7 +185,7 @@ describe('helpers.js BASE lane', () => {
   /* bystander to pin in-place positional replacement and the           */
   /* target/source triple match (:27/:47). No weak matchers: every     */
   /* assertion below is exact-value.                                    */
-  it('Hex direct unit: both Eldritch arms write exact full-set tes stamps and arm ONE merged remove_target_effect clock with rounds:600; stale legs replaced in place, bystanders preserved positionally, seed store and inputs never mutated', () => {
+  it('Hex direct unit: both Eldritch arms write exact full-set tes stamps and arm ONE merged remove_target_effect clock with rounds:Infinity + until:combat (combat-scoped, #1497 fix#108-mirror); stale legs replaced in place, bystanders preserved positionally, seed store and inputs never mutated', () => {
     const bystander = { target: 'Goblin', effect: 'sanctuary', source: 'Cleric One' };
     const arms = [
       {
@@ -231,14 +235,60 @@ describe('helpers.js BASE lane', () => {
         ['campaign', 'targetEffects', expectedStored, CAMPAIGN],
       ]);
       expect(addExpiration.mock.calls, label).toEqual([
-        [{ attackerName: CASTER, targetName: 'Goblin', effects: expectedExpiry, campaignName: CAMPAIGN, rounds: 600 }],
+        [{ attackerName: CASTER, targetName: 'Goblin', effects: expectedExpiry, campaignName: CAMPAIGN, rounds: Infinity, until: 'combat' }],
       ]);
+      // #1497 NEVER-A-CLOCK pin: Hex is 'Concentration, up to 1 hour'
+      // (2024 spells.json:7143, concentration:true) — authored >=1 minute
+      // is combat-scoped; the retired hours×600 countdown must never be
+      // re-introduced. rounds carries Infinity (no round seam matures it)
+      // and the row carries until:'combat' (the exact sweeper predicate,
+      // expirationQueue.js sweepCombatScopedExpirations: e?.until === 'combat').
+      const expiryArg = addExpiration.mock.calls[0][0];
+      expect(Number.isFinite(expiryArg.rounds), label).toBe(false);
+      expect(expiryArg.rounds, label).not.toBe(600);
+      expect(expiryArg.until, label).toBe('combat');
       // Inputs pristine: :23 copies the store; helper must never mutate.
       expect(getRuntimeValue, label).toHaveBeenCalledTimes(1);
       if (seed !== undefined) expect(seed, label).toEqual(seedCopy);
       expect(playerStats.automation.passives, label).toEqual(passives);
       expect(consoleError, label).not.toHaveBeenCalled();
     }
+  });
+
+  /* H3 — #1497 initiative-seam-claims pin: the armed Hex row must be  */
+  /* claimed at EVERY end boundary, never by a fabricated countdown.    */
+  /* (1) Round-seam immunity: addExpiration stamps expiryRounds:        */
+  /*     rounds ?? Infinity (expirationQueue.js:25) and processExpiration */
+  /*     List matures only on currentRound >= appliedRound + expiryRounds */
+  /*     (:53) — Infinity never matures at any round.                     */
+  /* (2) Sweeper claim: sweepCombatScopedExpirations filters on the      */
+  /*     exact byte e?.until === 'combat' (:127) and runs each doomed    */
+  /*     row's clearExpirationEffects — 'remove_target_effect' is wired  */
+  /*     to handleRemoveTargetEffect (clearExpirationEffects.js:461).    */
+  /* (3) Initiative seam: clearAllExpirationEffects (initiativeProcessing */
+  /*     .js:36) drains the caster store unconditionally.                  */
+  /* (4) Rest seams: restRules-shortRest/longRest -> sweepRestClocks     */
+  /*     (zoneDurationClock.js:139) -> same sweeper predicate.           */
+  /* Real-sweeper bytes are owned by the infra lanes (zoneDurationClock */
+  /* .test.js:265, clearAllExpirationEffects_additional.test.js:115);   */
+  /* this lane owns the PRODUCER row shape the sweeps claim.            */
+  it('Hex expiry row is combat-scoped: rounds never matures at any round seam and the until:combat byte is the exact sweeper predicate (initiative + rest seams claim it)', () => {
+    getRuntimeValue.mockImplementation(() => []);
+    applyHexEffects(HEX_DISK, makePlayerStats(), CAMPAIGN, 'Goblin', 'DEX');
+    expect(addExpiration.mock.calls.length).toBe(1);
+    const { rounds, until } = addExpiration.mock.calls[0][0];
+    // Row exactly as addExpiration stores it (expirationQueue.js:25).
+    const row = { target: 'Goblin', effects: [], appliedRound: 7, expiryRounds: rounds ?? Infinity, until: until || null };
+    // (1) Round-seam immunity: even 10× the retired 600-clock horizon and
+    // far past it, the entry stays armed — no countdown, no auto-resolve.
+    for (const currentRound of [7, 8, 601, 1200, 6000, 600000]) {
+      expect(currentRound >= row.appliedRound + row.expiryRounds, `round ${currentRound}`).toBe(false);
+    }
+    // (2) Exact sweeper predicate byte (expirationQueue.js:127).
+    expect(row?.until === 'combat').toBe(true);
+    // Never the retired numeric hours×600 recipe.
+    expect(rounds).not.toBe(600);
+    expect(Number.isFinite(rounds)).toBe(false);
   });
 
   /* H2 — guard table (:18 name gate incl. #1457 case trail on the   */

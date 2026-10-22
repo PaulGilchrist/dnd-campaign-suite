@@ -20,12 +20,13 @@ import * as healRider from './postCastHealService.js'
 /*                                                                     */
 /*  Identity per #1454 split table: save-DC / range auto-miss /       */
 /*  emp-evoc bake / overchannel / heal-throw slot-null /              */
-/*  corrupt-conditions honest-abort, ALL through the barrel + the     */
+/*  corrupt-conditions loud-DEGRADE (fix#126 #1495), ALL through the  */
 /*  REAL hub chain (index.js gates/stamps, damageCalculation.js,       */
 /*  savePath.js single-target branch, triggerSpells.js name gates,    */
 /*  helpers.js, rangeValidation.js, castingTimeUtils.js, blockChecks.js */
 /*  run real; damageUtils.js runs real — these rows never reach        */
-/*  getCombatContext, and fetchCalls [] on abort rows proves it).     */
+/*  getCombatContext, and fetchCalls [] on the proficiency-abort row   */
+/*  proves it).                                                          */
 /*  Mocked edges mirror the .execute lane canon (#1454): runtime,      */
 /*  dice (faithful null guard, diceRoller.js:78), log, feature         */
 /*  services, riders. Refund keeps only the barrel-call + the 0→1     */
@@ -449,10 +450,15 @@ describe('spellCastService.js barrel — hub transport lane', () => {
     })
   })
 
-  describe('corrupt caster state — honest abort (SP-002 family)', () => {
-    // null-continue branch owned by execution-early-resolutions.test.js:331-350;
-    // this row owns the corrupt NON-null abort bytes with zero side effects.
-    it('aborts a corrupt non-null activeConditions BEFORE any write, fetch, roll, or log', async () => {
+  describe('corrupt caster state — fix#126 loud DEGRADE (#1495)', () => {
+    // null-continue branch owned by execution-early-resolutions.test.js:331-350.
+    // RETIRED ABORT (pre-fix capture, green pre-fix): corrupt non-null
+    // activeConditions REJECTED executeSpellCast at the unguarded ambush read —
+    // whole cast + all post-cast riders dead (#1495). fix#126 self-catches at
+    // the hub (:157-:164/:774, mirroring the fix#119 :817 confusion-await catch):
+    // the resolver's abort bytes stay LOUD, the cast DEGRADES to
+    // metamagicHeighten:false and pays its lane honestly.
+    it('degrades a corrupt non-null activeConditions LOUDLY and completes the cast — resolver byte + hub catch byte, ambush bonus lost, spell lands', async () => {
       const spell = blightDisk()
       const ctx = makeCtx()
       runtime.getRuntimeValue.mockImplementation((_character, key) => {
@@ -460,18 +466,26 @@ describe('spellCastService.js barrel — hub transport lane', () => {
         return undefined
       })
 
-      await expect(
-        executeSpellCast(spell, { slotLevel: 4, targetName: 'Goblin1' }, ctx),
-      ).rejects.toThrow('activeConditions must be an array for caster')
+      const result = await executeSpellCast(spell, { slotLevel: 4, targetName: 'Goblin1' }, ctx)
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      // No rejection — the Blight damage lane completed (transport bytes mirror
+      // the golden save-DC row above).
+      expect(result).toBeNull()
+      expect(consoleErrorSpy.mock.calls.map(c => c[0])).toEqual([
         '[spellCast] casterConditions: activeConditions is not an array',
-      )
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalled()
-      expect(fetchCalls).toEqual([])
-      expect(ctx.rollDamage).not.toHaveBeenCalled()
-      expect(ctx.rollAttack).not.toHaveBeenCalled()
-      expect(logService.addEntry).not.toHaveBeenCalled()
+        '[spellCast] Magical Ambush resolution failed:',
+      ])
+      expect(ctx.rollDamage).toHaveBeenCalledTimes(1)
+      expect(ctx.rollDamage.mock.calls[0][0].context.saveDc).toBe(13)
+      // degraded fold byte — explicit false, never absent, never true
+      expect(ctx.rollDamage.mock.calls[0][0].context.metamagicHeighten).toBe(false)
+      expect(dice.rollExpression).toHaveBeenCalledTimes(1)
+      expect(dice.rollExpression).toHaveBeenCalledWith('8d8')
+      expect(runtime.setRuntimeValue.mock.calls).toEqual([
+        ['TestWizard', 'lastActionSpellCast', 1, CAMPAIGN],
+      ])
+      expect(fetchCalls).toEqual(['/data/spells.json'])
+      expect(logService.addEntry).toHaveBeenCalledTimes(1)
       expect(runtime.getRuntimeValue).toHaveBeenCalledWith('TestWizard', 'activeConditions', CAMPAIGN)
     })
   })

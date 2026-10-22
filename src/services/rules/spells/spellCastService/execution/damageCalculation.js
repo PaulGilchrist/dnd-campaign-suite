@@ -31,12 +31,39 @@ function computeRange(spell, metaCtx, attackerPos, targetPos, featEffects) {
 
 // CLA-120: single owner of the Empowered Evocation gate — INT mod on evocation
 // damage spells only (school gate + cantrip/leveled both eligible), 0 otherwise.
+// fix#1468(a): sign-preserving. RAW (2024/classes.json:13502 "Whenever you cast a
+// Wizard spell from Evocation school, add your Intelligence modifier to one damage
+// roll of that spell."; 5e/classes.json:13454 same law) ADDS the SIGNED modifier —
+// a -2 INT cast subtracts 2 damage. The old `empEvocIntMod > 0` gate clamped
+// negatives to 0, silently buffing weak-caster damage. getEmpoweredEvocationIntModifier
+// (postCastRiderService.js:217-220) already returns intAbility?.bonus verbatim —
+// modifiers are signed everywhere else in the house.
 function resolveEmpoweredEvocationIntMod(playerStats, spell) {
     const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
     const spellSchool = (spell.school || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
-    return hasEmpoweredEvoc && isEvocation && spell.damage && empEvocIntMod > 0 ? empEvocIntMod : 0;
+    return hasEmpoweredEvoc && isEvocation && !!spell.damage ? empEvocIntMod : 0;
+}
+
+// fix#1469(b)/(c): the file's single omit-safe, sign-aware, fold-once tag append.
+// Pre-fix, :79/:95 interpolated a null base into 'null + 5 [Blessed Strikes]' garbage
+// and :123 re-appended [Overchannel Maximize] on re-entry with no dedupe. Interpolation
+// mirrors the house formula-builder precedent savePrompt.js:148 describeSaveRoll
+// (`${saveBonus !== 0 ? ' +' + saveBonus : ''}` — omit when inert, never raw null),
+// extended to render negatives as ' - N' because diceRoller.js:46 parses modifier
+// segments ([+-]\d+) only — '+-N' is unparseable. Dedupe keys on the MARKER string,
+// never on the value (CLA-120 :48 idiom / CLA-279 fold-once shape). A null/empty base
+// logs (no-fallback law) and passes through unchanged — never bake a tag onto nothing.
+function appendBonusTerm(formula, bonus, tag) {
+    const marker = `[${tag}]`;
+    if (formula == null || formula === '') {
+        console.error(`[spellCast] appendBonusTerm: base formula missing for ${marker} — bonus ${bonus} not applied`);
+        return formula;
+    }
+    if (formula.includes(marker)) return formula;
+    const term = bonus > 0 ? ` + ${bonus}` : bonus < 0 ? ` - ${-bonus}` : '';
+    return `${formula}${term} ${marker}`;
 }
 
 // CLA-120: execution/index.js is the single owner of the single-target bake —
@@ -45,8 +72,10 @@ function resolveEmpoweredEvocationIntMod(playerStats, spell) {
 function computeEmpoweredEvocation(playerStats, spell, formula) {
     const empEvocIntMod = resolveEmpoweredEvocationIntMod(playerStats, spell);
     let empEvocFormula = formula || null;
-    if (empEvocIntMod > 0 && formula && !formula.includes('[Empowered Evocation]')) {
-        empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
+    // fix#1468(a): `!== 0` so a negative INT mod still folds ('2d10 - 2 [Empowered
+    // Evocation]'); falsy formula still skips only the BAKE (cla120 :137-138 pin).
+    if (empEvocIntMod !== 0 && formula) {
+        empEvocFormula = appendBonusTerm(formula, empEvocIntMod, 'Empowered Evocation');
     }
 
     return { empEvocFormula, empEvocIntMod };
@@ -76,7 +105,9 @@ function computeBlessedStrikes(spell, empEvocFormula, playerStats, campaignName,
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const wisMod = Math.max(0, wis?.bonus || 0);
     if (wisMod > 0) {
-        return `${empEvocFormula} + ${wisMod} [Blessed Strikes]`;
+        // fix#1469(b): was `${empEvocFormula} + ${wisMod} [Blessed Strikes]` — a null
+        // base concatenated literally ('null + 5 [Blessed Strikes]').
+        return appendBonusTerm(empEvocFormula, wisMod, 'Blessed Strikes');
     }
     return empEvocFormula;
 }
@@ -92,7 +123,9 @@ function computeRadiantSoul(spell, playerStats, campaignName, getRuntimeValue, e
         const charismaAbility = playerStats.abilities?.find(a => a.name === 'Charisma');
         const chaMod = Math.max(0, charismaAbility?.bonus || 0);
         if (chaMod > 0) {
-            finalFormula = `${empEvocFormula} + ${chaMod} [Radiant Soul]`;
+            // fix#1469(b): was `${empEvocFormula} + ${chaMod} [Radiant Soul]` — null-base
+            // concat garbage ('null + 4 [Radiant Soul]').
+            finalFormula = appendBonusTerm(empEvocFormula, chaMod, 'Radiant Soul');
         }
     }
     return finalFormula;
@@ -120,7 +153,12 @@ function computeOverchannel({ spell, metaCtx, playerStats, campaignName, getRunt
             overchannelActive = true;
             overchannelUseCount = currentUseCount + 1;
             const formulaForOverchannel = empEvocFormula || baseFormula;
-            overchannelFormula = `${formulaForOverchannel} [Overchannel Maximize]`;
+            // fix#1469(c): was a raw `${formulaForOverchannel} [Overchannel Maximize]`
+            // append — re-entry double-tagged the same formula (and a null base baked
+            // 'null [Overchannel Maximize]'). appendBonusTerm dedupes on the marker
+            // (exactly one tag, #1348) and logs+passes through a null base; consumers
+            // fall back via `overchannelFormula || formula` (savePath.js:255).
+            overchannelFormula = appendBonusTerm(formulaForOverchannel, 0, 'Overchannel Maximize');
             setRuntimeValue(playerStats.name, usesKey, overchannelUseCount, campaignName);
         }
     }

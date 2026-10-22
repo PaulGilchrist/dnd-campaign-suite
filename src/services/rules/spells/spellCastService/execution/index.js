@@ -33,8 +33,6 @@ import { handleSavePath } from './savePath.js';
 import { handleNoSavePath } from './noSavePath.js';
 import { handleHolyAura as handleHolyAuraTrigger } from './triggerSpells.js';
 import { handleMassCureWounds as handleMassCureWoundsTrigger } from './triggerSpells.js';
-import { handleMassHealingWord as handleMassHealingWordTrigger } from './triggerSpells.js';
-import { handlePrayerOfHealing as handlePrayerOfHealingTrigger } from './triggerSpells.js';
 import { handleFalseLife as handleFalseLifeTrigger } from './triggerSpells.js';
 import { handleRemoveCurse as handleRemoveCurseTrigger } from './triggerSpells.js';
 import { getCombatSummary } from '../../../../../services/encounters/combatData.js';
@@ -49,8 +47,17 @@ function computePsychicDamageType(spell, psychicSpellsConfig, damageType) {
     return damageType;
 }
 
-function resolveCastDamage(spell, psychicSpellsConfig) {
-    const damageInfo = resolveSpellDamageWithTypes(spell, spell.level || 1);
+function resolveCastDamage(spell, psychicSpellsConfig, playerStats) {
+    // fix#121(e) (#1454/#1462): disk law for cantrip ladders is CHARACTER level —
+    // Fire Bolt 5e spells.json damage.damage_at_character_level {1:'1d10',5:'2d10',
+    // 11:'3d10',17:'4d10'} (2024 stores the same ladder under damage_at_slot_level,
+    // keyed from '0'). The retired `spell.level || 1` argument baked the level-1 tier
+    // ('1d10') for EVERY cantrip cast, disagreeing with the caster-level-resolved
+    // roll at noSavePath.js:13 (resolveSpellDamageAtLevel(spell, playerStats.level)).
+    // Cantrips now resolve at caster level here too — one ladder, one level source;
+    // leveled spells keep the exact previous `spell.level || 1` byte.
+    const damageLevel = spell.level === 0 ? (playerStats.level || 1) : (spell.level || 1);
+    const damageInfo = resolveSpellDamageWithTypes(spell, damageLevel);
     const formula = damageInfo?.formula || null;
     const damageType = damageInfo?.primaryType || spell.damage?.damage_type || '';
     return { formula, damageType, effectiveDamageType: computePsychicDamageType(spell, psychicSpellsConfig, damageType) };
@@ -73,6 +80,12 @@ function applyHostileCastSideEffects(spell, playerStats, campaignName) {
 // `result` when handled; swallow returns undefined (matching bare `return;`).
 const passThrough = (r) => (r.handled ? { value: r.result } : null);
 const swallow = (r) => (r.handled ? { value: undefined } : null);
+
+// fix#121(b) (#1455): automation types routed by :710 handleGenericAutomation into
+// massHealUtils.createMassHealHandler, whose confirmFn owns the post-cast SELF-heal
+// rider inline (CLA-038, massHealUtils.js:218-223). Both rulesets' disk rows carry
+// these types (Mass Healing Word/Prayer of Healing 5e+2024; Mass Cure Wounds 2024).
+const MASS_HEAL_CONFIRM_AUTOMATION_TYPES = new Set(['mass_healing_word', 'prayer_of_healing', 'mass_cure_wounds']);
 
 // Run a chain of handled-result trigger thunks in exact order. Sync thunks
 // resolve immediately; async thunks are awaited — preserving the original
@@ -128,6 +141,26 @@ function resolveMagicalAmbushInvisible(playerStats, campaignName) {
     }
     const casterConditions = rawConditions == null ? [] : rawConditions;
     return magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+}
+
+// fix#126 (#1495): hub-side self-catch for the ambush resolver's LOUD guards
+// (:132/:140 — the resolver stays PURE-throw for its exported contract (:864;
+// census: executeSpellCast is its ONLY caller — the re-export has zero production
+// importers). Unguarded at the hub the rejection killed executeSpellCast WHOLE —
+// the paid slot plus every post-cast rider (surge/heals/marks, the fix#121(a)/
+// CLA-389 merges). Mirrors this file's resolved-shape tail law: the fix#119
+// confusion-await arm (`await r.result.catch(console.error)`) and the rider
+// `.catch` family — a failing NON-CRITICAL resolution degrades to its zero-bonus
+// shape (hasInvisible false => the fold ships the explicit metamagicHeighten:false
+// byte, index.generic-metaCtx #1495) and the cast proceeds. The ambush
+// disadvantage is lost; never the spell.
+function resolveMagicalAmbushOrDegrade(playerStats, campaignName) {
+    try {
+        return resolveMagicalAmbushInvisible(playerStats, campaignName);
+    } catch (e) {
+        console.error('[spellCast] Magical Ambush resolution failed:', e);
+        return false;
+    }
 }
 
 // Silence: verbal components are impossible inside a Silence zone.
@@ -326,16 +359,31 @@ async function runNoDamagePath(spell, { fullSpell, metaCtx, playerStats, campaig
     await runStatusEffectsFallback({ spell, fullSpell, metaCtx, playerStats, getTargetInfo, spellSaveDc, innateSorceryActive, hasInvisible, rollDamage });
 
     const massHealingOutcome = await runTriggerChain([
-        async () => swallow(await handleMassCureWoundsTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
-        async () => swallow(await handleMassHealingWordTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
-        async () => swallow(await handlePrayerOfHealingTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
+        // fix#121(b): Mass Cure Wounds' service forwarder fires the SELF-heal rider
+        // inline (massCureWoundsService.js:122) — flag 'self' so the merged post-cast
+        // block defers that leg (ally/chalice riders stay live).
+        async () => { const r = await handleMassCureWoundsTrigger(spell, metaCtx, playerStats, campaignName, mapName); return r.handled ? { value: undefined, healRidersRun: 'self' } : null; },
+        // fix#121(c) (#1463): the Mass Healing Word / Prayer of Healing legs were STRUCTURALLY
+        // DEAD — both disk rows carry automation.type ('mass_healing_word' / 'prayer_of_healing')
+        // on BOTH rulesets, so :710 handleGenericAutomation→executeHandler consumed them first;
+        // these legs could only be reached by automation-free lightweight envelopes
+        // ({name, level, baseLevel} — useActionSpellMetamagic.js:163 second caller), and THAT
+        // shape carries no heal_at_slot_level, so the forwarded services resolved no expression
+        // and silently returned null (massHealingWordService.js:141-145; prayerOfHealingService
+        // :210-212) — zero produced behavior on every reachable input shape. The :710 handler
+        // lane is lawful-complete (chooser modal, pay-at-confirm, SP-091 latch, CLA-038 rider —
+        // massHealUtils.js:107-108/:218-223). Deleted per orphan-code rule; triggerSpells
+        // forwarders stay byte-stable for any other caller (fix#109 constraint).
         async () => swallow(await handleFalseLifeTrigger(spell, metaCtx, playerStats, campaignName, mapName)),
     ]);
-    if (massHealingOutcome) return { handled: true, value: massHealingOutcome.value };
+    if (massHealingOutcome) return { handled: true, value: massHealingOutcome.value, healRidersRun: massHealingOutcome.healRidersRun };
 
     // Generic healing path
     if (spell.heal_at_slot_level) {
-        return { handled: true, value: await runGenericHealPath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod }) };
+        // fix#121(b) (#1455): runGenericHealPath is the single owner of the self/ally
+        // heal riders for generic heals (:472/:475) — flag 'pair' so the CLA-389 merge
+        // no longer refires them at runPostCastTriggers (:519/:522).
+        return { handled: true, value: await runGenericHealPath({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, spellCastingMod }), healRidersRun: 'pair' };
     }
 
     triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
@@ -370,11 +418,43 @@ function resolveHealExpression(healAtSlotLevel, slotLevel) {
     return highestBelow ? healAtSlotLevel[highestBelow] : expression;
 }
 
+// fix#126 (#1484): parse-or-null mirror of prayerOfHealingService.js:111-115 (#1393) —
+// unset/blank/non-numeric NEVER coerces to a fabricated ceiling.
+function parseMaxHp(value) {
+    if (value == null || value === '') return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+}
+
+// fix#126 (#1484): TARGET-OWNED maxHp law — exact twin of fix#103's prayerOfHealing
+// caster-substitution deletion (prayerOfHealingService.js:117-131 verdict: 'the old
+// tail || playerStats.hitPoints || 0 substituted the CASTER's current HP — a low-HP
+// caster silently capped every party member's heal; DELETED'). The retired :404 tail
+// did the same here: an unstamped ally (real max 183) healed against the caster's 138
+// (fix#1484 report: clamp at 138, delta truncated). Resolution law, in order:
+//   1. the target's OWN runtime 'hitPoints' row (PlayerStats single source of truth);
+//   2. LOUD console.error when a player target's row is unstamped (fix#113 loud-refuse
+//      family), then the target's OWN characters snapshot (computedStats.hitPoints /
+//      maxHp — fix#103 census: why unstamped; monster law is its own row maxHp);
+//   3. LOUD-SKIP unresolved (auraOfVitalityHandler.js:49-55 family): maxHp null ->
+//      callers write/log/latch NOTHING. The caster's pool never stands in (#58
+//      NaN-chain canon: unresolvable degrades loudly, never borrows a fake ceiling).
 function resolveTargetHpBounds(target, playerStats, characters) {
     const isTargetPlayer = target.name === playerStats.name || (characters || []).some(c => c.name === target.name && c.type === 'player');
-    const maxHp = isTargetPlayer
-        ? (getRuntimeValue(target.name, 'hitPoints') || playerStats.hitPoints || 0)
-        : (getRuntimeValue(target.name, 'hitPoints') || 0);
+    const ownRuntime = parseMaxHp(getRuntimeValue(target.name, 'hitPoints'));
+    let maxHp = ownRuntime;
+    if (maxHp == null) {
+        const targetChar = (characters || []).find(c => c.name === target.name);
+        const ownStats = targetChar?.computedStats || targetChar;
+        if (isTargetPlayer) {
+            console.error(`[spellCast] resolveTargetHpBounds: player target ${target.name} has unstamped runtime 'hitPoints' — resolving from its own characters snapshot (caster values are never adopted).`);
+        }
+        maxHp = parseMaxHp(ownStats?.hitPoints ?? ownStats?.maxHp);
+    }
+    if (maxHp == null) {
+        console.error(`[spellCast] Skipping heal of ${target.name}: unresolved target maxHp (runtime 'hitPoints'=${JSON.stringify(ownRuntime)}, own snapshot absent). No clamp, no write, no log, no latch.`);
+        return { maxHp: null, currentHp: null };
+    }
     const currentHp = getRuntimeValue(target.name, 'currentHitPoints') ?? maxHp;
     return { maxHp, currentHp };
 }
@@ -390,6 +470,7 @@ async function applyHealToCombat(actualHeal, targetName, campaignName) {
 // 'max' expression branch — heals target to full.
 async function applyMaxHeal({ spell, target, playerStats, characters, campaignName, bonusHeal, bonusDetails }) {
     const { maxHp, currentHp } = resolveTargetHpBounds(target, playerStats, characters);
+    if (maxHp == null) return null; // fix#126 loud-skip (unresolved own maxHp — no 'max' write against a borrowed ceiling)
     const actualHeal = maxHp - currentHp;
     const genericHealResult = { targetName: target.name, healAmount: Math.max(0, actualHeal), formula: 'max', rolls: [], rawTotal: Math.max(0, actualHeal), bonusHeal, bonusDetails };
     await applyHealToCombat(actualHeal, target.name, campaignName);
@@ -416,6 +497,10 @@ async function applyRolledHeal({ spell, target, playerStats, characters, campaig
     }
     if (!result) return null;
     const { maxHp, currentHp } = resolveTargetHpBounds(target, playerStats, characters);
+    // fix#126 loud-skip: unresolvable own ceiling -> no clamp, no combat write,
+    // no hp_change log, no latch. The displayed roll stays harmless memory — the
+    // diceRoller mock seam (and its #1480 reroll-display law) is untouched here.
+    if (maxHp == null) return null;
     const healAmount = result.total + bonusHeal;
     const actualHeal = Math.min(Math.max(0, healAmount), Math.max(0, maxHp - currentHp));
     await applyHealToCombat(actualHeal, target.name, campaignName);
@@ -502,7 +587,10 @@ async function castHex(spell, metaCtx, playerStats, campaignName, getTargetInfo)
 }
 
 // --- Post-cast triggers — returns the Wild Magic Surge popup (if any).
-async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }) {
+// healRidersRun: 'pair' when runGenericHealPath already fired self+ally riders
+// (:472/:475), 'self' when an automation-routed mass-heal producer owns the self
+// rider (massHealUtils.js:218-223, massCureWoundsService.js:122) — fix#121(b).
+async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, healRidersRun }) {
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
     });
@@ -515,13 +603,21 @@ async function runPostCastTriggers({ spell, metaCtx, playerStats, campaignName, 
         applyHexEffects(spell, playerStats, campaignName, hexTarget, metaCtx?.hexAbility);
     }
 
-    const triggerTargetCtx = { ...(metaCtx || {}), targetNames: metaCtx?.targetNames || (hexTarget ? [hexTarget] : undefined) };
-    triggerPostCastSelfHeals(spell, triggerTargetCtx, playerStats, campaignName, mapName).catch(e => {
-        console.error('[spellCast] Post-cast self-heal failed:', e);
-    });
-    triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-        console.error('[spellCast] Post-cast ally-heal failed:', e);
-    });
+    // fix#121(b): the heal-rider pair used to fire a second time here for every
+    // generic heal (runGenericHealPath :472/:475 + this block) — single-owner split
+    // now: producers flag healRidersRun, this shared block defers exactly the legs
+    // they already fired. All other riders stay ungated and fire once per cast.
+    if (healRidersRun !== 'pair' && healRidersRun !== 'self') {
+        const triggerTargetCtx = { ...(metaCtx || {}), targetNames: metaCtx?.targetNames || (hexTarget ? [hexTarget] : undefined) };
+        triggerPostCastSelfHeals(spell, triggerTargetCtx, playerStats, campaignName, mapName).catch(e => {
+            console.error('[spellCast] Post-cast self-heal failed:', e);
+        });
+    }
+    if (healRidersRun !== 'pair') {
+        triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+            console.error('[spellCast] Post-cast ally-heal failed:', e);
+        });
+    }
     triggerSmiteOfProtection(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Smite of Protection trigger failed:', e);
     });
@@ -672,7 +768,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (block) return block;
 
     // --- Spell resolution (inline) ---
-    const hasInvisible = resolveMagicalAmbushInvisible(playerStats, campaignName);
+    // fix#126 (#1495): self-caught ambush resolution — see resolveMagicalAmbushOrDegrade
+    // (:147-:165) for the fix#119-mirror law; degrades to hasInvisible:false here,
+    // so the fold below ships the explicit metamagicHeighten:false byte.
+    const hasInvisible = resolveMagicalAmbushOrDegrade(playerStats, campaignName);
     // CLA-219: Magical Ambush folds into the verified Heightened Spell transport
     // (metaCtx.metamagicHeighten) at this single choke point, so every save lane —
     // dedicated handlers, PC save prompt, NPC inline adjudicator, charm lane —
@@ -690,7 +789,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     // Spell stats
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
-    const { formula, damageType, effectiveDamageType } = resolveCastDamage(spell, psychicSpellsConfig);
+    const { formula, damageType, effectiveDamageType } = resolveCastDamage(spell, psychicSpellsConfig, playerStats);
 
     const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
     const { spellToHit, spellSaveDc, spellCastingMod } = computeSpellStats(playerStats, cantripSpellAbility);
@@ -704,12 +803,46 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         () => passThrough(handleMassSuggestion(spell, spellSaveDc, playerStats, campaignName)),
         () => passThrough(handleCalmEmotions(fullSpell, spellSaveDc, playerStats, campaignName, metaCtx)),
         () => passThrough(handleHypnoticPatternEarly({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, innateSorceryActive })),
-        () => { const r = handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion: (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp) }); return r.handled ? { value: r.result?.result } : null; },
+        // fix#121(d) (#1458): handleConfusionEarly returns { handled: true, result: <Promise> }
+        // (modalSpells.js:151-157) — the retired sync thunk read r.result?.result, i.e. `.result`
+        // off a Promise: undefined EVERY time, with the IIFE detached, untracked, never awaited
+        // (fix#116 await family). The chain outcome is now awaited; a rejection fails LOUDLY
+        // (fix#9 family) so the confusion effect either lands or console.errors before the cast
+        // is consumed. Swallow semantics preserved: consumed lane resolves undefined.
+        async () => {
+            const r = handleConfusionEarly({ fullSpell, spell, metaCtx, spellSaveDc, playerStats, campaignName, mapName, triggerConfusion: (s, m, p, c, mp) => triggerConfusion(s, m, p, c, mp) });
+            if (!r.handled) return null;
+            if (r.result && typeof r.result.then === 'function') {
+                await r.result.catch(e => {
+                    console.error('[spellCast] Confusion early trigger failed:', e);
+                });
+            }
+            return { value: undefined };
+        },
         () => passThrough(handleShapechange({ fullSpell, metaCtx, playerStats, campaignName, mapName, characters })),
         () => passThrough(handleSleep({ fullSpell, spellSaveDc, playerStats, campaignName, metaCtx, characters })),
-        async () => { const r = await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters, metaCtx }); return r.handled ? { value: r.result || undefined } : null; },
+        // fix#121(b) integrity (#1455): mass heals routed through automation land inside
+        // massHealUtils.confirmFn, which fires the post-cast SELF-heal rider itself
+        // (CLA-038, massHealUtils.js:218-223). The chain outcome flags 'self' so the
+        // merged post-cast block at :712 rolls the surge and every other rider exactly
+        // once without refiring the self rider. Mass Cure Wounds' 5e :329 forwarder
+        // (massCureWoundsService.js:122) carries the same self-heal ownership stamp.
+        async () => {
+            const r = await handleGenericAutomation({ spell, executeHandler, playerStats, campaignName, mapName, characters, metaCtx });
+            if (!r.handled) return null;
+            const automationType = (spell.automation?.type || '').toLowerCase();
+            const ownsSelfHeal = MASS_HEAL_CONFIRM_AUTOMATION_TYPES.has(automationType);
+            return { value: r.result || undefined, healRidersRun: ownsSelfHeal ? 'self' : undefined };
+        },
     ]);
-    if (earlyResult) return earlyResult.value;
+    if (earlyResult) {
+        // fix#121(a) (#1455): the retired bare `return earlyResult.value` meant every early-handled
+        // cast paid its slot while the post-cast rider block + Wild Magic chain (fix#114 live
+        // producer at :538) stayed STRUCTURALLY UNREACHABLE. Mirrors the verified CLA-389 merge
+        // lanes (:720/:727/:751/:759): run the post-cast block exactly once post-payment; the
+        // lane keeps its own visible picker/popup via hasVisibleCastPayload precedence.
+        return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, healRidersRun: earlyResult.healRidersRun }, earlyResult.value);
+    }
 
     // --- NO DAMAGE PATH ---
     if (!formula) {
@@ -717,7 +850,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         if (noDamage.handled) {
             // CLA-389: handled no-damage lanes (e.g. Expeditious Retreat) paid the
             // slot but previously swallowed the post-cast triggers entirely.
-            return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo }, noDamage.value);
+            return await runPostCastTriggersMerged({ spell, metaCtx, playerStats, campaignName, mapName, characters, getTargetInfo, healRidersRun: noDamage.healRidersRun }, noDamage.value);
         }
     }
 

@@ -23,15 +23,17 @@
 // Quirks pinned as CURRENT behavior (reported, not sanctioned; file:line of spellValidation.js):
 //  Q1 :276 applyClassSpellSource sets isSpellcaster=true unconditionally for ANY class name,
 //     even one absent from disk ('Artificer' row proves it); false only when no class is named.
-//  Q2 :123 2024 Magic Initiate disk text "You learn two cantrips" -> regex captures the literal
-//     token 'two' into grantedCantrips (feats.json 2024 Magic Initiate).
+//  Q2 FIXED #1530: the Magic Initiate capture 'two' is now catalog-refused + console.error'd;
+//     grantedCantrips stays [] (guard row below).
 //  Q3 :216 ALL 5e feats.json descriptions are arrays, and the gate `desc.includes('cantrip')`
 //     on an array is an element check -> false -> 5e feat description parsing is inert.
-//  Q4 :123 2024 Gnome subrace text yields capture 'Mending and Prestidigitation'.
-//  Q5 the pattern arm is unfiltered/uncanonicalized: 5e Tiefling disk text "You know the
-//     thaumaturgy cantrip" yields lowercase 'thaumaturgy', so a Fighter+Tiefling choosing
-//     'Thaumaturgy' (disk classes ['Cleric']) is STILL warned, while lowercase 'thaumaturgy'
-//     (spell found via s.index) is allowed. Case trail pinned.
+//  Q4 FIXED #1530: 'Mending and Prestidigitation' now SPLITS on the conjunction and both
+//     parts catalog-match (deduped against the em-arm hits); no multi-word junk token survives.
+//  Q5 FIXED #1530: pattern-arm captures are canonicalized through the spell catalog with a
+//     case-fold EXACT match: 5e Tiefling text "You know the thaumaturgy cantrip" now yields
+//     titled 'Thaumaturgy', so Fighter+Tiefling 'Thaumaturgy' is allowed and the lowercase
+//     pseudo-name is refused (flip rows below). Substring junk ('Armor' vs 'Mage Armor')
+//     is impossible — the guard is Map.get on lowercased EXACT keys.
 //  Q6 :432-433 vacuous self-compute: _spellLevel is read then void-ed (dead line).
 //  Q7 :455 valid = warnings.filter(type==='warning') is vacuous — only 'warning' type exists.
 //  Q8 :468-469 getSpellValidationInfo loads sources twice (validateSpells + direct call):
@@ -39,13 +41,16 @@
 //  Q9 :26 getClassSpellList echoes the INPUT case ([className]), not the canonical disk name.
 //  Q10 2024 disk backgrounds have no `features`/`traits` keys -> background extraction is
 //     disk-inert (all 16 rows extract nothing); extractor arms pinned via STRUCT fixtures.
-//  Q11 :251 applyBackgroundSpellSource forwards `version` to the 1-arg extractor (vacuous arg).
+//  Q11 FIXED #1530: applyBackgroundSpellSource's `version` forward is now load-bearing —
+//     the background extractor threads it into the catalog lookup (5e vs 2024 spell set).
 //
 // Kill-matrix (analytic declaration — mutant -> killing row):
 //  K1 selectedSpells `|| []` arm -> V-shortcircuit(null/undefined); K2 length===0 early return
 //  -> V-shortcircuit loader-call census; K3/K4 getClassSpellList found/index/!found arms -> C
 //  rows; K5 em vs pattern arms + buckets -> G-gnome/Tiefling exact arrays; K6 dedup arms ->
-//  G-gnome duplicate Minor Illusion dedup; K7 unfiltered capture -> Q2/Q4/Q5 rows; K8 desc
+//  G-gnome duplicate Minor Illusion dedup; K7 catalog filter + conjunction split + loud-drop ->
+//  #1530 guard rows ('two' dropped+errored, 'Mending and Prestidigitation' splits to two valid
+//  titled spells, lowercase 'thaumaturgy' canonicalized, 'Armor' substring junk refused); K8 desc
 //  includes-gate -> G-feats 5e bypass row; K9 feat-name hardcodes -> G-feats 2024 exact block;
 //  K10 features||traits fallback -> B-rows; K11 5e join vs 2024 coercion (version branch) ->
 //  E-struct row (identical fixture, divergent output); K12 sourceName ?. -> '' names in G-guard;
@@ -63,13 +68,14 @@
 // (Q10) — they impersonate no real entity. No fabricated class-list spell rows: the previous
 // suite's allSpells FABRICATED 5 of 9 class lists (e.g. Darkness/Misty Step omit Wizard, which
 // IS on disk) and 'Spellseeker'/'Asimov' exist nowhere on disk — refuted against disk, removed.
-// Mock census: spellValidation.js:7 imports exactly 4 dataLoader exports -> mock is exact-of-4
-// (previous mock carried 4 dead entries: loadWildMagicSurgeTable, fetchClassData, fetchRaceData,
-// fetchBackgroundData — never reachable from this module). The __fixtures__ barrel in this folder
+// Mock census: spellValidation.js:7 imports exactly 5 dataLoader exports (loadSpells added by
+// #1530 for the catalog-backed capture filter) -> mock is exact-of-5 (the previous mock carried
+// 4 dead entries: loadWildMagicSurgeTable, fetchClassData, fetchRaceData, fetchBackgroundData —
+// never reachable from this module). The __fixtures__ barrel in this folder
 // is NOT consumed by this file (corroborates #1529 zero-consumer report).
 // Security: kiro-injection watch — no injected instructions were found in fetched/tool content
 // this session; nothing external obeyed. Read-only disk access to public/data.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -78,6 +84,7 @@ vi.mock('../../ui/dataLoader.js', () => ({
   loadRaceData: vi.fn(),
   loadBackgroundData: vi.fn(),
   loadFeatData: vi.fn(),
+  loadSpells: vi.fn(),
 }));
 
 import * as dataLoader from '../../ui/dataLoader.js';
@@ -109,6 +116,8 @@ const notFound = (name) => `Spell "${name}" not found in spell database.`;
 const OUTSIDE_ONE = 'Spell (1) chosen outside of the class spell list.';
 const OUTSIDE_TWO = 'Spell(s) (2) chosen outside of the class spell list.';
 
+let consoleError;
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(dataLoader.loadClassData).mockImplementation(async (version = '5e') =>
@@ -123,6 +132,16 @@ beforeEach(() => {
   vi.mocked(dataLoader.loadFeatData).mockImplementation(async (version = '5e') =>
     version === '2024' ? feats2024 : feats5e,
   );
+  vi.mocked(dataLoader.loadSpells).mockImplementation(async (version = '5e') =>
+    version === '2024' ? spells2024 : spells5e,
+  );
+  // #1530 loud-drop channel: console.error is the sanctioned non-silent junk path;
+  // spy to keep lane output clean and let guard rows assert the exact drop messages.
+  consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('spellValidation', () => {
@@ -156,13 +175,16 @@ describe('spellValidation', () => {
         race: {
           name: 'Gnome',
           spells: ['Speak with Animals'],
-          // Q4: subrace trait text yields the multi-word capture verbatim;
-          // subrace 'Minor Illusion' is deduped against the trait hit.
-          cantrips: ['Minor Illusion', 'Mending', 'Prestidigitation', 'Mending and Prestidigitation'],
+          // #1530: the Rock Gnome capture 'Mending and Prestidigitation' splits on the
+          // conjunction; both parts catalog-match and are deduped against the trait hits.
+          cantrips: ['Minor Illusion', 'Mending', 'Prestidigitation'],
         },
         background: { name: '', spells: [], cantrips: [] },
         feats: { grantedSpells: [], grantedCantrips: [], spellListAccess: [] },
       });
+      // catalog loaded exactly once (module-level cache) even with multiple captures
+      expect(dataLoader.loadSpells).toHaveBeenCalledTimes(1);
+      expect(dataLoader.loadSpells).toHaveBeenCalledWith('2024');
     });
 
     it.each([
@@ -171,7 +193,9 @@ describe('spellValidation', () => {
         ['Magic Initiate', 'Fey Touched', 'Shadow Touched', 'Telepathy', 'Not A Feat'],
         {
           grantedSpells: ['Misty Step', 'Invisibility', 'Detect Thoughts'],
-          grantedCantrips: ['two'], // Q2: disk text "You learn two cantrips" -> capture 'two'
+          // #1530: disk text "You learn two cantrips" captured 'two' as a pseudo-cantrip;
+          // the token is now catalog-refused (console.error'd twice: desc + spell benefit).
+          grantedCantrips: [],
           spellListAccess: ['Any class (chosen by player)'],
         },
       ],
@@ -244,7 +268,7 @@ describe('spellValidation', () => {
       const formData = { class: { name: 'Wizard' }, background: { name: 'STRUCT Background' } };
 
       const sources = await getSpellSources(formData, '5e');
-      // pattern-arm captures are cantrip-bucket by construction (spellValidation.js:126)
+      // pattern-arm captures are cantrip-bucket by construction and catalog-canonicalized (#1530)
       expect(sources.background.spells).toEqual([]);
       expect(sources.background.cantrips).toEqual(key === 'features' ? ['Guidance'] : ['Produce Flame']);
 
@@ -268,6 +292,97 @@ describe('spellValidation', () => {
         expect(sources.background.spells).toEqual([]);
         expect(sources.background.cantrips).toEqual([]);
       }
+    });
+  });
+
+  describe('#1530 catalog-backed capture filter (ARM A at the prose parser)', () => {
+    // Structured-vs-parser verdict (disk census): the junk rows carry NO structured spell field
+    // (5e Tiefling Infernal Legacy keys = index,name,description,proficiencies; 2024 Rock Gnome
+    // subrace keys = name,description,languages; 2024 Magic Initiate benefits automation.spell is
+    // the empty-string player-choice placeholder) — prose is the only source there, so the fix
+    // arms the PARSER with catalog validation rather than delegating to a structured field.
+
+    it('5e Tiefling disk prose "thaumaturgy" is canonicalized to titled, zero junk dropped', async () => {
+      const sources = await getSpellSources(
+        { class: { name: 'Fighter' }, race: { name: 'Tiefling' } },
+        '5e',
+      );
+      expect(sources.race.cantrips).toStrictEqual(['Thaumaturgy']); // case-fold rescue, titled bytes
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it("'two' from Magic Initiate prose is refused loudly and never enters grantedCantrips", async () => {
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, feats: ['Magic Initiate'] },
+        '2024',
+      );
+      expect(sources.feats.grantedCantrips).toStrictEqual([]);
+      // desc arm + benefits[type==='spell'] arm each capture 'two' -> two loud drops
+      expect(consoleError).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"two"'));
+    });
+
+    it("'Mending and Prestidigitation' splits on the conjunction into two valid titled cantrips", async () => {
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+        {
+          name: 'STRUCT Race',
+          traits: [{ description: 'You know the mending and thaumaturgy cantrips of your choice.' }],
+        },
+      ]);
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, race: { name: 'STRUCT Race' } },
+        '5e',
+      );
+      // split + case-fold catalog match, canonical titled output, no conjunction fragment survives
+      expect(sources.race.cantrips).toStrictEqual(['Mending', 'Thaumaturgy']);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it('slash-joined prose fragments split before catalog matching', async () => {
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+        { name: 'STRUCT Race', traits: [{ description: 'You know the light/thaumaturgy cantrip.' }] },
+      ]);
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, race: { name: 'STRUCT Race' } },
+        '5e',
+      );
+      expect(sources.race.cantrips).toStrictEqual(['Light', 'Thaumaturgy']);
+    });
+
+    it('substring junk never sneaks in: "Armor" is refused, not matched to "Mage Armor" (#120/#1348 exact-match contract)', async () => {
+      expect(spells5e.some((s) => s.name === 'Mage Armor')).toBe(true); // disk precondition
+      expect(spells5e.some((s) => s.name === 'Armor')).toBe(false); // junk is a strict substring only
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+        { name: 'STRUCT Race', traits: [{ description: 'You know the Armor cantrip.' }] },
+      ]);
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, race: { name: 'STRUCT Race' } },
+        '5e',
+      );
+      expect(sources.race.cantrips).toStrictEqual([]);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('"Armor"'));
+    });
+
+    it('quantifier junk ("another cantrip") is dropped; real prose captures across traits each validate', async () => {
+      vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+        {
+          name: 'STRUCT Race',
+          traits: [
+            { description: 'You know the Guidance cantrip. When you level, you learn another cantrip.' },
+            { description: 'You know two cantrips of your choice.' },
+          ],
+        },
+      ]);
+      const sources = await getSpellSources(
+        { class: { name: 'Wizard' }, race: { name: 'STRUCT Race' } },
+        '5e',
+      );
+      expect(sources.race.cantrips).toStrictEqual(['Guidance']);
+      // loud drops for 'another' and 'two', in capture order
+      expect(consoleError).toHaveBeenCalledTimes(2);
+      expect(consoleError).toHaveBeenNthCalledWith(1, expect.stringContaining('"another"'));
+      expect(consoleError).toHaveBeenNthCalledWith(2, expect.stringContaining('"two"'));
     });
   });
 
@@ -361,14 +476,18 @@ describe('spellValidation', () => {
       expect(result.warnings.map((w) => w.message)).toEqual(expected);
     });
 
-    it('5e race grant is defeated by the lowercase disk capture but matches via index (Q5)', async () => {
+    it('#1530: the thaumaturgy case trail is FIXED — titled allowed, lowercase refused', async () => {
       const formData = { class: { name: 'Fighter' }, race: { name: 'Tiefling' } };
 
+      // disk prose "You know the thaumaturgy cantrip" is canonicalized to 'Thaumaturgy'
+      // via the catalog, so the TITLED spell selection is now allowed by the race grant:
       const titled = await validateSpells(formData, ['Thaumaturgy'], spells5e, '5e');
-      expect(titled.warnings).toStrictEqual([{ message: OUTSIDE_ONE, type: 'warning' }]);
+      expect(titled).toStrictEqual({ warnings: [], valid: true });
 
+      // the lowercase pseudo-name is no longer admitted into the allowed set; it still
+      // resolves as a spell via s.index but is off the Fighter list -> consolidated warn:
       const lowered = await validateSpells(formData, ['thaumaturgy'], spells5e, '5e');
-      expect(lowered).toStrictEqual({ warnings: [], valid: true });
+      expect(lowered).toStrictEqual({ warnings: [{ message: OUTSIDE_ONE, type: 'warning' }], valid: false });
     });
 
     it('feat grants widen the allowed set off the Cleric list (2024 Fey Touched)', async () => {

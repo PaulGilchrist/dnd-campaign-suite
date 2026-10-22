@@ -472,13 +472,16 @@ describe('executeSpellCast - Magic Missile hub lane (no-save routing, REAL disk 
     })
   })
 
-  it('code stance: a target-side shield buff nulls missile damage (RAW divergence — shield is +5 AC against attack rolls, darts auto-hit): no producer call, darts still rolled, log spells shieldImmune with zero final damage', async () => {
-    // helpers.js:523-526 models shield as missile immunity; D&D 5e/2024 RAW says auto-hit
-    // darts ignore Shield entirely. Pinning the code stance; divergence reported as source bug.
+  it('#1456 disk law at the hub: the Shield SPELL buff (toggleBuff bytes — name "Shield", effect "shield", no oneShot) nulls missile damage ("you take no damage from magic missile", spells.json:8779), while a monster one-shot shield stamp flows full dart damage through the producer — no blanket missile immunity', async () => {
+    // Stance was pinned as "RAW divergence" pre-fix because ANY effect:'shield' buff —
+    // including MA-1170 monster reaction stamps (oneShot:true, +5 AC vs ONE triggering
+    // attack, MonsterCardHelpers.js:1888-1899) — zeroed whole volleys. helpers.js now
+    // gates immunity to non-oneShot Shield-spell buffs; the false divergence claim is
+    // retired, both arms re-pinned to the quoted disk law.
     const spell = diskMagicMissile5e()
     hoisted.queue = [2, 2, 2]
     runtimeState.getRuntimeValue.mockImplementation((_character, key) => {
-      if (key === 'activeBuffs') return [{ effect: 'shield' }]
+      if (key === 'activeBuffs') return [{ name: 'Shield', effect: 'shield', sourceCharacter: 'Goblin' }]
       if (key === 'activeConditions' || key === 'targetEffects') return []
       return undefined
     })
@@ -501,6 +504,31 @@ describe('executeSpellCast - Magic Missile hub lane (no-save routing, REAL disk 
       castingTime: '1 action', missileCount: 3, missileDamage: '1d4 + 1', damageType: 'Force',
       targets: [{ name: 'Goblin', missiles: 3, rawDamage: 9, finalDamage: 0, shieldImmune: true }],
       totalRawDamage: 9, totalFinalDamage: 0,
+    })
+  })
+
+  it('#1456 hub: MONSTER shield-reaction stamp bytes (oneShot:true) never grant volley immunity — every dart reaches the producer at full raw total, shieldImmune:false', async () => {
+    const spell = diskMagicMissile5e()
+    hoisted.queue = [2, 2, 2]
+    runtimeState.getRuntimeValue.mockImplementation((_character, key) => {
+      if (key === 'activeBuffs') return [{ effect: 'shield', acBonus: 5, oneShot: true, source: 'Shield', vsAttack: 'TestWizard:Magic Missile', timestamp: 1 }]
+      if (key === 'activeConditions' || key === 'targetEffects') return []
+      return undefined
+    })
+
+    const services = makeServices()
+    await executeSpellCast(spell, { slotLevel: 1, magicMissileDistribution: { Goblin: 3 } }, services)
+
+    // full volley forwarded: 2+2+2=6 natural+1 totals rolled per dart -> raw 9
+    expect(applyDamage.applyDamageToTarget).toHaveBeenCalledTimes(1)
+    expect(applyDamage.applyDamageToTarget.mock.calls[0].slice(1, 3)).toEqual(['Goblin', 9])
+
+    const entries = castLogEntries()
+    expect(withoutTimestamp(entries[1])).toEqual({
+      type: 'spell', characterName: 'TestWizard', spellName: 'Magic Missile', spellLevel: 1,
+      castingTime: '1 action', missileCount: 3, missileDamage: '1d4 + 1', damageType: 'Force',
+      targets: [{ name: 'Goblin', missiles: 3, rawDamage: 9, finalDamage: 9, shieldImmune: false }],
+      totalRawDamage: 9, totalFinalDamage: 9,
     })
   })
 

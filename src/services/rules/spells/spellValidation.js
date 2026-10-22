@@ -4,7 +4,28 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData } from '../../ui/dataLoader.js';
+import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData, loadSpells } from '../../ui/dataLoader.js';
+
+// #1530: canonical spell-catalog index (one Map per ruleset version, lazily built once).
+// Prose-parser captures MUST match this catalog with a case-insensitive EXACT key
+// comparison (Map.get on the lowercased token — never substring: 'Armor' must not match
+// 'Mage Armor'). Matched tokens are canonicalized to the catalog's disk title;
+// unmatched junk ('two', unsplittable clause fragments) is dropped loudly via console.error
+// and never enters a result bucket / the allowed-spells set.
+const spellCatalogIndexCache = {};
+
+async function getSpellCatalogIndex(version) {
+  if (!spellCatalogIndexCache[version]) {
+    const spells = await loadSpells(version);
+    const index = new Map();
+    spells.forEach(spell => {
+      if (spell?.name) index.set(spell.name.toLowerCase(), spell.name);
+      if (spell?.index) index.set(spell.index.toLowerCase(), spell.name);
+    });
+    spellCatalogIndexCache[version] = index;
+  }
+  return spellCatalogIndexCache[version];
+}
 
 /**
  * Gets the spell list for a given class
@@ -32,47 +53,21 @@ export async function getClassSpellList(className, version = '5e') {
  * @param {string} version - '5e' or '2024'
  * @returns {object} - { spells: string[], cantrips: string[], details: string[] }
  */
-function extractRaceSpells(raceData, version = '5e') {
+async function extractRaceSpells(raceData, version = '5e') {
   const result = { spells: [], cantrips: [], details: [] };
   
   if (!raceData) {
     return result;
   }
-  
-  // Check 2024 race structure
-  if (version === '2024') {
-    // Check traits for spell-granting features
-    if (raceData.traits) {
-      raceData.traits.forEach(trait => {
-        const desc = trait.description || '';
-        extractSpellsFromDescription(desc, result);
-       });
-      }
-    
-     // Check subraces for spell-granting features
-    if (raceData.subraces) {
-      raceData.subraces.forEach(subrace => {
-        const desc = subrace.description || '';
-        extractSpellsFromDescription(desc, result);
-      });
-    }
-    } else {
-      // Check 5e race structure
-    if (raceData.traits) {
-      raceData.traits.forEach(trait => {
-        const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
-        extractSpellsFromDescription(desc, result);
-        });
-       }
 
-      // Check subraces
-    if (raceData.subraces) {
-      raceData.subraces.forEach(subrace => {
-        const desc = Array.isArray(subrace.description) ? subrace.description.join(' ') : (subrace.description || '');
-        extractSpellsFromDescription(desc, result);
-        });
-       }
-    }
+  // Traits + subrace descriptions share one extraction loop; version only selects the
+  // description coercion (5e joins array descriptions, 2024 reads them raw — pinned quirk).
+  const entries = [...(raceData.traits || []), ...(raceData.subraces || [])];
+  for (const entry of entries) {
+    const raw = entry.description || '';
+    const desc = version === '2024' ? raw : (Array.isArray(raw) ? raw.join(' ') : raw);
+    await extractSpellsFromDescription(desc, result, version);
+  }
   
   return result;
 }
@@ -80,10 +75,14 @@ function extractRaceSpells(raceData, version = '5e') {
 /**
  * Extracts spell names from a text description
  * This is a heuristic approach - looks for italicized spell names
+ * #1530: pattern-arm captures are catalog-validated (case-fold EXACT match via
+ * loadSpells), conjunction/slash fragments are split before matching, and junk
+ * tokens are console.error'd and dropped — never stored as pseudo-spells.
  * @param {string} description - The text description
  * @param {object} result - The result object to add spells to
+ * @param {string} version - '5e' or '2024' (selects the spell catalog)
  */
-function extractSpellsFromDescription(description, result) {
+async function extractSpellsFromDescription(description, result, version = '5e') {
   if (!description) return;
   
   // Look for spell names in italics (HTML format)
@@ -119,12 +118,26 @@ function extractSpellsFromDescription(description, result) {
     }
   }
   
-  // Also check for "you know the X cantrip" pattern
-  const cantripPattern = /(?:know|learn)\s+(?:the\s+)?([\w\s]+?)\s+cantrip/gi;
+  // Also check for "you know the X cantrip" pattern — catalog-validated (#1530).
+  // The lazy capture grabs whole clause fragments, so each capture is first split on
+  // conjunctions/slashes ("Mending and Prestidigitation"), then every part is looked up
+  // in the spell catalog case-insensitively (rescues lowercase prose like 'thaumaturgy').
+  // Catalog misses ('two', 'another') are junk: console.error + drop.
+  const cantripPattern = /(?:know|learn)\s+(?:the\s+)?([\w\s/]+?)\s+cantrip/gi;
+  let catalog = null;
   while ((match = cantripPattern.exec(description)) !== null) {
-    const spellName = match[1].trim();
-    if (!result.cantrips.includes(spellName) && !result.spells.includes(spellName)) {
-      result.cantrips.push(spellName);
+    for (const fragment of match[1].split(/\s+and\s+|\s*\/\s*/)) {
+      const token = fragment.trim();
+      if (!token) continue;
+      catalog = catalog || await getSpellCatalogIndex(version);
+      const canonicalName = catalog.get(token.toLowerCase());
+      if (!canonicalName) {
+        console.error(`spellValidation: dropping non-spell token "${token}" captured from feature text (not in ${version} spell catalog)`);
+        continue;
+      }
+      if (!result.cantrips.includes(canonicalName) && !result.spells.includes(canonicalName)) {
+        result.cantrips.push(canonicalName);
+      }
     }
   }
 }
@@ -135,7 +148,7 @@ function extractSpellsFromDescription(description, result) {
  * @param {string} version - '5e' or '2024'
  * @returns {object} - { spells: string[], cantrips: string[], details: string[] }
  */
-function extractBackgroundSpells(backgroundData) {
+async function extractBackgroundSpells(backgroundData, version = '5e') {
   const result = { spells: [], cantrips: [], details: [] };
   
   if (!backgroundData) {
@@ -144,10 +157,10 @@ function extractBackgroundSpells(backgroundData) {
   
   // Check features/traits for spell-granting abilities
   const features = backgroundData.features || backgroundData.traits || [];
-  features.forEach(feature => {
+  for (const feature of features) {
     const desc = Array.isArray(feature.description) ? feature.description.join(' ') : (feature.description || '');
-    extractSpellsFromDescription(desc, result);
-  });
+    await extractSpellsFromDescription(desc, result, version);
+  }
   
   return result;
 }
@@ -158,7 +171,7 @@ function extractBackgroundSpells(backgroundData) {
  * @param {string} version - '5e' or '2024'
  * @returns {object} - { spells: string[], cantrips: string[], spellListAccess: string[], details: string[] }
  */
-function extractFeatSpells(featData) {
+async function extractFeatSpells(featData, version = '5e') {
   const result = { 
     spells: [], 
     cantrips: [], 
@@ -214,17 +227,17 @@ function extractFeatSpells(featData) {
   
   // Check for other spell-granting feats by parsing description
   if (desc.includes('cantrip') || desc.includes('spell')) {
-    extractSpellsFromDescription(desc, result);
+    await extractSpellsFromDescription(desc, result, version);
   }
   
   // Check benefits array (2024 format)
   if (featData.benefits) {
-    featData.benefits.forEach(benefit => {
+    for (const benefit of featData.benefits) {
       if (benefit.type === 'spell') {
         const benefitDesc = benefit.description || '';
-        extractSpellsFromDescription(benefitDesc, result);
+        await extractSpellsFromDescription(benefitDesc, result, version);
       }
-    });
+    }
   }
   
   return result;
@@ -239,7 +252,7 @@ function extractFeatSpells(featData) {
 async function applyRaceSpellSource(sources, formData, version) {
   const races = await loadRaceData(version);
   const raceData = races.find(r => r.name === formData.race.name);
-  const raceSpells = extractRaceSpells(raceData, version);
+  const raceSpells = await extractRaceSpells(raceData, version);
 
   sources.race.spells = raceSpells.spells;
   sources.race.cantrips = raceSpells.cantrips;
@@ -248,7 +261,7 @@ async function applyRaceSpellSource(sources, formData, version) {
 async function applyBackgroundSpellSource(sources, formData, version) {
   const backgrounds = await loadBackgroundData(version);
   const backgroundData = backgrounds.find(b => b.name === formData.background.name);
-  const backgroundSpells = extractBackgroundSpells(backgroundData, version);
+  const backgroundSpells = await extractBackgroundSpells(backgroundData, version);
 
   sources.background.spells = backgroundSpells.spells;
   sources.background.cantrips = backgroundSpells.cantrips;
@@ -257,16 +270,16 @@ async function applyBackgroundSpellSource(sources, formData, version) {
 async function applyFeatSpellSources(sources, formData, version) {
   const feats = await loadFeatData(version);
 
-  formData.feats.forEach(featName => {
+  for (const featName of formData.feats) {
     const featData = feats.find(f => f.name === featName);
     if (featData) {
-      const featSpells = extractFeatSpells(featData, version);
+      const featSpells = await extractFeatSpells(featData, version);
 
       sources.feats.grantedSpells.push(...featSpells.spells);
       sources.feats.grantedCantrips.push(...featSpells.cantrips);
       sources.feats.spellListAccess.push(...featSpells.spellListAccess);
     }
-  });
+  }
 }
 
 async function applyClassSpellSource(sources, formData, version) {

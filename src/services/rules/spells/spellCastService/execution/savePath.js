@@ -247,6 +247,22 @@ async function handleSingleTargetSave({ spell, fullSpell, metaCtx, playerStats, 
     overchannelFormula, overchannelActive, overchannelUseCount, rollDamage, formula, hasInvisible,
     soulstitchSelection = [] }) {
 
+    // #1494 guard-first seam contract (fix#107/#124 family): this IS the
+    // save-dispatch module — a cast reaching this lane with no dc it can
+    // resolve is INVALID (not a save spell): loud console.error + decline
+    // (null, the falsy shape hub :889 already consumes as "lane shipped
+    // nothing — fall through to post-cast triggers"). Never a TypeError for
+    // direct callers, never a fake 0-DC save prompt. The hub gate
+    // `spell.dc || fullSpell.dc` (index.js:887, auto-miss twin :716) stays
+    // the first line — defense-in-depth, not replacement. The guard mirrors
+    // the exact crash surface of :222-:223: bare `spell.dc.` derefs run only
+    // when fullSpell.dc cannot short-circuit them (`||` needs truthy dc_type,
+    // `??` needs non-nullish dc_success).
+    if (!spell?.dc && !(fullSpell.dc?.dc_type && fullSpell.dc.dc_success != null)) {
+        console.error('[spellCast] savePath: no save dc on spell or fullSpell — refusing save dispatch:', spell?.name);
+        return null;
+    }
+
     const target = await getTargetInfo();
     const context = buildSingleTargetSaveContext(target, mapName, { playerStats, metaCtx, fullSpell, spell,
         effectiveDamageType, spellSaveDc, innateSorceryActive, hasInvisible, overchannelActive,

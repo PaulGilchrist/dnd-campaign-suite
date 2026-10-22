@@ -19,14 +19,14 @@
 //       (#1465 note, re-verified) — Rage row is 5e-only disk today; 2024 classes
 //       carry no blocksSpellcasting row → no split needed at this seam.
 //   checkGlobeOfInvulnerability(spell, targetName, playerStats, campaignName)
-//     gates: level ?? baseLevel ?? 1 <= 5 (before ANY store read); targetName
-//     truthy; store || [] + Array.isArray; globe te on target; attacker inside →
-//     allow. te disk owner: targetEffectDefinitions.js:939 'globe_barrier'
+//     gates: targetName truthy (before ANY store read); store || [] + Array.isArray;
+//     globe te on target; attacker inside → allow; THEN disk threshold read
+//     #1466: maxBlockedSpellLevel via loadSpells(playerStats.rules) (disk owners
+//     public/data/spells.json:4692 + 2024/spells.json:6226, both 5); missing key →
+//     console.error('[blockChecks:globe-threshold-drift]') + exported fallback (D-suite).
+//     te disk owner: targetEffectDefinitions.js:939 'globe_barrier'
 //     (fields:['source']); row bytes mirror globeOfInvulnerabilityHandler.js:64-69
 //     {target, effect, source, duration:'globe_duration'}.
-//     2024 disk spells.json Globe is level 6 automation.maxBlockedSpellLevel:5 —
-//     hard-coded <=5 agrees, but the field is unread: reported quirk, sanctioned
-//     only insofar as both catalogs block through level 5.
 //   checkForcecageBlocked(spell, targetName, playerStats, campaignName)
 //     gates: !targetName early return (zero handler calls); then SHORT-CIRCUIT
 //     chain Forcecage→Maze→Banishment→Imprisonment (first blocker owns the single
@@ -42,8 +42,10 @@
 //
 // MOCK COMPLETENESS vs blockChecks.js imports, line-by-line: useRuntimeState
 // (getRuntimeValue+setRuntimeValue — set needed by REAL materialComponents),
-// logService.addEntry, forcecage/maze/banishment/imprisonment handlers, dynamic
-// ./spellResolution.js getActiveBuffs. REAL always: blockChecks.js itself and
+// logService.addEntry, dataLoader.loadSpells (#1466 disk threshold read — stubbed
+// disk-faithfully with the real Globe row bytes), forcecage/maze/banishment/
+// imprisonment handlers, dynamic ./spellResolution.js getActiveBuffs. REAL always:
+// blockChecks.js itself and
 // ../../materialComponents.js (spellHasCostlyOrConsumedMaterial is pure
 // regex+registry; its fetch on :117 sits in consumeMaterial — never traversed
 // here, so no URL-aware stub needed).
@@ -86,8 +88,15 @@
 //       both messages; || instead of ?? (Fire Bolt lv0 row); baseLevel fallback;
 //       default-1 (trimmed ref); log creatureName=globe-source-not-attacker;
 //       addEntry-reject-throw mutant + console-error tag (last row).
-//   G2: level-gate-after-store-read reorder (store never touched);
-//       targetName-truthy dropped (would read store); threshold-6-blocks mutant.
+//   G2: untargeted-guard dropped (would read store); threshold-gate dropped
+//       (lv6 would block); disk consulted ONLY on the block branch (loadSpells
+//       times-0 on allow arms) — #1466 reorder pinned honestly: store IS read
+//       at above-threshold targeted casts (threshold lives on disk, not code).
+//   D (new #1466): disk-threshold-ignore mutant (disk=2 must let lv5 through);
+//       off-by-one at mutated threshold (lv2 blocks); drift console-error tag +
+//       exported fallback when the disk row lacks the key; DISK PARITY contract
+//       pins both real disk files' automation.maxBlockedSpellLevel to the export
+//       (fix#81 mirror-parity-contract: disk edits move the engine, drift alarms).
 //   G3: Array.isArray dropped (object store crashes filter); || [] dropped;
 //       store-key tuple ('campaign','targetEffects') vs param mutant.
 //   G4: target-key dropped from find (other target's globe would block);
@@ -100,6 +109,8 @@
 //   F3: chain-incomplete mutant (all four consulted, invocationCallOrder
 //       strictly ascending); null passthrough; zero-log.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -108,6 +119,13 @@ vi.mock('../../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+// #1466: stubbed with the REAL Globe row bytes from public/data/spells.json:4658-4693
+// (and 2024 :6192-6227 — identical automation block); the D-suite mutates the threshold
+// to prove the engine obeys it and pins both disk files against the exported fallback.
+vi.mock('../../../../ui/dataLoader.js', () => ({
+  loadSpells: vi.fn(),
 }));
 
 vi.mock('../../../../automation/handlers/spells/forcecageHandler.js', () => ({
@@ -132,12 +150,13 @@ vi.mock('./spellResolution.js', () => ({
 
 const { getRuntimeValue } = await import('../../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../../ui/logService.js');
+const { loadSpells } = await import('../../../../ui/dataLoader.js');
 const { getActiveBuffs } = await import('./spellResolution.js');
 const { isForcecageBlocked } = await import('../../../../automation/handlers/spells/forcecageHandler.js');
 const { isMazeBlocked } = await import('../../../../automation/handlers/spells/mazeHandler.js');
 const { isBanishmentBlocked } = await import('../../../../automation/handlers/spells/banishmentHandler.js');
 const { isImprisonmentBlocked } = await import('../../../../automation/handlers/spells/imprisonmentHandler.js');
-const { checkBlockedBySpellcastingBuff, checkGlobeOfInvulnerability, checkForcecageBlocked } = await import('./blockChecks.js');
+const { checkBlockedBySpellcastingBuff, checkGlobeOfInvulnerability, checkForcecageBlocked, GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK } = await import('./blockChecks.js');
 
 // Disk-faithful spell refs (levels verified against public/data/spells.json,
 // 2026-10-21: Fire Bolt 0, Fireball 3, Cone of Cold 5, Disintegrate 6).
@@ -151,12 +170,21 @@ function globeTe(target, source) {
   return { target, effect: 'globe_barrier', source, duration: 'globe_duration' };
 }
 
+// Disk-faithful Globe automation (public/data/spells.json:4688-4693 verified bytes);
+// the D-suite pins the REAL files, so this fixture is the runtime-read stub.
+const GLOBE_DISK_ROW = {
+  name: 'Globe of Invulnerability',
+  level: 6,
+  automation: { type: 'globe_of_invulnerability', duration: 'Concentration, up to 1 minute', auraRange: 10, maxBlockedSpellLevel: 5 },
+};
+
 const WIZARD = { name: 'TestWizard' };
 
 beforeEach(() => {
   vi.clearAllMocks();
   getRuntimeValue.mockReturnValue([]);
   addEntry.mockResolvedValue(undefined);
+  loadSpells.mockResolvedValue([GLOBE_DISK_ROW]);
   getActiveBuffs.mockReturnValue([]);
   isForcecageBlocked.mockReturnValue(false);
   isMazeBlocked.mockReturnValue(false);
@@ -225,14 +253,23 @@ describe('checkGlobeOfInvulnerability', () => {
     }
   });
 
-  it('allows above-threshold and untargeted casts WITHOUT ever reading the targetEffects store (level/target gates precede the store read)', async () => {
-    // Store populated — consulting it would block Fireball rows; none may touch it.
+  it('#1466 reorder: UNtargeted casts return before the store read (zero store, zero disk); targeted above-threshold casts read the store and consult the disk threshold on the block branch but never block or log', async () => {
+    // Store populated — consult is expected now (threshold lives on disk, evaluated after
+    // the te lookup); blocking is what must NOT happen at level 6 > disk 5.
     getRuntimeValue.mockReturnValue([globeTe('Goblin', 'Mage')]);
     expect(await checkGlobeOfInvulnerability(DISINTEGRATE, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
     expect(await checkGlobeOfInvulnerability({ name: 'Disintegrate', level: undefined, baseLevel: 6 }, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
+    expect(getRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(getRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects');
+    expect(loadSpells).toHaveBeenCalledTimes(2);
+    expect(loadSpells).toHaveBeenCalledWith('5e');
+    expect(addEntry).not.toHaveBeenCalled();
+
+    // Untargeted: the guard precedes EVERY read (kill: guard-drop mutant).
     expect(await checkGlobeOfInvulnerability(FIREBALL, null, WIZARD, 'test-campaign')).toBeNull();
     expect(await checkGlobeOfInvulnerability(FIREBALL, '', WIZARD, 'test-campaign')).toBeNull();
-    expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(getRuntimeValue).toHaveBeenCalledTimes(2);
+    expect(loadSpells).toHaveBeenCalledTimes(2);
     expect(addEntry).not.toHaveBeenCalled();
   });
 
@@ -246,19 +283,77 @@ describe('checkGlobeOfInvulnerability', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('allows when the globe protects someone else and when the on-target row is a different effect — find matches BOTH target and effect keys', async () => {
+  it('allows when the globe protects someone else and when the on-target row is a different effect — find matches BOTH target and effect keys, disk NEVER consulted when no globe shields the target', async () => {
     getRuntimeValue.mockReturnValue([
       globeTe('Orc', 'Mage'),
       { target: 'Goblin', effect: 'foresight', source: 'Mage', duration: 'concentration' },
     ]);
     expect(await checkGlobeOfInvulnerability(FIREBALL, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
     expect(addEntry).not.toHaveBeenCalled();
+    expect(loadSpells).not.toHaveBeenCalled();
   });
 
-  it('allows when the attacker stands inside ANY globe protecting the same target — attacker some() gate, globe source never consulted', async () => {
+  it('allows when the attacker stands inside ANY globe protecting the same target — attacker some() gate, globe source never consulted, disk NEVER consulted on the allow arm', async () => {
     getRuntimeValue.mockReturnValue([globeTe('Goblin', 'Mage'), globeTe('TestWizard', 'OtherMage')]);
     expect(await checkGlobeOfInvulnerability(FIREBALL, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
     expect(addEntry).not.toHaveBeenCalled();
+    expect(loadSpells).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  #1466 disk-driven threshold + mirror-parity contract (D-suite)    */
+/* ------------------------------------------------------------------ */
+
+describe('checkGlobeOfInvulnerability — #1466 disk-driven threshold', () => {
+  it('obeys a MUTATED disk threshold: automation.maxBlockedSpellLevel 2 lets Cone of Cold lv5 THROUGH (pre-fix hardcoded <=5 blocked — disk edits did nothing) and still blocks AT the mutated threshold', async () => {
+    getRuntimeValue.mockReturnValue([globeTe('Goblin', 'Mage')]);
+    loadSpells.mockResolvedValue([{ ...GLOBE_DISK_ROW, automation: { ...GLOBE_DISK_ROW.automation, maxBlockedSpellLevel: 2 } }]);
+    expect(await checkGlobeOfInvulnerability(CONE_OF_COLD, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
+    expect(addEntry).not.toHaveBeenCalled();
+    // boundary AT the mutated threshold still blocks (kills `<2` mutant).
+    const result = await checkGlobeOfInvulnerability({ name: 'Web', level: 2 }, 'Goblin', WIZARD, 'test-campaign');
+    expect(result).toStrictEqual({
+      automationPopup: {
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Globe of Invulnerability',
+          description: 'Web (level 2) is blocked by Globe of Invulnerability protecting Goblin.',
+        },
+      },
+    });
+    // ruleset routing: 2024 caster reads the 2024 catalog (both pinned equal by parity).
+    await checkGlobeOfInvulnerability({ name: 'Web', level: 2 }, 'Goblin', { name: 'TestWizard', rules: '2024' }, 'test-campaign');
+    expect(loadSpells).toHaveBeenLastCalledWith('2024');
+  });
+
+  it('drift alarm: disk row WITHOUT automation.maxBlockedSpellLevel logs [blockChecks:globe-threshold-drift] once and gates at the exported RAW fallback 5', async () => {
+    getRuntimeValue.mockReturnValue([globeTe('Goblin', 'Mage')]);
+    loadSpells.mockResolvedValue([{ name: 'Globe of Invulnerability', level: 6 }]);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await checkGlobeOfInvulnerability(CONE_OF_COLD, 'Goblin', WIZARD, 'test-campaign');
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[blockChecks:globe-threshold-drift]'));
+    expect(result?.automationPopup?.payload?.description).toContain('blocked by Globe of Invulnerability protecting Goblin');
+    expect(await checkGlobeOfInvulnerability(DISINTEGRATE, 'Goblin', WIZARD, 'test-campaign')).toBeNull();
+    consoleSpy.mockRestore();
+  });
+
+  it('DISK PARITY CONTRACT (fix#81 mirror-parity-contract): REAL bytes of both ruleset catalogs pin the Globe automation threshold to the exported fallback — an untested disk edit away from the fallback turns this row RED', async () => {
+    const spells5eDisk = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/spells.json'), 'utf8'));
+    const spells2024Disk = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/2024/spells.json'), 'utf8'));
+    for (const [version, list] of [['5e', spells5eDisk], ['2024', spells2024Disk]]) {
+      const row = list.find(s => s && s.name === 'Globe of Invulnerability');
+      expect(row, `Globe row absent from ${version} spells.json`).toBeTruthy();
+      expect(row.level).toBe(6);
+      // Law-vs-number drift detector: description must still say the threshold level
+      // (5e: "spell of 5th level or lower" :4661; 2024: "spell of level 5 or lower").
+      const text = row.description.join(' ');
+      expect(text).toMatch(/(?:5th level|level 5) or lower/);
+      expect(row.automation.maxBlockedSpellLevel, `disk drift alarm: ${version} spells.json`).toBe(GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK);
+    }
+    expect(GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK).toBe(5);
   });
 });
 

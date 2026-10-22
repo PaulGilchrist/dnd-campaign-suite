@@ -270,7 +270,10 @@ describe('executeSpellCast — Psychic Spells opt-in damage type (CLA-268)', () 
     expect(spellToHit).toBe(9)
     expect(Object.keys(ctx).sort()).toEqual(ATTACK_CTX_KEYS)
     expect(ctx.damageType).toBe('Psychic')
-    expect(ctx.autoDamageFormula).toBe('1d10')
+    // fix#121(e): CL14 caster — the cantrip ladder now resolves at character
+    // level (disk damage_at_character_level tier '11'), so the hub bake is
+    // '3d10', not the retired level-1 '1d10' tier.
+    expect(ctx.autoDamageFormula).toBe('3d10')
     expect(ctx.autoDamageSchool).toBe('Evocation')
 
     // Purity: the executed spell object keeps RAW type/components after swap.
@@ -291,7 +294,7 @@ describe('executeSpellCast — Psychic Spells opt-in damage type (CLA-268)', () 
       spellLevel: 0,
       castingTime: '1 action',
       damageType: 'Fire',
-      damageFormula: '1d10',
+      damageFormula: '3d10', // fix#121(e): character-level cantrip tier at CL14
       saveDC: null,
       concentration: false,
       description: null,

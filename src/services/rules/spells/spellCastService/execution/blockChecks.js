@@ -1,5 +1,6 @@
 import { getRuntimeValue } from '../../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../../ui/logService.js';
+import { loadSpells } from '../../../../ui/dataLoader.js';
 import { isForcecageBlocked } from '../../../../automation/handlers/spells/forcecageHandler.js';
 import { isMazeBlocked } from '../../../../automation/handlers/spells/mazeHandler.js';
 import { isBanishmentBlocked } from '../../../../automation/handlers/spells/banishmentHandler.js';
@@ -60,18 +61,50 @@ export async function checkBlockedBySpellcastingBuff(spell, playerStats, campaig
     };
 }
 
+// #1466 config-drift fix: the block threshold is READ FROM DISK, not hardcoded.
+// Disk owner: the Globe of Invulnerability row automation.maxBlockedSpellLevel —
+// public/data/spells.json:4692 (5e) and public/data/2024/spells.json:6226, both 5.
+// Disk law (spells.json:4661): "Any spell of 5th level or lower cast from outside the
+// barrier can't affect creatures or objects within it". Load idiom is dataLoader's
+// loadSpells (dataLoader.js:505) — the same cached fetch siblings use (spellValidation.js:7,
+// mageArmorService.js:3, damageUtils.js:1; hub lookupFullSpell, execution/index.js:188,
+// hits the identical /data/[2024/]spells.json URLs).
+// GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK is the LAST-DISTANCE default used only when
+// the disk read fails outright; it is NOT a second config source — the disk-parity
+// suite (blockChecks.test.js D-suite, fix#81 mirror-parity-contract precedent) pins
+// both disk rows to this constant and alarms if they ever diverge.
+export const GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK = 5;
+
+async function getGlobeMaxBlockedSpellLevel(rulesVersion) {
+    const version = rulesVersion === '2024' ? '2024' : '5e';
+    const spells = await loadSpells(version);
+    const globeRow = (Array.isArray(spells) ? spells : []).find(s => s?.name === 'Globe of Invulnerability');
+    const threshold = globeRow?.automation?.maxBlockedSpellLevel;
+    if (typeof threshold !== 'number') {
+        console.error(`[blockChecks:globe-threshold-drift] ${version} spells.json Globe of Invulnerability row missing automation.maxBlockedSpellLevel — falling back to RAW ${GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK}`);
+        return GLOBE_MAX_BLOCKED_SPELL_LEVEL_FALLBACK;
+    }
+    return threshold;
+}
+
 export async function checkGlobeOfInvulnerability(spell, targetName, playerStats, campaignName) {
     const effectiveSpellLevel = spell.level ?? spell.baseLevel ?? 1;
-    if (effectiveSpellLevel <= 5 && targetName) {
-        const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-        const effects = Array.isArray(storedEffects) ? storedEffects : [];
-        const globeEffects = effects.filter(te => te.effect === 'globe_barrier');
-        const globeEffect = effects.find(
-            te => te.target === targetName && te.effect === 'globe_barrier'
-        );
-        if (globeEffect) {
-            const attackerProtected = globeEffects.some(ge => ge.target === playerStats.name);
-            if (!attackerProtected) {
+    if (!targetName) return null;
+    const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? storedEffects : [];
+    const globeEffects = effects.filter(te => te.effect === 'globe_barrier');
+    const globeEffect = effects.find(
+        te => te.target === targetName && te.effect === 'globe_barrier'
+    );
+    if (globeEffect) {
+        const attackerProtected = globeEffects.some(ge => ge.target === playerStats.name);
+        if (!attackerProtected) {
+            // Threshold consulted only on a cast that can actually be blocked; loadSpells
+            // is module-cached so a repeated cast costs one Map hit. Version rides the
+            // caster's ruleset; the parity suite pins both ruleset rows to the same
+            // value, so the choice never changes the gate.
+            const maxBlockedSpellLevel = await getGlobeMaxBlockedSpellLevel(playerStats.rules);
+            if (effectiveSpellLevel <= maxBlockedSpellLevel) {
                 await addEntry(campaignName, {
                     type: 'automation',
                     creatureName: globeEffect.source,

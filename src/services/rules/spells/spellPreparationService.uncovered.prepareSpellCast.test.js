@@ -44,17 +44,19 @@
 //     perSpellTracking automation-action consumes; it pins the SHARED
 //     counter, recharge, case-trail filter, special-flag and guard arms
 //     that shadowTouched's row shape cannot reach.
-//   (3) #1524 :491-496 quirk RESIDENCE verdict — READ live source:
-//     consumeSpecialFreeCastFlags :490-496 reads '_Favored_Enemy_freeCast
-//     Count' and writes favoredEnemyUses THE COUNT IT JUST READ (no minus
-//     one) — a vacuous self-copy byte. The consume-side quirk's only pin
-//     WAS this file's legacy row (:503 old numbering); by residence it is
-//     OWNED here — KEPT, strengthened to full-ledger form (Q1): two casts
-//     against one latch byte 2 -> exact-of-2 writes of byte 2, latch
-//     read-exactly-twice, latch write-exactly-zero, read-precedes-write
-//     invocationCallOrder, plus the REAL disk row that makes the loop arm
-//     inert (Favored Enemy carries uses_expression WITHOUT usesMax ->
-//     gate :448 FALSE arm -> the special-flag arm is the only writer).
+//   (3) #1524 :491-496 quirk RESIDENCE verdict — READ live source 2026-10-21,
+//     FIXED #1527 2026-10-22: consumeSpecialFreeCastFlags read
+//     '_Favored_Enemy_freeCastCount' and wrote favoredEnemyUses THE COUNT IT JUST
+//     READ (no minus one) — a vacuous self-copy byte, pinned honestly here as Q1
+//     until the fix landed. The consumed quirk's pin is OWNED here — FLIPPED to
+//     the decrement-lands ledger (Q1): armed latch 2 stamps byte 1, store-bytes
+//     MOVING off the read-count; plus the #1348 decrement table Q1b (3->2,
+//     1->lawful-spent-0 fix#90, 0->LOUD refuse exact-of-1 console, zero writes,
+//     negative impossible). Latch read-exactly-twice, latch write-exactly-ZERO
+//     (#1512 different-keys restore law preserved, cited), read-precedes-write
+//     invocationCallOrder, plus the REAL disk row that keeps the loop arm inert
+//     (Favored Enemy carries uses_expression WITHOUT usesMax -> gate :448 FALSE
+//     arm -> the special-flag arm is the only writer).
 //     Same-family cousin found + pinned honestly: the Signature arm :512-
 //     515 has NO used==null gate — a second free cast RE-STAMPS
 //     SignatureSpells_<Spell>_used true (X1 sequel ledger).
@@ -76,17 +78,18 @@
 //   adjustActionFreeCastCounters type-filter :447 (case-exact) + break
 //     order :450-457 ......................................................... D1/D3
 //   adjustRechargeCounter consume :434-440 ................................ D3
-//   consumeSpecialFreeCastFlags :489-523 (favored quirk, NR :497-501,
+//   consumeSpecialFreeCastFlags :489-523 (favored decrement #1527, NR :497-501,
 //     Bewitching name-gate :502-504, Signature :512-516, Savant :518-522) Q1/X1/X2
 //   CLA-356 telekinetic skip guard :543-544 (consume half — authorize half
 //     is oracle gate #2, cited) ............................................. TK1
 //
 // QUIRK SCANS (consume spans, quantified):
-//   vacuous self-compute/write-back: :491-496 re-stamp — OBSERVABLE byte
-//     write-back pinned in Q1 (it becomes a visible setRuntimeValue call —
+//   vacuous self-compute/write-back: the :491-496 re-stamp was OBSERVABLE byte
+//     write-back pinned in Q1 (it became a visible setRuntimeValue call —
 //     pinned, not deleted, same honesty as the #1524 :802 wasted-allocation
-//     family but here the waste LANDS in the store). Signature used-flag
-//     re-stamp :512-515 — X1 sequel. Loop :543 guard short-circuits the
+//     family but here the waste LANDS in the store) — FIXED #1527: the arm now
+//     decrements (byte = latch-1, MOVES), spent-0 refuses loud (Q1/Q1b).
+//     Signature used-flag re-stamp :512-515 — X1 sequel. Loop :543 guard short-circuits the
 //     whole decrement phase — TK1 zero-write census.
 //   golden guard rows (#1518 form): getCombatSummary-null on concentration
 //     casts (:670/:630) — REAL off-table null, returns clean, pinned by
@@ -145,8 +148,10 @@
 //   :450 break -> continue .................. D1 (trailing instance latch would drain: read+write census kills)
 //   :451 next -> break ...................... D3 (instance recharge never reached — exact-of-1 kills)
 //   :447 type-filter drop ................. D3 (case-trail planted latch 7->6 flips ledger)
-//   :493 newCount >= 0 -> minus applied ... Q1 (byte 1 vs re-stamp byte 2 — THE quirk pin)
-//   :491 null-guard drop .................. Q1 cast-3 (favoredEnemyUses 'null' byte would land)
+//   :513 minus-drop (re-stamp read-count) ... Q1 (byte 2 vs landed byte 1 — THE #1527 pin, pre-fix flip)
+//   :513 `> 0` -> `>= 0` ..................... Q1b latch-0 row (would write -1 — exact-of-0 + loud-refuse census kills)
+//   :516 loud-refuse -> silent .......... Q1b (console-free spent-arm — refused-exactly-one pin kills)
+//   null-guard drop ................. Q1 cast-3 (favoredEnemyUses 'null' byte would land)
 //   :498 NR includes-flip ................. X1 (empty/null store would stamp)
 //   :512 lv===3 gate drop .................. analytic: disk selections are lv3-only by feature law; no disk-honest lv!=3 selection exists to falsify — recorded, not fabricated.
 //   :515 used-flag gate absent ............ X1 sequel (already the REAL byte — mutant adding a gate flips the sequel ledger)
@@ -510,38 +515,71 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
 
 // ---------------------------------------------------------------------------
 // consumeSpecialFreeCastFlags :489-523 — named-feature flag consumes,
-// incl. the :491-496 vacuous self-copy quirk (RESIDENCE: owned HERE,
-// full-ledger form #1524) and the Signature re-stamp cousin.
+// incl. the Favored Enemy consume leg (#1527 FIXED: decrement lands —
+// formerly the :491-496 vacuous self-copy quirk, Q1-pinned honest pre-fix)
+// and the Signature re-stamp cousin.
 // ---------------------------------------------------------------------------
 
 describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', () => {
-  it('Q1 (quirk home, #1524): Favored Enemy disk row consumed on a Hunter\'s Mark free cast — the :490-496 self-copy writes favoredEnemyUses THE COUNT IT JUST READ (2, not 1): two casts stamp byte 2 twice, latch read exactly twice, written EXACTLY ZERO, reads precede writes (#1513 form); a null store writes nothing (:491 guard)', async () => {
+  it('Q1 (#1527 FIXED, was the #1524 quirk home): Favored Enemy disk row consumed on a Hunter\'s Mark free cast — the consume-side DECREMENT LANDS: armed latch byte 2 stamps favoredEnemyUses 1 (pre-fix vacuous self-copy stamped the read-count 2 twice); two casts read the latch arity-2 exactly twice, latch written EXACTLY ZERO (different-keys ledger is the #1512 restore-lane law, cited not grown); reads precede writes (#1513 form); a null store writes nothing (null-guard arm)', async () => {
     const favoredActions = [{ ...diskFeature(classes2024,
       (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
-      'Favored Enemy automation for quirk residence').automation }];
+      'Favored Enemy automation for consume residence').automation }];
     const stats = wizardStats({ automation: { actions: favoredActions, bonusActions: [], specialActions: [], passives: [] } });
 
     // casts 1+2 against ONE armed latch byte 2 (_Favored_Enemy_freeCastCount
     // is producer-seeded via the arm modal / LR re-arm restRules-longRest.js:733
-    // null -> armed byte): the quirk re-stamps, never decrements.
+    // null -> armed byte): every consume stamps latch-1 — the ledger MOVES.
+    // The stamped byte repeats across casts only because the consume never
+    // drains the latch itself (#1512 open different-keys lane); the REAL store
+    // short-circuits the identical sequel write (useRuntimeState.js:96 valuesEqual).
     freshStore({ _Favored_Enemy_freeCastCount: 2 });
     const r1 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
     const r2 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
     expect([r1.freeCastUsed, r2.freeCastUsed]).toEqual([true, true]);
     expect(setRuntimeValue.mock.calls).toEqual([
-      [TW, 'favoredEnemyUses', 2, CAMPAIGN], // read-count re-stamp (2 !== a decrement's 1)
-      [TW, 'favoredEnemyUses', 2, CAMPAIGN],
+      [TW, 'favoredEnemyUses', 1, CAMPAIGN], // decrement landed (1 === read-1, NOT the re-stamp's 2)
+      [TW, 'favoredEnemyUses', 1, CAMPAIGN],
     ]);
-    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([[TW, '_Favored_Enemy_freeCastCount'], [TW, '_Favored_Enemy_freeCastCount']]); // arity-2 literal :490
+    expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(1); // store-bytes MOVED off the read-count
+    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([[TW, '_Favored_Enemy_freeCastCount'], [TW, '_Favored_Enemy_freeCastCount']]); // arity-2 literal read
+    expect(readsOf('favoredEnemyUses')).toEqual([]); // latch is the count source; the uses key is WRITE-only here
     expect(getRuntimeValue.mock.invocationCallOrder[0]).toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]); // read-ledger -> consume-write order
     expect(readsOf('activeBuffs')).toEqual([]); // loop-inert disk shape: gate :448 false (usesMax absent, census at load)
 
-    // deny half — REAL-null missing byte (#1517): guard :491 short-circuits.
+    // deny half — REAL-null missing byte (#1517): null-guard short-circuits.
     freshStore({});
     const r3 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
     expect(r3.freeCastUsed).toBe(true);
     expect(setRuntimeValue.mock.calls).toEqual([]);
-    expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN); // concentration consult: cs-null golden guard :670 (crash twin oracle #1513/#1518, cited)
+    expect(getCombatSummary).toHaveBeenCalledWith(CAMPAIGN); // concentration consult: cs-null golden guard (crash twin oracle #1513/#1518, cited)
+  });
+
+  it('Q1b (#1348 decrement table, #1527): latch 3 writes 2, latch 1 writes LAWFUL spent-0 (fix#90 zero-is-data, never -1), latch 0 no-op consumption REFUSES LOUD with ZERO writes (negative impossible; the pre-fix :493 `>= 0` arm silently stamped byte 0)', async () => {
+    const favoredActions = [{ ...diskFeature(classes2024,
+      (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
+      'Favored Enemy automation for consume residence').automation }];
+    const stats = wizardStats({ automation: { actions: favoredActions, bonusActions: [], specialActions: [], passives: [] } });
+
+    for (const [latch, stamped] of [[3, 2], [1, 0]]) {
+      freshStore({ _Favored_Enemy_freeCastCount: latch });
+      const result = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
+      expect(result.freeCastUsed).toBe(true);
+      expect(setRuntimeValue.mock.calls).toEqual([[TW, 'favoredEnemyUses', stamped, CAMPAIGN]]); // exact-of-1, byte = latch-1
+      expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(stamped);
+    }
+
+    // already-spent latch: loud refusal, zero writes, no negative byte anywhere.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    freshStore({ _Favored_Enemy_freeCastCount: 0, favoredEnemyUses: 0 }); // ledger holds lawful spent-0 (fix#90)
+    const r0 = await cast(DISK.huntersMark, stats, { freeCastAuthorized: true });
+    expect(r0.freeCastUsed).toBe(true); // payment authority is caller-supplied truth (#1514)
+    expect(setRuntimeValue.mock.calls).toEqual([]); // pre-fix wrote byte 0 here (CAPTURE-A0) — now REFUSED
+    expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(0); // lawful spent byte UNTOUCHED
+    const refused = errSpy.mock.calls.filter(c => String(c[0]).includes('Favored Enemy free-cast consume refused'));
+    expect(refused.length).toBe(1); // refusals EXACTLY-one, never silent
+    expect(refused[0][1]).toEqual({ playerName: TW, favoredEnemyCount: 0, spellName: DISK.huntersMark.name });
+    errSpy.mockRestore();
   });
 
   it('X1: Natural Recovery [spellName] grant (:497-501, NaturalRecoveryModal.jsx:29 bytes) consumed to null + used-flag true, alongside the Signature lv3 stamp (:512-515, spellCalc2024.js:661 selection) — exact-of-3 flag-arm order; SEQUEL cast exposes the Signature used-flag RE-STAMP quirk (no used==null gate), NR stays gated (:498 null fall-through, exact-of-1)', async () => {

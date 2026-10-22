@@ -8,7 +8,10 @@
 //   :960-964       cantrip short-circuit {...spell, baseLevel:0} + EARLY return
 //   :1004-1008     CLA-138 drop           concentration:false, duration:'1 minute',
 //                                          _noConcentrationChoice  -> owned by cla138 sibling, NOT here
-//   :886-888       Psychic Spells stamp   +_psychicSpellsOverride:true
+//   :886-888       Psychic Spells stamp   +_psychicSpellsOverride:true — school-gated by
+//                                          the disk row's automation.spellSchools
+//                                          ['enchantment','illusion'] (#1514 FIXED; pre-fix
+//                                          any damaging Warlock spell stamped)
 //   :890-892       Spell Breaker swap     casting_time '1 action'/'Action' -> '1 bonus action'
 //   :812-825       Phantasmal stamp       school:'Illusion', +_phantasmalCreatures,
 //                                          +_phantasmalHalvesHp (!! coercion), list append
@@ -79,6 +82,9 @@ function diskSpell(list, name, pins) {
   return row;
 }
 const diskFireball = diskSpell(spells5e, 'Fireball', { level: 3, casting_time: '1 action', school: 'Evocation', concentration: false });
+const diskFireball2024 = diskSpell(spells2024, 'Fireball', { level: 3, casting_time: 'Action', school: 'Evocation' }); // damaging but OFF disk spellSchools — #1514 deny carrier
+const diskPhantasmalKiller = diskSpell(spells2024, 'Phantasmal Killer', { level: 4, casting_time: 'Action', school: 'Illusion' }); // SECOND listed school of the row — iterate-the-array allow
+const diskCharmPerson2024 = diskSpell(spells2024, 'Charm Person', { level: 1, casting_time: 'Action', school: 'Enchantment', damage: null }); // in-school, no damage
 const diskEB = diskSpell(spells2024, 'Eldritch Blast', { level: 0, casting_time: 'Action', school: 'Evocation' }); // REAL cantrip level — #1510 :0-swallow face
 const diskWhispers = diskSpell(spells2024, 'Dissonant Whispers', { level: 1, casting_time: 'Action', school: 'Enchantment', concentration: false });
 const diskDispel = diskSpell(spells2024, 'Dispel Magic', { level: 3, casting_time: 'Action', school: 'Abjuration', concentration: false }); // lone-case trail: 2024 stores 'Action'
@@ -163,7 +169,7 @@ function makePlayerStats({ name = WIZARD, className = 'Wizard', passives = [] } 
 // no git-checkout mutation runs were performed):
 //  drop cantrip early return / stamp leaks onto cantrip            -> T2
 //  remove baseLevel stamp (cantrip + upcast)                       -> T2, T3
-//  widen psychic gate (drop class / opt-in / damage checks)        -> T4b, T4c, T2
+//  widen psychic gate (drop class / opt-in / damage / disk spellSchools checks) -> T4b, T4c, T4d, T2
 //  retype _psychicSpellsOverride key                               -> T4a full-object toStrictEqual
 //  drop normalizeCastingTime on Spell Breaker ('Action' miss)      -> T5a
 //  widen Spell Breaker to any spell                               -> T5b
@@ -246,7 +252,7 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
     expect(spell).toStrictEqual(freshSpell(diskFireball));     // three casts, caller bytes untouched
   });
 
-  it('T4: Psychic Spells stamp adds _psychicSpellsOverride ONLY; opt-out and non-Warlock deny', async () => {
+  it('T4: Psychic Spells stamp adds _psychicSpellsOverride ONLY on disk spellSchools; opt-out, non-Warlock, off-school, no-damage and missing-spellSchools deny (#1514)', async () => {
     const spell = freshSpell(diskWhispers); // lv1 Enchantment, Psychic damage on disk — inside the passive's spellSchools
     const warlockStats = makePlayerStats({ name: WARLOCK, className: 'Warlock', passives: [psychPassive()] });
     seed(WARLOCK, 'spell_slots_level_1', 2);
@@ -268,8 +274,46 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
       playerName: WIZARD, playerStats: wizardStats, campaignName: CAMPAIGN, usePsychicDamage: true,
     });
     expect(wrongClass.modifiedSpell).toStrictEqual(spell);
-    // producer-side finding: the disk passive is school-gated (enchantment/illusion) but this
-    // stamp arm checks class+passive+damage+opt-in only — school is NOT enforced producer-side.
+    // #1514 FIXED: producer-side school gate — iterate the disk row's automation.spellSchools
+    // (REAL bytes ['enchantment','illusion'], lowercase) case-insensitively vs spell.school
+    // (2024 spells.json stores capitalized schools; applyPsychicComponents precedent at
+    // spellCastService/execution/index.js:193-195 lowercases both sides — house idiom reused).
+
+    // T4d DENY: Evocation Fireball damages but is OFF the disk spellSchools list.
+    // Pre-fix capture: this row stamped _psychicSpellsOverride anyway (any-damage quirk).
+    const fb = freshSpell(diskFireball2024);
+    seed(WARLOCK, 'spell_slots_level_3', 1);
+    const evocation = await prepareSpellCast(fb, { slotLevel: 3 }, {
+      playerName: WARLOCK, playerStats: warlockStats, campaignName: CAMPAIGN, usePsychicDamage: true,
+    });
+    expect(evocation.modifiedSpell).toStrictEqual(fb); // school gate: stamped key ABSENT, byte-identical
+
+    // T4d ALLOW: Illusion Phantasmal Killer (damaging, second school of the disk array) —
+    // proves the gate ITERATES the row's spellSchools instead of hardcoding 'Enchantment'.
+    const pk = freshSpell(diskPhantasmalKiller);
+    seed(WARLOCK, 'spell_slots_level_4', 1);
+    const illusion = await prepareSpellCast(pk, { slotLevel: 4 }, {
+      playerName: WARLOCK, playerStats: warlockStats, campaignName: CAMPAIGN, usePsychicDamage: true,
+    });
+    expect(illusion.modifiedSpell).toStrictEqual({ ...pk, _psychicSpellsOverride: true });
+
+    // in-school WITHOUT damage denies (hasDamage arm still live beside the new school arm):
+    const cp = freshSpell(diskCharmPerson2024);
+    seed(WARLOCK, 'spell_slots_level_1', 1);
+    const noDamage = await prepareSpellCast(cp, { slotLevel: 1 }, {
+      playerName: WARLOCK, playerStats: warlockStats, campaignName: CAMPAIGN, usePsychicDamage: true,
+    });
+    expect(noDamage.modifiedSpell).toStrictEqual(cp);
+
+    // passive stripped of spellSchools (builder default [] per automationInfoBuilder
+    // psionic.js:11) -> empty iteration -> deny, never a free pass:
+    const noSchools = psychPassive(); delete noSchools.spellSchools;
+    const noSchoolsStats = makePlayerStats({ name: WARLOCK, className: 'Warlock', passives: [noSchools] });
+    seed(WARLOCK, 'spell_slots_level_1', 1);
+    const bare = await prepareSpellCast(freshSpell(diskWhispers), { slotLevel: 1 }, {
+      playerName: WARLOCK, playerStats: noSchoolsStats, campaignName: CAMPAIGN, usePsychicDamage: true,
+    });
+    expect(bare.modifiedSpell).toStrictEqual(diskWhispers);
   });
 
   it('T5: Spell Breaker swaps Action Dispel Magic to 1 bonus action (case-normalized disk byte); off-spell deny; idempotent under re-transform', async () => {

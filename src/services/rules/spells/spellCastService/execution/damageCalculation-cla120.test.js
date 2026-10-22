@@ -32,7 +32,8 @@
 //   'is idempotent: [EE] formula returned unchanged'           -> T1 (+ marker-vs-value row)
 //   'non-evocation school gate stays zero'                     -> T3 row (school fixed: fabricated
 //      'Necromancy' replaced by disk byte 'Conjuration' — fixture-fraud fix #1462 GOLD)
-//   'zero INT modifier -> no term'                             -> T3 row (+ negative-INT clamp quirk)
+//   'zero INT modifier -> no term'                             -> T3 row (negative-INT row
+//      MOVED out of the deny table by fix#1468(a): the clamp is gone — see T4 signed fold)
 // old fabricated fixtures replaced with disk bytes: FIRE_BOLT damage.formula (no such key on
 // disk) and FIREBALL hard '8d6' -> programmatic public/data{,/2024}/spells.json ladder reads.
 // Mock completeness: vi.mock of useRuntimeState.js REMOVED — computeEmpoweredEvocation never
@@ -54,6 +55,7 @@ vi.mock('../../postCastRiderService.js', () => ({
 
 import { computeEmpoweredEvocation } from './damageCalculation.js';
 import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../postCastRiderService.js';
+import { canRollExpression } from '../../../../dice/diceRoller.js'; // READ-ONLY parser proof (#1468/#1469)
 
 const readDisk = (p) => JSON.parse(readFileSync(join(process.cwd(), p), 'utf8'));
 const spells5e = readDisk('public/data/spells.json');
@@ -139,7 +141,7 @@ describe('computeEmpoweredEvocation — CLA-120 single-fold owner', () => {
   });
 
   it('folds cantrip bake-vs-roll level sources identically on BOTH ruleset disk ladders (level-source agnostic, #1454 pair positioned)', () => {
-    const bake5 = FB5.damage.damage_at_character_level['1']; // index.js:53 side (spell.level || 1)
+    const bake5 = FB5.damage.damage_at_character_level['1']; // retired :53 lv1 bake (fix#121(e): :53 now resolves CASTERR level, matching this key's tier at CL1-4)
     const roll5 = FB5.damage.damage_at_character_level['5']; // noSavePath.js:13 side (playerStats.level 5)
     const bake24 = FB24.damage.damage_at_slot_level['0'];
     const roll24 = FB24.damage.damage_at_slot_level['5'];
@@ -170,7 +172,6 @@ describe('computeEmpoweredEvocation — CLA-120 single-fold owner', () => {
       { label: 'evocation WITHOUT spell.damage (disk byte: Light has no damage block)', ps: HOLDER, spell: LIGHT, formula: null, expectFormula: null, intSelectorCalls: 1 },
       { label: 'school missing', ps: HOLDER, spell: { ...HR5, school: undefined }, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
       { label: 'INT modifier 0', ps: { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: 0 }] }, spell: HR5, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
-      { label: 'INT modifier -1 clamps to 0 (QUIRK: RAW would add the negative)', ps: { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: -1 }] }, spell: HR5, formula: '2d10', expectFormula: '2d10', intSelectorCalls: 1 },
     ];
     for (const row of rows) {
       getEmpoweredEvocationFeatures.mockClear();
@@ -187,5 +188,36 @@ describe('computeEmpoweredEvocation — CLA-120 single-fold owner', () => {
     expect(computeEmpoweredEvocation(HOLDER, { ...HR5, school: 'evocation' }, raw)).toStrictEqual({ empEvocFormula: '2d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
     expect(computeEmpoweredEvocation(HOLDER, { ...HR5, school: 'EVOCATION' }, raw)).toStrictEqual({ empEvocFormula: '2d10 + 5 [Empowered Evocation]', empEvocIntMod: 5 });
     expect(getEmpoweredEvocationFeatures).toHaveBeenCalledTimes(2);
+  });
+
+  it('fix#1468(a): negative INT modifier folds SIGNED — RAW adds the negative, clamp is gone', () => {
+    // RAW law: 2024/classes.json:13502 "Whenever you cast a Wizard spell from Evocation
+    // school, add your Intelligence modifier to one damage roll of that spell."
+    // (5e/classes.json:13454: "You can add your Intelligence modifier to one damage roll
+    // of any wizard evocation spell you cast.") Modifiers are signed everywhere else in
+    // the house — getEmpoweredEvocationIntModifier (postCastRiderService.js:217-220)
+    // returns intAbility?.bonus verbatim. PRE-FIX captures (flipped pins): :39
+    // `empEvocIntMod > 0` clamp gave INT -1 -> { empEvocFormula: '2d10', empEvocIntMod: 0 }.
+    const raw = HR5.damage.damage_at_slot_level['1'];
+    expect(raw).toBe('2d10'); // disk-drift alarm
+    const int8 = { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: -1 }] }; // INT 8 -> mod -1
+    const folded = computeEmpoweredEvocation(int8, HR5, raw);
+    expect(folded).toStrictEqual({ empEvocFormula: '2d10 - 1 [Empowered Evocation]', empEvocIntMod: -1 });
+    expect(folded.empEvocFormula.match(/\[Empowered Evocation\]/g)).toHaveLength(1); // #1348 exactly one tag
+    expect(folded.empEvocFormula).not.toContain('+-'); // diceRoller.js:46 parses ([+-]\d+) segments only
+
+    const int6 = { ...HOLDER, abilities: [{ name: 'Intelligence', bonus: -2 }] }; // the task's -2 INT cast subtracts 2
+    expect(computeEmpoweredEvocation(int6, HR5, raw)).toStrictEqual({ empEvocFormula: '2d10 - 2 [Empowered Evocation]', empEvocIntMod: -2 });
+
+    // fold-once: re-folding the negative-baked output never re-appends (CLA-120 core, negative shape)
+    expect(computeEmpoweredEvocation(int8, HR5, folded.empEvocFormula)).toStrictEqual({ empEvocFormula: '2d10 - 1 [Empowered Evocation]', empEvocIntMod: -1 });
+
+    // parseability proof (diceRoller imported READ-ONLY, never edited): the signed byte
+    // rolls; the old 'null + 5' garbage byte proves canRollExpression false (#1469(b))
+    expect(canRollExpression('2d10 - 1 [Empowered Evocation]')).toBe(true);
+    expect(canRollExpression('null + 5 [Blessed Strikes]')).toBe(false);
+
+    expect(getEmpoweredEvocationFeatures).toHaveBeenCalledTimes(3); // folded, int6, re-fold
+    expect(getEmpoweredEvocationIntModifier).toHaveBeenCalledTimes(3);
   });
 });

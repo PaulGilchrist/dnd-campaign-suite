@@ -48,6 +48,10 @@
 //       getRuntimeValue('campaign','targetEffects',campaign) — app-wide pattern
 //       (SavePromptModal/savePromptUtils/CharSheet read the same literal keys: cited,
 //       not changed). te.target must equal the caster name.
+//       #1528 VERDICT 2026-10-22: DISPROVEN — 'campaign' is the store's declared TIER
+//       selector (CAMPAIGN_KEYS[0], campaignKeys.js:7; producer registerTargetEffect
+//       writes it there, targetEffectDefinitions.js:1507/:1519), never a misplaced
+//       playerName; owner connects via te.target. Machine-census row added below.
 //   #14 concentrationRecastFreeCast  spell in ['Eyebite','Spiritual Weapon','Shapechange']
 //       (case-exact table) && getCombatSummary(campaign).creatures[name].concentration
 //       .spell === spell; null combat summary -> false.  [prepareSpellCast concentration
@@ -132,6 +136,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isCampaignKey } from '../../automation/common/campaignKeys.js'; // #1528 tier-law machine-check
 
 const CAMPAIGN = 'test-campaign';
 const CASTER = 'TestWizard';
@@ -448,6 +453,18 @@ describe('isFreeCastAuthorized — gate #13 Aura of Vitality: campaign-tier read
     expect(isFreeCastAuthorized(CASTER, 'Aura of Vitality', 3, makePlayerStats(), CAMPAIGN)).toBe(false);
     mem.delete('targetEffects');
     expect(isFreeCastAuthorized(CASTER, 'Aura of Vitality', 3, makePlayerStats(), CAMPAIGN)).toBe(false);
+  });
+
+  it('#1528 tier-law machine-check: the literal IS the store tier — targetEffects is CAMPAIGN_KEYS[0], the producer registerTargetEffect writes that tier, the oracle READS it there and NEVER writes; owner connects via te.target (a playerName-keyed character store is not the te home)', () => {
+    // Store law (campaignKeys.js:6-7): campaign-level keys live at characterKey='campaign',
+    // 'NOT under a character name' — so the :209 'campaign' literal is the correct tier
+    // selector and the audit-proposed playerName swap is a DENY-by-construction regression.
+    expect(isCampaignKey('targetEffects')).toBe(true);
+    mem.set('targetEffects', [{ target: CASTER, effect: 'aura_of_vitality', source: CASTER, duration: 'concentration' }]); // producer-shaped row (targetEffectDefinitions.js:1511)
+    expect(isFreeCastAuthorized(CASTER, 'Aura of Vitality', 3, makePlayerStats(), CAMPAIGN)).toBe(true); // te.target === playerName is the owner match
+    const auraReads = getRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects');
+    expect(auraReads).toEqual([['campaign', 'targetEffects', CAMPAIGN]]); // EXACTLY-one campaign-tier read, arity as-written
+    expect(setRuntimeValue.mock.calls.filter(c => c[1] === 'targetEffects')).toEqual([]); // oracle never writes te (writes[?][0]==='campaign' census: ZERO)
   });
 });
 

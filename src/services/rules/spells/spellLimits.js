@@ -137,17 +137,19 @@ function findClassLevelSpellcasting(classData, level, version, majorName) {
 }
 
 function findSubclassLevelSpellcasting(classData, level, majorName) {
-  // Check subclass class_levels for spellcasting (5e subclasses like Arcane Trickster)
+  // Check subclass class_levels for spellcasting (5e subclasses like Arcane Trickster).
+  // Subclass rows are SPARSE on disk (e.g. AT levels [3,4,7,8,9,10,11,13,...]): every row
+  // carries an explicit 'level' key, so match rows by row.level (house idiom, cf.
+  // trackedResources.js:87 `.find(cl => cl.level === playerStats.level)`) — never by array
+  // index, which lands a lv3 query on the lv7 row (#1509 fix).
   if (!classData.subclasses || !Array.isArray(classData.subclasses)) return null;
   const subclass = classData.subclasses.find(s => s.name === majorName || s.index === majorName?.toLowerCase());
   if (!subclass || !subclass.class_levels) return null;
-  for (let i = level - 1; i >= 0; i--) {
-    const levelEntry = subclass.class_levels[i];
-    if (levelEntry && levelEntry.spellcasting) {
-      return levelEntry.spellcasting;
-    }
-  }
-  return null;
+  const atOrBelow = subclass.class_levels
+    .filter(entry => entry && entry.level <= level)
+    .sort((a, b) => b.level - a.level);
+  const levelEntry = atOrBelow.find(entry => entry.spellcasting);
+  return levelEntry ? levelEntry.spellcasting : null;
 }
 
 function findSubclassFeatureSpellcasting(classData, version, majorName) {
@@ -172,7 +174,8 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
 
 function resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, characterLevel) {
   if (isKnown) {
-    // Known spellcasters use spells_known for level 1
+    // Known spellcasters have no prepared-spells cap (spells_known is a cumulative total,
+    // not a per-level cap — it never feeds the slot table, #1509).
     return null;
   }
   if (spellcasting.prepared_spells !== null && spellcasting.prepared_spells !== undefined) {
@@ -182,9 +185,12 @@ function resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, 
   return computePreparedSpellsLimit(className, spellcasting, abilityScores, characterLevel);
 }
 
-function buildSlotLimits(spellcasting, isKnown) {
+function buildSlotLimits(spellcasting) {
+  // Slot table is keyed strictly by spell_slots_level_N (#1509 fix): spells_known is the
+  // CUMULATIVE spells-known-of-1st-level-and-higher total on disk (bard lv4 = 7 with slots
+  // 4/3; warlock lv10 = 10 with ZERO lv1 slots), so it can never answer a per-level cap.
   const slots = {
-    level1: isKnown && spellcasting.spells_known ? spellcasting.spells_known : (spellcasting.spell_slots_level_1 || 0),
+    level1: spellcasting.spell_slots_level_1 || 0,
   };
   for (let i = 2; i <= 9; i++) {
     slots[`level${i}`] = spellcasting[`spell_slots_level_${i}`] || 0;
@@ -206,7 +212,7 @@ function convertSpellcastingToLimits(spellcasting, className = null, abilityScor
     cantrip: spellcasting.cantrips_known || 0,
     spellType: spellcasting.spell_type || 'known',
     preparedSpells: resolvePreparedSpells(spellcasting, isKnown, className, abilityScores, characterLevel),
-    ...buildSlotLimits(spellcasting, isKnown),
+    ...buildSlotLimits(spellcasting),
   };
 }
 
@@ -309,8 +315,11 @@ function collectKnownSpellLevelViolations(counts, limits) {
 /**
  * Validates if spell selection is within limits for a given class and level
  */
-export async function validateSpellSelection({ selectedSpells, allSpells, className, level, version = '5e', majorName = null, abilityScores = null }) {
-  const limits = await getSpellLimits({ className, level, version, majorName, abilityScores });
+export async function validateSpellSelection({ selectedSpells, allSpells, className, level, version = '5e', majorName = null, extraOptions = null, abilityScores = null }) {
+  // extraOptions is threaded through so 2024 Divine/Primal Order bonus-cantrip grants
+  // (e.g. Thaumaturge cleric, 3+1) are honored here exactly as getSpellLimits reports
+  // them (#1509 fix: it was dropped, falsely rejecting lawful selections).
+  const limits = await getSpellLimits({ className, level, version, majorName, extraOptions, abilityScores });
   const counts = countSpellsByLevel(selectedSpells, allSpells);
 
     // Non-spellcasting classes have no inherent restrictions — allow any selection for homebrew/feat/race feats

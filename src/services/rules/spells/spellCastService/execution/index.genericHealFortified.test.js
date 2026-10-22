@@ -33,15 +33,18 @@
 /*                                                                     */
 /*  RIDER REACH: consumed heals return via :720 runPostCastTriggers-  */
 /*  Merged (CLA-389) — riders RUN post-payment (surge times(1) every   */
-/*  row), unlike the :710/:712 generic-automation bypass (#1470/#1455 */
-/*  standing). runGenericHealPath fires self/ally heal riders at       */
-/*  :472/:475 and runPostCastTriggers re-fires at :519/:522 —          */
-/*  times(2) merge-not-dedupe, pinned verbatim (#1476 form).           */
+/*  row). fix#121(a): early-handled casts now reach this same merge.   */
+/*  fix#121(b) (#1455, FIXED): runGenericHealPath fires the self/ally */
+/*  heal riders at :470/:473 and flags healRidersRun:'pair' —          */
+/*  runPostCastTriggers DEFERS those legs (:553/:559 guard); the      */
+/*  #1476 times(2) merge-not-dedupe double-fire is retired.           */
 /*                                                                     */
 /*  QUIRKS pinned as documented behavior (byte evidence in rows):     */
-/*   - :376 player-target maxHp `|| playerStats.hitPoints` falls back */
-/*     to the CASTER's max HP for a different-player target (quirk;   */
-/*     reported upstream). No other lane exposes this arm.             */
+/*   - FIXED fix#126 (#1484): the retired :376 tail `|| playerStats.   */
+/*     hitPoints` adopted the CASTER's max for an unstamped ally      */
+/*     target. maxHp is now TARGET-OWNED (own runtime row -> own       */
+/*     characters snapshot -> loud-skip), fix#103 prayer twin law;      */
+/*     the two arms live in the guards describe below.                  */
 /*   - :394 'max' branch records bonusHeal but never lands it         */
 /*     (cosmetic fold byte).                                           */
 /*   - delta-0 log-vs-skip: :428 addEntry fires at delta 0 while      */
@@ -66,7 +69,9 @@
 /*  fails; M6 :409 maximize XOR flip -> plain/maximized times fail;   */
 /*  M7 :412 !maximize guard drop -> maximize row reroll times(1)      */
 /*  fails; M8 :383 clamp drop -> full-HP row getCombatContext fail;   */
-/*  M9 :420 cap drop -> cross-name row healAmount 62 vs 38 fail;      */
+/*  M9 fix#126 re-own: law row cap-drop -> healAmount still 62 (62<83 */
+/*     headroom) but hp-log delta/clamp + loud-skip arms fail; the     */
+/*     retired 62-vs-38 quirk kill is now the target-own-pool law row; */
 /*  M10 :337 gate fall-through -> triggerHealingWord times(0) fails   */
 /*  incl. Healing Word row; M11 :479 chalice drop -> modal envelope    */
 /*  fails; M12 :467 target guard drop -> resolve times(0) fails;       */
@@ -312,7 +317,12 @@ const CASTER = 'Wild_Sage_Druid';
 const TARGET = 'Disciplined_Monk';
 const COMBAT_CTX = { round: 3 };
 const SURGE_POPUP = { automationPopup: { type: 'popup', payload: { type: 'automation_info', name: 'Wild Magic Surge' } } };
-const MASS_ARMS = [massCureArm, massWordArm, prayerArm, falseLifeArm];
+// fix#121(c) (#1463): the hub :328 chain lost its Mass Healing Word / Prayer of
+// Healing legs (structurally dead — disk rows consumed at :710; see hub comment).
+// The live chain arms are massCure + falseLife; the deleted arms stay mocked as
+// landmines and are pinned times(0) below.
+const MASS_ARMS = [massCureArm, falseLifeArm];
+const DEAD_LEG_ARMS = [massWordArm, prayerArm];
 
 function diskRow(list, name) {
   const row = list.find((s) => (s.name || '').toLowerCase() === name.toLowerCase());
@@ -589,17 +599,20 @@ describe('executeSpellCast generic-heal lane (:337) — disk-live consumed casts
       expect(handleGenericAutomation).toHaveBeenCalledTimes(1);
       expect(handlePowerWordHeal).toHaveBeenCalledTimes(1);
       for (const arm of MASS_ARMS) expect(arm).toHaveBeenCalledTimes(1);
+      // fix#121(c): the deleted :330/:331 legs never dispatch — again, from any lane.
+      for (const arm of DEAD_LEG_ARMS) expect(arm).toHaveBeenCalledTimes(0);
       expect(endFriendsOnHostileAction).toHaveBeenCalledWith(CASTER, CAMPAIGN);
       expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(CASTER, CAMPAIGN);
 
-      // CLA-389 rider merge at :720: riders run post-payment; the
-      // self/ally heal riders fire TWICE — runGenericHealPath :472/:475
-      // and runPostCastTriggers :519/:522 — merge-not-dedupe (#1476 form).
+      // CLA-389 rider merge at :720 + fix#121(b) single-owner split: runGenericHealPath
+      // fired the self/ally pair (:472/:475) and flagged healRidersRun:'pair' — the
+      // merged block at :519/:522 DEFERS those two legs (the #1476 times(2) double-fire
+      // is retired); merge-only riders stay single-fire.
       const stampedCtx = { slotLevel: row.slotLevel, targetName: TARGET, metamagicHeighten: false };
       expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
-      expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
+      expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
       expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(row.spell, { ...stampedCtx, targetNames: [TARGET] }, caster, CAMPAIGN, 'testMap');
-      expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+      expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
       expect(triggerPostCastAllyHeals).toHaveBeenCalledWith(row.spell, stampedCtx, caster, CAMPAIGN, 'testMap');
 
       // damage-lane inert — the noDamage return at :717-:720 outranks it.
@@ -636,11 +649,12 @@ describe('executeSpellCast generic-heal lane (:337) — disk-live consumed casts
 });
 
 describe('executeSpellCast generic-heal lane guards and payload precedence', () => {
-  it('QUIRK (:376): player target with unstamped hitPoints falls back to the CASTER max HP — clamps the heal at 138, not the target 183', async () => {
-    // :375-:376 `getRuntimeValue(target,'hitPoints') || playerStats.hitPoints`
-    // — for a DIFFERENT-player target this silently adopts the caster's max.
-    // Pinned as documented behavior; reported upstream. latch still fires
-    // (heal landed).
+  it('fix#126 LAW (:401-:436): player target with unstamped runtime hitPoints resolves maxHp from its OWN snapshot 183 — never the CASTER pool 138 (fix#103 twin); heal lands against 183', async () => {
+    // Retired defect (#1484, pre-fix capture in the fix-maintain ledger): the tail
+    // `|| playerStats.hitPoints` clamped the ally at the caster's 138 — envelope
+    // healAmount 38, hp log maxHp 138. fix#126 resolution order: own runtime row
+    // (unstamped here -> LOUD warn byte), own characters snapshot (computedStats
+    // .hitPoints 183 — the target's OWN law), caster value structurally unreachable.
     // Explicit impl: 'hitPoints' key returns undefined (DEFAULT parameters
     // would resurrect a 183 default here).
     getRuntimeValue.mockImplementation((_who, key) => {
@@ -655,12 +669,57 @@ describe('executeSpellCast generic-heal lane guards and payload precedence', () 
 
     const result = await executeSpellCast(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1, targetName: TARGET }, services);
 
-    expect(result).toStrictEqual(diceEnvelope('1d8 + 3', [60], 38, 62, 2, [{ name: 'Fortified Health', amount: 2 }]));
+    // headroom 183-100=83 > roll+bonus 62 -> NOTHING truncated (the #1484 38-cap is dead)
+    expect(result).toStrictEqual(diceEnvelope('1d8 + 3', [60], 62, 62, 2, [{ name: 'Fortified Health', amount: 2 }]));
     const healLog = loggedEntries()[1];
-    expect(healLog).toStrictEqual({ type: 'hp_change', targetName: TARGET, delta: 38, currentHp: 138, maxHp: 138, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] });
+    expect(healLog).toStrictEqual({ type: 'hp_change', targetName: TARGET, delta: 62, currentHp: 162, maxHp: 183, isHealing: true, sourceName: CASTER, note: 'Cure Wounds', formula: '1d8 + 3 + (2 Fortified Health)', bonusDetails: [{ name: 'Fortified Health', amount: 2 }] });
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(1);
+    expect(applyHealingToTarget).toHaveBeenCalledWith(COMBAT_CTX, TARGET, 62, CAMPAIGN);
     expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(1);
     expect(markFortifiedHealthUsedIfGranted.mock.calls[0][2]).toBe(computed);
-    expect(consoleError).toHaveBeenCalledTimes(0);
+    // unstamped-runtime is LOUD even when the fallback lawfully resolves (fix#113 family)
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError.mock.calls[0][0]).toContain(`player target ${TARGET} has unstamped runtime 'hitPoints'`);
+    // reads stay the target-owned pair — the caster store is never consulted
+    expect(getRuntimeValue.mock.calls.filter((c) => c[1] === 'hitPoints')).toEqual([[TARGET, 'hitPoints']]);
+  });
+
+  it('fix#126 loud-skip (:432-:435): target with NO own resolvable maxHp (runtime unstamped, no snapshot) -> console.error skip, zero combat write, zero heal log, zero latch; cast still pays riders once', async () => {
+    // auraOfVitality/prayer loud-skip family (#1393 verdict): unresolvable stays
+    // unresolvable — the caster's 138 never stands in. characters:[] removes the
+    // snapshot AND the player classification, so the exact skip byte is the census.
+    getRuntimeValue.mockImplementation((_who, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return [];
+      if (key === 'currentHitPoints') return 100;
+      return undefined;
+    });
+    rollExpression.mockReturnValue({ total: 60, rolls: [60] });
+    triggerWildMagicSurge.mockResolvedValue(SURGE_POPUP);
+    const caster = casterStats('5e');
+    const services = makeServices(caster, []);
+
+    const result = await executeSpellCast(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1, targetName: TARGET }, services);
+
+    // loud-skip -> lane null -> CLA-389 merge keeps the surge popup (:638)
+    expect(result).toBe(SURGE_POPUP);
+    // displayed roll is harmless memory (diceRoller is pure): one roll, NO writes
+    expect(rollExpression).toHaveBeenCalledTimes(1);
+    expect(getCombatContext).toHaveBeenCalledTimes(0);
+    expect(applyHealingToTarget).toHaveBeenCalledTimes(0);
+    expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(0);
+    // ONE log — the generic cast log; the hp_change row is never written
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(loggedEntries()[0]).toStrictEqual({ ...castLogOf(diskRow(spells5e, 'Cure Wounds')) });
+    // skip byte once; bounds read stops at the unresolved 'hitPoints' tuple
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError.mock.calls[0][0]).toContain(`Skipping heal of ${TARGET}: unresolved target maxHp`);
+    expect(getRuntimeValue.mock.calls.filter((c) => c[0] === TARGET && c[1] !== 'activeConditions')).toEqual([
+      [TARGET, 'hitPoints'],
+    ]);
+    // the paid cast keeps its riders (fix#121(b) 'pair' ownership unchanged)
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
+    expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
   });
 
   it('no target (picker cancelled): :467 skips the whole resolve — no bonus oracle, no dice, no latch — yet CLA-389 riders still run and the surge popup becomes the lane value', async () => {
@@ -679,9 +738,12 @@ describe('executeSpellCast generic-heal lane guards and payload precedence', () 
     expect(applyHealingToTarget).toHaveBeenCalledTimes(0);
     expect(markFortifiedHealthUsedIfGranted).toHaveBeenCalledTimes(0);
     expect(triggerHealingWord).toHaveBeenCalledTimes(0);
-    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
+    // fix#121(b): :467 skips the heal itself but the :472/:475 rider pair still
+    // fires once inside runGenericHealPath (flagged 'pair') — the merged block's
+    // retired second leg (#1476 times(2)) stays skipped.
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
     expect(triggerPostCastSelfHeals).toHaveBeenCalledWith(diskRow(spells5e, 'Cure Wounds'), { slotLevel: 1, metamagicHeighten: false, targetNames: undefined }, caster, CAMPAIGN, 'testMap');
-    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
     expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
     expect(addEntry).toHaveBeenCalledTimes(1);
     expect(loggedEntries()[0]).toStrictEqual({ ...castLogOf(diskRow(spells5e, 'Cure Wounds')), targetName: null });

@@ -301,11 +301,14 @@ describe('helpers.js magic-missile chain — module-direct sole runner', () => {
       expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('shield buff short-circuits INSIDE applyMissileDamage before ignore-resistance resolution: applyDamage unreached, passives-missing caster still never throws, darts and rollDamage still fire at full raw total, log spells shieldImmune with zero final damage', async () => {
-      // playerStats WITHOUT automation.passives proves the :523-525 return precedes :527 resolveIgnoreResistance (direct-face ordering, unreachable-by-hub)
+    it('#1456 disk law: the Shield SPELL buff (toggleBuff bytes — name "Shield", effect "shield", NO oneShot) short-circuits INSIDE applyMissileDamage before ignore-resistance resolution: applyDamage unreached, passives-missing caster still never throws, darts and rollDamage still fire at full raw total, log spells shieldImmune with zero final damage', async () => {
+      // Disk spells.json:8779: "...and you take no damage from magic missile" — blanket
+      // MM immunity is the Shield SPELL's own grant; the same-name monster reaction is
+      // NOT it (next row). playerStats WITHOUT automation.passives proves the short-
+      // circuit precedes :527 resolveIgnoreResistance (direct-face ordering).
       const services = makeServices({ name: CASTER });
       hoisted.queue.push(3, 2); // dart totals 4 + 3 = 7
-      hoisted.buffs = [{ effect: 'shield', source: CASTER }];
+      hoisted.buffs = [{ name: 'Shield', effect: 'shield', sourceCharacter: CASTER }];
 
       await executeMagicMissile(spell5e, { magicMissileDistribution: { 'Goblin A': 2 } }, services);
 
@@ -314,6 +317,25 @@ describe('helpers.js magic-missile chain — module-direct sole runner', () => {
       expect(services.rollDamage.mock.calls[0][0].total).toBe(7); // cosmetic full-total roll survives the shield
       expect(addEntry.mock.calls[0][1].targets).toEqual([{ name: 'Goblin A', missiles: 2, rawDamage: 7, finalDamage: 0, shieldImmune: true }]);
       expect(addEntry.mock.calls[0][1].totalFinalDamage).toBe(0);
+    });
+
+    it('#1456 RAW gate: a MONSTER shield-reaction stamp (MA-1170 buildShieldBuff bytes — oneShot:true, +5 AC vs ONE named triggering attack) does NOT grant whole-volley missile immunity — all dart damage flows through applyDamageToTarget, shieldImmune:false', async () => {
+      // Monster Stamp disk law (MonsterCardHelpers.js:1888-1899 + MA-1170 comment): the
+      // authored reaction row grants acBonus against the triggering attack only — the
+      // Magic Missile immunity is text reserved to the Shield spell disk row (:8779).
+      // PRE-FIX capture: these stamp bytes zeroed the volley (applyDamage unreached,
+      // shieldImmune:true) — full-missile-immunity-vs-RAW, the #1456 bug.
+      const services = makeServices();
+      hoisted.queue.push(3, 2); // dart totals 4 + 3 = 7
+      hoisted.buffs = [{ effect: 'shield', acBonus: 5, oneShot: true, source: 'Shield', vsAttack: `${CASTER}:Magic Missile`, appliedRoundContext: { d20: 12, total: 14, targetAc: 11 }, timestamp: FIXED_TS }];
+      applyDamageToTarget.mockReturnValue({ finalDamage: 7, damageReduced: false });
+
+      await executeMagicMissile(spell5e, { magicMissileDistribution: { 'Goblin A': 2 } }, services);
+
+      expect(applyDamageToTarget).toHaveBeenCalledWith(CS, 'Goblin A', 7, ['Force'], { campaignName: CAMPAIGN, characters: CHARACTERS, ignoreResistance: false, attackerName: CASTER });
+      expect(endInvisibilityOnHostileAction).toHaveBeenCalled();
+      expect(addEntry.mock.calls[0][1].targets).toEqual([{ name: 'Goblin A', missiles: 2, rawDamage: 7, finalDamage: 7, shieldImmune: false }]);
+      expect(addEntry.mock.calls[0][1].totalFinalDamage).toBe(7);
     });
 
     it('resolveIgnoreResistance (:513-520): only the auto_effect+ignore_resistance pair flips the forwarded flag — full tuple otherwise identical; missing passives THROWS with console.error after dice were already spent (alive direct, DEAD-VIA-HUB cited missile.test.js header)', async () => {

@@ -280,17 +280,51 @@ describe('helpers.js applyPowerWordHealToTarget — module-direct PWH span (:190
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('non-array storedConditions throws AFTER the heal has landed — validation-order quirk (heal + popup execute at :194-:217 before :224 aborts)', async () => {
+  // #1481 FIX (flips the former validation-order quirk pin): activeConditions
+  // validation is HOISTED above powerWordHealDamage's heal + log + popup
+  // dispatch (fix#22 validate-before-mutate lineage, useAttackDamageResolution
+  // :511-:514 house order). An invalid payload now refuses the WHOLE cast
+  // BEFORE any HP is restored — half-applied state is structurally impossible.
+  it('#1481 invalid activeConditions throws BEFORE any heal — store-dark, zero HP restored, zero popup, zero logs (validate-before-mutate)', async () => {
     stubRuntime({ activeConditions: 'not-an-array' });
 
     await expect(applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN))
       .rejects.toThrow('activeConditions must be an array');
 
     expect(consoleError).toHaveBeenCalledWith('[spellCast] applyPowerWordHealToTarget: activeConditions is not an array');
-    // HP already restored and popup already dispatched when the guard fires.
-    expect(vi.mocked(applyHealingToTarget).mock.calls).toHaveLength(1);
-    expect(popups).toHaveLength(1);
+    // Half-applied state proven impossible (#1517 store-dark form): the
+    // throw precedes every mutation and every dispatch.
+    expect(vi.mocked(applyHealingToTarget).mock.calls).toEqual([]);
+    expect(logTuples('hp_change')).toEqual([]);
     expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([]);
+    expect(popups).toEqual([]);
+    // The validation read still happens exactly once, and it is the ONLY read.
+    expect(vi.mocked(getRuntimeValue).mock.calls.filter(([, key]) => key === 'activeConditions'))
+      .toEqual([['Goblin', 'activeConditions', CAMPAIGN]]);
+  });
+
+  it('#1481 order ledger (valid payload): validation read < heal write < popup dispatch — dispatch bytes byte-intact', async () => {
+    const ledger = [];
+    stubRuntime({ activeConditions: ['charmed'] });
+    const origStub = vi.mocked(getRuntimeValue).getMockImplementation();
+    getRuntimeValue.mockImplementation((...args) => {
+      if (args[1] === 'activeConditions') ledger.push('validate');
+      return origStub(...args);
+    });
+    applyHealingToTarget.mockImplementation((..._args) => { ledger.push('heal'); return { actualHeal: 50, oldHp: 50, newHp: 100 }; });
+    const orderListener = () => ledger.push('popup');
+    window.addEventListener('healing-popup', orderListener);
+
+    await applyPowerWordHealToTarget('Goblin', caster, CAMPAIGN);
+    window.removeEventListener('healing-popup', orderListener);
+
+    // validate-index < heal-index < popup-index (exact first-occurrence ledger).
+    expect(ledger.indexOf('validate')).toBe(0);
+    expect(ledger.indexOf('heal')).toBe(1);
+    expect(ledger.indexOf('popup')).toBeGreaterThan(1);
+    // Valid-path dispatch bytes unchanged: strip write + removal log still land.
+    expect(vi.mocked(setRuntimeValue).mock.calls).toEqual([['Goblin', 'activeConditions', [], CAMPAIGN]]);
+    expect(addEntryLogConditionNames()).toEqual(['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned']);
   });
 
   it('abort guards: null combat context or missing target row produce an identical full no-op (zero reads, writes, logs, popups)', async () => {

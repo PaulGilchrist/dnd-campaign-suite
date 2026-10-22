@@ -578,14 +578,14 @@ describe('executeSpellCast heal-slot ladder edges (index.js :365-:446) — the a
     }
   });
 
-  it('expression-resolution arms: disk Heal at slot 5 (below ladder min 6) returns null with a zero-heal census while riders still run twice, and a synthetic gap-ladder probe at slot 7 takes the HIGHEST tier at or below ("70", not "55" — K3 kills .pop()->[0])', async () => {
+  it('expression-resolution arms: disk Heal at slot 5 (below ladder min 6) returns null with a zero-heal census while riders still run once, and a synthetic gap-ladder probe at slot 7 takes the HIGHEST tier at or below ("70", not "55" — K3 kills .pop()->[0])', async () => {
     const services = makeServices(casterStats());
 
     // Arm 1 — :446 null-expression on REAL disk bytes: no oracle, no dice,
     // no HP read for the target, no combat write, no log beyond the cast,
-    // no latch, no healing-word (:337 precedes :341) — yet :472/:475 and
-    // the :519/:522 post-cast riders still fire (2x each), and the lane
-    // value stays null.
+    // no latch, no healing-word (:337 precedes :341) — yet :470/:473 fire once
+    // inside runGenericHealPath (fix#121(b) flags healRidersRun:'pair' — the
+    // merged :519/:522 re-fire is retired) and the lane value stays null.
     const nullResult = await executeSpellCast(DISK_HEAL, { slotLevel: 5, targetName: TARGET }, services);
     expect(nullResult).toBe(null);
     expect(resolveHealingBonusesWithDetails).not.toHaveBeenCalled();
@@ -594,8 +594,8 @@ describe('executeSpellCast heal-slot ladder edges (index.js :365-:446) — the a
     expect(applyHealingToTarget).not.toHaveBeenCalled();
     expect(markFortifiedHealthUsedIfGranted).not.toHaveBeenCalled();
     expect(triggerHealingWord).not.toHaveBeenCalled();
-    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(2);
-    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(2);
+    expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
+    expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
     expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
     expect(loggedEntries()).toEqual([castLogOf(DISK_HEAL, 6)]);
     expect(getRuntimeValue.mock.calls).toEqual([

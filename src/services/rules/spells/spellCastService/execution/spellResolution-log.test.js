@@ -195,7 +195,7 @@ describe('logGenericSpellCast — spellResolution.js mirror log bytes (live twin
         characterName: 'TestWizard',
         targetName: null, // resolvedTarget?.name || null — one arm for the whole quadruple
         spellName: 'Mystery Bolt',
-        spellLevel: 0, // spell.level || 0
+        spellLevel: 0, // resolveCantripLevel(...).displayLevel — spell.level || 0 semantics, #1501 canonical display
         castingTime: undefined, // key PRESENT with undefined value (dropped only by JSON.stringify)
         damageType: null,
         damageFormula: null,
@@ -204,6 +204,30 @@ describe('logGenericSpellCast — spellResolution.js mirror log bytes (live twin
         description: 'First part Second part third.',
       });
     }
+  });
+
+  it('#1501 display leg: REAL cantrip disk row (level 0) logs RAW 0 via the same resolver the damage leg feeds — convergence pinned at the source', async () => {
+    // Cross-lane convergence: the fireball5e/fireball2024 pins above cover
+    // leveled passthrough and the :176 Mystery-Bolt row covers undefined
+    // level -> 0; this row closes the cantrip-0 display byte over REAL disk
+    // data. Both legs of spellResolution.js call ONE resolveCantripLevel
+    // (:130): displayLevel ||0 here and at live twin index.js:272, while
+    // damageLevel scales the caster ladder (fix#121) — pinned at the
+    // consumer boundary in spellResolution.complex.test.js ('Fire Bolt
+    // damageLevel leg'), so the retired :108-||1-vs-:202-||0 disagreement
+    // cannot return without failing a lane in BOTH files.
+    const firebolt = diskRow(spells5e, 'Fire Bolt', 'public/data/spells.json');
+    expect(firebolt.level).toBe(0); // disk drift alarm: cantrips are level 0 RAW
+
+    await logGenericSpellCast({
+      spell: firebolt, playerStats: caster, campaignName: CAMPAIGN,
+      getTargetInfo: async () => ({ name: 'Goblin' }), fullSpell: firebolt,
+      damageType: 'Fire', formula: '4d10', spellSaveDc: 0,
+    });
+
+    const [body] = loggedBodies(1);
+    expect(body.spellLevel).toBe(0);
+    expect(body.damageFormula).toBe('4d10'); // lv17+ caster tier, never the baked '1d10'
   });
 
   it('short-circuits exactly-case "Hex" (real 2024 disk row) without touching getTargetInfo; lowercase "hex" logs — guard is byte-exact', async () => {

@@ -12,6 +12,16 @@ import { normalizeCastingTime } from '../../../../shared/castingTimeUtils.js';
 // NOTE: the live cast seam applies its blocksSpellcasting + CLA-404 Beast Spells
 // bypass in execution/blockChecks.js checkBlockedBySpellcastingBuff (the only
 // wired path); this mirror stays byte-shape for CLA-391 refusals.
+//
+// DEAD-MODULE MARKER (fix#74 precedent, #1501 census re-verified 2026-10-22):
+// resolveSpellResolution + logGenericSpellCast below have ZERO production
+// importers (grep 'resolveSpellResolution|logGenericSpellCast' src excl tests
+// -> local twin in execution/index.js:258). The module itself is LOAD-live only
+// via blockChecks.js:28 dynamic import of the getActiveBuffs re-export — it
+// never executes the level/damage lanes below. Deletion is PENDING OWNER
+// DECISION #1460; these lanes are maintained as canonical-semantics guard-bits
+// so a future rewiring resurrects LIVE-consistent behavior, never the retired
+// divergent falsy defaults (#1501).
 function checkBlockedByBuff(spell, playerStats, campaignName) {
     const buffs = getActiveBuffs(playerStats.name, campaignName);
     const blockingBuff = buffs.find(b => b.blocksSpellcasting);
@@ -103,10 +113,31 @@ function resolveCastingMod(result, cantripAbility, playerStats) {
     }
 }
 
+// #1501: ONE canonical level resolver for both legs — the retired pair of
+// independent falsy defaults (`spell.level || 1` here vs `spell.level || 0`
+// in logGenericSpellCast below) let the same undefined-level spell resolve
+// damage as a 1st-level slot while logging as a level-0 cantrip.
+// Damage-tier semantics mirror the fix#121 damageLevel idiom at live
+// execution/index.js:59 resolveCastDamage BYTE-FOR-BYTE: cantrips
+// (spell.level === 0 — a rules-defined value, disk Fire Bolt 5e spells.json
+// damage.damage_at_character_level {1:'1d10',5:'2d10',11:'3d10',17:'4d10'};
+// 2024 stores the same ladder under damage_at_slot_level keyed from '0')
+// scale at CASTER level; leveled spells take the slot level with the
+// minimum-1st-slot fallback (|| 1) for undefined level.
+// Log/table-key display mirrors the live log lane execution/index.js:272
+// (`spell.level || 0`): RAW cantrips are level 0, so 0 and undefined both
+// record as 0 in the cast log. Per-consumed-key canonical, single source.
+function resolveCantripLevel(spell, playerStats) {
+    const damageLevel = spell.level === 0 ? (playerStats.level || 1) : (spell.level || 1);
+    const displayLevel = spell.level || 0;
+    return { damageLevel, displayLevel };
+}
+
 // Damage type + to-hit/DC/modifier resolution onto the result object.
 function resolveSpellStats(result, spell, playerStats) {
-    result.spellLevel = spell.level || 1;
-    result.damageInfo = resolveSpellDamageWithTypes(spell, result.spellLevel);
+    const { damageLevel, displayLevel } = resolveCantripLevel(spell, playerStats);
+    result.spellLevel = displayLevel;
+    result.damageInfo = resolveSpellDamageWithTypes(spell, damageLevel);
     result.formula = result.damageInfo?.formula || null;
     resolveEffectiveDamageType(result, spell);
 
@@ -133,7 +164,7 @@ function resolveSpellResolution(spell, metaCtx, playerStats, campaignName, getTa
         casterConditions: [],
         hasInvisible: false,
         psychicSpellsConfig: null,
-        spellLevel: 1,
+        spellLevel: 0, // display default; always overwritten by resolveSpellStats (:139/:217)
         innateSorceryActive: false,
         damageInfo: null,
         formula: null,
@@ -199,7 +230,9 @@ function logGenericSpellCast({ spell, playerStats, campaignName, getTargetInfo, 
                 characterName: playerStats.name,
                 targetName: resolvedTargetName,
                 spellName: spell.name,
-                spellLevel: spell.level || 0,
+                // #1501: display level via the ONE canonical resolver —
+                // cantrip/undefined record 0, matching live index.js:272.
+                spellLevel: resolveCantripLevel(spell, playerStats).displayLevel,
                 castingTime: spell.casting_time,
                 damageType: damageType || null,
                 damageFormula: formula || null,

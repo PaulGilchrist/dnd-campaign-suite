@@ -1,5 +1,7 @@
 // @maintained-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import spells5e from '../../../../../../public/data/spells.json';
+import spells2024 from '../../../../../../public/data/2024/spells.json';
 
 /* ------------------------------------------------------------------ */
 /*  Lane: spellResolution.js RESOLVE face — numeric & damage-type      */
@@ -160,8 +162,48 @@ describe('spellResolution.complex — numeric & damage-type resolution', () => {
     });
   });
 
-  describe('damage-type fallback and psychic override', () => {
-    it('null damageInfo falls back to spell.damage.damage_type passthrough', () => {
+  describe('fix#1501 damageLevel leg — resolveCantripLevel consumer boundary', () => {
+    const disk = (arr, name) => {
+      const s = arr.find((x) => x.name === name);
+      if (!s) throw new Error(`disk row missing: ${name}`);
+      return { ...s };
+    };
+
+    it('cantrip disks both rulesets hand the CASTER ladder to resolveSpellDamageWithTypes; leveled passthrough and undefined-level min-slot 1 keep the live index.js:59 fix#121 idiom bytes', () => {
+      // Disk law: Fire Bolt 5e level 0 damage_at_character_level
+      // {1:'1d10',5:'2d10',11:'3d10',17:'4d10'}; 2024 stores the same
+      // ladder under damage_at_slot_level keyed from '0'.
+      const fb5 = disk(spells5e, 'Fire Bolt');
+      const fb24 = disk(spells2024, 'Fire Bolt');
+      expect([fb5.level, fb24.level]).toStrictEqual([0, 0]); // disk drift alarm
+      const caster20 = makePlayerStats({ level: 20 });
+
+      // Cantrips scale at caster level (#121) — pre-fix #1501 baked 1 here.
+      resolve(fb5, caster20);
+      expect(resolveSpellDamageWithTypes).toHaveBeenLastCalledWith(fb5, 20);
+      resolve(fb24, caster20);
+      expect(resolveSpellDamageWithTypes).toHaveBeenLastCalledWith(fb24, 20);
+
+      // Leveled spell: exact slot byte passthrough, unchanged.
+      const fireball = makeSpell();
+      resolve(fireball, caster20);
+      expect(resolveSpellDamageWithTypes).toHaveBeenLastCalledWith(fireball, 3);
+
+      // Undefined level: damage semantics take minimum-1st-slot 1 (|| 1,
+      // live :59 byte); display/log stays RAW 0 — ONE resolver, per-consumed-
+      // key canonical, never two independent falsy defaults again (#1501).
+      const undef = makeSpell({ level: undefined });
+      const undefResult = resolve(undef, caster20);
+      expect(resolveSpellDamageWithTypes).toHaveBeenLastCalledWith(undef, 1);
+      expect(undefResult.spellLevel).toBe(0);
+
+      // Caster missing level on a cantrip: (playerStats.level || 1) floor.
+      resolve(fb5, makePlayerStats());
+      expect(resolveSpellDamageWithTypes).toHaveBeenLastCalledWith(fb5, 1);
+    });
+  });
+
+  describe('damage-type fallback and psychic override', () => {    it('null damageInfo falls back to spell.damage.damage_type passthrough', () => {
       resolveSpellDamageWithTypes.mockReturnValue(null);
       const spell = makeSpell({ damage: { damage_type: 'Lightning' } });
 

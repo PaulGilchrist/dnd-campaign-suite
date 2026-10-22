@@ -9,7 +9,7 @@
 /*  verified) — this file owns the module internals.                   */
 /*                                                                    */
 /*  BAKE-vs-ROLL DECISION (#1454/:13 side owner, hub reaches BOTH     */
-/*  faces in ONE cast): live finding cited verbatim —                  */
+/*  faces in ONE cast): the cited live finding —                       */
 /*   #1454: 'cantrip-level dual-implementation: execution/index.js:53 */
 /*    bakes spell.level || 1 while noSavePath.js:13/15 rolls          */
 /*    playerStats.level — 2d10-roll-vs-1d10-bake mismatch pair'      */
@@ -18,15 +18,14 @@
 /*    :13 resolveSpellDamageAtLevel(spell, playerStats.level)         */
 /*    resolves at caster level — damageCalculation.js bakes NO dice   */
 /*    itself; mismatch lives upstream'                                */
-/*  Determination: the hub stamps metaCtx.finalFormula (index.js:741, */
-/*  baked from resolveCastDamage at spell.level || 1) BEFORE reaching  */
-/*  :767, so on production cantrip casts this module emits BOTH bytes  */
-/*  into one attackCtx: autoDamageFormula = hub-baked level-1 tier,    */
-/*  autoDamageRollResult = rollExpression(overchannelFormula) at       */
-/*  caster level (:13/:73). Fire Bolt lvl-5+ caster: '2d10' rolled vs  */
-/*  '1d10' baked — standing RED finding, pinned honestly in T8 row 2,  */
-/*  NOT silently repaired here (cla120 fold lane owns level-source-     */
-/*  agnostic arithmetic and cites our :13 side).                        */
+/*  fix#121(e) VERDICT (executed upstream): disk law is the cantrip  */
+/*  ladder at CHARACTER level (public/data/spells.json Fire Bolt      */
+/*  damage.damage_at_character_level {1:'1d10',5:'2d10',11:'3d10',    */
+/*  17:'4d10'}; 2024 stores the same ladder under damage_at_slot_     */
+/*  level). :13 was lawful; the hub :53/:741 bake was the outlaw side */
+/*  and now resolves cantrips at playerStats.level too — the two      */
+/*  implementations CONVERGE on one level source. T8 row 2 re-pinned  */
+/*  as the convergence byte (#1454 no-retype: dice stay disk ladder). */
 /*                                                                    */
 /*  :13 ARM CENSUS (4 arms): metaCtx.overchannelFormula (live,        */
 /*  upstream metaCtx); spell.damage.formula (DEAD vs disk — grep      */
@@ -352,7 +351,7 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     expect(isInnateSorceryActive).not.toHaveBeenCalled();
   });
 
-  it('T8 cantrip ladder at caster level on BOTH ruleset disk rows, with the honest hub bake-vs-roll mismatch pair and the undefined-level first-key quirk', async () => {
+  it('T8 cantrip ladder at caster level on BOTH ruleset disk rows, with the fix#121(e) bake-roll convergence and the undefined-level first-key quirk', async () => {
     // row 1: 5e Fire Bolt caster 6 -> ladder by playerStats.level (:13): '2d10'
     const { d } = await cast({ spell: FB5, playerStats: { name: 'TestWizard', level: 6 } });
     expect(rollExpression).toHaveBeenCalledWith('2d10');
@@ -362,16 +361,17 @@ describe('handleNoSavePath — module-direct roll side (#1454 :13 owner)', () =>
     expect(ctx.isCantrip).toBe(true); // level===0 arm (:37), replaces the deleted fixture-only test
     expect(ctx.overchannelSpellLevel).toBe(0); // :34 quirk: metaCtx.slotLevel absent -> spell.level 0 (a zero byte, not swallowed)
 
-    // row 2: PRODUCTION HUB SHAPE — index.js:741 stamps metaCtx.finalFormula baked at
-    // spell.level || 1 ('1d10' via index.js:53) while :13 rolls '2d10' here. Standing RED
-    // mismatch emitted INSIDE one attackCtx — pinned, not repaired (#1454/#1468 verbatim cite up top).
+    // row 2: PRODUCTION HUB SHAPE — index.js:741 stamps metaCtx.finalFormula and
+    // fix#121(e) resolves the cantrip bake at CASTERR level (mirror of :13), so the
+    // hub feeds '2d10' for a caster-6 row. The retired spell.level||1 bake fed '1d10'
+    // and the mismatch stood RED; the pair now CONVERGES — pinned as the same byte.
     rollExpression.mockClear();
-    const { d: d2 } = await cast({ spell: FB5, playerStats: { name: 'TestWizard', level: 6 }, metaCtx: { finalFormula: '1d10' } });
+    const { d: d2 } = await cast({ spell: FB5, playerStats: { name: 'TestWizard', level: 6 }, metaCtx: { finalFormula: '2d10' } });
     expect(rollExpression).toHaveBeenCalledWith('2d10');
     const ctx2 = capturedCtx(d2.rollAttack)[2];
-    expect(ctx2.autoDamageFormula).toBe('1d10'); // baked side byte
-    expect(ctx2.autoDamageRollResult).toBe(ROLL_STUB); // rolled side was fed '2d10'
-    expect(ctx2.autoDamageFormula).not.toBe(rollExpression.mock.calls[0][0]);
+    expect(ctx2.autoDamageFormula).toBe('2d10'); // baked side byte — lawful caster-level tier
+    expect(ctx2.autoDamageRollResult).toBe(ROLL_STUB); // rolled side fed the SAME '2d10'
+    expect(ctx2.autoDamageFormula).toBe(rollExpression.mock.calls[0][0]); // convergence pin (was not.toBe, #1454 RED)
 
     // row 3: undefined caster level — :13 has NO '|| 1' of its own; the ladder falls back to
     // its FIRST KEY (spellDamageUtils.js:18), giving the same '1d10' tier by a different route.

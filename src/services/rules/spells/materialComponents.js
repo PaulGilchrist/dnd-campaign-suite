@@ -41,9 +41,23 @@ const MATERIAL_REGISTRY = {
     'True Seeing': { itemName: 'Mushroom Powder (25 gp)', required: 'mushroom powder worth 25+ GP, which the spell consumes' },
 };
 
+// #213 canonical-name census: BOTH spellings are disk-canonical for their ruleset —
+// 'Stone Skin' is 2024 disk-canonical (public/data/2024/spells.json:12509; the registry
+// row's required text mirrors its material bytes at :12519), 'Stoneskin' is 5e
+// disk-canonical (public/data/spells.json:9430, material "Diamond dust worth 100 gp,
+// which the spell consumes."). Collapse: ONE row, keyed by the 2024 disk-canonical name,
+// plus an exact-match alias edge at the registry boundary so 5e saves/spell refs resolve
+// to the same row. Exact-match semantics are preserved (no case folding — 'revivify' /
+// 'stoneskin' lowercase still miss, H1 kill intact); this is a name-identity fold, not
+// normalization. Consumers: getConsumedMaterial feeds spellHasCostlyOrConsumedMaterial
+// (blockChecks.js:17 Beast Spells) and useSpellMetamagicGates.js:271/274/295 backpack
+// gating; before the fold, 5e 'Stoneskin' casts never reached the row (losing variant).
+const DISK_CANONICAL_NAME_ALIASES = { 'Stoneskin': 'Stone Skin' };
+
 export function getConsumedMaterial(spell) {
     if (!spell || !spell.name) return null;
-    return MATERIAL_REGISTRY[spell.name] || null;
+    const canonicalName = DISK_CANONICAL_NAME_ALIASES[spell.name] || spell.name;
+    return MATERIAL_REGISTRY[canonicalName] || null;
 }
 
 // CLA-404: Beast Spells (Druid lv18) exception detection — a spell is blocked

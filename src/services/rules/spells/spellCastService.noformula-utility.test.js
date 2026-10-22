@@ -544,12 +544,14 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
   // ------------------------------------------------------------------
   // S2 — RAW-disk hijack census (dead-twin scan, programmatic). Every
   // 'strip' name is intercepted EARLIER (:710) on raw disk bytes:
-  // generic action carries metaCtx (triggerSpells.js:460) and the :712
-  // early-return BYPASSES the post-cast/heal riders (:716-720 never
-  // runs). Span services stay silent — the span rows are disk-dead
-  // twins unless an automation-free payload legitimately arrives.
+  // generic action carries metaCtx (triggerSpells.js:460). fix#121(a):
+  // the :712 return now MERGES the post-cast block — surge + riders
+  // run exactly once on consumed casts (fix#121(b): the mass-heal
+  // automation types defer the SELF rider to their confirmFn). Span
+  // services stay silent — the span rows are disk-dead twins unless an
+  // automation-free payload legitimately arrives.
   // ------------------------------------------------------------------
-  it('RAW disk rows for every strip-class name are hijacked EARLIER by handleGenericAutomation (:710) with the generic metaCtx-bearing action, span services stay silent, and the :712 return bypasses heal riders', async () => {
+  it('RAW disk rows for every strip-class name are hijacked EARLIER by handleGenericAutomation (:710) with the generic metaCtx-bearing action, span services stay silent, and the :712 merge runs post-cast riders exactly once (fix#121(a)/(b))', async () => {
     const hijacked = []
     for (const ruleset of ['5e', '2024']) {
       for (const name of AUDIT_NAMES) {
@@ -576,12 +578,16 @@ describe('executeSpellCast - noformula utility lane: no-damage-chain remainder s
           playerStats, CAMPAIGN, MAP, services.characters,
         )
         expect(res).toStrictEqual({ automationPopup: sentinel }) // :712 passThrough forward
-        // Span service + duel + heal riders all unreachable on this lane:
+        // Span service + duel stay unreachable on this lane; fix#121(a):
+        // the merged post-cast block DOES run — surge once, ally rider
+        // once; the SELF rider is deferred exactly for the massHealUtils
+        // automation types whose confirmFn owns it (fix#121(b)).
         for (const t of SPAN_TRIGGERS) expect(t).not.toHaveBeenCalled()
         expect(automation.checkCompelledDuelAttackExpiry).not.toHaveBeenCalled()
-        expect(healRider.triggerPostCastSelfHeals).not.toHaveBeenCalled() // :712 bypass (:720 skipped)
-        expect(healRider.triggerPostCastAllyHeals).not.toHaveBeenCalled()
-        expect(wms.triggerWildMagicSurge).not.toHaveBeenCalled()
+        const isMassHealType = ['mass_healing_word', 'prayer_of_healing', 'mass_cure_wounds'].includes(String(envelope.automation?.type || '').toLowerCase())
+        expect(healRider.triggerPostCastSelfHeals).toHaveBeenCalledTimes(isMassHealType ? 0 : 1) // 'self' defer on massHealUtils routes
+        expect(healRider.triggerPostCastAllyHeals).toHaveBeenCalledTimes(1)
+        expect(wms.triggerWildMagicSurge).toHaveBeenCalledTimes(1)
         expect(envelope).toStrictEqual(before)
       }
     }

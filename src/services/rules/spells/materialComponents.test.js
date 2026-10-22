@@ -97,6 +97,16 @@ const spells2024 = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/2
 const diskRow = (list, name) => list.find(s => s && s.name === name);
 
 describe('getConsumedMaterial — exact-name registry lookup', () => {
+  it('#213 DISK PARITY: both disk-canonical Stone Skin rows exist, both carry consumed-diamond-dust material text, and both names resolve to the SAME registry row bytes', () => {
+    const row5e = diskRow(spells5e, 'Stoneskin');   // 5e canonical (spells.json:9430)
+    const row2024 = diskRow(spells2024, 'Stone Skin'); // 2024 canonical (2024/spells.json:12509)
+    expect(row5e).toBeTruthy();
+    expect(row2024).toBeTruthy();
+    expect(/consumes/i.test(row5e.material)).toBe(true);
+    expect(/consumes/i.test(row2024.material)).toBe(true);
+    expect(getConsumedMaterial(row5e)).toEqual(getConsumedMaterial(row2024));
+  });
+
   it('returns null for missing spell and nameless spell', () => {
     expect(getConsumedMaterial(null)).toBeNull();
     expect(getConsumedMaterial(undefined)).toBeNull();
@@ -110,14 +120,24 @@ describe('getConsumedMaterial — exact-name registry lookup', () => {
     }
   });
 
-  it('misses unregistered real spells, case variants, and curly-apostrophe spell names', () => {
+  it('misses unregistered real spells, case variants, and curly-apostrophe spell names — but folds the two disk-canonical spellings of Stone Skin to ONE row (#213)', () => {
     // Identify is costly on disk but deliberately outside this backpack-gating registry.
     expect(getConsumedMaterial(diskRow(spells5e, 'Identify'))).toBeNull();
-    // 5e disk spells the one-word 'Stoneskin'; registry key 'Stone Skin' is 2024-only.
-    expect(getConsumedMaterial(diskRow(spells5e, 'Stoneskin'))).toBeNull();
+    // #213 canonical-name census: 'Stone Skin' is 2024 disk-canonical (2024/spells.json:12509),
+    // 'Stoneskin' is 5e disk-canonical (spells.json:9430). PRE-FIX this 5e variant NEVER
+    // matched the registry (null — losing variant, alias-space divergence). The exact-match
+    // DISK_CANONICAL_NAME_ALIASES edge at materialComponents.js now folds it onto the
+    // single 'Stone Skin' row; both consumers (blockChecks Beast Spells, metamagic gates)
+    // resolve either disk spelling to the same bytes.
+    expect(getConsumedMaterial(diskRow(spells5e, 'Stoneskin'))).toEqual({ itemName: 'Diamond Dust (100 gp)', required: 'diamond dust worth 100+ GP, which the spell consumes' });
+    expect(getConsumedMaterial(diskRow(spells2024, 'Stone Skin'))).toEqual({ itemName: 'Diamond Dust (100 gp)', required: 'diamond dust worth 100+ GP, which the spell consumes' });
     expect(getConsumedMaterial({ name: 'Not A Spell' })).toBeNull();
     expect(getConsumedMaterial({ name: 'revivify' })).toBeNull();
     expect(getConsumedMaterial({ name: 'REVIVIFY' })).toBeNull();
+    // Fold is name-identity, NOT case/space normalization: lowercase 'stoneskin' and
+    // 'Stone Skin' case-mutants must still miss (H1 kill intact).
+    expect(getConsumedMaterial({ name: 'stoneskin' })).toBeNull();
+    expect(getConsumedMaterial({ name: 'STONE SKIN' })).toBeNull();
     // Registry key carries U+0027 (verified bytewise); U+2019 must NOT match.
     expect(getConsumedMaterial({ name: 'Heroes\u2019 Feast' })).toBeNull();
   });

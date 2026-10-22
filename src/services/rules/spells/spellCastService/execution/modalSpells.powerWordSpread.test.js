@@ -31,7 +31,7 @@
 /*  only on the 2024 disk (:10162, absent from 5e, #1450); Power Word */
 /*  Stun (both) and 2024 Power Word Fortify are the NON-spread        */
 /*  siblings — this gate serves Heal/Kill names ONLY (exact lowercase */
-/*  full-string compares :10/:26, name bytes pulled from REAL disk    */
+/*  full-string compares :14/:30 (was :10/:26 pre-fix), name bytes     */
 /*  rows below). There is NO radius/spread gathering in this span:    */
 /*  targets come from the injected getTargetInfo (first) plus the      */
 /*  chooser's metaCtx.multiTarget (second) — the source comment        */
@@ -57,18 +57,21 @@
 /*  exists at :15/:18/:31/:34). Corpse/HP semantics are downstream     */
 /*  (helpers lane #1478 tiers, heal delta-0 silent-skip).              */
 /*                                                                     */
-/*  QUIRK SCAN: golden unguarded-deref (#1360/#1486 :42 fresh form): */
-/*  heal :10 dereferences spell.name WITHOUT the `spell.name &&`      */
-/*  guard the kill gate carries at :26 — missing name rejects          */
-/*  TypeError on heal, resolves {handled:false} on kill; the          */
-/*  asymmetry is pinned verbatim (mending :10 loudly trips row Q).    */
+/*  QUIRK SCAN (#1471 FIXED, was golden): heal :14 (was :10) once      */
+/*  dereferenced spell.name WITHOUT the `spell.name &&` guard the kill  */
+/*  gate carried at :30 (was :26) — the :702-vs-:703 chain asymmetry   */
+/*  (heal is the FIRST hub arm, index.js:741, so a nameless envelope    */
+/*  TypeError-killed the cast before the guarded twin ever ran). Mended  */
+/*  guard-first to MATCH the sibling bytes; row Q now pins SYMMETRIC    */
+/*  decline { handled: false } on both gates — re-dropping either       */
+/*  guard loudly trips row Q.                                            */
 /*  silent-undefined (?:1480 family): target?.name ( :12/:28) — an    */
 /*  undefined getTargetInfo() RESULT must survive and still spread to  */
 /*  multiTarget (row C; falsy triple collapses — undefined/null/      */
 /*  {name:''} are observably identical past the `|| null` fold, #1352).*/
 /*  :0-swallow census: NO `|| 0` arms exist in this span (READ).      */
 /*  'null + N': no string concat in span. case trails (#1457): gate   */
-/*  lowercases (:10/:26) — row F uppercases the disk name. No          */
+/*  lowercases (:14/:30) — row F uppercases the disk name. No          */
 /*  action.name literal exists on this face (no caller-casing fork).  */
 /*  Dead twins/hijack (#1485): beforeEach clearAllMocks PRESERVES the */
 /*  hoisted stable-summary impl (neutral, deterministic every arm);    */
@@ -85,8 +88,9 @@
 /*  removed -> row E times(1) · M3 per-target refetch -> times(1)    */
 /*  rows A/B/C/E · M4 snapshot cloned per call -> toBe(SHARED_SUMMARY)*/
 /*  identity · M5 gate literal flip/case-sensitivity -> miss rows +   */
-/*  row F · M6 kill guard :26 dropped OR heal guard :10 added -> row  */
-/*  Q asymmetry · M7 fetch-guard :13/:29 always-fetch -> row D        */
+/*  row F · M6 guard symmetric (#1471): dropping heal :14 OR kill :30 */
+/*  guard -> row Q TypeError-fails the stripped gate · M7 fetch-guard  */
+/*  :13/:29 always-fetch -> row D                                      */
 /*  times(0) · M8 multiTarget-only branch dropped -> row C ·           */
 /*  M9 apply order swapped -> A Nth(1)/Nth(2) names · M10 campaign/   */
 /*  playerStats arg drift -> exact tuples + toBe(playerStats) ·       */
@@ -148,8 +152,8 @@ function makePlayerStats() {
 }
 
 const HANDLERS = [
-  { label: 'handlePowerWordKill', fn: handlePowerWordKill, applyKey: 'applyPowerWordKillToTarget', spellName: pwkName, span: ':25-:39' },
-  { label: 'handlePowerWordHeal', fn: handlePowerWordHeal, applyKey: 'applyPowerWordHealToTarget', spellName: pwhName, span: ':9-:23' },
+  { label: 'handlePowerWordKill', fn: handlePowerWordKill, applyKey: 'applyPowerWordKillToTarget', spellName: pwkName, span: ':29-:43' },
+  { label: 'handlePowerWordHeal', fn: handlePowerWordHeal, applyKey: 'applyPowerWordHealToTarget', spellName: pwhName, span: ':9-:27' },
 ];
 
 describe.each(HANDLERS)('$label spread gate (modalSpells$span, injected fake)', ({ label, fn, applyKey, spellName }) => {
@@ -222,7 +226,7 @@ describe.each(HANDLERS)('$label spread gate (modalSpells$span, injected fake)', 
   });
 });
 
-it('Q guard asymmetry quirk golden (#1360): missing spell.name rejects TypeError on the UNGUARDED heal gate (:10) and resolves { handled: false } on the guarded kill gate (:26), console untouched, nothing applied', async () => {
+it('Q guard symmetry (#1471 fix): missing spell.name resolves { handled: false } on BOTH gates — heal :14 mended to the guarded kill form :30 (was golden TypeError-on-heal at :10) — console untouched, nothing applied', async () => {
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const getTargetInfo = vi.fn(async () => ({ name: 'Thug 1' }));
@@ -230,7 +234,7 @@ it('Q guard asymmetry quirk golden (#1360): missing spell.name rejects TypeError
   const applyKill = vi.fn(() => Promise.resolve());
   const shared = { metaCtx: {}, getTargetInfo, playerStats: makePlayerStats(), campaignName: CAMPAIGN };
 
-  await expect(handlePowerWordHeal({ ...shared, spell: {}, applyPowerWordHealToTarget: applyHeal })).rejects.toThrow(TypeError);
+  await expect(handlePowerWordHeal({ ...shared, spell: {}, applyPowerWordHealToTarget: applyHeal })).resolves.toEqual({ handled: false });
   await expect(handlePowerWordKill({ ...shared, spell: {}, applyPowerWordKillToTarget: applyKill })).resolves.toEqual({ handled: false });
 
   expect(getTargetInfo).toHaveBeenCalledTimes(0);

@@ -493,19 +493,63 @@ describe('executeSpellCast feature subscribers — REAL helpers.js/triggerSpells
     expect(consoleError.mock.calls).toEqual([['[spellCast] Arcane Ward trigger failed:', boom]])
   })
 
-  it('dead-twin pin: automation-absent casts REJECT at the unguarded magicalAmbush read (index.js:675→:119) BEFORE any rider runs — helpers.js:77-79 arcane-ward throw and its :550 seam catch are structurally unreachable at this seam', async () => {
+  it('fix#126 (#1495) flip of the retired dead-twin pin: corrupt caster state NO LONGER rejects at the ambush read — the hub self-catches (:157-:164/:774), degrades metamagicHeighten:false, and the FULL post-cast rider block runs', async () => {
+    // Pre-fix capture (green pre-fix, #1495): executeSpellCast rejected WHOLE with
+    // 'activeConditions must be an array for caster' — surge / rider-saves / cast
+    // log all times(0): the paid cast and EVERY rider dead. Law now (fix#119 :817
+    // confusion-await catch mirrored at the hub): a failing NON-CRITICAL resolution
+    // costs its own bonus, never the cast. passives stay a lawful [] so the resolver
+    // dies at its OWN :139 corrupt-row guard — ambush bonus lost, spell lands.
+    const playerStats = makePlayerStats(arcaneWardPassive)
+    playerStats.automation = { passives: [] }
+    runtimeState.getRuntimeValue.mockImplementation((entity, key) => {
+      if (key === 'activeConditions') return 'not-an-array'
+      if (key === 'targetEffects') return []
+      return undefined
+    })
+    const spell = diskRow(spells2024, 'Armor of Agathys')
+
+    const res = await executeSpellCast(spell, { slotLevel: 1 }, makeServices(playerStats))
+
+    // Lane completes with its golden payload (mirrors the golden ward row: null).
+    expect(res).toBeNull()
+    // Resolver's LOUD guard byte (:139) then the hub catch byte (:161) — exact order.
+    expect(consoleError.mock.calls.map(c => c[0])).toEqual([
+      '[spellCast] casterConditions: activeConditions is not an array',
+      '[spellCast] Magical Ambush resolution failed:',
+    ])
+    // Riders alive: the post-cast block ran — surge + rider saves once each.
+    expect(wildSurge.triggerWildMagicSurge).toHaveBeenCalledTimes(1)
+    expect(postCastRider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1)
+    // The cast is real: hostile side-effects paid, cast log written. Zero writes:
+    // Armor of Agathys is a BONUS ACTION disk row (CLA-399 stamp gate stays shut)
+    // and the ambush fold is metaCtx-threading only (index.genericHealFortified
+    // / magicalAmbushTransport write-census law) — the degrade adds none.
+    expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
+    expect(addEntry).toHaveBeenCalledTimes(1)
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([])
+  })
+
+  it('fix#126 boundary (REPORT, owner lane): automation-ABSENT casts survive the ambush hub-catch but still die at the sibling damageCalculation.js:140-142 overchannel THROW — same #1495 class, forbidden edit here (#121-stable file)', async () => {
+    // Honest current-bytes map: the hub :157-:164 catch fires FIRST (its two console
+    // bytes prove ambush degraded, not murdered), then the damage-lane calc pays the
+    // SAME caster-substitution-free loud-throw at damageCalculation.js:142 — that
+    // guard's owner lane is damageCalculation.test.js (#1468-69/#121 family). Reported,
+    // not fixed: damageCalculation.js is out of this lane's edit boundary.
     const playerStats = makePlayerStats(arcaneWardPassive)
     delete playerStats.automation
     const spell = diskRow(spells2024, 'Armor of Agathys')
 
     await expect(executeSpellCast(spell, { slotLevel: 1 }, makeServices(playerStats)))
-      .rejects.toEqual(new Error('playerStats.automation.passives is required for magical ambush check'))
+      .rejects.toThrow('playerStats.automation.passives is required for overchannel check')
 
-    // Nothing past :675 executed: no rider, no ward handler, no cast log.
-    expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
+    expect(consoleError.mock.calls.map(c => c[0])).toEqual([
+      '[spellCast] magicalAmbush check: playerStats.automation.passives is missing',
+      '[spellCast] Magical Ambush resolution failed:',
+      '[spellCast] overchannelPassives: playerStats.automation.passives is missing',
+    ])
+    // Ambush already degraded before the sibling guard's death: no rider reached
+    // the tail (the reject happens mid-damage-lane).
     expect(wildSurge.triggerWildMagicSurge).not.toHaveBeenCalled()
-    expect(postCastRider.triggerPostCastRiderSaves).not.toHaveBeenCalled()
-    expect(addEntry).not.toHaveBeenCalled()
-    expect(consoleError.mock.calls).toEqual([['[spellCast] magicalAmbush check: playerStats.automation.passives is missing']])
   })
 })

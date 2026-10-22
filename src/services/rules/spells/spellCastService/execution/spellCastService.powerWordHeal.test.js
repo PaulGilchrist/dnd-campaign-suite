@@ -136,17 +136,19 @@ vi.mock('../../../../automation/index.js', () => ({
 }))
 
 vi.mock('../../../../rules/spells/postCastRiderService.js', () => ({
-  triggerPostCastRiderSaves: vi.fn(),
-  triggerSpellThief: vi.fn(),
-  triggerBewitchingMagic: vi.fn(),
-  triggerSoulstitchSpells: vi.fn(),
+  // REAL-Promise-shape mocks (#1449 canon): fix#121(a) routes the early PWH/PWK
+  // lane through runPostCastTriggers — the hub consumes .catch() on these.
+  triggerPostCastRiderSaves: vi.fn(() => Promise.resolve(null)),
+  triggerSpellThief: vi.fn(() => Promise.resolve(null)),
+  triggerBewitchingMagic: vi.fn(() => Promise.resolve(null)),
+  triggerSoulstitchSpells: vi.fn(() => Promise.resolve(null)),
   getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
 vi.mock('../../../../rules/spells/postCastHealService.js', () => ({
-  triggerPostCastSelfHeals: vi.fn(),
-  triggerPostCastAllyHeals: vi.fn(),
+  triggerPostCastSelfHeals: vi.fn(() => Promise.resolve(null)),
+  triggerPostCastAllyHeals: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../../../../rules/features/silenceService.js', () => ({
@@ -165,19 +167,19 @@ vi.mock('../../../../rules/features/friendsService.js', () => ({
 }))
 
 vi.mock('../../../../rules/features/smiteOfProtectionService.js', () => ({
-  triggerSmiteOfProtection: vi.fn(),
+  triggerSmiteOfProtection: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../../../../rules/features/inspiringSmiteService.js', () => ({
-  triggerInspiringSmite: vi.fn(),
+  triggerInspiringSmite: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../../../../rules/features/primalCompanionSpellShareService.js', () => ({
-  triggerPrimalCompanionSpellShare: vi.fn(),
+  triggerPrimalCompanionSpellShare: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../../../../rules/features/wildMagicSurgeService.js', () => ({
-  triggerWildMagicSurge: vi.fn(),
+  triggerWildMagicSurge: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('../../../../rules/features/falseLifeService.js', () => ({
@@ -427,7 +429,7 @@ describe('executeSpellCast — Power Word Heal hub edge routing (index.js:702 ea
     expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
     expect(getCombatContext).toHaveBeenCalledTimes(1)
     expect(getCombatContext).toHaveBeenCalledWith(CAMPAIGN)
-    expect(getTargetInfoCalls(services)).toBe(3) /* blockChecks :655 + log :234 + gate :11 — arity 0 */
+    expect(getTargetInfoCalls(services)).toBe(4) /* blockChecks :655 + log :234 + gate :11 + the fix#121(a) merged post-cast :510 hexTarget read — arity 0 */
     /* Full write census, exact order: CLA-399 stamp once FIRST (M6), then the
        survivor strip ['prone'], then stand-permission (M1 doubles all three). */
     expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
@@ -470,7 +472,7 @@ describe('executeSpellCast — Power Word Heal hub edge routing (index.js:702 ea
     /* M3: the :17 multiTarget leg is the only apply when first folds null;
        falsy-triple collapse (undefined result) cited #1352/#1487 row C. */
     expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
-    expect(getTargetInfoCalls(services)).toBe(3)
+    expect(getTargetInfoCalls(services)).toBe(4) /* + fix#121(a) merged post-cast :510 hexTarget read */
     /* No conditions stored -> zero strip writes/logs (strip bytes R1 + #1481). */
     expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
       [CASTER, 'lastActionSpellCast', 1, CAMPAIGN],
@@ -503,7 +505,7 @@ describe('executeSpellCast — Power Word Heal hub edge routing (index.js:702 ea
     expect(consoleError.mock.calls).toEqual([['[spellCast] Spell not found in spells.json:', PWH_ROW.name]])
     expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(applyHealingToTarget.mock.calls).toEqual([[SUMMARY, THUG, GAP, CAMPAIGN]])
-    expect(getTargetInfoCalls(services)).toBe(3)
+    expect(getTargetInfoCalls(services)).toBe(4) /* + fix#121(a) merged post-cast :510 hexTarget read */
     expect(runtimeState.setRuntimeValue.mock.calls).toEqual([
       [CASTER, 'lastActionSpellCast', 1, CAMPAIGN],
       [THUG, 'powerWordHealStandPermission', true, CAMPAIGN],

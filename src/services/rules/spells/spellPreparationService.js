@@ -204,6 +204,17 @@ function activeBuffFreeCast(playerName, spellName, buffKey, buffMatcher) {
 }
 
 // Aura of Vitality is free while the caster carries the aura targetEffect.
+// #1528 DISPROVEN 2026-10-22: the literal 'campaign' below is the store's TIER
+// SELECTOR, not a misplaced playerName — targetEffects is CAMPAIGN_KEYS[0]
+// (campaignKeys.js:7) and its producer registerTargetEffect writes it at the SAME
+// tier (targetEffectDefinitions.js:1507/:1519; sibling consumer isAuraOfVitalityActive
+// reads it identically at auraOfVitalityHandler.js:184 — while that handler's
+// name-keyed HP reads take the CHARACTER tier with a real name at :49-55, the shape
+// contrast proving both tiers are chosen deliberately, app-wide). The owner tier
+// connects at :210 via te.target === playerName. A playerName-key swap would read a
+// character store no producer writes (free-cast channel dead) and trip the store's
+// isCampaignKey guard (useRuntimeState.js:64-71). Byte-pinned by
+// isFreeCastAuthorized.test.js gate #13 ('campaign' reader key, cited not changed).
 function auraOfVitalityFreeCast(playerName, spellName, campaignName) {
   if ((spellName || '').toLowerCase() !== 'aura of vitality') return false;
   const targetEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
@@ -487,11 +498,22 @@ function consumeWildCompanionGrant(allActions, playerName, spellName, campaignNa
 
 // Consume the named-feature free-cast flags after the counter scans (order preserved).
 function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLevel, campaignName) {
+  // #1527: consume-side decrement LANDS. The old self-copy re-stamped favoredEnemyUses
+  // with the count it just read from the latch (vacuous write-back — consumption never
+  // moved the ledger) and its `>= 0` arm even admitted a silent no-op stamp at spent-0.
+  // House consume arm mirrors FREE_CAST_CONSUME_OPS.shared (:379 `count > 0 ? count - 1`)
+  // with the already-spent half made LOUD: count > 0 writes count - 1; stamping 0 from
+  // 1 is lawful spent-zero data (fix#90 family), negative is impossible, and a consume
+  // against an already-zero (or NaN) latch refuses loudly with ZERO writes. The
+  // favoredEnemyUses ledger is the downstream decrement-after-use reader: useTrackedResource.js:6-8
+  // renders it live into the Favored Enemy badge (CharClassFeatures.jsx:583 TrackedResourceInput).
   const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
-    if (newCount >= 0) {
-      setRuntimeValue(playerName, 'favoredEnemyUses', newCount, campaignName);
+    if (newCount > 0) {
+      setRuntimeValue(playerName, 'favoredEnemyUses', newCount - 1, campaignName);
+    } else {
+      console.error('[spellPreparationService] Favored Enemy free-cast consume refused — latch already spent, no-op consumption (zero writes, negative impossible):', { playerName, favoredEnemyCount, spellName });
     }
   }
   const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
@@ -571,8 +593,40 @@ function restoreActionFreeCastCounters(allActions, playerName, spellName, spellL
   adjustActionFreeCastCounters({ allActions, playerName, spellName, spellLevel, campaignName, ops: FREE_CAST_RESTORE_OPS });
 }
 
+// #1512: cancelled Bewitching free-cast re-arm. consumed-null/absent latch (the real
+// store answers null for missing keys) + Bewitching Magic passive owner + Misty Step
+// match -> restore the prior armed byte TRUE; explicit false stays disarmed; an intact
+// armed latch writes nothing (byte-identical restore).
+function restoreBewitchingArm(playerName, spellName, campaignName, playerStats) {
+  const bewitchingArmed = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
+  const hasBewitchingFeature = (playerStats?.automation?.passives || []).some(p => p.type === 'bewitching_magic');
+  if (spellName === 'Misty Step' && bewitchingArmed == null && hasBewitchingFeature) {
+    setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', true, campaignName);
+  }
+}
+
+// #1512: Signature Spells latch restore. The latch key `SignatureSpells_<Spell>_used`
+// carries no level segment, so selection-array membership covers every cancelled cast
+// level — the old hardcoded spellLevel === 3 gate left lv5/7/9 cancels permanently
+// spent. The truthy-latch guard is the restore-merge face (fix#27/#990 §39): refund
+// ONLY a consumed stamp (true); fresh null/false/absent latches write nothing. Disk-law
+// lv3 payment stays gated where it is consumed (:512-516) and authorized
+// (masteryOrSavantFreeCast).
+function restoreSignatureLatch(playerName, spellName, campaignName) {
+  const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
+  if (Array.isArray(sigSpells) && sigSpells.includes(spellName)) {
+    const usedKey = `SignatureSpells_${spellName.replace(/\s+/g, '_')}_used`;
+    if (getRuntimeValue(playerName, usedKey, campaignName)) {
+      setRuntimeValue(playerName, usedKey, false, campaignName);
+    }
+  }
+}
+
 // Roll back the named-feature free-cast flags after the counter scans (order preserved).
-function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName) {
+// #1512: playerStats is threaded through (capture-hoist fix#42 family) so the Bewitching
+// restore can VERIFY the feature owner before re-arming — never fabricate a latch state
+// for a caster who has no Bewitching Magic passive.
+function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName, playerStats) {
   const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
@@ -585,15 +639,15 @@ function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaign
     setRuntimeValue(playerName, 'naturalRecoveryFreeCast', null, campaignName);
     setRuntimeValue(playerName, 'naturalRecoveryFreeCastUsed', false, campaignName);
   }
-  if (getRuntimeValue(playerName, '_Bewitching_Magic_freeCast') && spellName === 'Misty Step') {
-    setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', null, campaignName);
-  }
+  // #1512: restore the PRIOR armed byte (true), never re-run the consume-side null-write.
+  // The old truthy-mirror of :502-504 (a) nulled a still-armed latch on cancel-before-
+  // consume (useConfirmableFlow.rollbackSpellSlot fires without a prior consume) and
+  // (b) fell through inert once consume had nulled it — a cancelled free-cast could never
+  // re-arm the feature.
+  restoreBewitchingArm(playerName, spellName, campaignName, playerStats);
 
-  const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
-  if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
-    const usedKey = `SignatureSpells_${spellName.replace(/\s+/g, '_')}_used`;
-    setRuntimeValue(playerName, usedKey, false, campaignName);
-  }
+  // #1512: LEVEL-FREE restore, see restoreSignatureLatch.
+  restoreSignatureLatch(playerName, spellName, campaignName);
 
   const divSpells = getRuntimeValue(playerName, '_Divination_Savant_selection', campaignName);
   if (Array.isArray(divSpells) && divSpells.includes(spellName)) {
@@ -622,7 +676,7 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
 
   const allActions = collectAutomationActions(playerStats);
   restoreActionFreeCastCounters(allActions, playerName, spellName, spellLevel, campaignName);
-  restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName);
+  restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName, playerStats);
 }
 
 function cleanupBuffsByName(casterName, buffName, campaignName) {
@@ -875,12 +929,24 @@ function applyNewConcentration(spell, playerName, playerStats, campaignName) {
   storageService.default.set('combatSummary', cs, campaignName);
 }
 
+// #1514: gate on the DISK row's automation.spellSchools (2024 Great Old One 'Psychic
+// Spells' stores lowercase ['enchantment','illusion']) — iterated off the passive, never
+// retyped (#1362); both sides lowercased (house idiom reused from applyPsychicComponents,
+// spellCastService/execution/index.js:193-197). Missing field -> empty list -> deny.
+function psychicDamageSchoolQualifies(psychicPassive, spell) {
+  const schools = Array.isArray(psychicPassive?.spellSchools) ? psychicPassive.spellSchools : [];
+  const spellSchool = String(spell.school || '').toLowerCase();
+  return schools.some(s => String(s).toLowerCase() === spellSchool);
+}
+
 // Psychic damage-type override and Spell Breaker bonus-action Dispel Magic stamp.
 function applyWarlockSpellBreakerStamps(modifiedSpell, spell, playerStats, usePsychicDamage) {
-  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+  const psychicPassive = playerStats.automation?.passives?.find(p => p.type === 'psychic_spells');
   const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
   const hasDamage = !!spell.damage;
-  const canChangeDamageType = playerStats.class?.name === 'Warlock' && hasPsychicSpells && hasDamage;
+  // #1514: school-gated — before this fix ANY damaging Warlock spell stamped
+  // _psychicSpellsOverride regardless of school.
+  const canChangeDamageType = playerStats.class?.name === 'Warlock' && !!psychicPassive && hasDamage && psychicDamageSchoolQualifies(psychicPassive, spell);
   const isDispelMagicAsBonusAction = hasSpellBreaker && spell.name === 'Dispel Magic';
 
   if (canChangeDamageType && usePsychicDamage) {

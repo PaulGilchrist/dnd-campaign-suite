@@ -18,13 +18,15 @@
 //   - :21 cantrip gate reads spell.level only; upcast producer
 //     useSimpleSpellHandlers.js:168 stamps {level:slotLevel, baseLevel:0} -> upcast cantrip
 //     LOSES cantripRangeBonus here while computeBlessedStrikes:62 accepts baseLevel (T2/T4 pair).
-//   - :79/:95 silent-null concat when empEvocFormula is null (callers guarantee a formula via
-//     noSavePath early-return; module never guards) — golden bytes.
+//   - fix#1469(b) :79/:95: null base no longer concatenates literally — appendBonusTerm
+//     logs console.error and returns the base unchanged (never interpolate raw null;
+//     callers still guarantee a formula via noSavePath early-return, module now guards too).
 //   - :89 playerStats.name deref runs before the passive gate — missing name is a TypeError
 //     with console untouched (#1360 family).
 //   - :118 getRuntimeValue arity is 2 — matches REAL useRuntimeState.js:63 signature;
 //     setRuntimeValue write is 4-args, arity-checked vs REAL :78.
-//   - :123 no idempotency marker check — re-entry double-tags [Overchannel Maximize]
+//   - fix#1469(c) :123: appendBonusTerm dedupes on the marker — re-entry keeps
+//     [Overchannel Maximize] EXACTLY ONCE (#1348) while the use-count writer still climbs
 //     (contrast :48 EE dedupe owned by the cla120 lane).
 // NO-CLOCK: pure grid-distance + string fold, zero timers/Date in unit or fixtures.
 // HP-key: only computeOverchannel writes, and writes only 'Overchannel_useCount'.
@@ -237,16 +239,27 @@ describe('computeBlessedStrikes — Wisdom-on-cantrip fold (damageCalculation.js
       // upcast shape {level:3, baseLevel:0} (useSimpleSpellHandlers.js:168): baseLevel===0 IS honored here —
       // counterpart of the computeRange:21 quirk row above.
       { label: 'upcast-cantrip shape keeps baseLevel gate', spell: { ...PS24, level: 3, baseLevel: 0 }, ps: cleric(3), chosen: 'Potent Spellcasting', expect: '1d12 + 3 [Blessed Strikes]', reads: 1 },
-      // QUIRK golden: null formula concatenates the literal 'null' (callers guarantee a formula; module never guards)
-      { label: 'QUIRK: null empEvocFormula concatenates literally', spell: PS24, ps: cleric(5), chosen: 'Potent Spellcasting', formula: null, expect: 'null + 5 [Blessed Strikes]', reads: 1 },
+      // fix#1469(b): null formula logs once and passes through — pre-fix capture was
+      // 'null + 5 [Blessed Strikes]' literal bytes (flipped honesty pin #1469)
+      { label: 'fix#1469(b): null empEvocFormula logs + passes through (never "null +")', spell: PS24, ps: cleric(5), chosen: 'Potent Spellcasting', formula: null, expect: null, reads: 1, errs: 1 },
+      // fix#1469(c): fold-once dedupe on the marker (#1348 tag-count-exactly-one)
+      { label: 'pre-tagged [Blessed Strikes] base never re-tags (dedupe)', spell: PS24, ps: cleric(5), chosen: 'Potent Spellcasting', formula: '1d12 + 5 [Blessed Strikes]', expect: '1d12 + 5 [Blessed Strikes]', reads: 1 },
     ];
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     for (const row of rows) {
+      errSpy.mockClear();
       const grv = vi.fn(() => row.chosen);
       const result = computeBlessedStrikes(row.spell, 'formula' in row ? row.formula : F, row.ps, 'test-campaign', grv);
       expect(result, row.label).toBe(row.expect);
+      if (typeof result === 'string') {
+        expect(result, row.label).not.toContain('null'); // 'null' substring NEVER appears
+        expect((result.match(/\[Blessed Strikes\]/g) ?? []), row.label).toHaveLength(row.expect.includes('[Blessed Strikes]') ? 1 : 0); // #1348
+      }
+      expect(errSpy.mock.calls, row.label).toHaveLength(row.errs ?? 0);
       expect(grv.mock.calls, row.label).toHaveLength(row.reads);
       if (row.reads) expect(grv.mock.calls[0], row.label).toStrictEqual(['TestCleric', '_Blessed_Strikes_option', 'test-campaign']);
     }
+    errSpy.mockRestore();
   });
 
   it('feature-selection gates: upgraded disk twin never matches, no-actions passes through, single-option auto-applies', () => {
@@ -296,17 +309,28 @@ describe('computeRadiantSoul — Radiant/Fire Charisma fold (damageCalculation.j
       // raw disk automation byte WITHOUT the core-handlers.js:454 hasAutomation stamp -> inert:
       // the gate (:91) requires the producer's stamp, so a collector that forgot it silently loses the feature.
       { label: 'raw disk passive without hasAutomation stamp is inert', spell: GB24, formula: GB, cha: 4, onceUsed: false, passives: [{ type: RS_AUTO.type, name: RS_FEATURE.name, damageTypes: RS_AUTO.damageTypes }], expect: GB, reads: 1 },
-      // QUIRK golden: null formula concatenates literally (see blessed twin above)
-      { label: 'QUIRK: null formula concatenates literally', spell: GB24, formula: null, cha: 4, onceUsed: false, expect: 'null + 4 [Radiant Soul]', reads: 1 },
+      // fix#1469(b): null formula logs once and passes through — pre-fix capture was
+      // 'null + 4 [Radiant Soul]' literal bytes (flipped honesty pin #1469)
+      { label: 'fix#1469(b): null formula logs + passes through (never "null +")', spell: GB24, formula: null, cha: 4, onceUsed: false, expect: null, reads: 1, errs: 1 },
+      // fix#1469(c): fold-once dedupe on the marker (#1348 tag-count-exactly-one)
+      { label: 'pre-tagged [Radiant Soul] base never re-tags (dedupe)', spell: GB24, formula: '4d6 + 4 [Radiant Soul]', cha: 4, onceUsed: false, expect: '4d6 + 4 [Radiant Soul]', reads: 1 },
     ];
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     for (const row of rows) {
+      errSpy.mockClear();
       const grv = vi.fn(() => row.onceUsed);
       const result = computeRadiantSoul(row.spell, holder(row.cha, row.passives), 'test-campaign', grv, row.formula);
       expect(result, row.label).toBe(row.expect);
+      if (typeof result === 'string') {
+        expect(result, row.label).not.toContain('null'); // 'null' substring NEVER appears
+        expect((result.match(/\[Radiant Soul\]/g) ?? []), row.label).toHaveLength(row.expect.includes('[Radiant Soul]') ? 1 : 0); // #1348
+      }
+      expect(errSpy.mock.calls, row.label).toHaveLength(row.errs ?? 0);
       expect(grv.mock.calls, row.label).toHaveLength(row.reads);
       expect(grv.mock.calls[0]?.[0], row.label).toBe('TestCelestial');
       expect(grv.mock.calls[0]?.[1], row.label).toBe(KEY);
     }
+    errSpy.mockRestore();
     expect(vi.mocked(setRuntimeValue)).not.toHaveBeenCalled(); // read-only latch lane — the consume owner lives elsewhere
   });
 
@@ -354,9 +378,11 @@ describe('computeOverchannel — maximize tag + use-count writer (damageCalculat
     expect(grv.mock.invocationCallOrder[0]).toBeLessThan(setMock.mock.invocationCallOrder[0]);
 
     const second = computeOverchannel({ ...args, empEvocFormula: null, baseFormula: first.overchannelFormula });
-    // QUIRK golden: no [Overchannel Maximize] marker dedupe at :123 (contrast the EE guard at
-    // :48, owned by the cla120 lane) — feeding a tagged formula back in re-tags it, count climbs.
-    expect(second).toStrictEqual({ overchannelFormula: '8d6 [Overchannel Maximize] [Overchannel Maximize]', overchannelActive: true, overchannelUseCount: 4 });
+    // fix#1469(c): appendBonusTerm dedupes [Overchannel Maximize] on the marker —
+    // re-entry keeps the tag EXACTLY ONCE (#1348) while the use-count writer still
+    // climbs. Pre-fix capture: '8d6 [Overchannel Maximize] [Overchannel Maximize]'.
+    expect(second).toStrictEqual({ overchannelFormula: '8d6 [Overchannel Maximize]', overchannelActive: true, overchannelUseCount: 4 });
+    expect(second.overchannelFormula.match(/\[Overchannel Maximize\]/g)).toHaveLength(1); // #1348 tag-count
 
     // EE formula wins over baseFormula (:122 empEvocFormula || baseFormula)
     const ee = computeOverchannel({ ...args, empEvocFormula: '8d6 + 5 [Empowered Evocation]', baseFormula: 'IGNORED' });
@@ -370,6 +396,18 @@ describe('computeOverchannel — maximize tag + use-count writer (damageCalculat
     expect(setMock.mock.calls).toHaveLength(4);
     expect(setMock.mock.calls[1]).toStrictEqual(['TestWizard', 'Overchannel_useCount', 4, 'test-campaign']);
     expect(setMock.mock.calls[3]).toStrictEqual(['TestWizard', 'Overchannel_useCount', 1, 'test-campaign']);
+
+    // fix#1469(b): armed over a NULL base — logs once, never bakes 'null [Overchannel
+    // Maximize]', passes null through (consumers fall back via `overchannelFormula ||
+    // formula`, savePath.js:255). Count still climbs: 5th write, grv default 3 -> 4.
+    const bsSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const nullBase = computeOverchannel({ ...args, empEvocFormula: null, baseFormula: null });
+    expect(nullBase).toStrictEqual({ overchannelFormula: null, overchannelActive: true, overchannelUseCount: 4 });
+    expect(bsSpy.mock.calls).toHaveLength(1);
+    expect(bsSpy.mock.calls[0][0]).not.toContain('null');
+    bsSpy.mockRestore();
+    expect(setMock.mock.calls).toHaveLength(5);
+    expect(setMock.mock.calls[4]).toStrictEqual(['TestWizard', 'Overchannel_useCount', 4, 'test-campaign']);
   });
 
   it('every unarmed gate returns the base formula untouched with zero writes (deny table)', () => {

@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /* OWNER MAP — execution/index.js pre-chain lane (#1382/#1458/#1461/ */
-/* #1462/#1470/#1474). OWNED HERE: ambush throw family (:117-120),   */
+/* #1462/#1470/#1474/#1495). OWNED HERE: ambush DEGRADE family        */
+/* (fix#126 — guards :132/:140 pure-throw, hub catch :157-:164 @:774), */
 /* SP-002 null-activeConditions CONTINUE (:124-129, cited :331-350), */
 /* lastActionSpellCast casings (:67) + endFriends/endInvisibility     */
 /* transport (:60-63) (#1382), cast-log bytes (:225-244), Hunter's    */
@@ -355,32 +356,53 @@ describe('executeSpellCast — early resolutions', () => {
   });
 
   /* ---------------------------------------------------------------- */
-  /*  Magical-ambush resolution — throw family (#1470, index.js:117) */
+  /*  Magical-ambush resolution — fix#126 DEGRADE family (#1495)    */
   /* ---------------------------------------------------------------- */
 
   describe('magical-ambush passives guard', () => {
-    it('throws the exact guard error for null or missing passives, before the silence lookup and with zero side effects', async () => {
+    it('fix#126 (#1495): passives-missing throw self-catches at the hub — cast CONTINUES degraded to metamagicHeighten:false, loud console pair, silence gate still reaches the cast', async () => {
+      // Pre-fix capture (#1495, pinned green pre-fix): executeSpellCast REJECTED
+      // WHOLE with 'playerStats.automation.passives is required…' — the paid slot
+      // burned and every post-cast rider (surge/heals/marks, CLA-389 merge
+      // :784+:793+:800+:824+:832) was structurally unreachable. fix#126 mirrors
+      // the fix#119 :817 confusion-await self-catch law: guard throws stay LOUD
+      // inside the resolver (pure :128-:144, exported contract intact) and the
+      // single hub caller (:157-:164 → :774) degrades to the zero-bonus shape.
       const arms = [
         ['passives: null', makePlayerStats({ automation: { passives: null } })],
         ['passives key absent', makePlayerStats({ automation: {} })],
       ];
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        for (const [label, playerStats] of arms) {
+          vi.clearAllMocks();
+          getRuntimeValue.mockReturnValue([]);
+          // Exit at the silence gate (:721) so the continue is observable without
+          // walking the damage chain — SP-002 arm (:393) pattern, same next gate.
+          getSilenceSource.mockReturnValue('SilenceCaster');
+          isCreatureInSilenceZone.mockReturnValue(true);
 
-      for (const [label, playerStats] of arms) {
-        vi.clearAllMocks();
-        getRuntimeValue.mockReturnValue([]);
+          const result = await runCast(makeSpell(), playerStats);
 
-        const err = await runCast(makeSpell(), playerStats).catch((e) => e);
-
-        expect(err, label).toBeInstanceOf(Error);
-        expect(err.message, label).toBe('playerStats.automation.passives is required for magical ambush check');
-        // Only the block hub ran before the throw (:671-665, :91): one
-        // antimagic store read, one target resolution — nothing past :675.
-        expect(getRuntimeValue.mock.calls, label).toEqual([['campaign', 'targetEffects']]);
-        expect(getSilenceSource.mock.calls, label).toEqual([]);
-        expect(addEntry.mock.calls, label).toEqual([]);
-        expect(setRuntimeValue.mock.calls, label).toEqual([]);
-        expect(endFriendsOnHostileAction.mock.calls, label).toEqual([]);
-        expect(endInvisibilityOnHostileAction.mock.calls, label).toEqual([]);
+          // No rejection: the cast reached the silence gate and returned its refusal.
+          expect(result, label).toStrictEqual(SILENCE_POPUP);
+          // Guard byte (:131) then hub catch byte (:161) — exact order, nothing else.
+          expect(spy.mock.calls.map(c => c[0]), label).toEqual([
+            '[spellCast] magicalAmbush check: playerStats.automation.passives is missing',
+            '[spellCast] Magical Ambush resolution failed:',
+          ]);
+          // The resolver died BEFORE its caster read (:137): exactly one hub read.
+          expect(getRuntimeValue.mock.calls, label).toEqual([['campaign', 'targetEffects']]);
+          expect(getSilenceSource.mock.calls, label).toEqual([['TestWizard', CAMPAIGN]]);
+          // Silence refusal precedes payment: cast log/hostile side effects still zero.
+          expect(addEntry.mock.calls, label).toHaveLength(1);
+          expect(setRuntimeValue.mock.calls, label).toEqual([]);
+          expect(endFriendsOnHostileAction.mock.calls, label).toEqual([]);
+          expect(endInvisibilityOnHostileAction.mock.calls, label).toEqual([]);
+          spy.mockClear();
+        }
+      } finally {
+        spy.mockRestore();
       }
     });
   });

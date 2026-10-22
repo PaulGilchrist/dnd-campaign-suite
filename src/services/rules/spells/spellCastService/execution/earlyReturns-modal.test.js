@@ -30,18 +30,18 @@
 /*     Service.triggerConfusion) are the mock boundaries, owned by     */
 /*     shapechangeHandler.test.js / confusionService.test.js.          */
 /*                                                                     */
-/*  :707 QUARK PIN (THE Promise-shape double-unwrap, #1470 disposition */
-/*  "OWNED BY earlyReturns-modal"): handleConfusionEarly returns        */
-/*  { handled: true, result: <detached async-IIFE Promise> } and the  */
-/*  arm reads r.result?.result — a Promise has no .result, so the read */
-/*  is undefined EVERY time; :712 consumes { value: undefined } and    */
-/*  executeSpellCast resolves undefined. triggerConfusion itself fires */
-/*  synchronously inside the thunk (its awaited { handled: true } is   */
-/*  never consumed — untracked, #1458 detached). Severity honestly:   */
-/*  cosmetic-to-moderate — gameplay outcome is unchanged (the service  */
-/*  side effects run), but any future popup payload returned by the    */
-/*  detached IIFE is silently discarded. Pinned as observable bytes so */
-/*  a future fix trips this suite loudly.                              */
+/*  :707 FIXED (fix#121(d), #1458; was the Promise-shape double-unwrap  */
+/*  quirk, disposition "OWNED BY earlyReturns-modal"): handleConfusionEarly */
+/*  returns { handled: true, result: <async-IIFE Promise> } (modalSpells.js */
+/*  :151-157); the RETIRED arm read r.result?.result — a Promise has no    */
+/*  .result, so the read was undefined EVERY time and the IIFE ran          */
+/*  detached/untracked. The arm is now ASYNC: it awaits the Promise        */
+/*  (effect lands before the lane resolves) and console.errors loudly on   */
+/*  rejection (fix#116 await family + fix#9 loud-fail family). Swallow      */
+/*  contract preserved: :712 consumes { value: undefined } and               */
+/*  executeSpellCast resolves undefined. triggerConfusion fires with the    */
+/*  exact wrapped tuple — now tracked, never floating. Post-cast riders run */
+/*  once via the fix#121(a) merge.                                          */
 /*                                                                     */
 /*  Intercept-before-generic proof (#1463 dead-span contrast): the     */
 /*  disk rows for Mass Suggestion/Hypnotic Pattern/Sleep carry          */
@@ -49,7 +49,8 @@
 /*  SERVICE_HANDLED_SPELLS (triggerSpells.js:42-57) — absent a :704/  */
 /*  :706/:709 intercept they would be hijacked at :710. Every consumed */
 /*  row pins handleGenericAutomation + executeHandler never called,   */
-/*  and the :712 bypass pins post-cast riders never run (#1455).      */
+/*  and fix#121(a): consumed casts now run the post-cast rider block   */
+/*  exactly once through the :712 merge (#1455 bypass retired).        */
 /*  Case-gate split (#1457/185/212/232 trail): early-arm gates        */
 /*  lowercase (modalSpells.js:42/70/96/123/150/163) while the disk    */
 /*  lookup is EXACT-case (index.js:179) — pinned on the calm arm.     */
@@ -360,21 +361,25 @@ function makeOpts(extra = {}) {
   };
 }
 
-// :712 early-chain bypass — post-cast riders are structurally unreachable
-// on consumed casts (#1455, pinned per consumed row).
+// fix#121(a) (#1455): consumed early-chain casts now thread the post-cast rider
+// block exactly once through the :712 merge (surge + riderSaves + bewitching +
+// thief + heal pair riders via their name gates inside the mocked service). The
+// damage/save paths, :710 generic arm and the healing-word fire remain unreachable
+// — the cast was consumed before :714. Self/ally heal riders fire once at :519/:522
+// unless the producer flagged healRidersRun (:710 mass types / :337 — none here).
 function expectNoPostCastOrPaths() {
   expect(handleSavePath).not.toHaveBeenCalled();
   expect(handleNoSavePath).not.toHaveBeenCalled();
   expect(mockGeneric).not.toHaveBeenCalled();
   expect(executeHandler).not.toHaveBeenCalled();
-  expect(triggerWildMagicSurge).not.toHaveBeenCalled();
-  expect(triggerPostCastRiderSaves).not.toHaveBeenCalled();
-  expect(triggerBewitchingMagic).not.toHaveBeenCalled();
-  expect(triggerSpellThief).not.toHaveBeenCalled();
+  expect(triggerWildMagicSurge).toHaveBeenCalledTimes(1);
+  expect(triggerPostCastRiderSaves).toHaveBeenCalledTimes(1);
+  expect(triggerBewitchingMagic).toHaveBeenCalledTimes(1);
+  expect(triggerSpellThief).toHaveBeenCalledTimes(1);
   expect(triggerSoulstitchSpells).not.toHaveBeenCalled();
   expect(triggerHealingWord).not.toHaveBeenCalled();
-  expect(triggerPostCastSelfHeals).not.toHaveBeenCalled();
-  expect(triggerPostCastAllyHeals).not.toHaveBeenCalled();
+  expect(triggerPostCastSelfHeals).toHaveBeenCalledTimes(1);
+  expect(triggerPostCastAllyHeals).toHaveBeenCalledTimes(1);
   expect(rollAttack).not.toHaveBeenCalled();
   expect(rollDamage).not.toHaveBeenCalled();
 }
@@ -600,19 +605,18 @@ describe('executeSpellCast early-modal chain (:702-:709) — exact dispatch enve
   /*  HERE (#1470 disposition). REAL producer, honest quirk pin.     */
   /* ---------------------------------------------------------------- */
 
-  it('consumes Confusion at :707 resolving UNDEFINED — r.result?.result reads a detached Promise (no .result) every time while triggerConfusion fires synchronously with the exact wrapped tuple; the consumed cast bypasses :708+:712+riders entirely', async () => {
+  it('consumes Confusion at :707 resolving UNDEFINED — fix#121(d): the arm AWAITS the awaited-IIFE Promise (detached-read retired), triggerConfusion fires once with the exact wrapped tuple, a rejection fails loudly, and the consumed cast still skips :708+save/damage lanes while riders run once post-payment', async () => {
     const envelope = diskRow('Confusion');
     const ctx = { slotLevel: 4 };
 
     const result = await executeSpellCast(envelope, ctx, makeOpts());
-    await Promise.resolve(); // flush the detached IIFE — fully settled, nothing more resolves
 
-    // THE quirk, pinned as observable bytes: handleConfusionEarly returns
-    // { handled: true, result: <async-IIFE Promise> } (modalSpells.js:150-157);
-    // :707 unwraps r.result?.result — undefined at read-time ALWAYS.
+    // fix#121(d): handleConfusionEarly still returns { handled: true,
+    // result: <async-IIFE Promise> } (modalSpells.js:151-157), but the hub
+    // arm now AWAITS it inside runTriggerChain — the effect is TRACKED and
+    // landed before the lane resolves (fix#116 family). Swallow contract
+    // preserved: the consumed lane resolves undefined.
     expect(result).toBeUndefined();
-    // the service call still fires — synchronously inside the thunk, and it
-    // is UNTRACKED: its resolved { handled: true } is discarded (#1458).
     expect(triggerConfusion).toHaveBeenCalledTimes(1);
     const [sArg, mArg, pArg, cArg, mpArg] = triggerConfusion.mock.calls[0];
     expect(sArg).toBe(envelope); // raw cast envelope, NOT fullSpell (:707 passes spell)
@@ -623,9 +627,21 @@ describe('executeSpellCast early-modal chain (:702-:709) — exact dispatch enve
     expect(cArg).toBe(CAMPAIGN);
     expect(mpArg).toBe('grid-1');
     // consumed DESPITE undefined: { value: undefined } is truthy at :712 —
-    // later arms and every downstream lane never run (#1455 bypass contrast)
+    // later arms and the damage/save lanes never run; fix#121(a): the
+    // post-cast rider block DOES run, exactly once, before the return.
     expect(shapechangeHandle).not.toHaveBeenCalled(); // :708 unreachable
     expectNoPostCastOrPaths();
+
+    // loud-fail arm (fix#9 family): a rejecting triggerConfusion must console.error
+    // the exact hub bytes instead of surfacing as an unhandled rejection.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const boom = new Error('confusion-boom');
+    triggerConfusion.mockRejectedValueOnce(boom);
+    const rejResult = await executeSpellCast(envelope, ctx, makeOpts());
+    expect(rejResult).toBeUndefined(); // consumed lane stays swallow-shaped
+    expect(triggerConfusion).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith('[spellCast] Confusion early trigger failed:', boom);
+    errSpy.mockRestore();
   });
 
   /* ---------------------------------------------------------------- */

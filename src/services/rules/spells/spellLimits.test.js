@@ -1,13 +1,17 @@
 // @maintained-by-ai
 // spellLimits.js contract suite — REAL disk slot tables (both rulesets) served through
 // the fetch mock; expectations are literal bytes so every assertion is falsifiable.
-// Quirks pinned as CURRENT behavior (📌 reported, not sanctioned):
-//   - spellLimits.js:187 — known-type casters get `level1` = spells_known (spells-known
-//     COUNT, not slots); other slot levels read spell_slots_level_i. Warlock lv10 and
-//     bard lv4 disk rows make the conflation observable (0-vs-10, 4-vs-7).
-//   - validateSpellSelection does NOT forward extraOptions to getSpellLimits, so the
-//     2024 Divine/Primal Order cantrip bonus inflates getSpellLimits but validation
-//     still fails on the base count (spellLimits.js:312-313) — pinned in VT5.
+// FIXED #1509 (fix lane, 2026-10-22) — three spellLimits.js defects corrected, pins flipped:
+//   - spellLimits.js findSubclassLevelSpellcasting — sparse subclass rows now matched by their
+//     explicit row.level (nearest at-or-below), never by array index; lv3 AT reads the lv3
+//     row, not the lv7 row.
+//   - spellLimits.js buildSlotLimits — slot table strictly slot-driven (spell_slots_level_N);
+//     cumulative spells_known no longer masquerades as the level1 cap.
+//   - validateSpellSelection now forwards extraOptions to getSpellLimits, so 2024
+//     Divine/Primal Order bonus cantrips validate against the inflated cap.
+// Still pinned as CURRENT behavior (📌 reported, not sanctioned):
+//   - spellLimits.js loadClassData — truthy malformed response poisons classDataCache
+//     (:34 lane, separate ledger line).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -99,15 +103,17 @@ describe('getSpellLimits — REAL disk tables (5e + 2024)', () => {
     expect(JSON.stringify(diskRow5e('Wizard', 20))).toBe(JSON.stringify(diskRowAfter));
   });
 
-  it('Pact Magic warlock lv10: level1 carries spells_known (10), NOT the 0 lv1 slots — conflation pin', async () => {
-    // Disk row: cantrips_known 4, spells_known 10, spell_slots_level_1 0, spell_slots_level_5 2, spell_type known.
-    // spellLimits.js:187 replaces only level1 with spells_known; lv2-lv9 stay slot-driven (📌 SOURCE BUG, pinned).
+  it('Pact Magic warlock lv10: level1 = spell_slots_level_1 (0), the cumulative spells_known conflation is FIXED (#1509)', async () => {
+    // Disk row: cantrips_known 4, spells_known 10 (CUMULATIVE lv1+ total), spell_slots_level_1 0,
+    // spell_slots_level_5 2, spell_type known. Slot table is strictly slot-driven now: level1 reads
+    // spell_slots_level_1, so the warlock's zero lv1 slots are honest (pre-fix pin read spells_known
+    // = 10 — slot/known conflation, flipped here).
     const limits = await getSpellLimits({ className: 'Warlock', level: 10, version: '5e' });
     expect(limits).toStrictEqual({
       cantrip: 4,
       spellType: 'known',
       preparedSpells: null,
-      level1: 10, // = spells_known, would be 0 if read from spell_slots_level_1
+      level1: 0, // spell_slots_level_1 (pre-fix defect pin: 10 = spells_known)
       level2: 0, level3: 0, level4: 0,
       level5: 2, // Pact slot lives here (slot-driven)
       level6: 0, level7: 0, level8: 0, level9: 0,
@@ -141,21 +147,36 @@ describe('getSpellLimits — REAL disk tables (5e + 2024)', () => {
     expect(unknown).toStrictEqual(NON_CASTER_DEFAULT);
   });
 
-  it('5e rogue lv3 resolves via subclasses[].class_levels — index-as-level scan returns the SPARSE lv7 row; non-matching majors fall back', async () => {
-    // 🔴 SOURCE BUG pinned (spellLimits.js:144-148): the subclass scan iterates array INDEX i from
-    // level-1 downward, but AT's subclass.class_levels is sparse on disk ([0]=lv3,[1]=lv4,[2]=lv7...).
-    // A lv3 query therefore lands on index 2 = the LEVEL 7 row (spells_known 5, slots lv1 4, lv2 2)
-    // — same SP-075 slot-vs-level bug family (#1503 form). Byte-exact current behavior:
+  it('5e rogue lv3 resolves via subclasses[].class_levels LEVEL-MATCHED scan — lv3 query reads the lv3 row (#1509 FIXED)', async () => {
+    // FIX #1509: subclass.class_levels is SPARSE on disk ([0]=lv3,[1]=lv4,[2]=lv7,...) and every
+    // row carries an explicit 'level' key; the scan matches row.level (nearest at-or-below) instead
+    // of array index. Pre-fix this query landed on index 2 = the lv7 row (level1 5, level2 2).
+    // lv3 AT disk row: cantrips_known 3, spells_known 3, slots lv1 2, lv2 0, lv3 0, lv4 0.
     const at = await getSpellLimits({ className: 'Rogue', level: 3, version: '5e', majorName: 'Arcane Trickster' });
     expect(at).toStrictEqual({
       cantrip: 3,
-      spellType: 'known', // subclass row has no spell_type → 'known' fallback, then level1 = spells_known
+      spellType: 'known', // subclass row has no spell_type → 'known' fallback
       preparedSpells: null,
-      level1: 5, // spells_known of the lv7 row (would be 3 if the lv3 row were found by level)
-      level2: 2, // lv7 slots (the true lv3 disk value is 0)
+      level1: 2, // lv3-row spell_slots_level_1 (pre-fix defect pin: 5 = lv7-row)
+      level2: 0, // true lv3 disk value (pre-fix defect pin: 2 = lv7-row)
       level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0, // lv5-lv9 keys ABSENT on the row
     });
 
+    // Interior-gap arm: lv5 AT has no lv5 subclass row ([3,4,7,...]) — the scan resolves DOWN to
+    // the lv4 row (slots lv1 3), never UP to the lv7-row the index scan grabbed (pre-fix: lv9-row).
+    const at5 = await getSpellLimits({ className: 'Rogue', level: 5, version: '5e', majorName: 'Arcane Trickster' });
+    expect(at5.level1).toBe(3);
+    expect(at5.level2).toBe(0);
+    expect(at5.cantrip).toBe(3);
+
+    // Below-the-first-row arm: EK starts at subclass lv3 (rows [3,...,20]); a lv1 query has NO
+    // at-or-below row and honestly falls back to the non-caster default (pre-fix: index 0 = lv3-row).
+    const ek1 = await getSpellLimits({ className: 'Fighter', level: 1, version: '5e', majorName: 'Eldritch Knight' });
+    expect(ek1).toStrictEqual(NON_CASTER_DEFAULT);
+    const ek5 = await getSpellLimits({ className: 'Fighter', level: 5, version: '5e', majorName: 'Eldritch Knight' });
+    expect(ek5.level1).toBe(3); // lv5-row spell_slots_level_1 (pre-fix: lv7-row spells_known 5)
+
+    // Dense-unaffected arm: non-matching majors and absent major still fall back byte-exact.
     const thief = await getSpellLimits({ className: 'Rogue', level: 3, version: '5e', majorName: 'Thief' });
     expect(thief).toStrictEqual(NON_CASTER_DEFAULT);
 
@@ -323,8 +344,8 @@ describe('validateSpellSelection — selection legality (REAL rows)', () => {
   const LV1 = ['Bless', 'Cure Wounds', 'Guiding Bolt', 'Sanctuary', 'Shield of Faith'];
   const LV2 = ['Mirror Image', 'Spider Climb', 'Calm Emotions', 'Silence'];
 
-  it('bard lv4 within disk limits: full result object byte-exact, including the level1=spells_known conflation', async () => {
-    // disk bard lv4: cantrips_known 3, spells_known 7, slots 4/3/0/0...
+  it('bard lv4 within disk limits: full result object byte-exact, level1 slot-driven (spells_known conflation FIXED #1509)', async () => {
+    // disk bard lv4: cantrips_known 3, spells_known 7 (CUMULATIVE lv1+ total), slots 4/3/0/0...
     const result = await validateSpellSelection({
       selectedSpells: [CANTRIPS[0], CANTRIPS[1], CANTRIPS[2], LV1[0], LV1[1], LV2[0], LV2[1], LV2[2]],
       allSpells, className: 'Bard', level: 4, version: '5e',
@@ -336,7 +357,7 @@ describe('validateSpellSelection — selection legality (REAL rows)', () => {
         cantrip: 3,
         spellType: 'known',
         preparedSpells: null,
-        level1: 7, // spells_known (not 4 slots) — same :187 quirk as getSpellLimits
+        level1: 4, // spell_slots_level_1 (pre-fix defect pin: 7 = cumulative spells_known)
         level2: 3,
         level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0,
       },
@@ -372,19 +393,40 @@ describe('validateSpellSelection — selection legality (REAL rows)', () => {
     expect(atLimit.violations).toStrictEqual([]);
   });
 
-  it('unforwarded extraOptions + implicit-null preparedSpells: two quantified source quirks pinned', async () => {
-    // 📌 quirk A: validateSpellSelection never forwards extraOptions (spellLimits.js:313), so a
-    // 2024 Thaumaturge cleric legally knowing 4 cantrips per getSpellLimits FAILS its own validation.
+  it('extraOptions forwarded through validation (#1509 FIXED): order-bonus cantrips accepted; ungranted and over-cap still rejected', async () => {
+    // FIX #1509: validateSpellSelection threads extraOptions into getSpellLimits, so the 2024
+    // Thaumaturge cleric's lawful 3+1 cantrips validate against the inflated cap (pre-fix defect
+    // pin: bonus dropped → 'Cantrips: 4/3' false rejection).
     const strictLimit = await getSpellLimits({
       className: 'Cleric', level: 1, version: '2024', extraOptions: { divineOrder: 'Thaumaturge' },
     });
     expect(strictLimit.cantrip).toBe(4);
-    const validation = await validateSpellSelection({
+    const granted = await validateSpellSelection({
+      selectedSpells: CANTRIPS,
+      allSpells, className: 'Cleric', level: 1, version: '2024',
+      extraOptions: { divineOrder: 'Thaumaturge' },
+    });
+    expect(granted.limits.cantrip).toBe(4); // order bonus present on the validation path
+    expect(granted.valid).toBe(true);
+    expect(granted.violations).toStrictEqual([]);
+
+    // Over-cap arm: 5 cantrips against the 4 cap (3 base + 1 order) — still rejected honestly.
+    const over = await validateSpellSelection({
+      selectedSpells: [...CANTRIPS, 'Thaumaturgy'],
+      allSpells, className: 'Cleric', level: 1, version: '2024',
+      extraOptions: { divineOrder: 'Thaumaturge' },
+    });
+    expect(over.valid).toBe(false);
+    expect(over.violations).toStrictEqual(['Cantrips: 5/4']);
+
+    // Ungranted arm: no extraOptions → base cap 3, the same selection stays rejected.
+    const noBonus = await validateSpellSelection({
       selectedSpells: CANTRIPS,
       allSpells, className: 'Cleric', level: 1, version: '2024',
     });
-    expect(validation.limits.cantrip).toBe(3); // validation path re-fetches WITHOUT the order bonus
-    expect(validation.violations).toStrictEqual(['Cantrips: 4/3']);
+    expect(noBonus.limits.cantrip).toBe(3);
+    expect(noBonus.valid).toBe(false);
+    expect(noBonus.violations).toStrictEqual(['Cantrips: 4/3']);
 
     // 📌 quirk B: 5e wizard lv1 row lacks prepared_spells and no abilityScores → preparedSpells null;
     // any non-cantrip selection then violates against the literal null (message byte '/null'),
