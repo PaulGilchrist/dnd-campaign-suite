@@ -5,8 +5,9 @@
 // is the single owner of the direct-path adder — attack.damage/autoFormulaOverride may
 // already carry " + N [Radiant Soul]"; spellContext (idx 1) never re-appends.
 // spellRollDamage (idx 2) owns consumption: stamps "_radiantSoul_<name_with_underscores>
-// _oncePerTurn" campaign-keyed, gated on passive + damage-type match (NOT on chaMod —
-// zero-CHA burn is the same defect class pinned honestly in the attack lane, #1028).
+// _oncePerTurn" campaign-keyed, gated on passive + damage-type match AND the applied
+// proof byte ('[Radiant Soul]' in the rolled ctx.formula — stamp-if-applied, #1028
+// fixed here mirroring fix#65 attackRollDamageCalc.js markRadiantSoulUsed shape).
 //
 // Applied-rec #1042 verdict: the cited "spellRollDamage writes consumption flag" test
 // exists ONLY in this file at old :91-101 — no separate radiantSoul.test.js. This lane
@@ -26,6 +27,8 @@
 //   'flag armed'                               consolidated into append test's live latch (no pre-armed fixture)
 //   'does not append for Cold'               strengthened: co-located uppercase near-miss falsifier (#948) + zero-stamp negative pin (#934/#1026)
 //   'spellRollDamage consumption flag'       consolidated into append test's stamp leg (exact bytes campaign-keyed)
+//   'zero-CHA burns the latch'               FLIPPED #1028 (fix#65 mirror): stamp-if-applied —
+//                                            zero-CHA roll keeps the latch armed; applied proof byte passes through
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Deterministic roller seam: exact bytes in, exact totals out (hand-derived once, never a
@@ -177,7 +180,7 @@ describe('directSpellDamageSteps — CLA-279 Radiant Soul single-source adder (s
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith(HOLDER, LATCH_KEY, true, 'test-campaign');
   });
 
-  it('appends nothing for a non-holder, no "+ 0" term for zero-CHA (which still burns the latch — same defect class as attack lane #1028), and a null roll burns nothing', async () => {
+  it('appends nothing for a non-holder, no "+ 0" term for zero-CHA (which no longer burns the latch — #1028 fixed, fix#65 mirror), and a null roll burns nothing', async () => {
     // Non-holder: applyRadiantSoul returns before the store is even read.
     const outsider = await steps[1].handler(makeCtx({
       attack: { damage: '2d6', damageType: 'Fire' },
@@ -200,11 +203,21 @@ describe('directSpellDamageSteps — CLA-279 Radiant Soul single-source adder (s
     expect(nullRoll).toBeNull();
     expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
 
-    // Honest pin (#825/#1026 WATCH): the stamp is gated only on passive + type match,
-    // NOT on chaMod — the latch burns despite zero applied bonus (reported upstream,
-    // never fixed here).
+    // Fixed pin (#1028, fix#65 mirror): the stamp additionally requires the applied
+    // proof byte in the rolled formula — the zero-CHA burn is gone, the latch stays
+    // armed for the next qualifying spell.
     const zeroRoll = await steps[2].handler({ ...zeroCtx, formula: '2d6' });
     expect(zeroRoll.data.total).toBe(7); // 2+5 dice, no adder
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+    expect(runtimeRef.store[LATCH_KEY]).toBeUndefined();
+
+    // Proof-byte pass-through leg: the gate reads the byte, never re-derives chaMod —
+    // a genuinely applied (pre-baked) adder still consumes the armed latch.
+    const appliedRoll = await steps[2].handler({
+      ...zeroCtx,
+      formula: '1d10 + 3 [Radiant Soul]',
+    });
+    expect(appliedRoll.data.total).toBe(8); // d10 roll of 5 + 3 pre-baked CHA, derived once
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith(HOLDER, LATCH_KEY, true, 'test-campaign');
   });
 });

@@ -5,9 +5,11 @@
 // is the single owner of the direct-path adder — attack.damage/autoFormulaOverride may
 // already carry " + N [Radiant Soul]"; the step never re-appends, and marks consumption
 // via the once-per-turn key "_radiantSoul_<name_with_underscores>_oncePerTurn".
-// Per #1027: the only setRuntimeValue stamp in this handler is this radiant-soul guard,
-// gated on passive + damage-type match (NOT on the adder actually appending — see the
-// zero-CHA leg, honestly pinned; defect reported, never fixed here).
+// Per #1027/#1028 (fix#63 shape, 2026-10-22): the only setRuntimeValue stamp in this
+// handler is this radiant-soul guard, gated on passive + damage-type match AND the
+// rolled formula carrying the '[Radiant Soul]' byte (stamp-if-applied — both append
+// sites gate on chaMod > 0, applyRadiantSoulBonus :33 / computeRadiantSoul :94), so a
+// zero-CHA attack no longer burns the once-per-turn latch with zero bonus applied.
 //
 // Family split (radiant_soul):
 //   attackRollDamageSteps-damageRolling.test.js          same handler: generic EE append/skip + crit dispatch — owned there
@@ -20,7 +22,7 @@
 //   'does NOT re-append [Radiant Soul] (execution-owned)' kept + co-located autoFormulaOverride falsifier leg (#842), exact totals
 //   'does not append when flag armed'                  consolidated into append test's second call (live latch, not pre-armed fixture)
 //   'does not append for Cold'                         strengthened: co-located case-variant near-miss falsifier (#948) + zero-stamp negative pin (#934)
-//   'does not append for non-holder'                   consolidated with new zero-CHA falsifier leg (stamp behavior differs per gate — both pinned)
+//   'does not append for non-holder'                   consolidated with zero-CHA falsifier leg (non-holder stamps nothing; zero-CHA lands nothing AND burns nothing — #1028 pin flipped, retry-fires pair #1348 shape)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Deterministic roller seam: exact bytes in, exact totals out (hand-derived once, never a
@@ -33,6 +35,7 @@ const ROLL_TABLE = {
   '3d8': { total: 11, rolls: [2, 4, 5], modifier: 0 },
   '1d6+4': { total: 10, rolls: [2, 4], modifier: 4 },
   '4d6': { total: 10, rolls: [1, 2, 3, 4], modifier: 0 },
+  '4d6+4': { total: 14, rolls: [1, 2, 3, 4], modifier: 4 }, // #1028 retry-fires leg
 };
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -167,7 +170,7 @@ describe('rollBaseDamage — CLA-279 Radiant Soul single-source adder', () => {
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith(HOLDER, LATCH_KEY, true, 'test-campaign');
   });
 
-  it('appends nothing for a non-holder, and appends no "+ 0" term for zero-CHA holders (which still burn the latch)', async () => {
+  it('appends nothing for a non-holder, and a zero-CHA attack lands no bonus and leaves the latch ARMED (#1028 fixed) — the next qualifying attack rides', async () => {
     // Non-holder: gate returns before the store is even read.
     const outsider = await step.handler(makeCtx({
       attack: { damage: '4d6', damageType: 'Fire' },
@@ -179,16 +182,34 @@ describe('rollBaseDamage — CLA-279 Radiant Soul single-source adder', () => {
     expect(runtime.getRuntimeValue).not.toHaveBeenCalled();
     expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
 
-    // Zero-CHA falsifier: without the chaMod<=0 guard the formula would carry
-    // "+ 0 [Radiant Soul]". Honest pin (#842/#1026): markRadiantSoulUsed does NOT
-    // check chaMod, so the once-per-turn latch is burned despite zero applied bonus
-    // (reported as a source defect, not fixed here).
-    const zeroCha = await step.handler(makeCtx({
-      attack: { damage: '4d6', damageType: 'Fire' },
-      playerStats: makeHolderStats(0),
-    }));
+    // Zero-CHA falsifier: without the append-side chaMod<=0 guard the formula would
+    // carry "+ 0 [Radiant Soul]". #1028 pin FLIPPED (fix#63 stamp-if-applied shape):
+    // markRadiantSoulUsed now refuses when the rolled formula carries no
+    // '[Radiant Soul]' byte — zero bonus landed, so nothing is consumed. Disk law
+    // (public/data/2024/classes.json, Warlock → Celestial Patron lv6): "add Charisma
+    // modifier to that spell's damage" — Cha mod 0 adds nothing, consumes nothing.
+    const zeroPs = makeHolderStats(0);
+    const zeroCtx = makeCtx({ attack: { damage: '4d6', damageType: 'Fire' }, playerStats: zeroPs });
+    const zeroCha = await step.handler(zeroCtx);
     expect(zeroCha.data.formula).toBe('4d6 [fire]');
     expect(zeroCha.data.total).toBe(10);
+    expect(runtime.setRuntimeValue).not.toHaveBeenCalled();
+    expect(runtimeRef.store[LATCH_KEY]).toBeUndefined(); // latch dark, not burned
+
+    // Retry-qualifying pair (#1348 shape): CHA buffed 0→4 mid-fight — the next
+    // Radiant/Fire attack MUST ride now (the old burn denied it) and consume exactly once.
+    zeroPs.abilities = [{ name: 'Charisma', bonus: 4 }];
+    const retry = await step.handler(zeroCtx);
+    expect(retry.data.formula).toBe('4d6 [fire] + 4 [Radiant Soul]');
+    expect(retry.data.total).toBe(14); // 1+2+3+4 dice + 4 CHA, derived once
+    expect(runtime.setRuntimeValue).toHaveBeenCalledTimes(1);
     expect(runtime.setRuntimeValue).toHaveBeenCalledWith(HOLDER, LATCH_KEY, true, 'test-campaign');
+    expect(runtimeRef.store[LATCH_KEY]).toBe(true);
+
+    // Once-per-turn holds from the APPLIED leg onward: third attack appends nothing
+    // and re-stamps nothing (no redundant latch byte written when armed).
+    const third = await step.handler(zeroCtx);
+    expect(third.data.formula).toBe('4d6 [fire]');
+    expect(runtime.setRuntimeValue).toHaveBeenCalledTimes(1);
   });
 });

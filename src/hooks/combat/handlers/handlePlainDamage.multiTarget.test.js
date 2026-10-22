@@ -14,6 +14,9 @@
 // Old -> new: 9 -> 3. Census folds old apply-arg-bytes + log-bytes + popup-bytes tests; skip table
 // (it.each, #936 fold precedent) collapses twin==primary, multi==primary, twin/multi-not-found, and the
 // two mixed dedupe rows; failed-apply continuation is new (partial-failure honesty, #934).
+// #941 FIX lane flip: apply leg 3 (multi) now carries characters (was null) — proven by the exact-byte
+// nth-call pins plus a players-context-present arm whose halved byte is derivable ONLY from the threaded
+// characters; the multi leg no longer writes the twinTarget* popup namespace (was last-write-wins clobber).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../services/dice/diceRoller.js', () => ({
@@ -167,8 +170,9 @@ describe('handlePlainDamage — multi-target fan-out iteration', () => {
 
         expect(applyDamageToTarget).toHaveBeenCalledTimes(3);
         expect(applyDamageToTarget).toHaveBeenNthCalledWith(1, roster, 'Goblin', 10, ['force'], { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestFighter', suppressHpLog: true });
+        // #941 fix: multi no longer passes characters:null — every legs receives the same deps.characters the twin leg gets.
         expect(applyDamageToTarget).toHaveBeenNthCalledWith(2, roster, 'Orc', 10, ['force'], { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestFighter' });
-        expect(applyDamageToTarget).toHaveBeenNthCalledWith(3, roster, 'Skeleton', 10, ['force'], { campaignName: 'test-campaign', characters: null, ignoreResistance: false, attackerName: 'TestFighter' });
+        expect(applyDamageToTarget).toHaveBeenNthCalledWith(3, roster, 'Skeleton', 10, ['force'], { campaignName: 'test-campaign', characters: deps.characters, ignoreResistance: false, attackerName: 'TestFighter' });
 
         expect(logShapes()).toEqual([
             { name: 'Magic Missile', targetName: 'Goblin', note: 'combined_damage_roll' },
@@ -176,19 +180,57 @@ describe('handlePlainDamage — multi-target fan-out iteration', () => {
             { name: 'Magic Missile (Words of Creation)', targetName: 'Skeleton', note: 'multi_damage_roll_before_apply' },
         ]);
 
-        expect(deps.setPopupHtml).toHaveBeenCalledTimes(3);
-        // Multi is processed after twin and overwrites the shared twin* popup fields — last write wins.
-        expect(finalPopup()).toMatchObject({ twinTargetName: 'Skeleton', twinFinalDamage: 6, twinTargetCurrentHp: 8 });
+        // Popup writes: primary + twin ONLY. #941 fix: the multi handler never publishes into the twinTarget*
+        // namespace (renderer Venn: no consumer honors multi-target keys, so the multi leg writes no popup bytes at all).
+        expect(deps.setPopupHtml).toHaveBeenCalledTimes(2);
+        const popup = finalPopup();
+        expect(popup).toMatchObject({ twinTargetName: 'Orc', twinFinalDamage: 5, twinTargetCurrentHp: 10 });
+        expect(popup).not.toHaveProperty('multiTargetName');
     });
 
-    it('continues the fan-out when a follow-up apply fails — remaining target still takes damage and its popup fields land', async () => {
+    // #941 (a): applyDamageToTarget derives the PLAYER defense profile from options.characters —
+    // resolveBaseDefenses(:704-709) characters.find(name) -> computedStats.resistances/immunities, and
+    // emitWardDamageEvents(:876-889)/checkDarkOnesBlessing(:1040) consume the same array. Pre-fix the multi
+    // leg passed characters:null, so a player multi-target's resistance profile could not even be looked up.
+    // Honor-system mirror: the halved byte is derived ONLY from opts.characters inside the mock — unforgeable
+    // without the threaded players context (pre-fix characters:null => find miss => full 10, not halved 5).
+    it('players-context-present multi arm — resistance halves THROUGH the threaded characters payload (bytes come only from characters)', async () => {
+        loadCombatSummary.mockResolvedValue({ creatures: [roster.creatures[0], { name: 'Alistair', type: 'player', ac: 17, currentHp: 27, maxHp: 30 }] });
+        const characters = [...deps.characters, { name: 'Alistair', computedStats: { armorClass: 17, resistances: ['force'] } }];
+        applyDamageToTarget.mockImplementation((_summary, targetName, rawDamage, _types, opts) => {
+            const player = (opts.characters || []).find(c => c.name === targetName);
+            const resisted = !!(player && (player.computedStats?.resistances || []).includes('force'));
+            const finalDamage = resisted ? Math.floor(rawDamage / 2) : rawDamage;
+            return { finalDamage, newHp: 27 - finalDamage, damageReduced: finalDamage < rawDamage };
+        });
+
+        await createLogDamageAndShow({ ...deps, characters })(spell({ targetName: 'Goblin', damageType: 'force', multiTarget: 'Alistair' }));
+
+        // Leg 2 is the multi target: characters threaded identically to the twin leg (:518 shape), never null.
+        const multiCall = applyDamageToTarget.mock.calls[1];
+        expect(multiCall[1]).toBe('Alistair');
+        expect(multiCall[2]).toBe(10);
+        expect(multiCall[4]).toEqual({ campaignName: 'test-campaign', characters, ignoreResistance: false, attackerName: 'TestFighter' });
+        expect(multiCall[4].characters).toBe(characters);
+        // Resistance behavior THROUGH the payload: characters present => honor-system engine halves 10 -> 5,
+        // and the halved value lands on the primary's own popup bytes (multi never touches twinTarget*).
+        expect(finalPopup()).toMatchObject({ targetName: 'Goblin', finalDamage: 10, damageApplied: true });
+        expect(finalPopup()).not.toHaveProperty('multiTargetName');
+    });
+
+    it('continues the fan-out when a follow-up apply fails — remaining target still takes damage and logs, and its bytes never land on the twin fields', async () => {
         applyDamageToTarget.mockImplementation((_summary, targetName) => targetName === 'Orc' ? null : { finalDamage: 7, newHp: 6, damageReduced: false });
 
         await createLogDamageAndShow(deps)(spell({ targetName: 'Goblin', damageType: 'force', metamagicTwinTarget: 'Orc', multiTarget: 'Skeleton' }));
 
         expect(applyTargetNames()).toEqual(['Goblin', 'Orc', 'Skeleton']);
         expect(logShapes().map((entry) => entry.targetName)).toEqual(['Goblin', 'Orc', 'Skeleton']);
-        expect(finalPopup()).toMatchObject({ twinTargetName: 'Skeleton', twinFinalDamage: 7 });
+        // Failed twin apply writes its optional-chained undefined bytes; #941 fix: multi's successful apply
+        // (finalDamage 7) must NOT masquerade as twin bytes.
+        const popup = finalPopup();
+        expect(popup).toMatchObject({ twinTargetName: 'Orc' });
+        expect(popup.twinFinalDamage).toBeUndefined();
+        expect(popup).not.toHaveProperty('multiTargetName');
     });
 
     // Follow-up handlers run AFTER the primary's log (:1244 log → :1273 follow-ups) and each

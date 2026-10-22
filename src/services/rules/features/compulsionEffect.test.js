@@ -2,13 +2,19 @@
 // compulsionEffect lane — the multi-target CONFIRM side of the Compulsion family:
 // gateCompulsion → pendingCompulsion → handleCompulsionConfirm → applyCompulsionEffect
 // (wiring into this export is pinned by confirm-payloads.test.js, which mocks it wholesale;
-// this file owns its internals). Trigger/action-envelope logic lives in compulsionTrigger.test.js;
-// the single-target NPC auto-roll handler lane is compulsionHandler.test.js (split recorded there,
-// compelledDuel #24). Charmed-condition clearing / concentration seams are NOT this lane's bytes —
-// they ride useInitiativeEffects.concentrationClearing (concentrationClearing2.test.js).
+// this file owns its internals). The single-target NPC auto-roll handler lane is
+// compulsionHandler.test.js (split recorded there, compelledDuel #24). Charmed-condition clearing /
+// concentration seams are NOT this lane's bytes — they ride useInitiativeEffects.concentrationClearing
+// (concentrationClearing2.test.js).
 // Disk canon (public/data/spells.json + 2024/spells.json, read 2026-10-20): Compulsion is
 // level 4, Wisdom save, Concentration up to 1 minute — the >=1-minute duration is combat-scoped
 // per the no-timers policy (no clock here: expiration/condition clear at turn seams).
+// #1348 (2026-10-22): the DEAD triggerCompulsion export and its compulsionTrigger.test.js twin
+// were deleted (zero production callers; double-fetched getCombatContext; app-fabricated
+// automation.advantage). Disk prose grants NO advantage on either ruleset — the straight-save
+// stamp (advantage:false / disadvantage:false) pinned below IS the disk-honest shape; the 5e
+// auto-succeed-if-can't-be-charmed clause is immunity adjudication at the prompt/GM seam.
+// fetch-times-1 ledger pin: exactly one getCombatContext read per failed-save charm leg.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyCompulsionEffect } from './compulsionService.js';
 import { getCombatContext } from '../combat/damageUtils.js';
@@ -168,6 +174,11 @@ describe('applyCompulsionEffect (multi-target confirm lane)', () => {
             campaignName,
         });
 
+        // #1348 fetch-times-1 ledger: the failed-save charm leg reads combat context EXACTLY once
+        // (the dead trigger's :11/:36 double-fetch died with triggerCompulsion — no refetch).
+        expect(getCombatContext).toHaveBeenCalledTimes(1);
+        expect(getCombatContext).toHaveBeenCalledWith(campaignName);
+
         expect(result).toEqual({
             type: 'popup',
             payload: {
@@ -227,6 +238,10 @@ describe('applyCompulsionEffect (multi-target confirm lane)', () => {
 
         expect(addCondition.mock.calls.map(c => c[0].creatureName)).toEqual(['Goblin', 'Troll']);
         expect(addExpiration.mock.calls.map(c => c[0].targetName)).toEqual(['Goblin', 'Troll']);
+
+        // #1348 fetch ledger, multi-target leg: one combat-context read per FAILED save only
+        // (2 of 3 failed -> 2 reads; the success leg never re-reads).
+        expect(getCombatContext).toHaveBeenCalledTimes(2);
 
         expect(result).toEqual({
             type: 'popup',

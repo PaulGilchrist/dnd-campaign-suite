@@ -1,8 +1,16 @@
 // @maintained-by-ai
 // useSpellPositionResolver — RESOLUTION lane: resolvePositions() writes
 // cachedPosRef.current = { attackerPos, targetPos } exactly when attacker +
-// target both resolve on the map; never touches it otherwise (write-only
-// once-per-resolve, stale value survives a failed resolve).
+// target both resolve on the map WITH FINITE GRID COORDS (hasGridPos canon:
+// Number.isFinite both, strict, no coercion — lineOfSightGate.js:39,
+// rangeCheck.js:23, spellOverlayService.js:45); never touches it otherwise
+// (write-only once-per-resolve, stale value survives a failed resolve).
+// #946 fix: a name-matched entry missing gridX used to write a HALF-COORD
+// cache ({gridX: undefined, gridY: 5}); half-coords are truthy so they pass
+// the executor's computeRange:16 !guard, getDistanceFeet turns them into
+// NaN, and computeRangeEffect reads NaN as an out-of-range AUTO-MISS.
+// Cache-MISS is the graceful arm (computeRange:{} / LOS gate allowed-
+// ungated), so invalid resolves silently leave the cache untouched.
 //
 // Seams (who owns what):
 //   this file           → cache WRITE contract: service wiring, player-first
@@ -19,8 +27,8 @@
 //   "return value" x2            → dropped: shape pinned by every cache toEqual
 //   early-return x2, no-context x3, no-target x2, attacker-missing x2,
 //   target-failure x3, map-edge x4, load-reject x1   → guard it.each table
-//   "attacker has no gridX/gridY" → dropped: passed only via unstubbed mock,
-//                         not a real contract (see source bugs in audit note)
+//   "attacker has no gridX/gridY" → REINSTATED as coord-guard table arms
+//                         below (#946 half-coord cache fixed source-side)
 //   refresh                      → lifecycle test (refresh + retention)
 //   useCallback identity x4      → rerender-new-map observable test (#796)
 //   fake "timeout" (100ms race)  → real fake-timer test of the 3000ms race
@@ -186,6 +194,57 @@ describe('useSpellPositionResolver', () => {
       title: 'fetching the combat context fails',
       setup: () => mockGetCombatContext.mockRejectedValue(new Error('Context error')),
     },
+    // ── #946 coord-guard arms: a name-matched entry without VALID grid coords
+    // must write NOTHING (half-coord cache poisoned the executor's range math:
+    // NaN distance read back as an out-of-range auto-miss). Cache-MISS is the
+    // graceful arm (computeRange:{} / LOS gate allowed-ungated), so the honest
+    // behavior on invalid coords is a silent skip — never a half-entry.
+    {
+      title: 'the attacker entry is missing gridX',
+      setup: () => mockLoadMapData.mockResolvedValue([makeMapData({
+        players: [{ name: 'Wizard', gridY: 5 }, { name: 'Rogue', gridX: 10, gridY: 10 }],
+      })]),
+      check: () => expect(mockGetCombatContext).not.toHaveBeenCalled(), // guard precedes the context fetch
+    },
+    {
+      title: 'the attacker entry has a non-numeric gridX (strict hasGridPos — no coercion)',
+      setup: () => mockLoadMapData.mockResolvedValue([makeMapData({
+        players: [{ name: 'Wizard', gridX: '5', gridY: 5 }, { name: 'Rogue', gridX: 10, gridY: 10 }],
+      })]),
+      check: () => expect(mockGetCombatContext).not.toHaveBeenCalled(),
+    },
+    {
+      title: 'the resolved target player is missing gridY',
+      setup: () => {
+        mockLoadMapData.mockResolvedValue([makeMapData({
+          players: [
+            { name: 'Wizard', gridX: 5, gridY: 5 },
+            { name: 'Rogue', gridX: 10 },
+          ],
+        })]);
+        mockGetCombatContext.mockResolvedValue(makeCombatSummary({
+          creatures: [{ name: 'Wizard', targetName: 'Rogue' }, { name: 'Rogue' }],
+        }));
+      },
+    },
+    {
+      title: 'the sole matching placed item is missing gridX',
+      setup: () => mockLoadMapData.mockResolvedValue([makeMapData({
+        placedItems: [{ name: 'Goblin', gridY: 3 }],
+      })]),
+    },
+    {
+      title: 'every matching placed item has invalid coords',
+      setup: () => mockLoadMapData.mockResolvedValue([makeMapData({
+        placedItems: [
+          { name: 'Goblin', gridY: 3 },
+          { name: 'Goblin 2', gridX: 2 },
+        ],
+      })]),
+      // Any VALID match wins the nearest scan (finite dist < Infinity), so
+      // half-coords only survive when every match is coordless — matches[0]
+      // default nearest. The write-side guard must block that.
+    },
   ];
 
   it.each(guardCases)(
@@ -203,6 +262,25 @@ describe('useSpellPositionResolver', () => {
       check();
     }
   );
+
+  it('caches a valid multi-match resolution even when a farther same-named item lacks coords', async () => {
+    // Legit name-match arm stays byte-intact: the NaN-distance nearest scan
+    // still lands on valid coords, so the cache write must proceed unchanged.
+    mockLoadMapData.mockResolvedValue([makeMapData({
+      placedItems: [
+        { name: 'Goblin', gridX: 3, gridY: 3 },
+        { name: 'Goblin 2', gridY: 8 },
+      ],
+    })]);
+    mockGetCombatContext.mockResolvedValue(makeCombatSummary());
+
+    const result = await resolveWith();
+
+    expect(result.current.cachedPosRef.current).toEqual({
+      attackerPos: { gridX: 5, gridY: 5 },
+      targetPos: { gridX: 3, gridY: 3 },
+    });
+  });
 
   it('refreshes the cache on every resolve and keeps the last good value when a later resolve fails', async () => {
     stubHappyPath();

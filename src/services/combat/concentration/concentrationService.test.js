@@ -3,8 +3,8 @@
 // BASE CANONICAL lane — concentrationService orchestration (family map, all five lanes closed):
 //  - concentrationRules.test.js ....................... pure dice math truth-tables (#991) — rules are MOCKED here,
 //                                                       consumers-exact calls only (#872), never re-computed.
-//  - cleanupConcentrationEffects.test.js .............. REST seam + cleanup filter semantics + pinned filter
-//                                                       defects :483/:213-217/:225-227 + break-log emitter (#990).
+//  - cleanupConcentrationEffects.test.js .............. REST seam + cleanup filter semantics + filter defects
+//                                                       :483/:213-217/:225-227/:450-451/:469 FIXED #990-fix + break-log emitter (#990).
 //  - concentrationService.cla107-hex-purge.test.js .... hex purge trigger payload + log (#992).
 //  - concentrationService.sp128-er-purge.test.js ...... Expeditious Retreat purge payload + ER wrong-spell leg (#993).
 //  - THIS FILE ........................................ roll/save orchestration, break-generic, addConcentration

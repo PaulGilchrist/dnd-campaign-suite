@@ -52,25 +52,6 @@ export const saveNPCs = async (campaignName, npcs) => {
   }
 };
 
-export const loadNPC = async (campaignName, npcName) => {
-  try {
-    const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedNpcName = encodeURIComponent(npcName);
-    const response = await fetch(`/api/campaigns/${encodedCampaign}/npcs/${encodedNpcName}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to load NPC');
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error loading NPC:', error);
-    throw error;
-  }
-};
-
 export const deleteNPC = async (campaignName, npcName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);

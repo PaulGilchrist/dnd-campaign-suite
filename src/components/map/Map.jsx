@@ -348,7 +348,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     if (!mapData) return null;
 
     if (mapData.type === 'outdoor') {
-        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
+        // key={mapName} (#798): an outdoor→outdoor flip must remount HexMap so
+        // its useMapLoader guard resets and reloads — without the key the same
+        // instance keeps the previous map's terrain/pois on screen.
+        return <HexMap key={mapName} campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
     }
 
     const { players } = mapData;

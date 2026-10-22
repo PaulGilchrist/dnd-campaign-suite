@@ -325,6 +325,85 @@ describe('applyLongRest', () => {
     })
   })
 
+  describe('Natural Recovery tracking reset (#1312 — batch-carried, post-batch dead call removed)', () => {
+    // The reset keys naturalRecoveryFreeCast/naturalRecoveryFreeCastUsed/
+    // naturalRecoverySlots are registered in LONG_REST_RESOURCES
+    // (restRules-constants.js:179-181) and buildLongRestCharData nulls every
+    // registered key (:65-67) BEFORE setRuntimeBatch fires (:623). The old
+    // resetNaturalRecoveryTracking(charData) at :648-654 mutated the ALREADY
+    // flushed payload object after the batch — it reached no server/SSE carrier
+    // (charData is never re-batched) and wrote byte-identical nulls to what the
+    // registration already carried: a dead call. The hasNaturalRecovery flag it
+    // shared stays live — it drives the 'Natural Recovery (spell slots)' log line.
+    const NR_KEYS = ['naturalRecoveryFreeCast', 'naturalRecoveryFreeCastUsed', 'naturalRecoverySlots']
+
+    function nrDruidStats(overrides = {}) {
+      return makeStats({
+        class: { name: 'Druid', subclass: { name: 'Circle of the Land' }, major: { name: 'Circle of the Land' } },
+        automation: { passives: [{ type: 'natural_recovery' }] },
+        ...overrides,
+      })
+    }
+
+    it('#1348 form: spent pre-rest tracking lands as exact null reset bytes inside the flushed payload, batch fired once BEFORE the log', async () => {
+      // Pre-rest non-null spent state on the store (registration path must overwrite it).
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'naturalRecoveryFreeCast') return ['Fireball']
+        if (key === 'naturalRecoveryFreeCastUsed') return true
+        if (key === 'naturalRecoverySlots') return 2
+        return undefined
+      })
+      // Flush-time ledger: deep-snapshot charData at the setRuntimeBatch call seam —
+      // whatever is in this snapshot is exactly what reaches server/SSE.
+      let flushed
+      vi.mocked(setRuntimeBatch).mockImplementation((_name, data) => {
+        flushed = JSON.parse(JSON.stringify(data))
+      })
+      await applyLongRest(nrDruidStats(), CAMPAIGN)
+
+      // Reset bytes present AT FLUSH TIME (mutation-before-flush): builder nulls
+      // ride the payload; no post-flush mutation is required for correctness.
+      for (const key of NR_KEYS) {
+        expect(flushed, `${key} must be null-re-armed in the flushed batch`).toHaveProperty(key, null)
+      }
+      // Order ledger: ONE atomic flush, and it precedes the long_rest log entry.
+      expect(setRuntimeBatch).toHaveBeenCalledTimes(1)
+      expect(setRuntimeBatch.mock.invocationCallOrder[0])
+        .toBeLessThan(addEntry.mock.invocationCallOrder[0])
+      // No-double-write guard: the batch is the SOLE carrier for these keys —
+      // no standalone setRuntimeValue re-writes anywhere, before or after flush.
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => NR_KEYS.includes(c[1]))).toHaveLength(0)
+      // Dead-call regression guard (#1312): the flushed payload object is byte-stable
+      // after applyLongRest resolves — nothing mutates charData post-flush anymore.
+      expect(setRuntimeBatch.mock.calls[0][1]).toEqual(flushed)
+    })
+
+    it('log flag stays live for holders and is absent for non-holders, with no NR key writes either way', async () => {
+      await applyLongRest(nrDruidStats(), CAMPAIGN)
+      expect(addEntry).toHaveBeenCalledWith(
+        CAMPAIGN,
+        expect.objectContaining({
+          type: 'long_rest',
+          message: expect.stringContaining('Natural Recovery (spell slots)'),
+        }),
+      )
+
+      vi.clearAllMocks()
+      // clearAllMocks keeps implementations — re-seed the empty-store baseline
+      vi.mocked(getRuntimeValue).mockImplementation(() => undefined)
+      vi.mocked(addEntry).mockReturnValue(Promise.resolve({}))
+      await applyLongRest(makeStats(), CAMPAIGN)
+      const msg = addEntry.mock.calls.find(c => c[1]?.type === 'long_rest')?.[1]?.message ?? ''
+      expect(msg).not.toContain('Natural Recovery (spell slots)')
+      // Non-holder: registration nulls still re-arm the keys in the batch, but no
+      // stray standalone writes ever existed for these keys (dead call confirmed).
+      for (const key of NR_KEYS) {
+        expect(batchFor('Test Hero')).toHaveProperty(key, null)
+      }
+      expect(vi.mocked(setRuntimeValue).mock.calls.filter(c => NR_KEYS.includes(c[1]))).toHaveLength(0)
+    })
+  })
+
   describe('Portent dice', () => {
     it('refreshes 2 dice below level 14 and 3 at 14+ for specialActions holders', async () => {
       const stats = makeStats({ automation: { specialActions: [{ type: 'portent' }] } })

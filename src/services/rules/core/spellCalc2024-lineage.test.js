@@ -93,6 +93,7 @@ describe('spellCalc2024-lineage', () => {
   it.each(LINEAGE_ROWS)('$subrace ($type): disk ladder grants exactly, gated by levelNSpell keys', ({ raceName, subrace, option }) => {
     const automation = lineageAutomation(raceName);
     const raceArg = { name: raceName, subrace: { name: subrace } };
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     for (const level of [1, 3, 5]) {
       const result = getSpellAbilities(spellsDb, wizardStats(level, automation), { campaignName: 'test-campaign', race: raceArg });
@@ -107,11 +108,22 @@ describe('spellCalc2024-lineage', () => {
       }
       expect(result.spells.find(s => s.name === 'Magic Missile').prepared).toBe('Prepared');
 
-      // Counters: cantrips track the key grant. spells_known stays NaN here — the
-      // 2024 Wizard disk table (classes.json) carries no spells_known key, so the
-      // += in applyLineageFeatureSpells starts from undefined; the sheet masks it
-      // (CharSpells.jsx:79 prepared_spells || spells_known). Slotless-host counter
-      // math is pinned below (#1262).
+      // #1268 FIX PIN (was a NaN honest-comment): the 2024 Wizard disk table
+      // (classes.json) carries cantrips_known + prepared_spells but NO spells_known
+      // key, so this Wizard host is an UNTRACKED spells_known subject. The old
+      // `spells_known += levelSpellCount` started from undefined and produced NaN
+      // (masked in the sheet by CharSpells.jsx:79 prepared_spells || spells_known).
+      // Post-fix the counter is never NaN and stays absent (undefined) on this host;
+      // the absent-key arm skips LOUD when a real ladder spell is gated in, and stays
+      // silent at lv1 (no ladder yet). cantrips_known (present on disk) still accumulates.
+      const levelSpellCount = granted.filter(name => name !== option.cantrip).length;
+      expect(Number.isNaN(result.spells_known), `lv${level} spells_known must never be NaN`).toBe(false);
+      expect(result.spells_known, `lv${level} spells_known untracked on Wizard disk host`).toBeUndefined();
+      // loud-skip arm: an absent-key host with a gated grant must log, never silently drop.
+      const skipLogged = errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"));
+      expect(skipLogged, `lv${level} loud-skip fires iff levelSpellCount>0`).toBe(levelSpellCount > 0);
+
+      // Counters: cantrips track the key grant (Wizard disk table DOES carry cantrips_known).
       expect(result.cantrips_known).toBe(wizardClass.class_levels[level - 1].spellcasting.cantrips_known + 1);
 
       // Casting ability: lineage override (short name) when the disk option declares
@@ -128,7 +140,42 @@ describe('spellCalc2024-lineage', () => {
         expect(result.saveDc).toBe(13);
       }
     }
+    errSpy.mockRestore();
   });
+
+  // #1268: TRACED host — the Barbarian disk table lawfully seeds spells_known:0
+  // (public/data/2024/classes.json Barbarian, required_major:'Path of the Wild Heart'),
+  // so a lineage grant on that host accumulates byte-intact onto the disk seed and
+  // NEVER fires the loud-skip arm. This falsifies any "silent 0" or NaN interpretation:
+  // the counter is a real disk-derived number, distinct from the untracked Wizard case.
+  it('#1268: tracked disk host (Barbarian lv5) accumulates spells_known onto the disk seed, silent, finite', () => {
+    const automation = lineageAutomation('Elf');
+    const barbLevels = classes.find(c => c.name === 'Barbarian').class_levels;
+    const diskSeed = barbLevels[4].spellcasting.spells_known; // ground truth: 0
+    expect(diskSeed).toBe(0);
+    const barbStats = {
+      name: 'BarbLineage', level: 5, proficiency: 3,
+      class: { name: 'Barbarian', spell_casting_ability: 'Intelligence', class_levels: barbLevels },
+      abilities: makeAbilities(), spells: [], automation,
+    };
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // required_major re-point so the Barbarian row resolves (disk gates to Wild Heart).
+    barbStats.class.class_levels = barbLevels.map(cl => ({
+      ...cl,
+      spellcasting: cl.spellcasting ? { ...cl.spellcasting, required_major: undefined } : cl.spellcasting,
+    }));
+    const result = getSpellAbilities(spellsDb, barbStats, { campaignName: 'test-campaign', race: { name: 'Elf', subrace: { name: 'High Elf' } } });
+    errSpy.mockRestore();
+
+    const highElf = lineageTrait('Elf').trait.automation.options.find(o => o.name === 'High Elf');
+    const ladderCount = expectedLadder(highElf, 5).filter(n => n !== highElf.cantrip).length;
+    // Tracked host: spells_known is a real number = disk seed + gated ladder grants.
+    expect(Number.isNaN(result.spells_known)).toBe(false);
+    expect(result.spells_known).toBe(diskSeed + ladderCount);
+    // A tracked host never shouts.
+    expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"))).toBe(false);
+  });
+
 
   it('CLA-139: subrace is the authoritative legacy channel; runtime refines only when absent', () => {
     const automation = lineageAutomation('Tiefling');
@@ -169,6 +216,7 @@ describe('spellCalc2024-lineage', () => {
     expect(lv1.spells[0].prepared).toBe('Always');
     expect(lv1.cantrips_known).toBe(1);
     // lv1 quirk: ladder gated by key, so spells_known stays 0 (#1262).
+    expect(Number.isFinite(lv1.spells_known)).toBe(true); // #1268 NaN-never on tracked host
     expect(lv1.spells_known).toBe(0);
     // Lineage ability WIS outranks the class Intelligence, math recomputed.
     expect(lv1.spellCastingAbility).toBe('WIS');
@@ -179,6 +227,7 @@ describe('spellCalc2024-lineage', () => {
     const lv5 = getSpellAbilities(spellsDb, fighterStats(5), { campaignName: 'test-campaign', race: raceArg });
     expect(lv5.spells.map(s => s.name)).toEqual(['Druidcraft', 'Longstrider', 'Pass Without Trace']);
     expect(lv5.cantrips_known).toBe(1);
+    expect(Number.isFinite(lv5.spells_known)).toBe(true); // #1262 tracked slotless host
     expect(lv5.spells_known).toBe(2);
   });
 

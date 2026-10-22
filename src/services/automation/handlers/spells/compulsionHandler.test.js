@@ -7,9 +7,14 @@
 //
 // Caller liveness (grep-verified 2026-10-16): automation/index.js:219 imports this handle and
 // :548 registers `compulsion: handleCompulsion` in HANDLER_MAP — executeHandler(:702) dynamic
-// dispatch on automation.type is the live production lane. In-repo producers of a type-'compulsion'
-// action: compulsionService.triggerCompulsion (compulsionService.js:42-55 → executeHandler; its
-// rebuild/advantage/DC logic is compulsionTrigger.test.js's, which mocks executeHandler).
+// dispatch on automation.type is the live production lane. Producer census #1348 (2026-10-22):
+// the previously-cited in-repo producer compulsionService.triggerCompulsion was a DEAD export
+// (its 'live producer' claim here was STALE) and has been DELETED along with its compulsion
+// Trigger.test.js twin — it double-fetched getCombatContext and stamped app-fabricated
+// automation.advantage (disk prose grants none; straight WIS save, auto-succeed-only if the
+// target can't be charmed). No in-repo producer of a type-'compulsion' envelope remains; this
+// handle stays registry-live and dispatch-reachable if an envelope ever arrives, so the
+// automation.advantage transport pins below stand as handler-contract pins.
 // Honest seam note: the REAL spell rows (public/data/spells.json, 2024/spells.json) carry NO
 // automation.type (mirrored in triggerSpells.test.js:124), so the live sheet cast runs
 // spellGates.gateCompulsion (:726/:840) → pendingCompulsion → handleCompulsionConfirm →

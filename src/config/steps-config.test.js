@@ -97,11 +97,12 @@ describe('steps-config', () => {
       });
     }
 
-    // FIXME (source bug, 2026-10-14): WizardStepRenderer destructures languageWarnings
-    // into _languageWarnings and omits it from the getProps({...}) context in
-    // CharacterCreationWizard.jsx, so step 12's `warnings` prop is always undefined and
-    // WizardStepLanguages never renders the limit warnings that useWizardLanguages computes.
-    // Fix: forward `languageWarnings` in the renderer's getProps({...}) call.
+    // Guard (was FIXME 2026-10-14, fixed 2026-10-22): the renderer's getProps({...})
+    // block in CharacterCreationWizard.jsx previously destructured languageWarnings into
+    // _languageWarnings and omitted it from the supplied context, so step 12's `warnings`
+    // prop was always undefined and WizardStepLanguages never rendered the limit warnings
+    // that useWizardLanguages computes. Fix: `languageWarnings` is now forwarded in the
+    // renderer's getProps({...}) call.
     it('renderer supplies every context key each step reads (no dropped wiring)', () => {
       const src = readFileSync(
         join(process.cwd(), 'src/components/character-creation/CharacterCreationWizard.jsx'),

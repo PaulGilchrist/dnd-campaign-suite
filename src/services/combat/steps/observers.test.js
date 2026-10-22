@@ -20,7 +20,8 @@
 //     → ONE inert-payload table test (test 6), extended with empty-string / zero /
 //     false / undefined-result degenerate rows
 //   'handles null targetName' (weak objectContaining) → exact-bytes defaults test (test 5),
-//     also pinning 'unknown'/'Attack'/'Action'/''/0 fallbacks and foreign-campaign pass-through
+//     also pinning 'unknown'/'Attack'/'Action'/''/0 fallbacks, the fixed #1065 anonymous
+//     description via canonical getName -> 'Unknown', and foreign-campaign pass-through
 //   'handles addEntry error gracefully' (asserted only non-rejection) → all three observers'
 //     .catch paths + console.error byte-pin (test 7)
 //   'returns three observers' → strengthened golden census with handler presence (test 1)
@@ -136,8 +137,9 @@ describe('createObservers', () => {
 
   it('bare ctx logs exact fallback bytes to the ctx-supplied campaign, not a hardcoded one', async () => {
     // Foreign-campaign decoy (#1050): campaignName flows from ctx.
-    // Honest pin (#910): description interpolation does NOT carry the 'unknown' fallback
-    // (observers.js:40/:57 — flagged as source bug), so the 'undefined' byte is pinned.
+    // Fixed (#1065): description interpolation resolves the anonymous ctx through the
+    // canonical utils.getName -> 'Unknown' token (ui/utils.js:12); the pre-fix
+    // 'undefined applied ...' bytes are retired here.
     const ctx = { campaignName: 'other-campaign' };
 
     await Promise.all(observers.map(o => o.handler(ctx, TRIGGERS[o.event])));
@@ -159,7 +161,7 @@ describe('createObservers', () => {
         type: 'ability_use',
         characterName: 'unknown',
         abilityName: 'Sneak Attack',
-        description: 'undefined applied Sneak Attack (3d6)',
+        description: 'Unknown applied Sneak Attack (3d6)',
         targetName: null,
         timestamp: expect.any(Number),
       }],
@@ -167,7 +169,7 @@ describe('createObservers', () => {
         type: 'action_complete',
         characterName: 'unknown',
         actionName: 'Action',
-        description: 'undefined completed action with 0 total damage.',
+        description: 'Unknown completed action with 0 total damage.',
         total: 0,
         targetName: null,
         timestamp: expect.any(Number),

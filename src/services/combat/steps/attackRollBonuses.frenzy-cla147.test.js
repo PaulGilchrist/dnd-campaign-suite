@@ -158,4 +158,95 @@ describe('CLA-147 Frenzy — single rider owner (attackRollBonuses)', () => {
     expect(rollExpression).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
+
+  // ── #1026 latch-honesty falsifier arms ─────────────────────────────────────
+  // Pre-fix defect (attackRollBonuses.js :91): the _frenzyUsedRound stamp sat
+  // UNCONDITIONALLY after the rider loop — with every rollExpression returning
+  // null (:86 continue) the loop applied ZERO rider bytes yet still burned the
+  // frenzy for the round. Fix (#1026): appliedFlag written inside the loop;
+  // stamp gated on it (write-only-if-applied, the applyWeaponHitBonus/
+  // consumeWeaponHitUses :336→:347 guard family in this same file, mirroring
+  // epitomeEmpoweredStrikes.js :22/:31 and the fix#61(d) dirty-guard shape).
+  describe('#1026 stamp write-only-if-applied', () => {
+    afterEach(() => { rollExpression.mockReset(); });
+
+    // stateful latch store so sequential handler invocations consult real bytes
+    function statefulRuntime() {
+      const store = {};
+      getRuntimeValue.mockImplementation((_, key) => {
+        if (key === 'activeBuffs') {
+          return [
+            { damageBonusExpression: 'rage_damage' }, // raging
+            { effect: 'advantage_attacks_advantage_against' }, // reckless
+          ];
+        }
+        return store[key] ?? null;
+      });
+      setRuntimeValue.mockImplementation((_, key, value) => { store[key] = value; });
+      return store;
+    }
+
+    const rollOnce = (n) =>
+      rollExpression.mockImplementationOnce(() => ({ total: 4 * n, rolls: Array(4).fill(n), modifier: 0 }));
+
+    it('all-null rolls: no rider bytes, ZERO latch writes; next attack still gains the rider and stamps once', async () => {
+      const store = statefulRuntime();
+      rollExpression.mockReturnValue(null);
+      const step = buildAutomationBonusesStep();
+
+      const r1 = await step.handler(laneCtx());
+      // #1026-fix: burned-round fingerprint ('formula byte-identical BUT stamped') flips to honest.
+      expect(r1.data.formula).toBe('1d8+5 plus 4'); // zero rider appended
+      expect(r1.data.rolls).toEqual([8]);
+      expect(r1.data.total).toBe(13);
+      // attempt happened (gates passed) but nothing landed ⇒ the write-only-if-applied guard holds
+      expect(rollExpression).toHaveBeenCalledTimes(1);
+      expect(rollExpression).toHaveBeenCalledWith('4d6');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(store._frenzyUsedRound).toBeUndefined(); // frenzy NOT burned for the round
+
+      // falsifier for latch-not-burned: second attack this round is still eligible
+      rollOnce(4);
+      const r2 = await step.handler(laneCtx());
+      expect(r2.data.formula).toBe('1d8+5 plus 4 + 4d6 [slashing]');
+      expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(setRuntimeValue).toHaveBeenCalledWith('DraconicDragon', '_frenzyUsedRound', 1, 'test-campaign');
+      expect(store._frenzyUsedRound).toBe(1);
+    });
+
+    it('one of two frenzy actions rolls null, the other lands: rider applied, latch stamped exactly once', async () => {
+      const store = statefulRuntime();
+      const ctx = laneCtx();
+      ctx.playerStats.automation.actions = [FRENZY_ACTION, FRENZY_ACTION];
+      rollExpression.mockReturnValueOnce(null);
+      rollOnce(4);
+
+      const r = await buildAutomationBonusesStep().handler(ctx);
+      expect(r.data.formula).toBe('1d8+5 plus 4 + 4d6 [slashing]'); // only the landed rider
+      expect(r.data.rolls).toEqual([8, 4, 4, 4, 4]);
+      expect(r.data.total).toBe(29);
+      expect(rollExpression).toHaveBeenCalledTimes(2); // null arm + landed arm
+      // multi-valid vs all-null distinguishable: exactly one stamp here, zero there
+      expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+      expect(setRuntimeValue).toHaveBeenCalledWith('DraconicDragon', '_frenzyUsedRound', 1, 'test-campaign');
+      expect(store._frenzyUsedRound).toBe(1);
+    });
+
+    it('both frenzy actions land: two rider groups appended, latch still stamped exactly once', async () => {
+      const store = statefulRuntime();
+      const ctx = laneCtx();
+      ctx.playerStats.automation.actions = [FRENZY_ACTION, FRENZY_ACTION];
+      rollOnce(4);
+      rollOnce(3);
+
+      const r = await buildAutomationBonusesStep().handler(ctx);
+      expect(r.data.formula).toBe('1d8+5 plus 4 + 4d6 [slashing] + 4d6 [slashing]');
+      expect(r.data.rolls).toEqual([8, 4, 4, 4, 4, 3, 3, 3, 3]);
+      expect(r.data.total).toBe(41);
+      expect(rollExpression).toHaveBeenCalledTimes(2);
+      expect(setRuntimeValue).toHaveBeenCalledTimes(1); // once per turn, not once per action
+      expect(setRuntimeValue).toHaveBeenCalledWith('DraconicDragon', '_frenzyUsedRound', 1, 'test-campaign');
+      expect(store._frenzyUsedRound).toBe(1);
+    });
+  });
 });

@@ -121,7 +121,6 @@ export default function usePlayerDragging({
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;
-        svg.setPointerCapture(e.pointerId);
 
         const svgPt = toSvgPoint(svg, e.clientX, e.clientY);
         if (!svgPt) return;
@@ -139,6 +138,14 @@ export default function usePlayerDragging({
         const reachable = unconstrained
             ? null
             : computeReachable(player.gridX, player.gridY, computeMovementObstacles(walls, placedItems), gridSize);
+
+        // #910: capture only once the drag has verifiably started (house pattern:
+        // useRuler.js guards, validates, then captures; mirrors the #883 fix in
+        // useItemDragging.js). Capturing before the ctm/player guards stranded the
+        // pointer on failed starts — up/leave bail on null dragging, so release never
+        // ran and the implicit capture swallowed every later click. dragging !== null
+        // now strictly implies captured.
+        svg.setPointerCapture(e.pointerId);
 
         setDragging({
             playerId,
@@ -195,10 +202,18 @@ export default function usePlayerDragging({
     }, [dragging, mapData, gridSize, setMapData, svgRef]);
 
     const handlePointerUp = useCallback((e) => {
-        if (!dragging) return;
+        if (!dragging) return; // failed down never captured — bailing strands nothing (#910)
         e.preventDefault();
 
+        // #910 capture discipline (mirrors the #883 fix in useItemDragging.js:
+        // release-first in up): dragging !== null strictly implies captured (down
+        // captures only after its guards), so release runs BEFORE the ctm/player
+        // guards below — a guarded up must never strand the held capture. Pointer
+        // capture routes the captured pointer's later events to the capturing
+        // element carrying that pointer's own id, so e.pointerId here is the id
+        // held since down; releasing it drops exactly that hold.
         const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
 
         const svgPt = toSvgPoint(svg, e.clientX, e.clientY);
         if (!svgPt) { setDragging(null); return; }
@@ -254,7 +269,6 @@ export default function usePlayerDragging({
             )
         }));
 
-        if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
 
         finalizePlayerMove({ dragging, player, targetX, targetY, campaignName, budget, mapData });

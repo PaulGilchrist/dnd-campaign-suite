@@ -343,4 +343,76 @@ describe('prismatic-spray-violet save-result handler', () => {
         }));
         expect(setCombatSummary).toHaveBeenCalledWith(combatSummary);
     });
+
+    // #871 pin: on save FAILURE the handler swaps this target's ray te for a fresh
+    // banishment te. The dedupe must be banishment-identity-exact (effect+target+source):
+    // same-caster effects of OTHER classes on this target (hunter's-mark-shaped te) and
+    // banishments from OTHER casters / on OTHER targets must survive byte-intact.
+    it('#871: failed save removes ONLY the same-caster banishment te — hunter\'s-mark-shaped and other-caster te survive byte-intact', async () => {
+        const huntersMark = { target: NAME, effect: 'hunters_mark', source: CASTER, duration: 'concentration' };
+        const banishmentOtherCaster = { effect: 'banishment', target: NAME, source: 'OtherCaster', duration: 'Concentration, up to 1 minute', permanent: false };
+        const banishmentOtherTarget = { effect: 'banishment', target: 'Bob', source: 'OtherCaster', duration: 'Concentration, up to 1 minute', permanent: false };
+        const staleBanishment = { ...BANISHMENT, duration: 'stale duplicate, must be replaced' };
+
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign' && prop === trackingKey) return { casterName: CASTER, dc: 15 };
+            if (key === NAME && prop === 'activeConditions') return ['blinded'];
+            if (key === 'campaign' && prop === 'targetEffects') return [
+                { target: NAME, effect: 'prismatic_spray_violet', source: CASTER },
+                { target: 'Bob', effect: 'prismatic_spray_violet', source: CASTER },
+                huntersMark,
+                banishmentOtherCaster,
+                banishmentOtherTarget,
+                staleBanishment,
+            ];
+            return null;
+        });
+
+        const handler = createPrismaticSprayVioletHandler(CAMPAIGN, combatSummary, setCombatSummary);
+        await handler(event(NAME, { success: false }));
+
+        // Exact-array: filter preserves seed order; only the (NAME, CASTER, 'banishment')
+        // triple is removed and the fresh BANISHMENT appended. Hunters-mark survives.
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [
+            { target: 'Bob', effect: 'prismatic_spray_violet', source: CASTER },
+            huntersMark,
+            banishmentOtherCaster,
+            banishmentOtherTarget,
+            BANISHMENT,
+        ], CAMPAIGN);
+    });
+
+    // #871 cross-guard: multi-caster on the SAME target — save-result for NAME must not
+    // strip CASTER's banishment from OTHER targets, nor another caster's te on NAME.
+    it('#871 cross-guard: two casters banishing two targets — each save-result touches only its own pair', async () => {
+        const secondTarget = 'Bob';
+        const otherTrackingKey = `_prismaticSprayViolet_${NAME.replace(/\s+/g, '_')}`;
+        const markOnOther = { target: secondTarget, effect: 'hunters_mark', source: CASTER, duration: 'concentration' };
+        const banishmentMineOnOther = { effect: 'banishment', target: secondTarget, source: CASTER, duration: 'Concentration, up to 1 minute', permanent: false };
+        const banishmentOtherOnName = { effect: 'banishment', target: NAME, source: 'OtherCaster', duration: 'Concentration, up to 1 minute', permanent: false };
+
+        getRuntimeValue.mockImplementation((key, prop) => {
+            if (key === 'campaign' && prop === otherTrackingKey) return { casterName: CASTER, dc: 15 };
+            if (key === NAME && prop === 'activeConditions') return ['blinded'];
+            if (key === 'campaign' && prop === 'targetEffects') return [
+                { target: NAME, effect: 'prismatic_spray_violet', source: CASTER },
+                { target: secondTarget, effect: 'prismatic_spray_violet', source: 'OtherCaster' },
+                markOnOther,
+                banishmentMineOnOther,
+                banishmentOtherOnName,
+            ];
+            return null;
+        });
+
+        const handler = createPrismaticSprayVioletHandler(CAMPAIGN, combatSummary, setCombatSummary);
+        await handler(event(NAME, { success: false }));
+
+        expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'campaign', 'targetEffects', [
+            { target: secondTarget, effect: 'prismatic_spray_violet', source: 'OtherCaster' },
+            markOnOther,
+            banishmentMineOnOther,   // my banishment on Bob: untouched (wrong target)
+            banishmentOtherOnName,   // OtherCaster's banishment on NAME: untouched (wrong source)
+            BANISHMENT,              // fresh te for (NAME, CASTER)
+        ], CAMPAIGN);
+    });
 });

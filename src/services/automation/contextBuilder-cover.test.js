@@ -75,7 +75,9 @@ vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
 function setupDefaults() {
   buildBaseAttackContext.mockResolvedValue({ target: { name: 'Orc' }, targetName: 'Orc', resistanceNotice: null });
   loadMapData.mockResolvedValue(null);
-  loadNPCs.mockResolvedValue([]);
+  // Real wire envelope from GET /api/campaigns/:campaign/npcs (jsonEntityCrud.js:49) (#1181) —
+  // a bare-array mock here let the envelope-vs-array TypeError in applyMeleeProximity hide.
+  loadNPCs.mockResolvedValue({ npcs: [] });
   rangeToFeet.mockImplementation((r) => (typeof r === 'number' ? r : 5));
   getRuntimeValue.mockReturnValue(undefined);
   getInnateSorceryBonus.mockReturnValue({ spellAdvantage: false, saveDcBonus: 0 });

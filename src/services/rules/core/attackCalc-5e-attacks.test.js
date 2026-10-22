@@ -1,4 +1,5 @@
 // @maintained-by-ai
+import { readFileSync } from 'fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getAttacks } from './attackCalc.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
@@ -147,6 +148,84 @@ describe('attackCalc getAttacks edge cases', () => {
       // dex(2) + prof(3) + thrownProfBonus(3) = 8
       expect(result[0].hitBonus).toBe(8);
       expect(result[0].hitBonusFormula).toContain('Thrown Weapon Fighting');
+    });
+
+    // #1233/#1234 disk law: public/data/equipment.json names the item 'Shortsword'
+    // (one word, index 'shortsword'); the space spelling 'Short Sword' exists NOWHERE
+    // on disk (also census-checked: no campaign/homebrew carries it). attackCalc's
+    // buildThrownShortSwordAttacks used to match 'Short Sword', so the thrown-Shortsword
+    // row was UNREACHABLE on real data. These pins extract the disk row at load and
+    // throw on census drift rather than testing a stale name.
+    const diskEquipment = JSON.parse(readFileSync('public/data/equipment.json', 'utf8'));
+    const DISK_SHORTSWORD = diskEquipment.find(e => e.name === 'Shortsword');
+    const thrownRows = rows => rows.filter(a => a.hitBonusFormula.includes('Thrown Weapon Fighting (Proficiency)'));
+
+    it('disk lock (#1233): canonical name is "Shortsword", space variant "Short Sword" absent from equipment.json', () => {
+      expect(DISK_SHORTSWORD, 'equipment.json must carry a "Shortsword" row').toBeDefined();
+      expect(DISK_SHORTSWORD.name).toBe('Shortsword');
+      expect(DISK_SHORTSWORD.weapon_range).toBe('Melee');
+      expect(DISK_SHORTSWORD.damage.damage_dice).toBe('1d6');
+      expect(DISK_SHORTSWORD.range.normal).toBe(5);
+      expect(diskEquipment.some(e => e.name === 'Short Sword')).toBe(false);
+    });
+
+    it('real-disk-name leg (#1234): TWF + equipped disk Shortsword row builds the thrown attack', () => {
+      // Pre-fix capture: with the 'Short Sword' match this fixture produced NO thrown
+      // row — the space-name literal never appears on disk, so the builder was dead.
+      const playerStats = makePlayerStats({
+        equipped: ['Shortsword'],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+      const result = getAttacks([DISK_SHORTSWORD], [], playerStats);
+      const thrown = thrownRows(result);
+      expect(thrown).toHaveLength(1);
+      expect(thrown[0].name).toBe('Shortsword');
+      // dex(2) + prof(3) + thrownProfBonus(3) = 8; range from disk row (normal 5)
+      expect(thrown[0].hitBonus).toBe(8);
+      expect(thrown[0].range).toBe(5);
+      expect(thrown[0].type).toBe('Action');
+      expect(thrown[0].damage).toBe('1d6+2');
+      // the plain melee Shortsword row coexists without the thrown bonus
+      // (melee main-hand picks max(str 3, dex 2) = str 3 → 3+3)
+      const melee = result.filter(a => a.name === 'Shortsword' && !thrownRows([a]).length);
+      expect(melee).toHaveLength(1);
+      expect(melee[0].hitBonus).toBe(6);
+    });
+
+    it('magical equip name "+1 Shortsword" reaches the thrown builder via magic-prefix strip', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['+1 Shortsword'],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+      const result = getAttacks([DISK_SHORTSWORD], [], playerStats);
+      const thrown = thrownRows(result);
+      expect(thrown).toHaveLength(1);
+      expect(thrown[0].name).toBe('+1 Shortsword');
+      // dex(2) + prof(3) + magic(1) + thrownProfBonus(3) = 9
+      expect(thrown[0].hitBonus).toBe(9);
+    });
+
+    it('legacy space-name fixture is REJECTED (#1233 match design): exact disk literal only', () => {
+      // Sibling name-matches in attackCalc are exact ('Hand Crossbow', 'Shield'), so
+      // the fix stays exact on 'Shortsword'; a fake homebrew 'Short Sword' row (which
+      // production data never carries) must NOT build the thrown row.
+      const fakeSpaceRow = { ...DISK_SHORTSWORD, name: 'Short Sword', index: 'short-sword' };
+      const playerStats = makePlayerStats({
+        equipped: ['Short Sword'],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+      const result = getAttacks([fakeSpaceRow], [], playerStats);
+      expect(thrownRows(result)).toHaveLength(0);
+    });
+
+    it('#1348 arms: Longsword equipped never builds a thrown row', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword'],
+        class: { name: 'Fighter', fightingStyles: ['Thrown Weapon Fighting'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(thrownRows(result)).toHaveLength(0);
+      expect(result[0].name).toBe('Longsword');
     });
   });
 

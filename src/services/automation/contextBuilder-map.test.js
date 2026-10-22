@@ -14,6 +14,13 @@
 // Lane notes (do not confuse these cover implementations):
 // - common/damageRoll.js computeMapAwareContext is a separate, simpler
 //   cover path tested in common/buildAttackContext-map.test.js — not here.
+//
+// Envelope honesty (#1181): loadNPCs is mocked but resolves the REAL wire
+// envelope { npcs: [...] } (server GET /api/campaigns/:campaign/npcs,
+// jsonEntityCrud.js:49 responseWrapper) — a bare-array mock hid the
+// envelope-vs-array TypeError at contextBuilder-map.js applyMeleeProximity.
+// Teardown hygiene (#1181): this lane stubs NO global fetch (all transport
+// is vi.mock'd above) — no afterEach vi.unstubAllGlobals pairing needed.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildAttackContext } from './contextBuilder.js';
@@ -67,7 +74,8 @@ vi.mock('./handlers/class-cleric-paladin/avengingAngelHandler.js', () => ({
 function setupDefaults() {
   buildBaseAttackContext.mockResolvedValue({ target: { name: 'Orc' }, targetName: 'Orc', resistanceNotice: null });
   loadMapData.mockResolvedValue(null);
-  loadNPCs.mockResolvedValue([]);
+  // Real wire envelope from GET /api/campaigns/:campaign/npcs (jsonEntityCrud.js:49) (#1181).
+  loadNPCs.mockResolvedValue({ npcs: [] });
   rangeToFeet.mockImplementation((r) => (typeof r === 'number' ? r : 5));
   getRuntimeValue.mockReturnValue(undefined);
   setRuntimeValue.mockReturnValue(undefined);
@@ -412,9 +420,10 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
   });
 
   describe('melee proximity disadvantage', () => {
+    // type:'npc' is required to reach the npcs lookup inside applyMeleeProximity (#1181).
     function setupMeleeProxTest() {
       setupMapPathWithTarget('Orc', 10, 10);
-      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ name: 'Orc', gridX: 10, gridY: 10 }]));
+      loadMapData.mockResolvedValue(makeMapDataWithNPCs(null, [{ type: 'npc', name: 'Orc', gridX: 10, gridY: 10 }]));
     }
 
     it('sets disadvantage when firing in melee range of hostile NPC', async () => {
@@ -445,10 +454,15 @@ describe('contextBuilder: buildAttackContext (map-based)', () => {
           { type: 'npc', name: 'Hostile', gridX: 3, gridY: 3, attitude: 'negative' },
         ]
       ));
-      loadNPCs.mockResolvedValue([
-        { name: 'Friendly', attitude: 'friendly' },
-        { name: 'Hostile', attitude: 'negative' },
-      ]);
+      // ENVELOPE-FIXTURE pin (#1181): GET /api/campaigns/:campaign/npcs resolves
+      // { npcs:[...] } (jsonEntityCrud.js:49) — the old bare-array mock hid the
+      // npcs?.find TypeError in applyMeleeProximity (contextBuilder-map.js).
+      loadNPCs.mockResolvedValue({
+        npcs: [
+          { name: 'Friendly', attitude: 'friendly' },
+          { name: 'Hostile', attitude: 'negative' },
+        ],
+      });
       isHostileNPC.mockImplementation((npc) => npc.attitude === 'negative');
       await buildAttack();
       expect(isHostileNPC).toHaveBeenCalledWith(

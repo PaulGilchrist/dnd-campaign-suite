@@ -517,6 +517,26 @@ describe('maps - POST /api/campaigns/:campaign/maps', () => {
         expect(MOCK_FS.has(`${mapsDir}/dungeon--cave.json`)).toBe(true);
     });
 
+    // .json-edge arm (#1173): trailing .json stripped so the file stays reachable
+    // via the client's toKebabCase key — mirrors src/services/maps/mapsService.js
+    it('should strip trailing .json from name when building the filename', async () => {
+        const mapsDir = '/mock/campaigns/test-campaign/maps';
+        MOCK_FS.set(mapsDir, []);
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/maps')
+            .send({ name: 'Cave.json', type: 'indoor' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.map.fileName).toBe('cave.json');
+        expect(MOCK_FS.has(`${mapsDir}/cave.json`)).toBe(true);
+        expect(MOCK_FS.has(`${mapsDir}/cavejson.json`)).toBe(false); // pre-fix server bytes: 'cavejson'
+        const mapData = JSON.parse(MOCK_FS.get(`${mapsDir}/cave.json`));
+        expect(mapData.name).toBe('cave');
+        expect(mapData.displayName).toBe('Cave.json');
+    });
+
     it('should create maps directory if it does not exist', async () => {
         const mapsDir = '/mock/campaigns/test-campaign/maps';
         MOCK_FS.delete(mapsDir);

@@ -1,4 +1,5 @@
 import { addEntry } from '../../ui/logService.js';
+import utils from '../../ui/utils.js';
 
 /**
  * Observer definitions for the action pipeline.
@@ -37,7 +38,7 @@ export function createObservers() {
             type: 'ability_use',
             characterName: ctx.playerStats?.name || 'unknown',
             abilityName: 'Sneak Attack',
-            description: `${ctx.playerStats?.name} applied Sneak Attack (${data.effectiveSneakDice}d6)`,
+            description: `${utils.getName(ctx.playerStats?.name)} applied Sneak Attack (${data.effectiveSneakDice}d6)`,
             targetName: ctx.targetName || null,
             timestamp: Date.now(),
           }).catch((e) => { console.error("[observers:log-error]", e); });
@@ -54,7 +55,7 @@ export function createObservers() {
             type: 'action_complete',
             characterName: ctx.playerStats?.name || 'unknown',
             actionName: ctx.attack?.name || 'Action',
-            description: `${ctx.playerStats?.name} completed ${ctx.attack?.name || 'action'} with ${ctx.total || 0} total damage.`,
+            description: `${utils.getName(ctx.playerStats?.name)} completed ${ctx.attack?.name || 'action'} with ${ctx.total || 0} total damage.`,
             total: ctx.total || 0,
             targetName: ctx.targetName || null,
             timestamp: Date.now(),

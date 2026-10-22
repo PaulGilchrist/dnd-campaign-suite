@@ -1,5 +1,5 @@
 // @maintained-by-ai
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -115,11 +115,48 @@ describe('ConditionEffectBadges - Aura & Protection Badges', () => {
         expect(screen.getByText(getEffectDefinition('protection_from_poison').label)).toBeInTheDocument();
     });
 
-    // NOTE: no click→CON-save pin for the Protection from Poison badge —
-    // its builder reads ctx.te.dc lazily inside onClick, and ctx.te is
-    // undefined by the time any click lands (shared ctx mutated per spec
-    // loop). Any click throws TypeError; see SOURCE BUGS in the audit
-    // report. Add the click payload pin once the source captures te eagerly.
+    // #820 click-pin RESTORED (was withheld here pending the eager-capture
+    // source fix): buildProtectionFromPoisonBadge now captures ctx.te.dc
+    // eagerly into const poisonDc before returning its onClick closure, so
+    // clicking the badge rerolls the CON save vs Poisoned with the dc the
+    // te carried at build time instead of dereferencing the ctx.te that the
+    // spec loop (jsx:617) reassigns per iteration.
+    it('rolls the CON save vs Poisoned with the te dc when the Protection from Poison badge is clicked', () => {
+        const onRollConditionSave = vi.fn();
+        renderBadges({
+            targetEffects: [{ target: [CREATURE_NAME], effect: 'protection_from_poison', source: 'Cleric', dc: 13 }],
+            onRollConditionSave,
+        });
+
+        fireEvent.click(screen.getByText(getEffectDefinition('protection_from_poison').label));
+
+        expect(onRollConditionSave).toHaveBeenCalledTimes(1);
+        expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'poisoned', label: 'Poisoned', dc: 13, ability: 'con' });
+    });
+
+    // Mutant kill vs re-lazification: forcecage's spec sits AFTER
+    // protection_from_poison in BADGE_SPECS, so a lazified onClick closure
+    // would read the stale forcecage te (dc 19) off ctx.te at click time
+    // instead of this badge's eagerly captured dc.
+    it('keeps each badge click payload pinned to its own te when a later spec reassigns ctx.te', () => {
+        const onRollConditionSave = vi.fn();
+        renderBadges({
+            targetEffects: [
+                { target: [CREATURE_NAME], effect: 'protection_from_poison', source: 'Cleric', dc: 13 },
+                { target: [CREATURE_NAME], effect: 'forcecage', source: 'Wizard', dc: 19 },
+            ],
+            onRollConditionSave,
+        });
+
+        fireEvent.click(screen.getByText(getEffectDefinition('protection_from_poison').label));
+        expect(onRollConditionSave).toHaveBeenCalledTimes(1);
+        expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'poisoned', label: 'Poisoned', dc: 13, ability: 'con' });
+
+        fireEvent.click(screen.getByText('Forcecaged'));
+        expect(onRollConditionSave).toHaveBeenCalledTimes(2);
+        expect(onRollConditionSave).toHaveBeenCalledWith(CREATURE_NAME, { key: 'forcecaged', label: 'Forcecaged', dc: 19, ability: 'cha' });
+    });
+
     it('renders Warding Bond from activeBuffs with exact registry bytes and a remove affordance', () => {
         const def = getEffectDefinition('warding_bond');
         renderBadges({ buffs: [{ name: def.label, effect: 'warding_bond', sourceCharacter: 'Cleric' }] });

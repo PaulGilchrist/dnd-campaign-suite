@@ -3,10 +3,10 @@
 // assembled for which action shape, and the campaignName gate on SSE observer registration.
 // Step internals are CITED, never re-pinned here: attack census lives in
 // attackRollDamageSteps.test.js (#1039 template), spell census in
-// directSpellDamageSteps-structure.test.js (#1039/#1048 golden), generic chain golden in
-// genericSteps.test.js (#1063), observer bodies in observers.test.js / sseObservers.test.js.
+// directSpellDamageSteps-structure.test.js (#1039/#1048 golden), observer bodies in
+// observers.test.js / sseObservers.test.js.
 //
-// Mock discipline (#744/#786): the three step-builders and both observer factories are
+// Mock discipline (#744/#786): the two step-builders and both observer factories are
 // inert spies returning distinguishable sentinel lanes (two chained steps each, unique
 // recorder names). No real step body ever executes here; routing is falsifiable because
 // the RIGHT spy must be called once (zero args — builders take none, exact-bytes #993),
@@ -18,11 +18,21 @@
 //            when not spell) — attack wins precedence even when spellType also present
 //   spell  : type==='spell' | spellType | autoDamageSchool (also when damage present —
 //            the :39 non-spell guard keeps spell damage out of the attack lane)
-//   generic: UNREACHABLE dead branch (index.js:47) — any bare damage is claimed by the
-//            attack lane at :39, and spell-flagged damage by the spell lane. Honest note
-//            (#945); reported as a source bug, not pinned as live behavior.
 //   none   : no damage, no spell/weapon flags (and degenerate undefined action) → zero
 //            steps, log observers still registered.
+//   generic: REMOVED (fix #1063/#1064, verified dead-by-removal here). buildGenericSteps
+//            was aspirational-from-birth: wired in the same commit that added it
+//            (9447923a2) yet unreachable at every predicate since — :39 claims ALL bare
+//            damage (damage/damageExpression/hasDamage rows above are permanent ABSORPTION
+//            pins of the generic lane's former target shapes), :45 captures every
+//            spell-flagged escape, so the old :47 arm was the empty set; and its chain
+//            started at 'generic:do', never run by production callers ('housekeeping:do'
+//            only, useAttackDamageResolution.js:102/:447). Builder file genericSteps.js +
+//            lane golden genericSteps.test.js (#1063) removed with it; the lane's roll
+//            contract is absorbed verbatim by attackRollDamageCalc.js:62-67 and
+//            directSpellDamageSteps.js:126/:142. The genericBuilder spy/mock is removed
+//            with the module — re-adding a generic lane requires re-adding a routed
+//            producer plus fresh falsifiable rows here, not a resurrected empty arm.
 //
 // old→new map (old 9 tests → new 3):
 //   :5-11 toHaveProperty smoke + :13-16/:18-21/:23-26/:75-81 expect(run).toBeDefined()
@@ -61,7 +71,6 @@ const S = vi.hoisted(() => {
     executed,
     attackBuilder: vi.fn(() => lane('attack')),
     spellBuilder: vi.fn(() => lane('spell')),
-    genericBuilder: vi.fn(() => lane('generic')),
     logObserverHandler,
     sseObserverHandler,
     createObservers: vi.fn(() => [{ event: '*', handler: logObserverHandler }]),
@@ -73,14 +82,12 @@ import { buildPipelineForAction } from './index.js';
 
 vi.mock('./attackRollDamageSteps.js', () => ({ buildAttackRollDamageSteps: S.attackBuilder }));
 vi.mock('./directSpellDamageSteps.js', () => ({ buildDirectSpellDamageSteps: S.spellBuilder }));
-vi.mock('./genericSteps.js', () => ({ buildGenericSteps: S.genericBuilder }));
 vi.mock('./observers.js', () => ({ createObservers: S.createObservers }));
 vi.mock('./sseObservers.js', () => ({ createSseObservers: S.createSseObservers }));
 
 const BUILDERS = {
   attack: S.attackBuilder,
   spell: S.spellBuilder,
-  generic: S.genericBuilder,
 };
 
 // Distinguishable fixtures (#1022): each row pins ONE router branch, verbatim.
@@ -103,7 +110,7 @@ function reArm() {
   // determinism re-arm (#1057): mockClear() wipes call history but preserves the
   // sentinel implementations (clearAllMocks would destroy the builder factories).
   [
-    S.attackBuilder, S.spellBuilder, S.genericBuilder,
+    S.attackBuilder, S.spellBuilder,
     S.createObservers, S.createSseObservers,
     S.logObserverHandler, S.sseObserverHandler,
   ].forEach((spy) => spy.mockClear());

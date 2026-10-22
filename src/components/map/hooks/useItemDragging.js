@@ -25,7 +25,6 @@ export default function useItemDragging({
 
         const svg = svgRef.current;
         if (!svg) return;
-        svg.setPointerCapture(e.pointerId);
 
         const pt = svg.createSVGPoint();
         pt.x = e.clientX;
@@ -39,6 +38,13 @@ export default function useItemDragging({
 
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
+
+        // #883: capture only once the drag has verifiably started (house pattern:
+        // useRuler.js guards, validates, then captures). Capturing before these
+        // guards stranded the pointer on failed starts — up/leave bail on null
+        // itemDragging, so release never ran and the implicit capture swallowed
+        // every later click. itemDragging !== null now strictly implies captured.
+        svg.setPointerCapture(e.pointerId);
 
         setItemDragging({
             itemId,
@@ -93,7 +99,7 @@ export default function useItemDragging({
     }, [itemDragging, gridSize, setPlacedItems, svgRef, campaignName]);
 
     const handleItemPointerUp = useCallback((e) => {
-        if (!itemDragging) return;
+        if (!itemDragging) return; // failed down never captured — bailing strands nothing
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
 

@@ -72,7 +72,9 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         r: Math.floor(loadedGridSize / 2),
     });
 
-    ctx.hasLoaded.current = true;
+    // setLoading(false) rides the SAME update batch as every loaded-state
+    // setter above, so the persistence effect (guarded on `loading`) runs
+    // exactly once with this loaded snapshot in its closure.
     ctx.setLoading(false);
 }
 
@@ -124,7 +126,10 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
         console.error('Failed to save initial hex map data:', err);
     }
 
-    ctx.hasLoaded.current = true;
+    // Flipping `loading` here is the ONLY post-load signal the persistence
+    // effect needs: it is state, so the re-render it causes re-runs that
+    // effect deterministically with the fresh snapshot in its closure —
+    // no ref/await-seam split (#800).
     ctx.setLoading(false);
 }
 
@@ -146,7 +151,6 @@ function useMapLoader(campaignName, mapName, characters) {
     const [panY, setPanY] = useState(0);
 
     const isInitialized = useRef(false);
-    const hasLoaded = useRef(false);
     const needsResetViewRef = useRef(false);
     const hexMapNameRef = useRef(mapName);
     const hexMapDisplayNameRef = useRef(mapName);
@@ -165,7 +169,7 @@ function useMapLoader(campaignName, mapName, characters) {
             setMapData, setGridSize, setTerrain, setRivers, setRoads, setPois,
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
-            hexMapDisplayNameRef, needsResetViewRef, hasLoaded,
+            hexMapDisplayNameRef, needsResetViewRef,
         };
 
         const loadMap = async () => {
@@ -185,8 +189,15 @@ function useMapLoader(campaignName, mapName, characters) {
         loadMap();
     }, [campaignName, mapName, characters]);
 
+    // Persistence effect. The guard is the `loading` STATE, not a ref:
+    // pre-load it must skip (flushing here would clobber server data with
+    // empty defaults — guard intentional), and `loading` is in the deps so
+    // the commit that flips it false re-runs this effect exactly once with
+    // the loaded snapshot. A ref flipped after an await seam (old
+    // hasLoaded.current) left flush-vs-passive-effect ordering to the
+    // scheduler — mount snapshot flushed once-or-not-at-all (#800).
     useEffect(() => {
-        if (!hasLoaded.current) return;
+        if (loading) return;
         if (mapName !== hexMapNameRef.current) return;
 
         const dataToSave = {
@@ -207,7 +218,7 @@ function useMapLoader(campaignName, mapName, characters) {
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);
+    }, [campaignName, mapName, loading, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);
 
     return {
         loading, mapData, setMapData,

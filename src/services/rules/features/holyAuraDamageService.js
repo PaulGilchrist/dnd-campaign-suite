@@ -30,7 +30,14 @@ export async function checkHolyAuraDamage(creature, attackerName, combatSummary,
         const conSaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
         if (!conSaveDc) return null;
         const saveRoll = rollD20();
-        const conBonus = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution ?? 0;
+        // Disk-canonical read (#1376): every ability_score_modifiers producer
+        // ships lowercase 3-letter keys (monsters.json 636/636 rows,
+        // npcStatBlockUtils ABILITY_KEYS, npcClickFormHandlers ABILITY_ABBRS);
+        // zero producers write uppercase 'CON' or long-form 'constitution', so
+        // no fallback arms — reading those silently faked every fiend/undead
+        // save at +0 (negatives included). Mirror of the saveBonuses lowercase
+        // contract in rollSaveForCreature (combat/applyDamage.js:135-136).
+        const conBonus = attackerCreature.ability_score_modifiers?.con ?? 0;
         const saveTotal = saveRoll + conBonus;
         addEntry(campaignName, {
             type: 'save_result',

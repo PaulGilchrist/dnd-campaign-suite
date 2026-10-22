@@ -25,42 +25,51 @@ export function handle(heroismAction, playerStats, campaignName, _mapName) {
     };
 }
 
-function addHeroismTurnStartEffect(targetName, playerStats, tempHpAmount, campaignName) {
-    const targetStats = { ...playerStats, name: targetName };
-    const turnStartEffects = targetStats.turnStartEffects || [];
+function isHeroismCompanionTe(te) {
+    return (te.effect === 'heroism' || te.effect === 'wisdom_save_advantage')
+        && te.source === HEROISM_BUFF_NAME;
+}
+
+// #1373(c) fix: dedup and merge against the TARGET's stored turnStartEffects,
+// never the caster's passed playerStats (pre-fix the caster-local array was
+// written onto the target key, clobbering the target's own entries).
+function addHeroismTurnStartEffect(targetName, tempHpAmount, campaignName) {
+    const storedEffects = getRuntimeValue(targetName, 'turnStartEffects', campaignName) || [];
+    const turnStartEffects = Array.isArray(storedEffects) ? storedEffects : [];
     if (turnStartEffects.some(e => e.type === 'heroism_temp_hp')) return;
-    targetStats.turnStartEffects = [...turnStartEffects, {
+    setRuntimeValue(targetName, 'turnStartEffects', [...turnStartEffects, {
         type: 'heroism_temp_hp',
         name: HEROISM_BUFF_NAME,
         tempHpAmount: tempHpAmount,
-    }];
-    setRuntimeValue(targetName, 'turnStartEffects', targetStats.turnStartEffects, campaignName);
+    }], campaignName);
 }
 
+// #1373(a) fix (fix#27 accumulate pattern): ONE merged write — the fresh pair
+// is appended to the FILTERED base, so a re-cast can never resurrect the stale
+// pair onto the store. #1373(b): the filter covers BOTH companion keys,
+// scoped to this target+source (fix#93).
 function syncHeroismTargetEffects(targetName, campaignName) {
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const effects = Array.isArray(storedEffects) ? storedEffects : [];
-    const filteredEffects = effects.filter(te => !(te.effect === 'heroism' && te.source === HEROISM_BUFF_NAME && te.target === targetName));
-    if (filteredEffects.length !== effects.length) {
-        setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
-    }
-
-    effects.push({
-        target: targetName,
-        effect: 'heroism',
-        source: HEROISM_BUFF_NAME,
-        duration: 'concentration',
-    });
-    effects.push({
-        target: targetName,
-        effect: 'wisdom_save_advantage',
-        source: HEROISM_BUFF_NAME,
-        duration: 'concentration',
-    });
-    setRuntimeValue('campaign', 'targetEffects', effects, campaignName);
+    const filteredEffects = effects.filter(te => !(isHeroismCompanionTe(te) && te.target === targetName));
+    setRuntimeValue('campaign', 'targetEffects', [
+        ...filteredEffects,
+        {
+            target: targetName,
+            effect: 'heroism',
+            source: HEROISM_BUFF_NAME,
+            duration: 'concentration',
+        },
+        {
+            target: targetName,
+            effect: 'wisdom_save_advantage',
+            source: HEROISM_BUFF_NAME,
+            duration: 'concentration',
+        },
+    ], campaignName);
 }
 
-async function applyHeroismToTarget({ targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc }) {
+async function applyHeroismToTarget({ targetName, campaignName, casterName, duration, tempHpAmount, combatSummary, dc }) {
     const storedBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
     const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
     const existingHeroismIndex = buffs.findIndex(b => b.name === HEROISM_BUFF_NAME);
@@ -78,7 +87,7 @@ async function applyHeroismToTarget({ targetName, playerStats, campaignName, cas
     });
     setRuntimeValue(targetName, 'activeBuffs', buffs, campaignName);
 
-    addHeroismTurnStartEffect(targetName, playerStats, tempHpAmount, campaignName);
+    addHeroismTurnStartEffect(targetName, tempHpAmount, campaignName);
     syncHeroismTargetEffects(targetName, campaignName);
 
     addExpiration({ attackerName: casterName, targetName, effects: [
@@ -131,7 +140,7 @@ export async function applyHeroism(heroismAction, playerStats, campaignName, _ma
     const dc = playerStats.spellAbilities?.saveDc || (8 + (playerStats.proficiency || 0));
 
     for (const targetName of targetNames) {
-        await applyHeroismToTarget({ targetName, playerStats, campaignName, casterName, duration, tempHpAmount, combatSummary, dc });
+        await applyHeroismToTarget({ targetName, campaignName, casterName, duration, tempHpAmount, combatSummary, dc });
     }
 
     return {
@@ -155,7 +164,11 @@ export function removeHeroismBuff(targetName, campaignName) {
 
     const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
     const effects = Array.isArray(storedEffects) ? storedEffects : [];
-    const filteredEffects = effects.filter(te => !(te.effect === 'heroism' && te.source === HEROISM_BUFF_NAME));
+    // #1373(b) fix: strip BOTH companion keys (pre-fix matched 'heroism' only
+    // and 'wisdom_save_advantage' leaked for the whole campaign). NOT target-
+    // scoped by design: the concentration-break caller (concentrationService.js:410)
+    // passes the CASTER's name — one break ends Heroism on every sustained target.
+    const filteredEffects = effects.filter(te => !isHeroismCompanionTe(te));
     if (filteredEffects.length !== effects.length) {
         setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
     }

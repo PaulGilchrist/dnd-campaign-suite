@@ -285,7 +285,7 @@ const SIMPLE_SPELL_SPECS = [
   // lv2 upcast stamps te slotLevel:2 and logs spellLevel:2 instead of resolving at
   // the base makePending level.
   { name: 'bane', key: 'Bane', run: applySpell(() => applyBaneEffect, p => ({ automation: { type: 'bane', range: p.range, maxTargets: p.maxTargets }, level: p.metaCtx?.slotLevel || p.spellLevel, casting_time: p.castingTime })) },
-  { name: 'bless', key: 'Bless', run: applySpell(() => applyBlessEffect, p => ({ automation: { type: 'bless', range: p.range, maxTargets: p.maxTargets } })) },
+  { name: 'bless', key: 'Bless', run: applySpell(() => applyBlessEffect, p => ({ automation: { type: 'bless', range: p.range, maxTargets: p.maxTargets }, level: p.metaCtx?.slotLevel || p.spellLevel })) },
   { name: 'faerieFire', key: 'FaerieFire', run: triggerSpell(() => triggerFaerieFire, (p, r) => ({ targets: toArray(r) }), showPopupIfPayload) },
   { name: 'holyAura', key: 'HolyAura', run: applySpell(() => applyHolyAuraEffect, p => ({ automation: { type: 'holy_aura', duration: p.spell.duration, auraRange: 30, casting_time: p.castingTime } }), showPopupIfPresent) },
   { name: 'slow', key: 'Slow', run: runSlow },

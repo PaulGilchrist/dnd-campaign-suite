@@ -6,8 +6,8 @@
 // Owned here: every byte the plain popup carries — roll detail (formula/rolls/total/adjustedTotal),
 // target + hp bytes, crit styling flag, dc/tavern/spell/bardic/empowered passthrough, piercer/savage
 // availability + weaponType, applyResult-derived bytes (finalDamage overwrite on intercept, holyAura),
-// twin/secondary popup bytes incl. the twinTarget* collision the multi handler reuses (:558-566) —
-// pinned AS-AUTHORED, no new bug invented.
+// twin/secondary popup bytes — multi publishes NOTHING since the #941 fix (it used to clobber twinTarget*);
+// the zero-byte multi row pins that honestly.
 // Owned elsewhere (not re-driven): fan-out order, per-target apply payloads, write counts and log notes
 // (.multiTarget #941); MA-0010 grants (.hitClause); base hp/lastAttack resolution (.test.js — its :154
 // already pins the apply args, so the old args test here is cut); min-damage/zero-damage seams
@@ -332,11 +332,11 @@ describe('handlePlainDamage — popup payload bytes', () => {
         expect(await run(longsword())).toMatchObject(bytes);
     });
 
-    // As-authored (:523-531/:558-566): BOTH secondary handlers publish into the SAME twinTarget*
-    // namespace — the multi handler overwrites twin bytes when both are distinct. .multiTarget #941
-    // owns the fan-out ORDER and order-dependent overwrite fold (:181); here the payload bytes for
-    // each lane are pinned without re-driving order. The multi row asserts the field-name collision
-    // honestly as-authored — no new bug needed.
+    // FIXED (#941): the two secondary handlers no longer SHARE the twinTarget* namespace. The twin handler
+    // (:523-531) owns twinTarget* bytes; the multi handler publishes NOTHING into popup (renderer Venn: no
+    // consumer honors any multi-target second-target key, so per the honest-minimal verdict it stops clobbering
+    // twin bytes and invents no keys). .multiTarget #941 owns the fan-out ORDER and the characters-threading
+    // arms; here each lane's payload bytes are pinned without re-driving order.
     const secondaryPopupBytes = [
         {
             label: 'twin npc copies secondary apply bytes with maxHp from the roster',
@@ -363,16 +363,17 @@ describe('handlePlainDamage — popup payload bytes', () => {
             bytes: { twinTargetName: 'Alistair', twinTargetMaxHp: 0 },
         },
         {
-            label: 'quirk as-authored — multi target publishes into the twinTarget* namespace (:558-566)',
+            label: 'multi publishes NO popup bytes — twinTarget* stay absent, no keys invented (#941 flip of the as-authored clobber pin)',
             rosterCreature: { name: 'Orc', type: 'npc', ac: 14, currentHp: 15, maxHp: 15 },
             context: { multiTarget: 'Orc' },
             secondary: { finalDamage: 6, newHp: 8, damageReduced: false },
             runtime: {},
-            bytes: { twinTargetName: 'Orc', twinFinalDamage: 6, twinTargetCurrentHp: 8, twinTargetMaxHp: 15 },
+            bytes: {},
+            absent: ['twinTargetName', 'twinFinalDamage', 'twinTargetCurrentHp', 'twinTargetMaxHp'],
         },
     ];
 
-    it.each(secondaryPopupBytes)('secondary (twin/multi) popup bytes — $label', async ({ rosterCreature, context, secondary, runtime, bytes }) => {
+    it.each(secondaryPopupBytes)('secondary (twin/multi) popup bytes — $label', async ({ rosterCreature, context, secondary, runtime, bytes, absent }) => {
         loadCombatSummary.mockResolvedValue({
             creatures: [roster.creatures[0], rosterCreature],
         });
@@ -387,6 +388,9 @@ describe('handlePlainDamage — popup payload bytes', () => {
 
         const popup = await run(longsword(context));
         expect(popup).toMatchObject(bytes);
+        for (const key of absent || []) {
+            expect(popup).not.toHaveProperty(key);
+        }
         expect(popup.targetName).toBe('Goblin');
         expect(popup.finalDamage).toBe(8);
     });

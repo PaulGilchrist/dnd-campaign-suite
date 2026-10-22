@@ -1,5 +1,5 @@
 import { getCombatContext } from '../rules/combat/damageUtils.js'
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
+// #1074 fix: retired fallback was getRuntimeValue('campaign','activeCreatureName',campaignName) — arity-2 read (useRuntimeState.js:63), campaignName ignored, cross-context bleed.
 
 export { getCombatContext }
 
@@ -26,9 +26,9 @@ function resolveActiveCreatureName(fromApi, campaignName) {
     fromApi.activeCreatureName = fromApi.creatures[0].name
   }
   if (fromApi.activeCreatureName) return
-  const topLevel = getRuntimeValue('campaign', 'activeCreatureName', campaignName)
-  if (topLevel) {
-    fromApi.activeCreatureName = topLevel
+  const cached = getActiveCreatureName(campaignName) // #1074-fix: campaign-keyed cache, was current-context runtime read
+  if (cached) {
+    fromApi.activeCreatureName = cached
   }
 }
 
@@ -56,9 +56,9 @@ export async function loadActiveCreatureName(campaignName) {
       if (fromApi?.activeCreatureName) {
         return fromApi.activeCreatureName
       }
-      const topLevel = getRuntimeValue('campaign', 'activeCreatureName', campaignName)
-      if (topLevel) {
-        return topLevel
+      const cached = getActiveCreatureName(campaignName) // #1074-fix: campaign-keyed cache, was current-context runtime read
+      if (cached) {
+        return cached
       }
     } catch (error) { console.warn('[combatData] Active creature name unavailable from API:', error) }
   }

@@ -33,7 +33,6 @@ import { getCombatSummary, setCombatSummaryCache } from '../../encounters/combat
 import storage from '../../ui/storage.js'
 import { addEntry } from '../../ui/logService.js'
 import {
-    isSpellSummon,
     removeSummonedCreatures,
     stripSummonedFromCombatSummary,
     vanishSummonAtZeroHp,
@@ -56,17 +55,6 @@ const expectNoWrites = (label = '') => {
     expect(setRuntimeValue, `${label}: runtime`).not.toHaveBeenCalled()
     expect(window.dispatchEvent, `${label}: dispatch`).not.toHaveBeenCalled()
 }
-
-describe('isSpellSummon', () => {
-    it('flags only summonSource === "spell"', () => {
-        expect(isSpellSummon({ name: 'Imp', summonSource: 'spell' })).toBe(true)
-        expect(isSpellSummon({ name: 'Dragon', summonSource: 'true_polymorph' })).toBe(false)
-        expect(isSpellSummon({ name: 'Goblin' })).toBe(false)
-        expect(isSpellSummon({})).toBe(false)
-        expect(isSpellSummon(null)).toBe(false)
-        expect(isSpellSummon(undefined)).toBe(false)
-    })
-})
 
 describe('removeSummonedCreatures', () => {
     it('guards invalid args before touching any store, and survives degenerate store shapes', () => {

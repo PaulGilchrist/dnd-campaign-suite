@@ -84,6 +84,7 @@ import { sendBardicInspirationOffensePrompt } from '../../combat/prompts/bardicI
 import { hasBardicInspirationOffense, getBardicInspirationDieSize } from '../../combat/auras/bardicInspirationState.js';
 import { spendResource } from '../../automation/common/resourceCheck.js';
 import { addEntry } from '../../ui/logService.js';
+import { createPipeline } from '../actionPipeline.js';
 
 const CAMPAIGN = 'test-campaign';
 const HOLDER = 'AasimarTest';
@@ -385,10 +386,10 @@ describe('buildBardicInspirationOffenseStep — offense chooser', () => {
   // DECLINE event (still a real player choice) so nothing is left dangling.
   it.each([
     { label: 'offense unavailable → {data:{}}', offense: false, dieSize: 8, raw: { current: 2 }, tracked: null, prompt: false },
-    { label: 'die size missing → null, no prompt', offense: true, dieSize: null, raw: { current: 2 }, tracked: null, prompt: false },
-    { label: 'uses 0, object ledger → null, no prompt', offense: true, dieSize: 8, raw: { current: 0 }, tracked: null, prompt: false },
-    { label: 'uses 0, legacy number ledger → null, no prompt', offense: true, dieSize: 8, raw: 0, tracked: null, prompt: false },
-    { label: 'no ledger anywhere → null, no prompt', offense: true, dieSize: 8, raw: null, tracked: null, prompt: false },
+    { label: 'die size missing → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: null, raw: { current: 2 }, tracked: null, prompt: false },
+    { label: 'uses 0, object ledger → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: { current: 0 }, tracked: null, prompt: false },
+    { label: 'uses 0, legacy number ledger → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: 0, tracked: null, prompt: false },
+    { label: 'no ledger anywhere → {data:{}} (silent skip, never bare null — #1041), no prompt', offense: true, dieSize: 8, raw: null, tracked: null, prompt: false },
     { label: 'object ledger current:2 → prompt fires', offense: true, dieSize: 8, raw: { current: 2 }, tracked: null, prompt: true },
     { label: 'legacy number ledger 3 → prompt fires', offense: true, dieSize: 8, raw: 3, tracked: null, prompt: true },
     { label: 'trackedResources fallback when raw null → prompt fires', offense: true, dieSize: 8, raw: null, tracked: 1, prompt: true },
@@ -409,7 +410,12 @@ describe('buildBardicInspirationOffenseStep — offense chooser', () => {
     if (prompt) {
       window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: BI_PID, used: false } }));
     }
-    await pending;
+    // Shape pin (#1041): EVERY no-prompt arm must be the exact {data:{}}
+    // continue-token — bare null is the pipeline ABORT token (actionPipeline.js:36
+    // `if (result === null) break;`) and would strand rollBaseDamage (subscribes
+    // 'bi:checked') so a hit with exhausted BI rolled no base damage.
+    const result = await pending;
+    expect(result).toEqual({ data: {} });
     expect(hasBardicInspirationOffense).toHaveBeenCalledWith(HOLDER, CAMPAIGN);
     if (prompt) {
       expect(sendBardicInspirationOffensePrompt).toHaveBeenCalledWith(CAMPAIGN, HOLDER, 'Goblin', dieSize, BI_PID);
@@ -466,5 +472,112 @@ describe('buildBardicInspirationOffenseStep — offense chooser', () => {
     expect(spendResource).not.toHaveBeenCalled();
     window.dispatchEvent(new CustomEvent('bardic-inspiration-offense-result', { detail: { promptId: BI_PID, used: false } }));
     await pending;
+  });
+
+  // #1041 consumer-relay pin: the no-die/no-uses arms must RELAY the chain on to
+  // 'bi:checked' (real createPipeline, real biStep, stand-in for rollBaseDamage —
+  // its own lane owns its body, this only pins the seam). Documented outcome shift:
+  // PRE-fix these arms returned bare null, which actionPipeline.js:36
+  // (`if (result === null) break;`) treats as chain ABORT — a BI-exhausted bard's
+  // hit never reached rollBaseDamage. The {data:{}} shape restores the INTENDED
+  // silent-skip parity with the :168 no-offense arm; prompt/accept/decline rows
+  // above are byte-identical pre/post.
+  it.each([
+    ['die size missing', { dieSize: null, raw: { current: 2 } }],
+    ['uses 0', { dieSize: 8, raw: { current: 0 } }],
+  ])('#1041 relay — %s: chain continues past bi:checked to the damage step', async (_label, { dieSize, raw }) => {
+    hasBardicInspirationOffense.mockReturnValue(true);
+    getBardicInspirationDieSize.mockReturnValue(dieSize);
+    runtimeValues({ bardicInspirationUses: raw });
+    const reached = [];
+    const pipeline = createPipeline();
+    pipeline.step(biStep);
+    pipeline.step({
+      name: 'rollBaseDamageStandIn',
+      subscribe: 'bi:checked',
+      emit: 'damage:rolled',
+      handler: () => { reached.push('bi:checked'); return { data: {} }; },
+    });
+    const resumeRef = { current: { existingProp: 'keep' } };
+    await pipeline.run('charger:checked', makeCtx({ targetName: 'Goblin' }), resumeRef);
+    expect(reached).toEqual(['bi:checked']);
+    expect(sendBardicInspirationOffensePrompt).not.toHaveBeenCalled();
+    expect(spendResource).not.toHaveBeenCalled();
+    // Clean terminal exit: no pause envelope left behind, pre-existing state intact.
+    expect(resumeRef.current).toBeNull();
+  });
+});
+
+describe('#1348 return-shape census — every skip/continue arm of all four riders', () => {
+  // Contract (actionPipeline.js:10): handler result is { data?, modal?, popup?, nextEvent? } | null,
+  // and null ABORTS the chain (:36, pinned by actionPipeline.test.js "aborts the chain").
+  // Rider steps must never emit bare null on inert paths — exact-bytes pins below.
+  it.each([
+    {
+      label: 'attackRiderManeuvers: hit, no rider options → :51',
+      run: async () => {
+        getAttackRiderOptions.mockResolvedValue([]);
+        return maneuversStep.handler(makeCtx({ popupHtml: { hit: true } }));
+      },
+      expected: { data: {} },
+    },
+    {
+      label: 'attackRiderManeuvers: miss, no miss riders → :51',
+      run: async () => {
+        getAttackRiderOptionsByContext.mockResolvedValue([]);
+        return maneuversStep.handler(makeCtx({ popupHtml: { hit: false } }));
+      },
+      expected: { data: {} },
+    },
+    {
+      label: 'cunningStrike: lastAttack miss → :100',
+      run: async () => {
+        runtimeValues({ lastAttack: { hit: false } });
+        return csStep.handler(makeCtx());
+      },
+      expected: { data: { sneakDice: 0 } },
+    },
+    {
+      label: 'cunningStrike: hit, no cunning passive → :113',
+      run: async () => csStep.handler(makeCtx({ playerStats: { name: HOLDER, level: 14, automation: { actions: [], passives: [] } } })),
+      expected: { data: { sneakDice: 7 } },
+    },
+    {
+      label: 'charger: no charge passive → :131',
+      run: async () => chargerStep.handler(makeCtx({ attack: { weaponType: 'melee' }, playerStats: { name: HOLDER, automation: { passives: [] } } })),
+      expected: { data: {} },
+    },
+    {
+      label: 'bardicInspirationOffense: no offense feature → :168',
+      run: async () => {
+        hasBardicInspirationOffense.mockReturnValue(false);
+        return biStep.handler(makeCtx());
+      },
+      expected: { data: {} },
+    },
+    {
+      label: 'bardicInspirationOffense: die missing → :174 (#1041 was bare null)',
+      run: async () => {
+        hasBardicInspirationOffense.mockReturnValue(true);
+        getBardicInspirationDieSize.mockReturnValue(null);
+        runtimeValues({ bardicInspirationUses: { current: 2 } });
+        return biStep.handler(makeCtx());
+      },
+      expected: { data: {} },
+    },
+    {
+      label: 'bardicInspirationOffense: uses 0 → :174 (#1041 was bare null)',
+      run: async () => {
+        hasBardicInspirationOffense.mockReturnValue(true);
+        getBardicInspirationDieSize.mockReturnValue(8);
+        runtimeValues({ bardicInspirationUses: { current: 0 } });
+        return biStep.handler(makeCtx());
+      },
+      expected: { data: {} },
+    },
+  ])('$label', async ({ run, expected }) => {
+    const result = await run();
+    expect(result, 'no rider skip-arm may return bare null (abort token)').not.toBeNull();
+    expect(result).toEqual(expected);
   });
 });

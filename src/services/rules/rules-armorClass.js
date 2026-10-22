@@ -56,7 +56,7 @@ function getMageArmorBuff(playerStats) {
     return buffs.find(b => b.effect === 'mage_armor') || null;
 }
 
-function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions }) {
+function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, shield, addedBonus, dexterity, charisma, contributions }) {
     const mageArmor = getMageArmorBuff(playerStats);
     if (mageArmor) {
         const baseAc = mageArmor.baseAc || 13;
@@ -79,7 +79,14 @@ function computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armor
         }
         return armorClass;
     }
-    if (is2024(playerStats, playerSummary) && playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance') {
+    // 2024 disk law (public/data/2024/classes.json 'Dazzling Footwork'):
+    // "While you aren't wearing armor or wielding a shield ... Unarmored Defense.
+    // Your base Armor Class equals 10 plus your Dexterity and Charisma modifiers."
+    // Mirror the applyUnarmoredDefense2024 gate (:158, `&& !armorName && !shield`):
+    // with a shield equipped the Dance branch must not apply — fall through to the
+    // plain unarmored lane below so applyShield (:241) stacks on 10 + Dex, not on
+    // the Dance formula (#1249: was 10+Dex+Cha, then +Shield 2 = 18).
+    if (is2024(playerStats, playerSummary) && playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance' && !shield) {
         replaceContributions(contributions, [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`]);
         return 10 + dexterity.bonus + charisma.bonus + addedBonus;
     }
@@ -226,7 +233,11 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
 
     const addedBonus = computeAddedBonus(allEquipment, playerStats, playerSummary, armorName, contributions);
 
-    let armorClass = computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, addedBonus, dexterity, charisma, contributions });
+    // Shield lookup hoisted above computeBaseArmorClass so the College of Dance
+    // branch can gate on it (#1249) — same `shield` const feeds applyShield below.
+    const shield = playerStats.inventory.equipped.find(item => parseMagicItemName(item).baseName === 'Shield');
+
+    let armorClass = computeBaseArmorClass({ allEquipment, playerStats, playerSummary, armorName, shield, addedBonus, dexterity, charisma, contributions });
 
     // 5e: Medium Armor Master – increase medium armor dex bonus cap from 2 to 3 when Dex >= 16
     if (!is2024(playerStats, playerSummary)) {
@@ -237,7 +248,6 @@ export function getArmorClass(allEquipment, playerStats, playerSummary) {
         }
     }
 
-    const shield = playerStats.inventory.equipped.find(item => parseMagicItemName(item).baseName === 'Shield');
     armorClass = applyShield(armorClass, playerStats.inventory.equipped, shield, contributions);
 
     if (!is2024(playerStats, playerSummary)) {

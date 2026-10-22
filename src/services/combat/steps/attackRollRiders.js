@@ -171,7 +171,7 @@ export function buildBardicInspirationOffenseStep() {
       const raw = getRuntimeValue(ctx.playerStats.name, 'bardicInspirationUses', ctx.campaignName);
       const uses = (typeof raw === 'object' && raw !== null) ? raw.current
         : (raw != null ? Number(raw) : (ctx.playerStats?._trackedResources?.bardicInspirationUses?.current ?? 0));
-      if (!dieSize || uses <= 0) return null;
+      if (!dieSize || uses <= 0) return { data: {} };
 
       const targetName = ctx.targetName || 'unknown target';
       const promptId = `bi-offense-${utils.guid()}`;

@@ -303,7 +303,7 @@ function buildThrownShortSwordAttacks(ctx) {
     for (const equippedName of playerStats.inventory.equipped) {
         if (!equippedName || typeof equippedName !== 'string') continue;
         const { weapon } = resolveWeapon(allEquipment, equippedName);
-        if (weapon && weapon.name === 'Short Sword' && weapon.weapon_range === 'Melee') {
+        if (weapon && weapon.name === 'Shortsword' && weapon.weapon_range === 'Melee') {
             attacks.push(buildWeaponAttack({
                 weapon,
                 weaponName: equippedName,

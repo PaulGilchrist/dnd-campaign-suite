@@ -1,4 +1,14 @@
-import { executeHandler } from '../../automation/index.js';
+// compulsionService — Compulsion (SP-027) confirm-side service. Live lane (#1348, 2026-10-22):
+// spellGates.gateCompulsion → pendingCompulsion → handleCompulsionConfirm → applyCompulsionEffect.
+// The former triggerCompulsion export was DEAD (zero production callers; the real sheet cast never
+// builds a type-'compulsion' action envelope — disk spell rows carry no automation.type) and also
+// double-fetched getCombatContext (:11/:36) and stamped app-fabricated automation.advantage
+// (old :37/:48). Disk law (public/data/spells.json + 2024/spells.json, read 2026-10-22): the
+// Compulsion prose grants NO advantage on either ruleset — straight WIS save; 5e prose adds only
+// "A target automatically succeeds on this saving throw if it can't be charmed" (immunity
+// adjudication, downstream at the prompt/GM seam — not an advantage flag). The live stamp below is
+// advantage:false / disadvantage:false, matching the prose. compulsionHandler.js stays registered
+// in HANDLER_MAP (automation/index.js:219/:548) but now has no in-repo envelope producer.
 import { getCombatContext } from '../combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { createSaveListener } from '../../automation/common/savePrompt.js';
@@ -6,58 +16,8 @@ import { addEntry } from '../../ui/logService.js';
 import { addExpiration } from '../effects/expirations.js';
 import { addCondition } from '../../combat/conditions/conditionSaveService.js';
 
-async function resolveCompulsionTarget(metaCtx, campaignName) {
-    if (metaCtx?.targetName) return metaCtx.targetName;
-    const cs = await getCombatContext(campaignName);
-    if (cs?.creatures && cs.creatures.length > 0) {
-        return cs.creatures[0].name;
-    }
-    return null;
-}
-
 function defaultSpellSaveDc(playerStats) {
     return playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-}
-
-function targetInCombat(cs, targetName, casterName) {
-    return cs?.creatures?.some(c => c.name === targetName && c.name !== casterName) ?? false;
-}
-
-export async function triggerCompulsion(spell, metaCtx, playerStats, campaignName, mapName) {
-    const isCompulsion = (spell.name || '').toLowerCase() === 'compulsion';
-    if (!isCompulsion) return null;
-
-    const targetName = await resolveCompulsionTarget(metaCtx, campaignName);
-    if (!targetName) {
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Compulsion', description: 'No target selected for Compulsion.' } };
-    }
-
-    // Check if caster/target are in combat to determine if target gets advantage on save
-    const cs = await getCombatContext(campaignName);
-    const targetInCombatAdvantage = targetInCombat(cs, targetName, playerStats.name);
-
-    const spellSaveDc = metaCtx?.spellSaveDc || defaultSpellSaveDc(playerStats);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 4;
-
-    const action = {
-        name: 'Compulsion',
-        automation: {
-            type: 'compulsion',
-            saveDc: spellSaveDc,
-            targetName: targetName,
-            advantage: targetInCombatAdvantage,
-        },
-        spell,
-        spellSlotLevel: slotLevel,
-    };
-
-    try {
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
-        return result;
-    } catch (e) {
-        console.error('[compulsionService] Failed to execute Compulsion handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Compulsion', description: `Failed to execute Compulsion.` } };
-    }
 }
 
 export async function applyCompulsionEffect(spell, playerStats, campaignName, mapName, targetNames) {

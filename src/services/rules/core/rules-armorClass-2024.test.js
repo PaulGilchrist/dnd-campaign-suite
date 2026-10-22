@@ -121,24 +121,48 @@ describe('rules.getArmorClass — 2024 ruleset', () => {
     });
   });
 
+  // FIXED #1249: College of Dance + shield. Disk: Dazzling Footwork requires
+  // "aren't wearing armor or wielding a shield". computeBaseArmorClass now gates
+  // the Dance branch on !shield (mirroring applyUnarmoredDefense2024:158), so a
+  // shielded dancer falls through to the plain unarmored lane and the shield
+  // stacks there: 10 + Dex 2 + Shield 2 = 14 (pre-fix: dance 10+2+4 = 16, then
+  // the :241 shield lane stacked +2 on the Dance formula for an illegal 18).
+  describe('College of Dance shield gate (#1249)', () => {
+    it('shield blocks the Dance formula: falls to unarmored 10 + Dex + Shield = 14', () => {
+      const playerStats = stats2024({
+        cls: { name: 'Bard', subclass: { name: 'College of Dance' } },
+        abilities: [{ name: 'Dexterity', bonus: 2 }, { name: 'Charisma', bonus: 4 }],
+        equipped: ['Shield']
+      });
+
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, playerStats);
+
+      expect(ac).toBe(14);
+      expect(formula).toContain('Unarmored AC (10) + Dexterity Bonus (2)');
+      expect(formula).toContain('Shield (2)');
+      expect(formula).not.toContain('Charisma Bonus');
+    });
+
+    it('magic shield also blocks the Dance branch (parseMagicItemName gate): 10 + Dex 2 + Shield 2 + 1 = 15', () => {
+      const playerStats = stats2024({
+        cls: { name: 'Bard', subclass: { name: 'College of Dance' } },
+        abilities: [{ name: 'Dexterity', bonus: 2 }, { name: 'Charisma', bonus: 4 }],
+        equipped: ['+1 Shield']
+      });
+
+      const [ac, formula] = rules.getArmorClass(ARMOR_CATALOG, playerStats);
+
+      expect(ac).toBe(15);
+      expect(formula).not.toContain('Charisma Bonus');
+    });
+  });
+
   // QUIRK PINS: 2024 unarmored defense x shield. The 2024 disk texts differ
   // feature-by-feature, and the shared shield lane (applyShield at :241 runs
   // BEFORE applyUnarmoredDefense2024) honors neither correctly. Reported as
   // SOURCE BUGS; these rows pin current behavior so any change is deliberate.
   describe('QUIRK PINS: shield interaction with 2024 unarmored defenses', () => {
     it.each([
-      {
-        // Disk: Dazzling Footwork requires "aren't wearing armor or wielding a
-        // shield". computeBaseArmorClass:82 checks armor only — shield stacks on
-        // top of the dance AC. Rules-correct would be 10 + 2 + shield 2 = 14.
-        label: 'College of Dance: shield wrongly stacks (rules-correct 14, actual 18)',
-        playerStats: stats2024({
-          cls: { name: 'Bard', subclass: { name: 'College of Dance' } },
-          abilities: [{ name: 'Dexterity', bonus: 2 }, { name: 'Charisma', bonus: 4 }],
-          equipped: ['Shield']
-        }),
-        ac: 18
-      },
       {
         // Disk: Barbarian UD applies "while you aren't wearing any armor" (shield
         // allowed). applyUnarmoredDefense2024:174 replaces armorClass — which

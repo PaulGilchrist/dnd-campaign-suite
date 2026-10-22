@@ -448,7 +448,13 @@ async function revertPolymorphIfBufferDepleted(creature, campaignName) {
 }
 
 function applyPlayerHpDamage({ creature, damageAfterTempHp, options, campaignName, rawDamage, finalDamage }) {
-  const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
+  // #1185 FIXED: pass campaignName for arity CONSISTENCY with siblings
+  // (:432/:443/:753). Honest caveat: getRuntimeValue is arity-2
+  // (useRuntimeState.js:63) — this 3rd arg is structurally discarded, exactly
+  // as at every sibling. The store is keyed by characterKey only, so true
+  // cross-campaign isolation is the deferred infra item (#1520 unify call);
+  // the shadow-read risk is store-wide, never site-specific.
+  const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints', campaignName);
   if (storedCurrentHp == null) {
     const store = getStore(creature.name);
     const storeKeys = [...store.keys()];
@@ -524,10 +530,12 @@ function recordProjectedWardDamage({ creature, actualDamageTaken, isSecondary, a
   }, campaignName);
 }
 
+// Strip one condition key (case-insensitive) from the working list and log the
+// removal as its own fact. Writes NOTHING — the caller owns the single merged
+// activeConditions write (#1207, fix#27 §39 canon); logs stay per-condition.
 function removeConditionFromList({ creature, conditions, conditionKey, displayName, reason, campaignName }) {
-  if (!conditions.some(c => String(c).toLowerCase() === conditionKey)) return;
+  if (!conditions.some(c => String(c).toLowerCase() === conditionKey)) return conditions;
   const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
-  setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
   addEntry(campaignName, {
     type: 'condition',
     action: 'removed',
@@ -536,12 +544,18 @@ function removeConditionFromList({ creature, conditions, conditionKey, displayNa
     reason,
     timestamp: Date.now(),
   }).catch((e) => { console.error("[applyDamage] Error:", e); });
+  return filtered;
 }
 
 // Frightened always ends on damage; Charmed ends on damage unless the target is
 // dominated (dominated targets get a repeat save instead — see handleDominateRepeatSave).
-// Both removals filter the SAME single-read condition list, preserving the original
-// last-write-wins semantics when a creature holds both conditions at once.
+// fix#27 §39 canon (mirrors useInitiativeEffects.js:178-184 / concentrationService.js:221-227):
+// both removals accumulate against the SINGLE snapshot read below and land in ONE
+// merged activeConditions write. The old per-condition filter-AND-write pair shared
+// that one stale read, so with frightened+charmed coexisting the later charmed-write
+// re-added the Frightened the frightened-write had just removed (last-writer-wins
+// resurrection, #1207). Per-condition removal LOGS stay separate entries (distinct
+// facts); the ARRAY gets one write; zero writes when nothing breaks (#1512 dirty-guard parity).
 function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaignName) {
   // SP-069: Hypnotic Pattern ends for an affected creature that takes damage —
   // strip its charmed/incapacitated/speed_zero trio BEFORE the generic reads so
@@ -550,10 +564,13 @@ function removeCombatConditionsOnDamage(creature, domination, isPlayer, campaign
     breakHypnoticPatternOnDamage(creature.name, campaignName);
   }
   const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
-  removeConditionFromList({ creature, conditions, conditionKey: 'frightened', displayName: 'Frightened', reason: 'took damage', campaignName });
+  let remaining = removeConditionFromList({ creature, conditions, conditionKey: 'frightened', displayName: 'Frightened', reason: 'took damage', campaignName });
   if (!domination) {
     const reason = isPlayer ? 'took damage (Friends)' : 'took damage (Charm)';
-    removeConditionFromList({ creature, conditions, conditionKey: 'charmed', displayName: 'Charmed', reason, campaignName });
+    remaining = removeConditionFromList({ creature, conditions: remaining, conditionKey: 'charmed', displayName: 'Charmed', reason, campaignName });
+  }
+  if (remaining !== conditions) {
+    setRuntimeValue(creature.name, 'activeConditions', remaining, campaignName);
   }
 }
 

@@ -676,7 +676,17 @@ export function buildToppleMasteryStep() {
       const choiceMast = available.choiceMasteries || [];
       const hasTopple = allMasteries.includes('Topple') || choiceMast.includes('Topple');
       if (!hasTopple) return { data: {} };
-      if (available.baseMastery !== 'Topple') return { data: {} };
+      // FIX #1037: the old base-only gate (available.baseMastery !== 'Topple') made the
+      // union above dead code — Topple granted via extraMasteries (weapon_mastery_choice,
+      // automationPassives.js:70-76) was also excluded from auto-apply (:575) and any modal,
+      // so it vanished silently. The gate now TRUSTS hasTopple, mirroring the cleave sibling's
+      // union gate (:529-530). One dedup: choiceMasteries-granted Topple is normally resolved
+      // at the tacticalMaster choice modal, whose confirm lane prompts the CON save
+      // (useCharActionsCleave.js:170-171) before the chain resumes here — the runner merges
+      // the step's _tacticalMasterPending latch onto this ctx at the pause
+      // (actionPipeline.js:38, resume lane pins the latch intact), so a choice-only grant
+      // deferred to the modal never double-prompts (a Push pick must not force a Topple save).
+      if (!allMasteries.includes('Topple') && ctx._tacticalMasterPending) return { data: {} };
 
       const toppleTargetName = lastAttack.targetName;
       const { abilityName, saveDc } = computeToppleSaveDc(ctx, lastAttack);

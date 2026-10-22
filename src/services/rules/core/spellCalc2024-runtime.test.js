@@ -146,28 +146,42 @@ describe('spellCalc2024-runtime', () => {
       expect(getSpellAbilities(allSpells, stats).spells).toEqual([]);
     });
 
-    it('improved_illusions grants Minor Illusion as an Always cantrip row only when the passive is present', () => {
-      const allSpells = [makeSpell('Minor Illusion', 0)];
+    it('improved_illusions stamps Minor Illusion as an Always \'1 bonus action\' row only when the passive is present (#1272)', () => {
+      const allSpells = [makeSpell('Minor Illusion', 0), makeSpell('Fire Bolt', 0)];
       const stats = makePlayerStats();
       stats.automation = { passives: [{ type: 'improved_illusions' }] };
 
+      // Grant-when-absent arm: disk law classes.json:13537 — Improved Illusions holder
+      // can "cast [Minor Illusion] as Bonus Action". The upgrade must reach the FINAL
+      // sheet row bytes, both when the row has to be granted (fixed 2026-10-22: the
+      // pre-remap stamp was wiped by remapSpellRow's DB clone — #1272).
       const granted = getSpellAbilities(allSpells, stats);
-      expect(granted.spells.find(s => s.name === 'Minor Illusion')).toMatchObject({ level: 0, prepared: 'Always' });
+      expect(granted.spells.find(s => s.name === 'Minor Illusion')).toMatchObject({
+        level: 0, prepared: 'Always', casting_time: '1 bonus action',
+      });
 
-      // Already known: still exactly one Always row. NOTE: casting_time stays '1 action' —
-      // applyImprovedIllusions's '1 bonus action' stamp (spellCalc2024.js:355) is wiped by
-      // the finalizeSpellRows detail remap; pinned here so a fix that restores the upgrade
-      // fails loudly (reported as a source defect, not faked green).
-      stats.spells = ['Minor Illusion'];
+      // Already-known arm: exactly one Always row, upgraded post-remap; a sibling
+      // cantrip row is byte-intact at the DB casting_time (other stamps unaffected).
+      stats.spells = ['Minor Illusion', 'Fire Bolt'];
       const known = getSpellAbilities(allSpells, stats);
-      const knownRow = known.spells.find(s => s.name === 'Minor Illusion');
       expect(known.spells.filter(s => s.name === 'Minor Illusion').length).toBe(1);
-      expect(knownRow).toMatchObject({ prepared: 'Always', casting_time: '1 action' });
+      expect(known.spells.find(s => s.name === 'Minor Illusion')).toMatchObject({
+        prepared: 'Always', casting_time: '1 bonus action',
+      });
+      expect(known.spells.find(s => s.name === 'Fire Bolt')).toMatchObject({
+        prepared: 'Always', casting_time: '1 action',
+      });
 
       // Negative: no passive and not known — never granted.
       stats.spells = [];
       stats.automation = {};
       expect(getSpellAbilities(allSpells, stats).spells).toEqual([]);
+
+      // Negative: non-holder byte-intact — known rows keep DB casting_time bytes.
+      stats.spells = ['Minor Illusion', 'Fire Bolt'];
+      const plain = getSpellAbilities(allSpells, stats);
+      expect(plain.spells.find(s => s.name === 'Minor Illusion').casting_time).toBe('1 action');
+      expect(plain.spells.find(s => s.name === 'Fire Bolt').casting_time).toBe('1 action');
     });
   });
 });

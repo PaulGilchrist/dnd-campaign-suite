@@ -79,7 +79,8 @@ describe('buildAttackContextForDamage (no map)', () => {
         damageUtils.getResistanceNotice.mockReturnValue(null);
         damageUtils.getAttackerTargetName.mockReturnValue(undefined);
         mapsService.loadMapData.mockResolvedValue(null);
-        npcsService.loadNPCs.mockResolvedValue([]);
+        // Wire-envelope shape kept honest even though the no-map branch never calls loadNPCs (#1181).
+        npcsService.loadNPCs.mockResolvedValue({ npcs: [] });
         runtimeState.getRuntimeValue.mockReturnValue(null);
     });
 

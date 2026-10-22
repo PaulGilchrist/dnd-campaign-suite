@@ -103,7 +103,10 @@ describe('useMapLoader - API & persistence', () => {
     it('exposes setters whose changes persist to saveMapData as one exact full snapshot', async () => {
         const { result } = await renderLoadedHook();
 
-        // Loading a map flushes the loaded state through the save envelope exactly once.
+        // Loading a map flushes the loaded state through the save envelope
+        // exactly once — deterministic: the persistence effect's guard is the
+        // `loading` STATE (in its deps), flipped in the same update batch as
+        // the loaded state, so the flush cannot miss (#800).
         expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
         expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot());
         mapsService.saveMapData.mockClear();
@@ -160,6 +163,21 @@ describe('useMapLoader - API & persistence', () => {
         expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, MAP, savedSnapshot({
             travelState: { travelMode: 'active', destination: 'City A' },
         }));
+    });
+
+    // #800 RACE-DETERMINISTIC pin: every fresh mount of an existing map
+    // flushes EXACTLY ONE save with the exact loaded snapshot — across
+    // repeated mounts in this single invocation, no once-or-not-at-all.
+    it('flushes exactly one loaded snapshot on each of 5 repeated mounts', async () => {
+        for (let i = 0; i < 5; i++) {
+            mapsService.saveMapData.mockClear();
+            const { unmount } = await renderLoadedHook();
+
+            const calls = mapsService.saveMapData.mock.calls;
+            expect(calls, `mount ${i} save count`).toHaveLength(1);
+            expect(calls[0], `mount ${i} loaded snapshot envelope`).toEqual([CAMPAIGN, MAP, savedSnapshot()]);
+            unmount();
+        }
     });
 
     it('ignores a load that resolves after unmount and never saves', async () => {

@@ -15,12 +15,29 @@ function NpcChangeName({ entry }) {
   );
 }
 
-function PlayerChangeName({ entry, isDamage, isTemp }) {
+// Label by sign with an honest zero arm (#880): delta<0 damage now RENDERS the
+// sourceName/note bytes producers author onto it (multiTargetHandler.js:129-130
+// 'Fire Bolt (multi-target spread)' style, damageReductionHandler.js:298-299 —
+// the old !isDamage guards swallowed them). delta===0 is legitimate in the
+// producer census — heals clamped to 0 at full HP (healingRoll.js logHealingToSSE
+// 'Already at full HP' path, healService.js:83, spellCast execution/index.js
+// applyMaxHeal/applyRolledHeal) and zero damage from full resistance
+// (handlePlainDamage.js:1136 -(totalDamageDealt)) — so it renders neutral text,
+// never 'Healed'/'Takes Damage' with a 0 byte. Family voice: Title-Case outcome
+// labels ('Temporary Hit Points', 'Brought Back to Life').
+function PlayerChangeName({ entry, isDamage, isZero, isTemp }) {
+  const label = isDamage
+    ? (entry.sourceName ? `Takes Damage (${entry.sourceName})` : 'Takes Damage')
+    : isZero
+      ? (entry.sourceName ? `No HP Change (${entry.sourceName})` : 'No HP Change')
+      : isTemp
+        ? 'Temporary Hit Points'
+        : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed');
   return (
     <>
       {entry.isUnconscious && 'Knocked Unconscious — '}
-      {isDamage ? 'Takes Damage' : (isTemp ? 'Temporary Hit Points' : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed'))}
-      {entry.note && !isDamage && <span className="log-dice-formula">{entry.note}</span>}
+      {label}
+      {entry.note && <span className="log-dice-formula">{entry.note}</span>}
       {entry.maximizeHealingDice && !isDamage && ' — Dice maximized by Supreme Healing'}
     </>
   );
@@ -71,17 +88,22 @@ function PlayerHpDetails({ entry, isDamage, isTemp }) {
 
 export function HpChangeEntry({ entry }) {
   const isDamage = entry.delta < 0;
+  const isZero = entry.delta === 0;
   const isNpc = !!entry.threshold;
   const isTemp = entry.isTempHp;
+  // Tri-state polarity (#880/#877 house shape): zero delta is neither red damage
+  // nor green healing — neutral cls/icon so '0 HP' never rides the heal chrome.
+  const polarityCls = isDamage ? 'log-hp-damage' : isZero ? 'log-hp-neutral' : isTemp ? 'log-temp-hp' : 'log-healing';
+  const iconCls = isDamage ? 'fa-heart-crack' : isZero ? 'fa-circle-info' : isTemp ? 'fa-shield' : 'fa-heart';
   return (
-    <div className={`log-entry log-hp-change ${isDamage ? 'log-hp-damage' : isTemp ? 'log-temp-hp' : 'log-healing'}`}>
+    <div className={`log-entry log-hp-change ${polarityCls}`}>
       <div className="log-entry-header">
         <span className="log-icon">
-          <i className={`fas ${isDamage ? 'fa-heart-crack' : isTemp ? 'fa-shield' : 'fa-heart'}`}></i>
+          <i className={`fas ${iconCls}`}></i>
         </span>
         <span className="log-character">{entry.targetName}</span>
         <span className="log-name">
-          {isNpc ? <NpcChangeName entry={entry} /> : <PlayerChangeName entry={entry} isDamage={isDamage} isTemp={isTemp} />}
+          {isNpc ? <NpcChangeName entry={entry} /> : <PlayerChangeName entry={entry} isDamage={isDamage} isZero={isZero} isTemp={isTemp} />}
         </span>
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>

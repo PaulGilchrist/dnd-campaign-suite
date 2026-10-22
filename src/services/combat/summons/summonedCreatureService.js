@@ -5,10 +5,6 @@ import storage from '../../ui/storage.js';
 
 const SUMMONED_EFFECT = 'summoned';
 
-export function isSpellSummon(creature) {
-    return Boolean(creature && creature.summonSource === 'spell');
-}
-
 // SP-114: "The creature disappears when it drops to 0 Hit Points" — called by the
 // damage pipeline (applyDamage) and the GM initiative-card HP setter the moment a
 // spell-summoned cs combatant hits 0. Mutates combatSummary in place so the caller's

@@ -6,16 +6,17 @@
 // falsy-field suppression asserting the surviving sibling byte (#842), and
 // cross-leg field suppression.
 // CUT (owners cited): container type-dispatch → LogEntryRendering.test.jsx (#876,
-// queued NEXT); producer payload bytes (#871 encounter entries: EncounterBuilder.jsx:305
-// action:'joined'; useLootHandlers.js:58 and autoRewardService.js:59 action:'loot_awarded'
+// queued NEXT); producer payload bytes (#871 encounter entries: EncounterBuilder.jsx:315
+// action:'joined'; useLootHandlers.js:60 and autoRewardService.js:61 action:'loot_awarded'
 // — autoRewardService owns the award-number payloads, we only pin how they render).
 // Family-standard setup (useLog fake, zero-network, zero added mocks) from
 // log-test-utils.jsx; #876 rule: fixed timestamps, never assert Date.now() output.
 // Old→new map: started-core(1)+timestamp(1)+completed-core(1) → polarityMatrix;
 // monster-list bytes → startLegDetails; xp+loot bytes → endLegDetails;
 // hide-monsters(1)+hide-xp(1)+hide-loot(1) → falsyMatrix; NEW: cross-leg
-// suppression, exact separator/nbsp bytes, producer action fall-through legs.
-import { beforeEach } from 'vitest';
+// suppression, exact separator/nbsp bytes, #878-fix presentation-map legs
+// (joined/loot_awarded own legs, enum-cover #1348, UNKNOWN + console.error).
+import { beforeEach, vi } from 'vitest';
 import { enc, q, setup, beforeEachSetup } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
@@ -27,16 +28,17 @@ describe('Log > EncounterEntry', () => {
     beforeEachSetup();
   });
 
-  // Only the literal 'started' selects the start leg. Real producers emit
-  // 'joined' (EncounterBuilder.jsx:307) and 'loot_awarded' (useLootHandlers.js:60,
-  // autoRewardService.js:61); BOTH non-'started' actions fall through to the
-  // completed leg — 'joined' renders "Encounter Completed" with a trophy
-  // (pinned honestly — SOURCE BUGS).
+  // #878 FIX: binary isStart ternary replaced by ENCOUNTER_PRESENTATION map covering
+  // the full producer enum census — 'joined' (EncounterBuilder.jsx:315) and
+  // 'loot_awarded' (useLootHandlers.js:60, autoRewardService.js:61) no longer fall
+  // through to the completed leg. Row2 flipped from the honest-broken pin
+  // ('log-encounter-end' + 'fa-trophy' + 'Encounter Completed') to the fixed bytes.
+  // started/completed leg bytes byte-intact from the pre-fix pin.
   it.each([
     ['started', 'log-encounter-start', 'fa-skull', 'Encounter Started'],
-    ['joined', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
+    ['joined', 'log-encounter-joined', 'fa-right-to-bracket', 'Encounter Joined'], // #878-fix (was end+trophy+Completed)
     ['completed', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
-    ['loot_awarded', 'log-encounter-end', 'fa-trophy', 'Encounter Completed'],
+    ['loot_awarded', 'log-encounter-rewards', 'fa-coins', 'Loot Awarded'], // #878-fix (was end+trophy+Completed)
   ])('action "%s" renders the %s leg: class, icon, title, fixed-epoch time', (action, legCls, iconCls, title) => {
     setup(Log, [enc({ timestamp: TS, action })]);
     expect(q('.log-entry')).toHaveClass('log-entry', 'log-encounter', legCls);
@@ -50,6 +52,65 @@ describe('Log > EncounterEntry', () => {
     expect(q('.log-encounter-name').textContent).toBe('Orc Ambush');
     expect([...document.querySelectorAll('.log-encounter-monsters .log-encounter-monster')].map((n) => n.textContent))
       .toEqual(['Gob x4,\u00a0', 'Troll\u00a0']);
+  });
+
+  // #878: joined rows (EncounterBuilder.jsx:315 payload: encounterName + monsters)
+  // render the roster on the join leg and NEVER the completion trophy, XP, or loot.
+  it('joined leg renders exact roster bytes and suppresses completion trophy/xp/loot', () => {
+    setup(Log, [enc({ timestamp: TS, action: 'joined', encounterName: 'Orc Ambush', monsters: ['1x Goblin', '2x Troll'], xpPerChar: 750, lootItems: ['Sword'] })]);
+    expect(q('.log-entry')).toHaveClass('log-encounter-joined');
+    expect(q('.log-name').textContent).toBe('Encounter Joined');
+    expect([...document.querySelectorAll('.log-encounter-monsters .log-encounter-monster')].map((n) => n.textContent))
+      .toEqual(['1x Goblin,\u00a0', '2x Troll\u00a0']);
+    expect(q('.log-encounter .log-icon i')).not.toHaveClass('fa-trophy');
+    expect(q('.log-encounter .log-icon i')).toHaveClass('fa-right-to-bracket');
+    expect(q('.log-encounter-xp')).toBeNull();
+    expect(q('.log-encounter-loot')).toBeNull();
+  });
+
+  // #878: loot_awarded rows (useLootHandlers.js:60 / autoRewardService.js:61 payload:
+  // xpPerChar + lootItems) render the rewards leg with exact bytes, no roster.
+  it('loot_awarded leg renders exact xp/loot bytes and suppresses the roster', () => {
+    const { container } = setup(Log, [enc({ timestamp: TS, action: 'loot_awarded', encounterName: 'Combat', xpPerChar: 27, lootItems: ['a pouch of 25 gp'] })]);
+    expect(q('.log-name').textContent).toBe('Loot Awarded');
+    expect(q('.log-encounter-xp i')).toHaveClass('fa-star');
+    expect(q('.log-encounter-xp').textContent).toBe('\u00a027 XP per character');
+    expect([...container.querySelectorAll('.log-encounter-loot .log-encounter-loot-item')].map((n) => n.textContent))
+      .toEqual(['a pouch of 25 gp']);
+    expect(container.querySelector('.log-encounter-monsters')).toBeNull();
+  });
+
+  // #878 enum-cover (#1348): every action the producers can emit (plus the defensive
+  // UNKNOWN arm) renders a mutually distinguishable label/icon/class triple — no two
+  // rows share all three bytes.
+  it.each([
+    ['started', 'Encounter Started', 'fa-skull', 'log-encounter-start'],
+    ['joined', 'Encounter Joined', 'fa-right-to-bracket', 'log-encounter-joined'],
+    ['completed', 'Encounter Completed', 'fa-trophy', 'log-encounter-end'],
+    ['loot_awarded', 'Loot Awarded', 'fa-coins', 'log-encounter-rewards'],
+    ['quantum-tunneled', 'Encounter Update', 'fa-circle-info', 'log-encounter-neutral'],
+  ])('enum-cover: action "%s" is distinguishable (%s / %s)', (_action, title, iconCls, legCls) => {
+    setup(Log, [enc({ timestamp: TS, action: _action })]);
+    expect(q('.log-entry')).toHaveClass('log-encounter', legCls);
+    expect(q('.log-name').textContent).toBe(title);
+    expect(q('.log-encounter .log-icon i')).toHaveClass(iconCls);
+  });
+
+  // Mirrors the #876/#877 house pattern (LogConditionEntry.jsx:32-35): an unknown
+  // action logs loudly and renders the neutral fallback — never silently
+  // 'Encounter Completed' + trophy.
+  it('unknown action logs console.error and renders the neutral fallback — never a silent "Encounter Completed"', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { container } = setup(Log, [enc({ timestamp: TS, action: 'quantum-tunneled', xpPerChar: 750, lootItems: ['Sword'], monsters: ['Troll'] })]);
+    expect(q('.log-entry')).toHaveClass('log-encounter-neutral');
+    expect(q('.log-entry')).not.toHaveClass('log-encounter-end');
+    expect(q('.log-icon i')).toHaveClass('fa-circle-info');
+    expect(q('.log-name')).toHaveTextContent('Encounter Update');
+    expect(container.querySelector('.log-encounter-monsters')).toBeNull();
+    expect(container.querySelector('.log-encounter-xp')).toBeNull();
+    expect(container.querySelector('.log-encounter-loot')).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('quantum-tunneled'), expect.anything());
+    errorSpy.mockRestore();
   });
 
   it('end leg renders exact XP byte with star icon and exact ordered loot item bytes', () => {

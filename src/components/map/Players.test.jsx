@@ -146,10 +146,6 @@ describe('Players', () => {
         }
     });
 
-    // FIXME: source bug — usePlayerDragging sets dragging={playerId,...} but
-    // Players.jsx gates the 'dragging' class on dragging.creatureId (legacy field
-    // the app never produces), so the drag feedback in Map.css never applies.
-    // Source should check dragging.playerId; leaving this test failing to guard it.
     it('marks the token being dragged, combined with selection', () => {
         const { container } = renderComponent({
             dragging: { playerId: 'player-1', pointerId: 1 },

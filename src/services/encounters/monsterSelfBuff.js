@@ -58,13 +58,41 @@ function selfBuffDurationNote(rounds) {
   return `${rounds} rounds (${minutes} minute${minutes === 1 ? '' : 's'})`;
 }
 
+// Refusal-slug derivation shared by the already-active refusal log AND the
+// grant-log latch promise (§278 producer vocabulary, per-row): Ghost's row
+// name "Ethereality" → ethereality_refused, Succubus/Incubus's "Etherealness"
+// → etherealness_refused (`_refused` suffix appended by each caller). One
+// derivation, zero divergence (#1145).
+function selfBuffRefusalSlug(action, effectKey) {
+  return String(action?.name || effectKey || 'self_buff').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+// #1145: ethereal grant prose derived from the GRANTING monster's own disk
+// row — the shared branch used to hardcode "the ghost enters the Border
+// Ethereal" and promise an `ethereality_refused` latch for ALL ethereal
+// grants, misnaming the Succubus/Incubus fiend row (disk: "The fiend
+// magically enters the Ethereal Plane from the Material Plane, or vice
+// versa"; actual refusal slug etherealness_refused, proven @press-2).
+// Subject noun + planar boundary read off the row description; the Ghost
+// lane's pinned bytes ("the ghost … Border Ethereal") stay byte-identical —
+// that row legitimately says ghost.
+function etherealGrantNote({ action, effectKey }) {
+  const desc = String(action?.description || '');
+  const subject = ((/\bthe\s+([a-z]+)/i.exec(desc) || [])[1] || 'creature').toLowerCase();
+  const border = /\bBorder Ethereal\b/.test(desc);
+  const boundary = border ? 'Border Ethereal' : 'Ethereal Plane';
+  const origin = /from the Material Plane, or vice versa/i.test(desc) ? ' from the Material Plane, or vice versa' : '';
+  const sight = border ? 'visible on the Material Plane while on the Border Ethereal and vice versa; ' : '';
+  return `the ${subject} enters the ${boundary}${origin} — ${sight}plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the \`${selfBuffRefusalSlug(action, effectKey)}_refused\` / already_ethereal latch.`;
+}
+
 export function buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }) {
   const effectNote = effectKey === 'enlarged'
     ? 'damage dice on Strength-based weapon attacks doubled by the attack-damage consumer. STR checks/saves advantage and rest-rearm are GM-enforced (§70 advisory).'
     : effectKey === 'bolstered'
       ? `te \`bolstered\` standing refuses a re-Bolster ("can't take this action again until the start of its next turn" rides the already_bolstered refusal + the legendary per-action cooldown latch); te \`bolster_advantage\` (Advantage on D20 Tests — live te fold in conditionEffects.js) stamped on itself${bolsterAllyRadiusFt(action) ? ` and allies within ${bolsterAllyRadiusFt(action)} ft` : ''}; gridless radius + ally membership GM-enforced (§42 advisory).`
       : effectKey === 'ethereal'
-        ? 'the ghost enters the Border Ethereal — visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can\'t affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the `ethereality_refused` / already_ethereal latch.'
+        ? etherealGrantNote({ action, effectKey })
         : effectKey === 'disguised'
           ? 'the hag casts Disguise Self on itself (save-less SELF cast — the row\'s "spell save DC 13" is the hag\'s caster stat, never a target save); no attack/cast enders — RAW the disguise lasts the full duration. Truelook, physical inspection (DC 20 Intelligence (Investigation)) and dispel-magic are GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while disguised refuses zero-cost via the `illusory_appearance_refused` / already_disguised latch.'
           : `ends when it attacks, casts a spell, or uses its Enlarge (attack/cast/enlarge enders drop the te with an \`${effectKey}_ended\` log), or when its clock runs out. Concentration-break ender and invisibility advantage/disadvantage adjudication are GM-enforced (§70 advisory).`;
@@ -79,7 +107,7 @@ export function buildSelfBuffGrantLog({ monsterName, action, effectKey, rounds }
 }
 
 export function buildAlreadyEnlargedRefusalLog({ monsterName, action, effectKey }) {
-  const slug = String(action?.name || effectKey || 'self_buff').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const slug = selfBuffRefusalSlug(action, effectKey);
   return {
     type: 'automation',
     automationType: `${slug}_refused`,

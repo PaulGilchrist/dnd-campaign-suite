@@ -477,9 +477,17 @@ const EXPIRATION_HANDLERS = {
     // in-encounter — the te stands until an admin clear (documented residual).
     // MA-0102: Weakening Breath 1-minute clock expiry — RAW "After 1 minute,
     // it succeeds automatically": strip the te and log the auto-success.
+    // #1295-fix: AND-triple per fix#44 house shape (banishmentHandler.js:108,
+    // handleRemoveTargetEffect :255) — the expiry payload carries source
+    // (weakeningBreathService.js:49), so the clock strips ONLY its own dragon's
+    // te; a second dragon's weakening_breath te on the same target survives its
+    // sibling's clock (pre-fix: collateral strip). Null canon (#1517): strict
+    // === — both-null legacy twins still expire together; one-sided-null rows
+    // survive (conservative: badge stands, no cross-source strip). Disk census:
+    // zero weakening_breath rows in public/campaigns — no legacy null data.
     'weakening_breath_auto_success': (effect, targetName, attackerName, campaignName) => {
         const effects = [...(getRuntimeValue('campaign', 'targetEffects', campaignName) || [])];
-        const filtered = effects.filter(te => !(te.effect === (effect.effectKey || 'weakening_breath') && te.target === targetName));
+        const filtered = effects.filter(te => !(te.effect === (effect.effectKey || 'weakening_breath') && te.target === targetName && te.source === effect.source));
         if (filtered.length !== effects.length) {
             setRuntimeValue('campaign', 'targetEffects', filtered, campaignName);
         }

@@ -295,7 +295,7 @@ export function createPrismaticSprayVioletHandler(campaignName, combatSummary, s
 
             const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || []
             const cleanedEffects = allTargetEffects.filter(te => !(te.target === targetName && te.effect === 'prismatic_spray_violet' && te.source === saveData.casterName))
-            const existingBanishment = cleanedEffects.filter(te => !(te.effect === 'banishment' || (te.target === targetName && te.source === saveData.casterName)))
+            const existingBanishment = cleanedEffects.filter(te => !(te.effect === 'banishment' && te.target === targetName && te.source === saveData.casterName))
             setRuntimeValue('campaign', 'targetEffects', [
                 ...existingBanishment,
                 {

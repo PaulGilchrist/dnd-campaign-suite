@@ -1,8 +1,11 @@
 // @maintained-by-ai
 // DeathSaveEntry lane: owned contract = death_save entry RENDER bytes only —
-// title per polarity (success / failure / nat20 / nat1), stable/dead/removed
-// finality bytes + icon, single-die and advantage selected/discarded bytes,
-// ✓/✗ totals bytes, actor + fixed-timestamp header.
+// enum-cover presentation map (#877): title/class/die-string per producer
+// `result` value (absent|'stable'|'dead'|'removed') + neutral UNKNOWN arm,
+// polarity per explicit success tri-state (never truthiness-red), roll-less
+// rows render no die node (no '()' ghost), stable/dead/removed finality bytes
+// + icon, single-die and advantage selected/discarded bytes, ✓/✗ totals bytes,
+// actor + fixed-timestamp header.
 // CUT (owners cited): container type-dispatch → LogEntryRendering.test.jsx (#876);
 // producer payloads (what fields get sent) → DeathSavingThrows.test.jsx /
 // DeathSavePromptModal.test.jsx / initiative-callbacks.test.jsx (#837/#863);
@@ -13,8 +16,12 @@
 // → polarityMatrix; stable/dead(2) → finalityMatrix (+nat20-precedence, +removed pins);
 // advantage(4) → advantageMatrix; totals(2) → totalsMatrix (absent-totals leg folded
 // into polarityMatrix); name+time(2) → header.
+// #877 fixes: 'removed' revive row mislabel flipped ('Death Save Failure' →
+// 'Dying Condition Removed'), '()' ghost die suppressed, stable/dead/omitted-success
+// polarity moved off truthiness onto explicit tri-state (mirrors LogConditionEntry
+// #876 presentation-map + UNKNOWN + console.error pattern).
 import { screen } from '@testing-library/react';
-import { beforeEach } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 import { ds, q, setup, beforeEachSetup } from './log-test-utils.jsx';
 
 import Log from './Log.jsx';
@@ -55,27 +62,67 @@ describe('Log > DeathSaveEntry', () => {
   });
 
   // Finality entries mirror real producer payloads (DeathSavingThrows.jsx):
-  // no `success` field, so they get the failure polarity class — pinned
-  // honestly (see SOURCE BUG report for 'removed' title and stable class).
+  // #877: stable/dead/removed carry explicit honest tones from the presentation
+  // map — stable and removed (revive) render green, dead red; none inherit a
+  // class from truthiness on the absent `success` field. 'removed'
+  // (DeathSavingThrows.jsx:61, GM clears the dying track via the
+  // "Resurrect character" button) is a rescue, so it labels honestly and
+  // renders NO die node (pre-fix pins 'Death Save Failure' + '()' — flipped).
   it.each([
-    ['stable', { result: 'stable', success: undefined, totalSuccesses: 3, totalFailures: 1 }, 'Stabilized!', 'fa-skull-crossbones', null, ['✓ 3', '✗ 1'], []],
-    ['dead', { result: 'dead', success: undefined, totalSuccesses: 1, totalFailures: 3 }, 'Has Perished!', 'fa-skull', null, ['✓ 1', '✗ 3'], []],
-    ['stable beats nat20 title', { result: 'stable', success: undefined, isNatural20: true, totalSuccesses: 3, totalFailures: 0 }, 'Stabilized!', 'fa-skull-crossbones', 'NAT 20', ['✓ 3', '✗ 0'], []],
-    ['removed (revive reset)', { result: 'removed', success: undefined, roll: undefined, totalSuccesses: 0, totalFailures: 0 }, 'Death Save Failure', 'fa-skull-crossbones', null, ['✓ 0', '✗ 0'], ['()']],
-  ])('renders %s finality bytes', (_label, overrides, title, iconCls, natBadge, totals, dieTexts) => {
+    ['stable', { result: 'stable', success: undefined, totalSuccesses: 3, totalFailures: 1 }, 'Stabilized!', 'log-death-save-success', 'fa-skull-crossbones', null, ['✓ 3', '✗ 1'], []],
+    ['dead', { result: 'dead', success: undefined, totalSuccesses: 1, totalFailures: 3 }, 'Has Perished!', 'log-death-save-failure', 'fa-skull', null, ['✓ 1', '✗ 3'], []],
+    ['stable beats nat20 title', { result: 'stable', success: undefined, isNatural20: true, totalSuccesses: 3, totalFailures: 0 }, 'Stabilized!', 'log-death-save-success', 'fa-skull-crossbones', 'NAT 20', ['✓ 3', '✗ 0'], []],
+    ['removed (revive reset)', { result: 'removed', success: undefined, roll: undefined, totalSuccesses: 0, totalFailures: 0 }, 'Dying Condition Removed', 'log-death-save-success', 'fa-skull-crossbones', null, ['✓ 0', '✗ 0'], []],
+  ])('renders %s finality bytes', (_label, overrides, title, polarityCls, iconCls, natBadge, totals, dieTexts) => {
     setup(Log, [ds(overrides)]);
+    expect(q('.log-entry')).toHaveClass('log-death-save', polarityCls);
     expect(q('.log-name').textContent).toBe(title);
     expect(q('.log-death-save .log-icon i')).toHaveClass(iconCls);
-    // Only 'stable'/'dead' suppress dice; 'removed' is not finality to the
-    // renderer, so the roll-less revive-reset payload renders an empty '()'
-    // ghost die (both pinned honestly — SOURCE BUGS).
+    // Every finality payload is roll-less: the renderer emits no die node
+    // at all — never an empty '()' ghost die (#877).
     expect([...document.querySelectorAll('.log-death-save .log-die')].map((n) => n.textContent)).toEqual(dieTexts);
+    expect(q('.log-death-save').textContent).not.toContain('()');
     const [succText, failText] = totals;
     expect(q('.log-death-save-total-successes').textContent).toBe(succText);
     expect(q('.log-death-save-total-failures').textContent).toBe(failText);
     if (natBadge) {
       expect(screen.getByText(natBadge)).toBeInTheDocument();
     }
+  });
+
+  // #877 enum-cover (#1348): every death_save row shape the producers can
+  // emit (plus the defensive UNKNOWN arm) renders a mutually distinguishable
+  // label/class/die-string triple — no two rows share all three bytes.
+  it.each([
+    // [case, overrides, label, cls, dieTexts]
+    ['roll row, explicit success', { roll: 14 }, 'Death Save Success', 'log-death-save-success', ['(14)']],
+    ['roll row, explicit failure', { success: false, roll: 8 }, 'Death Save Failure', 'log-death-save-failure', ['(8)']],
+    ['roll row, omitted success (neutral, not red)', { success: undefined, roll: 12 }, 'Death Save', 'log-death-save-neutral', ['(12)']],
+    ['roll row, success, no die data', { success: true, roll: undefined }, 'Death Save Success', 'log-death-save-success', []],
+    ['stable finality', { result: 'stable', success: undefined, totalSuccesses: 3, totalFailures: 1 }, 'Stabilized!', 'log-death-save-success', []],
+    ['dead finality', { result: 'dead', success: undefined, totalSuccesses: 1, totalFailures: 3 }, 'Has Perished!', 'log-death-save-failure', []],
+    ['removed revive', { result: 'removed', success: undefined, roll: undefined, totalSuccesses: 0, totalFailures: 0 }, 'Dying Condition Removed', 'log-death-save-success', []],
+    ['unknown result fallback', { result: 'stabilized', success: undefined, roll: undefined }, 'Death Save Update', 'log-death-save-neutral', []],
+  ])('enum-cover: %s', (_label, overrides, title, cls, dieTexts) => {
+    setup(Log, [ds(overrides)]);
+    expect(q('.log-entry')).toHaveClass('log-death-save', cls);
+    expect(q('.log-name').textContent).toBe(title);
+    expect([...document.querySelectorAll('.log-death-save .log-die')].map((n) => n.textContent)).toEqual(dieTexts);
+    expect(q('.log-death-save').textContent).not.toContain('()');
+  });
+
+  // Mirrors the #876 house pattern (LogConditionEntry.jsx:32-35): an unknown
+  // `result` logs loudly and renders the neutral fallback — never silently a
+  // red 'Death Save Failure'.
+  it('unknown result logs console.error and renders the neutral fallback', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setup(Log, [ds({ result: 'stabilized', success: undefined, roll: undefined })]);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('stabilized'), expect.anything());
+    expect(q('.log-entry')).toHaveClass('log-death-save', 'log-death-save-neutral');
+    expect(q('.log-name').textContent).toBe('Death Save Update');
+    expect(q('.log-death-save .log-icon i')).toHaveClass('fa-circle-info');
+    expect([...document.querySelectorAll('.log-death-save .log-die')].map((n) => n.textContent)).toEqual([]);
+    errSpy.mockRestore();
   });
 
   it.each([

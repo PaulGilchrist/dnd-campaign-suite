@@ -9,12 +9,15 @@
  * Handler under test: clearExpirationEffects.js:480-495. Pins:
  *   - write budget (#1292): the campaign.targetEffects rewrite is GATED on
  *     something actually being removed; the auto-success log is UNCONDITIONAL
- *   - filter scoping: te removed by effectKey + target only. The handler
- *     IGNORES te.source (the payload carries source at
- *     weakeningBreathService.js:49 but :482 never reads it), so a second
- *     dragon's weakening_breath te on the SAME target is collateral-stripped
- *     — pinned honestly below; if source-scoping is ever fixed, that
- *     survivor assertion flips deliberately.
+ *   - filter scoping (#1295-fix): AND-triple effectKey + target + source
+ *     (payload carries source per weakeningBreathService.js:49; fix#44 house
+ *     shape per banishmentHandler.js:108). A second dragon's weakening_breath
+ *     te on the SAME target SURVIVES its sibling's clock — pre-fix the
+ *     source-blind filter collateral-stripped it; the survivor assertion at
+ *     the two-dragon test below is the deliberately flipped #1295 pin.
+ *   - null canon (#1517): strict === — a source-less legacy clock expires
+ *     only source-less twins; one-sided-null rows survive (no cross-source
+ *     strip). Disk census: zero weakening_breath rows in public/campaigns.
  *
  * Owned elsewhere — do not duplicate here:
  *   - clock/expiration registration payload (type, effectKey, 10 rounds):
@@ -79,7 +82,7 @@ beforeEach(() => {
 });
 
 describe('MA-0102 weakening_breath_auto_success expiration type', () => {
-    it('strips this target\'s weakening_breath tes in exactly one gated write; foreign targets and other effects survive; logs the auto-success verbatim', () => {
+    it('strips only THIS clock\'s weakening_breath te in exactly one gated write; foreign targets, other effects, and a SECOND DRAGON\'s te on the same target survive (#1295-fix flipped pin); logs the auto-success verbatim', () => {
         const ownTe = { target: TARGET, effect: 'weakening_breath', source: GOLD, dc: 21, damageSubtractDie: '1d6' };
         const secondDragonTe = { target: TARGET, effect: 'weakening_breath', source: BLUE, dc: 19 };
         const foreignTe = { target: FOREIGN_TARGET, effect: 'weakening_breath', source: GOLD };
@@ -88,11 +91,55 @@ describe('MA-0102 weakening_breath_auto_success expiration type', () => {
 
         clearExpirationEffects(EXPIRATION, TARGET, GOLD, CAMPAIGN);
 
-        // Filter is effectKey + target only — te.source is never consulted,
-        // so BLUE's te on TARGET drops as collateral (see header pin note).
-        expect(runtimeStore['campaign.targetEffects']).toEqual([foreignTe, unrelatedTe]);
+        // Filter is the AND-triple effectKey + target + source (#1295-fix) —
+        // the payload's source (GOLD) is consulted, so BLUE's te on TARGET
+        // survives GOLD's clock byte-exact. Pre-fix this asserted
+        // [foreignTe, unrelatedTe] (BLUE collateral-stripped) — flipped here.
+        expect(runtimeStore['campaign.targetEffects']).toEqual([secondDragonTe, foreignTe, unrelatedTe]);
+        expect(runtimeStore['campaign.targetEffects'][0]).toBe(secondDragonTe);
         expect(writes).toEqual(['campaign.targetEffects']);
         expect(logs).toEqual([AUTO_SUCCESS_LOG]);
+    });
+
+    it('single-source self-expiry: the only weakening_breath te on the target belongs to the clock\'s source — stripped in one gated write', () => {
+        const ownTe = { target: TARGET, effect: 'weakening_breath', source: GOLD, dc: 21 };
+        runtimeStore['campaign.targetEffects'] = [ownTe];
+
+        clearExpirationEffects(EXPIRATION, TARGET, GOLD, CAMPAIGN);
+
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(writes).toEqual(['campaign.targetEffects']);
+        expect(logs).toEqual([AUTO_SUCCESS_LOG]);
+    });
+
+    it('null-source arms (#1517 canon): strict === — both-null legacy twin expires; one-sided-null survives (te w/ source vs source-less clock; clock w/ source vs source-less te); gated writes', () => {
+        const legacyClock = [{ type: 'weakening_breath_auto_success', effectKey: 'weakening_breath', target: TARGET }];
+
+        // both-null identity is the law: source-less legacy te + source-less clock → stripped.
+        const nullTe = { target: TARGET, effect: 'weakening_breath' };
+        runtimeStore['campaign.targetEffects'] = [nullTe];
+        clearExpirationEffects(legacyClock, TARGET, GOLD, CAMPAIGN);
+        expect(runtimeStore['campaign.targetEffects']).toEqual([]);
+        expect(writes).toEqual(['campaign.targetEffects']);
+
+        // te HAS source, clock does NOT → survives (no collateral on modern rows).
+        writes.length = 0;
+        logs.length = 0;
+        const sourcedTe = { target: TARGET, effect: 'weakening_breath', source: GOLD };
+        runtimeStore['campaign.targetEffects'] = [sourcedTe];
+        clearExpirationEffects(legacyClock, TARGET, GOLD, CAMPAIGN);
+        expect(runtimeStore['campaign.targetEffects']).toEqual([sourcedTe]);
+        expect(writes).toEqual([]);
+        expect(logs.length).toBe(1);
+
+        // clock HAS source, te does NOT → survives (badge stands, conservative).
+        writes.length = 0;
+        logs.length = 0;
+        runtimeStore['campaign.targetEffects'] = [nullTe];
+        clearExpirationEffects(EXPIRATION, TARGET, GOLD, CAMPAIGN);
+        expect(runtimeStore['campaign.targetEffects']).toEqual([nullTe]);
+        expect(writes).toEqual([]);
+        expect(logs.length).toBe(1);
     });
 
     it('no weakening_breath te present → zero targetEffects writes (gated), but the auto-success log still fires once', () => {

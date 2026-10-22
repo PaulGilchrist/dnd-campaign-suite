@@ -27,8 +27,10 @@
 // runtime (#1137) so the honest double press arms and refuses off REAL store
 // bytes (#949); builders verified THROUGH the flow, exact toBe (#993).
 // grant-log ghost-copy residuals ("the ghost enters…", `ethereality_refused`
-// latch promise) stay verbatim-honest on this shared ethereal branch (#1140)
-// — the lane's ACTUAL refusal slug is etherealness_refused, pinned below.
+// latch promise) were FIXED #1145: the shared ethereal branch now derives
+// subject/boundary/latch slug from THIS row's own description ("the fiend
+// enters the Ethereal Plane from the Material Plane, or vice versa",
+// `etherealness_refused`) — the lane's ACTUAL refusal slug, pinned below.
 //
 // selfBuff family map: base seam → monsterSelfBuff.test.js · ghost own card
 // → ghost-ethereality.test.js (#1138) · sprite → sprite-invisibility.test.js
@@ -162,11 +164,13 @@ describe('MA-1551 honest double press — real te store latch, one merged rounds
     }]);
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ type: 'automation', automationType: 'ethereal_granted', characterName: 'Succubus/Incubus 1', abilityName: 'Etherealness' });
-    // Ghost byte-twin grant copy verbatim-honest (#1140): the shared
-    // ethereal branch says "the ghost enters…" and promises an
-    // `ethereality_refused` latch even on this fiend card — the ACTUAL
-    // refusal slug is etherealness_refused (press 2, below). §70 residual.
-    expect(logs[0].description).toBe("Succubus/Incubus 1 Etherealness: te `ethereal` armed on itself for 4800 rounds (8 hours) — the ghost enters the Border Ethereal — visible on the Material Plane while on the Border Ethereal and vice versa; plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the `ethereality_refused` / already_ethereal latch.");
+    // Monster-correct grant prose (#1145): the shared branch no longer
+    // hardcodes "the ghost enters the Border Ethereal" / `ethereality_refused`
+    // for ALL ethereal grants — subject ("the fiend"), boundary
+    // ("Ethereal Plane from the Material Plane, or vice versa") and latch
+    // slug (`etherealness_refused`, matching press 2 below) all derive from
+    // THIS row's own name/description. §70 residual unchanged.
+    expect(logs[0].description).toBe("Succubus/Incubus 1 Etherealness: te `ethereal` armed on itself for 4800 rounds (8 hours) — the fiend enters the Ethereal Plane from the Material Plane, or vice versa — plane interaction (can't affect or be affected by anything on the other plane) is GM-enforced (§70 advisory). At Will, no uses limit; a re-cast while ethereal refuses zero-cost via the `etherealness_refused` / already_ethereal latch.");
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('is Ethereal'));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Border Ethereal'));
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('At Will'));

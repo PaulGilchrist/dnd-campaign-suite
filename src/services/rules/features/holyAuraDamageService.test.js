@@ -5,7 +5,9 @@
 // body is pinned HERE with fixed-stub dice: guard gates, the two campaign-scoped
 // store READ shapes (:20 two-arg 'campaign' key, :30 three-arg caster read —
 // this service performs ZERO direct writes), fiend/undead detection
-// normalization (:11-14), the ability_score_modifiers ?? chain (:33), the
+// normalization (:11-14), the ability_score_modifiers disk-canonical lowercase
+// read (:33, #1376 fix: disk ships only 'con' — never uppercase 'CON' and
+// never the producer-less 'constitution' long-form), the
 // resolved saveResult contract consumed downstream by DiceRollResult.jsx:817-829
 // (.roll/.modifier/.total/.dc/.success), delegation to addCondition at :49, and
 // both console.error catch branches (:44/:57).
@@ -50,7 +52,9 @@ const CASTER = 'Paladin';
 const ATTACKER = 'Warlock'; // fiend attacker forced to CON-save
 
 // Disk-canon monsters.json carries LOWERCASE ability_score_modifiers keys
-// ('con') — a real near-miss proving :33 never consults the disk-canonical key.
+// ('con') — 636/636 rows byte-censused, zero uppercase-abbrev keys in the
+// whole file (#1376 RED: the old uppercase :33 read never consulted this
+// disk-canonical key and faked every fiend/undead save at +0).
 function fiend(extra = {}) {
     return { name: ATTACKER, type: 'npc', monsterType: 'Fiend', template: [], ...extra };
 }
@@ -137,7 +141,7 @@ describe('holyAuraDamageService', () => {
     describe('targetEffects selection + save-success golden path (:20-45)', () => {
         it('reads campaign targetEffects (exact 2-arg shape), filters holy_aura rows to this target, chains caster source to the aura, logs the successful save, and resolves the saveResult contract', async () => {
             rollD20.mockReturnValue(12); // 12 + CON 3 = 15 >= DC 15
-            const attacker = fiend({ ability_score_modifiers: { CON: 3 } });
+            const attacker = fiend({ ability_score_modifiers: { con: 3 } }); // disk-canonical lowercase
             seedStore([
                 { effect: 'aura_of_life', target: CREATURE.name, source: 'Cleric' }, // real near-miss effect name
                 { effect: 'holy_aura', target: 'Orc', source: 'WrongCaster' },        // wrong target
@@ -248,12 +252,20 @@ describe('holyAuraDamageService', () => {
         });
     });
 
-    describe('ability_score_modifiers ?? chain (:33)', () => {
+    describe('ability_score_modifiers lowercase disk-canonical read (:33)', () => {
+        // +0-never-lies ledger (#1376): modifier 0 is only ever logged when the
+        // disk value IS 0 or the shape is absent. Uppercase 'CON' and long-form
+        // 'constitution' have ZERO producers (monsters.json census 636/636 rows
+        // lowercase; npcStatBlockUtils ABILITY_KEYS / npcClickFormHandlers
+        // ABILITY_ABBRS lowercase) and must NOT resurrect as fallback arms.
         it.each([
-            ['CON abbr wins over constitution long-form', { CON: 5, constitution: 2 }, 5, true],  // 10+5 >= 15
-            ['constitution long-form fallback', { constitution: 4 }, 4, false],                      // 10+4 < 15
-            ['disk-canonical lowercase "con" is ignored → bonus 0', { con: 3 }, 0, false],         // monsters.json shape
-            ['empty modifiers object → bonus 0', {}, 0, false],
+            ['lowercase con positive preserved', { con: 5 }, 5, true],        // 10+5 >= 15
+            ['lowercase con NEGATIVE preserved — never rounded up to +0', { con: -1 }, -1, false], // 10-1 < 15
+            ['lowercase con zero is the honest 0', { con: 0 }, 0, false],     // 10+0 < 15
+            ['uppercase CON ignored — no producer ships it', { CON: 5 }, 0, false],
+            ['constitution long-form ignored — speculative arm removed', { constitution: 4 }, 0, false],
+            ['empty modifiers object → honest absent 0', {}, 0, false],
+            ['absent shape (no ability_score_modifiers key) → honest 0', undefined, 0, false],
         ])('%s (roll fixed 10 vs DC 15)', async (_label, mods, mod, success) => {
             rollD20.mockReturnValue(10);
 
@@ -269,8 +281,8 @@ describe('holyAuraDamageService', () => {
 
     describe('failed-save delegation seam (:46-58)', () => {
         it('re-loads the combat summary and delegates the exact Blinded write to addCondition, logging save then condition entries in order', async () => {
-            rollD20.mockReturnValue(5); // 5 + CON 3 = 8 < 15
-            const attacker = fiend({ ability_score_modifiers: { CON: 3 } });
+            rollD20.mockReturnValue(5); // 5 + CON -1 = 4 < 15
+            const attacker = fiend({ ability_score_modifiers: { con: -1 } }); // negative disk mod rides the live fail seam
             const argSummary = makeSummary(attacker); // stale arg summary — must NOT be forwarded
 
             const result = await checkHolyAuraDamage(CREATURE, ATTACKER, argSummary, CAMPAIGN, 5);
@@ -290,10 +302,10 @@ describe('holyAuraDamageService', () => {
                 playerStats: attacker, // :49 attackerCreature identity, not the damaged creature
             });
             expect(addEntry).toHaveBeenCalledTimes(2);
-            expect(addEntry).toHaveBeenNthCalledWith(1, CAMPAIGN, saveTuple(5, 3, 8, false, 15));
+            expect(addEntry).toHaveBeenNthCalledWith(1, CAMPAIGN, saveTuple(5, -1, 4, false, 15));
             expect(addEntry).toHaveBeenNthCalledWith(2, CAMPAIGN, blindedConditionTuple);
             expect(setRuntimeValue).not.toHaveBeenCalled(); // write budget delegated wholesale
-            expect(result).toEqual({ roll: 5, modifier: 3, total: 8, success: false, dc: 15 });
+            expect(result).toEqual({ roll: 5, modifier: -1, total: 4, success: false, dc: 15 });
         });
 
         it('rejecting save-result log does not break the flow: identical Error + exact prefix to console.error', async () => {

@@ -8,12 +8,15 @@
 //   GET    /npcs        200 { npcs:[...] } jsonEntityCrud.js:49 (responseWrapper — NOT a bare array)
 //   POST   /npcs        200 { success:true } :74 | 400 { error:'Expected an array for npcs' } :62
 //                       | 400 validateList npcs.js:44 (bestiary guard, same :34 template)
-//   GET    /npcs/:id    200 { npc:{...} } :104 (itemWrapper) | 404 { error:'NPC not found' } :89/:97
+//   GET    /npcs/:id    (server route jsonEntityCrud.js:104 itemWrapper { npc } | 404 :89/:97) —
+//                       client export loadNPC DELETED #1181: zero prod callers (fresh census); the
+//                       lane dropped its transport + error rows accordingly.
 //   DELETE /npcs/:id    200 { success:true } :133 | 404 { error:'NPC not found' } :119 (missing file)
 // CUSTOM-NPC invariant (@app MANDATORY): npcs.json is custom-only; the client lane surfaces the
 // server's plain-English bestiary 400 verbatim and never retries — pinned in the guard lane.
-// Pass-through honesty: loadNPCs/loadNPC resolve the FULL wrapped envelope (consumers unpack
-// .npcs/.npc at Initiative.jsx:255, Sessions.jsx:217, NPCs.jsx:132) — pinned here, not unwrapped.
+// Pass-through honesty: loadNPCs resolves the FULL wrapped envelope (consumers unpack
+// .npcs at Initiative.jsx:255, Sessions.jsx:216; NPCs.jsx:132 unwraps saveNPC's PUT .npc) —
+// pinned here, not unwrapped.
 // Old->new map (20 old -> 14 new): all transport pins kept, strengthened with real envelopes
 // (old bare-array / bare-{name} / {success,savedCount} fakes were shapes the real server never sends);
 // rename+encoding rows folded into transport table (%20 campaign+name, %26 special char);
@@ -21,7 +24,7 @@
 // error table + one propagated-rejection test; generic-fallback folded per row (#959).
 // No wall-clock (#app): zero timers. Source console.error in catches silenced, not asserted (#app).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { loadNPCs, saveNPCs, loadNPC, deleteNPC, saveNPC } from './npcsService.js';
+import { loadNPCs, saveNPCs, deleteNPC, saveNPC } from './npcsService.js';
 
 // ─── Fixtures (real shapes: cleanNPCData output, npcFormUtils.js:53) ──────
 
@@ -96,13 +99,6 @@ describe('exact fetch transport + real server envelopes', () => {
       envelope: { success: true },
     },
     {
-      label: 'loadNPC: GET one, resolves WRAPPED { npc:{...} } (:104)',
-      invoke: (c) => loadNPC(c, 'Bram Ironhand'),
-      url: '/api/campaigns/test-campaign/npcs/Bram%20Ironhand',
-      opts: { method: 'GET', headers: CT },
-      envelope: { npc: CUSTOM_NPC },
-    },
-    {
       label: 'deleteNPC: DELETE exact opts — no headers, no body (:79-80)',
       invoke: (c) => deleteNPC(c, 'Bram Ironhand'),
       url: '/api/campaigns/test-campaign/npcs/Bram%20Ironhand',
@@ -167,12 +163,6 @@ describe('error lane: server bytes verbatim, then || fallback, per export', () =
       fallback: 'Failed to save NPCs',
     },
     {
-      label: 'loadNPC',
-      invoke: (c) => loadNPC(c, 'Bram Ironhand'),
-      serverError: { error: 'NPC not found' }, // jsonEntityCrud.js:89/:97 404
-      fallback: 'Failed to load NPC',
-    },
-    {
       label: 'deleteNPC',
       invoke: (c) => deleteNPC(c, 'Bram Ironhand'),
       serverError: { error: 'NPC not found' }, // jsonEntityCrud.js:119 404 (missing file)
@@ -194,7 +184,6 @@ describe('error lane: server bytes verbatim, then || fallback, per export', () =
       expect(saveNPC('test-campaign', CUSTOM_NPC)).rejects.toThrow('ENOTFOUND'),
       expect(loadNPCs('test-campaign')).rejects.toThrow('ENOTFOUND'),
       expect(saveNPCs('test-campaign', [])).rejects.toThrow('ENOTFOUND'),
-      expect(loadNPC('test-campaign', 'Bram Ironhand')).rejects.toThrow('ENOTFOUND'),
       expect(deleteNPC('test-campaign', 'Bram Ironhand')).rejects.toThrow('ENOTFOUND'),
     ]);
   });

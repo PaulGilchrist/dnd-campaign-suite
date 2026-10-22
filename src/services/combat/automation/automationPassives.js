@@ -219,6 +219,11 @@ export async function markFortifiedHealthUsed(playerStats, campaignName) {
 // Fortified Health bonus (targetStats may differ from the caster). Mark the
 // latch on every owner store whose passive actually fired this resolution —
 // symmetric with healingPassiveContribution's read (stats.name per owner).
+// #966 FIXED: the read lane (:173) accepts legacy 'max_hp_increase' AND
+// current 'fortified_health' bytes, so the ownership match here carries the
+// SAME dual-literal set (house alias idiom, mirroring carryingCapacity.js:16).
+// Accept-if-read ⇒ mark-if-applied: a legacy-byte holder now latches on its
+// first application and is refused the rest of the round.
 export async function markFortifiedHealthUsedIfGranted(bonusDetails, casterStats, targetStats, campaignName) {
     if (!bonusDetails?.some(d => d.name === 'Fortified Health')) return;
     const seen = new Set();
@@ -226,7 +231,7 @@ export async function markFortifiedHealthUsedIfGranted(bonusDetails, casterStats
         if (!stats?.name || seen.has(stats.name)) continue;
         seen.add(stats.name);
         const owns = (stats.automation?.passives || []).some(p =>
-            p.type === 'passive_rule' && p.effect === 'fortified_health' && p.alsoSelfHealing?.extraHealingExpression);
+            p.type === 'passive_rule' && (p.effect === 'fortified_health' || p.effect === 'max_hp_increase') && p.alsoSelfHealing?.extraHealingExpression);
         if (!owns) continue;
         if (fortifiedHealthLatchBlocks(stats.name, campaignName)) continue;
         await markFortifiedHealthUsed(stats, campaignName);

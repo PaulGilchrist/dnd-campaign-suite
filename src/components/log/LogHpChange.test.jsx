@@ -4,16 +4,22 @@
 // temp-HP leg (no current/max bytes), damage breakdown modifier legs (resistance/immunity
 // badges; any other authored status renders type byte bare — no 'vulnerable' badge exists
 // in the renderer), NPC threshold names + delta!==0 falsy guard (#842 sibling survives),
-// attacker/source swallow pin, fixed-timestamp header (#876: never Date.now()).
+// attacker/source RENDER pin (#880 FIXED 2026-10-22: damage leg now shows the
+// sourceName/note bytes multiTargetHandler.js:129-130 authors; the pre-fix swallow is
+// captured in git history + the flip rows below), zero-delta neutral arm (#880),
+// fixed-timestamp header (#876: never Date.now()).
 // CUT (owners cited): type→component routing + placeholders → LogEntryRendering.test.jsx
-// (#879 canonical); healing-side legs ('Healed', source paren, note formula, maximize) →
-// healing lane LogHpHealing.test.jsx (#880, queued next); producer payloads → 
+// (#879 canonical); healing-side legs ('Healed', heal source paren, heal note formula,
+// maximize, zero-at-full-HP heal rows) → healing lane LogHpHealing.test.jsx (#880);
+// producer payloads → 
 // combatLoggingService.test.js and damage-pipeline tests.
-// NOTE: breakdown bytes relocated INTO this lane from LogHpHealing.test.jsx:14-30 (that
-// file's lane is healing entry — removal there recommended, report-only).
+// NOTE: breakdown bytes relocated INTO this lane from old LogHpHealing.test.jsx:14-30;
+// REC closed — that block is GONE from the healing lane (verified 2026-10-22), this is
+// the sole breakdown owner (resistant/immune/normal/vulnerable rows below).
 // Old->new map: basic-damage(2) + unconscious(1) → damageMatrix (large-delta folded into
 // knockout's 0/max pin); temp-hp(1) → tempHpLeg (+no-current/max pin); thresholds(1) →
-// npcThresholdMatrix (+zero-delta falsy + recovering polarity pins); healing(4) → #880.
+// npcThresholdMatrix (+zero-delta falsy + recovering polarity pins); healing(4) → #880
+// healing lane hpHealMatrix.
 import { screen } from '@testing-library/react';
 import { beforeEach } from 'vitest';
 import { hp, q, setup, beforeEachSetup } from './log-test-utils.jsx';
@@ -28,12 +34,21 @@ describe('Log > HpChangeEntry (damage lane)', () => {
   });
 
   // Player damage legs: label byte (incl. knockout em-dash prefix), polarity class,
-  // icon, exact delta+current/max detail bytes. Zero delta is honest '0 HP' but is
-  // mislabeled 'Healed' (isDamage = delta < 0) — pinned honestly, SOURCE BUG reported.
+  // icon, exact delta+current/max detail bytes. #880 FIXED: damage now RENDERS the
+  // sourceName/note bytes multiTargetHandler.js:124-131 authors (was swallowed by
+  // !isDamage guards); zero delta is the honest neutral arm (was mislabeled 'Healed'
+  // via isDamage = delta < 0). Producers hit zero for real: full absorption at
+  // handlePlainDamage.js:1136 -(totalDamageDealt), delta 0 at multiTargetHandler.js:125.
   it.each([
-    ['plain damage (authored sourceName/note hidden — SOURCE BUG)', { sourceName: 'Shadow Wizard', note: 'Fire Bolt' }, 'Takes Damage', 'log-hp-damage', 'fa-heart-crack', '-5 HP 20/25 remaining'],
+    ['damage with authored sourceName/note — both bytes render (#880 fix, was swallow)',
+      { sourceName: 'Shadow Wizard', note: 'Fire Bolt' },
+      'Takes Damage (Shadow Wizard)Fire Bolt', 'log-hp-damage', 'fa-heart-crack', '-5 HP 20/25 remaining'],
+    ['multi-target spread — bytes exactly as multiTargetHandler.js:129-130 authors them',
+      { delta: -7, sourceName: 'Zar', note: 'Burning Hands (multi-target spread)' },
+      'Takes Damage (Zar)Burning Hands (multi-target spread)', 'log-hp-damage', 'fa-heart-crack', '-7 HP 20/25 remaining'],
     ['knockout', { delta: -10, currentHp: 0, isUnconscious: true }, 'Knocked Unconscious — Takes Damage', 'log-hp-damage', 'fa-heart-crack', '-10 HP 0/25 remaining'],
-    ['zero delta (honest 0 byte, mislabeled heal — SOURCE BUG)', { delta: 0 }, 'Healed', 'log-healing', 'fa-heart', '0 HP 20/25 remaining'],
+    ['zero delta — honest neutral arm, never \'Healed\' (#880 fix)',
+      { delta: 0 }, 'No HP Change', 'log-hp-neutral', 'fa-circle-info', '0 HP 20/25 remaining'],
   ])('renders %s entry bytes', (_label, overrides, name, polarityCls, iconCls, detailsText) => {
     setup(Log, [hp({ timestamp: FIXED_TS, ...overrides })]);
     expect(q('.log-entry')).toHaveClass('log-hp-change', polarityCls);
@@ -42,9 +57,10 @@ describe('Log > HpChangeEntry (damage lane)', () => {
     expect(q('.log-time').textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
     expect(q('.log-name').textContent).toBe(name);
     expect(q('.log-hp-details').textContent).toBe(detailsText);
-    // multiTargetHandler authors sourceName+note on damage entries; the renderer
-    // guards both behind !isDamage, so neither byte may appear (mislabel-watch pin).
-    expect(screen.queryByText(/Shadow Wizard|Fire Bolt/)).not.toBeInTheDocument();
+    // Note byte lives in its own formula span inside .log-name — match the authored
+    // fixture byte for byte (source/note distinguishability, #1348 family).
+    const notes = Array.from(q('.log-name').querySelectorAll('.log-dice-formula')).map((n) => n.textContent);
+    expect(notes).toEqual(overrides.note ? [overrides.note] : []);
   });
 
   // Damage breakdown modifier legs (bytes relocated from LogHpHealing.test.jsx, the
@@ -83,7 +99,7 @@ describe('Log > HpChangeEntry (damage lane)', () => {
     ['dead overkill', { threshold: 'dead', delta: -20 }, 'Defeated (-20)', 'log-hp-damage', 'fa-heart-crack', '-20 HP'],
     ['bloodied', { threshold: 'bloodied', delta: -15 }, 'Bloodied (-15)', 'log-hp-damage', 'fa-heart-crack', '-15 HP'],
     ['recovering heal byte', { threshold: 'recovering', delta: 10 }, 'Recovering (+10)', 'log-healing', 'fa-heart', '+10 HP'],
-    ['zero delta drops only the parentheses', { threshold: 'dead', delta: 0 }, 'Defeated', 'log-healing', 'fa-heart', '0 HP'],
+    ['zero delta drops only the parentheses (neutral polarity, #880 fix)', { threshold: 'dead', delta: 0 }, 'Defeated', 'log-hp-neutral', 'fa-circle-info', '0 HP'],
   ])('renders %s NPC threshold bytes', (_label, overrides, name, polarityCls, iconCls, detailsText) => {
     setup(Log, [hp({ timestamp: FIXED_TS, ...overrides })]);
     expect(q('.log-entry')).toHaveClass('log-hp-change', polarityCls);

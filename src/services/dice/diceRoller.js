@@ -39,7 +39,11 @@ function parseExpression(formula) {
   const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
   if (!stripped) return null;
   const cleaned = stripped.replace(/\s/g, '');
-  const match = cleaned.match(/^(\d+)?d(\d+)((?:[+-]\d+)+)?$/i);
+  // sides must be >=1: no d0 exists in RAW — rollDie(0) would silently
+  // fabricate a phantom 1 (#1072). Zero-COUNT dice ('0d6') stay legal and
+  // contribute nothing (disk-honest: True Strike damage_at_slot_level "0").
+  // d0-shaped junk joins the house parse-failure class: null, never a roll.
+  const match = cleaned.match(/^(\d+)?d([1-9]\d*)((?:[+-]\d+)+)?$/i);
   if (match) {
     const modifierStr = match[3];
     let modifier = 0;

@@ -85,6 +85,31 @@ describe('getEvasionEffects', () => {
       { source: 'Double Evasion', saveType: 'DEX', shareable: true, shareRange: 30 },
     ])
   })
+
+  // #979: sparse automation arrays — executor tolerates null entries
+  // (automation/index.js:718 if (!a) return false) and isInteractiveAutomation
+  // guards the same shape (automationService.js:118). getEvasionEffects skips
+  // null halves silently: no throw, non-matching subset returned.
+  it('skips null automation entries silently — [null] alone and mixed [valid, null, valid] arms (#979)', () => {
+    expect(getEvasionEffects([{ name: 'Sparse', automation: [null] }])).toEqual([])
+    expect(getEvasionEffects([
+      makeFeature({ type: 'evasion' }, 'Uncanny Dodge'),
+      { name: 'Sparse', automation: [null] },
+      null,
+    ])).toEqual([
+      { source: 'Uncanny Dodge', saveType: 'DEX', shareable: false, shareRange: 0 },
+    ])
+    expect(getEvasionEffects([
+      makeFeature([
+        { type: 'evasion' },
+        null,
+        { type: 'evasion', saveType: 'CON', shareable: true, shareRange: 30 },
+      ], 'Mixed Evasion'),
+    ])).toEqual([
+      { source: 'Mixed Evasion', saveType: 'DEX', shareable: false, shareRange: 0 },
+      { source: 'Mixed Evasion', saveType: 'CON', shareable: true, shareRange: 30 },
+    ])
+  })
 })
 
 // ── getAllSaveProficiencies (automationService.js:183-202) ───────────

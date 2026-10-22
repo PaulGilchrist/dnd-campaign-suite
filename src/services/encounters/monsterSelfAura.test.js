@@ -44,8 +44,10 @@
 // #945/#967, save_dc-0 edge); old 'first click' + old refusal :100-117 →
 // consolidated store-faithful lifecycle (exact log/popup bytes, campaign-
 // keyed tuple #932/#1019, advisory-precedence falsifier); old 'double-spend
-// guard' kept, strengthened (#1035 reach-branch: now pins log-only refusal
-// bytes, loud console guard, zero-write #1026); old 'non-self-aura inert' →
+// guard' kept, strengthened (#1035 reach-branch: pins refusal log bytes,
+// loud console guard, zero-write #1026; #1136 flip: pin flipped from
+// 'popup silent' to the mid-flight refusal popup exact bytes — the guard no
+// longer refuses silently); old 'non-self-aura inert' →
 // inert it.each with full zero-write pins (#934); old '§70 fallback builder'
 // → builder it.each (fallback/precedence/clock-kind legs + popup builder).
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -181,7 +183,7 @@ describe('MA-0554 day economy — full arm + PRESERVED refusal machinery (cited 
 });
 
 describe('double-spend guard (#1035 reach-branch — cited by BOTH ticket lanes #1134/#1135)', () => {
-  it('gate fresh on stale snapshot but store spent: refuses exhausted — zero te, zero spend write, popup silent (guard is log-only), loud console guard once', async () => {
+  it('gate fresh on stale snapshot but store spent: refuses exhausted — zero te, zero spend write, mid-flight refusal popup exact bytes (#1136: no longer silent), loud console guard once', async () => {
     const deps = makeDeps({ uses: { 'Darkness Aura': 1 } });
     const setPopupHtml = vi.fn();
     const guard = vi.spyOn(console, 'error');
@@ -201,8 +203,13 @@ describe('double-spend guard (#1035 reach-branch — cited by BOTH ticket lanes 
     const logs = deps.addEntry.mock.calls.map(c => c[1]);
     expect(logs.filter(l => l.type === 'ability_use')).toHaveLength(0); // no spend logged
     expect(logs.find(l => l.automationType === 'darkness_aura_refused').description).toBe('Darkmantle 1 has already used Darkness Aura today (1/Day) — Darkness Aura refused. Uses reset at dawn; GM-enforced for monsters.');
-    // Honest: the mid-flight guard refuses by log only — no popup on this path.
-    expect(setPopupHtml).not.toHaveBeenCalled();
+    // #1136 FIX: the mid-flight guard no longer refuses silently — the raced
+    // second click answers with its own popup, exact bytes pinned here.
+    // Reason-distinct from the gate-exhausted arm (#1348): 'Already Armed',
+    // never the 'Uses Exhausted' headline (that wording stays #1082-owned).
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Already Armed</h3><p>Darkmantle 1 is already activating Darkness Aura — a preceding click spent the 1/Day use. Darkness Aura refused: no second use spent, no aura re-armed. Uses reset at dawn (GM-enforced for monsters).</p></div>');
+    expect(setPopupHtml.mock.calls[0][0]).not.toContain('Uses Exhausted');
   });
 });
 

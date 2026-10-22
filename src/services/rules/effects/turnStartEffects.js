@@ -238,9 +238,6 @@ export async function applyTurnStartEffects(activeName, playerStats, campaignNam
         }
     }
 
-    // Clear Survivor once-per-turn flag at start of the active creature's turn (before processing effects)
-    clearFlagIfSet(activeName, 'survivorUsedThisTurn', false, campaignName);
-
     // Wild Magic Surge: expire effects with "start of your next turn" duration
     await expireWildMagicSurgeEffects(activeName, campaignName, 'start of your next turn');
 
@@ -441,12 +438,25 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
 }
 
+// CLA-350 Survivor (Champion Fighter 18, 5e + 2024). Disk law, verbatim
+// public/data/classes.json:5970: "At the start of each of your turns, you
+// regain hit points equal to 5 + your Constitution modifier if you have no
+// more than half of your hit points left. You don't gain this benefit if you
+// have 0 hit points." The 2024 row (public/data/2024/classes.json:5417)
+// adds no rest latch: "Heroic Rally - regain Hit Points equal to 5 +
+// Constitution modifier if Bloodied and have at least 1 Hit Point." There is
+// NO once-per-rest latch on disk to honour — heal-once-per-turn is the law
+// (host-verified PASS, docs/automations-manifest.json CLA-350 2026-10-09:
+// "round re-arm fired x2 logs"). The former `survivorUsedThisTurn`
+// clear/consult/stamp trio could never gate a heal (the pre-loop clear ran
+// before its consult in the same call — structurally dead; #1324) and was
+// removed rather than faked. Once-per-turn enforcement lives where it is
+// observable: the round-scoped turn-start gates at BOTH callers
+// (navigationHandlers.js turnStartGateKey `${round}:${name}` shouldApply and
+// sseHandlers.js applyTurnStartPass) plus the by-type merge dedup above.
+// No-timers compliant: runs only at explicit turn seams. fix#22
+// validate-before-mutate order preserved: read HP → gate → evaluate → mutate.
 async function applySurvivorTurnStartHeal(activeName, playerStats, effect, campaignName) {
-    const survivorUsedThisTurn = getRuntimeValue(activeName, 'survivorUsedThisTurn', campaignName);
-    if (survivorUsedThisTurn) {
-        return;
-    }
-
     const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
     const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
     if (storedMaxHp == null) {
@@ -468,7 +478,6 @@ async function applySurvivorTurnStartHeal(activeName, playerStats, effect, campa
 
     const newHp = Math.min(maxHp, currentHp + healAmount);
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
-    await setRuntimeValue(activeName, 'survivorUsedThisTurn', true, campaignName);
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: activeName,

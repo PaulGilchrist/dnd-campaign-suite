@@ -531,7 +531,14 @@ async function handleTwinPlainTarget({ combatSummary, context, target, campaignN
     }));
 }
 
-async function handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry }) {
+// #941 (a): characters is threaded to the multi leg exactly like the twin leg (:518) — applyDamageToTarget
+// derives the player defense profile (resistances/immunities via resolveBaseDefenses), ward events, Dark Ones'
+// Blessing and dominate-repeat context from it; characters:null silently dropped that player context on multi-hit.
+// #941 (b): the multi leg publishes NO popup bytes. It used to write the twinTarget* namespace (:558-566),
+// clobbering the twin handler's fields (:523-531) whenever both follow-ups were distinct. Renderer Venn: no
+// popup consumer honors any multi-target second-target key, so inventing multiTarget* keys here would be dead
+// payload — consumer gap reported, not papered over.
+async function handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, logEntry }) {
     const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
     if (!multiTarget || multiTarget.name === target.name) return;
 
@@ -553,17 +560,7 @@ async function handleMultiPlainTarget({ combatSummary, context, target, campaign
         gwfDisplayRolls: gwfDisplayRolls,
     });
 
-    const multiApplyResult = await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], { campaignName, characters: null, ignoreResistance: false, attackerName: characterName });
-
-    setPopupHtml(prev => ({
-        ...prev,
-        twinTargetName: multiTarget.name,
-        twinFinalDamage: multiApplyResult?.finalDamage,
-        twinTargetCurrentHp: multiApplyResult?.newHp,
-        twinTargetMaxHp: multiTarget.type === 'player'
-            ? (getRuntimeValue(multiTarget.name, 'hitPoints') ?? 0)
-            : multiTarget.maxHp,
-    }));
+    await applyDamageToTarget(combatSummary, multiTarget.name, adjustedTotal, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: characterName });
 }
 
 // MA-0553: monsters.json sizes include ranges ("Medium or Small" — Bandit);
@@ -1166,7 +1163,7 @@ async function runFollowupTargets({ context, combatSummary, target, campaignName
         await handleTwinPlainTarget({ combatSummary, context, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
     }
     if (context?.multiTarget) {
-        await handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, setPopupHtml, logEntry });
+        await handleMultiPlainTarget({ combatSummary, context, target, campaignName, characterName, characters, name, formula, modifier, damageType, adjustedTotal, displayRolls, gwfBaseRolls, gwfDisplayRolls, logEntry });
     }
 }
 

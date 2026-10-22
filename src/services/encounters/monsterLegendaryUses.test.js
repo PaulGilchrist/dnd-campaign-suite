@@ -14,20 +14,21 @@
 //     @yamata #1115 @garuda #1108 @grantReaction #1094
 //   refusal vocab popup+log exact     :200-219 (old :124-167 vocab legs) same crowd
 //   turn-latch / re-arm / spend-refuse lifecycle  :149-198 (old :124-167)
-//   no-delegate resolver ladder       :232-238 (old :191-196)  @ma1580 #1103
-//   recharge canon: seam fixture      :89-99  + regain seam :181-191
+//   no-delegate resolver ladder       :232-237 (old :191-196)  @ma1580 #1103
+//   recharge canon: seam fixture      :89-99  + regain seam :181-190
 //     (old :51-60 / :145-149)                                  @ma1907-1910 #1108
-//   turn-start no-spurious-writes, monster-agnostic :477-484 (old :701-706)
-//     + dracolich dict +14 data pin :358-362 (old :441)     @ma1868 #1106
+//   turn-start no-spurious-writes, monster-agnostic :510-516 (old :477-484)
+//     + dracolich dict +14 data pin :362-366 (old :358-362)  @ma1868 #1106
 //   check-row dict/case-insensitive/abbr-fallback table (+bare-number MA-2002
-//     shape)                        :355-388 (old :450-458)   @ma2002 #1114
-//   MA-0073 prose match/non-match region      :409-432 (old :636/:641/:644)
-//     canonical cooldown lifecycle + byte-inert + no-spurious :434-484 (old :652-706)
+//     shape + #1116 loud-vs-silent census pins :375-392 table,
+//     :394-414 console.error bytes)  :355-421 (old :355-388) @ma2002 #1114
+//   MA-0073 prose match/non-match region      :442-465 (old :409-432)
+//     canonical cooldown lifecycle + byte-inert + no-spurious :467-517 (old :434-484)
 //                                                          @ma1868 #1106
-//   uses:3 many-monsters header census + live press        :486-554 (old spread)
+//   uses:3 many-monsters header census + live press        :519-587 (old :486-554)
 //                                                          @nidhogg #1101 generic uses owner
-//   advisory popup/log CANON        :390-407 (old :607)     @ma1581
-//   plain-"Chomp" delegate twin     :556-583 (old :1330)    @ma1582
+//   advisory popup/log CANON        :423-437 (old :390-407)   @ma1581
+//   plain-"Chomp" delegate twin     :591-615 (old :556-583)   @ma1582
 // Cost grammar ("Costs N Actions") is @ma1883's ownership (#1105/#1107 split
 // honest) — no cost rows here. Per-monster economy walks folded into the
 // lifecycle + census dup-map; ticket legs live in their lane files:
@@ -354,6 +355,10 @@ describe('MA-0023 aboleth any-ally prerequisite + self-heal', () => {
 // #1108, @quetzal): dict-vs-bare-number skills shapes resolve here.
 describe('MA-0051 legendary ability-check rows', () => {
   const dracolich = monstersData.find(m => m.index === 'adult-blue-dracolich');
+  const CHECK = { ability_check: { ability: 'wisdom', skill: 'perception' } };
+  // #1116 invalid-shape rows below are LOUD by law — silence here, pin the
+  // bytes in the dedicated console.error test; vi.restoreAllMocks @:100.
+  beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); });
 
   it('data: Detect authors ability_check wisdom/perception; dict skills.Perception is +14', () => {
     const detect = dracolich.legendary_actions.find(a => a.name === 'Detect');
@@ -372,12 +377,41 @@ describe('MA-0051 legendary ability-check rows', () => {
     ['real dracolich dict shape: skill mod beats ability fallback', dracolich, { ability_check: { ability: 'wisdom', skill: 'perception' } }, 14],
     ['case-insensitive skill lookup', { skills: { PeRcEPTION: { modifier: 9 } } }, { ability_check: { ability: 'wisdom', skill: 'perception' } }, 9],
     ['bare-number skills shape (MA-2002 Smaug census): +11, not collapsed +0', { skills: { Perception: 11 } }, { ability_check: { ability: 'wisdom', skill: 'perception' } }, 11],
+    ['numeric-string primitive coerces (the ??-entry arm is FOR primitives — intact)', { skills: { Perception: '11' } }, { ability_check: { ability: 'wisdom', skill: 'perception' } }, 11],
+    ['explicit dict modifier:0 is honest +0 (authored zero, not a collapse)', { skills: { Perception: { modifier: 0 } } }, CHECK, 0],
+    ['#1116 dict w/o modifier (disk-census-zero INVALID shape) → loud null, never silent +0', { skills: { Perception: {} } }, CHECK, null],
+    ['#1116 dict modifier:null → null (closes the Number(null)=0 silent hole)', { skills: { Perception: { modifier: null } } }, CHECK, null],
+    ['#1116 dict modifier:"proficient" non-numeric → null', { skills: { Perception: { modifier: 'proficient' } } }, CHECK, null],
+    ['#1116 null skill entry → null (was Number(null)=0 silent)', { skills: { Perception: null } }, CHECK, null],
+    ['#1116 empty-string primitive → null (no Number("")=0)', { skills: { Perception: '' } }, CHECK, null],
     ['skill-less check falls to 3-letter abbr ability mod', { ability_score_modifiers: { wis: 3 } }, { ability_check: { ability: 'wisdom' } }, 3],
     ['negative ability mod preserved', { ability_score_modifiers: { wis: -2 } }, { ability_check: { ability: 'wisdom' } }, -2],
     ['unresolvable → null (caller refuses before spend)', {}, { ability_check: { ability: 'wisdom', skill: 'perception' } }, null],
     ['non-check row → null', dracolich, { name: 'Tail Attack' }, null],
   ])('%s', (_t, monster, action, bonus) => {
     expect(legendaryCheckBonus(monster, action)).toBe(bonus);
+  });
+
+  // #1116: dict-shaped entry lacking a numeric modifier was collapsing
+  // Number({}) → NaN → the finite ternary's :0 tail to a SILENT +0 → spend
+  // + d20+0 on garbage (dishonest RAW). Verdict by census (disk read
+  // 2026-10-22, monsters.json 807 skill rows): 770 dict-with-numeric-
+  // modifier + 37 bare-number + ZERO dict-without-modifier → invalid shape
+  // → LOUD console.error citing the entry bytes + null, so the consumer
+  // refuses with 'no-check-bonus' at ZERO spend (MonsterCardModal :913).
+  it('#1116 invalid shapes console.error citing entry bytes; honest shapes log nothing', () => {
+    expect(legendaryCheckBonus({ skills: { Perception: {} } }, CHECK)).toBeNull();
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error.mock.calls[0][0]).toContain('skills.Perception');
+    expect(console.error.mock.calls[0][0]).toContain('{}');
+    console.error.mockClear();
+    expect(legendaryCheckBonus({ skills: { Perception: { modifier: 'proficient' } } }, CHECK)).toBeNull();
+    expect(console.error.mock.calls[0][0]).toContain('{"modifier":"proficient"}');
+    console.error.mockClear();
+    expect(legendaryCheckBonus({ skills: { Perception: 11 } }, CHECK)).toBe(11);
+    expect(legendaryCheckBonus({ skills: { Perception: { modifier: 14 } } }, CHECK)).toBe(14);
+    expect(legendaryCheckBonus({ skills: { Perception: 0 } }, CHECK)).toBe(0);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('legendaryCheckLabel: Wisdom (Perception) / ability-only fallback', () => {

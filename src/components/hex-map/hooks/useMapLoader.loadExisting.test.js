@@ -19,8 +19,10 @@
  * Honest scoping notes (known source bugs, not masked here): fixtures use a
  * constant mapName, so the never-reset isInitialized (:161) and stale
  * hexMapNameRef (:210/:190) on a mapName change are not exercised, and the
- * :178 silent catch / :188-210 mount-save race are not surfaced by this
- * lane's resolving-load fixtures.
+ * :178 silent catch is not surfaced by this lane's resolving-load fixtures.
+ * The former :188-210 mount-save race is FIXED in the source (#800): the
+ * persistence guard is now the `loading` state, whose flip commit is what
+ * deterministically flushes this lane's loaded snapshot exactly once.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';

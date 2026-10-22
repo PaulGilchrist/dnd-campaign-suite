@@ -29,6 +29,7 @@
 // - Light melee seam → attackCalc2024-light-melee.test.js
 import { describe, it, expect, vi } from 'vitest';
 import { getAttacks } from './attackCalc2024.js';
+import DISK_EQUIPMENT from '../../../../public/data/equipment.json';
 
 // Unavoidable mock only: SSE/runtime-backed combat summary (the Swift Quiver
 // gate reads it on every getAttacks call; null = concentration inactive).
@@ -38,48 +39,20 @@ vi.mock('../../encounters/combatData.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Fixtures — copied from public/data/equipment.json (Hand Crossbow, Heavy
-// Crossbow, Light Crossbow entries; verified against disk 2026-10-20). The
-// disk catalog's ONLY Light Ranged weapons are Hand Crossbow and Heavy
-// Crossbow (Heavy Crossbow carries 'Light' + 'Two-Handed' on disk — pinned
-// as-authored). The retired stub fixtures fabricated bytes: Dart carried a
-// 'Light' property (disk: ['Finesse','Thrown'] — Dart never enters this
-// seam), Sling was listed 'Light' (disk: ['Ammunition']), and Dart 1d8
-// (disk: 1d4).
+// Fixtures — DISK-imported rows (never-retype law #1362). The retired
+// retyped copies pinned the disk defect at 2026-10-20 state: Heavy Crossbow
+// carried a fabricated 'Light' property on disk which wrongly made it
+// eligible for the light dual-wield seam (#1239); the row was corrected
+// (fix#90) and the truth-table flipped to lawful here. PHB law (every
+// edition): Heavy Crossbow is Ammunition/Heavy/Loading/Two-Handed — never
+// Light. The disk catalog's Light Ranged weapon is Hand Crossbow only.
 // ---------------------------------------------------------------------------
 
-const HAND_CROSSBOW = {
-  name: 'Hand Crossbow',
-  equipment_category: 'Weapon',
-  weapon_category: 'Martial',
-  weapon_range: 'Ranged',
-  damage: { damage_dice: '1d6', damage_type: 'Piercing' },
-  range: { normal: 30, long: 120 },
-  properties: ['Ammunition', 'Light', 'Loading'],
-  mastery: 'Vex',
-};
+const diskRow = (name) => DISK_EQUIPMENT.find(e => e.name === name);
 
-const HEAVY_CROSSBOW = {
-  name: 'Heavy Crossbow',
-  equipment_category: 'Weapon',
-  weapon_category: 'Martial',
-  weapon_range: 'Ranged',
-  damage: { damage_dice: '1d10', damage_type: 'Piercing' },
-  range: { normal: 100, long: 400 },
-  properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
-  mastery: 'Push',
-};
-
-const LIGHT_CROSSBOW = {
-  name: 'Light Crossbow',
-  equipment_category: 'Weapon',
-  weapon_category: 'Simple',
-  weapon_range: 'Ranged',
-  damage: { damage_dice: '1d8', damage_type: 'Piercing' },
-  range: { normal: 80, long: 320 },
-  properties: ['Ammunition', 'Loading', 'Two-Handed'],
-  mastery: 'Slow',
-};
+const HAND_CROSSBOW = diskRow('Hand Crossbow');
+const HEAVY_CROSSBOW = diskRow('Heavy Crossbow');
+const LIGHT_CROSSBOW = diskRow('Light Crossbow');
 
 const CATALOG = [HAND_CROSSBOW, HEAVY_CROSSBOW, LIGHT_CROSSBOW];
 
@@ -97,6 +70,20 @@ const char = (equipped, feats = []) => ({
   activeBuffs: [],
   class: { name: 'Fighter' },
   feats,
+});
+
+// ---------------------------------------------------------------------------
+// Disk law pins (#1239 / fix#90): guards the corrected rows against a
+// re-typed 'Light' ever returning to the Heavy Crossbow disk row.
+// ---------------------------------------------------------------------------
+
+describe('light ranged seam - disk law pins (#1239)', () => {
+  it('Heavy Crossbow is NOT Light on disk; Hand Crossbow stays Light; Light Crossbow stays non-Light', () => {
+    expect(HEAVY_CROSSBOW).toBeDefined();
+    expect(HEAVY_CROSSBOW.properties).not.toContain('Light');
+    expect(HAND_CROSSBOW.properties).toContain('Light');
+    expect(LIGHT_CROSSBOW.properties).not.toContain('Light');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -150,7 +137,7 @@ describe('attackCalc2024 - light ranged weapons', () => {
       ],
     },
     {
-      label: 'two Light, different dice: Heavy Crossbow 1d10 outranks equipped-order-first Hand Crossbow for Action; off-hand row default dice-only 1d6',
+      label: 'Light + non-Light: Hand Crossbow lone Light (<2 Light gate) and Heavy Crossbow (NOT Light, #1239) both take Action rows',
       equipped: ['Hand Crossbow', 'Heavy Crossbow'], feats: [],
       rows: [
         {
@@ -159,20 +146,20 @@ describe('attackCalc2024 - light ranged weapons', () => {
           hitBonus: 5,
           hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
           range: 100, type: 'Action', weaponType: '', mastery: 'Push',
-          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+          properties: ['Ammunition', 'Loading', 'Two-Handed'],
         },
         {
-          name: 'Hand Crossbow', damage: '1d6', damageType: 'Piercing',
-          damageFormula: 'Damage Formula = Weapon (1d6)',
+          name: 'Hand Crossbow', damage: '1d6+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d6) + Dexterity Bonus (3)',
           hitBonus: 5,
           hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
-          range: 30, type: 'Bonus Action', weaponType: 'ranged', mastery: 'Vex',
+          range: 30, type: 'Action', weaponType: '', mastery: 'Vex',
           properties: ['Ammunition', 'Light', 'Loading'],
         },
       ],
     },
     {
-      label: 'Crossbow Expert is Hand Crossbow ONLY: two Heavy Crossbows leave the Bonus row dice-only 1d10',
+      label: 'two Heavy Crossbows: both non-Light → both Action rows; the light seam refuses Heavy Crossbow, Crossbow Expert fabricates no Bonus row',
       equipped: ['Heavy Crossbow', 'Heavy Crossbow'], feats: ['Crossbow Expert'],
       rows: [
         {
@@ -181,15 +168,15 @@ describe('attackCalc2024 - light ranged weapons', () => {
           hitBonus: 5,
           hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
           range: 100, type: 'Action', weaponType: '', mastery: 'Push',
-          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+          properties: ['Ammunition', 'Loading', 'Two-Handed'],
         },
         {
-          name: 'Heavy Crossbow', damage: '1d10', damageType: 'Piercing',
-          damageFormula: 'Damage Formula = Weapon (1d10)',
+          name: 'Heavy Crossbow', damage: '1d10+3', damageType: 'Piercing',
+          damageFormula: 'Damage Formula = Weapon (1d10) + Dexterity Bonus (3)',
           hitBonus: 5,
           hitBonusFormula: 'To Hit Bonus Formula = Dexterity Bonus (3) + Proficiency (2)',
-          range: 100, type: 'Bonus Action', weaponType: 'ranged', mastery: 'Push',
-          properties: ['Ammunition', 'Light', 'Loading', 'Two-Handed'],
+          range: 100, type: 'Action', weaponType: '', mastery: 'Push',
+          properties: ['Ammunition', 'Loading', 'Two-Handed'],
         },
       ],
     },

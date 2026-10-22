@@ -31,6 +31,16 @@ function findFrightfulPresenceEffect(targetName, campaignName) {
 // "or the effect ends for it" clause lands here).
 export async function trackFrightfulPresence({ campaignName, attackerName, targetName, saveType, saveDc }) {
     if (!campaignName || !attackerName || !targetName || saveDc == null) return;
+    // #1368(c): re-arm dedup. registerTargetEffect dedups the te itself
+    // (target+effect+source, fix#93 census) but addExpiration APPENDS — every
+    // repeat trigger stacked a second 10-round clock, and at expiry each twin
+    // fired its own frightful_presence_immunity_grant leg (duplicate immunity
+    // clocks + duplicate granted logs). A live same-source te means the clock
+    // and its immunity leg are already armed — skip all writes (dirty-guard
+    // shape, same as stripFrightened/removeFrightfulPresenceTe below).
+    const liveEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const liveTe = liveEffects.find(te => te.effect === FP_TE_EFFECT && te.target === targetName && te.source === attackerName);
+    if (liveTe) return;
     registerTargetEffect(campaignName, targetName, FP_TE_EFFECT, attackerName, {
         condition: 'frightened',
         saveType: saveType || 'WIS',
@@ -64,6 +74,12 @@ export async function trackFrightfulPresence({ campaignName, attackerName, targe
 // are enforced by the MA-0030 immunity gate (gazeImmunityActive reads the
 // effect key from the row's authored success_immunity).
 export async function grantFrightfulPresenceImmunity({ campaignName, attackerName, targetName, reason }) {
+    // #1368(c) mirror: a live same-source immunity te means its 14400-round
+    // clock is already armed — re-granting appends duplicate clocks + duplicate
+    // granted logs (te write itself is deduped upstream, fix#93). Skip.
+    const liveEffects = getRuntimeValue('campaign', 'targetEffects', campaignName) || [];
+    const liveImmunity = liveEffects.find(te => te.effect === FP_IMMUNITY_TE_EFFECT && te.target === targetName && te.source === attackerName);
+    if (liveImmunity) return;
     registerTargetEffect(campaignName, targetName, FP_IMMUNITY_TE_EFFECT, attackerName, {
         duration: '24_hours',
         rounds: FP_IMMUNITY_ROUNDS,
@@ -105,16 +121,25 @@ function removeFrightfulPresenceTe(targetName, campaignName) {
 
 // NPC repeats auto-roll inline (applySleepTurnEnd shape); PCs get a queued
 // save listener prompt at the end of their own turn.
+// #1368(a/b): the ability is read from the te bytes at consumption — never
+// hardcoded. Prompt + bonus both key on te.saveType (disk tokens: 'Charisma'
+// for Adult White/Gold FP, 'Wisdom' for Dracolich/Tarrasque/Black/Smaug).
+// SavePromptModal renders `(saveType).toUpperCase()` and re-derives the bonus
+// via normalizeSaveType(saveType).toLowerCase() (CLA-303) — 'WIS' over a CHA
+// te made the player roll the WRONG save. Prompt token: uppercase abbrev
+// (repeatSaveService family); bonus key: te full word + lowercase-abbrev
+// fallback (MA-0303 key-mismatch family, CLA-303) — no cross-ability fallback.
 async function resolveFrightfulPresenceRepeatSave(csCreature, targetName, saveType, saveDc, campaignName) {
     if (csCreature?.type !== 'player') {
-        const key = lower(saveType) === 'wis' ? 'wis' : lower(saveType);
-        const saveBonus = csCreature?.saveBonuses?.[key] ?? csCreature?.saveBonuses?.wis ?? 0;
+        const bonuses = csCreature?.saveBonuses || {};
+        const key = lower(saveType);
+        const saveBonus = Number(bonuses[key] ?? bonuses[key.substring(0, 3)] ?? 0);
         const roll = Math.floor(Math.random() * 20) + 1;
         return { roll, saveBonus, success: (roll + saveBonus) >= saveDc };
     }
     const { promise } = createSaveListener(campaignName, {
         targetName,
-        saveType: 'WIS',
+        saveType: String(saveType).toUpperCase().substring(0, 3),
         saveDc,
         dcSuccess: 'none',
         condition: 'Frightful Presence (repeat save)',
@@ -152,8 +177,8 @@ export async function applyFrightfulPresenceTurnEnd(campaignName, targetName) {
         total,
         saveBonus,
         description: success
-            ? `${targetName} succeeded its repeat Wisdom save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — Frightful Presence ends; immune to ${attackerName}'s Frightful Presence for 24 hours.`
-            : `${targetName} failed its repeat Wisdom save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — remains Frightened.`,
+            ? `${targetName} succeeded its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — Frightful Presence ends; immune to ${attackerName}'s Frightful Presence for 24 hours.`
+            : `${targetName} failed its repeat ${saveType} save (DC ${saveDc}, rolled ${roll} + ${saveBonus} = ${total}) — remains Frightened.`,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[frightfulPresenceService:repeat-result]', e); });
 

@@ -30,14 +30,15 @@ vi.mock('../../character/race-rules/index.js', () => ({
   rules2024: { getRace: vi.fn(), getSenses: vi.fn(), getTraits: vi.fn() },
 }));
 
-// No getCarryingCapacity stub: rules.js:394-399 routes carryingCapacity through
-// abilityCalc.getHitPoints (capacity pin lives in rules-core.test.js:95-114).
+// #1251 FIXED: rules.js:394-399 now dispatches abilityCalc.getCarryingCapacity (bundle
+// forwards it, rules-core.js:23) — stub completes the factory so the trunk :553 write
+// resolves; capacity law pins live in core/rules-carryingCapacity.test.js + rules-core.test.js.
 vi.mock('./abilityCalc.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(() => 150),
 }));
 
 vi.mock('./abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(() => 150),
 }));
 
 vi.mock('./attackCalc.js', () => ({

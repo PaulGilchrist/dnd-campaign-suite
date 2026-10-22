@@ -7,9 +7,11 @@ import { campaignMapsDir, normalizeMapFile } from '../utils/campaignPaths.js';
 
 const router = express.Router();
 
-// Helper to sanitize map names to filenames
-const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
-const toKebabCase = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+// Helper to sanitize map names to filenames (mirrors src/services/maps/mapsService.js —
+// identical bytes, pinned by maps-kebab-parity.test.js; strip trailing .json so
+// 'Cave.json' saves as cave.json and stays reachable by the client's 'cave' key)
+export const toKebabCase = (name) => name.toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
 // Mirror the authoritative active map into the '__map__' runtime key so range
 // gates (rangeCheck.js) and every client see the same map the /maps list reports.

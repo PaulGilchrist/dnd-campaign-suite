@@ -116,10 +116,24 @@ describe('ConditionEffectBadges - Save & Ability Check Badges', () => {
             name: 'all-checks Adv Check falls back from missing ability list',
             effects: { abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight'] },
             label: 'Adv Check',
-            // Pinned as-rendered: the builder double-wraps the reason text
-            // (jsx:100-101 embeds parens in reasonText, then wraps again) —
-            // reported as a cosmetic source bug, not smoothed over here.
-            title: 'Advantage on all ability checks ( (Foresight))',
+            // #829 FIXED: was ' ( (Foresight))' (builder double-wrapped —
+            // jsx:100 embedded parens in reasonText, then the assembler
+            // wrapped again). Builder now emits bare reasons; the assembler
+            // owns the parens, matching buildAttackAdvantageBadge and
+            // buildSaveAdvantageBadge.
+            title: 'Advantage on all ability checks (Foresight)',
+        },
+        {
+            name: 'all-checks Adv Check joins multiple reasons comma-space',
+            effects: { abilityCheckAdvantage: true, abilityCheckAdvantageReasons: ['Foresight', 'Guidance'] },
+            label: 'Adv Check',
+            title: 'Advantage on all ability checks (Foresight, Guidance)',
+        },
+        {
+            name: 'all-checks Adv Check omits the paren suffix with no reasons',
+            effects: { abilityCheckAdvantage: true, abilityCheckAdvantageReasons: [] },
+            label: 'Adv Check',
+            title: 'Advantage on all ability checks',
         },
         {
             name: 'hex save disadvantage joins the ability list in order',

@@ -22,7 +22,7 @@
  * catch at :178 and asserts the intended fall-through outcome only.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
@@ -75,27 +75,40 @@ const renderNewMap = (chars = characters) =>
     renderHook(() => useMapLoader(CAMPAIGN, MAP, chars));
 
 // calls[0] is always the exact direct create-save fired inside
-// createAndSaveNewMap. The persistence-effect envelope (adds displayName/
-// rivers/weather/pan/travelState slots around the same fresh state) may
-// also flush at mount — the source's await seam between the setters and
-// hasLoaded.current makes that effect-flush scheduling-dependent — so a
-// second save is allowed but pinned exactly when present, never beyond.
+// createAndSaveNewMap; calls[1] is the persistence-effect mount envelope
+// (same fresh state plus displayName/rivers/pan/weather/travelState slots).
+// #800 fixed: the persistence effect now guards on the `loading` STATE with
+// it in its deps, so the post-load flush happens EXACTLY once regardless of
+// when the create-save promise resolves relative to the passive-effect flush
+// (the old hasLoaded.current ref flipped across an await seam, making the
+// flush scheduling-dependent — save counts of 1-or-2 were observed in the
+// same run). Both calls pinned exactly, every run.
 const expectFreshCreateSave = (chars = characters) => {
     const calls = mapsService.saveMapData.mock.calls;
-    expect(calls.length).toBeLessThanOrEqual(2);
+    expect(calls).toHaveLength(2);
     expect(calls[0]).toEqual([CAMPAIGN, MAP, freshPayload(chars)]);
-    if (calls.length === 2) {
-        expect(calls[1]).toEqual([CAMPAIGN, MAP, {
-            ...freshPayload(chars),
-            displayName: MAP,
-            rivers: [],
-            panX: 0,
-            panY: 0,
-            weather: null,
-            travelState: null,
-        }]);
-    }
+    expect(calls[1]).toEqual([CAMPAIGN, MAP, {
+        ...freshPayload(chars),
+        displayName: MAP,
+        rivers: [],
+        panX: 0,
+        panY: 0,
+        weather: null,
+        travelState: null,
+    }]);
 };
+
+// Fresh envelope as the persistence effect writes it (mount snapshot of the
+// fresh state), for standalone exact pins.
+const freshEnvelope = (chars = characters) => ({
+    ...freshPayload(chars),
+    displayName: MAP,
+    rivers: [],
+    panX: 0,
+    panY: 0,
+    weather: null,
+    travelState: null,
+});
 
 const waitForLoad = async (result) => {
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -115,7 +128,7 @@ describe('useMapLoader - creating new map', () => {
         const { result } = renderNewMap();
         await waitForLoad(result);
 
-        // Direct create-save (+ optional exact mount envelope) once each.
+        // Direct create-save then exact mount envelope — both, once each.
         expectFreshCreateSave();
 
         // Exposed state equals that payload exactly — full plains grid
@@ -166,5 +179,48 @@ describe('useMapLoader - creating new map', () => {
         expect(result.current.mapData).toEqual(freshPayload());
         expect(result.current.marchingOrder).toEqual(['Thorin', 'Gandalf']);
         expect(result.current.loading).toBe(false);
+    });
+
+    // #800 RACE-DETERMINISTIC pin: repeated fresh mounts must produce the
+    // IDENTICAL two-save list every time. Pre-fix, mounts in the same run
+    // split between 1 and 2 saves depending on whether the create-save
+    // promise resolved before the setter-batch's passive-effect flush.
+    it('persists exactly create-save + mount envelope on every one of 5 repeated mounts', async () => {
+        for (let i = 0; i < 5; i++) {
+            mapsService.saveMapData.mockClear();
+            const { result, unmount } = renderNewMap();
+            await waitForLoad(result);
+
+            const calls = mapsService.saveMapData.mock.calls;
+            expect(calls, `mount ${i} save count`).toHaveLength(2);
+            expect(calls[0], `mount ${i} create payload`).toEqual([CAMPAIGN, MAP, freshPayload()]);
+            expect(calls[1], `mount ${i} mount envelope`).toEqual([CAMPAIGN, MAP, freshEnvelope()]);
+            unmount();
+        }
+    });
+
+    // #800 deferred arm: hold the create-save open past the setter-batch
+    // flush so the old ref-guard race definitely takes its "not-at-all"
+    // path, then resolve it — the loading-state guard must still flush the
+    // mount envelope exactly once after load settles.
+    it('flushes the mount envelope exactly once when the create-save resolves after the setter flush', async () => {
+        let resolveSave;
+        mapsService.saveMapData.mockReturnValue(new Promise(resolve => { resolveSave = resolve; }));
+
+        const { result } = renderNewMap();
+        // Let the fresh-state setters commit and their passive-effect flush
+        // run while the create-save is still pending.
+        await act(async () => {});
+        expect(mapsService.saveMapData.mock.calls).toHaveLength(1);
+
+        await act(async () => { resolveSave(); });
+        await waitForLoad(result);
+        // Give the loading-flush's passive effect its run.
+        await act(async () => {});
+
+        const calls = mapsService.saveMapData.mock.calls;
+        expect(calls).toHaveLength(2);
+        expect(calls[0]).toEqual([CAMPAIGN, MAP, freshPayload()]);
+        expect(calls[1]).toEqual([CAMPAIGN, MAP, freshEnvelope()]);
     });
 });

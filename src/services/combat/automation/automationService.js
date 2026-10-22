@@ -130,6 +130,7 @@ export function getEvasionEffects(features) {
         if (!feature?.automation) return;
         const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation];
         for (const auto of automations) {
+            if (!auto) continue;
             if (auto.type === 'evasion') {
                 effects.push({
                     source: feature.name,

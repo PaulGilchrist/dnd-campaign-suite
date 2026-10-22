@@ -68,6 +68,7 @@ const CENSUS = [
   ['weakening_breath', 'Weakening Breath', 'fa-hand-fist', 'effect-disadvantage', 'Saves & Checks', ['source', 'dc', 'saveType', 'damageSubtractDie'], { damageSubtractDie: '1d6' }],
   ['hex_ability_check_disadvantage', 'Check Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source'], { ability: 'wis' }],
   ['dex_save_disadvantage', 'DEX Save Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks'],
+  ['wisdom_save_advantage', 'WIS Save Adv', 'fa-shield', 'effect-buff', 'Saves & Checks', ['source']],
   ['disadvantage_perception_checks', 'Perception Disadv', 'fa-eye-slash', 'effect-disadvantage', 'Saves & Checks'],
   ['hex_save_disadvantage', 'Save Disadv', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source'], { ability: 'wis' }],
   ['ability_save_disadvantage', 'Save Disadv (Ability)', 'fa-shield', 'effect-disadvantage', 'Saves & Checks', ['ability', 'source']],

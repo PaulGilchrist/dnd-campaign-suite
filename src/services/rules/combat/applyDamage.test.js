@@ -11,9 +11,11 @@
 //   - player concentration prompt payload + Relentless Hunter exemption → applyDamage.relentlessHunter.test.js
 //   - buff/aura/chooser/silence/dc-'full'/dominate/hypnotic/zero-HP-feature seams → their lanes
 //   - Projected Ward reaction CLICK producer (arms arcaneWardActive/arcaneWardHp) → arcaneWardHandler.test.js
-// Honest note (#1185): applyDamage.js:451 reads currentHitPoints WITHOUT campaignName.
-// The keyed store stub below does not model campaign boundaries, so no leg here can
-// discriminate that defect — runtime-store lanes own the campaign-keying contract.
+// Honest note (#1185 FIXED): applyDamage.js:451 now passes campaignName like
+// siblings :432/:443/:753 (consistency only — getRuntimeValue is arity-2,
+// useRuntimeState.js:63, the 3rd arg is structurally discarded store-wide;
+// true campaign isolation is deferred infra #1520). Parity-by-code-review;
+// arg-shape pinned in applyDamage.auraWarding.test.js T1b.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -54,6 +56,7 @@ vi.mock('./rangeValidation.js', () => ({
 // ── Imports ─────────────────────────────────────────────────────
 
 import { applyDamageToTarget } from './applyDamage.js';
+import { rollD20 } from '../../dice/diceRoller.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
@@ -241,8 +244,9 @@ describe('applyDamageToTarget', () => {
     expect(conditionLogs().some(b => b.condition === 'Charmed')).toBe(false);
 
     // monster: 'charmed' stripped ('poisoned' preserved); NPC charm reason byte differs.
-    // NOTE (reported, not pinned): frightened+charmed held TOGETHER resurrects frightened
-    // — both removals filter the same single-read snapshot (:552-557, last-write-wins).
+    // Single-condition arms only here — the frightened+charmed COEXIST arm (former
+    // #1207 resurrect defect, FIXED by the fix#27 §39 merged write at
+    // removeCombatConditionsOnDamage) is pinned in its own it() below.
     vi.clearAllMocks();
     const wolf = makeMonster('Wolf', { maxHp: 10, currentHp: 10 });
     store = stubStore({ 'Wolf.activeConditions': ['charmed', 'poisoned'] });
@@ -260,6 +264,65 @@ describe('applyDamageToTarget', () => {
     expect(conditionLogs().find(b => b.condition === 'Charmed')).toEqual(
       expect.objectContaining({ characterName: 'Bard', reason: 'took damage (Friends)' }),
     );
+  });
+
+  it('#1207 coexist: one hit breaking frightened AND charmed lands ONE merged write — neither condition resurrects', async () => {
+    // fix#27 §39 canon (mirrors useInitiativeEffects.js:178-184 / concentrationService.js:221-227):
+    // both removals accumulate off the SINGLE :558 snapshot into ONE activeConditions write.
+    // Pre-fix bytes: the frightened-write put ['charmed','poisoned'] down, then the charmed-write
+    // re-filtered the SAME stale snapshot and wrote ['Frightened','poisoned'] last — resurrecting
+    // Frightened (last-writer-wins on stale base, found live by falsifier, was commented not pinned).
+    // #1348 distinguishable fixture: fresh name/bytes vs sibling arms (Ranger/Wolf/Bard/Frosty).
+    vi.clearAllMocks();
+    const ghast = makeMonster('Ghast', { maxHp: 26, currentHp: 26 });
+    const store = stubStore({
+      'Ghast.currentHitPoints': 26,
+      'Ghast.hitPoints': 26,
+      'Ghast.activeConditions': ['Frightened', 'charmed', 'poisoned'],
+    });
+
+    await applyDamage(makeCs(ghast), 'Ghast', 7, ['Slashing']);
+
+    // Exactly ONE condition-array write, fully filtered by both keys — byte-exact tuple.
+    const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+    expect(conditionWrites).toEqual([['Ghast', 'activeConditions', ['poisoned'], CAMPAIGN]]);
+    // Read-your-write parity on the Map-backed stub (#1517-faithful): final store byte
+    // contains NEITHER broken condition — no resurrection.
+    expect(store.get('Ghast.activeConditions')).toEqual(['poisoned']);
+    expect(store.get('Ghast.activeConditions')).not.toContain('Frightened');
+    expect(store.get('Ghast.activeConditions')).not.toContain('charmed');
+    // Per-condition removal logs stay SEPARATE facts (per-condition keys, honest split),
+    // in the source's frightened-then-charmed decision order.
+    const logs = conditionLogs();
+    expect(logs).toEqual([
+      expect.objectContaining({ type: 'condition', action: 'removed', characterName: 'Ghast', condition: 'Frightened', reason: 'took damage' }),
+      expect.objectContaining({ type: 'condition', action: 'removed', characterName: 'Ghast', condition: 'Charmed', reason: 'took damage (Charm)' }),
+    ]);
+  });
+
+  it('#1207 dominated coexist: frightened strips (charmed arm guarded off) — single write, charmed retained', async () => {
+    // The !domination guard (:560) is UNTOUCHED by the merge: a dominated target takes
+    // the repeat-save lane for its charm (SP-037), but damage still ends Frightened
+    // unconditionally (:547). The merged write must carry the frighten strip ALONE —
+    // 'charmed' survives verbatim in the written bytes.
+    vi.clearAllMocks();
+    const domina = makeCreature('Domina', { concentration: { id: 'c1', spell: 'Dominate Person', dc: null } });
+    const crawler = makeMonster('Crawler', { maxHp: 22, currentHp: 22 });
+    const store = stubStore({
+      'Crawler.currentHitPoints': 22,
+      'Crawler.activeConditions': ['frightened', 'charmed'],
+      'Domina.pendingExpirations': [{ target: 'Crawler', effects: [{ type: 'dominated' }] }],
+    });
+    rollD20.mockReturnValue(2); // repeat WIS save vs DC 17 fails — domination latches
+
+    await applyDamage({ round: 1, creatures: [domina, crawler] }, 'Crawler', 4, ['Bludgeoning'], {
+      characters: [makeCharacter('Crawler'), { name: 'Domina', computedStats: { spellAbilities: { saveDc: 17 } } }],
+    });
+
+    const conditionWrites = setRuntimeValue.mock.calls.filter(c => c[1] === 'activeConditions');
+    expect(conditionWrites).toEqual([['Crawler', 'activeConditions', ['charmed'], CAMPAIGN]]);
+    expect(store.get('Crawler.activeConditions')).toEqual(['charmed']);
+    expect(conditionLogs().map(b => [b.condition, b.action])).toEqual([['Frightened', 'removed']]);
   });
 
   it('suppresses every damage-triggered effect when immunity zeroes the hit', async () => {

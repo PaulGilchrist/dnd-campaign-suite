@@ -28,11 +28,12 @@
 //                                                             Stone hardcode)
 //  rest zero-te / null-combat-summary ............. -> T2 / T3 (te sweep is cs-independent — honest pin)
 //  invisibility x2 (vacuous objectContaining({})) .. -> T5  (both flag prefixes + other-caster falsifier, byte pin)
-//  calm restore x2 .................................. -> T6  (restore + skip-existing + multi-suppressed defect)
-//  calm buffs / protection from poison / faerie ..... -> T9  (aura+buff sweeps unified; name-only over-removals
-//                                                             pinned honestly, #871 class)
+//  calm restore x2 .................................. -> T6  (restore + skip-existing + ONE merged write per target
+//                                                             — #990-fix(a) flipped, fix#27 §39 canon shape)
+//  calm buffs / protection from poison / faerie ..... -> T9  (aura+buff sweeps unified; caster-attributed strips only
+//                                                             — #990-fix(b)(c) flipped, foreign-stamped buffs survive)
 //  holy aura 'in order' ............................. -> T9  (no-duration holy te proves the lane fires past the
-//                                                             generic sweep; unconditional caster-key reset pinned)
+//                                                             generic sweep; dirty-guarded caster-key reset pinned #990-fix(d))
 //  condition field / conditions array / retained .... -> T7  (one full-semantics test on a tasha-shaped te — the
 //                                                             real producer stamps conditions[] + duration
 //                                                             'concentration', so the dedicated tasha lane is inert on
@@ -44,7 +45,22 @@
 //  resilient sphere te .............................. -> removed (producer stamps duration:'concentration'+source
 //                                                             — generic sweep already drains; verified
 //                                                             resilientSphereHandler.js:35-41, lane is a no-op re-scan)
-//  byte-inert zero-cleanup .......................... -> T13
+//  byte-inert zero-cleanup .......................... -> T13 (+ :450-451/#990-fix(d) dirty-guard flipped)
+//
+// #990 filter audit — FIXED 2026-10-22 (this lane, concentrationService.js):
+//  (a) :213-217 restoreSuppressedConditions spliced per-loop off one stale snapshot -> last write dropped earlier
+//      restores (multi-missing). Now ONE merged write per target, mirroring fix#27's restored twin at
+//      useInitiativeEffects.js:170-184 + producer canon calmEmotionsHandler.js:190-194. T6 flipped.
+//  (b) :483 cleanupBuffsByName ignored the casterName its sole caller (:381) passes -> cross-caster strip.
+//      Now name AND caster attribution (b.source || b.sourceCharacter), T9 flipped.
+//  (c) :225-227 removeCalmEmotionsBuffs stripped ANY creature's Calm buff on ANY caster's break -> caster-scoped,
+//      matching the calm buff's producer stamp (calmEmotionsHandler.js:182-188 sourceCharacter) and the expiration
+//      consumer clearExpirationEffects.js:322. T9 flipped.
+//  (d) minor :450-451/:469 unconditional writes -> dirty-guarded (zero writes when unchanged). T12/T13 flipped.
+// Intentional wildcard STRIPS kept by census (never a bug): the roster-wide spell cleaners
+// ('Protection from Energy' / 'Circle of Power' / INITIATIVE_CLEARED_EFFECT_KEYS live in
+// useInitiativeEffects.js — different lane, untouched) and SPELL_RUNTIME_CLEANERS['Expeditious Retreat']
+// :179-180, whose Dash-buff producer stamps NO source (sp128 lane pins that over-purge honestly, #993).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Faithful two-tier runtime store: every read sees the result of prior writes,
@@ -303,23 +319,34 @@ describe('cleanupConcentrationEffects — break cleanup filter semantics', () =>
         expect(teWrites()).toEqual([['campaign', 'targetEffects', [CHARLIE_VIS], CAMPAIGN, true]])
     })
 
-    it('calm_emotions immunity restores suppressed conditions with the te casing, never duplicating, and multi-suppressed restores overwrite (pinned defect)', async () => {
-        // Falsifier leg: Bob already has 'poisoned' — only the missing condition is appended, once.
+    it('calm_emotions immunity restores suppressed conditions — ONE merged write per target, exact final bytes, never duplicating (#990-fix(a) flipped)', async () => {
+        // Falsifier leg: Bob already has 'poisoned' — only the missing condition is appended, once, one write.
         const calmBob = { source: 'Alice', duration: 'concentration', effect: 'calm_emotions', mode: 'immunity', suppressedConditions: ['frightened', 'poisoned'], target: 'Bob' }
-        // Defect leg (#871 class): the loop re-splices the ORIGINAL captured list each iteration, so with
-        // two missing suppressed conditions the last write drops the earlier restore. Pinned honestly here —
-        // concentrationService.js:213-217; update this pin when fixed.
+        // Multi-missing leg (former pinned defect #990 T6, concentrationService.js:213-217): pre-fix every loop
+        // iteration re-spliced the ORIGINAL snapshot and wrote per condition, so the LAST write dropped the earlier
+        // restore — captured via spies pre-fix as two writes [['frightened'],['paralyzed']], final byte
+        // ['paralyzed']. #990-fix(a): fix#27 §39 shape (useInitiativeEffects.js:178-184) — accumulate into ONE
+        // merged write per target; final bytes ['frightened','paralyzed'], exactly one write.
         const calmCharlie = { source: 'Alice', duration: 'concentration', effect: 'calm_emotions', mode: 'immunity', suppressedConditions: ['frightened', 'paralyzed'], target: 'Charlie' }
-        seedCampaign([calmBob, calmCharlie])
+        // No-change arm (#1512-restore-arms parity): Dave holds both suppressed conditions (one opposite-cased) —
+        // case-insensitive skip-existing means restored === conditions, ZERO writes; falsifies an
+        // unguarded always-write.
+        const calmDave = { source: 'Alice', duration: 'concentration', effect: 'calm_emotions', mode: 'immunity', suppressedConditions: ['frightened', 'paralyzed'], target: 'Dave' }
+        seedCampaign([calmBob, calmCharlie, calmDave])
         setCs([{ name: 'Bob' }, { name: 'Charlie' }])
         seed('Bob', { activeConditions: ['poisoned'] })
+        seed('Dave', { activeConditions: ['Frightened', 'paralyzed'] })
 
         await cleanupConcentrationEffects('Alice', 'Calm Emotions', CAMPAIGN)
 
         expect(h.doc('Bob').activeConditions).toEqual(['poisoned', 'frightened'])
-        expect(callsFor('Bob', 'activeConditions')).toHaveLength(1)
-        expect(callsFor('Charlie', 'activeConditions').map(c => c[2])).toEqual([['frightened'], ['paralyzed']])
-        expect(h.doc('Charlie').activeConditions).toEqual(['paralyzed'])
+        expect(callsFor('Bob', 'activeConditions')).toEqual([['Bob', 'activeConditions', ['poisoned', 'frightened'], CAMPAIGN]])
+        // #990-fix(a): exact final bytes + exactly ONE merged write (te casing preserved).
+        expect(callsFor('Charlie', 'activeConditions')).toEqual([['Charlie', 'activeConditions', ['frightened', 'paralyzed'], CAMPAIGN]])
+        expect(h.doc('Charlie').activeConditions).toEqual(['frightened', 'paralyzed'])
+        // No-change arm — zero writes, store byte-identical.
+        expect(callsFor('Dave', 'activeConditions')).toHaveLength(0)
+        expect(h.doc('Dave').activeConditions).toEqual(['Frightened', 'paralyzed'])
         expect(te()).toEqual([])
     })
 
@@ -365,10 +392,11 @@ describe('cleanupConcentrationEffects — break cleanup filter semantics', () =>
         expect(teWrites()).toHaveLength(0)
     })
 
-    it('buff sweeps strip the casters leftovers by name+source where checked — and by name-only where not (pinned defects)', async () => {
+    it('buff sweeps strip caster-attributed leftovers only — foreign caster\'s stamped buffs survive byte-intact (#990-fix(b)(c) flipped)', async () => {
         const AoL_A = { name: 'Aura of Life', sourceCharacter: 'Alice' }
         const PFP_A = { name: 'Protection from Poison', sourceCharacter: 'Alice' }
         const FF_A = { name: 'Faerie Fire', source: 'Alice' }
+        const CE_A = { name: 'Calm Emotions', sourceCharacter: 'Alice' }
         const HASTE_B = { name: 'Haste' }
         const AoL_C = { name: 'Aura of Life', sourceCharacter: 'Charlie' }
         const FF_C = { name: 'Faerie Fire', source: 'Charlie' }
@@ -382,24 +410,31 @@ describe('cleanupConcentrationEffects — break cleanup filter semantics', () =>
         ])
         setCs([{ name: 'Bob' }, { name: 'Charlie' }])
         seed('Bob', {
-            activeBuffs: [AoL_A, PFP_A, FF_A, HASTE_B],
+            activeBuffs: [AoL_A, PFP_A, FF_A, CE_A, HASTE_B],
             auraOfLifeHpMaxProtected: true,
             auraOfPuritySaveAdvantageConditions: ['frightened'],
         })
         seed('Charlie', { activeBuffs: [AoL_C, FF_C, CE_C, HASTE_C] })
+        // Dirty arms (#990-fix(d)): Alice HOLDS holy-aura keys — the reset must fire (clean arm pinned
+        // zero-write in T13).
+        seed('Alice', { holyAuraTargets: ['Bob'], holyAuraSaveDc: 15 })
 
         await cleanupConcentrationEffects('Alice', 'Faerie Fire', CAMPAIGN)
 
+        // Caster-match strips (every attribution channel): calm lane (:225 sourceCharacter, matches the
+        // calmEmotionsHandler.js:186 stamp), cleanupBuffsByName (:483 name+attribution — FF_A's producer stamps
+        // b.source, faerieFireHandler.js:56), aura/PFP/holy lanes unchanged.
         expect(h.doc('Bob').activeBuffs).toEqual([HASTE_B])
-        // Pinned defects (#871 over-removal class): Charlie's own buffs stripped by the name-only
-        // sweeps — cleanupBuffsByName (concentrationService.js:483, no source check) and
-        // removeCalmEmotionsBuffs (line 225, unconditional + no source check). Update when fixed.
-        expect(h.doc('Charlie').activeBuffs).toEqual([AoL_C, HASTE_C])
+        // #990-fix(b)(c): former pinned over-removals (#871 class) flipped — Charlie's own buffs all survive
+        // byte-identical with ZERO writes to its store (pre-fix capture: CE_C stripped by the calm lane and
+        // FF_C stripped by cleanupBuffsByName — two over-removal writes ending at ['AoL_C','HASTE_C']).
+        expect(h.doc('Charlie').activeBuffs).toEqual([AoL_C, FF_C, CE_C, HASTE_C])
+        expect(callsFor('Charlie', 'activeBuffs')).toHaveLength(0)
         expect(h.doc('Bob').auraOfLifeHpMaxProtected).toBe(false)
         // Quirk: purity save-advantage conditions clear for every roster creature with a stored
         // list, even one carrying no Aura of Purity buff (line 306-309).
         expect(h.doc('Bob').auraOfPuritySaveAdvantageConditions).toEqual([])
-        // Caster-owned auxiliary holy-aura keys reset; foreign tes byte-identical.
+        // Caster-owned auxiliary holy-aura keys reset (dirty leg, #990-fix(d)).
         expect(h.doc('Alice').holyAuraTargets).toEqual([])
         expect(h.doc('Alice').holyAuraSaveDc).toBe(null)
         expect(te()).toEqual([{ target: 'Dave', effect: 'haste', source: 'Charlie', duration: 'concentration' }])
@@ -458,28 +493,47 @@ describe('cleanupConcentrationEffects — break cleanup filter semantics', () =>
         expect(h.doc('Bob').activeConditions).toEqual(['poisoned'])
         expect(h.doc('campaign')._fleshToStone_Bob).toBe(null)
         expect(h.doc('campaign')._fleshToStone_Zoe).toEqual({ casterName: 'Charlie' })
+        // Dirty leg of the :469 write-guard pair (#1348): the lane's ONE real removal write.
+        expect(teWrites()).toEqual([['campaign', 'targetEffects', [stoneZoe], CAMPAIGN]])
         expect(te()).toEqual([stoneZoe])
         expect(clearFleshToStonePrompt).toHaveBeenCalledWith(CAMPAIGN, 'Bob')
         expect(clearFleshToStonePrompt).toHaveBeenCalledTimes(1)
         expect(revertTruePolymorph).not.toHaveBeenCalled()
     })
 
-    it('break without a spell name is byte-inert except the unconditional summon/heroism dispatch and holy-aura caster resets', async () => {
+    it('flesh to stone lane on an already-drained te store still nulls the stamp and clears the prompt with ZERO targetEffects churn (#990-fix(d))', async () => {
+        // te carries duration:'concentration' so the generic sweep drains it BEFORE cleanupFleshToStoneEffects
+        // re-reads. Pre-fix :469 wrote unconditionally — captured as two te writes (the second an unchanged-array
+        // re-write). #990-fix(d): length-guard keeps the dirty leg (test above) and silences this churn arm.
+        const conStone = { target: 'Bob', effect: 'flesh_to_stone', source: 'Alice', duration: 'concentration' }
+        seedCampaign([conStone], { _fleshToStone_Bob: { casterName: 'Alice' } })
+        setCs([{ name: 'Bob' }])
+        seed('Bob', { activeConditions: ['restrained', 'poisoned'] })
+
+        await cleanupConcentrationEffects('Alice', 'Flesh to Stone', CAMPAIGN)
+
+        // Exactly ONE te write — the generic sweep (5-arg skipSync store shape); flesh lane contributes zero.
+        expect(teWrites()).toEqual([['campaign', 'targetEffects', [], CAMPAIGN, true]])
+        expect(h.doc('Bob').activeConditions).toEqual(['poisoned'])
+        expect(h.doc('campaign')._fleshToStone_Bob).toBe(null)
+        expect(clearFleshToStonePrompt).toHaveBeenCalledWith(CAMPAIGN, 'Bob')
+    })
+
+    it('break without a spell name is byte-inert — zero store writes, dispatch-only collaborators (#990-fix(d) flipped)', async () => {
         // Honest zero-cleanup leg (#934): nothing matches, nothing is removed...
         const F_CON = { source: 'Charlie', effect: 'haste', target: 'Dave', duration: 'concentration' }
         seedCampaign([F_CON])
 
         await cleanupConcentrationEffects('Alice', undefined, CAMPAIGN)
 
-        // ...except the guards/keys that fire unconditionally: break log is skipped (no spell name),
-        // summons + heroism always dispatched, and holy-aura caster keys reset on EVERY break
-        // regardless of spell (concentrationService.js:450-451 — harmless noise, pinned honestly).
+        // ...and post-#990-fix(d) FULLY inert: the break log is skipped (no spell name), summons + heroism
+        // are collaborator dispatches (no store writes), and the holy-aura caster keys are dirty-guarded —
+        // Alice holds neither key, so pre-fix's two unconditional reset writes (concentrationService.js:450-451,
+        // pinned honestly as harmless churn) are gone: ZERO setRuntimeValue calls. Dirty arm pinned in T9.
         expect(addEntry).not.toHaveBeenCalled()
         expect(removeSummonedCreatures).toHaveBeenCalledWith('Alice', CAMPAIGN)
         expect(removeHeroismBuff).toHaveBeenCalledWith('Alice', CAMPAIGN)
         expect(te()).toEqual([F_CON])
-        expect(callsFor('campaign', 'targetEffects')).toHaveLength(0)
-        expect(callsFor('Alice', 'holyAuraTargets')).toEqual([['Alice', 'holyAuraTargets', [], CAMPAIGN]])
-        expect(callsFor('Alice', 'holyAuraSaveDc')).toEqual([['Alice', 'holyAuraSaveDc', null, CAMPAIGN]])
+        expect(setRuntimeValue).not.toHaveBeenCalled()
     })
 })

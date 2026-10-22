@@ -8,8 +8,12 @@
 // ma1577-tarrasque re-runs the DC-17 chain (report-only overlap). Cited
 // by adult-white-fp (:147-172) and ancient-black-fp (:174-221 — row shape
 // + description wording included): keep those spans' subjects intact.
-// Pinned AS-IS source smells: PC prompt hard-codes saveType 'WIS' even
-// over a Charisma te; NPC bonus falls back saveBonuses[?] ?? wis ?? 0.
+// #1368 FIXED (was pinned AS-IS pre-fix): the PC prompt no longer hard-codes
+// 'WIS' — saveType derives from the te bytes ('CHA' over a Charisma te,
+// 'WIS' over a Wisdom te — disk tokens verbatim); the NPC bonus keys the SAME
+// ability (CLA-303 lowercase-abbrev contract + MA-0303 full-word key
+// fallback, never the cross-ability ?? wis fallback); track + grant gained
+// re-arm dedup (live same-source te ⇒ zero duplicate clocks/immunity writes).
 // grantFrightfulPresenceImmunity has zero external callers (turn-END
 // success leg + this suite; caller scan 2026-10-20). Immunity refusal is
 // upstream (MA-0030 gate per service header) — absence NOT pinned here.
@@ -48,6 +52,13 @@ vi.mock('../effects/expirationQueue.js', () => ({ addExpiration: (entry) => { ex
 vi.mock('../../combat/conditions/targetEffectDefinitions.js', () => ({
     registerTargetEffect: (_campaign, targetName, effectKey, source, extra = {}) => {
         registered.push({ targetName, effectKey, source, ...extra });
+        // Real registerTargetEffect dedups target+effect+source (fix#93) and
+        // WRITES campaign.targetEffects — mirror both so the service's #1368(c)
+        // re-arm guard sees a live te exactly as production does.
+        const list = runtimeStore['campaign.targetEffects'] || (runtimeStore['campaign.targetEffects'] = []);
+        const te = { target: targetName, effect: effectKey, source, ...extra };
+        const i = list.findIndex(x => x.target === targetName && x.effect === effectKey && x.source === source);
+        if (i >= 0) list[i] = te; else list.push(te);
     },
     getActiveTargetEffect: () => null,
 }));
@@ -74,6 +85,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 describe('trackFrightfulPresence (MA-0048)', () => {
     it('failed-save arming writes ONE te envelope + ONE merged 10-round clock (strip te + Frightened, then immunity-grant leg) + ONE tracked log, byte-exact', async () => {
+        seed({ 'campaign.targetEffects': [] }); // re-arm guard read (#1368c) — fresh arm on empty te
         await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, saveType: 'Wisdom', saveDc: 18 });
         expect(registered).toEqual([{ targetName: TARGET, effectKey: FP_TE_EFFECT, source: DRACOLICH, condition: 'frightened', saveType: 'Wisdom', dc: 18, duration: '1_minute', rounds: 10 }]);
         expect(expirations).toEqual([{ attackerName: DRACOLICH, targetName: TARGET, campaignName: CAMPAIGN, rounds: 10, effects: [
@@ -87,6 +99,23 @@ describe('trackFrightfulPresence (MA-0048)', () => {
         expect(typeof logs[0].timestamp).toBe('number');
         expect(writes).toEqual([]); // te/clock exit via mocked seams; zero raw store writes
     });
+    it('#1368(c) re-arm dedup: repeat trigger vs a live same-source te arms NOTHING — zero new te writes, zero duplicate 10-round clocks, zero logs; first-trigger envelope byte-intact; a DIFFERENT source still arms its own te + clock', async () => {
+        seed({ 'campaign.targetEffects': [] });
+        const arm = () => trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, saveType: 'Wisdom', saveDc: 18 });
+        await arm(); // trigger 1 arms te + clock (pre-fix trigger 2 appended a second clock — captured green AS-IS in the pre-fix run: expirations.length === 2)
+        const firstTe = teFor(TARGET);
+        await arm(); // trigger 2 (FP re-used next round vs the same frightened target)
+        await arm(); // trigger 3
+        expect(registered).toHaveLength(1);
+        expect(expirations).toHaveLength(1); // pre-fix: 3 stacked clocks each firing its own immunity-grant leg at expiry
+        expect(logs.filter(l => l.automationType === 'frightful_presence_tracked')).toHaveLength(1);
+        expect(teFor(TARGET)).toEqual(firstTe);
+        // distinct source = distinct RAW effect — must still arm
+        await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: 'Adult White Dragon 1', targetName: TARGET, saveType: 'Charisma', saveDc: 14 });
+        expect(registered).toHaveLength(2);
+        expect(expirations).toHaveLength(2);
+        expect(runtimeStore['campaign.targetEffects']).toHaveLength(2);
+    });
     it('guards real tables: missing campaign/attacker/target or nullish saveDc (pre-fix rows carry no save_dc) arms NOTHING, logs nothing, writes nothing', async () => {
         const bad = [{}, { attackerName: DRACOLICH }, { campaignName: CAMPAIGN }, { campaignName: '', attackerName: DRACOLICH, targetName: TARGET, saveDc: 18 }, { campaignName: CAMPAIGN, targetName: TARGET, saveDc: 18 }, { campaignName: CAMPAIGN, attackerName: DRACOLICH, saveDc: 18 }, { campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, saveDc: null }, { campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET }];
         for (const arg of bad) await trackFrightfulPresence(arg);
@@ -95,6 +124,7 @@ describe('trackFrightfulPresence (MA-0048)', () => {
     it('log-service failure cannot desync the arm: te + clock still written once, identical Error surfaced with exact console prefix, promise resolves', async () => {
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         logFailure = LOG_DOWN;
+        seed({ 'campaign.targetEffects': [] });
         await expect(trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, saveType: 'Wisdom', saveDc: 18 })).resolves.toBeUndefined();
         expect(registered).toHaveLength(1);
         expect(expirations).toHaveLength(1);
@@ -141,6 +171,16 @@ describe('applyFrightfulPresenceTurnEnd (MA-0048 turn-END consumer)', () => {
         expect(teFor(TARGET)).toBeUndefined();
         expect(immunityFor(TARGET)).toMatchObject({ rounds: 14400 });
     });
+    it('#1368(b) bonus killer: over a Charisma te the NPC auto-roll pays saveBonuses.cha — NEVER the wis value (pre-fix ?? saveBonuses?.wis cross-ability fallback returned 99; pin is cha-keyed)', async () => {
+        csCreatures = [{ name: TARGET, type: 'npc', saveBonuses: { wis: 99, cha: 2 } }];
+        seed({ 'campaign.targetEffects': [{ ...ARMED_TE, source: 'Adult White Dragon 1', saveType: 'Charisma', dc: 14 }], [k2(TARGET, 'activeConditions')]: ['frightened'] });
+        vi.spyOn(Math, 'random').mockReturnValue(0); // roll 1 + 2 = 3 < DC 14
+        expect(await applyFrightfulPresenceTurnEnd(CAMPAIGN, TARGET)).toEqual({ handled: true, success: false, roll: 1, total: 3 });
+        const repeat = logWith('rollType', 'save-fp-repeat');
+        expect(repeat).toMatchObject({ saveType: 'Charisma', saveDc: 14, saveBonus: 2, roll: 1, total: 3, success: false });
+        expect(repeat.description).toBe("ElderPaladin failed its repeat Charisma save (DC 14, rolled 1 + 2 = 3) — remains Frightened.");
+        expect([registered, expirations]).toEqual([[], []]); // failure leg stays write-free
+    });
 });
 describe('MA-0147 Adult White Dragon FP — CHA row engages the MA-0048 service', () => {
     const WHITE = 'Adult White Dragon 1';
@@ -152,20 +192,25 @@ describe('MA-0147 Adult White Dragon FP — CHA row engages the MA-0048 service'
         expect(row.repeat_save).toEqual({ condition: 'frightened', save_type: 'Charisma', duration_minutes: 1 });
         expect(row.success_immunity).toEqual({ effect: 'frightful_presence_immunity', duration: '24_hours', duration_minutes: 1440 });
         expect(FP_TE_EFFECT).toBe('frightful_presence');
+        seed({ 'campaign.targetEffects': [] });
         await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: WHITE, targetName: TARGET, saveType: row.repeat_save.save_type, saveDc: row.save_dc });
         expect(registered).toEqual([{ targetName: TARGET, effectKey: FP_TE_EFFECT, source: WHITE, condition: 'frightened', saveType: 'Charisma', dc: 14, duration: '1_minute', rounds: 10 }]);
         expect(expirations[0].rounds).toBe(10);
         expect(expirations[0].effects.map(e => e.type)).toEqual(['remove_target_effect', 'condition', 'frightful_presence_immunity_grant']);
         expect(logWith('automationType', 'frightful_presence_tracked').sourceName).toBe(WHITE);
     });
-    it('turn-END success over a CHA DC 14 te: save-fp-repeat records Charisma DC 14, immunity te sourced from the dragon; prompt stays WIS-hardcoded (pinned AS-IS)', async () => {
+    it('turn-END success over a CHA DC 14 te: save-fp-repeat records Charisma DC 14, immunity te sourced from the dragon; #1368(a) prompt asks CHA — derived from the te, NOT the pre-fix hardcoded WIS', async () => {
         csCreatures = [{ name: TARGET, type: 'player' }];
         seed({ 'campaign.targetEffects': [{ ...ARMED_TE, source: WHITE, saveType: 'Charisma', dc: 14 }], [k2(TARGET, 'activeConditions')]: ['frightened'] });
         expect(await applyFrightfulPresenceTurnEnd(CAMPAIGN, TARGET)).toEqual({ handled: true, success: true, roll: 20, total: 25 });
-        expect(listenerOpts[0]).toMatchObject({ saveType: 'WIS', saveDc: 14 });
+        // SavePromptModal renders (saveType).toUpperCase() and rolls
+        // saveBonuses[normalizeSaveType(saveType).toLowerCase()] — 'CHA' →
+        // CHARISMA label + cha bonus (pre-fix 'WIS' made the PC roll Wisdom).
+        expect(listenerOpts[0]).toEqual({ targetName: TARGET, saveType: 'CHA', saveDc: 14, dcSuccess: 'none', condition: 'Frightful Presence (repeat save)' });
         expect(teFor(TARGET)).toBeUndefined();
         expect(runtimeStore[k2(TARGET, 'activeConditions')]).toEqual([]);
         expect(logWith('rollType', 'save-fp-repeat')).toMatchObject({ saveType: 'Charisma', saveDc: 14, success: true });
+        expect(logWith('rollType', 'save-fp-repeat').description).toBe("ElderPaladin succeeded its repeat Charisma save (DC 14, rolled 20 + 5 = 25) — Frightful Presence ends; immune to Adult White Dragon 1's Frightful Presence for 24 hours.");
         expect(immunityFor(TARGET)).toEqual({ targetName: TARGET, effectKey: FP_IMMUNITY_TE_EFFECT, source: WHITE, duration: '24_hours', rounds: 14400 });
         expect(expirations).toEqual([{ attackerName: WHITE, targetName: TARGET, campaignName: CAMPAIGN, rounds: 14400, effects: [{ type: 'remove_target_effect', effectKey: FP_IMMUNITY_TE_EFFECT, source: WHITE, target: TARGET }] }]);
     });
@@ -184,6 +229,7 @@ describe('MA-0163 Ancient Black Dragon FP — WIS row engages the MA-0048 servic
         expect(row.dc_success).toBe('none');
         expect(row.repeat_save).toEqual({ condition: 'frightened', save_type: 'Wisdom', duration_minutes: 1 });
         expect(row.success_immunity).toEqual({ effect: FP_IMMUNITY_TE_EFFECT, duration: '24_hours', duration_minutes: 1440 });
+        seed({ 'campaign.targetEffects': [] });
         await trackFrightfulPresence({ campaignName: CAMPAIGN, attackerName: ABD, targetName: TARGET, saveType: row.repeat_save.save_type, saveDc: row.save_dc });
         expect(registered).toEqual([{ targetName: TARGET, effectKey: FP_TE_EFFECT, source: ABD, condition: 'frightened', saveType: 'Wisdom', dc: 21, duration: '1_minute', rounds: 10 }]);
         expect(expirations).toEqual([{ attackerName: ABD, targetName: TARGET, campaignName: CAMPAIGN, rounds: 10, effects: [
@@ -222,10 +268,23 @@ describe('MA-0163 Ancient Black Dragon FP — WIS row engages the MA-0048 servic
 
 describe('grantFrightfulPresenceImmunity (exported; production entry = turn-END success leg)', () => {
     it('writes the 24h immunity te (14400 rounds, CLA-334 minutes×10 label) + matching clock + granted log interpolating the reason', async () => {
+        seed({ 'campaign.targetEffects': [] }); // re-arm guard read (#1368c)
         await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, reason: 'repeat save succeeded' });
         expect(registered).toEqual([{ targetName: TARGET, effectKey: FP_IMMUNITY_TE_EFFECT, source: DRACOLICH, duration: '24_hours', rounds: 14400 }]);
         expect(expirations).toEqual([{ attackerName: DRACOLICH, targetName: TARGET, campaignName: CAMPAIGN, rounds: 14400, effects: [{ type: 'remove_target_effect', effectKey: FP_IMMUNITY_TE_EFFECT, source: DRACOLICH, target: TARGET }] }]);
         expect(logs).toHaveLength(1);
         expect(logWith('automationType', 'frightful_presence_immunity_granted').description).toBe("ElderPaladin is immune to Adult Blue Dracolich 1's Frightful Presence for the next 24 hours (14400 rounds) — repeat save succeeded.");
+    });
+    it('#1368(c) mirror: re-grant vs a live same-source immunity te writes NOTHING (no duplicate 14400-round clock, no duplicate granted log); distinct source still grants', async () => {
+        seed({ 'campaign.targetEffects': [] });
+        await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, reason: 'repeat save succeeded' });
+        await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: DRACOLICH, targetName: TARGET, reason: 'effect ended' });
+        expect(registered).toHaveLength(1);
+        expect(expirations).toHaveLength(1);
+        expect(logs).toHaveLength(1);
+        await grantFrightfulPresenceImmunity({ campaignName: CAMPAIGN, attackerName: 'Adult White Dragon 1', targetName: TARGET, reason: 'effect ended' });
+        expect(registered).toHaveLength(2);
+        expect(expirations).toHaveLength(2);
+        expect(runtimeStore['campaign.targetEffects']).toHaveLength(2);
     });
 });

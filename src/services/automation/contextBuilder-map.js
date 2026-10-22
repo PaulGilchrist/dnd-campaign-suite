@@ -24,7 +24,12 @@ export function buildAttackContext({ attack, playerStats, campaignName, mapName,
         basePromise,
         mapsService.loadMapData(campaignName, mapName),
         loadNPCs(campaignName),
-    ]).then(([base, mapData, npcs]) => {
+    ]).then(([base, mapData, npcEnvelope]) => {
+        // Wire contract: GET /api/campaigns/:campaign/npcs resolves the WRAPPED
+        // envelope { npcs:[...] } (jsonEntityCrud.js:49 responseWrapper) — unwrap at
+        // arrival. #1181: applyMeleeProximity called .find on the envelope (TypeError).
+        // ?? [] guards only the degraded/campaign-missing edge; server loadOrInit ensures an array.
+        const npcs = npcEnvelope?.npcs ?? [];
         const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
         if (!attackerPlayer) return base;
 

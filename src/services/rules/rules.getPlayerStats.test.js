@@ -44,11 +44,10 @@
 //   (5e-only immunities/resistances + final senses write for BOTH rulesets).
 //
 // QUIRK SCANS (report-only, source untouched):
-//   • 🔴 rules.js:394-399 carryingCapacity=HP in BOTH branches (ledger standing;
-//     defect pin owned rules-core.test.js:95-114): goldens carry the byte
-//     (carryingCapacity===hitPoints: 5e 45/45, 2024 78/78) while the mocked
-//     getCarryingCapacity stubs (150/999) are NEVER called by the trunk —
-//     getSubModules (:23) does not even forward getCarryingCapacity.
+//   • #1251 FIXED rules.js:394-399 (was carryingCapacity=HP in BOTH branches): the trunk
+//     now dispatches abilityCalc.getCarryingCapacity through the extended bundle
+//     (rules-core.js:23), so the goldens carry the lane's stub values 150/999 and the
+//     previously-dead getCarryingCapacity mocks at :129/:144 are LIVE trunk collaborators.
 //   • 🔴 rules.js:379-391 no-op ternaries in getAbilities/getHitPoints facades
 //     (identical branches; owned rules.test.js facade lane — cited here because
 //     goldens traverse the wrappers at :545/:552/:553).
@@ -125,7 +124,7 @@ vi.mock('./core/abilityCalc.js', () => ({
     { name: 'Charisma', bonus: 0, totalScore: 10 },
   ]),
   getHitPoints: vi.fn(() => 45),
-  // Dead stub: getSubModules never forwards getCarryingCapacity (🔴 rules.js:394-399).
+  // #1251 FIXED: live trunk collaborator via the extended getSubModules bundle (:23).
   getCarryingCapacity: vi.fn(() => 150),
 }))
 
@@ -395,8 +394,10 @@ describe('rules.getPlayerStats trunk orchestration', () => {
         { name: 'Charisma', bonus: 0, totalScore: 10 },
       ],
       hitPoints: 45,
-      // 🔴 rules.js:394-399 carryingCapacity=HP (defect pin: rules-core.test.js:95-114)
-      carryingCapacity: 45,
+      // #1251 FIXED: facade now dispatches abilityCalc.getCarryingCapacity — this is the
+      // lane's 5e mock stub value (was the 45 HP-defect echo). rules-core.test.js:96-118
+      // owns the honest raw-law twin against the real module.
+      carryingCapacity: 150,
       speed: 30,
       initiative: 3,
       // computeInitiative boolean flags (:31-:43) — trunk bytes, internals #1258.
@@ -477,8 +478,9 @@ describe('rules.getPlayerStats trunk orchestration', () => {
         { name: 'Charisma', bonus: 0, totalScore: 10 },
       ],
       hitPoints: 78,
-      // 🔴 rules.js:394-399 carryingCapacity=HP, 2024 branch same defect.
-      carryingCapacity: 78,
+      // #1251 FIXED: 2024 branch dispatches getCarryingCapacity — lane mock stub value
+      // (was the 78 HP-defect echo).
+      carryingCapacity: 999,
       speed: 30,
       initiative: 4,
       initiativeAdvantage: false,

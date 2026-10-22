@@ -80,6 +80,10 @@ function applyFrenzyBonuses(ctx, acc) {
   const round = getCurrentCombatRound(ctx.campaignName);
   if (used === round || !ctx.hit) return acc;
   if (!frenzyTriggerActive(ctx)) return acc;
+  // #1026 latch honesty: track what the loop ACTUALLY applied; the once-per-round
+  // latch is written only if a rider landed (write-only-if-applied, mirroring the
+  // applyWeaponHitBonus :336→consumeWeaponHitUses :347 guard family in this file).
+  let applied = false;
   for (const a of frenzy) {
     const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
     const r = rollExpression(resolvedExpr);
@@ -87,8 +91,9 @@ function applyFrenzyBonuses(ctx, acc) {
     acc.formula += ` + ${resolvedExpr} [${frenzyDamageLabel(ctx, a)}]`;
     acc.total += r.total;
     acc.rolls = [...acc.rolls, ...r.rolls];
+    applied = true;
   }
-  setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
+  if (applied) setRuntimeValue(ctx.playerStats.name, '_frenzyUsedRound', round, ctx.campaignName);
   return acc;
 }
 
@@ -117,7 +122,9 @@ function applyDivineFuryBonuses(ctx, acc) {
     }
     acc.formula += ` + ${expr} [${dt}]`; acc.total += r.total; acc.rolls = [...acc.rolls, ...r.rolls];
   }
-  setRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', round, ctx.campaignName);
+  // #1026 same-shape guard: stamp only when the rider actually landed (r non-null).
+  // Modal branch (:113) stamps on resolution in useModalHandlers.js:42 — landed only.
+  if (r) setRuntimeValue(ctx.playerStats.name, '_divineFuryUsedRound', round, ctx.campaignName);
   return acc;
 }
 
@@ -371,6 +378,19 @@ export function buildWeaponHitBonusesStep() {
   };
 }
 
+// #1035: consume the authored extraDamageType on natural_20_attack_roll rows.
+// Disk census (public/data + 2024 + campaigns): the ONLY row carrying it is
+// 2024 feats.json 'Boon Of Irresistible Offense' → Overwhelming Strike, string
+// shape 'same_as_attack'. Mirrors the frenzy label byte-style (:71-74):
+// same_as_* resolves to the attack's own type, explicit types lowercase as
+// authored; missing type = unauthored metadata -> honest zero extra (loud).
+function natural20DamageLabel(ctx, a) {
+  const raw = String(a.extraDamageType || '').trim();
+  if (!raw) return '';
+  if (raw.toLowerCase() === 'same_as_attack') return (ctx.attack?.damageType || 'Slashing').toLowerCase();
+  return raw.toLowerCase();
+}
+
 function resolveNatural20Expression(a, playerStats) {
   const expr = a.extraDamageExpression || '';
   if (expr !== 'increased_ability_score') return expr;
@@ -404,15 +424,23 @@ export function buildNatural20BonusesStep() {
 
       const matchingActions = ctx.playerStats.automation.actions.filter(x => x.type === 'damage_bonus' && x.trigger === 'natural_20_attack_roll');
       for (const a of matchingActions) {
+        // #1035: extraDamageType is the append gate — every authored
+        // natural_20_attack_roll row on disk carries it; without a consumed
+        // damage type the rider contributes zero extra (no silent [name] label).
+        const dt = natural20DamageLabel(ctx, a);
+        if (!dt) {
+          console.error(`[natural20Bonuses] "${a.name}" missing extraDamageType — zero extra damage (#1035)`);
+          continue;
+        }
         const expr = resolveNatural20Expression(a, ctx.playerStats);
         if (expr || expr === 0) {
           const r = rollExpression(String(expr));
           if (r) {
-            formula += ` + ${expr} [${a.name}]`;
+            formula += ` + ${expr} [${dt}]`;
             total += r.total;
             rolls = [...rolls, ...r.rolls];
           } else if (typeof expr === 'number') {
-            formula += ` + ${expr} [${a.name}]`;
+            formula += ` + ${expr} [${dt}]`;
             total += expr;
           }
         }

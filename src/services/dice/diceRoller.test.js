@@ -21,6 +21,11 @@
 //   12 rollExpression its → grammar table + invalid table + rerollOnes pair
 //   5 doubled / 2 maximized its → 1 it.each each
 //   10 formatDamageFormula + 5 applyHealingRerollOnes its → tables
+// #1072 arms (diceRoller.js:42 phantom d0): count===0 ('0d6', '0d6+3') is
+// legal zero-contribution — 0 dice, 0 RNG, total = modifier only (disk-honest
+// True Strike "0": "0d6"); sides===0 ('d0','1d0','2d0+5','0d0','-d0') is
+// refused at the regex to null (house parse-failure class, same path as the
+// authored '2d'/'d' junk), across parse/can-roll/roll/doubled/maximized.
 // ──────────────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
@@ -133,9 +138,16 @@ describe('parseExpression', () => {
     { formula: '2D6', count: 2, sides: 6, modifier: 0 },
     { formula: '1D8+3', count: 1, sides: 8, modifier: 3 },
     { formula: '2 d 6', count: 2, sides: 6, modifier: 0 },
+    // Zero-count dice are disk-honest zero-contribution (True Strike 2024
+    // damage_at_slot_level "0": "0d6") — #1072: they roll NOTHING, never a
+    // phantom 1; that immunity is pinned in the null table below (d0/Nd0).
     { formula: '0d6', count: 0, sides: 6, modifier: 0 },
+    { formula: '0d6+3', count: 0, sides: 6, modifier: 3 },
     { formula: '1d8 + 3 or 2d6', count: 1, sides: 8, modifier: 3 },
     { formula: 'invalid or 2d6', count: 2, sides: 6, modifier: 0 },
+    // #1072 or-chain immunity: a refused d0 leg falls through to the
+    // valid die, never the pre-fix phantom {count:1,sides:0}.
+    { formula: 'd0 or 2d6', count: 2, sides: 6, modifier: 0 },
   ])('parses $formula', ({ formula, count, sides, modifier }) => {
     expect(parseExpression(formula)).toEqual({ count, sides, modifier });
   });
@@ -143,9 +155,12 @@ describe('parseExpression', () => {
   // Junk fails honestly (null), never a fabricated roll (#945).
   // kh/kl keep notation is NOT authored here — selection core lives in
   // rollAdvantage/rollDisadvantage; junk keep-formulas parse to null.
+  // d0-shaped dice are refused at the regex (#1072): no d0 exists in RAW
+  // and sides:0 previously birthed a phantom die always rolling 1.
   it.each([
     '', '   ', '[tag]', '[a] [b]', 'not a formula', 'abc',
     '2d', 'd', '4', '0', '-2d6', '2d6kh1', 'd6kl1', 'invalid or nonsense',
+    'd0', '1d0', '2d0+5', '0d0', '-d0', 'D0',
   ])('returns null for $formula', (formula) => {
     expect(parseExpression(formula)).toBeNull();
   });
@@ -159,11 +174,13 @@ describe('canRollExpression', () => {
     ['1d8 plus 2', true],
     ['2d6 or junk', true],
     [' 2d6 ', true],
+    ['0d6', true], // zero-count is rollable — contributes nothing (#1072)
     ['', false],
     ['   ', false],
     ['junk', false],
     ['4', false],
     ['2d', false],
+    ['d0', false], // refused: no d0 in RAW — phantom-immune (#1072)
     ['2d6kh1', false],
     ['[tag]', false],
   ])('canRollExpression($formula) === $expected', (formula, expected) => {
@@ -183,6 +200,7 @@ describe('rollExpression', () => {
     { formula: '2d6[fire]', seq: [0.5, 0.5], rolls: [4, 4], modifier: 0, total: 8, echo: '2d6[fire]' },
     { formula: '2D20', seq: [0.999999, 0], rolls: [20, 1], modifier: 0, total: 21, echo: '2D20' },
     { formula: '0d6+2', seq: [], rolls: [], modifier: 2, total: 2, echo: '0d6+2' },
+    { formula: '0d6', seq: [], rolls: [], modifier: 0, total: 0, echo: '0d6' },
     { formula: '1d8+7 plus 4', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4' },
     { formula: '1d8+7 plus 4 [bludgeoning]', seq: [0.5], rolls: [5], modifier: 11, total: 16, echo: '1d8+7 plus 4 [bludgeoning]' },
     { formula: '1d8 plus 2d6', seq: [0.5, 0.5, 0.5], rolls: [5, 4, 4], modifier: 0, total: 13, echo: '1d8 plus 2d6' },
@@ -198,7 +216,10 @@ describe('rollExpression', () => {
 
   // Flat constants alone never roll (#1063); junk and unauthored kh notation
   // fail honestly to null with 0 RNG consumed (#945).
-  it.each(['', '   ', 'xyz', '[tag]', 'junk or nonsense', '4', '0', '-2d6', '2d', '2d6kh1'])('returns null for $formula (consuming 0)', (formula) => {
+  // d0/0d0-formulas are refused at parse — pre-fix they birthed a phantom
+  // die rolling a guaranteed 1 per die (rollExpression('d0') -> total 1,
+  // '2d0+5' -> total 7) (#1072); now: null, 0 RNG consumed, ever.
+  it.each(['', '   ', 'xyz', '[tag]', 'junk or nonsense', '4', '0', '-2d6', '2d', '2d6kh1', 'd0', '1d0', '2d0+5', '0d0', '-d0'])('returns null for $formula (consuming 0)', (formula) => {
     const rng = pinRandom([]);
     expect(rollExpression(formula)).toBeNull();
     expect(rng).toHaveReturnedTimes(0);
@@ -231,7 +252,8 @@ describe('rollExpressionDoubled', () => {
     expect(rng).toHaveReturnedTimes(seq.length);
   });
 
-  it.each(['xyz', '', '[tag]'])('returns null for $formula (consuming 0)', (formula) => {
+  // d0 refused at parse (#1072): pre-fix doubled('1d0') fabricated total 2.
+  it.each(['xyz', '', '[tag]', '1d0', 'd0'])('returns null for $formula (consuming 0)', (formula) => {
     const rng = pinRandom([]);
     expect(rollExpressionDoubled(formula)).toBeNull();
     expect(rng).toHaveReturnedTimes(0);
@@ -251,7 +273,9 @@ describe('rollExpressionMaximized', () => {
     expect(rng).toHaveReturnedTimes(0);
   });
 
-  it.each(['xyz', '', '[tag]'])('returns null for $formula', (formula) => {
+  // d0 refused at parse (#1072): pre-fix maximized('1d0') showed zero-face
+  // dice rolls:[0].
+  it.each(['xyz', '', '[tag]', '1d0', 'd0'])('returns null for $formula', (formula) => {
     expect(rollExpressionMaximized(formula)).toBeNull();
   });
 });
@@ -269,6 +293,8 @@ describe('formatDamageFormula', () => {
     { formula: '1d8+3[fire]', rolls: [5], isCrit: false, expected: '1d8+3 (5)' },
     { formula: '1d8+4+2', rolls: [3], isCrit: false, expected: '1d8+6 (3)' },
     { formula: '1d8+3', rolls: null, isCrit: false, expected: '1d8+3' },
+    // d0 reaches the parse-failure echo arm, never a fabricated '1d0 (...)' (#1072)
+    { formula: '1d0', rolls: null, isCrit: false, expected: '1d0' },
     { formula: '1d8+3', rolls: [], isCrit: false, expected: '1d8+3' },
     { formula: '[tag]', rolls: [5], isCrit: false, expected: '[tag]' },
     { formula: 'not a formula', rolls: [5], isCrit: false, expected: 'not a formula' },

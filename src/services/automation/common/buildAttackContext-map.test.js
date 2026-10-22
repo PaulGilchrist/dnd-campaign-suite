@@ -1,6 +1,13 @@
 // @maintained-by-ai
 // Map-present branch of buildAttackContextForDamage.
 // The map-absent branch is covered by buildAttackContext-noMap.test.js.
+//
+// Envelope honesty (#1181): loadNPCs resolves the REAL wire envelope
+// { npcs: [...] } (GET /api/campaigns/:campaign/npcs, jsonEntityCrud.js:49
+// responseWrapper) — bare-array mocks hid the envelope-vs-array TypeError
+// in damageRoll.js collectHostileThreats.
+// Teardown hygiene (#1181): this lane stubs NO global fetch (all transport
+// is vi.mock'd above) — no afterEach vi.unstubAllGlobals pairing needed.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -88,7 +95,8 @@ describe('buildAttackContextForDamage (map present)', () => {
         damageUtils.getResistanceNotice.mockReturnValue(null);
         damageUtils.getAttackerTargetName.mockReturnValue(undefined);
         mapsService.loadMapData.mockResolvedValue(makeMapData());
-        npcsService.loadNPCs.mockResolvedValue([]);
+        // Real wire envelope from GET /api/campaigns/:campaign/npcs (jsonEntityCrud.js:49) (#1181).
+        npcsService.loadNPCs.mockResolvedValue({ npcs: [] });
         runtimeState.getRuntimeValue.mockReturnValue(null);
         rangeValidation.rangeToFeet.mockReturnValue(0);
         rangeValidation.getDistanceFeet.mockReturnValue(5);
@@ -140,7 +148,7 @@ describe('buildAttackContextForDamage (map present)', () => {
             expect(result.attackerName).toBe(playerName);
             expect(result.targetName).toBe('Enemy');
 
-            npcsService.loadNPCs.mockResolvedValue([]);
+            npcsService.loadNPCs.mockResolvedValue({ npcs: [] });
             mapsService.loadMapData.mockRejectedValue(new Error('Failed to load map'));
 
             result = await buildAttackContextForDamage(makeAttackContext(), playerName, campaignName, mapName);
@@ -394,7 +402,9 @@ describe('buildAttackContextForDamage (map present)', () => {
         it('collects hostile NPCs with attitude mapped from the NPC service', async () => {
             const thug = { type: 'npc', name: 'Thug', gridX: 6, gridY: 11 };
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [thug]));
-            npcsService.loadNPCs.mockResolvedValue([{ name: 'Thug', attitude: 'negative' }]);
+            // ENVELOPE-FIXTURE pin (#1181): GET /npcs resolves { npcs:[...] }
+            // (jsonEntityCrud.js:49) — collectHostileThreats must unwrap, not .find the envelope.
+            npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Thug', attitude: 'negative' }] });
             rangeValidation.computeMeleeProximityEffect.mockReturnValue({ mode: 'disadvantage', reason: 'Flanked' });
 
             const result = await buildAttackContextForDamage(
@@ -413,7 +423,7 @@ describe('buildAttackContextForDamage (map present)', () => {
                 { type: 'npc', name: 'Ally', gridX: 7, gridY: 12 },
                 { type: 'npc', name: 'Mystery', gridX: 8, gridY: 13 },
             ]));
-            npcsService.loadNPCs.mockResolvedValue([{ name: 'Ally', attitude: 'positive' }]);
+            npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Ally', attitude: 'positive' }] });
 
             await buildAttackContextForDamage(
                 makeAttackContext({ range: '60 ft.' }),
@@ -426,7 +436,8 @@ describe('buildAttackContextForDamage (map present)', () => {
         it('matches placed NPCs with numeric suffixes to base NPC names', async () => {
             const goblin2 = { type: 'npc', name: 'Goblin 2', gridX: 6, gridY: 11 };
             mapsService.loadMapData.mockResolvedValue(makeMapData([attackerPlayer], [goblin2]));
-            npcsService.loadNPCs.mockResolvedValue([{ name: 'Goblin', attitude: 'negative' }]);
+            // ENVELOPE-FIXTURE pin (#1181): unwrapped lookup must still match the numeric suffix.
+            npcsService.loadNPCs.mockResolvedValue({ npcs: [{ name: 'Goblin', attitude: 'negative' }] });
 
             await buildAttackContextForDamage(
                 makeAttackContext({ range: '60 ft.' }),

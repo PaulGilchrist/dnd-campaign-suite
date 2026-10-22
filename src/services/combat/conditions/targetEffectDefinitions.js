@@ -465,6 +465,20 @@ const TARGET_EFFECT_DEFINITIONS = [
     group: 'Saves & Checks',
   },
   {
+    // #1373(b): Heroism companion te — heroismService stamps it alongside the
+    // 'heroism' marker te (RAW: "advantage on saving throws against being
+    // frightened", folded as WIS save advantage by the LIVE consumer
+    // conditionEffects.js LATE_TARGET_EFFECT_HANDLERS wisdom_save_advantage).
+    // Cleanup filters (heroismService, clearExpirationEffects) cover both keys.
+    effect: 'wisdom_save_advantage',
+    label: 'WIS Save Adv',
+    description: 'Advantage on Wisdom saving throws.',
+    icon: 'fa-shield',
+    cls: 'effect-buff',
+    group: 'Saves & Checks',
+    fields: ['source'],
+  },
+  {
     effect: 'disadvantage_perception_checks',
     label: 'Perception Disadv',
     description: 'Disadvantage on Perception checks.',

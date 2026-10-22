@@ -30,7 +30,7 @@ async function applyCrusherRiderMove(ctx, ps) {
   const crusherFeat = (ps.automation?.passives || []).find(a => a.type === 'attack_rider' && a.trigger === 'bludgeoning_damage_hit' && a.oncePerTurn);
   if (!crusherFeat) return;
   const key = `_${crusherFeat.name.replace(/\s+/g, '_')}_usedRound`;
-  const round = getCurrentCombatRound();
+  const round = getCurrentCombatRound(ctx.campaignName);
   if (getRuntimeValue(ps.name, key, ctx.campaignName) === round) return;
   const cs = await getCombatContext(ctx.campaignName);
   const t = cs ? getTargetFromAttacker(cs, ps.name) : null;

@@ -224,9 +224,23 @@ export function legendaryCheckBonus(monster, action) {
     // (canonical, dracolich +14) or a bare number (Smaug's flat
     // "Perception": 11). Both carry the full check modifier; the dict-only
     // read silently collapsed bare numbers to +0 (dishonest RAW).
+    // #1116: explicit shape branch replaces `Number(entry?.modifier ?? entry)`
+    // — for a dict lacking `modifier` the ?? fell through to the OBJECT,
+    // Number({}) → NaN, and the finite-ternary's :0 tail collapsed it to a
+    // SILENT +0 (then spend + d20+0 on garbage). Census (monsters.json
+    // 2026-10-22, 807 skill rows): 770 dict-with-numeric-modifier, 37 bare
+    // numbers, ZERO dict-without-modifier → that shape is INVALID input:
+    // loud console.error + null (consumer refuses zero-spend, 'no-check-bonus'
+    // @MonsterCardModal:913), never a quiet +0. Primitives keep the MA-2002
+    // coercion with strict-presence-before-coercion (fix #39: no
+    // Number("")/Number(null)=0).
     const entry = skills[skillKey];
-    const mod = Number(entry?.modifier ?? entry);
-    return Number.isFinite(mod) ? mod : 0;
+    const raw = entry != null && typeof entry === 'object' ? entry.modifier : entry;
+    const text = String(raw ?? '').trim();
+    const mod = text === '' ? NaN : Number(text);
+    if (Number.isFinite(mod)) return mod;
+    console.error(`[monsterLegendaryUses] legendaryCheckBonus: skills.${skillKey} entry has no resolvable numeric modifier (${JSON.stringify(entry)}) — unresolvable; caller must refuse before spend.`);
+    return null;
   }
   // ability_score_modifiers are keyed by 3-letter abbr (wis/dex/…).
   const abbr = String(ac.ability).toLowerCase().slice(0, 3);

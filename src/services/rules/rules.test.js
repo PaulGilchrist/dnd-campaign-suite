@@ -70,9 +70,9 @@
 //     the getSubModules bundle swap is what a real dispatch change would flip (#1444 owns trunk).
 //   • Arity fork rules.js:404-406: 5e silently DROPS playerSummary from getSpellAbilities — pinned
 //     exactly at rules-core.js:58-62 twin.
-//   • DEFECT standing rules.js:394-399 carryingCapacity=HP (and the bundle omits getCarryingCapacity
-//     entirely, rules-core.js:23) — wrapper-level collaborator pin below; raw-value twin
-//     core/rules-core.test.js:96-115.
+//   • FIXED #1251 rules.js:394-399 was carryingCapacity=HP on both branches (bundle omitted
+//     getCarryingCapacity, rules-core.js:23) — now both branches dispatch getCarryingCapacity;
+//     wrapper-level collaborator pin below; raw-value twin core/rules-core.test.js:96-118.
 //   • :0-swallow census (this lane's inputs): none reachable — all facade inputs here are arrays/objects;
 //     NaN-on-level-less-summary and computed||0 censuses live at getPlayerStats trunk (#1444).
 //   • Console untouched by every test below (no guard branch is entered). NO-CLOCK: pure synchronous
@@ -210,9 +210,9 @@ describe('rules.js facade glue', () => {
       expect(m.use2024).toBe(false)
       expect(m.abilityCalc.getAbilities).toBe(abilityCalc5e.getAbilities)
       expect(m.abilityCalc.getHitPoints).toBe(abilityCalc5e.getHitPoints)
-      // Defect shape (rules-core.js:23): the bundle omits getCarryingCapacity entirely,
-      // which is what makes the facade getCarryingCapacity defect below survivable.
-      expect(m.abilityCalc.getCarryingCapacity).toBeUndefined()
+      // #1251 FIXED (rules-core.js:23): the bundle forwards getCarryingCapacity so the
+      // facade below reaches the real capacity law instead of getHitPoints.
+      expect(m.abilityCalc.getCarryingCapacity).toBe(abilityCalc5e.getCarryingCapacity)
       expect(m.classRules).toBe(classRules5e.default)
       expect(m.raceRules).toBe(rules5e)
     })
@@ -275,20 +275,20 @@ describe('rules.js facade glue', () => {
       expect(abilityCalc2024.getHitPoints.mock.calls).toEqual([[stats2024]])
     })
 
-    it('DEFECT pin: getCarryingCapacity invokes abilityCalc.getHitPoints and NEVER getCarryingCapacity, both branches (rules.js:394-399, #1444 standing)', async () => {
+    it('#1251 FIXED: getCarryingCapacity invokes abilityCalc.getCarryingCapacity, never getHitPoints, both branches (rules.js:394-399)', async () => {
       const abilityCalc5e = await import('./core/abilityCalc.js')
       const abilityCalc2024 = await import('./core/abilityCalc2024.js')
 
-      // RAW would be a STR-based capacity; today the wrapper returns HP (twin value pin:
-      // core/rules-core.test.js:96-115). Flip these collaborator pins together with it.
-      expect(rules.getCarryingCapacity({ rules: '5e' })).toBe(45)
-      expect(rules.getCarryingCapacity({ rules: '2024' })).toBe(78)
-      expect(abilityCalc5e.getHitPoints).toHaveBeenCalledTimes(1)
-      expect(abilityCalc5e.getHitPoints.mock.calls).toEqual([[{ rules: '5e' }]])
-      expect(abilityCalc2024.getHitPoints).toHaveBeenCalledTimes(1)
-      expect(abilityCalc2024.getHitPoints.mock.calls).toEqual([[{ rules: '2024' }]])
-      expect(abilityCalc5e.getCarryingCapacity).not.toHaveBeenCalled()
-      expect(abilityCalc2024.getCarryingCapacity).not.toHaveBeenCalled()
+      // Values are the lane's mock stubs (150/999): the collaborator pin that the raw-value
+      // twin core/rules-core.test.js:96-118 now pins honestly against the real law module.
+      expect(rules.getCarryingCapacity({ rules: '5e' })).toBe(150)
+      expect(rules.getCarryingCapacity({ rules: '2024' })).toBe(999)
+      expect(abilityCalc5e.getCarryingCapacity).toHaveBeenCalledTimes(1)
+      expect(abilityCalc5e.getCarryingCapacity.mock.calls).toEqual([[{ rules: '5e' }]])
+      expect(abilityCalc2024.getCarryingCapacity).toHaveBeenCalledTimes(1)
+      expect(abilityCalc2024.getCarryingCapacity.mock.calls).toEqual([[{ rules: '2024' }]])
+      expect(abilityCalc5e.getHitPoints).not.toHaveBeenCalled()
+      expect(abilityCalc2024.getHitPoints).not.toHaveBeenCalled()
     })
 
     it('getSpellAbilities arity fork: 2024 forwards playerSummary, 5e drops it (rules.js:404-406)', async () => {

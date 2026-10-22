@@ -34,13 +34,22 @@ function applyRadiantSoulBonus(formula, ctx, ps) {
   return `${formula} + ${chaMod} [Radiant Soul]`;
 }
 
-function markRadiantSoulUsed(ctx, ps) {
+// #1028 latch honesty (fix#63 attackRollBonuses.js:86-96 applied-flag stamp-if-applied
+// shape): the once-per-turn latch is consumed only when the adder ACTUALLY lands on this
+// roll. Disk law (public/data/2024/classes.json, Warlock → Celestial Patron, level 6):
+// "add Charisma modifier to that spell's damage" — at Cha mod 0 nothing is added, so
+// nothing is consumed; the latch stays armed and the next qualifying Radiant/Fire attack
+// rides. Both append sites already gate on chaMod > 0 (applyRadiantSoulBonus :33 above;
+// execution/damageCalculation.js computeRadiantSoul :94 for the pre-baked CLA-279 path),
+// so a '[Radiant Soul]' byte in the rolled formula is the applied-non-zero proof.
+function markRadiantSoulUsed(ctx, ps, formula) {
   if (!ps?.automation?.passives) return;
   const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
   if (!radiantSoulPassive || !radiantSoulPassive.hasAutomation) return;
   const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
   const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
   if (!damageTypes.includes(spellDamageType)) return;
+  if (!formula.includes('[Radiant Soul]')) return; // stamp only if applied (#1028)
   const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
   setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
 }
@@ -79,7 +88,7 @@ export function buildRollBaseDamageStep() {
         : (wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula));
       if (!result) return null;
 
-      markRadiantSoulUsed(ctx, ps);
+      markRadiantSoulUsed(ctx, ps, formula);
 
       return {
         data: { formula, total: result.total, rolls: result.rolls, modifier: result.modifier },

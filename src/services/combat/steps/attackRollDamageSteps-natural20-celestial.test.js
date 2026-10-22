@@ -7,10 +7,11 @@
 // plus missing-actions + both false-side arms, incl d20=19/9/undefined). Do not trim these.
 //
 // Applied recs:
-//   #1029/#1022 applied: same_as_attack / not-same_as_attack / missing-extraDamageType legs
-//     verified byte-identical (resolveNatural20Expression :374-385 never reads extraDamageType;
-//     handler :411 appends only expr + a.name) -> folded to one dice leg; damageType is a
-//     DISCARDED byte on this step (logged as source finding).
+//   #1029/#1022 applied (SUPERSEDED by #1035 FIX): same_as_attack / force / missing
+//     legs were byte-identical ONLY because the step never read extraDamageType
+//     (dead-metadata finding logged as #1035). Now consumed: force-X appends the
+//     authored type, same_as_attack appends ctx.attack.damageType, missing is a
+//     zero-extra gate with console.error. Fold replaced by one pin per shape.
 //   #1029 fold-CANON cited: app/stamp exact legs here are CANON for dice riders (cla048 uses
 //     REAL roller, constants-only resolve-first — NdM bytes are owned here, per cla048's own
 //     lane-split header :9-13). automationBonuses' Inner Radiance app+stamp folded here:
@@ -38,6 +39,13 @@
 // t7 -> dropped (rider-mismatch duplicate of automationBonuses :444, weaker there too);
 // t9 -> renamed (roll-null = zero-guard); t11 -> + never-stamps pin.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+
+// #1035 census source: imported, NEVER retyped (drift-throw in the disk-row pin).
+const feats2024 = JSON.parse(readFileSync('public/data/2024/feats.json', 'utf8'));
+const diskN20Automation = feats2024
+  .find(f => f.index === 'boon-of-irresistible-offense')
+  .benefits.find(b => b.name === 'Overwhelming Strike').automation;
 
 // Faithful diceRoller stub (#1026/#815): NdM → each die floor(M/2)+1; constants are
 // UNROLLABLE (real roller returns null) so flat-value paths are honestly exercised.
@@ -189,10 +197,12 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
 
-      // #1029/#1022 fold: same_as_attack ('slashing'), explicit ('force') and missing
-      // extraDamageType legs are byte-identical here — resolveNatural20Expression never
-      // reads extraDamageType and the formula carries only expr + action name.
-      it('dice bonus rolls and appends + 1d6 [Overwhelming Strike] (exact acc)', async () => {
+      // #1035 FIXED: extraDamageType is consumed — force-X appends the authored
+      // type lowercased (pre-fix dead byte here was '+ 1d6 [Overwhelming Strike]',
+      // extraDamageType 'force' discarded). #1029's byte-identical three-shape fold
+      // is VOID post-fix: same_as_attack / explicit / missing now diverge (pinned
+      // below, mutually distinguishable #1348).
+      it('dice bonus with extraDamageType=force rolls and appends + 1d6 [force] (exact acc)', async () => {
         const r = await steps[13].handler(makeCtx({
           isNatural20: true,
           playerStats: {
@@ -212,14 +222,15 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         }));
-        expect(r.data).toEqual({ formula: '1d8+3 + 1d6 [Overwhelming Strike]', total: 15, rolls: [8, 3, 4] });
+        expect(r.data).toEqual({ formula: '1d8+3 + 1d6 [force]', total: 15, rolls: [8, 3, 4] });
         expect(rollExpression).toHaveBeenCalledWith('1d6');
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
 
-      it('increased_ability_score with abilityIncreased=Strength appends + 5 flat (exact acc)', async () => {
+      it('increased_ability_score flat + 5 appends authored type [thunder] (#1035: type consumed; flat branch :424-429)', async () => {
         const r = await steps[13].handler(makeCtx({
           isNatural20: true,
+          attack: { damageType: 'Slashing' },
           playerStats: {
             abilities: [{ name: 'Strength', bonus: 5 }],
             automation: {
@@ -229,6 +240,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
                   type: 'damage_bonus',
                   trigger: 'natural_20_attack_roll',
                   extraDamageExpression: 'increased_ability_score',
+                  extraDamageType: 'thunder',
                   abilityIncreased: 'Strength',
                 },
               ],
@@ -238,11 +250,12 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         }));
-        // Flat branch (:414-417): constants are unrollable → total gains expr itself (+5).
-        expect(r.data).toEqual({ formula: '1d8+3 + 5 [Overwhelming Strike]', total: 16, rolls: [8, 3] });
+        // Flat branch (:424-429): constants are unrollable → total gains expr itself (+5).
+        // Pre-fix flip (#1035): label was the dead '[Overwhelming Strike]' name byte.
+        expect(r.data).toEqual({ formula: '1d8+3 + 5 [thunder]', total: 16, rolls: [8, 3] });
       });
 
-      it('increased_ability_score with unknown ability appends + 0 and total unchanged', async () => {
+      it('increased_ability_score with unknown ability appends + 0 [cold] and total unchanged', async () => {
         const r = await steps[13].handler(makeCtx({
           isNatural20: true,
           playerStats: {
@@ -254,6 +267,7 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
                   type: 'damage_bonus',
                   trigger: 'natural_20_attack_roll',
                   extraDamageExpression: 'increased_ability_score',
+                  extraDamageType: 'cold',
                   abilityIncreased: 'Strength',
                 },
               ],
@@ -263,7 +277,116 @@ describe('buildAttackRollDamageSteps - natural20Bonuses, celestialRevelation', (
           total: 11,
           rolls: [8, 3],
         }));
-        expect(r.data).toEqual({ formula: '1d8+3 + 0 [Overwhelming Strike]', total: 11, rolls: [8, 3] });
+        expect(r.data).toEqual({ formula: '1d8+3 + 0 [cold]', total: 11, rolls: [8, 3] });
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      // #1035 same_as_attack arm: resolves to the attack's own damage type
+      // (byte-style mirrors frenzyDamageLabel :71-74 — attack-less ctx falls
+      // back to 'Slashing', the same default the frenzy rider uses).
+      it('extraDamageType=same_as_attack appends the attack type: + 2d8 [piercing] (exact acc)', async () => {
+        const r = await steps[13].handler(makeCtx({
+          isNatural20: true,
+          attack: { damageType: 'Piercing' },
+          playerStats: {
+            automation: {
+              actions: [
+                {
+                  name: 'Mirror Strike',
+                  type: 'damage_bonus',
+                  trigger: 'natural_20_attack_roll',
+                  extraDamageExpression: '2d8',
+                  extraDamageType: 'same_as_attack',
+                },
+              ],
+            },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3 + 2d8 [piercing]', total: 21, rolls: [8, 3, 5, 5] });
+        expect(rollExpression).toHaveBeenCalledWith('2d8');
+      });
+
+      // #1035 missing arm: no extraDamageType = unauthored row — ZERO extra,
+      // ctx bytes byte-intact, loud console.error. Pre-fix this appended
+      // ' + 5 [Overwhelming Strike]' on metadata whose type was discarded.
+      it('missing extraDamageType appends ZERO extra and logs console.error (ctx byte-intact)', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const r = await steps[13].handler(makeCtx({
+          isNatural20: true,
+          playerStats: {
+            abilities: [{ name: 'Strength', bonus: 5 }],
+            automation: {
+              actions: [
+                {
+                  name: 'Broken Strike',
+                  type: 'damage_bonus',
+                  trigger: 'natural_20_attack_roll',
+                  extraDamageExpression: 'increased_ability_score',
+                  abilityIncreased: 'Strength',
+                },
+              ],
+            },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(String(errSpy.mock.calls[0][0])).toContain('Broken Strike');
+      });
+
+      // #1348 distinguishability: two riders sharing one dice byte, differing ONLY
+      // in extraDamageType, land mutually-exclusive type bytes (pre-fix both were
+      // identical — every label was the action name, the defect fingerprint).
+      it('#1348: same 1d4 dice, force vs same_as_attack land distinct type bytes', async () => {
+        const act = (name, extraDamageType) => ({
+          name, type: 'damage_bonus', trigger: 'natural_20_attack_roll',
+          extraDamageExpression: '1d4', extraDamageType,
+        });
+        const r = await steps[13].handler(makeCtx({
+          isNatural20: true,
+          attack: { damageType: 'Piercing' },
+          playerStats: {
+            automation: { actions: [act('Force Rider', 'force'), act('Mirror Rider', 'same_as_attack')] },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        }));
+        expect(r.data.formula).toBe('1d8+3 + 1d4 [force] + 1d4 [piercing]');
+        expect(r.data.total).toBe(17); // 11 + 3 + 3 (d4→3 stub)
+        expect(r.data.formula).not.toMatch(/Force Rider|Mirror Rider/);
+      });
+
+      // #1035 real-disk-row pin (imported bytes, #1365 law): the ONLY natural_20
+      // row in the corpus — 2024 feats.json Boon Of Irresistible Offense. These
+      // three asserts are the drift-throw; if disk bytes change, this pin fails
+      // BEFORE any expected-formula byte is trusted.
+      it('DISK row boon-of-irresistible-offense: same_as_attack + increased_ability_score appends + 4 [slashing] (exact acc)', async () => {
+        expect(diskN20Automation.trigger).toBe('natural_20_attack_roll');
+        expect(diskN20Automation.extraDamageType).toBe('same_as_attack');
+        expect(diskN20Automation.extraDamageExpression).toBe('increased_ability_score');
+        const r = await steps[13].handler(makeCtx({
+          isNatural20: true,
+          attack: { damageType: 'Slashing' },
+          playerStats: {
+            abilities: [{ name: 'Strength', bonus: 4 }, { name: 'Dexterity', bonus: 3 }],
+            automation: { actions: [{ name: 'Overwhelming Strike', ...diskN20Automation }] },
+          },
+          formula: '1d8+3',
+          total: 11,
+          rolls: [8, 3],
+        }));
+        // increased_ability_score (no abilityIncreased) → max(STR 4, DEX 3) = 4 flat;
+        // same_as_attack → the attack's [slashing]. Pre-fix capture (#1035, this same
+        // imported row): '1d8+3 + 4 [Overwhelming Strike]' — type byte discarded.
+        expect(r.data).toEqual({ formula: '1d8+3 + 4 [slashing]', total: 15, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
     });

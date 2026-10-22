@@ -1,13 +1,18 @@
 // @maintained-by-ai
 // Lane: toppleMastery + masteryDone steps ASSEMBLED via buildAttackRollDamageSteps()
 // (attackRollDamageSteps.js:31-32; steps[22] / steps[23]).
-// Mechanics named from source (buildToppleMasteryStep attackRollPostDamage.js:663-709): post-hit
-// mastery resolution — on lastAttack.hit with Topple as the weapon's BASE mastery, prompts the last
+// Mechanics named from source (buildToppleMasteryStep attackRollPostDamage.js:663-719): post-hit
+// mastery resolution — on lastAttack.hit with Topple anywhere in the base/extra/choice union
+// (:675-677), prompts the last
 // target for a CON save (DC 8 + weapon ability mod + proficiency, computeToppleSaveDc :629-636),
 // announces a save_result (success:null), and on a failed save applies prone via the REAL
 // addCondition + stamps activeConditionMeta (handleToppleFailure :638-661). Save-driven, not
-// auto-on-hit: a saved target stays untouched. Topple must be baseMastery — extra/choice-list
-// Topple still refuses (:679). masteryDone (:711-726) is the terminal { _pipelineComplete:true } riding 'mastery:done'.
+// auto-on-hit: a saved target stays untouched. Gate FIX #1037: the base-only refusal
+// (old :679 `available.baseMastery !== 'Topple'`) made hasTopple (:677) dead code — extra/choice
+// granted Topple now PROMPTS; only no-union Topple or a choice-only grant already resolved at the
+// tacticalMaster modal (ctx._tacticalMasterPending latch, actionPipeline.js:38; modal confirm lane
+// prompts the save, useCharActionsCleave.js:170-171) refuses. masteryDone (:721-736 post-fix) is the terminal
+// { _pipelineComplete:true } riding 'mastery:done'.
 // Consulted bytes census: getRuntimeValue('campaign','lastAttack',campaign); collectWeaponMastery(
 // lastAttack.attackName, playerStats) — NOT ctx.attack.name (byte-source swap pinned in t3);
 // writes via addCondition: setRuntimeValue(target,'activeConditions',[...,'prone']) + 'activeConditionMeta'.
@@ -23,13 +28,18 @@
 // mocked createSaveListener promise. Guard legs reach their labeled branch (#1035): every miss-run
 // pins not-called side effects, every armed run pins exact call arrays.
 // Old->new: condition x3 -> t1 (table); miss-guard + collect-null + no-Topple guards -> t2
-// (4 labeled runs, zero-effect pins; byte-source swap at :673); prompt + announce-log + DEX DC +
-// STR-default + success-no-write -> t3 (2 runs, exact payloads, byte-source swap at :630/:681);
-// apply-prone + failure-logs -> t4 (one run, exact write/log ledger); already-prone zero-write
-// (vacuous — fixture lacked creatures so addCondition never ran; source dedupes, never skips the
-// write) -> t5 (exact single write ['prone']); masteryDone x3 -> t6. "No target name returns early"
-// REMOVED: source has no such guard — it prompts with an undefined targetName; armed path covers
-// target bytes honestly.
+// (4 labeled runs, zero-effect pins; byte-source swap at :673); #1037 honest refusal legs
+// C (extra-Topple) + D (choice-Topple) FLIPPED to prompt arms -> t2b (exact payload each) —
+// the honest pre-fix capture of the never-prompt defect lived in the old t2 C/D bytes
+// (collectWeaponMastery {baseMastery:'Push', extraMasteries:['Topple']} /
+// {choiceMasteries:['Topple']} -> createSaveListener not called); new #1348 distinguishable
+// silent arms -> t2 (no-union-Topple + choice-only-with-modal-latch); prompt + announce-log +
+// DEX DC + STR-default + success-no-write -> t3 (2 runs, exact payloads, byte-source swap at
+// :630/:681); apply-prone + failure-logs -> t4 (one run, exact write/log ledger); already-prone
+// zero-write (vacuous — fixture lacked creatures so addCondition never ran; source dedupes,
+// never skips the write) -> t5 (exact single write ['prone']); masteryDone x3 -> t6.
+// "No target name returns early" REMOVED: source has no such guard — it prompts with an
+// undefined targetName; armed path covers target bytes honestly.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -236,23 +246,159 @@ describe('toppleMastery step (assembled)', () => {
     expect(addEntry).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
 
-    // Run C: Topple in extraMasteries but NOT base (:677 passes, :679 refuses).
+    // Run C (#1348 arm): weapon has masteries but no Topple anywhere in the union
+    // (:678 refuses). Distinguishable from run D by the latch byte, from A/B by a
+    // non-null collect return.
     clearEffects();
     const ctxC = makeCtx({ attack: { name: 'Greataxe' } });
-    collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: ['Topple'], choiceMasteries: [] });
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: ['Vex'], choiceMasteries: [] });
     const resC = await step.handler(ctxC);
     expect(resC).toEqual({ data: {} });
     expect(createSaveListener).not.toHaveBeenCalled();
+    expect(addEntry).not.toHaveBeenCalled();
     expect(setRuntimeValue).not.toHaveBeenCalled();
 
-    // Run D: Topple in choiceMasteries but NOT base (:677 passes via choice list, :679 refuses).
+    // Run D (#1348 arm, FIX #1037 dedup): choice-only Topple already resolved at the
+    // tacticalMaster modal — the runner merged its _tacticalMasterPending latch onto this
+    // ctx at the pause (actionPipeline.js:38), and the confirm lane owns the CON save
+    // (useCharActionsCleave.js:170-171, pinned byte-exact in useCharActionsCleave.test.js).
+    // A Push pick must never force a Topple save, a Topple pick must not double-prompt.
     clearEffects();
     const ctxD = makeCtx({ attack: { name: 'Greataxe' } });
+    ctxD._tacticalMasterPending = true;
     collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: [], choiceMasteries: ['Topple'] });
     const resD = await step.handler(ctxD);
     expect(resD).toEqual({ data: {} });
     expect(createSaveListener).not.toHaveBeenCalled();
     expect(addEntry).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('t2b FIX #1037 flipped legs: granted-Topple arms prompt with exact payloads (was never-prompt refusal)', async () => {
+    const step = toppleStep(steps);
+
+    // Run C (flipped from old t2/C refusal — pre-fix these bytes captured NO prompt):
+    // Topple granted via extraMasteries (weapon_mastery_choice accumulation,
+    // automationPassives.js:70-76) but NOT base. Old :679 refused; the gate now trusts
+    // hasTopple (:677), mirroring the cleave sibling union gate (:529-530).
+    clearEffects();
+    const ctxC = makeCtx({ attack: { name: 'Greataxe' } });
+    stubRuntime(HIT_ON_ORC);
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: ['Topple'], choiceMasteries: [] });
+    const resC = await step.handler(ctxC);
+    expect(resC).toEqual({ data: {} });
+    expect(collectWeaponMastery).toHaveBeenCalledWith('Greataxe', ctxC.playerStats);
+    // STR 3 + prof 3 -> DC 14 (computeToppleSaveDc; no attacks[] entry, Strength default :631).
+    expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+      targetName: 'Orc',
+      saveType: 'CON',
+      saveDc: 14,
+    });
+    expect(addEntry.mock.calls).toEqual([[
+      'test-campaign',
+      {
+        type: 'save_result',
+        characterName: 'TestChar',
+        targetName: 'Orc',
+        saveType: 'CON',
+        saveDc: 14,
+        description: 'Topple: Orc must make a DC 14 CON save (weapon Strength) or fall Prone.',
+        success: null,
+      },
+    ]]);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(applyMasteryEffect).not.toHaveBeenCalled();
+
+    // Run D (flipped from old t2/D refusal): Topple granted via choiceMasteries with NO
+    // modal on this attack (no latch) — the step owns the prompt. Same exact payload shape
+    // (#1348 pair vs t2/D: identical fixture bytes, differing only by the latch).
+    clearEffects();
+    const ctxD = makeCtx({ attack: { name: 'Greataxe' } });
+    stubRuntime(HIT_ON_ORC);
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: [], choiceMasteries: ['Topple'] });
+    const resD = await step.handler(ctxD);
+    expect(resD).toEqual({ data: {} });
+    expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+      targetName: 'Orc',
+      saveType: 'CON',
+      saveDc: 14,
+    });
+    expect(addEntry.mock.calls).toEqual([[
+      'test-campaign',
+      {
+        type: 'save_result',
+        characterName: 'TestChar',
+        targetName: 'Orc',
+        saveType: 'CON',
+        saveDc: 14,
+        description: 'Topple: Orc must make a DC 14 CON save (weapon Strength) or fall Prone.',
+        success: null,
+      },
+    ]]);
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+
+    // Run E: extra-granted Topple full-chain — failed save lands prone with the exact
+    // t4 ledger bytes, proving the flipped arm resolves, not just creates a listener.
+    clearEffects();
+    const ctxE = makeCtx({ attack: { name: 'Greataxe' } });
+    stubRuntime(HIT_ON_ORC);
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: ['Topple'], choiceMasteries: [] });
+    createSaveListener.mockReturnValue({
+      promptId: 'test-prompt-id',
+      promise: Promise.resolve({ success: false }),
+    });
+    await step.handler(ctxE);
+    expect(setRuntimeValue.mock.calls).toEqual([
+      ['Orc', 'activeConditions', ['prone'], 'test-campaign'],
+      ['Orc', 'activeConditionMeta', { prone: { dc: 14, ability: 'CON' } }, 'test-campaign'],
+    ]);
+    expect(addEntry.mock.calls).toEqual([
+      ['test-campaign', {
+        type: 'save_result',
+        characterName: 'TestChar',
+        targetName: 'Orc',
+        saveType: 'CON',
+        saveDc: 14,
+        description: 'Topple: Orc must make a DC 14 CON save (weapon Strength) or fall Prone.',
+        success: null,
+      }],
+      ['test-campaign', {
+        type: 'save_result',
+        characterName: 'TestChar',
+        rollType: 'save-topple',
+        targetName: 'Orc',
+        saveDc: 14,
+        saveType: 'CON',
+        success: false,
+        description: 'Orc failed CON save vs Topple. Gains Prone condition.',
+      }],
+      ['test-campaign', {
+        type: 'ability_use',
+        characterName: 'TestChar',
+        abilityName: 'Topple',
+        description: 'TestChar used Topple on Orc — target failed CON save (DC 14, weapon Strength), fell Prone.',
+        targetName: 'Orc',
+      }],
+    ]);
+
+    // Run F: base Topple WITH modal latch — prompts, byte-intact vs t3/t4. Pre-fix the
+    // base arm prompted post-resume even when the modal offered a choice; the latch dedup
+    // is scoped to choice-only grants so the base arm is untouched (never weakened).
+    clearEffects();
+    const ctxF = makeCtx({ attack: { name: 'Greataxe' } });
+    stubRuntime(HIT_ON_ORC);
+    ctxF._tacticalMasterPending = true;
+    collectWeaponMastery.mockReturnValue({ baseMastery: 'Topple', extraMasteries: [], choiceMasteries: ['Topple'] });
+    createSaveListener.mockReturnValue({
+      promptId: 'test-prompt-id',
+      promise: Promise.resolve({ success: true }),
+    });
+    await step.handler(ctxF);
+    expect(createSaveListener).toHaveBeenCalledWith('test-campaign', {
+      targetName: 'Orc',
+      saveType: 'CON',
+      saveDc: 14,
+    });
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 

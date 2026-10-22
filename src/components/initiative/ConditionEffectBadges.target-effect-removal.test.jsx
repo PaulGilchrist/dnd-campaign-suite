@@ -26,11 +26,12 @@
 // (findDirect + removeAction:'target_effect', only the effect string varies):
 // regenerate, aura_of_life, aura_of_purity, circle_of_power, heroism,
 // holy_aura, maze, imprisonment, confusion.
-// protection_from_poison EXCLUDED — live bug at jsx:142: the builder defers
-// ctx.te into a lazy onClick while the specs loop (jsx:617) reassigns
-// ctx.te, so its badge's deferred callbacks read undefined after render
-// (#820); its findResolved path is represented by forcecage. Fix in source
-// first, then enumerate it here.
+// protection_from_poison was EXCLUDED pre-#820: the builder (jsx:142)
+// deferred ctx.te into a lazy onClick while the specs loop (jsx:617)
+// reassigned ctx.te, so its badge's deferred callbacks read undefined after
+// render. Fixed at source with an eager poisonDc capture — now enumerated
+// below via its findResolved array-target path; click→CON-save payload is
+// pinned in auras.test.jsx (#820).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx';
@@ -87,6 +88,7 @@ describe('ConditionEffectBadges - generic target_effect removal', () => {
         { key: 'sanctuary', path: 'findDirect + isLocalhost gating (canonical)' },
         { key: 'banishment', path: 'findDirect control/debuff family' },
         { key: 'forcecage', target: ['Alice', 'Bob'], path: 'findResolved array-target resolution' },
+        { key: 'protection_from_poison', target: ['Alice', 'Bob'], path: 'findResolved post-#820 eager-capture fix' },
         { key: 'pass_without_trace_bonus', path: 'findDirect + live-registry build' },
         { key: 'slasher_enhanced_critical', compute: { targetAttackDisadvantageCount: 1 }, path: 'compute-guard override, no find' },
     ];

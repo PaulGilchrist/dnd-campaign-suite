@@ -3,8 +3,8 @@
  * useMapLoader — init lane (observable state before any load resolves).
  *
  * Owns here: while the initial load is pending the hook reports loading with
- * no map data and persists nothing (pins the hasLoaded mount-save guard at
- * :189), and ref state is seeded from the mount props before any load lands.
+ * no map data and persists nothing (pins the :188 loading-state mount-save
+ * guard), and ref state is seeded from the mount props before any load lands.
  *
  * Lane map (do NOT duplicate across these files):
  * - post-load setters + envelope persistence        -> useMapLoader.api.test.js
@@ -24,8 +24,10 @@
  * Honest scoping notes (known source bugs, not masked here): fixtures use a
  * constant mapName, so the never-reset isInitialized (:161) and stale
  * hexMapNameRef (:210/:190) on a mapName change are not exercised; the
- * pending-load promise makes the :188-210 mount-save race observable via the
- * hasLoaded guard, which this lane pins.
+ * pending-load promise makes the mount-save guard observable via the
+ * `loading` state, which this lane pins (#800 fixed: the guard is the
+ * loading STATE in the persistence effect's deps — the old hasLoaded ref
+ * flipped after an await seam and the flush was scheduling-dependent).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';

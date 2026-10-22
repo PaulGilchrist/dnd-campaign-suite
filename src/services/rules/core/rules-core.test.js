@@ -22,8 +22,8 @@ import { getProficiencies } from '../rules-proficiencies.js';
 import { getArmorClass } from '../rules-armorClass.js';
 import { getLanguages } from '../rules-languages.js';
 import { getMagicItems } from '../rules-magicItems.js';
-import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './abilityCalc.js';
-import { getAbilities as getAbilities2024 } from './abilityCalc2024.js';
+import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e, getCarryingCapacity as getCarryingCapacity5e } from './abilityCalc.js';
+import { getAbilities as getAbilities2024, getCarryingCapacity as getCarryingCapacity2024 } from './abilityCalc2024.js';
 import { getSpellAbilities as getSpellAbilities5e } from './spellCalc.js';
 import { getSpellAbilities as getSpellAbilities2024 } from './spellCalc2024.js';
 import { getAttacks as getAttacks5e } from './attackCalc.js';
@@ -46,8 +46,9 @@ describe('rules facade composition contract', () => {
     expect(m.proficiencyUtils).toBe(proficiencyUtils);
     expect(m.classRules).toBe(classRules);
     expect(m.raceRules).toBe(rules5e);
-    // Defect context (pinned below): the bundle omits getCarryingCapacity entirely.
-    expect(m.abilityCalc.getCarryingCapacity).toBeUndefined();
+    // #1251 FIXED: the bundle (rules-core.js:23) now forwards getCarryingCapacity so
+    // the facade can reach the real carrying-capacity law, not getHitPoints.
+    expect(m.abilityCalc.getCarryingCapacity).toBe(getCarryingCapacity5e);
   });
 
   it('getSubModules wires the real 2024 implementation bundle when rules is "2024"', () => {
@@ -55,6 +56,7 @@ describe('rules facade composition contract', () => {
 
     expect(m.use2024).toBe(true);
     expect(m.abilityCalc.getAbilities).toBe(getAbilities2024);
+    expect(m.abilityCalc.getCarryingCapacity).toBe(getCarryingCapacity2024);
     expect(m.spellCalc.getSpellAbilities).toBe(getSpellAbilities2024);
     expect(m.attackCalc).toBe(getAttacks2024);
     expect(m.proficiencyUtils).toBe(proficiencyUtils2024);
@@ -93,14 +95,13 @@ describe('rules facade composition contract', () => {
     }
   });
 
-  it('DEFECT pin: rules.getCarryingCapacity returns hit points, not carrying capacity', () => {
-    // rules.js:394-399 calls abilityCalc.getHitPoints(playerStats) on BOTH branches
-    // instead of getCarryingCapacity — and getSubModules' abilityCalc bundle
-    // (rules-core.js:23) never exposes getCarryingCapacity, so the intended call would
-    // throw today. Consequence at rules.js:553: playerStats.carryingCapacity = HP.
-    // Other suites mock abilityCalc entirely, so nothing else catches this.
-    // Expected RAW: STR 15 x 15 = 225 (core/carryingCapacity.js). Flip this pin when
-    // the facade is fixed; see SOURCE BUGS report of test-maint pass.
+  it('#1251 FIXED: rules.getCarryingCapacity returns STR-based capacity, not hit points', () => {
+    // rules.js:394-399 was calling abilityCalc.getHitPoints(playerStats) on BOTH branches
+    // and getSubModules' abilityCalc bundle (rules-core.js:23) never exposed
+    // getCarryingCapacity — consequence at rules.js:553: playerStats.carryingCapacity = HP.
+    // Fixed: bundle forwards getCarryingCapacity; facade dispatches to it.
+    // RAW law (public/data/ability-scores.json): "carrying capacity is your Strength
+    // score multiplied by 15" → STR 15 x 15 = 225 (core/carryingCapacity.js).
     const playerStats = {
       rules: '5e',
       level: 1,
@@ -111,6 +112,8 @@ describe('rules facade composition contract', () => {
       ],
     };
 
-    expect(rules.getCarryingCapacity(playerStats)).toBe(11); // 10 + (10/2+1)*0 + 1*1 = HP, not 225
+    expect(rules.getCarryingCapacity(playerStats)).toBe(225);
+    // #1348 distinguishable: same char, capacity !== HP (defect value was 11).
+    expect(rules.getCarryingCapacity(playerStats)).not.toBe(rules.getHitPoints(playerStats, {}));
   });
 });

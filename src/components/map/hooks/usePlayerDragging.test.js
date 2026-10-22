@@ -6,8 +6,10 @@
 //           + onTokenMoveLanded exact args once (defender-detection internals owned by
 //           opportunityTrigger.test.js; items-lane parity #905) + capture release
 //   leave → cancel: release + clear, zero commit writes
-// #905-class pointer-capture leaks (down captures BEFORE the ctm/player guards; up releases
-// AFTER them) are pinned honestly on the guard rows below — see SOURCE BUGS note there.
+// #905/#910 capture discipline (FIXED this lane, mirrors the #883 fix in useItemDragging.js):
+// down validates through every guard then captures as its LAST statement before state; up
+// releases BEFORE its ctm/player guards. Pinned on the guard rows below + the
+// 'pointer capture discipline (#910)' block.
 // Do NOT duplicate here: useItemDragging.test.js — placedItems lane (commit contract #905);
 // useMapDrops.test.js — external drop-target lane; Map*.test.jsx — consume this hook fully mocked;
 // movementBudget.test.js / chargeEconomy.test.js — budget clamp math (every drop here runs with
@@ -182,15 +184,15 @@ describe('usePlayerDragging', () => {
       expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
     });
 
-    // SOURCE BUG (#905 class, confirmed live in player lane): setPointerCapture runs
-    // BEFORE the ctm/player guards, so a failed down strands the capture with no drag
-    // state. Pinned honestly at current behaviour — delete the expectCaptured:true rows
-    // only when the source captures after its guards.
+    // #910 capture discipline (this row honest-pinned the #905-class SOURCE BUG of
+    // setPointerCapture running BEFORE the ctm/player guards, stranding capture on a
+    // failed down). Flipped: the source now captures after every guard (mirrors the
+    // #883 fix in useItemDragging.js), so failed arms capture NOTHING.
     it.each([
       ['svgRef is null', null, 'p1', false],
-      ['getScreenCTM returns null', svgNoCtm(), 'p1', true],
-      ['player id is unknown', svgAt(60, 80), 'nonexistent', true],
-    ])('starts no drag and writes nothing when %s (captured=%s)', (_, svg, playerId, expectCaptured) => {
+      ['getScreenCTM returns null', svgNoCtm(), 'p1', false],
+      ['player id is unknown', svgAt(60, 80), 'nonexistent', false],
+    ])('starts no drag, writes nothing, and captures nothing when %s (captured=%s)', (_, svg, playerId, expectCaptured) => {
       svgRef.current = svg;
       const { result } = getHook();
       act(() => {
@@ -200,6 +202,16 @@ describe('usePlayerDragging', () => {
       expect(setMapData).not.toHaveBeenCalled();
       const captured = svg ? svg.setPointerCapture.mock.calls.length > 0 : false;
       expect(captured).toBe(expectCaptured);
+      // Terminals stay silent: up/leave bail on null dragging — safe only because
+      // the failed down never captured.
+      act(() => {
+        result.current.handlePointerUp(mockEvent());
+      });
+      act(() => {
+        result.current.handlePointerLeave({ pointerId: 1 });
+      });
+      const releases = svg ? svg.releasePointerCapture.mock.calls.length : 0;
+      expect(releases).toBe(0);
     });
   });
 
@@ -339,13 +351,16 @@ describe('usePlayerDragging', () => {
       expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
     });
 
-    // SOURCE BUG (#905 class): releasePointerCapture runs AFTER the ctm/player guards,
-    // so a guarded pointer-up clears the drag but strands the capture. Pinned as-is.
+    // #910 capture discipline (this row honest-pinned the #905-class SOURCE BUG of
+    // releasePointerCapture running AFTER the ctm/player guards, so a guarded up
+    // cleared the drag but stranded the capture). Flipped: up releases the held
+    // capture FIRST — every arm that started a drag (and thus captured) releases
+    // exactly once even when its own guards trip; the no-drag arm never captured.
     it.each([
       ['no drag is active', false, () => {}],
       ['getScreenCTM returns null mid-drag', true, () => { svgRef.current = svgNoCtm(); }],
       ['the dragged player is removed mid-drag', true, () => { mapDataHolder.current = { players: [] }; }],
-    ])('up writes nothing, clears the drag, and leaves capture unreleased when %s', (_, startDrag, mutate) => {
+    ])('up releases the held capture, clears the drag, and writes nothing when %s', (_, startDrag, mutate) => {
       if (!startDrag) svgRef.current = svgAt(150, 150);
       const helpers = startDrag ? press() : getHook();
       mutate();
@@ -357,8 +372,76 @@ describe('usePlayerDragging', () => {
       expect(setMapData).not.toHaveBeenCalled();
       expect(setRuntimeValueSpy).not.toHaveBeenCalled();
       expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
-      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+      if (startDrag) {
+        expect(svgRef.current.releasePointerCapture).toHaveBeenCalledTimes(1);
+        expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
+      } else {
+        expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+      }
       expect(helpers.result.current.dragging).toBeNull();
+    });
+  });
+
+  // #910 capture discipline: setPointerCapture must run AFTER every down-guard
+  // (useRuler.js is the house pattern; mirrors the #883 fix in useItemDragging.js),
+  // so dragging !== null strictly implies captured, and up/leave each release a held
+  // capture exactly once — even when up's own guards trip mid-flight.
+  describe('pointer capture discipline (#910)', () => {
+    it('orders every down guard before the pointer capture (call-order ledger)', () => {
+      const getScreenCTM = vi.fn(() => ({ inverse: () => ({}) }));
+      svgRef.current = { ...svgAt(60, 80), getScreenCTM };
+      const players = mapDataHolder.current.players;
+      const findSpy = vi.fn((pred) => players.find(pred));
+      const event = mockEvent({ pointerId: 42 });
+      const { result } = getHook({ mapData: { ...mapDataHolder.current, players: { find: findSpy } } });
+      act(() => {
+        result.current.handlePointerDown(event, 'p1');
+      });
+      expect(result.current.dragging).not.toBeNull();
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledWith(42);
+      const captureOrder = svgRef.current.setPointerCapture.mock.invocationCallOrder[0];
+      expect(event.stopPropagation.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+      expect(event.preventDefault.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+      expect(getScreenCTM.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+      expect(findSpy.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+    });
+
+    it('guarded up (capture held, ctm lost mid-drag) still releases exactly once, then leave stays silent', () => {
+      const helpers = press();
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+      const upSvg = svgNoCtm(); // down's capture is live; up's own guard will trip
+      svgRef.current = upSvg;
+      act(() => {
+        helpers.result.current.handlePointerUp(mockEvent({ clientX: 150, clientY: 150 }));
+      });
+      expect(helpers.result.current.dragging).toBeNull();
+      expect(upSvg.releasePointerCapture).toHaveBeenCalledTimes(1); // release precedes the bail
+      expect(upSvg.releasePointerCapture).toHaveBeenCalledWith(1);
+      expect(setMapData.mock.calls.filter(([fn]) => typeof fn === 'function').length).toBe(0);
+      // Late leave after up must not double-release (state already cleared).
+      act(() => {
+        helpers.result.current.handlePointerLeave({ pointerId: 1 });
+      });
+      expect(upSvg.releasePointerCapture).toHaveBeenCalledTimes(1);
+    });
+
+    it('pairs capture and release exactly once per pointerId across a successful drag up then leave', () => {
+      const helpers = press('p1', { event: { pointerId: 7 } });
+      const dragSvg = svgRef.current; // same svg must see capture then release (no dropAt svg-swap)
+      expect(dragSvg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(dragSvg.releasePointerCapture).not.toHaveBeenCalled();
+      act(() => {
+        helpers.result.current.handlePointerUp(mockEvent({ clientX: 150, clientY: 150, pointerId: 7 }));
+      });
+      expect(dragSvg.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(dragSvg.releasePointerCapture).toHaveBeenCalledWith(7);
+      act(() => {
+        helpers.result.current.handlePointerLeave({ pointerId: 7 });
+      });
+      expect(dragSvg.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(dragSvg.setPointerCapture).toHaveBeenCalledTimes(1);
     });
   });
 

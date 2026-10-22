@@ -393,9 +393,13 @@ const rules = {
      // === SHARED: getCarryingCapacity ===
      getCarryingCapacity: (playerStats) => {
          const { abilityCalc } = getSubModules(playerStats, null);
+         // #1251 FIXED: was delegating to abilityCalc.getHitPoints on BOTH ternary
+         // branches, so rules.js:553 persisted carryingCapacity === HP for every
+         // character. Law: STR totalScore x 15 x sizeMultiplier
+         // (public/data/ability-scores.json; core/carryingCapacity.js shared re-export).
          return is2024(playerStats, null)
-             ? abilityCalc.getHitPoints(playerStats)
-             : abilityCalc.getHitPoints(playerStats);
+             ? abilityCalc.getCarryingCapacity(playerStats)
+             : abilityCalc.getCarryingCapacity(playerStats);
       },
 
      // === RULESET-SPECIFIC: getSpellAbilities ===

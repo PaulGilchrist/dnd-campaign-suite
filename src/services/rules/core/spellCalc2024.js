@@ -38,6 +38,23 @@ function addAlwaysPrepared(spellAbilities, spellName) {
     }
 }
 
+// #1268: the known-counters (cantrips_known / spells_known) are bumped ONLY when the
+// host container actually carries them. Bumping an absent key seeded a NaN (undefined + n),
+// masked in the sheet by CharSpells.jsx:79 (prepared_spells || spells_known). Absent-key
+// hosts skip LOUD per the no-fallback law — never a silent 0. The always-prepared spell
+// rows are the canonical record on untracked hosts. Tracked hosts (#1262 slotless
+// containers seeded by SLOTLESS_CONTAINER; Barbarian/Monk disk tables carrying
+// spells_known:0) accumulate byte-intact.
+function bumpCounterIfTracked(spellAbilities, key, count, lineageName) {
+    if (key in spellAbilities) {
+        spellAbilities[key] += count;
+        return;
+    }
+    if (count > 0) {
+        console.error(`[spellCalc2024] lineage counter '${key}' absent on host — skipping ${count} ${lineageName} grant(s); always-prepared rows are the canonical record`);
+    }
+}
+
 // Player-chosen spell selections persisted to runtime state (class-feature Savants,
 // Signature Spells) — always prepared unless already known.
 function addRuntimeSelectionSpells(spellAbilities, playerName, runtimeKey, campaignName) {
@@ -204,8 +221,9 @@ function applyLineageFeatureSpells(spellAbilities, feature, playerStats, playerS
         addAlwaysPrepared(spellAbilities, spellName);
     });
 
-    spellAbilities.cantrips_known += cantripCount;
-    spellAbilities.spells_known += levelSpellCount;
+    // #1268: tracked-counter bump only — absent keys skip loud (see bumpCounterIfTracked).
+    bumpCounterIfTracked(spellAbilities, 'cantrips_known', cantripCount, lineageName);
+    bumpCounterIfTracked(spellAbilities, 'spells_known', levelSpellCount, lineageName);
 }
 
 // passive_rule + always_prepared_spells: gated on the feature existing in the major's
@@ -334,8 +352,12 @@ function applyAutomationFeature(spellAbilities, feature, playerStats, playerSumm
     }
 }
 
-// Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass (with the
-// Bonus Action casting-time override when the row already exists).
+// Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass when the
+// row is absent. The '1 bonus action' casting-time override is NOT stamped here:
+// finalizeSpellRows remaps every row onto a fresh spells-DB clone (remapSpellRow's
+// cloneDeep), which wipes any pre-remap casting_time mutation (#1272). The upgrade
+// is applied post-remap by stampImprovedIllusionsCastingTime (FT-068 stamp-last
+// pattern) so the feature benefit actually reaches the sheet.
 function applyImprovedIllusions(spellAbilities, playerStats, allSpells) {
     const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
     if (!hasImprovedIllusions || !allSpells) return;
@@ -345,15 +367,19 @@ function applyImprovedIllusions(spellAbilities, playerStats, allSpells) {
         if (minorIllusionDetail) {
             spellAbilities.spells.push({ ...minorIllusionDetail, prepared: 'Always' });
         }
-    } else if (minorIllusion.casting_time !== '1 action' && minorIllusion.casting_time !== 'Bonus Action') {
-        // Override casting time to Bonus Action for Improved Illusions
-        const minorIllusionDetail = allSpells.find(s => s.name === 'Minor Illusion');
-        if (minorIllusionDetail) {
-            const idx = spellAbilities.spells.findIndex(s => s.name === 'Minor Illusion');
-            if (idx >= 0) {
-                spellAbilities.spells[idx] = { ...minorIllusionDetail, prepared: 'Always', casting_time: '1 bonus action' };
-            }
-        }
+    }
+}
+
+// #1272: Improved Illusions casting-time override — disk law classes.json:13537
+// ("cast [Minor Illusion] as Bonus Action"). Stamped AFTER the finalizeSpellRows
+// detail remap so it outlives remapSpellRow's DB clone (both grant arms — existing
+// row and absent-row grant — arrive as remapped rows and get the same stamp).
+function stampImprovedIllusionsCastingTime(spellAbilities, playerStats) {
+    const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+    if (!hasImprovedIllusions) return;
+    const minorIllusion = spellAbilities.spells.find(s => s.name === 'Minor Illusion');
+    if (minorIllusion) {
+        minorIllusion.casting_time = '1 bonus action';
     }
 }
 
@@ -670,7 +696,8 @@ function applyAutomationSpellGrants(spellAbilities, playerStats, playerSummary, 
         });
     }
 
-    // Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass
+    // Improved Illusions: grant Minor Illusion cantrip row when absent (#1272: the
+    // casting-time override is applied post-remap in finalizeSpellRows, not here).
     applyImprovedIllusions(spellAbilities, playerStats, allSpells);
 
     // Spell Thief: remove blocked spells and add stolen spells from runtime state
@@ -773,6 +800,10 @@ function finalizeSpellRows(spellAbilities, playerStats, allSpells) {
 
     const mageHandLegerdemainActive = hasMageHandLegerdemain(playerStats);
     spellAbilities.spells = spellAbilities.spells.map(spell => remapSpellRow(spell, allSpells, mageHandLegerdemainActive));
+
+    // #1272: Improved Illusions '1 bonus action' stamp, AFTER the detail remap so it
+    // survives remapSpellRow's DB clone (FT-068 stamp-last pattern below).
+    stampImprovedIllusionsCastingTime(spellAbilities, playerStats);
 
     // CLA-234: Path of the Wild Heart ritual stamps (casting_time 'Ritual' +
     // _ritualOnly + Wisdom casting ability) happen BEFORE the slot-level filter

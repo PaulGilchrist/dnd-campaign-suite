@@ -11,7 +11,7 @@ export const epitomeEmpoweredStrikes = {
         return ctx.attack?.weaponType === 'unarmed';
     },
     handler: async (ctx, prevData) => {
-        const round = getCurrentCombatRound();
+        const round = getCurrentCombatRound(ctx.campaignName);
         const usedRound = getRuntimeValue(ctx.playerStats.name, 'epitomeEmpoweredUsedRound', ctx.campaignName);
         if (usedRound === round) return { data: prevData };
 

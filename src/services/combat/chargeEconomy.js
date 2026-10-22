@@ -7,9 +7,13 @@
  * same SSE broadcast as turn transitions.
  *
  * Off-switches: enforcement off ⇒ every function is a zero-write no-op —
- * the L1–4 guarantee. actionEconomy gates slot charges; movementBudget
- * gates movement charges; off-mode refunds allowed at the modal-cancel /
- * GM-correction seams (turnState.js un-charge, L5-002).
+ * the L1–4 guarantee, refunds included. actionEconomy gates slot charges
+ * AND refunds (off never charged ⇒ nothing for this bridge to refund —
+ * refundSlot refuses false, symmetric with chargeSlot; fix#62 adjudication
+ * of the doc/impl divergence, honest-pin #989 flipped to doc-conform).
+ * movementBudget gates movement charges. The modal-cancel / GM-correction
+ * un-charge seam (turnState.js refund, L5-002) is honored only WHILE
+ * actionEconomy enforcement is on.
  */
 import { cloneDeep } from 'lodash'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
@@ -41,7 +45,11 @@ export function chargeSlot({ creatureName, bucket, campaignName }) {
     return true
 }
 
-/** Un-charge one economy slot (modal cancel / referee correction). */
+/**
+ * Un-charge one economy slot at the modal-cancel / GM-correction seam.
+ * Enforcement off ⇒ false with zero writes (nothing was ever charged here);
+ * on ⇒ false only when nothing is spent to refund (no phantom credit).
+ */
 export function refundSlot({ creatureName, bucket, campaignName }) {
     if (!creatureName || !campaignName) return false
     if (!enforcementFlag('actionEconomy')) return false

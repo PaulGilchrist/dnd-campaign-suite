@@ -286,16 +286,30 @@ describe('useAttackDamageResolution - automations at the hook seam', () => {
             name: 'Overwhelming Strike', type: 'damage_bonus', trigger: 'natural_20_attack_roll', ...extra,
         });
 
+        // #1035 fix: extraDamageType is consumed at the append site — pre-fix the
+        // label was the dead '[Overwhelming Strike]' name byte for every shape.
+        // Legs are mutually distinguishable (#1348): [force] vs [slashing] labels,
+        // dice vs flat expr.
         it.each([
             {
-                label: 'dice expression rolls and appends with the feature-name label',
+                label: 'dice expression rolls and appends with the authored force type',
                 action: n20Action({ extraDamageExpression: '2d10', extraDamageType: 'force' }),
-                formula: '1d8+3 [slashing] + 2d10 [Overwhelming Strike]', total: 31, rolls: [8, 10, 10],
+                formula: '1d8+3 [slashing] + 2d10 [force]', total: 31, rolls: [8, 10, 10],
             },
             {
-                label: 'increased_ability_score resolves to the flat STR bonus, no roll',
+                label: 'increased_ability_score resolves to the flat STR bonus, no roll, force type',
                 action: n20Action({ extraDamageExpression: 'increased_ability_score', extraDamageType: 'force', abilityIncreased: 'Strength' }),
-                formula: '1d8+3 [slashing] + 3 [Overwhelming Strike]', total: 14, rolls: [8],
+                formula: '1d8+3 [slashing] + 3 [force]', total: 14, rolls: [8],
+            },
+            {
+                label: 'same_as_attack mirrors the Longsword slashing type onto the flat bonus',
+                action: n20Action({ extraDamageExpression: 'increased_ability_score', extraDamageType: 'same_as_attack', abilityIncreased: 'Strength' }),
+                formula: '1d8+3 [slashing] + 3 [slashing]', total: 14, rolls: [8],
+            },
+            {
+                label: 'missing extraDamageType contributes zero extra (ctx bytes intact)',
+                action: n20Action({ extraDamageExpression: '2d10' }),
+                formula: '1d8+3 [slashing]', total: 11, rolls: [8],
             },
         ])('$label on a natural 20', async ({ action, formula, total, rolls }) => {
             const { hook, rollDamage } = UseAttackDamageResolution(statsWith([action]));

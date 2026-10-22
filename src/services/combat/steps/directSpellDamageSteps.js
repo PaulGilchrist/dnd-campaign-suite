@@ -73,6 +73,27 @@ function applyRadiantSoul(formula, ctx, ps) {
   return formula;
 }
 
+// #1028 latch honesty (mirrors fix#65 attackRollDamageCalc.js markRadiantSoulUsed :45-55
+// applied-flag stamp-if-applied shape): the once-per-turn latch is consumed only when the
+// adder ACTUALLY lands on this roll. Disk law (public/data/2024/classes.json, Warlock →
+// Celestial Patron, level 6): "add Charisma modifier to that spell's damage" — at Cha mod 0
+// nothing is added, so nothing is consumed; the latch stays armed and the next qualifying
+// Radiant/Fire spell rides. Both adder sites feeding the rolled ctx.formula gate on
+// chaMod > 0 (applyRadiantSoul above; execution/damageCalculation.js computeRadiantSoul :94
+// for the pre-baked CLA-279 path), so a '[Radiant Soul]' byte in the rolled formula is the
+// applied-non-zero proof.
+function markRadiantSoulUsed(ctx, ps, formula) {
+  if (!ps?.automation?.passives) return;
+  const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
+  if (!radiantSoulPassive || !radiantSoulPassive.hasAutomation) return;
+  const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
+  const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
+  if (!damageTypes.includes(spellDamageType)) return;
+  if (!formula.includes('[Radiant Soul]')) return; // stamp only if applied (#1028)
+  const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
+  setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
+}
+
 /**
  * Build the damage pipeline steps for a spell-type action.
  * Each step: { name, subscribe, emit, condition(ctx), handler(ctx) → result|null }
@@ -132,18 +153,8 @@ export function buildDirectSpellDamageSteps() {
         }
         if (!result) return null;
 
-        // Mark Radiant Soul as used for this turn
-        if (ps?.automation?.passives) {
-          const radiantSoulPassive = ps.automation.passives.find(p => p.type === 'radiant_soul');
-          if (radiantSoulPassive && radiantSoulPassive.hasAutomation) {
-            const spellDamageType = (ctx.attack?.damageType || '').toLowerCase();
-            const damageTypes = (radiantSoulPassive.damageTypes || []).map(dt => dt.toLowerCase());
-            if (damageTypes.includes(spellDamageType)) {
-              const oncePerTurnKey = `_radiantSoul_${ps.name.replace(/\s+/g, '_')}_oncePerTurn`;
-              setRuntimeValue(ps.name, oncePerTurnKey, true, ctx.campaignName);
-            }
-          }
-        }
+        // Mark Radiant Soul as used for this turn (#1028 latch honesty — see helper).
+        markRadiantSoulUsed(ctx, ps, ctx.formula);
 
         return {
           data: { formula: ctx.formula, total: result.total, rolls: result.rolls, modifier: result.modifier },
@@ -185,14 +196,15 @@ export function buildDirectSpellDamageSteps() {
       handler: async (ctx) => {
         const dicePerLevel = Math.max(2, ctx.overchannelUseCount);
         const totalDice = dicePerLevel * ctx.overchannelSpellLevel;
-        const r = rollExpression(`${totalDice}d12`);
+        const costFormula = `${totalDice}d12`;
+        const r = rollExpression(costFormula);
         if (r) {
           addEntry(ctx.campaignName, {
             type: 'roll',
             characterName: ctx.playerStats?.name || 'unknown',
             rollType: 'overchannel-damage',
             name: 'Overchannel',
-            formula: `${totalDice}d12`,
+            formula: costFormula,
             rolls: r.rolls,
             total: r.total,
             modifier: r.modifier,
@@ -201,8 +213,47 @@ export function buildDirectSpellDamageSteps() {
             finalDamage: r.total,
             note: 'Overchannel self-damage (ignores resistance/immunity)',
           }).catch((e) => { console.error("[directSpellDamageSteps:log-error]", e); });
+          return { data: {} };
         }
-        return { data: {} };
+        // #1044 no-free-ride: cost roll null while spellRollDamage :149-153 already
+        // maximized ctx.total = the RAW cost unpaired with the RAW bonus
+        // (public/data/2024/classes.json Wizard lv14: "take 2d12 Necrotic damage per
+        // level of spell slot immediately after casting"). Nothing is applied or logged
+        // before spellProceedToDamage consumes the merged ctx bytes, so this is the
+        // clean seam to strip the bonus: re-roll the BASE formula with the same
+        // crit-aware dispatcher spellRollDamage would have used without overchannel
+        // (overchannel beats crit there — refused overchannel must not double-apply,
+        // and a genuine crit must not lose its dice). Loud-reject console.error +
+        // playbook §5 refusal log (a skip MUST log). No latch burns here — overchannel
+        // is neither sorcery-point nor once-per-turn; the escalating overchannelUseCount
+        // is owned upstream by computeOverchannel and is never re-charged from this
+        // lane. Base re-roll null (maximized roll succeeded upstream ⇒ only a mutated
+        // ctx.formula can) — nothing honest to hand downstream → fix#69 null = abort.
+        console.error(`[directSpellDamageSteps] Overchannel cost roll failed (${costFormula}) — refusing uncosted maximized bonus`);
+        const base = ctx.isCrit ? rollExpressionDoubled(ctx.formula) : rollExpression(ctx.formula);
+        addEntry(ctx.campaignName, {
+          type: 'automation',
+          characterName: ctx.playerStats?.name || 'unknown',
+          automationType: 'overchannel_refused',
+          abilityName: 'Overchannel',
+          note: 'overchannel_refused',
+          reason: `cost roll failed (${costFormula})`,
+          description: base
+            ? `Overchannel refused (cost roll failed: ${costFormula}) — maximized bonus stripped, spell cast at base dice for ${base.total}. No necrotic self-damage rolled.`
+            : `Overchannel refused (cost roll failed: ${costFormula}) and base damage (${ctx.formula}) could not be rolled — spell aborted, no damage applied.`,
+          timestamp: Date.now(),
+        }).catch((e) => { console.error("[directSpellDamageSteps:log-error]", e); });
+        if (!base) return null;
+        return {
+          data: {
+            formula: ctx.formula,
+            total: base.total,
+            rolls: base.rolls,
+            modifier: base.modifier,
+            overchannelActive: false,
+            overchannelRefused: true,
+          },
+        };
       },
     },
 

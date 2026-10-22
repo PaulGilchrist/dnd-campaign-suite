@@ -10,7 +10,7 @@
 // SPELL_RUNTIME_CLEANERS[spellName] (:314), so wrong-spell survival is
 // pinned instead of a Charm Person fold-in. Generic break machinery:
 // concentrationService.test.js + user-driven trio #833-#835; REST seam and
-// the name-only cleanupBuffsByName:483 filter defect: #990
+// the cleanupBuffsByName:483 filter semantics (caster-attributed since #990-fix): #990
 // cleanupConcentrationEffects.test.js. ER family (#949): cast lane
 // expeditiousRetreatService, latch turnStartEffects.er-dash-offer, buff
 // consumption charSummaryCalc.ft105, Dash execution expeditiousRetreatDashHandler.

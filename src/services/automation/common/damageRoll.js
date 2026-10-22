@@ -58,10 +58,15 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
       }
 
     try {
-        const [mapData, npcs] = await Promise.all([
+        const [mapData, npcEnvelope] = await Promise.all([
             mapsService.loadMapData(campaignName, mapName),
             loadNPCs(campaignName),
          ]);
+        // Wire contract: GET /api/campaigns/:campaign/npcs resolves the WRAPPED
+        // envelope { npcs:[...] } (jsonEntityCrud.js:49 responseWrapper) — unwrap at
+        // arrival. #1181: collectHostileThreats called .find on the envelope (TypeError).
+        // ?? [] guards only the degraded/campaign-missing edge; server loadOrInit ensures an array.
+        const npcs = npcEnvelope?.npcs ?? [];
 
         return await computeMapAwareContext({ mapData, npcs, attackContext, playerName, campaignName, targetName, resistanceNotice });
      } catch {

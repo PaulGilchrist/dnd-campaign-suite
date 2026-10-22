@@ -1,6 +1,7 @@
 // @maintained-by-ai
 // Lane: useItemDragging — placedItems token drag contract (Map.jsx / PlacedItems.jsx).
-//   down  → capture + drag-ghost state bytes (offset/start cell/mover identity)
+//   down  → guard-then-capture (guards fully validate first; capture only when the
+//           drag actually starts — #883) + drag-ghost state bytes (offset/start cell/mover identity)
 //   move  → snapped clamped cell bytes via setPlacedItems + steadyAim runtime write
 //   up    → release capture, clear state, onTokenMoveLanded commit exact args
 //   leave → cancel: release + clear, ZERO commit writes
@@ -183,6 +184,11 @@ describe('useItemDragging', () => {
       expect(result.current.itemDragging).toBeNull();
       expect(setPlacedItems).not.toHaveBeenCalled();
       expect(setRuntimeValueSpy).not.toHaveBeenCalled();
+      // #883: a failed down must never touch the pointer — capture happens only
+      // once the drag actually starts (svgRef-null row has no spy to read).
+      if (svgRef.current) {
+        expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      }
     });
   });
 
@@ -277,6 +283,67 @@ describe('useItemDragging', () => {
       });
       expect(result.current.itemDragging).toBeNull();
       expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // #883 capture discipline: setPointerCapture must run AFTER every down-guard
+  // (useRuler.js is the house pattern), so itemDragging !== null strictly implies
+  // captured, and failed starts strand nothing.
+  describe('pointer capture discipline (#883)', () => {
+    it.each([
+      ['getScreenCTM returns null', () => svgMock({ getScreenCTM: () => null }), 'item1'],
+      ['item id is unknown', () => svgMock(), 'nonexistent'],
+    ])('failed down (%s): zero capture calls and terminals stay silent', (_, makeSvg, itemId) => {
+      svgRef.current = makeSvg();
+      const event = mockEvent();
+      const { result } = getHook();
+      act(() => {
+        result.current.handleItemPointerDown(event, itemId);
+      });
+      expect(result.current.itemDragging).toBeNull();
+      expect(svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+      // up/leave bail on null state — safe only because the failed down never captured.
+      act(() => {
+        result.current.handleItemPointerUp(mockEvent());
+      });
+      act(() => {
+        result.current.handleItemPointerLeave({ pointerId: 1 });
+      });
+      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+    });
+
+    it('orders every down guard before the pointer capture (call-order ledger)', () => {
+      const getScreenCTM = vi.fn(() => ({ inverse: () => ({}) }));
+      svgRef.current = svgMock({ getScreenCTM });
+      const event = mockEvent();
+      const { result } = getHook();
+      act(() => {
+        result.current.handleItemPointerDown(event, 'item1');
+      });
+      expect(result.current.itemDragging).not.toBeNull();
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(1);
+      const captureOrder = svgRef.current.setPointerCapture.mock.invocationCallOrder[0];
+      expect(event.stopPropagation.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+      expect(event.preventDefault.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+      expect(getScreenCTM.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+    });
+
+    it('pairs capture and release exactly once per pointerId across up then leave', () => {
+      const { result, event } = setupDrag('item1');
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+      act(() => {
+        result.current.handleItemPointerUp(event);
+      });
+      expect(svgRef.current.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(svgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
+      // Late leave after up must not double-release (state already cleared).
+      act(() => {
+        result.current.handleItemPointerLeave({ pointerId: 1 });
+      });
+      expect(svgRef.current.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(svgRef.current.setPointerCapture).toHaveBeenCalledTimes(1);
     });
   });
 

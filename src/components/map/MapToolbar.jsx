@@ -40,6 +40,11 @@ const MapToolbar = ({
     } = spellOverlayState || {};
 
     const toggleSpellMode = () => {
+        // Defensive-only: the sole production producer (Map.jsx) always passes a
+        // full overlay state. With no setSpellMode the mode can never engage, so
+        // the honest click is a total inert no-op — not a half-action that drops
+        // the paint tool without arming spell mode (#928a).
+        if (!setSpellMode) return;
         if (spellMode) {
             setSpellMode(null);
         } else {
@@ -124,7 +129,11 @@ const MapToolbar = ({
                     )}
                 </div>
             </div>
-            {spellMode !== null && spellMode !== undefined && (
+            {/* Truthy gate unifies the falsy arms: '' and null render identically
+                (no controls, inactive button) — spellMode is only ever null or a
+                non-empty OverlayShape from its producers, and every downstream
+                consumer tests truthiness, so '' means inactive (#928b). */}
+            {!!spellMode && (
                 <SpellOverlayControls
                     selectedShape={selectedShape}
                     setSelectedShape={onSelectShape}

@@ -210,19 +210,32 @@ function restoreSuppressedConditions(effect, campaignName) {
     const storedConditions = getRuntimeValue(effect.target, 'activeConditions') || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
     const lowerConditions = conditions.map(c => String(c).toLowerCase());
+    const restored = [...conditions];
     for (const suppressedCond of effect.suppressedConditions) {
-        if (!lowerConditions.includes(String(suppressedCond).toLowerCase())) {
-            setRuntimeValue(effect.target, 'activeConditions', [...conditions, suppressedCond], campaignName);
+        const lowerSuppressed = String(suppressedCond).toLowerCase();
+        if (!lowerConditions.includes(lowerSuppressed)) {
+            restored.push(suppressedCond);
+            lowerConditions.push(lowerSuppressed);
         }
+    }
+    if (restored.length !== conditions.length) {
+        // #990-fix(a): ONE merged write per effect-target (house §39 canon — fix#27 twin
+        // useInitiativeEffects.js:178-184, producer canon calmEmotionsHandler.js:190-194): the old loop wrote
+        // per condition from a single stale snapshot, so with multi-missing suppressedConditions the LAST write
+        // dropped the earlier restore. Zero writes when nothing missing (#1512 dirty-guard parity).
+        setRuntimeValue(effect.target, 'activeConditions', restored, campaignName);
     }
 }
 
-function removeCalmEmotionsBuffs(campaignName) {
+function removeCalmEmotionsBuffs(casterName, campaignName) {
     const cs = getCombatSummary(campaignName);
     if (!cs?.creatures) return;
     for (const creature of cs.creatures) {
         const buffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || [];
-        const filtered = buffs.filter(b => b.name !== 'Calm Emotions');
+        // #990-fix(c): caster-scoped — the Calm Emotions buff stamps sourceCharacter (calmEmotionsHandler.js:186)
+        // and the expiration consumer scopes identically (clearExpirationEffects.js:322). The old name-only filter
+        // stripped ANOTHER caster's live Calm buff whenever any caster broke concentration.
+        const filtered = buffs.filter(b => !(b.name === 'Calm Emotions' && b.sourceCharacter === casterName));
         if (filtered.length !== buffs.length) {
             setRuntimeValue(creature.name, 'activeBuffs', filtered, campaignName);
         }
@@ -258,8 +271,8 @@ function clearCasterConcentrationTargetEffects(casterName, campaignName) {
         restoreSuppressedConditions(effect, campaignName);
     }
 
-    // Remove "Calm Emotions" activeBuffs from all creatures
-    removeCalmEmotionsBuffs(campaignName);
+    // Remove this caster's "Calm Emotions" activeBuffs from the roster (#990-fix(c))
+    removeCalmEmotionsBuffs(casterName, campaignName);
 
     for (const effect of casterEffects) {
         if (effect.condition) {
@@ -447,8 +460,16 @@ function cleanupHolyAuraEffects(casterName, campaignName) {
     if (filteredEffects.length !== storedEffects.length) {
         setRuntimeValue('campaign', 'targetEffects', filteredEffects, campaignName);
     }
-    setRuntimeValue(casterName, 'holyAuraTargets', [], campaignName);
-    setRuntimeValue(casterName, 'holyAuraSaveDc', null, campaignName);
+    // #990-fix(d): dirty-guarded — pre-fix these two caster keys were reset on EVERY concentration break
+    // regardless of spell (T13 churn capture: two writes on a caster holding neither key). Dirty arm pinned T9.
+    const savedHolyTargets = getRuntimeValue(casterName, 'holyAuraTargets', campaignName);
+    if (savedHolyTargets && savedHolyTargets.length !== 0) {
+        setRuntimeValue(casterName, 'holyAuraTargets', [], campaignName);
+    }
+    const savedHolySaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
+    if (savedHolySaveDc != null) {
+        setRuntimeValue(casterName, 'holyAuraSaveDc', null, campaignName);
+    }
 }
 
 function cleanupFleshToStoneEffects(casterName, campaignName) {
@@ -466,7 +487,12 @@ function cleanupFleshToStoneEffects(casterName, campaignName) {
         }
         const allTargetEffects = getRuntimeValue('campaign', 'targetEffects') || [];
         const cleanedEffects = allTargetEffects.filter(te => !(te.target === targetName && te.effect === 'flesh_to_stone' && te.source === casterName));
-        setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
+        // #990-fix(d): write-only-if-changed — the generic concentration sweep can drain the te before this lane
+        // re-reads, so the pre-fix unconditional write re-broadcast an unchanged array (#934 write-once parity;
+        // churn captured pre-fix T12, dirty leg still writes once).
+        if (cleanedEffects.length !== allTargetEffects.length) {
+            setRuntimeValue('campaign', 'targetEffects', cleanedEffects, campaignName);
+        }
         setRuntimeValue('campaign', key, null, campaignName);
         clearFleshToStonePrompt(campaignName, targetName);
     }
@@ -477,10 +503,21 @@ function cleanupBuffsByName(casterName, buffName, campaignName) {
     if (!cs || !cs.creatures) {
         return
     }
+    // Buff attribution is dual-channel by producer census: sourceCharacter (buffToggle.js:24,
+    // calmEmotionsHandler.js:186, aidHandler.js:102...) and source (faerieFireHandler.js:56).
+    const attributedToOther = b => {
+        const stamped = b.sourceCharacter || b.source
+        return !!stamped && stamped !== casterName
+    }
     for (const creature of cs.creatures) {
         const buffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName) || []
         if (!Array.isArray(buffs)) continue
-        const filtered = buffs.filter(b => b.name !== buffName)
+        // #990-fix(b): the sole caller (:381) already passed casterName but the filter ignored it — name-only
+        // matching stripped another caster's same-named buff (cross-caster strip). Same-name rows now die only
+        // when unattributed or caster-matched: unattributed stays name-keyed because the Hunter's Mark/Hex
+        // concentration-row producer stamps NO source (spellPreparationService.js:801), so a strict source
+        // requirement would leak the caster's own rows.
+        const filtered = buffs.filter(b => b.name !== buffName || attributedToOther(b))
         if (filtered.length !== buffs.length) {
             setRuntimeValue(creature.name, 'activeBuffs', filtered, campaignName)
         }

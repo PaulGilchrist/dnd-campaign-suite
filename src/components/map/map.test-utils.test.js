@@ -91,10 +91,13 @@ describe('mapTestUtils', () => {
             const mockES = new globalThis.EventSource();
             expect(() => mockES.close()).not.toThrow();
 
-            const { loadMapData, saveMapData, formatMapName, loadMaps } = await import('../../services/maps/mapsService.js');
+            // formatMapName echo dropped (#1173): mapsService is vi.mock'd by
+            // setupMapMocks (map.test-utils.js:138 — identity stub), so asserting
+            // here tests the mock, not the helper. Real formatMapName owner table:
+            // src/services/maps/mapsService.test.js:70-82 (exact bytes, .json edge).
+            const { loadMapData, saveMapData, loadMaps } = await import('../../services/maps/mapsService.js');
             expect(await loadMapData('test')).toBeNull();
             await saveMapData('test', {});
-            expect(formatMapName('Test Map')).toBe('Test Map');
             expect(await loadMaps()).toEqual({ maps: [] });
 
             const { loadMonsters } = await import('../../services/ui/dataLoader.js');

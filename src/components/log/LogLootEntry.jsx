@@ -9,7 +9,7 @@ export function LootEntry({ entry }) {
           <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
         </div>
         <div className="log-loot-details">
-           {entry.xpPerChar && entry.xpPerChar > 0 && (
+           {entry.xpPerChar > 0 && (
              <span className="log-loot-xp">
                <i className="fas fa-star"></i>&nbsp;{entry.xpPerChar.toLocaleString()} XP per character
              </span>

@@ -20,7 +20,9 @@ import { rules2024 } from '../character/race-rules/index.js';
 export function getSubModules(playerStats, playerSummary) {
     const use2024 = is2024(playerStats, playerSummary);
     return {
-        abilityCalc: use2024 ? { getAbilities: getAbilities2024, getHitPoints: getHitPoints2024 } : { getAbilities: getAbilities5e, getHitPoints: getHitPoints5e },
+        abilityCalc: use2024
+            ? { getAbilities: getAbilities2024, getHitPoints: getHitPoints2024, getCarryingCapacity: getCarryingCapacity2024 }
+            : { getAbilities: getAbilities5e, getHitPoints: getHitPoints5e, getCarryingCapacity: getCarryingCapacity5e },
         spellCalc: use2024 ? { getSpellAbilities: getSpellAbilities2024 } : { getSpellAbilities: getSpellAbilities5e },
         attackCalc: use2024 ? getAttacks2024 : getAttacks5e,
         proficiencyUtils: use2024 ? proficiencyUtils2024 : proficiencyUtils,

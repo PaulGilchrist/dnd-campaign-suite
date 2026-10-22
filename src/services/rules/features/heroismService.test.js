@@ -37,12 +37,14 @@
  *    boundary precedent). Only the addConcentration call tuple is pinned.
  *
  * STORE: strict argument-keyed fake — unknown composite reads and
- * wrong-campaign reads THROW (machine proof of read scoping, of zero reads
- * in handle/guards, and of the service NEVER reading 'turnStartEffects'
- * from the store — it dedups from the passed playerStats only; pinned in
- * the turnStart quirk table). Call-shape quirk pinned: activeBuffs reads
- * carry campaignName (ignored — useRuntimeState.js:63 takes 2 args) while
- * 'campaign','targetEffects' reads omit it.
+ * wrong-campaign reads THROW (machine proof of read scoping and of zero
+ * reads in handle/guards). Since #1373(c) the turnStart dedup reads the
+ * TARGET's stored 'turnStartEffects' (pre-fix it deduped against the
+ * caster's passed playerStats and clobbered that caster-local array onto
+ * the target key — fixed, pinned in the turnStart table). Call-shape
+ * quirk pinned: activeBuffs and turnStartEffects reads carry campaignName
+ * (ignored — useRuntimeState.js:63 takes 2 args) while 'campaign',
+ * 'targetEffects' reads omit it.
  * skipSync audit: only 4-tuple setRuntimeValue writes
  * (useRuntimeState.js:78 has no skipSync param; no setRuntimeObject and no
  * SSE-echo path in this lane — cast writes legitimately broadcast).
@@ -52,25 +54,23 @@
  * callbacks, expiry flows as one queue entry (owner #1285); Date.now()
  * appears only in the log payload timestamp — fake timers freeze it at TS.
  *
- * SOURCE BUGS REPORTED (not fixed here):
- *  - heroismService.js:48-60 pushes the fresh te pair onto the UNFILTERED
- *    `effects` array after writing `filteredEffects` at :45 — a re-cast's
- *    final targetEffects write resurrects the stale pair, leaving TWO
- *    identical 'heroism' te and TWO 'wisdom_save_advantage' te in store
- *    (pinned in the re-cast budget).
- *  - The re-cast-only duplication also flows from the dedup filter at :43
- *    matching effect === 'heroism' only; both removers
- *    (heroismService.js:158, clearExpirationEffects.js handleRemoveHeroismBuff)
- *    likewise never strip 'wisdom_save_advantage' — that te LEAKS for the
- *    whole campaign (pinned in the remove budget).
- *  - 'wisdom_save_advantage' is absent from targetEffectDefinitions.js
- *    (registry holds 'heroism' at :772) — violates the te registry rule;
- *    GM EffectAdder UI cannot ever add it manually.
- *  - heroismService.js:28-38 addHeroismTurnStartEffect dedups against the
- *    CASTER's passed playerStats.turnStartEffects (never the target's stored
- *    value) and writes that caster-local array onto the TARGET key — any
- *    other caster-local entries clobber/land in the target's stored list
- *    (pinned in the turnStart quirk table).
+ * SOURCE BUGS FIXED (#1373):
+ *  - :48-60 pushed the fresh te pair onto the UNFILTERED `effects` array
+ *    after writing `filteredEffects` — a re-cast resurrected the stale pair
+ *    (2x te). Now ONE merged write onto the filtered base (fix#27 shape);
+ *    re-cast pinned to exactly one fresh pair, single te write.
+ *  - :43/:158 matched effect === 'heroism' only, so the 'wisdom_save_advantage'
+ *    companion te (RAW fear-advantage half, LIVE-consumed by conditionEffects.js
+ *    LATE handlers) LEAKED on every cleanup lane. Both filters now cover both
+ *    keys, and the key is REGISTERED in targetEffectDefinitions.js (registry
+ *    mandate — GM EffectAdder sees it).
+ *  - :28-38 deduped against the CASTER's passed playerStats.turnStartEffects
+ *    and wrote that caster-local array onto the TARGET key (clobber). Now
+ *    reads/merges the TARGET's stored value (fix#93 target-keyed); foreign
+ *    target entries preserved, caster-local entries never land.
+ *    NOTE: clearExpirationEffects.js handleRemoveHeroismBuff still matches
+ *    'heroism' only — consumer lane, out of this file's edit scope, reported
+ *    to the ledger as residual.
  *
  * PRESERVED-CITED-BY: none — no src file cites heroismService.test.js
  * (grep for 'heroismService.test' across the repo returns zero hits).
@@ -138,7 +138,6 @@ const STATS = (over = {}) => ({
     name: 'Bard',
     spellAbilities: { modifier: 3, saveDc: 13 },
     proficiency: 3,
-    turnStartEffects: [],
     ...over,
 });
 
@@ -258,15 +257,17 @@ describe('heroismService', () => {
         it('single target — exact read order, full write budget, stamps, queue, log, popup', async () => {
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': [],
                 'campaign.targetEffects': [],
             });
 
             const result = await applyHeroism(action(), STATS(), CAM, MAP, ['Fighter']);
 
             expect(getCombatSummary.mock.calls).toEqual([[CAM]]);
-            // campaign te read omits campaignName while activeBuffs read carries it (quirk pinned)
+            // campaign te read omits campaignName while per-target reads carry it (quirk pinned)
             expect(getRuntimeValue.mock.calls).toEqual([
                 ['Fighter', 'activeBuffs', CAM],
+                ['Fighter', 'turnStartEffects', CAM],
                 ['campaign', 'targetEffects'],
             ]);
             // full write budget in exact source order: buffs -> turnStart -> te
@@ -300,6 +301,7 @@ describe('heroismService', () => {
             const summary = { creatures: [{ name: 'Bard' }] };
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': [],
                 'campaign.targetEffects': [],
             });
             getCombatSummary.mockReturnValue(summary);
@@ -319,6 +321,7 @@ describe('heroismService', () => {
         ])('temp-HP producer ladder: $label', async ({ stats, act, amount }) => {
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': [],
                 'campaign.targetEffects': [],
             });
 
@@ -335,7 +338,9 @@ describe('heroismService', () => {
         it('multiple targets — per-target writes in order, cumulative te, batch popup', async () => {
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': [],
                 'Rogue.activeBuffs': [],
+                'Rogue.turnStartEffects': [],
                 'campaign.targetEffects': [],
             });
 
@@ -343,8 +348,10 @@ describe('heroismService', () => {
 
             expect(getRuntimeValue.mock.calls).toEqual([
                 ['Fighter', 'activeBuffs', CAM],
+                ['Fighter', 'turnStartEffects', CAM],
                 ['campaign', 'targetEffects'],
                 ['Rogue', 'activeBuffs', CAM],
+                ['Rogue', 'turnStartEffects', CAM],
                 ['campaign', 'targetEffects'],
             ]);
             expect(setRuntimeValue.mock.calls).toEqual([
@@ -368,7 +375,7 @@ describe('heroismService', () => {
             expect(result.payload.description).toBe('2 targets gained Heroism: Fighter, Rogue.');
         });
 
-        it('re-cast replaces buff but final te write resurrects the stale pair (SOURCE BUG #48-60)', async () => {
+        it('re-cast leaves exactly one fresh te pair — merged write onto the filtered base (#1373a)', async () => {
             const staleHeroismTe = teHeroism('Fighter');
             const staleWisdomTe = teWisdom('Fighter');
             strictStore({
@@ -376,6 +383,7 @@ describe('heroismService', () => {
                     { name: 'Heroism', effect: 'heroism', tempHpAmount: 2 },
                     { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
                 ],
+                'Fighter.turnStartEffects': [],
                 'campaign.targetEffects': [staleHeroismTe, staleWisdomTe],
             });
 
@@ -385,12 +393,15 @@ describe('heroismService', () => {
             expect(setRuntimeValue.mock.calls).toEqual([
                 ['Fighter', 'activeBuffs', [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }, buffStamp(3)], CAM],
                 ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
-                // intermediate write is correctly filtered...
-                ['campaign', 'targetEffects', [staleWisdomTe], CAM],
-                // ...but the final write pushes onto the UNFILTERED array:
-                // stale pair resurrected + fresh pair appended = te duplication. Pinned honestly.
-                ['campaign', 'targetEffects', [staleHeroismTe, staleWisdomTe, teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+                // ONE merged write: stale pair filtered out of the base BEFORE the
+                // fresh pair is appended — no intermediate write, no resurrection,
+                // final store holds each te key exactly once.
+                ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
             ]);
+            const teWrites = setRuntimeValue.mock.calls.filter(c => c[0] === 'campaign' && c[1] === 'targetEffects');
+            expect(teWrites).toHaveLength(1);
+            expect(teWrites[0][2].filter(te => te.effect === 'heroism')).toHaveLength(1);
+            expect(teWrites[0][2].filter(te => te.effect === 'wisdom_save_advantage')).toHaveLength(1);
             expect(addExpiration.mock.calls).toEqual([
                 [{ attackerName: 'Bard', targetName: 'Fighter', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], campaignName: CAM }],
             ]);
@@ -398,37 +409,51 @@ describe('heroismService', () => {
 
         it.each([
             {
-                label: 'caster-local non-heroism entry is copied onto the TARGET key (clobber quirk)',
-                tsLocal: [{ type: 'mage_hand_legerdemain', name: 'Mage Hand Legerdemain' }],
+                label: 'caster-local entries never land on the target key (#1373c)',
+                tsStore: [],
+                casterTs: [{ type: 'mage_hand_legerdemain', name: 'Mage Hand Legerdemain' }],
                 writes: [
                     ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
-                    ['Fighter', 'turnStartEffects', [{ type: 'mage_hand_legerdemain', name: 'Mage Hand Legerdemain' }, tsStamp(3)], CAM],
+                    ['Fighter', 'turnStartEffects', [tsStamp(3)], CAM],
                     ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
                 ],
             },
             {
-                label: 'heroism_temp_hp already in caster stats — guard hits, zero turnStartEffects writes',
-                tsLocal: [tsStamp(3)],
+                label: 'target already has heroism_temp_hp — guard hits, zero turnStartEffects writes',
+                tsStore: [tsStamp(3)],
+                casterTs: [],
                 writes: [
                     ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
                     ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
                 ],
             },
-        ])('turnStart dedup reads CASTER stats, never the target store: $label', async ({ tsLocal, writes }) => {
-            // strict fake: no 'Fighter.turnStartEffects' key seeded — any store read would THROW
+            {
+                label: 'target-owned neighbor te preserved — append-merge, never clobber (#1348)',
+                tsStore: [{ type: 'aura_of_life', name: 'Aura of Life' }],
+                casterTs: [],
+                writes: [
+                    ['Fighter', 'activeBuffs', [buffStamp(3)], CAM],
+                    ['Fighter', 'turnStartEffects', [{ type: 'aura_of_life', name: 'Aura of Life' }, tsStamp(3)], CAM],
+                    ['campaign', 'targetEffects', [teHeroism('Fighter'), teWisdom('Fighter')], CAM],
+                ],
+            },
+        ])('turnStart dedup reads TARGET store, caster playerStats inert: $label', async ({ tsStore, casterTs, writes }) => {
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': tsStore,
                 'campaign.targetEffects': [],
             });
 
-            await applyHeroism(action(), STATS({ turnStartEffects: tsLocal }), CAM, MAP, ['Fighter']);
+            await applyHeroism(action(), STATS({ turnStartEffects: casterTs }), CAM, MAP, ['Fighter']);
 
+            expect(getRuntimeValue.mock.calls).toContainEqual(['Fighter', 'turnStartEffects', CAM]);
             expect(setRuntimeValue.mock.calls).toEqual(writes);
         });
 
         it('log rejection is caught — buffs unaffected, identical Error + exact prefix to console.error', async () => {
             strictStore({
                 'Fighter.activeBuffs': [],
+                'Fighter.turnStartEffects': [],
                 'campaign.targetEffects': [],
             });
             const err = new Error('log down');
@@ -456,7 +481,7 @@ describe('heroismService', () => {
     });
 
     describe('removeHeroismBuff (concentration-break lane, live caller concentrationService.js:13)', () => {
-        it('strips heroism buff and heroism te, keeps neighbors — wisdom te LEAKS (source bug, pinned)', () => {
+        it('strips heroism buff and BOTH heroism companion tes, keeps neighbors (#1373b)', () => {
             strictStore({
                 'Fighter.activeBuffs': [
                     { name: 'Heroism', effect: 'heroism' },
@@ -473,8 +498,10 @@ describe('heroismService', () => {
 
             expect(setRuntimeValue.mock.calls).toEqual([
                 ['Fighter', 'activeBuffs', [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }], CAM],
-                // filter matches effect === 'heroism' only — wisdom_save_advantage survives removal forever
-                ['campaign', 'targetEffects', [teWisdom('Fighter'), { target: 'Fighter', effect: 'bless_bonus', source: 'Bard', duration: 'concentration' }], CAM],
+                // cleanup covers both final keys — no wisdom_save_advantage leak;
+                // unscoped by target by design (concentration-break passes the
+                // caster's name; one break ends Heroism on every sustained target)
+                ['campaign', 'targetEffects', [{ target: 'Fighter', effect: 'bless_bonus', source: 'Bard', duration: 'concentration' }], CAM],
             ]);
             expect(addEntry.mock.calls).toEqual([]); // silent remover — no log by design
         });

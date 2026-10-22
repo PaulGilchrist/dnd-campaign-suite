@@ -13,19 +13,18 @@
  * including the 0-byte near-miss, the roll-null guard that must not burn the
  * latch (#1026), and exact log bytes (#app logging mandate).
  *
- * NO-ARG ROUND READ (#1050 defect class, same as colossusSlayer.js:17):
- * epitomeEmpoweredStrikes.js:14 calls getCurrentCombatRound() with NO
- * campaignName. Call bytes pinned as current behavior:
- * toHaveBeenCalledWith() — a fix passing ctx.campaignName (the
- * eldritchStrikes.js:27 CORRECT sibling, #1051) fails that pin. Production
- * consequence reported, not fixed: getCurrentCombatRound(undefined) →
- * getCombatSummary(undefined) → null (combatData.js:48) → constant 1 fallback
- * (combatData.js:81). The latch therefore stamps round 1 and every later
- * attack compares 1 === 1 — the feature fires once per rest, not once per
- * round, until rest rules clear epitomeEmpoweredUsedRound
- * (restRules-shortRest.js:71). The round-5 re-arm leg below pins the
- * strict-=== INTENT and is reachable only under a round mock the production
- * call cannot produce — titled honestly accordingly (#910).
+ * ROUND READ (#1050 FIXED, same class as colossusSlayer.js:17):
+ * epitomeEmpoweredStrikes.js:14 now passes ctx.campaignName to
+ * getCurrentCombatRound(campaignName), mirroring the eldritchStrikes.js:27
+ * CORRECT sibling (#1051). Pre-fix the no-arg call resolved
+ * getCurrentCombatRound(undefined) → getCombatSummary(undefined) → null
+ * (combatData.js:48) → constant 1 fallback (combatData.js:81): the latch
+ * stamped round 1 and every later attack compared 1 === 1 — the feature
+ * fired once per rest, not once per round, until rest rules cleared
+ * epitomeEmpoweredUsedRound (restRules-shortRest.js:71). The live-cache
+ * capture test below pins the fix against the REAL combatData cache with a
+ * second-campaign decoy; the round-5 re-arm leg is now production-reachable
+ * because the campaign-keyed cache round moves with initiative (#910).
  *
  * Family map (steps/features/): eldritchStrikes.test.js (#1051) and
  * colossusSlayer.test.js (#1050) are distinct decision lanes; no sibling
@@ -44,7 +43,7 @@
  * planted wrong-character falsifier added, adapted from #1050 since the
  * faithful store keys reads by characterKey); used-round ×2 + multiple-attacks
  * ×1 + new-round ×1→one honest latch cycle + one strict-byte test (the old
- * "new round resets" claim was mock-only fiction — pinned false above);
+ * "new round resets" claim was mock-only fiction pre-#1050 — re-arm now pinned live via the real-cache capture above);
  * class-lookup ×3 + level-success ×5→1 die-table test with deferral pins;
  * sideEffects-shape/no-invocation ×3 folded into deferral pins; log ×3→1
  * exact-bytes test (target + default legs); errors ×2→1 order-sensitive test;
@@ -190,14 +189,14 @@ describe('epitomeEmpoweredStrikes', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('latch cycle: fires fresh at round 4, defers the campaign-pinned stamp to sideEffects, refuses the same round, and re-arms at a new round only because the mock moves it', async () => {
+  it('latch cycle: fires fresh at round 4, defers the campaign-pinned stamp to sideEffects, refuses the same round, and re-arms at a new round', async () => {
     getCurrentCombatRound.mockReturnValue(4);
 
     const first = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
-    // #1050 defect-class pin: the round read is called with NO campaignName —
-    // a campaign-pinned fix (eldritchStrikes.js:27 shape) fails this byte,
-    // and production resolves the no-arg read to constant 1 (header).
-    expect(getCurrentCombatRound).toHaveBeenCalledWith();
+    // #1050 fix pin: the round read carries ctx.campaignName
+    // (eldritchStrikes.js:27 shape); pre-fix it took NO args and the
+    // production read collapsed to constant 1 (header).
+    expect(getCurrentCombatRound).toHaveBeenCalledWith(CAMPAIGN);
     expect(first.data).toEqual({ formula: '1d4+3 + 1d4 [Empowered Strikes]', total: 9, rolls: [4, 3, 1] });
     expect(runtimeWrites).toEqual([]); // nothing burns before sideEffects
     expect(addEntry).not.toHaveBeenCalled();
@@ -213,8 +212,9 @@ describe('epitomeEmpoweredStrikes', () => {
     expect(rollExpression).toHaveBeenCalledTimes(1);
     expect(runtimeWrites).toHaveLength(1);
 
-    // Mock-only re-arm (production no-arg round read never moves — header):
-    // pins the strict-=== intent so a latch fix stays round-sensitive.
+    // Round-5 re-arm: post-#1050-fix production moves with the campaign cache
+    // (the live-capture test proves it); under the mock this still pins that
+    // the strict-=== latch stays round-sensitive.
     getCurrentCombatRound.mockReturnValue(5);
     const third = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
     expect(third.data).toEqual({ formula: '1d4+3 + 1d4 [Empowered Strikes]', total: 9, rolls: [4, 3, 1] });
@@ -293,5 +293,43 @@ describe('epitomeEmpoweredStrikes', () => {
     const failing = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
     await expect(failing.sideEffects()).rejects.toThrow('store failure');
     expect(addEntry).toHaveBeenCalledTimes(1); // only the first call's log ever fired
+  });
+
+  // #1050 live capture: the mocked seam delegates to the REAL combatData
+  // cache so the campaign-keyed round read executes production bytes.
+  // Pre-fix (no-arg call at :14) the stamp pinned to 1 (cache-miss fallback,
+  // combatData.js:81) while the live campaign sat at round 7 — captured red.
+  it('live-cache round read: test-campaign round 7 stamps 7, a second-campaign decoy reads its own round', async () => {
+    const real = await vi.importActual('../../../encounters/combatData.js');
+    real.setCombatSummaryCache({ round: 7, creatures: [] }, CAMPAIGN);
+    real.setCombatSummaryCache({ round: 5, creatures: [] }, 'other-campaign');
+    getCurrentCombatRound.mockImplementation(real.getCurrentCombatRound);
+    try {
+      const first = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
+      expect(getCurrentCombatRound).toHaveBeenCalledWith(CAMPAIGN); // never ()
+      expect(first.data).toEqual({ formula: '1d4+3 + 1d4 [Empowered Strikes]', total: 9, rolls: [4, 3, 1] });
+      await first.sideEffects();
+      expect(runtimeWrites).toEqual([['Monk1', LATCH, 7, CAMPAIGN]]);
+
+      // Same-round follow-up refused at round 7 (strict === against the real cache).
+      const second = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
+      expect(second).toEqual({ data: PREV });
+
+      // Round-wrap re-arm in the real cache: stamp moves 7 → 8 (pre-fix the
+      // production read never left 1, so the feature never re-armed).
+      real.setCombatSummaryCache({ round: 8, creatures: [] }, CAMPAIGN);
+      const third = await epitomeEmpoweredStrikes.handler(makeCtx(), PREV);
+      await third.sideEffects();
+      expect(runtimeWrites[1]).toEqual(['Monk1', LATCH, 8, CAMPAIGN]);
+
+      // Second campaign: its own cache byte (5), never 7, never the 1-fallback.
+      const other = await epitomeEmpoweredStrikes.handler(makeCtx({ campaignName: 'other-campaign' }), PREV);
+      await other.sideEffects();
+      expect(runtimeWrites[2]).toEqual(['Monk1', LATCH, 5, 'other-campaign']);
+    } finally {
+      real.setCombatSummaryCache(null, CAMPAIGN);
+      real.setCombatSummaryCache(null, 'other-campaign');
+      getCurrentCombatRound.mockReset();
+    }
   });
 });

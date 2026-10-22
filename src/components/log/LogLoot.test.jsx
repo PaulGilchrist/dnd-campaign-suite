@@ -16,7 +16,8 @@
 // Old->new map: icon(1)+title(1)+xp-format(2)+items(2)+combined(1) -> fullEntry;
 // hide-xp-matrix(1)+hide-items-matrix(1) -> suppressionMatrix (#877 shape);
 // NEW: honest blank details (undefined legs), stray-"0" bug pin (#878 honest-pin
-// convention), exact \u00a0 XP byte, details child order, producer-metadata-not-rendered pin.
+// convention) flipped to FIXED strongest-form pin (#882), exact \u00a0 XP byte,
+// details child order, producer-metadata-not-rendered pin.
 
 import { beforeEach } from 'vitest';
 import { loot, q, setup, beforeEachSetup } from './log-test-utils.jsx';
@@ -76,13 +77,30 @@ describe('Log > LootEntry', () => {
     expect(q('.log-loot .log-name').textContent).toBe('Loot & XP Awarded');
   });
 
-  // Pinned honestly (SOURCE BUG LogLootEntry.jsx:12): `entry.xpPerChar && …`
-  // short-circuits to 0 and React renders the number 0 — the XP span is correctly
-  // absent but a stray "0" byte leaks into details whenever xpPerChar is 0
-  // (reachable via producers when totalEncounterXp floors to 0).
-  it('xpPerChar 0 hides the XP span but leaks a stray "0" byte into details', () => {
+  // FIXED (#882, source LogLootEntry.jsx:12): the old `entry.xpPerChar && …`
+  // short-circuited to 0 and React rendered the number 0 (stray "0" byte in
+  // details whenever xpPerChar was 0 — reachable via producers when
+  // totalEncounterXp floors to 0). Guard is now > 0-only. Strongest pins:
+  // 0 -> NO text node at all (exact details innerHTML), positive -> exact leg
+  // bytes, absent (undefined/null) -> silent.
+  it('xpPerChar 0 renders no XP span and no stray "0" text node in details', () => {
     setup(Log, [loot({ timestamp: TS, xpPerChar: 0, lootItems: ['Gold coins'] })]);
     expect(q('.log-loot-xp')).not.toBeInTheDocument();
-    expect(q('.log-loot-details').textContent).toBe('0Gold coins');
+    expect(q('.log-loot-details').textContent).toBe('Gold coins');
+    expect(q('.log-loot-details').innerHTML)
+      .toBe('<ul class="log-loot-items"><li class="log-loot-item">Gold coins</li></ul>');
+  });
+
+  it('xpPerChar 27 renders the exact XP leg byte', () => {
+    setup(Log, [loot({ timestamp: TS, xpPerChar: 27, lootItems: ['Gold coins'] })]);
+    expect(q('.log-loot-xp').textContent).toBe('\u00a027 XP per character');
+    expect([...q('.log-loot-details').children].map((n) => n.className))
+      .toEqual(['log-loot-xp', 'log-loot-items']);
+  });
+
+  it.each([undefined, null])('xpPerChar %s is silent — no XP span, no stray bytes', (value) => {
+    setup(Log, [loot({ timestamp: TS, xpPerChar: value, lootItems: ['Gold coins'] })]);
+    expect(q('.log-loot-xp')).not.toBeInTheDocument();
+    expect(q('.log-loot-details').textContent).toBe('Gold coins');
   });
 });

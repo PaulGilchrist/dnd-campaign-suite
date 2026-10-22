@@ -136,11 +136,13 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
     vi.clearAllMocks();
     getRuntimeValue.mockReset();
     // Store-faithful runtime (#1137/#1091). Arity mirrors the source's real reads:
-    // activeBuffs (:753) passes campaignName — served ONLY for the exact campaign tuple
-    // (#932/#1019); currentHitPoints (:451) is read WITHOUT campaignName — served 2-arg.
+    // activeBuffs (:753) and currentHitPoints (:451, #1185 FIXED — now passes
+    // campaignName like siblings :432/:443) are served ONLY for the exact
+    // campaign tuple (#932/#1019) — a revert to the old 2-arg read yields
+    // undefined here and applyPlayerHpDamage throws (:463), failing loudly.
     getRuntimeValue.mockImplementation((key, subKey, campaignName) => {
-      if (subKey === 'currentHitPoints') return 30;
       if (campaignName !== CAMPAIGN) return undefined;
+      if (subKey === 'currentHitPoints') return 30;
       if (subKey === 'activeBuffs') return [];
       return undefined;
     });
@@ -170,6 +172,24 @@ describe('applyDamageToTarget — Aura of Warding resistances (CLA-022)', () => 
       expect(result.newHp).toBe(20); // runtime HP 30 − halved 10, store-faithful
     },
   );
+
+  // T1b — structural arg-pin (#1185 FIXED): the currentHitPoints read at :451
+  // now carries campaignName with the EXACT 3-arg tuple shape of its siblings
+  // (:753 activeBuffs shown as the consistency witness). Behavioral parity is
+  // guaranteed by the campaign-guarded stub above (2-arg revert => undefined
+  // => throw at :463); this pin locks the bytes-level arity consistency.
+  // Caveat stays honest: getRuntimeValue is arity-2 (useRuntimeState.js:63),
+  // the 3rd arg is discarded there too — true isolation is deferred #1520.
+  it('reads currentHitPoints with the exact campaign tuple, matching sibling read shape', async () => {
+    const cs = makeCombatSummary([createPlayerCreature('Cleric')]);
+    const characters = [createMinimalCharacter('Cleric')];
+    computeAuraComboEffects.mockResolvedValue(wardingAuraEffects());
+
+    await applyDamageToTarget(cs, 'Cleric', 20, ['Radiant'], { campaignName: CAMPAIGN, characters });
+
+    expect(getRuntimeValue).toHaveBeenCalledWith('Cleric', 'currentHitPoints', CAMPAIGN);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Cleric', 'activeBuffs', CAMPAIGN);
+  });
 
   // T2 — zero-reduction census, two distinct reaches of the :778 length-guard (#1035).
   it('reduces nothing for types outside the ward or when no aura contributes', async () => {

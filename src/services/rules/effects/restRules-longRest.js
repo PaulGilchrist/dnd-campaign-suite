@@ -440,12 +440,12 @@ function refreshPortentDice(name, playerStats, campaignName) {
   return true
 }
 
-function resetNaturalRecoveryTracking(charData) {
-  // Natural Recovery: reset free cast tracking on long rest
-  charData.naturalRecoveryFreeCast = null
-  charData.naturalRecoveryFreeCastUsed = null
-  charData.naturalRecoverySlots = null
-}
+// Natural Recovery tracking reset (naturalRecoveryFreeCast / naturalRecoveryFreeCastUsed /
+// naturalRecoverySlots) is carried entirely by the atomic long-rest batch: the keys are
+// registered in LONG_REST_RESOURCES (restRules-constants.js) and buildLongRestCharData
+// nulls every registered key BEFORE setRuntimeBatch fires (#1312 — the post-batch
+// resetNaturalRecoveryTracking(charData) helper mutated the already-flushed payload and
+// reached no server/SSE carrier; removed as a dead call).
 
 // Chef: Bolstering Treats crafted and Replenishing Meals reset on Long Rest.
 // Returns the feature-presence flags used by the long rest log.
@@ -645,13 +645,15 @@ export async function applyLongRest(playerStats, campaignName) {
     ['wrathOfTheSeaSource', null],
   ])
 
-  // Natural Recovery: reset free cast tracking on long rest
+  // Natural Recovery: log flag only — the tracking-key reset rides the atomic
+  // batch above via LONG_REST_RESOURCES registration (#1312: the old gated
+  // resetNaturalRecoveryTracking(charData) here ran AFTER setRuntimeBatch had
+  // flushed — post-batch charData mutation reaches no server/SSE carrier and
+  // wrote byte-identical nulls the registration already carried: dead call,
+  // removed. The hasNaturalRecovery flag below stays live for the log.)
   const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
     p => p.type === 'natural_recovery'
   )
-  if (hasNaturalRecovery) {
-    resetNaturalRecoveryTracking(charData)
-  }
 
   resetWishCooldown(name, campaignName)
 

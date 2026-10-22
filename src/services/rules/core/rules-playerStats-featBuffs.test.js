@@ -30,12 +30,14 @@ vi.mock('../../character/race-rules/index.js', () => ({
   rules2024: { getRace: vi.fn(), getSenses: vi.fn(), getTraits: vi.fn() },
 }));
 
+// #1251 FIXED: facade dispatches abilityCalc.getCarryingCapacity — stub completes the
+// factory (rules-core.js:23 bundle now forwards it; pins in core/rules-carryingCapacity.test.js).
 vi.mock('./abilityCalc.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(() => 150),
 }));
 
 vi.mock('./abilityCalc2024.js', () => ({
-  getAbilities: vi.fn(), getHitPoints: vi.fn(),
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(() => 150),
 }));
 
 vi.mock('./attackCalc.js', () => ({

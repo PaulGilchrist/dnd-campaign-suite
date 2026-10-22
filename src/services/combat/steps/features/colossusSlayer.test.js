@@ -17,9 +17,26 @@
  * lives on the featureDamage pipeline lane (#1034 owns dispatch) and is NOT
  * duplicated here; this lane pins the step handler internals.
  *
- * Latch round source: getCurrentCombatRound() is called WITHOUT campaignName
- * here while siblings (assassinate.js:28, eldritchStrikes.js:27) pass it —
- * pinned verbatim as current behavior; cross-campaign impact reported.
+ * Latch round source (#1050 FIXED): getCurrentCombatRound now carries
+ * ctx.campaignName at both call sites (:17 gate read, :29 sideEffects stamp),
+ * mirroring siblings (assassinate.js:28, eldritchStrikes.js:27). Pre-fix the
+ * no-arg read resolved getCurrentCombatRound(undefined) → getCombatSummary
+ * (undefined) → null (combatData.js:48) → constant-1 fallback (combatData.js:
+ * 81): the latch stamped/read round 1 regardless of the live campaign round,
+ * so the once-per-round gate mis-armed across rounds and campaigns. The
+ * live-cache capture test below pins the fix against the REAL combatData
+ * cache with a second-campaign decoy.
+ *
+ * Self-log mandate (#1050 log fix): pre-fix this step was silent on trigger —
+ * zero addEntry bytes anywhere in the file (captured red below). It now
+ * self-logs inside sideEffects AFTER the latch stamp, mirroring the
+ * byte-nearest sibling epitomeEmpoweredStrikes.js:30-39 (same dice-append
+ * rider shape: stamp, then await addEntry ability_use, .catch console.error)
+ * and carrying rolled values in the description per tavernBrawler.js:38-45.
+ * The featureRiders dispatcher (attackRollPostDamage.js:35-45) stays pure
+ * routing — every self-logging sibling logs in its own module; the loop
+ * never logs for them — so no dispatcher edit. Refusal legs (no context,
+ * no target, HP gate, latch, roll-null) stay addEntry-silent.
  *
  * Old→new: condition ×5→1; no-context + no-target ×2→1; full-HP ×2 +
  * null-hp ×2→1 HP-gate; success ×3 (adds, rolls 1d8, sideEffects setter)
@@ -49,10 +66,17 @@ vi.mock('../../../encounters/combatData.js', () => ({
 }));
 
 // Faithful campaign-keyed store: latch/condition reads and writes must carry campaignName.
+// callJournal pins invocationCallOrder parity: latch stamp BEFORE trigger log (siblings).
 const runtimeStore = {};
+const callJournal = [];
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: (name, key, campaign) => runtimeStore[`${campaign}:${name}:${key}`],
-  setRuntimeValue: (name, key, value, campaign) => { runtimeStore[`${campaign}:${name}:${key}`] = value; },
+  setRuntimeValue: (name, key, value, campaign) => { runtimeStore[`${campaign}:${name}:${key}`] = value; callJournal.push('stamp'); },
+}));
+
+// Silence-proof seam: pre-fix the trigger legs recorded zero calls here (#1050).
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => { callJournal.push('log'); return Promise.resolve(); }),
 }));
 
 // ── Imports ──────────────────────────────────────────────────────
@@ -61,6 +85,7 @@ import { colossusSlayer } from './colossusSlayer.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../encounters/combatData.js';
+import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -85,9 +110,21 @@ function makePrevData() {
 function arm({ currentHp = 7, maxHp = 10, round = 3 } = {}) {
   const cs = { creatures: [] };
   getCombatContext.mockResolvedValue(cs);
-  getTargetFromAttacker.mockReturnValue({ currentHp, maxHp });
+  getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp, maxHp });
   getCurrentCombatRound.mockReturnValue(round);
   return cs;
+}
+
+// Exact trigger-log payload bytes (dice stub rolls 1d8 -> [5]/5; epitome-
+// mirrored ability_use shape, rolled values carried per mandate).
+function triggerLog({ name = 'Goblin', currentHp, maxHp }) {
+  return {
+    type: 'ability_use',
+    characterName: 'Fighter1',
+    abilityName: 'Colossus Slayer',
+    description: `Fighter1 used Colossus Slayer on ${name} — +1d8 extra damage rolled 5 [5] (target below HP maximum ${currentHp}/${maxHp}, once per turn).`,
+    targetName: name,
+  };
 }
 
 // ── Tests ────────────────────────────────────────────────────────
@@ -96,6 +133,7 @@ describe('colossusSlayer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const k of Object.keys(runtimeStore)) delete runtimeStore[k];
+    callJournal.length = 0;
   });
 
   afterEach(() => {
@@ -130,6 +168,8 @@ describe('colossusSlayer', () => {
     expect(getTargetFromAttacker).toHaveBeenCalledWith(cs, 'Fighter1');
     expect(rollExpression).not.toHaveBeenCalled();
     expect(runtimeStore).toEqual({});
+    expect(addEntry).not.toHaveBeenCalled(); // refusal legs stay silent — no trigger spam
+    expect(callJournal).toEqual([]);
   });
 
   it('HP gate: null currentHp, null maxHp, or a target at full HP gets no bonus and burns nothing', async () => {
@@ -144,6 +184,7 @@ describe('colossusSlayer', () => {
     }
     expect(rollExpression).not.toHaveBeenCalled();
     expect(runtimeStore).toEqual({}); // latch never stamped on a refused hit
+    expect(addEntry).not.toHaveBeenCalled(); // full-HP/null-HP refusals never log a trigger
   });
 
   it('below max HP adds exactly 1d8 [extra] and defers the campaign-keyed latch stamp to sideEffects', async () => {
@@ -156,10 +197,17 @@ describe('colossusSlayer', () => {
     expect(result.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
 
     expect(runtimeStore).toEqual({}); // nothing stamped before sideEffects runs
+    expect(addEntry).not.toHaveBeenCalled(); // silent pre-fix (#1050); now gated on sideEffects too
+    expect(callJournal).toEqual([]);
     await result.sideEffects();
     expect(runtimeStore[LATCH_KEY]).toBe(3);
-    // Current behavior pinned: round read WITHOUT campaignName (siblings pass it — reported).
-    expect(getCurrentCombatRound).toHaveBeenCalledWith();
+    // #1050 fix pin: round read carries ctx.campaignName (siblings' shape).
+    expect(getCurrentCombatRound).toHaveBeenCalledWith('test-campaign');
+    // #1050 mandate pin: exactly one honest trigger log, rolled 1d8 values,
+    // campaign-first — and stamped BEFORE logged (epitome sibling ordering).
+    expect(addEntry).toHaveBeenCalledTimes(1);
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', triggerLog({ currentHp: 7, maxHp: 10 }));
+    expect(callJournal).toEqual(['stamp', 'log']);
   });
 
   it('latches once per round: same-round follow-up refused, next round applies again at 0 HP', async () => {
@@ -169,20 +217,25 @@ describe('colossusSlayer', () => {
     expect(first.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
     await first.sideEffects();
     expect(runtimeStore[LATCH_KEY]).toBe(1);
+    expect(addEntry).toHaveBeenCalledTimes(1); // one honest log per applied trigger
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', triggerLog({ currentHp: 7, maxHp: 10 }));
 
-    // Second hit, same round: latch byte equals current round — no dice, no reforged formula.
+    // Second hit, same round: latch byte equals current round — no dice, no reforged formula, no log.
     expect(await colossusSlayer.handler(makeCtx(), prevData)).toEqual({ data: prevData });
     expect(rollExpression).toHaveBeenCalledTimes(1);
     expect(runtimeStore[LATCH_KEY]).toBe(1);
+    expect(addEntry).toHaveBeenCalledTimes(1); // latch refusal burns nothing and says nothing
 
     // Round 2 re-arms; currentHp 0 still counts as below max (falsifies a truthiness guard).
     getCurrentCombatRound.mockReturnValue(2);
-    getTargetFromAttacker.mockReturnValue({ currentHp: 0, maxHp: 10 });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp: 0, maxHp: 10 });
     const second = await colossusSlayer.handler(makeCtx(), prevData);
     expect(second.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
     await second.sideEffects();
     expect(runtimeStore[LATCH_KEY]).toBe(2);
     expect(rollExpression).toHaveBeenCalledTimes(2);
+    expect(addEntry).toHaveBeenCalledTimes(2); // second trigger logs again, with 0/10 gate bytes
+    expect(addEntry).toHaveBeenLastCalledWith('test-campaign', triggerLog({ currentHp: 0, maxHp: 10 }));
   });
 
   it('a failed roll grants nothing and never burns the latch — the follow-up attack still gets its 1d8', async () => {
@@ -191,8 +244,51 @@ describe('colossusSlayer', () => {
     const prevData = makePrevData();
     expect(await colossusSlayer.handler(makeCtx(), prevData)).toEqual({ data: prevData });
     expect(runtimeStore).toEqual({}); // stamp is gated on a successful roll, not merely attempted
+    expect(addEntry).not.toHaveBeenCalled(); // a zero-grant fires no trigger log
 
     const retry = await colossusSlayer.handler(makeCtx(), prevData);
     expect(retry.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
+    await retry.sideEffects();
+    expect(addEntry).toHaveBeenCalledTimes(1); // only the applied retry self-logs
+    expect(addEntry).toHaveBeenCalledWith('test-campaign', triggerLog({ currentHp: 7, maxHp: 10 }));
+  });
+
+  // #1050 live capture: the mocked seam delegates to the REAL combatData
+  // cache so the campaign-keyed round read executes production bytes.
+  // Pre-fix (no-arg call) this stamp pinned to 1 (cache-miss fallback,
+  // combatData.js:81) while the live campaign sat at round 7 — captured red.
+  it('live-cache round read: test-campaign round 7 stamps 7, a second-campaign decoy reads its own round', async () => {
+    const real = await vi.importActual('../../../encounters/combatData.js');
+    real.setCombatSummaryCache({ round: 7, creatures: [] }, 'test-campaign');
+    real.setCombatSummaryCache({ round: 5, creatures: [] }, 'other-campaign');
+    getCurrentCombatRound.mockImplementation(real.getCurrentCombatRound);
+    getCombatContext.mockResolvedValue({ creatures: [] });
+    getTargetFromAttacker.mockReturnValue({ name: 'Goblin', currentHp: 7, maxHp: 10 });
+    try {
+      const first = await colossusSlayer.handler(makeCtx(), makePrevData());
+      expect(getCurrentCombatRound).toHaveBeenCalledWith('test-campaign'); // never ()
+      expect(first.data).toEqual({ formula: '1d8+3 + 1d8 [extra]', total: 16, rolls: [8, 3, 5] });
+      await first.sideEffects();
+      expect(runtimeStore[LATCH_KEY]).toBe(7);
+      expect(addEntry).toHaveBeenCalledTimes(1); // trigger self-log at the live round-7 seam
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', triggerLog({ currentHp: 7, maxHp: 10 }));
+
+      // Same-round follow-up refused at round 7 (pre-fix: refused only by
+      // accident against a stale 1-stamp, and re-fired at every later round).
+      expect(await colossusSlayer.handler(makeCtx(), makePrevData())).toEqual({ data: makePrevData() });
+      expect(addEntry).toHaveBeenCalledTimes(1); // refusal stays silent
+
+      // Second campaign: its own cache byte (5), never 7, never the 1-fallback.
+      const other = await colossusSlayer.handler(makeCtx({ campaignName: 'other-campaign' }), makePrevData());
+      await other.sideEffects();
+      expect(runtimeStore[`other-campaign:Fighter1:${LATCH}`]).toBe(5);
+      expect(getCurrentCombatRound).toHaveBeenLastCalledWith('other-campaign');
+      expect(addEntry).toHaveBeenCalledTimes(2); // and lands in ITS OWN campaign log, campaign-first
+      expect(addEntry).toHaveBeenLastCalledWith('other-campaign', triggerLog({ currentHp: 7, maxHp: 10 }));
+    } finally {
+      real.setCombatSummaryCache(null, 'test-campaign');
+      real.setCombatSummaryCache(null, 'other-campaign');
+      getCurrentCombatRound.mockReset();
+    }
   });
 });

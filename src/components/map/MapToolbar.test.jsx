@@ -126,6 +126,63 @@ describe('MapToolbar', () => {
         });
     });
 
+    describe('missing spellOverlayState arms — Spell click is inert, never throws (#928a)', () => {
+        // Producers: Map.jsx:395 is the only production site and always sends a
+        // full object, so null/undefined/{} are defensive-only. Honest behavior of
+        // a Spell click with no overlay state is a total no-op: no TypeError, no
+        // half-action (setTool must NOT fire because the mode can never engage).
+        it.each([
+            ['null', null],
+            ['undefined', undefined],
+            ['empty object', {}],
+            ['object without setters', { spellMode: null, selectedShape: 'sphere' }],
+        ])('%s: click dispatches nothing and stays inactive', (_label, state) => {
+            const setTool = vi.fn();
+            renderMapToolbar({ spellOverlayState: state, setTool });
+            const spellBtn = screen.getByRole('button', { name: 'Spell' });
+            expect(spellBtn).not.toHaveClass('active');
+            expect(() => fireEvent.click(spellBtn)).not.toThrow();
+            expect(setTool).not.toHaveBeenCalled();
+            expect(screen.getByRole('button', { name: 'Spell' })).not.toHaveClass('active');
+            expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('spellMode falsy-arm unification — null, undefined and "" render identically (#928b)', () => {
+        // Census: spellMode producers emit ONLY null or non-empty OverlayShape
+        // strings (Map.jsx init/clear, toggleSpellMode, onSelectShape, Cancel);
+        // '' is never produced and every downstream consumer (usePlayerDragging,
+        // useItemDragging, useSpellHandlers) tests truthiness, so '' means
+        // inactive. Verdict: the mount gate unifies to truthy — '' mounts
+        // nothing, exactly like null.
+        it.each([
+            ['null', null],
+            ['undefined', undefined],
+            ['empty string', ''],
+        ])('%s: button inactive, controls not mounted', (_label, spellMode) => {
+            const setTool = vi.fn();
+            renderMapToolbar({ spellOverlayState: createMockSpellOverlayState({ spellMode }), setTool });
+            const spellBtn = screen.getByRole('button', { name: 'Spell' });
+            expect(spellBtn.getAttribute('class')).toBe('');
+            expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+            // Truthy arm re-arms normally from the unified inactive state.
+            fireEvent.click(spellBtn);
+            expect(setTool).toHaveBeenCalledWith('none');
+            expect(setTool).toHaveBeenCalledTimes(1);
+        });
+
+        it('active shape mounts controls active: button class byte and Cancel present', () => {
+            renderMapToolbar({
+                spellOverlayState: createMockSpellOverlayState({ spellMode: OverlayShape.SPHERE }),
+            });
+            expect(screen.getByRole('button', { name: 'Spell' })).toHaveClass('active');
+            expect(screen.getByRole('combobox')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+        });
+    });
+
     describe('tool buttons toggle with exact args and active byte both directions', () => {
         it.each([
             ['paint', 'Paint'],

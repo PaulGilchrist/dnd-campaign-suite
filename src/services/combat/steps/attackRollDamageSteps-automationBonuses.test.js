@@ -100,6 +100,7 @@ vi.mock('../../rules/effects/expirations.js', () => ({ addExpiration: vi.fn() })
 
 const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
+const { rollExpression } = await import('../../dice/diceRoller.js');
 const { addEntry } = await import('../../ui/logService.js');
 const { loadCombatSummary } = await import('../../encounters/combatData.js');
 const { getActiveBuffs } = await import('../../automation/common/buffToggle.js');
@@ -288,6 +289,20 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
         expect(setRuntimeValue).not.toHaveBeenCalled();
       });
+      // #1026-fix same-shape arm: roll null (empty acc) ⇒ latch NOT burned. Pre-fix
+      // fingerprint was the burned-round pair: byte-identical formula + stamp fired.
+      it('divine fury: roll null → zero rider bytes AND zero stamp (write-only-if-applied)', async () => {
+        gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
+        vi.mocked(rollExpression).mockReturnValueOnce(null);
+        const r = await steps[11].handler(makeCtx({
+          isMeleeOrUnarmed: true,
+          playerStats: { name: 'TestChar', level: 5, automation: { actions: [{ type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: '0', damageType: 'radiant' }] } },
+          formula: '1d8+3', total: 11, rolls: [8, 3],
+        }));
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(rollExpression).toHaveBeenCalledWith('0');
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
       it('divine fury: "radiant or necrotic" opens divineFury modal, pending data, zero writes', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? [{ damageBonusExpression: '1d6' }] : null);
         const setDF = vi.fn();
@@ -417,15 +432,31 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
 
   // ── natural20Bonuses (steps[13]) — condition arms + dice/flat/zero handler arms are
   //    CANON in attackRollDamageSteps-natural20-celestial.test.js (drives this same step,
-  //    superset of the old six here) — only the Math.max(STR,DEX) default branch is unique ──
+  //    superset of the old six here) — only the Math.max(STR,DEX) default branch is unique.
+  //    #1035 fix: extraDamageType is the append gate; the fixture carries an authored type
+  //    ('fire', lane-distinct byte) so Math.max stays observable — pre-fix this pinned the
+  //    dead name-label byte ' + 5 [AB]' (extraDamageType discarded). ──
   describe('natural20Bonuses step', () => {
-    it('increased_ability_score with no abilityIncreased appends max(STR,DEX) = +5', async () => {
+    it('increased_ability_score with no abilityIncreased appends max(STR,DEX) = +5 [fire]', async () => {
+      const r = await steps[13].handler(makeCtx({
+        isNatural20: true,
+        playerStats: { name: 'TestChar', abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 5 }], automation: { actions: [{ type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: 'increased_ability_score', extraDamageType: 'fire', name: 'AB' }] } },
+        formula: '1d8+3', total: 11, rolls: [8, 3],
+      }));
+      expect(r.data).toEqual({ formula: '1d8+3 + 5 [fire]', total: 16, rolls: [8, 3, 5] });
+    });
+
+    // #1035 zero-gate falsifier (lane-distinct shape): absent extraDamageType =
+    // unauthored row → ZERO extra, ctx bytes byte-intact, console.error once.
+    it('missing extraDamageType → zero extra (ctx bytes intact, console.error)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const r = await steps[13].handler(makeCtx({
         isNatural20: true,
         playerStats: { name: 'TestChar', abilities: [{ name: 'Strength', bonus: 3 }, { name: 'Dexterity', bonus: 5 }], automation: { actions: [{ type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: 'increased_ability_score', name: 'AB' }] } },
         formula: '1d8+3', total: 11, rolls: [8, 3],
       }));
-      expect(r.data).toEqual({ formula: '1d8+3 + 5 [AB]', total: 16, rolls: [8, 3, 5] });
+      expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
   });
 

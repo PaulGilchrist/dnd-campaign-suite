@@ -97,7 +97,9 @@ function buildAbilityCheckAdvantageBadge(ctx) {
 
 function buildAbilityCheckAdvantageAllBadge(ctx) {
     const reasons = ctx.effects.abilityCheckAdvantageReasons || []
-    const reasonText = reasons.length > 0 ? ` (${reasons.join(', ')})` : ''
+    // #829: emit bare reasons — the tooltip assembler owns the parens
+    // (same contract as buildAttackAdvantageBadge:64 and buildSaveAdvantageBadge:80).
+    const reasonText = reasons.length > 0 ? reasons.join(', ') : ''
     return { label: 'Adv Check', cls: 'effect-buff', icon: 'fa-hand', removable: true, removeAction: 'target_effect', effectType: 'advantage_abilities', tooltip: `Advantage on all ability checks${reasonText ? ' (' + reasonText + ')' : ''}` }
 }
 
@@ -139,7 +141,8 @@ function buildEnfeebleBadge(ctx) {
 }
 
 function buildProtectionFromPoisonBadge(ctx) {
-    return { label: 'Protection from Poison', cls: 'effect-buff', icon: 'fa-shield-halved', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'protection_from_poison', onClick: ctx.onRollConditionSave ? () => ctx.onRollConditionSave(ctx.creatureName, { key: 'poisoned', label: 'Poisoned', dc: ctx.te.dc || 0, ability: 'con' }) : undefined, tooltip: `Protection from Poison from ${ctx.te.source || 'unknown'}: Resistance to poison damage. Advantage on saving throws against being poisoned. Concentration` }
+    const poisonDc = ctx.te.dc || 0
+    return { label: 'Protection from Poison', cls: 'effect-buff', icon: 'fa-shield-halved', removable: ctx.isLocalhost, removeAction: 'target_effect', effectType: 'protection_from_poison', onClick: ctx.onRollConditionSave ? () => ctx.onRollConditionSave(ctx.creatureName, { key: 'poisoned', label: 'Poisoned', dc: poisonDc, ability: 'con' }) : undefined, tooltip: `Protection from Poison from ${ctx.te.source || 'unknown'}: Resistance to poison damage. Advantage on saving throws against being poisoned. Concentration` }
 }
 
 function buildOttoDanceBadge(ctx) {

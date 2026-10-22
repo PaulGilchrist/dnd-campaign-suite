@@ -2526,3 +2526,6 @@ run2#1549: ui/youtubePlayer -> maintained (13->14) SDK stub-completeness exact-o
 ## Batch #220 — PROGRESS: completed 2682 / remaining 0 (total 2682) — TEST-MAINTAIN PASS FINISHED
 - Suite: lint clean; 2750 files, 30,175 passed, exact canon pair + 3 expected = GREEN canon. 46th consecutive clean run (WATCH #3 silent 8th, WATCH #4 silent 3rd). Evidence /tmp/batch220.log.
 - Honest total 2,682; all maintained. Owner 2026-10-22: blanket-approval for test-bugs-fix pass (no per-item gates). Fix queue: .opencode/plans/bug-fix-queue.txt (197 red / 85 warn / 112 trash / 309 pin) with line-pointers bug-fix-queue-lines.txt.
+
+## Fix-pass CHECKPOINT: FIRST FULLY GREEN SUITE (fixcheck50, 2026-10-22)
+- lint clean; 2757/2757 files; 30,316 passed + 3 expected fail; ZERO failures. Both FIXME canon exceptions retired (fix#50 Players dragging gate, fix#51 languageWarnings supply). 51 fix-lanes dispatched (incl #10r regression repair, pair-fold lanes #2/#4/#16/#36/#47, flake WATCH #5 registered). Baseline for all future adjudications: EXIT:0 / 3-expected-only.
