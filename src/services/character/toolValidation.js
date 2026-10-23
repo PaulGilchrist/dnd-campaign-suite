@@ -121,38 +121,6 @@ export async function getToolsByCategory(category) {
     );
 }
 
-/**
- * Computes how many tool proficiency selections are allocated from Skilled uses
- * @param {Map} categoryLimits - The categoryLimits map from getToolLimitsByCategory
- * @param {Array} selectedTools - Array of selected tool names
- * @param {Array<string>} allTools - Full tool list with _category property
- * @param {Array<string>} toolCategories - Tool category names
- * @returns {number} Number of selected tools allocated from Skilled
- */
-export function computeSkilledToolUsage(categoryLimits, selectedTools, allTools, toolCategories) {
-    if (!categoryLimits || categoryLimits.size === 0 || !selectedTools || selectedTools.length === 0) {
-        return 0;
-    }
-
-    const isPlaceholder = (t) => /^(\d+) from: (.+)$/.test(t);
-    const toolsByCategory = {};
-    toolCategories.forEach(cat => {
-        const toolsInCat = allTools.filter(t => t._category === cat);
-        toolsByCategory[cat] = new Set(toolsInCat.map(t => t.name));
-    });
-
-    let categoryCovered = 0;
-    for (const [category, limit] of categoryLimits) {
-        const selectedInCategory = selectedTools.filter(t =>
-            !isPlaceholder(t) && toolsByCategory[category]?.has(t)
-        ).length;
-        categoryCovered += Math.min(selectedInCategory, limit);
-    }
-
-    const userSelectedTools = selectedTools.filter(t => !isPlaceholder(t));
-    return Math.max(0, userSelectedTools.length - categoryCovered);
-}
-
 function addCategoryLimit(categoryLimits, category, count) {
     categoryLimits.set(category, (categoryLimits.get(category) || 0) + count);
 }

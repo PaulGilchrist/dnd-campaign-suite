@@ -9,7 +9,7 @@
 // no range-only pins (#973); zero wall-clock — round economy is seam-mocked (#app).
 //
 // PRESERVED cites (#936 fold arms — load-bearing, who cites them):
-//   frenzy apply + 5 guard arms ......... attackRollBonuses.frenzy-cla147.test.js (#1026)
+//   frenzy loud-decline + 5 guard arms .. attackRollBonuses.frenzy-cla147.test.js (#1026; flat-decline flip ledger silent-zero)
 //   weaponHitBonuses modal ' or ' CANON . attackRollBonuses-spellDiscriminator.test.js (#1025, its :29 cites this file's ' or ' modal)
 //   whb oncePerTurn-skip / uses-depleted / option-skip / upgraded-suppress / stamp /
 //   both-triggers / condition ........... attackRollBonuses-lunarForm.test.js (never re-driven there, #1024/#1028)
@@ -40,7 +40,8 @@
 // gain, distinguishable bytes); unarmed/ranged gate falsified by t2+t3 pair.
 // monk 'fire'-explicit + default-fire → t4/t5 (option-normalize + fallback; explicit
 // 'fire' was byte-identical to default and dropped). heavy explicit + default-type →
-// t6 (two distinguishable dice, one call). frenzy t8-t13 kept (cited). df t14-t17 kept.
+// t6 (two distinguishable dice, one call). frenzy t8 flipped to loud-decline (ledger
+// silent-zero), t9-t13 kept (cited). df t14-t17 kept.
 // brutalStrike old×5 → t18 (inactive guard) + t19 (Hamstring clock leg, added).
 // natural20 old×10 → t20 (Math.max default only). celestial old×10 → t21-t26
 // (5 guards + 1 exact app; duplicate app-name legs dropped, sibling-owned).
@@ -122,7 +123,8 @@ function makeCtx(overrides = {}) {
 }
 function buffsMock(b) { vi.mocked(getActiveBuffs).mockReturnValue(b); }
 function gvImpl(fn) { getRuntimeValue.mockImplementation(fn); }
-// frenzy ctx: raging (advantage + rage damage buff) STR melee hit, +2 flat bonus rider.
+// frenzy ctx: raging (advantage + rage damage buff) STR melee hit, +2 FLAT rider —
+// the silent-zero ledger fixture: post-fix it declines LOUD (zero rolls/bytes/stamp).
 function frenzyCtx(overrides = {}) {
   return makeCtx({
     isMeleeOrUnarmed: true,
@@ -222,14 +224,23 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
         expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
       });
 
-      // Frenzy fold (#936, cited #1026): apply + stamp once, five clause-guards each
-      // byte-pinned with zero latch write.
-      it('applies frenzy +2 on raging reckless STR hit and stamps _frenzyUsedRound once', async () => {
+      // Frenzy fold (#936, cited #1026): one loud-decline + five clause-guards
+      // each byte-pinned with zero latch write.
+      // Ledger silent-zero flip (was 'applies frenzy +2 …'): the flat '2' fixture
+      // was mock-leniency fake-green — the mock fabricates rolls for constants and
+      // non-dice text (mock :60-62), while the REAL diceRoller parseExpression
+      // (:46) is dice-only and RAW Frenzy is 'rage_damage_d6' dice (disk canon;
+      // canonical dice application is cla147 lane CANON). Now flat non-dice
+      // expressions decline LOUD: zero contribution, zero rolls, zero stamp.
+      it('frenzy: flat non-dice expression declines LOUD — formula intact, no roll, no stamp', async () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         gvImpl((_, p) => p === 'activeBuffs' ? FRENZY_BUFFS : null);
         const r = await steps[11].handler(frenzyCtx());
-        expect(r.data).toEqual({ formula: '1d8+3 + 2 []', total: 13, rolls: [8, 3, 2] });
-        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestChar', '_frenzyUsedRound', 1, 'test-campaign');
+        expect(r.data).toEqual({ formula: '1d8+3', total: 11, rolls: [8, 3] });
+        expect(rollExpression).not.toHaveBeenCalled();
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(errSpy).toHaveBeenCalledTimes(1);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('unrecognized frenzy expression'));
       });
       it('frenzy: miss gains no bonus and never stamps the latch', async () => {
         gvImpl((_, p) => p === 'activeBuffs' ? FRENZY_BUFFS : null);

@@ -57,13 +57,19 @@ export default function SilenceModal({
         const casterName = playerStats.name;
         const targetedNames = Array.isArray(selected) ? selected.map(t => t.name || t) : [];
 
-        if (targetedNames.length === 0) {
-            setRuntimeValue(casterName, SILENCE_KEY, false, campaignName);
-            setRuntimeValue(casterName, SILENCE_CENTER_KEY, null, campaignName);
-            setRuntimeValue(casterName, SILENCE_RADIUS_KEY, null, campaignName);
-            onClose();
-            return;
-        }
+        // DEAD-BRANCH REMOVAL (census 2026-10-23, test-maintain-bugs.md:286): an
+        // empty-selection RESET branch (silenceCaster=false + center/radius=null + close)
+        // stood here; it could never fire. The REAL picker's toggleTarget has no keep-one
+        // guard, so deselect-last does empty `selected` mid-pick — but confirm is doubly
+        // gated at zero: button `disabled={selected.length === 0}`
+        // (shared/CreatureSelectionModal.jsx:153; picker lane pins it in
+        // shared/CreatureSelectionModal.test.jsx, modal lane in SilenceModal.test.jsx
+        // "nothing castable until a target is picked") and
+        // `if (selected.length === 0) return;` before onConfirm(selected) (:67-68).
+        // The user's cancel path is Skip -> handleSkip (close-only, no runtime writes —
+        // pinned by "closes via Skip without touching any runtime state"). Zone teardown
+        // is owned by the live seams: silenceHandler.js:29 (silenceCaster=false) and the
+        // clear_silence_zone/clear_runtime_value expirations granted below.
 
         const csAll = await resolveSilenceCombatants(campaignName);
         const posOf = name => csAll.find(c => c.name === name && hasGridPos(c));

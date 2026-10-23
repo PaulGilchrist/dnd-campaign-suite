@@ -76,13 +76,3 @@ export const resetTestState = (popupReturnValue) => {
   popupReturnValue.setPopupHtml = vi.fn();
   popupReturnValue.value = {};
 };
-
-export default {
-  createMockStore,
-  mockPlayerSummary,
-  createDefaultProps,
-  createMockPlayerStats,
-  createSharedPopupReturnValue,
-  setPopup,
-  resetTestState,
-};

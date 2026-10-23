@@ -3,12 +3,19 @@
 // Owned elsewhere (do NOT duplicate here):
 //   - panel-interactions.test.jsx  — checkbox toggle, qty +/-, remove, clear all,
 //     monster card modal open/close, description starts empty
-//   - remaining.test.jsx           — openSaveModal (no-name), Join button visibility,
-//     Clear All, apply suggestion, description editing, filter preservation, party
-//     summary display, generator modal open/close
+//   - remaining.test.jsx           — Join button visibility (gate only), generator
+//     modal open → Apply → close, selected-row preservation under the type filter,
+//     default header chrome incl. no-Reset and party summary display
+//     (its openSaveModal spy, Clear All and description-editing pins retired:
+//     save flow subsumed by THIS lane @fix#263, Clear All by panel-interactions
+//     @#406, description editing by PreviewToggle.test.jsx)
 //   - load-encounter.test.jsx      — handleLoadEncounter resolution + XP reconcile
 //   - reset-encounter.test.jsx     — handleReset
-//   - uncovered-handlers.test.jsx  — delete/rename confirm flows
+//   - uncovered-handlers.test.jsx  — delete/rename builder dispatch passthrough at
+//     the management-hook seam, UNCONFIRMED since fix#410 (renames never confirmed;
+//     the real delete confirm lives in the leaf — single-confirm count owned by
+//     delete-confirmation.test.jsx, rename reachability/service bytes by
+//     EncounterModal.rename-flow.test.jsx)
 //   - EncounterMonsterTable.test.jsx / EncounterFilterPanel.test.jsx — child-level
 //     header onSort calls and panel player-callback calls (no builder state wiring)
 // This file uniquely covers:

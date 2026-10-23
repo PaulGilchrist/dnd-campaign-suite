@@ -3,11 +3,28 @@
 // exported entry point here is resolveAttackDamageStandalone; every assertion is a
 // pure function call through the pipeline seam, no React render.
 // Canon ownership: normalizeAutoDamage full-shape/crit/registry/EE contracts live in
-// normalizeAutoDamage.test.js (that block was deleted here as a duplicate); OA-true
+// normalizeAutoDamage.test.js. EXCISION CENSUS (fix#54 zero-dup; ledger run2#283):
+// the former describe('normalizeAutoDamage') block at old :288-481 (11 its) was
+// deleted here — 7 its subsumed byte-exact by home full-shape/minimal/crit-matrix/
+// lookup/EE-null arms (2 of them, the self-admitted weak mock-0 EE pin and the
+// Greataxe registry pin, were strictly weaker than home and carried nothing out);
+// 4 unique arms migrated into home as 3 units: school-rides-without-attackType
+// (lookup arm), empty-payload-{}-defaults (own it), unarmed-name-derived across
+// empty-registry AND null-playerStats (own it.each). OA-true
 // transport to both gates is pinned by useAttackDamageResolution.opportunity-transport.test.js.
 // Owned here: byte-exact run-ctx defaults + overrides spread, the exact callable ctx
 // surface consumed by pipeline steps, no-op modal-setter contract, and the byte-exact
 // minimalCtx payload at the rollDamage seam (pass-through and default branches).
+// FOLD DISPOSITION (ledger run2#309, 🗑 old :168-285): DISCHARGED — the ctx-defaults
+// twin its (old :97/:120) and the proceedWithDamage twin its (old :169/:200/:233/:258)
+// were folded into the two it.each blocks below at the Test Quality reshape (f59d311cd,
+// 481→225). The two describes stay split per fix#220 honest-split: normalized-diff of
+// the it.each bodies shows they differ beyond parameters — different mock behavior
+// (inert run vs run invoking proceedWithDamage) pinning different seams (run-ctx
+// snapshot vs rollDamage payload); merging would branch assertions and blur attribution
+// (fix#230 standard). This turn hoists the per-case byte-identical mock-skeleton out
+// of the proceedWithDamage it.each body into its beforeEach. Census: nothing further
+// foldable — the full-shape expected/expectedContext tables are intentional byte-pins.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock audit: the only collaborator reachable from resolveAttackDamageStandalone's
@@ -166,6 +183,15 @@ describe('resolveAttackDamageStandalone — proceedWithDamage minimalCtx at roll
     beforeEach(() => {
         vi.resetAllMocks();
         rollDamage = vi.fn();
+        buildPipelineForAction.mockReturnValue({
+            run: vi.fn(async (_event, ctx) => {
+                // Mirrors attackRollPostDamage handing proceedWithDamage the finished
+                // damage tuple; the inner attack arg is what names the payload.
+                ctx.proceedWithDamage({
+                    attack: innerAttack, formula: '1d8+4', total: 9, rolls: [5, 4], modifier: 4,
+                });
+            }),
+        });
     });
 
     it.each([
@@ -202,16 +228,6 @@ describe('resolveAttackDamageStandalone — proceedWithDamage minimalCtx at roll
             },
         },
     ])('$label', async ({ ctxOverrides, expectedContext }) => {
-        buildPipelineForAction.mockReturnValue({
-            run: vi.fn(async (_event, ctx) => {
-                // Mirrors attackRollPostDamage handing proceedWithDamage the finished
-                // damage tuple; the inner attack arg is what names the payload.
-                ctx.proceedWithDamage({
-                    attack: innerAttack, formula: '1d8+4', total: 9, rolls: [5, 4], modifier: 4,
-                });
-            }),
-        });
-
         await resolveAttackDamageStandalone(makeAttack(), ctxOverrides, {
             playerStats: makePlayerStats(), campaignName: CAMPAIGN,
             setPopupHtml: vi.fn(), rollDamage,

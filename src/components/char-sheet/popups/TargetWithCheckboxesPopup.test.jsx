@@ -10,7 +10,8 @@ import TargetWithCheckboxesPopup from './TargetWithCheckboxesPopup.jsx';
 // (target AND ≥1 selection), the 'Cast {title}' label default, and the exact
 // { targetName, selections } payload mapping cb.selectionData. Base surface
 // inherited from TargetPopupBase (Escape→onSkip, 'Spell' name fallback,
-// subtitle composition) is not multiplied here — strongest pins live in
+// subtitle composition, the 'Cancel' fallback base re-supplies at
+// TargetPopupBase.jsx:7) is not multiplied here — strongest pins live in
 // MultiTargetCountPopup.test.jsx (skip once each) and MagicMissileTargetPopup.test.jsx
 // ('Spell' full-line), pending a dedicated TargetPopupBase spec.
 
@@ -63,10 +64,14 @@ describe('TargetWithCheckboxesPopup', () => {
     expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Nope' })).toBeInTheDocument();
 
-    // This popup's own label defaults: 'Cast {title}' and 'Cancel'.
-    rerender(<TargetWithCheckboxesPopup {...makeProps({ confirmLabel: undefined, cancelLabel: undefined })} />);
+    // This popup's own fallback expression `Cast ${title}` (base would render
+    // 'Confirm', so this is attributable to the child). The 'Cancel' default
+    // is unattributable from here — child :54 `cancelLabel || 'Cancel'` and
+    // base TargetPopupBase.jsx:7 both re-supply the same literal — pinned
+    // directly at its owner, TargetPopupBase.test.jsx:198, not here (fix#291).
+    rerender(<TargetWithCheckboxesPopup {...makeProps({ confirmLabel: undefined })} />);
     expect(screen.getByRole('button', { name: 'Cast Remove Effects' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nope' })).toBeInTheDocument(); // cancelLabel still forwarded
   });
 
   it('marks exactly one selected target, loads its list, and stays confirm-disabled until a checkbox is ticked', () => {

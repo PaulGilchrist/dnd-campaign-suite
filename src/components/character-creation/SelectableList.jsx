@@ -195,13 +195,9 @@ function SelectableList({
       return;
     }
 
-    const newItems = isRepeatable
-       ? currentItems.includes(itemName)
-         ? currentItems.filter(i => i !== itemName)
-         : [...currentItems, itemName]
-       : currentItems.includes(itemName)
-         ? currentItems.filter(i => i !== itemName)
-         : [...currentItems, itemName];
+    const newItems = currentItems.includes(itemName)
+      ? currentItems.filter(i => i !== itemName)
+      : [...currentItems, itemName];
     onArrayFieldChange(fieldName, newItems);
   };
 

@@ -219,6 +219,12 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
             description: 'Test description',
         });
 
+        // Modal close pins too: :579 close is unconditional post-validation, so
+        // the option-not-found branch must close exactly like the found-option
+        // branch above (migrated from the retired skipManeuver.test.js dup block —
+        // without this pin, a mutant gating the close inside `if (option)` survives).
+        expect(deps.setModalState).toHaveBeenCalledTimes(1);
+        expect(deps.setModalState).toHaveBeenCalledWith({ attackRiderOptionsModal: null });
         // Only the two flag latches hit the runtime store — no targetEffects at all.
         expect(setRuntimeValue).toHaveBeenCalledTimes(2);
         expect(setRuntimeValue).toHaveBeenNthCalledWith(1, CHAR, '_brutalStrikeActive', true, CAMPAIGN);

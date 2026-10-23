@@ -1,6 +1,7 @@
 // @maintained-by-ai
-/* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx:395-413).
- * handleReset touches ONLY component-local useState (EncounterBuilder.jsx:184-214) —
+/* Lane #405 — Reset button → handleReset state-wipe contract (EncounterBuilder.jsx:410-428).
+ * handleReset touches ONLY component-local useState (EncounterBuilder.jsx:161-209; sort
+ * state at :214-215 is deliberately NOT wiped) —
  * it never calls save/update/delete endpoints and never writes localStorage. The load
  * precondition uses the management-hook mock below (not the real
  * useEncounterManagement/useSyncedState) precisely so that server isolation is provable:
@@ -11,7 +12,7 @@
  * sort/Join dispatch/save-modal commit (#399 additional-interactions), XP bands (#400
  * gameplay-flows), localStorage/filter persistence (#401 helpers), row chrome/clear-all
  * (#406 panel-interactions), generator-apply/header gate/default-no-Reset chrome (#407
- * remaining). Reset-button-absent-when-no-encounter is green in remaining.test.jsx:163;
+ * remaining). Reset-button-absent-when-no-encounter is green in remaining.test.jsx:171;
  * its post-reset counterpart (setCurrentEncounterName(null)) is pinned here. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';

@@ -15,8 +15,11 @@ import useCharActionsAutomation from './useCharActionsAutomation.js';
 //   modal routing → .test.resource-modals.js / .test.condition-modals.js / .test.class-feature-modals.js
 //   telepathicSpeech producer → .test.telepathic-speech.js (CLA-053)
 //   handleDivineInterventionCast flows → .test.divine-intervention.js
-//   cannotAct / early returns → .test.early-returns.js (flagged whole-file delete by #330;
-//   its versions of the FP-lane tests below are weaker — this file is the FP-lane owner).
+//   guard passthroughs (non-monk MONK_KI-membership negative, empty-options damage_bonus,
+//   omitted onBuffsChange dep) → .test.early-returns.js. (#330 whole-file-delete flag
+//   CLOSED 2026-10-23: its FP-lane dups were deleted in the 2026-10-18 trim and are
+//   verified stronger here (this file is the FP-lane owner); the three surviving arms are
+//   grep-confirmed unique — cannotAct stays owned here at its test below.)
 
 vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
     onSpellSelected: vi.fn(),

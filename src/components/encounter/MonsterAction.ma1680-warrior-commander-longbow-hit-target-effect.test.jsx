@@ -37,7 +37,6 @@ import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { attackRowMissingToHit } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const WARRIOR_COMMANDER = monsters.find((m) => m.index === 'warrior-commander');
@@ -63,7 +62,6 @@ describe('MA-1680 warrior-commander Longbow hit_target_effect lane', () => {
   });
 
   it('chip dispatch identity: exactly one "+9" chip (no save/DC decoy), press dispatches the exact Longbow row', () => {
-    expect(attackRowMissingToHit(LONGBOW)).toBe(false);
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction

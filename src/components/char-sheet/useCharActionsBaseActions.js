@@ -16,20 +16,6 @@ function sizeIndexFor(size, fallbackIndex) {
     return index === -1 ? fallbackIndex : index;
 }
 
-// Pure: Wisdom (Bardic Inspiration replacement) Stealth bonus recalculation.
-function resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty) {
-    const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-    const wisMod = wisAbility?.bonus || 0;
-    const wisBonus = Math.max(1, wisMod);
-    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-    const isProficient = playerStats.skillProficiencies?.includes('Stealth');
-    const isExpert = playerStats.expertise?.includes('Stealth');
-    let newBonus = wisBonus;
-    if (isProficient) newBonus += proficiency;
-    if (isExpert) newBonus += proficiency;
-    return newBonus - exhaustionPenalty;
-}
-
 function findStealthSkill(playerStats) {
     return (playerStats?.abilities || []).flatMap(a => a.skills || []).find(s => s.name === 'Stealth');
 }
@@ -54,12 +40,18 @@ function computeStealthBonus(conditionEffects, playerStats, exhaustionPenalty) {
     // subtracts unconditionally AFTER the listed-or-zero bonus is selected —
     // mirrors computeGrappleCheckBonus's `checkBonus -= exhaustionPenalty`.
     let stealthBonus = (stealthSkill?.bonus ?? 0) - exhaustionPenalty;
-    const isCharismaSkill = ['Deception', 'Intimidation', 'Performance', 'Persuasion'].includes('Stealth');
-    if (ce.wisCheckReplace && isCharismaSkill) {
-        stealthBonus = resolveWisReplaceStealthBonus(playerStats, exhaustionPenalty);
-    }
+    // Vestigial generic-check conditions removed here (test-maintain ledger pass #338):
+    // `.includes('Stealth')` over the Charisma skills made the ce.wisCheckReplace
+    // branch statically false (Stealth is a Dexterity skill; the guard was hardcoded
+    // to the literal at birth in 1958e7b59 — it never bridged a 'Hide'-named skill,
+    // and no skill named 'Hide' exists in disk data or any live campaign sheet).
+    // wisCheckReplace stays live in the generic Charisma lane (CharAbilities.jsx),
+    // where the argument is a variable skill.name. The tautology
+    // `'Stealth' === 'Stealth'` on the Pass Without Trace guard was pure noise —
+    // this lane is Stealth-only; only ce.passWithoutTraceBonus gates that live
+    // bonus (pinned by useCharActionsHideAction.test.js).
     stealthBonus += jackOfAllTradesStealthAdjust(playerStats);
-    if (ce.passWithoutTraceBonus && 'Stealth' === 'Stealth') {
+    if (ce.passWithoutTraceBonus) {
         stealthBonus += parseInt(ce.passWithoutTraceBonus, 10);
     }
     return stealthBonus;

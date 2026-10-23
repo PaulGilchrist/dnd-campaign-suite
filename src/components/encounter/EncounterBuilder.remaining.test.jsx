@@ -9,7 +9,8 @@
 // (#399 additional-interactions — its save flow subsumes the old openSaveModal spy
 // test here), XP summary (#400 gameplay-flows), localStorage/filter/bands (#401
 // helpers), load hydrate/reconcile (#403 load-encounter), reset (#405 reset-encounter),
-// delete/rename confirmations (uncovered-handlers), modal-null render (rendering),
+// delete/rename confirmations (uncovered-handlers), modal-null render (rendering
+// lane deleted fix#261 f59d311cd — retired citation, pass #406 stale-byte note),
 // PreviewToggle edit/onChange behavior (PreviewToggle.test.jsx — subsumes the old
 // mocked-textarea description test here).
 // Runs the REAL filter/summary/table/selected panels, PreviewToggle, and pure

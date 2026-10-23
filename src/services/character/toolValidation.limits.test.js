@@ -7,7 +7,7 @@
 // - toolValidation.major-feature.test.js — Fighter Student of War major-feature tool grants and the
 //   bg+major accumulation; no Fighter majors are used here. Major-level proficiency_choices are
 //   ignored (feature-only contract, majorFeatureChoices.test.js) — tool-side analog cited there, not here.
-// - toolValidation.services.test.js — getToolsByCategory / computeSkilledToolUsage units, untouched here.
+// - toolValidation.services.test.js — getToolsByCategory units (computeSkilledToolUsage lane retired with its dead export), untouched here.
 // - skillValidation.major-feature.test.js — idiom source: disk-verbatim fixtures, zero fabricated data.
 // Disk honesty: fixtures are verbatim public/data/2024/{backgrounds,classes,feats}.json +
 // public/data/equipment.json rows (Thieves' Tools, Navigator's Tools, Dice Set, Flute, …;

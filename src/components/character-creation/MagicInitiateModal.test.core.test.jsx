@@ -35,6 +35,21 @@ describe('MagicInitiateModal', () => {
       expect(screen.getByText('Magic Initiate')).toBeInTheDocument();
       expect(screen.getByText(/Choose a class/)).toBeInTheDocument();
     });
+
+    it('overlay and modal shells carry no dismiss handler — dismissal is button-only', () => {
+      // Owner decision 15eb96d46 removed overlay-click dismissal app-wide.
+      // Structural absence pin (house idiom: MonsterCardModal.legendary-arcane-prowl-sphinx.test.jsx:175):
+      // a real click on a handlerless shell proves nothing, so pin the handler's absence directly.
+      const props = createProps();
+      const { container } = render(<MagicInitiateModal {...props} />);
+
+      const overlay = container.querySelector('.mi-overlay');
+      const modal = container.querySelector('.mi-modal');
+      expect(overlay.getAttribute('onclick')).toBeNull();
+      expect(modal.getAttribute('onclick')).toBeNull();
+      // The only onClose affordances are the header Close and Skip buttons (pinned above).
+      expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1);
+    });
   });
 
   describe('ruleset-aware class selection', () => {

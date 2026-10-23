@@ -425,9 +425,9 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Regain Bardic Inspiration on initiative (Bard level 18/20 Superior Inspiration)
             regainBardicInspiration(playerStats, campaignName);
 
-            if (Object.keys(updates).length > 0) {
-                setRuntimeBatch(playerStats.name, updates, campaignName);
-            }
+            // Always fires: buildInitiativeUpdates (:69) unconditionally sets 9
+            // keys; the batch payload is pinned byte-exact by batchResets.test.js.
+            setRuntimeBatch(playerStats.name, updates, campaignName);
         };
 
         window.addEventListener('initiative-rolled', handleInitiativeRolled);

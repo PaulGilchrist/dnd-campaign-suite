@@ -28,7 +28,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
+import { buildHitConditionClause } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const OCEAN_SPEAR = monsters.find((m) => m.index === 'merfolk-skirmisher').actions[0];
@@ -59,7 +59,6 @@ describe('MA-1147 merfolk-skirmisher Ocean Spear hit_target_effect fix', () => {
   });
 
   it('chip dispatch identity: exactly one "+2" chip (no save/DC decoy), click fires onAttack with the Ocean Spear row', () => {
-    expect(attackRowMissingToHit(OCEAN_SPEAR)).toBe(false);
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction

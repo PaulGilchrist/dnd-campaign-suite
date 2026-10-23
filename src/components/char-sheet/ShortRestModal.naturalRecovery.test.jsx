@@ -259,6 +259,44 @@ describe('ShortRestModal - Natural Recovery', () => {
       expect(log.message).not.toContain('Natural Recovery:');
     });
 
+    // run2#294 fold: the vacuous coverage.test.jsx:414 test ('allows completing short
+    // rest without making Natural Recovery selections' — clicked Complete, asserted only
+    // that the modal header was still mounted) was deleted in the pass #295 restructure;
+    // its subject is owned honestly here. Truth (ShortRestModal.jsx:85-106): the whole
+    // Natural Recovery branch is selection-gated — with zero selections the complete
+    // NEVER reaches applyNaturalRecoverySelections (:50-62, the only writer of the
+    // naturalRecoverySlots: 0 consumption stamp) and never logs natural_recovery_refused
+    // (:97-103, refusal requires selections > 0 AND spent slots). The rest itself
+    // completes; the feature stays armed.
+    it('completing with zero selections: rest succeeds, feature stays armed (zero writes), no refusal log, no recovery detail', async () => {
+      setupGetRuntimeValue({ spell_slots_level_1: 0, spell_slots_level_2: 1, spell_slots_level_3: 2, naturalRecoverySlots: 10 });
+      const { addEntry } = await import('../../services/ui/logService.js');
+      renderModal(landDruid);
+      // No tick() — arm nothing at all, just complete.
+      fireEvent.click(screen.getByText('Complete Short Rest'));
+      await act(async () => {});
+
+      // Conservation law: nothing selected → nothing written. All three setRuntimeBatch
+      // sites in the modal are intent-gated (arcane request, NR selections>0, swap
+      // click), so a zero-selection druid complete must produce ZERO batch calls —
+      // above all never the naturalRecoverySlots: 0 consumption stamp (:60).
+      expect(setRuntimeBatchMock).not.toHaveBeenCalled();
+      const naturalWrites = setRuntimeValueMock.mock.calls.filter(
+        (call) => String(call[1]).startsWith('spell_slots_level_') || call[1] === 'naturalRecoverySlots'
+      );
+      expect(naturalWrites).toHaveLength(0);
+
+      // Refusal log is selection-gated (:86/:88): choosing nothing is not a refusal.
+      const refusals = addEntry.mock.calls.filter(c => c[1]?.automationType === 'natural_recovery_refused');
+      expect(refusals).toHaveLength(0);
+
+      // The rest completes honestly: one short_rest entry, claiming no slot recovery
+      // (buildNaturalRecoveryDetail :164 requires applied AND selections > 0).
+      const log = addEntry.mock.calls.map(c => c[1]).find(e => e && e.type === 'short_rest');
+      expect(log).toBeDefined();
+      expect(log.message).not.toContain('Natural Recovery:');
+    });
+
     it('shows consumed state with no live controls at naturalRecoverySlots 0 and re-arms on null (long rest reset)', () => {
       setupGetRuntimeValue({ spell_slots_level_1: 2, spell_slots_level_2: 2, naturalRecoverySlots: 0 });
       const { unmount } = renderModal(landDruid);

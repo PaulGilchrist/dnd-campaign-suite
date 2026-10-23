@@ -7,9 +7,9 @@
 //   'Gaming Tool' verbatim, case-sensitive table, outer trim). One direct table row here
 //   pins the unit itself; the rest of the table is not duplicated.
 // - .services.test.js (#2064) — normalization through the getToolsByCategory filter
-//   (plural==singular on disk rows); #2064 also owns computeSkilledToolUsage (NOT pinned
-//   here) and flags its dead-export dupe with skilled-pool.js to the orchestrator ledger —
-//   any pin of it must move/die with that export.
+//   (plural==singular on disk rows). Its computeSkilledToolUsage lane DIED with the dead
+//   export (resolved: live math is skilled-pool.js computeSkilledToolUsageOnly) — nothing
+//   to own or pin here anymore.
 // - .major-feature.test.js (#2062) — 'Tool: ' prefix extraction owned there.
 // - .limits.test.js (#2061) — fetch→limit aggregation seam map home.
 // Zero mocks: normalizeCategory is pure string logic; no imports are exercised.

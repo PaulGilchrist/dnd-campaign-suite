@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { cloneDeep } from 'lodash';
 import { useSyncedState } from '../../hooks/runtime/useSyncedState.js';
 import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import useEncounterManagement from '../../hooks/management/useEncounterManagement.js';
@@ -381,8 +382,14 @@ function EncounterBuilder({ characters, campaignName, onJoinEncounter }) {
          );
          const effectiveXP = Math.round(totalXP * mult);
          if (data.effectiveXP !== effectiveXP) {
-           data.effectiveXP = effectiveXP;
-           updateEncounter(name, data);
+           // Clone-at-seam: mutate a clone, never the object resolved by
+           // loadEncounterData — on PUT failure or unmount the caller's copy
+           // must stay honest (server/disk is truth, re-read via the next
+           // loadEncounterData GET). Sibling idiom: cloneDeep-before-persist
+           // at encounterToInitiative.js:137/:247 and monsterShapeShift.js:164.
+           const payload = cloneDeep(data);
+           payload.effectiveXP = effectiveXP;
+           updateEncounter(name, payload);
          }
        }
 

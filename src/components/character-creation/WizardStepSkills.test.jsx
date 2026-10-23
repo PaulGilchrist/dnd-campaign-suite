@@ -182,7 +182,7 @@ describe('WizardStepSkills', () => {
     it.each([
       ['on an unselected skill', ['Acrobatics'], 'Stealth'],
       ['off a selected skill', ['Acrobatics', 'Stealth'], 'Acrobatics'],
-    ])('calls onSkillToggle with the exact skill name when toggling %s', async (_case, proficient, skill) => {
+    ])('calls onSkillToggle with the exact skill name when toggling %s and shows no expertise feedback', async (_case, proficient, skill) => {
       const { onSkillToggle } = await renderStep({
         preSelectedSkills: [],
         formData: { skillProficiencies: proficient, expertSkills: [] },

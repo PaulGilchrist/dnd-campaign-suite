@@ -24,7 +24,6 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
     return new Set(all);
   });
   const [suggestions, setSuggestions] = useState([]);
-  const [generating, setGenerating] = useState(false);
 
   const toggleEnv = (env) => {
     setSelectedEnvs(prev => {
@@ -45,10 +44,10 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
     return monsters.filter(m => m.environments && m.environments.some(e => selected.includes(e))).length;
   }, [monsters, selectedEnvs]);
 
+  // generateEncounterSuggestions is pure synchronous logic: the whole call
+  // completes before React repaints, so a busy/spinner state could never be
+  // observed and has been removed (test-maintain bug pass #412 dead-branch).
   const handleGenerate = () => {
-    setGenerating(true);
-
-    // Run synchronously — the service is pure logic
     const results = generateEncounterSuggestions({
       monsters,
       playerLevels,
@@ -58,7 +57,6 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
     });
 
     setSuggestions(results);
-    setGenerating(false);
   };
 
   const handleApply = (suggestion) => {
@@ -123,13 +121,9 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
             <button
               className="encounter-btn gen-generate-btn"
               onClick={handleGenerate}
-              disabled={generating || availableCount === 0 || playerLevels.length === 0}
+              disabled={availableCount === 0 || playerLevels.length === 0}
             >
-              {generating ? (
-                <><i className="fa-solid fa-spinner fa-spin"></i> Generating...</>
-              ) : (
-                <><i className="fa-solid fa-wand-magic-sparkles"></i> Generate</>
-              )}
+              <><i className="fa-solid fa-wand-magic-sparkles"></i> Generate</>
             </button>
           </div>
 
@@ -170,7 +164,7 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
             </div>
           )}
 
-          {suggestions.length === 0 && !generating && (
+          {suggestions.length === 0 && (
             <div className="gen-empty">
               <i className="fa-solid fa-dice-d6"></i> Pick environments and click Generate
             </div>

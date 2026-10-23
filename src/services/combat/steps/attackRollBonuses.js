@@ -73,6 +73,17 @@ function frenzyDamageLabel(ctx, a) {
   return a.damageType.toLowerCase();
 }
 
+// Ledger silent-zero fix: Frenzy is dice-only RAW ("roll a number of d6s equal
+// to your Rage Damage bonus") and BOTH disk Frenzy riders author the canonical
+// 'rage_damage_d6' (public/data/classes.json:466 + 2024/classes.json:888 census;
+// zero campaign rows carry anything else). Dice-shape test on the RESOLVED bytes:
+// '[count]d[sides>=1]' after stripping bracket labels (diceRoller parseExpression
+// :39/:46 byte-style); zero-count '0d6' stays legal honest-zero (diceRoller
+// :43-44 precedent). Flat resolved tokens (bare 'rage_damage' → '4' via the
+// token table) and unknown future tokens used to fall through rollExpression as
+// null and drop SILENTLY with zero contribution — they now decline LOUD.
+const frenzyExprIsDice = (expr) => /\d*d[1-9]\d*/i.test(String(expr ?? '').replace(/\s*\[.*?\]\s*/g, ''));
+
 function applyFrenzyBonuses(ctx, acc) {
   const frenzy = (ctx.playerStats.automation.actions || []).filter(x => x.type === 'damage_bonus' && x.trigger === 'reckless_attack_hit_while_raging');
   if (frenzy.length === 0) return acc;
@@ -86,8 +97,15 @@ function applyFrenzyBonuses(ctx, acc) {
   let applied = false;
   for (const a of frenzy) {
     const resolvedExpr = resolveDiceExpression(a.damageExpression, ctx.playerStats);
+    if (!frenzyExprIsDice(resolvedExpr)) {
+      console.error(`[attackRollBonuses] unrecognized frenzy expression: "${a.damageExpression}" (resolves to "${resolvedExpr}") — frenzy is rage_damage_d6 dice-only: zero contribution, latch untouched`);
+      continue;
+    }
     const r = rollExpression(resolvedExpr);
-    if (!r) continue;
+    if (!r) {
+      console.error(`[attackRollBonuses] frenzy rider "${a.name ?? a.damageExpression}" failed to roll dice expression "${resolvedExpr}" — zero contribution, latch untouched`);
+      continue;
+    }
     acc.formula += ` + ${resolvedExpr} [${frenzyDamageLabel(ctx, a)}]`;
     acc.total += r.total;
     acc.rolls = [...acc.rolls, ...r.rolls];

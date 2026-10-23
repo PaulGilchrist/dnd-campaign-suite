@@ -1,7 +1,10 @@
 import { useState, useCallback } from 'react';
 import TargetPopupBase from './TargetPopupBase';
 
-export default function MultiTargetPopup({ spell, _playerStats, _campaignName, range, creatureTargets, onConfirm, onSkip }) {
+// Host (SpellTargetPopups.jsx) passes playerStats/campaignName as props-contract
+// noise: target names render straight from the creatureTargets prop, so this
+// popup needs nothing from character stats.
+export default function MultiTargetPopup({ spell, _campaignName, range, creatureTargets, onConfirm, onSkip }) {
   void _campaignName;
   const [secondTarget, setSecondTarget] = useState('');
   const needsTarget = !secondTarget;

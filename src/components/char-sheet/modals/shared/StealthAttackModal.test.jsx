@@ -69,9 +69,12 @@ describe('StealthAttackModal', () => {
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('derives the available-dice suffix from the class level dice value, defaulting to d6', () => {
-        // Explicit per-level sneak_attack_dice_value wins.
-        const d8 = makeProps({
+    it('renders available-dice suffix as d6 law, ignoring absent-key fantasy data', () => {
+        // sneak_attack_dice_value is authored nowhere in public/data or public/campaigns
+        // (census 2026-10-23: 0 producers). RAW sneak dice faces are d6 at every Rogue
+        // level in both rulesets, and canonical accessors hardcode dice_value: 6
+        // (classRules2024.js:269). Even hostile fake data must not change the label.
+        const fakeD8 = makeProps({
             playerStats: {
                 name: 'TestRogue',
                 level: 3,
@@ -86,14 +89,15 @@ describe('StealthAttackModal', () => {
             costD6: 2,
             availableDice: 3,
         });
-        const view = render(<StealthAttackModal {...d8} />);
-        expect(screen.getByText(/3d8 available/)).toBeInTheDocument();
+        render(<StealthAttackModal {...fakeD8} />);
+        expect(screen.getByText(/3d6 available/)).toBeInTheDocument();
+        expect(screen.queryByText(/3d8 available/)).not.toBeInTheDocument();
 
-        // Missing class data falls back to d6.
+        // Missing class data still renders d6.
         render(<StealthAttackModal {...makeProps({ playerStats: { name: 'TestRogue', level: 5, class: undefined }, availableDice: 2 })} />);
         expect(screen.getByText(/2d6 available/)).toBeInTheDocument();
 
-        // Level index out of range falls back to d6 — class-root dice value is ignored.
+        // Class-root fantasy key is likewise ignored.
         const outOfRange = makeProps({
             playerStats: {
                 name: 'TestRogue',
@@ -105,7 +109,7 @@ describe('StealthAttackModal', () => {
             },
             availableDice: 1,
         });
-        view.rerender(<StealthAttackModal {...outOfRange} />);
+        render(<StealthAttackModal {...outOfRange} />);
         expect(screen.getByText(/1d6 available/)).toBeInTheDocument();
         expect(screen.queryByText(/1d8 available/)).not.toBeInTheDocument();
     });

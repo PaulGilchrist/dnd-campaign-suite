@@ -249,4 +249,68 @@ describe('CLA-147 Frenzy — single rider owner (attackRollBonuses)', () => {
       expect(store._frenzyUsedRound).toBe(1);
     });
   });
+
+  // ── ledger silent-zero hardening arms (owner-approved) ──────────────────────
+  // attackRollBonuses.applyFrenzyBonuses used to end its loop at
+  // `if (!r) continue;` — the REAL diceRoller (parseExpression :46) rolls dice
+  // ONLY, so any flat resolved token fell through with zero contribution and zero
+  // noise. Disk census: both Frenzy riders (public/data/classes.json:466 +
+  // 2024/classes.json:888) author the canonical 'rage_damage_d6' — latent class,
+  // not live damage-drop. Post-fix the step shape-gates the RESOLVED bytes BEFORE
+  // rolling (lane mock leniency cannot mask it): flat and unknown tokens decline
+  // LOUD, contribute nothing, and leave the _frenzyUsedRound latch untouched.
+  describe('ledger silent-zero: unrecognized frenzy expressions are loud', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const ctxWithExpr = (damageExpression) =>
+      laneCtx({ playerStats: { ...frenzyStats(), automation: { actions: [{ ...FRENZY_ACTION, name: 'Frenzy', damageExpression }], passives: [] } } });
+    // self-contained roll stub: the #1026 afterEach mockReset() strips the factory
+    // impl by the time this block runs — implement per-call, deterministic 4d6 dice.
+    const dice4 = () =>
+      rollExpression.mockImplementationOnce(() => ({ total: 16, rolls: [4, 4, 4, 4], modifier: 0 }));
+
+    // Canonical arm: 'rage_damage_d6' → REAL resolveDiceExpression → '4d6'
+    // (lv20 rage_damage 4) → rolled, applied, latched exactly as before.
+    it("canonical 'rage_damage_d6' still applies exact ' + 4d6 [slashing]' and stamps", async () => {
+      dice4();
+      const r = await buildAutomationBonusesStep().handler(ctxWithExpr('rage_damage_d6'));
+      expect(r.data.formula).toBe('1d8+5 plus 4 + 4d6 [slashing]');
+      expect(r.data.total).toBe(29);
+      expect(r.data.rolls).toEqual([8, 4, 4, 4, 4]);
+      expect(rollExpression).toHaveBeenCalledTimes(1);
+      expect(rollExpression).toHaveBeenCalledWith('4d6');
+      expect(setRuntimeValue).toHaveBeenCalledWith('DraconicDragon', '_frenzyUsedRound', 1, 'test-campaign');
+    });
+
+    // Bare 'rage_damage' is a LEGAL flat token of the automationExpressions table
+    // (:154, ordered after rage_damage_d6 :153) but NOT frenzy law (dice-only
+    // extra damage, both disk descriptions) → mid-lv value '4' → loud decline.
+    it("bare 'rage_damage' flat token → console.error, zero contribution, no roll, no stamp", async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const r = await buildAutomationBonusesStep().handler(ctxWithExpr('rage_damage'));
+      // resolves to flat '4' (lv20 rage_damage) — dice-shape guard rejects pre-roll.
+      expect(r.data.formula).toBe('1d8+5 plus 4');
+      expect(r.data.rolls).toEqual([8]);
+      expect(r.data.total).toBe(13);
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('unrecognized frenzy expression: "rage_damage"'));
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('zero contribution, latch untouched'));
+    });
+
+    // #1348 loud-not-silent: a future misauthored token neither the dice roller
+    // nor the token table knows must scream at first cast, not leak damage silently.
+    it('unknown future token → loud decline, zero contribution, latch untouched', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const r = await buildAutomationBonusesStep().handler(ctxWithExpr('frenzy_bonus'));
+      expect(r.data.formula).toBe('1d8+5 plus 4');
+      expect(r.data.total).toBe(13);
+      expect(r.data.rolls).toEqual([8]);
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('unrecognized frenzy expression: "frenzy_bonus"'));
+    });
+  });
 });

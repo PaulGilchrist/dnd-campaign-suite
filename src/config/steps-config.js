@@ -90,11 +90,10 @@ export const WIZARD_STEPS = [
     step: 6,
     title: 'Class',
     component: WizardStepClass,
-    getProps: ({ formData, errors, allClassesData, classSubtypes, ruleset, onInputChange }) => ({
+    getProps: ({ formData, errors, allClassesData, ruleset, onInputChange }) => ({
       formData,
       errors,
       allClassesData,
-      classSubtypes,
       ruleset,
       onInputChange,
     }),

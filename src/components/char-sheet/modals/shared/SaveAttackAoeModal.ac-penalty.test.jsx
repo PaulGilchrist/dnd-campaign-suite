@@ -67,7 +67,6 @@ vi.mock('../../../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { addEntry } from '../../../../services/ui/logService.js';
-import { parseAcPenaltyClause } from '../../../encounter/MonsterCardHelpers.js';
 
 const GREEN = monstersData.find(m => m.index === 'adult-green-dragon');
 const MIASMA = GREEN.legendary_actions.find(a => a.name === 'Noxious Miasma');
@@ -79,7 +78,11 @@ function spyRandom(seq) {
 }
 afterEach(() => randomSpy?.mockRestore());
 
-function renderMiasma(acPenaltyClause = parseAcPenaltyClause(MIASMA.save_effect)) {
+// Literal clause bytes (MA-lane canon: consumers pin literals, never restate
+// the parse). Derived from helper law MonsterCardHelpers.js:228 applied to the
+// disk save_effect data-locked at owner lane MonsterCardHelpers.ac-penalty.test.js:19,41
+// ("−2 penalty to AC" → value:2). Living truth-table: that owner lane.
+function renderMiasma(acPenaltyClause = { effect: 'ac_penalty', value: 2 }) {
   return render(
     <SaveAttackAoeModal
       action={MIASMA}
@@ -143,7 +146,9 @@ describe('MA-0115 Noxious Miasma ac_penalty grant', () => {
   });
 
   it.each([
-    ['successful CON save with clause present', [0.99, 0.99, 0.99, 0.99], parseAcPenaltyClause(MIASMA.save_effect)],
+    // Literal clause bytes — same derivation as renderMiasma above (owner lane:
+    // MonsterCardHelpers.ac-penalty.test.js:19).
+    ['successful CON save with clause present', [0.99, 0.99, 0.99, 0.99], { effect: 'ac_penalty', value: 2 }],
     ['failed save but null clause (every other row)', [0.01, 0.01, 0.01, 0.01], null],
   ])('grants nothing on %s: no te, no expiry, no AC Penalty log', async (_label, rolls, clause) => {
     spyRandom(rolls);

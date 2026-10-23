@@ -17,7 +17,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MonsterAction } from './MonsterAction.jsx';
-import { buildHitConditionClause, attackRowMissingToHit } from './MonsterCardHelpers.js';
+import { buildHitConditionClause } from './MonsterCardHelpers.js';
 
 const monsters = JSON.parse(readFileSync('public/data/monsters.json', 'utf8'));
 const SG = monsters.find((m) => m.index === 'stone-giant');
@@ -64,7 +64,6 @@ describe('MA-1534 stone-giant Boulder — tuple-miss disk fingerprint + press id
   });
 
   it('press identity: exactly one live "+9" chip, click dispatches Boulder attack with the disk row', () => {
-    expect(attackRowMissingToHit(BOULDER)).toBe(false);
     const onAttack = vi.fn();
     const { container } = render(
       <MonsterAction

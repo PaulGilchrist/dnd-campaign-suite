@@ -8,6 +8,16 @@ vi.mock('../../../services/automation/index.js', () => ({
 
 import * as automation from '../../../services/automation/index.js';
 import WeaponKindMasteryModal from './WeaponKindMasteryModal.jsx';
+import { resetWeaponsCache } from './weapon-kind-mastery-cache.js';
+
+// XSS posture of the sp-body sink (WeaponKindMasteryModal.jsx:61):
+// payload.description is built by weaponKindMasteryHandler.applySelections (:46)
+// from a hard-coded template interpolating checkbox-picked weapon names sourced
+// from /data/equipment.json (trusted authored catalog). This is sanctioned
+// trusted-content-from-disk HTML (same verified class as the ~40 sibling sinks
+// audited in fix#17; cf. damageReductionHandler.js:272 <strong>) — no sanitizer
+// is needed today and none is faked here. If this lane ever carries user-editable
+// prose, DOMPurify must be added at the sink first.
 
 const mockPlayerStats = {
   name: 'Fighter1',
@@ -62,6 +72,7 @@ describe('WeaponKindMasteryModal — result state', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetWeaponsCache();
     automation.applyWeaponKindMastery.mockResolvedValue({
       type: 'popup',
       payload: {
@@ -78,12 +89,49 @@ describe('WeaponKindMasteryModal — result state', () => {
 
     await selectAndApply();
 
-    expect(screen.getByText(RESULT_DESCRIPTION)).toBeInTheDocument();
+    // The result copy is injected into the modal body via dangerouslySetInnerHTML
+    // (WeaponKindMasteryModal.jsx:61) — pin the raw innerHTML of that exact
+    // container, not just that the words appear somewhere in the document.
+    const body = document.querySelector('.sp-modal .sp-body');
+    expect(body).not.toBeNull();
+    expect(body.innerHTML).toBe(RESULT_DESCRIPTION);
+    expect(body.textContent).toBe(RESULT_DESCRIPTION);
     // selection UI is gone, replaced by Done
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+  });
+
+  it('renders markup in the result description as live HTML (sanctioned sp-body sink)', async () => {
+    // Markup-bearing shape matching sibling automation_info handlers
+    // (e.g. damageReductionHandler.js:272 wraps values in <b>/<strong>).
+    // A plain-text mock cannot discriminate this sink; this payload can:
+    // if the component ever swapped to a children render, the <b> would show
+    // as escaped literal text and both structural assertions below go red.
+    automation.applyWeaponKindMastery.mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Weapon Mastery',
+        description: 'Weapon kinds set to: <b>Battleaxe, Club</b>. Mastery properties will be available when attacking with these weapons.',
+      },
+    });
+    renderWithWeapons();
+    await waitForWeapons();
+
+    await selectAndApply();
+
+    const body = document.querySelector('.sp-modal .sp-body');
+    // innerHTML keeps the tag structure verbatim (set, not escaped)
+    expect(body.innerHTML).toMatch(/^Weapon kinds set to: <b>Battleaxe, Club<\/b>\. Mastery properties will be available when attacking with these weapons\.$/);
+    // markup is interpreted: a real <b> element exists with the picked names
+    const bold = body.querySelector('b');
+    expect(bold).not.toBeNull();
+    expect(bold.textContent).toBe('Battleaxe, Club');
+    // text axis: no escaped tag noise leaks into the visible text
+    expect(body.textContent).toBe('Weapon kinds set to: Battleaxe, Club. Mastery properties will be available when attacking with these weapons.');
+    expect(body.textContent).not.toContain('<b>');
   });
 
   it('calls onClose when Done is clicked in the result state', async () => {

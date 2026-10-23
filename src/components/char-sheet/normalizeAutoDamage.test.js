@@ -142,6 +142,51 @@ describe('normalizeAutoDamage', () => {
     });
   });
 
+  // fix#202-migrated from the excised standalone block (ex 'defaults missing fields
+  // to safe defaults'): the minimal payload above still carries name/formula/
+  // damageType — this pins the true zero-input floor: payload {} transports every
+  // token as undefined (toEqual drops undefined keys) yet every || default still
+  // lands and nothing throws (autoDamageSchool '' vs undefined-name is the
+  // discriminating byte, source :176).
+  it('empty payload {} lands the full default shape with every token undefined', () => {
+    const { attack, ctx } = normalizeAutoDamage({}, false, makePlayerStats());
+
+    expect(attack).toEqual({ weaponType: 'weapon', properties: [], isHordeBreaker: false });
+    expect(ctx).toEqual({
+      hit: true,
+      isCrit: false,
+      isAutoCrit: false,
+      isNatural20: false,
+      targetName: null,
+      isBonusActionAttack: false,
+      overchannelActive: false,
+      overchannelUseCount: 0,
+      overchannelSpellLevel: 1,
+      sneakDice: 0,
+      autoDamageSource: true,
+      empoweredEvocationModifier: 0,
+      isCantrip: false,
+      metamagicHeighten: false,
+      metamagicTwinTarget: null,
+      autoDamageSchool: '',
+      isOpportunityAttack: false,
+    });
+  });
+
+  it.each([
+    // fix#202-migrated from the excised standalone block (ex 'detects unarmed
+    // strike weaponType' + its ex null-playerStats twin): unarmed is NAME-derived
+    // (source :183, before any registry lookup), so the token survives both an
+    // empty registry and null playerStats — the default-weapon and registry-win
+    // arms above cover neither combination.
+    { label: 'empty registry', stats: () => makePlayerStats({ attacks: [] }) },
+    { label: 'null playerStats', stats: () => null },
+  ])('unarmed weaponType is name-derived — survives $label', ({ stats }) => {
+    const autoDamage = { name: 'Unarmed Strike', formula: '1d4', damageType: 'bludgeoning' };
+
+    expect(normalizeAutoDamage(autoDamage, false, stats()).attack.weaponType).toBe('unarmed');
+  });
+
   it.each([
     { isCrit: false, isAutoCrit: false, critFlags: { isCrit: false, isAutoCrit: false, isNatural20: false } },
     { isCrit: true, isAutoCrit: false, critFlags: { isCrit: true, isAutoCrit: true, isNatural20: true } },
@@ -191,6 +236,18 @@ describe('normalizeAutoDamage', () => {
       auto: { name: 'Spiritual Weapon: Move & Attack', formula: '1d8+4', damageType: 'Force', autoDamageSchool: 'evocation', attackType: 'spell' },
       attacks: [{ name: 'Spiritual Weapon', weaponType: 'spell', attackType: 'spell', school: 'evocation', properties: [] }],
       expected: { name: 'Spiritual Weapon: Move & Attack', damage: '1d8+4', damageType: 'Force', weaponType: 'weapon', attackType: 'spell', school: 'evocation', properties: [], type: 'spell', isHordeBreaker: false },
+      ctxIsBonusActionAttack: false,
+    },
+    // fix#202-migrated from the excised standalone block (ex 'returns attack and
+    // ctx objects from a valid autoDamage payload'): popup school is an INDEPENDENT
+    // SP-112 token — it rides onto the attack even when attackType is absent, so
+    // attack.attackType/attack.type stay undefined (source :123/:126 ||-fallbacks
+    // hit nothing: the registry entry supplies neither token either).
+    {
+      label: 'SP-112: popup school rides without attackType — type stays absent',
+      auto: { name: 'Longsword', formula: '1d8+3', damageType: 'slashing', autoDamageSchool: 'evocation' },
+      attacks: [{ name: 'Longsword', weaponType: 'weapon', properties: [] }],
+      expected: { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', weaponType: 'weapon', school: 'evocation', properties: [], isHordeBreaker: false },
       ctxIsBonusActionAttack: false,
     },
   ])('attack lookup: $label', ({ auto, attacks, expected, ctxIsBonusActionAttack }) => {

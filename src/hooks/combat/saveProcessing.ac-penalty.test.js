@@ -66,7 +66,6 @@ vi.mock('../../services/rules/effects/expirationQueue.js', () => ({
 }));
 
 import { processSaveRoll } from './saveProcessing.js';
-import { parseAcPenaltyClause } from '../../components/encounter/MonsterCardHelpers.js';
 import monstersData from '../../../public/data/monsters.json';
 
 const campaignName = 'test-campaign';
@@ -84,7 +83,11 @@ const miasmaContext = {
     autoDamageFormula: '2d6',
     autoDamageDamageType: 'Poison',
     saveConditions: [],
-    acPenaltyClause: parseAcPenaltyClause(MIASMA.save_effect),
+    // Literal clause bytes (MA-lane canon: consumers pin literals, never restate
+    // the parse). Derived from helper law MonsterCardHelpers.js:228 applied to the
+    // disk save_effect data-locked at owner lane MonsterCardHelpers.ac-penalty.test.js:41
+    // ("−2 penalty to AC" → value:2). Living truth-table: that owner lane.
+    acPenaltyClause: { effect: 'ac_penalty', value: 2 },
 };
 
 async function resolveSave(context, success, roll) {

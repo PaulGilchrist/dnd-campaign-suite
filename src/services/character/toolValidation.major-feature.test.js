@@ -11,7 +11,7 @@
 // - toolValidation.limits.test.js — bg/class/feat limit aggregation and validateTools overflow/
 //   Skilled math with NO Fighter majors; bg+major accumulation is delegated to this file.
 // - toolValidation.parsing.test.js (#2063), .services.test.js (#2064), .test.js (#2065) —
-//   regex parsing and getToolsByCategory/computeSkilledToolUsage lanes, untouched here.
+//   regex parsing and getToolsByCategory lanes (computeSkilledToolUsage retired with its dead export), untouched here.
 // Disk honesty: Fighter (Battle Master + Champion decoy), background Artisan, and equipment rows
 // are verbatim public/data/{2024/classes,2024/backgrounds,equipment}.json. Disk sweep: Battle
 // Master's Student of War (lv3, choose 1 from 17 Artisan's Tools + choose 1 skill) is the only

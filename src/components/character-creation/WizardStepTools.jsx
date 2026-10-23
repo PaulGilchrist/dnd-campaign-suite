@@ -42,27 +42,8 @@ function WizardStepTools({ stepNumber, formData, errors, onToolToggle, toolLimit
         // Use the total skilledUsesUsed from skillLimits (computed by service including both skills and tools)
         const skilledUsesUsed = skillLimits?.skilledUsesUsed || 0;
 
-        // Compute how many of those are from tools specifically (for display)
-        const categoryLimits = toolLimits?.categoryLimits || new Map();
-        const toolsByCategory = {};
-        toolCategories.forEach(cat => {
-            const toolsInCat = allTools.filter(t => t._category === cat);
-            toolsByCategory[cat] = new Set(toolsInCat.map(t => t.name));
-        });
-
-        let categoryCovered = 0;
-        for (const [category, limit] of categoryLimits) {
-            const selectedInCategory = tools.filter(t =>
-                !isPlaceholder(t) && toolsByCategory[category]?.has(t)
-            ).length;
-            categoryCovered += Math.min(selectedInCategory, limit);
-        }
-
-        const userSelectedTools = tools.filter(t => !isPlaceholder(t));
-        const toolsFromSkilled = Math.max(0, userSelectedTools.length - categoryCovered);
-
-        return { used: skilledUsesUsed, toolsFromSkilled, available: skilledUsesAvailable };
-    }, [toolLimits, skillLimits, allTools, toolCategories, tools, isPlaceholder]);
+        return { used: skilledUsesUsed, available: skilledUsesAvailable };
+    }, [toolLimits, skillLimits]);
 
     useEffect(() => {
         const loadTools = async () => {

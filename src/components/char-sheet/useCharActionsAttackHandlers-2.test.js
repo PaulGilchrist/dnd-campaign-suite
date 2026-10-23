@@ -300,6 +300,12 @@ describe('useCharActionsAttackHandlers — chooser terminal handlers', () => {
                 description: `${playerName} uses Brutal Strike on Longsword — Forceful Blow + Hamstring Blow`,
             });
             expect(deps.setModalState).toHaveBeenCalledWith({ recklessAttackModal: null });
+            // Migrated unique arm from brutalGate's folded arms-on-confirm test
+            // (pass #322 rec, fix#226 no-gap standard): positive args-pin that
+            // buildCtx receives the threaded attack — the roll pin below cannot
+            // catch a mutant that calls buildCtx(wrongObject) because the mock
+            // ignores args and resolves this same ctx either way.
+            expect(deps.buildCtx).toHaveBeenCalledWith(attack);
 
             await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith(attack.name, 6, ctx));
             // CLA-044 sticky safety: whatever survives the settled lane is stale.

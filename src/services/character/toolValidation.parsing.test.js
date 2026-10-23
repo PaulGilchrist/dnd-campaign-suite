@@ -8,7 +8,7 @@
 //   aggregation; here only the parse contracts, no fetch involved.
 // - .major-feature.test.js (#2062) — 'Tool: ' prefix row extraction (applyMajorFeatureGrants)
 //   is owned there, not here.
-// - .services.test.js (#2064) — getToolsByCategory / computeSkilledToolUsage units.
+// - .services.test.js (#2064) — getToolsByCategory units (computeSkilledToolUsage lane retired with its dead export).
 // - .test.js (#2065) — normalizeCategory direct-unit lane (null/''/whitespace-only);
 //   here normalization is pinned only through parse outputs.
 // Disk honesty: fixtures are verbatim public/data/2024/{backgrounds,classes,feats}.json

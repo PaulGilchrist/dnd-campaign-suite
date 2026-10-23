@@ -3,7 +3,7 @@
 // span click → useCharActionsBaseActions invoked with the component's props/mocks →
 // observable popup + runtime-store write. All handleGrappleAction internals
 // (already-grappled guard, contest resolution, monk-Dex, JoAT/advantage stacking,
-// STR-mod fallbacks, log text) are owned by useCharActionsBaseActions.test.js and
+// STR-mod fallbacks, log text) are owned by useCharActionsGrappleAction.test.js and
 // useCharActionsBaseActions.grapple-contest-math.test.js; the Grapple-clickable-span
 // contract is owned by CharActions.baseActions.test.jsx.
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';

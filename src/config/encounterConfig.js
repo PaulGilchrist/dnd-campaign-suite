@@ -35,7 +35,8 @@ export const ENCOUNTER_CONFIG = {
     //  regardless of party size — a fight that's "2 monsters per adventurer" is
     //  equally punishing for a party of 4 or 6.
     //
-    //  Effective XP = totalMonsterXP / multiplier. If effectiveXP >= the threshold,
+    //  Effective XP = totalMonsterXP * multiplier (see EncounterBuilder.jsx:254).
+    //  If effectiveXP >= the threshold,
     //  the encounter meets that difficulty. See DMG p.82 for the raw-count table.
     //
     //  Common ratios:
@@ -93,8 +94,9 @@ export const ENCOUNTER_CONFIG = {
 
    // ---------------------------------------------------------------------------
    //  Difficulty Ratios
-   //  After dividing totalMonsterXP by the multiplier, the label is determined by
-   //  the ratio of effectiveXP to the medium threshold for the party's levels.
+   //  After multiplying totalMonsterXP by the multiplier (encounterGenerator.js:44),
+   //  the label is determined by the ratio of effectiveXP to the medium threshold
+   //  for the party's levels.
    //
    //    Easy:    ratio < easyMax       (default < 0.5)
    //    Medium:  easyMax <= ratio < mediumMax  (0.5 - 0.99)
