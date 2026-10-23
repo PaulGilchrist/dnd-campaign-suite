@@ -205,7 +205,7 @@ describe('prepareSpellCast — modifiedSpell transform face (byte diffs, stamps,
     expect(spell).toStrictEqual(snapshot);                           // input purity
     expect(result.metaCtx).toStrictEqual({ slotLevel: 3, oldConcentrationSpell: null, shouldSetConcentration: false, slotConsumed: true, freeCastUsed: false });
     expect(setRuntimeValue.mock.calls).toEqual([[WIZARD, 'spell_slots_level_3', 2, CAMPAIGN]]); // full write census: slot pay only
-    expect(getRuntimeValue).toHaveBeenCalledWith(WIZARD, '_War_Gods_Blessing_active'); // quirk: 2-arg read, campaignName NOT plumbed
+    expect(getRuntimeValue).toHaveBeenCalledWith(WIZARD, '_War_Gods_Blessing_active', CAMPAIGN); // unified tier (owner unify call): reads carry campaignName like their write peers
     expect(addEntry).not.toHaveBeenCalled();
 
     // golden unguarded-deref row (#1360 form): automation absent entirely — plain copy, slotless refusal, no crash

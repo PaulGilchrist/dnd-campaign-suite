@@ -240,6 +240,7 @@ function makeWrapper(mockSetPopupHtml, popupHtmlValue = null) {
 }
 
 // Render CharActions with a fresh rollDamage mock wired through useLoggedDiceRoll.
+// Returns the rollDamage spy plus unmount so cleanup lanes can tear the tree down.
 async function renderWithDiceRoll(mockSetPopupHtml, popupHtmlValue = null) {
   const mockRollDamage = vi.fn();
   useLoggedDiceRoll.mockReturnValue({
@@ -247,8 +248,8 @@ async function renderWithDiceRoll(mockSetPopupHtml, popupHtmlValue = null) {
     rollDamage: mockRollDamage, rollSkillCheck: vi.fn(),
     rollAbilityCheck: vi.fn(), quickRollPlayerSave: vi.fn(),
   });
-  await renderWithWrapper(<CharActions playerStats={createStats()} />, makeWrapper(mockSetPopupHtml, popupHtmlValue));
-  return mockRollDamage;
+  const view = await renderWithWrapper(<CharActions playerStats={createStats()} />, makeWrapper(mockSetPopupHtml, popupHtmlValue));
+  return { rollDamage: mockRollDamage, unmount: view.unmount };
 }
 
 function flush() {
@@ -354,7 +355,7 @@ describe('CharActions damage-type-choice popup flow', () => {
 
   it('damage-type-choice rolls the chosen type, latches usedKey, and clears the popup', async () => {
     const mockSetPopupHtml = vi.fn();
-    const mockRollDamage = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
+    const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
     const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
 
     dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
@@ -371,7 +372,7 @@ describe('CharActions damage-type-choice popup flow', () => {
 
   it('damage-type-skip clears the popup without rolling', async () => {
     const mockSetPopupHtml = vi.fn();
-    const mockRollDamage = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
+    const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
     const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
 
     dispatchCustomEvent('damage-type-skip');
@@ -385,13 +386,33 @@ describe('CharActions damage-type-choice popup flow', () => {
 
   it('ignores damage-type-choice when no damage_type_choice popup is active', async () => {
     const mockSetPopupHtml = vi.fn();
-    const mockRollDamage = await renderWithDiceRoll(mockSetPopupHtml);
+    const { rollDamage: mockRollDamage } = await renderWithDiceRoll(mockSetPopupHtml);
 
     dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
     dispatchCustomEvent('damage-type-skip');
     await flush();
 
     expect(mockRollDamage).not.toHaveBeenCalled();
+    expect(mockSetPopupHtml).not.toHaveBeenCalled();
+  });
+
+  // Leak pin (run2 #5, test-maintain-bugs.md:82): pre-fix the choice/skip
+  // listeners were registered without effect cleanup, so after unmount a stale
+  // closure survived on window and a click re-rolled the dead popup's bonus
+  // damage. Cleanup now tears both listeners down at unmount.
+  it('stops responding to damage-type-choice/skip after unmount (no stale-closure re-roll)', async () => {
+    const mockSetPopupHtml = vi.fn();
+    const { rollDamage: mockRollDamage, unmount } = await renderWithDiceRoll(mockSetPopupHtml, choicePopup);
+    const { setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+
+    unmount();
+
+    dispatchCustomEvent('damage-type-choice', { chosenType: 'Radiant' });
+    dispatchCustomEvent('damage-type-skip');
+    await flush();
+
+    expect(mockRollDamage).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
     expect(mockSetPopupHtml).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,10 @@ import { isDivineSmite } from './spellUtils.js';
 
 export function getInspiringSmitePassives(playerStats) {
     const passives = (() => {
-        const x = playerStats.automation?.passives;
+        // Apex guard (#204-class): `?.` on playerStats routes a nullish apex into the file's
+        // OWN loud arm below — decline is throw, never a fabricated pool (fix#179 refuse-
+        // no-fabricated-values); an absent apex is the same data hole as absent passives.
+        const x = playerStats?.automation?.passives;
         if (x == null) { console.error('[inspiringSmiteService] Missing array:', x); throw new Error('Expected array, got ' + x); }
         return x;
     })();

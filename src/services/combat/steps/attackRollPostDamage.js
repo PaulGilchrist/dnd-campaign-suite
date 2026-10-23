@@ -1,4 +1,4 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled } from '../../dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../../encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -163,13 +163,55 @@ export function buildOverchannelStep() {
     handler: async (ctx) => {
       const dicePerLevel = Math.max(2, ctx.overchannelUseCount);
       const totalDice = dicePerLevel * ctx.overchannelSpellLevel;
-      const r = rollExpression(`${totalDice}d12`);
+      const costFormula = `${totalDice}d12`;
+      const r = rollExpression(costFormula);
       if (r) {
         const cs = await loadCombatSummary(ctx.campaignName);
         const app = applyDamageToTarget(cs, ctx.playerStats.name, r.total, ['Necrotic'], { campaignName: ctx.campaignName, characters: null, ignoreResistance: true, attackerName: ctx.playerStats.name });
-        addEntry(ctx.campaignName, { type: 'roll', characterName: ctx.playerStats.name, rollType: 'overchannel-damage', name: 'Overchannel', formula: `${totalDice}d12`, rolls: r.rolls, total: r.total, modifier: r.modifier, damageType: 'Necrotic', targetName: ctx.playerStats.name, finalDamage: app?.finalDamage, note: 'Overchannel self-damage (ignores resistance/immunity)' }).catch((e) => { console.error("[damagePipeline] Error:", e); });
+        addEntry(ctx.campaignName, { type: 'roll', characterName: ctx.playerStats.name, rollType: 'overchannel-damage', name: 'Overchannel', formula: costFormula, rolls: r.rolls, total: r.total, modifier: r.modifier, damageType: 'Necrotic', targetName: ctx.playerStats.name, finalDamage: app?.finalDamage, note: 'Overchannel self-damage (ignores resistance/immunity)' }).catch((e) => { console.error("[damagePipeline] Error:", e); });
+        return { data: {} };
       }
-      return { data: {} };
+      // #1044-attack-twin no-free-ride (fix#70 recipe mirrored to the attack lane):
+      // rollBaseDamage (attackRollDamageCalc.js :85-88) already maximized the base dice
+      // upstream and every rider step since has stacked totals onto ctx — a cost-roll
+      // null that still returned { data: {} } here fired 'damage:ready' and let
+      // proceedToDamage land the maximized bonus with ZERO necrotic self-damage paid
+      // (public/data/2024/classes.json Wizard lv14: "take 2d12 Necrotic damage per level
+      // of spell slot immediately after casting"). Clean seam to strip: re-roll the BASE
+      // formula with the same crit-aware dispatcher rollBaseDamage would have used
+      // without overchannel (:88 — overchannel beats crit upstream, so a refused
+      // overchannel hands back the crit-doubled base it suppressed, never a plain
+      // roll). Loud-reject console.error + playbook §5 refusal log (a skip MUST log).
+      // No latch burns — overchannel is neither sorcery-point nor once-per-turn; the
+      // escalating overchannelUseCount is owned upstream by computeOverchannel.
+      // Base re-roll null (only a mutated ctx.formula can — the maximized roll
+      // succeeded upstream) — nothing honest to hand proceedToDamage → fix#69
+      // null = abort (actionPipeline.js:36 breaks the chain; { data: {} } would continue it).
+      console.error(`[attackRollPostDamage] Overchannel cost roll failed (${costFormula}) — refusing uncosted maximized bonus`);
+      const base = ctx.isCrit ? rollExpressionDoubled(ctx.formula) : rollExpression(ctx.formula);
+      addEntry(ctx.campaignName, {
+        type: 'automation',
+        characterName: ctx.playerStats.name,
+        automationType: 'overchannel_refused',
+        abilityName: 'Overchannel',
+        note: 'overchannel_refused',
+        reason: `cost roll failed (${costFormula})`,
+        description: base
+          ? `Overchannel refused (cost roll failed: ${costFormula}) — maximized bonus stripped, attack lands at base dice for ${base.total}. No necrotic self-damage rolled.`
+          : `Overchannel refused (cost roll failed: ${costFormula}) and base damage (${ctx.formula}) could not be rolled — attack aborted, no damage applied.`,
+        timestamp: Date.now(),
+      }).catch((e) => { console.error("[attackRollPostDamage:log-error]", e); });
+      if (!base) return null;
+      return {
+        data: {
+          formula: ctx.formula,
+          total: base.total,
+          rolls: base.rolls,
+          modifier: base.modifier,
+          overchannelActive: false,
+          overchannelRefused: true,
+        },
+      };
     },
   };
 }

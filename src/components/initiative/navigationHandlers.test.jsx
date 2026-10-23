@@ -29,6 +29,10 @@
 // as a natural double-step dedupe (mirrors the next lane's re-advance guard); prev's
 // standalone no-turn-end-pass test folded into CLA-198 prev (non-wrap) + round-decrement
 // (wrap) lanes; prev's two early-return guards (disabled / null summary) merged into one test.
+//
+// #868 FLIP (round-1 rewind floor): the pinned "complete no-op" is now the lawful
+// initiative_rewind_refused arm in navigationHandlers.js — refusal log exact-bytes + still
+// zero state writes; legal steps additionally pinned refusal-log-free (addEntry not called).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createNextCreatureHandler, createPreviousCreatureHandler } from './navigationHandlers.js';
 import * as initiativeService from '../../services/encounters/initiativeService.js';
@@ -36,6 +40,7 @@ import * as unbreakableMajesty from '../../services/combat/auras/unbreakableMaje
 import * as expirations from '../../services/rules/effects/expirations.js';
 import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import storage from '../../services/ui/storage.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     getNextCreatureName: vi.fn(),
@@ -65,6 +70,12 @@ vi.mock('../../services/ui/storage.js', () => ({
         getProperty: vi.fn(),
         setProperty: vi.fn(),
     },
+}));
+
+// #868 FLIP: the round-1 rewind floor is no longer a silent no-op — navigationHandlers
+// refuses it with one campaign-log entry (fix#79 refusal family). Zero-network maintained.
+vi.mock('../../services/ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 describe('navigationHandlers.js', () => {
@@ -297,6 +308,8 @@ describe('navigationHandlers.js', () => {
 
             expect(storage.set).not.toHaveBeenCalled();
             expect(setActiveCreatureName).not.toHaveBeenCalled();
+            // Disabled arm stays silent — the greyed button is the acknowledgment (no log spam).
+            expect(addEntry).not.toHaveBeenCalled();
 
             vi.clearAllMocks();
             makePrevious({ combatSummaryRef: { current: null } })();
@@ -305,6 +318,7 @@ describe('navigationHandlers.js', () => {
             expect(setActiveCreatureName).not.toHaveBeenCalled();
             expect(setCombatSummary).not.toHaveBeenCalled();
             expect(initiativeService.getPreviousCreatureName).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('BUG CLA-198: applies round-scoped turn start effects on NON-wrap previous steps too, once per creature', async () => {
@@ -331,6 +345,8 @@ describe('navigationHandlers.js', () => {
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Alice', campaignName, 1);
             // BUG CLA-307: rewinding never runs the turn-END condition removal pass.
             expect(expirations.applyTurnEndConditionRemoval).not.toHaveBeenCalled();
+            // Legal within-round back-step (creatures[index-1]) — no refusal feedback leaks.
+            expect(addEntry).not.toHaveBeenCalled();
 
             // Re-stepping onto a creature whose gate key already matches is gated — no double tick
             vi.clearAllMocks();
@@ -366,18 +382,30 @@ describe('navigationHandlers.js', () => {
             expect(unbreakableMajesty.clearPerRoundMajestyTrackers).toHaveBeenCalledWith('Charlie', campaignName, 2);
             // BUG CLA-307: a wrap rewind is still not a real turn end — no turn-END pass.
             expect(expirations.applyTurnEndConditionRemoval).not.toHaveBeenCalled();
+            // Round 3 → 2 wrap is a LEGAL rewind — no refusal feedback on valid steps.
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('should be a complete no-op when a round-decrementing step hits the round-1 floor', () => {
+        it('#868 FLIP: refuses loudly at the round-1 floor — exact refusal log, still zero state writes', async () => {
             roundRef.current = 1;
             initiativeService.getPreviousCreatureName.mockReturnValue({
                 newActiveName: 'Charlie',
                 roundDecrement: true,
             });
 
-            makePrevious({ activeCreatureName: 'Alice' })();
+            await makePrevious({ activeCreatureName: 'Alice' })();
 
-            // Guard returns before any persistence or UI update — zero writes, not just round.
+            // No-silent-no-op law (fix#79 refusal family): the floor click acknowledges
+            // itself with exactly ONE refused-log byte, <feature>_refused convention.
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, {
+                type: 'automation',
+                automationType: 'initiative_rewind_refused',
+                characterName: 'Alice',
+                description: 'Initiative rewind refused — at_start_of_round_1: round 1 is the first round, there is no earlier turn to rewind to.',
+            });
+            // The refusal arm still writes NOTHING else — pointer, round, effects untouched
+            // (there is no round-0 last creature to rewind onto; NO-CLOCK: no time moves).
             expect(storage.set).not.toHaveBeenCalled();
             expect(setCombatSummary).not.toHaveBeenCalled();
             expect(setActiveCreatureName).not.toHaveBeenCalled();

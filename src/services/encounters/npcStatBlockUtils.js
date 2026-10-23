@@ -124,7 +124,9 @@ export function npcToMonsterFormat(npc) {
     subtype: null,
     alignment: 'Unaligned',
     armor_class: buildArmorClass(npc),
-    hit_points: npc.hitPoints || '',
+    // fix#90 zero-is-data / fix#147 discriminator: 0 HP is lawful (destruction-target,
+    // corpse rows; MonsterCardBody.jsx:158 renders it verbatim). ?? honors it; '' only for absent.
+    hit_points: npc.hitPoints ?? '',
     hit_dice: npc.hitDice || '',
     speed: npc.speed || { walk: '30 ft.' },
     initiative_details: buildInitiativeDetails(npc.initiativeBonus),
@@ -132,7 +134,11 @@ export function npcToMonsterFormat(npc) {
     ability_score_modifiers: abMods,
     saving_throws: buildSavingThrows(npc.savingThrowBonuses || {}),
     skills: buildSkillBonuses(npc.skillBonuses || {}),
-    senses: { passive_perception: 10 + (abMods.wis || 0) },
+    // fix#90 zero-is-data / fix#147 discriminator: a wis modifier of 0 must pass through
+    // the finite branch, not a falsy chain. ?? was rejected here: NaN (absent/junk wis
+    // score) would render 'NaN' on the card, so absent guards to the rules-default 10
+    // explicitly while every finite value — including 0 — is honored.
+    senses: { passive_perception: 10 + (Number.isFinite(abMods.wis) ? abMods.wis : 0) },
     languages: '',
     ...buildDefenseFields(npc),
     challenge_rating: null,

@@ -298,13 +298,28 @@ function sleepStagingForAction(spellInfo, action) {
 // MA-0248: authored staged paralysis row (Ancient Silver Dragon Paralyzing
 // Breath) — failed saves stage the ladder inside the picker (MA-0068 staged
 // shape: Incapacitated → turn-END repeat save → Paralyzed, repeating each
-// turn with auto-success after paralyzed_minutes×10 rounds, CLA-334). NOT
-// sleep staging — paralysis never wakes on damage, so it rides its own
-// paralyzing_staged te (paralyzingBreathService, MA-0102 sibling shape).
-// Byte-inert flag default.
+// turn until a repeat save succeeds). #755 duration-owner adjudication: the
+// retired CLA-334 minutes×10 recipe is GONE from this producer — the disk
+// authors paralyzed_minutes:1 and ≥1 minute is COMBAT-SCOPED per the
+// no-timers duration policy: never a fabricated round countdown; the ladder
+// matures only at initiative seams (turn-END repeat saves) and the escalation
+// ends at the combat boundaries (new initiative roll / short rest / long
+// rest). Canonical combat-scoped verdict: until:'combat' (fix#127
+// execution/helpers.js:83 and fix#108 spiritualWeaponService.js:107 mirror;
+// zoneDurationClock.js:102) — expirationQueue honors the sentinel:
+// sweepCombatScopedExpirations drains until:'combat' entries at those seams,
+// entries without it are NEVER touched (expirationQueue.js:118). The
+// authored minutes ride verbatim as paralyzedMinutes — picker display copy,
+// never re-counted into rounds here. OWNER QUEUE (downstream honor, outside
+// this modal): SaveAttackAoeModal.jsx:816 and paralyzingBreathService.js:161
+// still default the te/expiry stamp to numeric `?? 10`; required bytes there
+// are `rounds: Infinity, until: 'combat'` (fix#127 canonical). This producer
+// never manufactures a clock. NOT sleep staging — paralysis never wakes on
+// damage, so it rides its own paralyzing_staged te (paralyzingBreathService,
+// MA-0102 sibling shape). Byte-inert flag default.
 function stagedParalysisForAction(spellInfo, action) {
   if (spellInfo || !action?.staged_paralysis) return null;
-  return { paralyzedRounds: (Number(action.staged_paralysis.paralyzed_minutes) || 1) * 10 };
+  return { until: 'combat', paralyzedMinutes: Number(action.staged_paralysis.paralyzed_minutes) || 1 };
 }
 
 // MA-0079: authored push clause (Adult Bronze Dragon Repulsion Breath —

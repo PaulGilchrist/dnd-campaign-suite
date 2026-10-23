@@ -214,6 +214,15 @@ describe('CharReactions - Basic Rendering', () => {
     // positive spell-row rendering; this file owns the negative for both branches
     // of buildReactions: empty eligible-name set (filter leg) and null
     // spellAbilities (guard leg).
+    // fix#148 arms: the guard leg only guarded the container — the inner spells
+    // array was dereferenced unguarded (CharReactions.jsx:144 `.spells.length`).
+    // Persisted disk census shows slot-only containers (test-campaign
+    // HeroesFeastBard.json carries spell_slots_level_1..9 with no spells key), and
+    // the store round-trip can carry { spells: null }. absent/null/[] all reach the
+    // same UI outcome (section omitted, reactions list intact) — silent guard per
+    // fix#40 precedent and the house `?.spells` treatment (spellSectionUtils.js:53,
+    // formatUtils.js:19). The populated arm proves the optional-chain is not
+    // vacuous: real rows still list through the same guard.
     it.each([
         ['no reaction spells are configured', () => {
             getReactionSpellNames.mockReturnValue(new Set());
@@ -224,6 +233,24 @@ describe('CharReactions - Basic Rendering', () => {
                 playerStats: { ...basePlayerStats, spellAbilities: null },
             });
         }],
+        ['spellAbilities.spells is null', () => {
+            return createProps({
+                playerStats: { ...basePlayerStats, spellAbilities: { ...basePlayerStats.spellAbilities, spells: null } },
+            });
+        }],
+        ['spellAbilities has no spells key (disk shape)', () => {
+            const slotOnlyContainer = Object.fromEntries(
+                Object.entries(basePlayerStats.spellAbilities).filter(([key]) => key !== 'spells'),
+            );
+            return createProps({
+                playerStats: { ...basePlayerStats, spellAbilities: slotOnlyContainer },
+            });
+        }],
+        ['spellAbilities.spells is empty', () => {
+            return createProps({
+                playerStats: { ...basePlayerStats, spellAbilities: { ...basePlayerStats.spellAbilities, spells: [] } },
+            });
+        }],
     ])('does not render the reaction spells section when %s', (_label, buildProps) => {
         render(<CharReactions {...buildProps()} />);
         expect(screen.queryByText('Range')).not.toBeInTheDocument();
@@ -231,6 +258,38 @@ describe('CharReactions - Basic Rendering', () => {
         expect(screen.queryByText('Hellish Rebuke')).not.toBeInTheDocument();
         // Reactions list still renders — the guard hides only the spell table.
         expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+    });
+
+    it('still lists reaction spells when the spells array is populated (non-vacuous guard)', () => {
+        // Same section-absence assertions inverted: the exact spell row that the
+        // null/absent/[] arms above omit must appear byte-identical in label when
+        // a legal spells array is present, proving fix#148's ?. chain passes
+        // populated paths through unchanged.
+        render(<CharReactions {...createProps()} />);
+        expect(screen.getByText('Range')).toBeInTheDocument();
+        expect(screen.getByText('Shield')).toBeInTheDocument();
+        expect(screen.getByText('Hellish Rebuke')).toBeInTheDocument();
+        expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+    });
+
+    it('renders the reactions list identically for null, absent, and empty spells arrays (#1348 same-empty-state)', () => {
+        // Identical-input, differing-output discrimination: all three absent-ish
+        // shapes must produce the SAME DOM as each other (section omitted), not
+        // just "not the populated DOM".
+        const shapes = [
+            { ...basePlayerStats.spellAbilities, spells: null },
+            (() => Object.fromEntries(Object.entries(basePlayerStats.spellAbilities).filter(([key]) => key !== 'spells')))(),
+            { ...basePlayerStats.spellAbilities, spells: [] },
+        ];
+        const containers = shapes.map((spellAbilities, i) => {
+            const { container } = render(<CharReactions {...createProps({ playerStats: { ...basePlayerStats, spellAbilities } })} key={i} />);
+            return container;
+        });
+        expect(containers[0].textContent).toBe(containers[1].textContent);
+        expect(containers[1].textContent).toBe(containers[2].textContent);
+        // And that shared DOM is the section-omitted state.
+        expect(containers[0].textContent).not.toContain('Range');
+        expect(containers[0].textContent).toContain('Opportunity Attack:');
     });
 
     // Dynamic-grant negative (appendDynamicReactions, CharReactions.jsx:82):

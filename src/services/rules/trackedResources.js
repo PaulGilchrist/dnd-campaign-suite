@@ -280,17 +280,25 @@ function addDivineResources(resources, ctx) {
   addClericDivineResources(resources, ctx)
 }
 
-function addRangerPrimalResources(resources, { playerStats, wis }) {
+function addRangerPrimalResources(resources, { playerStats, wis, is2024 }) {
   const isRanger = playerStats.class?.name === 'Ranger'
-  const maxNV = isRanger && playerStats.level >= 14 ? Math.max(wis?.bonus || 0, 1) : 0
-  resources.naturesVeilUses = { current: maxNV, max: maxNV }
+  // fix#134 (#1533): RULESET-GATED — Tireless/"Nature's Veil" rows exist
+  // ONLY in the 2024 disk (public/data/2024/classes.json Ranger class_levels
+  // lv10 'Tireless' / lv14 "Nature's Veil"). 5e/classes.json Ranger lv10 is
+  // 'Hide in Plain Sight'/'Natural Explorer' and lv14 is 'Favored Enemy'/
+  // 'Vanish' — no row either edition-side, so a 5e Ranger seeds 0
+  // (version-guard house idiom, featsOfChaosResources :373). Consumers that
+  // honor the seeded pool: tirelessHandler.js/naturesVeilHandler.js read
+  // playerStats._trackedResources[key].current as the authoritative max.
+  const naturesVeilAllowed = isRanger && is2024 && playerStats.level >= 14
+  resources.naturesVeilUses = wisGatedPool(naturesVeilAllowed, wis)
 
   const favoredEnemyValue = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)?.favored_enemy || 0
   const favoredEnemyMax = Math.max(1, favoredEnemyValue)
   resources.favoredEnemyUses = { current: favoredEnemyMax, max: favoredEnemyMax }
 
-  const maxTU = isRanger && playerStats.level >= 10 ? Math.max(wis?.bonus || 0, 1) : 0
-  resources.tirelessUses = { current: maxTU, max: maxTU }
+  const tirelessAllowed = isRanger && is2024 && playerStats.level >= 10
+  resources.tirelessUses = wisGatedPool(tirelessAllowed, wis)
 }
 
 // WIS-gated use pool: max(WIS bonus, 1) when allowed, else 0.
@@ -299,17 +307,40 @@ function wisGatedPool(allowed, wis) {
   return { current: value, max: value }
 }
 
-function addDruidPrimalResources(resources, { playerStats, features, wis }) {
+function addDruidPrimalResources(resources, { playerStats, features, wis, is2024 }) {
   const maxWS = features?.maxWildShapeUses || 0
   resources.wildShapeUses = { current: maxWS, max: maxWS }
 
   const isDruid = playerStats.class?.name === 'Druid'
-  const maxNR = isDruid ? Math.floor(playerStats.level / 2) : 0
+  // fix#134 (#1532): half-level recovery is ROUNDING-RULESET-AWARE per the
+  // disk rows — 5e/classes.json Druid 'Land' lv2 'Natural Recovery':
+  // "combined level that is equal to or less than half your druid level
+  // (rounded up)" -> CEIL (lv5 = 3; old floor seeded 2, captured pre-fix).
+  // 2024/classes.json 'Circle of the Land' lv6: "combined levels equal to or
+  // less than half your Druid level" — no round-up clause; integer slot
+  // levels <= half -> FLOOR (lv7 = 3). Grant level per row (5e lv2,
+  // 2024 lv6): below grant seeds 0.
+  const nrLevel = playerStats.level || 0
+  const maxNR = isDruid
+    ? (is2024
+      ? (nrLevel >= 6 ? Math.floor(nrLevel / 2) : 0)
+      : (nrLevel >= 2 ? Math.ceil(nrLevel / 2) : 0))
+    : 0
   resources.naturalRecoverySlots = { current: maxNR, max: maxNR }
 
   const isMoonCircle = isDruid && matchesPatron(playerStats, ['Circle of the Moon'])
   resources.moonlightStepUses = wisGatedPool(isMoonCircle, wis)
 
+  // #1532-b DISPROVEN-BYTE-CITED: disk law for cosmicomenUses IS the WIS
+  // gate — 2024/classes.json Circle of the Stars lv6 'Cosmic Omen': "You can
+  // use this Reaction a number of times equal to your Wisdom modifier
+  // (minimum of once), and you regain all expended uses when you finish a
+  // Long Rest" + automation.uses_expression "WIS modifier". The ONE-per-Long-
+  // Rest law governs a DIFFERENT key: exactly one omen roll arms
+  // cosmicOmenEffect each Long Rest (restRules-longRest.js
+  // resetStarMapOnLongRest :519-535). Capping this seed to 1 would
+  // contradict the disk; consumers honor max (cosmicOmenHandler.js :11-31,
+  // TrackedResourceInput.jsx max={max} :13).
   const isStarsCircle = isDruid && matchesPatron(playerStats, ['Circle of the Stars'])
   resources.cosmicomenUses = wisGatedPool(isStarsCircle && playerStats.level >= 6, wis)
 

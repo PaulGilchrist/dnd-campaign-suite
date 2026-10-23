@@ -206,6 +206,13 @@ describe('normalizeAutoDamage', () => {
     { label: 'evocation + INT 3 → 3', features: EMPOWERED_EVOCATION, intMod: 3, school: 'evocation', expected: 3 },
     { label: 'school match is case-insensitive', features: EMPOWERED_EVOCATION, intMod: 3, school: 'Evocation', expected: 3 },
     { label: 'zero INT modifier → 0', features: EMPOWERED_EVOCATION, intMod: 0, school: 'evocation', expected: 0 },
+    // fix#121 signed law (damageCalculation.js:34-40, quoting 2024/classes.json:13502
+    // "add your Intelligence modifier"): the modifier is ADDED signed — negatives apply.
+    // The old `empEvocIntMod > 0` gate floored them to +0, inflating weak-caster damage.
+    { label: 'evocation + INT -1 → -1 (signed subtract, not floored)', features: EMPOWERED_EVOCATION, intMod: -1, school: 'evocation', expected: -1 },
+    { label: 'evocation + INT -5 → -5 (deep negative stays signed)', features: EMPOWERED_EVOCATION, intMod: -5, school: 'evocation', expected: -5 },
+    { label: 'negative INT outside evocation → 0 (school gate unchanged)', features: EMPOWERED_EVOCATION, intMod: -2, school: 'abjuration', expected: 0 },
+    { label: 'negative INT without the feature → 0', features: [], intMod: -1, school: 'evocation', expected: 0 },
   ])('empowered evocation: $label', ({ features, intMod, school, expected }) => {
     postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue(features);
     postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(intMod);
@@ -217,6 +224,48 @@ describe('normalizeAutoDamage', () => {
     );
 
     expect(ctx.empoweredEvocationModifier).toBe(expected);
+  });
+
+  // fix#158 coupling idiom: what the resolver DISPLAYS equals what it WRITES —
+  // ctx.empoweredEvocationModifier must be the selector's signed bytes verbatim
+  // (postCastRiderService.js:217-220 returns intAbility?.bonus, negative included).
+  // Pre-fix capture: INT 8 (mod -1) evocation wrote ctx.empoweredEvocationModifier:0
+  // — a '+0' silent buff inflating the damage lane by |mod| versus the spell lane
+  // (damageCalculation.js:77 `!== 0`).
+  it('INT 8 (-1) evocation rides the ctx signed: no clamp byte, no +0 artifact', () => {
+    postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue(EMPOWERED_EVOCATION);
+    postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(-1);
+
+    const ps = makePlayerStats();
+    const { attack, ctx } = normalizeAutoDamage(
+      { name: 'Fire Bolt', formula: '1d10', damageType: 'Fire', autoDamageSchool: 'evocation' },
+      false,
+      ps,
+    );
+
+    expect(ctx.empoweredEvocationModifier).toBe(-1); // signed subtract rides on
+    expect(ctx.empoweredEvocationModifier).not.toBe(0); // floored clamp byte killed
+    // display-vs-written equality: written value === selector bytes for THIS character
+    expect(ctx.empoweredEvocationModifier).toBe(postCastRiderService.getEmpoweredEvocationIntModifier(ps));
+    // this seam contributes a VALUE, never rewrites the formula term (append owner
+    // is the pipeline consumer / fix#121 spell bake) — so no '+0' or '- 0' artifact
+    // can leak anywhere on the normalized output.
+    expect(attack.damage).toBe('1d10');
+    expect(JSON.stringify({ ...ctx, playerStats: undefined })).not.toMatch(/[+]0(\b|[^.\d])/);
+  });
+
+  it('zero INT modifier stays inert: ctx 0 with no signed-term artifact', () => {
+    postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue(EMPOWERED_EVOCATION);
+    postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(0);
+
+    const { ctx } = normalizeAutoDamage(
+      { name: 'Fire Bolt', formula: '1d10', damageType: 'Fire', autoDamageSchool: 'evocation' },
+      false,
+      makePlayerStats(),
+    );
+
+    expect(ctx.empoweredEvocationModifier).toBe(0); // inert, not '-0'
+    expect(Object.is(ctx.empoweredEvocationModifier, -0)).toBe(false);
   });
 
   it('is neutral without playerStats (no registry lookup, no empowered evocation)', () => {

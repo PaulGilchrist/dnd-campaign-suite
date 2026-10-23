@@ -54,6 +54,14 @@ const SERVICE_HANDLED_SPELLS = new Set([
     'ray of enfeeblement',
     'hex',
     'command',
+    // fix#132 (#1483/#1472): disk rows BOTH rulesets carry
+    // automation.type 'healing_start_of_turn'; HANDLER_MAP registers the
+    // regenerate lane under key 'regenerate' (automation/index.js:614), so
+    // the unshielded :710 dispatch resolved NULL — slot paid, popup
+    // undefined, consumed-and-discarded, and the :311 -> :59
+    // applyRegenerateSpell arm sat structurally unreachable behind :710.
+    // Shielding routes disk-byte casts to the documented live service arm.
+    'regenerate',
 ]);
 
 async function handleRegenerate(spell, getTargetInfo, applyRegenerateSpell, playerStats, campaignName) {

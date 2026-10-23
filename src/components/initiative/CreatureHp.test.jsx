@@ -5,7 +5,8 @@
 //   lane census: NPC remote badge / summoned numeric / localhost editable / player static (jsx:69-129)
 //   current HP commit: onChange(name, parseInt(v)||0), negatives pass through (jsx:24)
 //   Enter key blurs → commits once (jsx:25-27)
-//   max HP commit: clamps current to new effective max, writes base max = value - aid - feast (jsx:40-50)
+//   max HP commit: onChange(name, clamped current, base max = value - aid - feast); prop is
+//     never mutated — #854 removed direct creature.maxHp/currentHp writes (frozen-pin below) (jsx:40-49)
 //   defaults: currentHp ?? 0, maxHp ?? 1 reflected in bytes (jsx:61-62)
 //   runtime aid/heroesFeast sum into effective max display + bloodied threshold (jsx:63-67)
 // NOT owned here (do not duplicate):
@@ -17,7 +18,7 @@
 //   npc badge it.each → kept (test 1); summoned → kept (test 2)
 //   npc commit it.each + negative passthrough + player commit it.each → consolidated (test 5);
 //     player commit rows dropped — same shared CurrentHpInput component as NPC lane
-//   max blur below current → strengthened to clamp/passthrough table + mutated bytes (test 7)
+//   max blur below current → strengthened to clamp/passthrough table + onChange payload + frozen-prop pin (test 7)
 //   player span / player static display → consolidated lane census (test 4)
 //   missing HP fallback x3 → consolidated (test 9)
 //   aid block: player-localhost span cut (same expression as remote byte, test 10);
@@ -120,15 +121,27 @@ describe('CreatureHp', () => {
         currentHp | expectedOnChange | label
         ${8}      | ${5}             | ${'clamps current down to new max'}
         ${3}      | ${3}             | ${'passes current through when still under new max'}
-    `('max HP blur commits $label', ({ currentHp, expectedOnChange }) => {
+    `('max HP blur commits $label via onChange(name, currentHp, baseMax) — never mutates the prop', ({ currentHp, expectedOnChange }) => {
         const creature = { ...npc, currentHp, maxHp: 10 };
         render(<CreatureHp {...props} creature={creature} />);
         const input = maxInput('Goblin');
         input.value = '5';
         fireEvent.blur(input);
-        expect(props.onChange).toHaveBeenCalledWith('Goblin', expectedOnChange);
-        expect(creature.maxHp).toBe(5);
-        expect(creature.currentHp).toBe(expectedOnChange);
+        expect(props.onChange).toHaveBeenCalledWith('Goblin', expectedOnChange, 5);
+        expect(creature.maxHp).toBe(10);
+        expect(creature.currentHp).toBe(currentHp);
+    });
+
+    it('#854 mutation-proof: max HP blur on a frozen creature prop does not throw and reports full payload', () => {
+        const frozen = Object.freeze({ ...npc, currentHp: 8, maxHp: 10 });
+        render(<CreatureHp {...props} creature={frozen} />);
+        const input = maxInput('Goblin');
+        input.value = '5';
+        expect(() => fireEvent.blur(input)).not.toThrow();
+        expect(props.onChange).toHaveBeenCalledTimes(1);
+        expect(props.onChange).toHaveBeenCalledWith('Goblin', 5, 5);
+        expect(frozen.currentHp).toBe(8);
+        expect(frozen.maxHp).toBe(10);
     });
 
     it('max HP commit subtracts runtime aid increases from base max', () => {
@@ -139,8 +152,8 @@ describe('CreatureHp', () => {
         expect(input.value).toBe('12');
         input.value = '10';
         fireEvent.blur(input);
-        expect(props.onChange).toHaveBeenCalledWith('Goblin', 7);
-        expect(creature.maxHp).toBe(5);
+        expect(props.onChange).toHaveBeenCalledWith('Goblin', 7, 5);
+        expect(creature.maxHp).toBe(7);
     });
 
     it('undefined HP defaults to 0 current / 1 max across lanes', () => {

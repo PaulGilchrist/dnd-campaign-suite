@@ -79,7 +79,9 @@ function RecklessAttackModal({ playerStats: _playerStats, campaignName: _campaig
                 return [...prev, effectName];
             });
         } else {
-            setSelectedEffects(prev => prev[0] === effectName ? [] : [effectName]);
+            // Radio onChange never refires on an already-checked radio, so the
+            // deselect leg of the old ternary was unreachable (fix#228 family).
+            setSelectedEffects([effectName]);
         }
     };
 

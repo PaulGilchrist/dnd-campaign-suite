@@ -75,6 +75,11 @@ describe('MA-1000 disk lock + rider forward through the modal seams', () => {
     const opts = buildSaveOptions(homunculusBite());
     expect(opts.saveDc).toBe(12);
     expect(opts.saveType).toBe('con');
+    // fix#172 family: rider-only save leg + authored dc_success:"none" after
+    // save_type (MA-0030 placement) — the transport's honest zero-success face
+    // replaces the MV-20 fabricated half copy.
+    expect(homunculusBite().dc_success).toBe('none');
+    expect(Object.keys(homunculusBite()).indexOf('dc_success')).toBe(Object.keys(homunculusBite()).indexOf('save_type') + 1);
     expect(opts.saveConditions).toEqual(['poisoned']);
     expect(opts.saveMargin).toEqual({ failsBy: 5, also: 'unconscious' });
     expect(opts.autoDamageSecondaryFormula).toBeNull(); // no secondary-damage decoys on the rider leg

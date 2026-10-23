@@ -1,5 +1,5 @@
 // @maintained-by-ai
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { applyMaxHpPassives, getCarryingCapacity } from './carryingCapacity.js'
 
 // Unit canon for carryingCapacity.js itself. abilityCalc2024.test.js pins the
@@ -55,6 +55,17 @@ describe('applyMaxHpPassives', () => {
     ]), 100)).toBe(100)
 
     expect(applyMaxHpPassives({}, 100)).toBe(100)
+  })
+
+  it('tolerates a nullish playerStats apex with silent passthrough of hitPoints (#204-class apex guard)', () => {
+    // Posture: tolerant-quiet, mirroring the hasPassiveEffect exemplar (automationPassives.js:19)
+    // and greatWeaponFightingApplies (greatWeaponFighting.js:42, fix#204): absent apex folds
+    // to the SAME neutral as absent automation ({}, 100 -> 100 above) — never a log, never a throw.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(applyMaxHpPassives(undefined, 100)).toBe(100)
+    expect(applyMaxHpPassives(null, 55)).toBe(55)
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })
 

@@ -48,9 +48,10 @@
 //     now dispatches abilityCalc.getCarryingCapacity through the extended bundle
 //     (rules-core.js:23), so the goldens carry the lane's stub values 150/999 and the
 //     previously-dead getCarryingCapacity mocks at :129/:144 are LIVE trunk collaborators.
-//   • 🔴 rules.js:379-391 no-op ternaries in getAbilities/getHitPoints facades
-//     (identical branches; owned rules.test.js facade lane — cited here because
-//     goldens traverse the wrappers at :545/:552/:553).
+//   • ✅ FIXED #1256 rules.js:379-391 no-op ternaries in getAbilities/getHitPoints
+//     facades (identical branches) COLLAPSED to direct getSubModules-routed calls;
+//     facade lane rules.test.js:244+ keeps the dispatch pins (goldens traverse the
+//     wrappers at :545/:552/:553).
 //   • Golden unguarded-deref: rules-initiative.js:8-9 dexAbility.bonus throws on
 //     degenerate rosters; the graph traverses :556 with the full six-ability mock
 //     rows (console untouched). Reorder mutant (:556 before :545) is killed twice

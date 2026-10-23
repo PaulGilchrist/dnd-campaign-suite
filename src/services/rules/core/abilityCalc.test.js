@@ -169,20 +169,33 @@ describe('abilityCalc (5e)', () => {
       expect(str2.bonus).toBe(0); // floor((11-10)/2) = 0
     });
 
-    it('adds proficiency to proficient skills and doubles proficiency for expertise', async () => {
+    it('applies the RAW expertise law: doubled proficiency ONLY where proficient (4-quadrant)', async () => {
       const result = await getAbilities(makeStats({
-        skillProficiencies: ['Athletics'],
+        level: 5, // proficiency +3
+        skillProficiencies: ['Athletics', 'Stealth', 'Sleight of Hand'],
+        expertise: ['Stealth', 'Acrobatics'], // Acrobatics: illegal expertise mark (not proficient)
       }));
-      const athletics = result.find(a => a.name === 'Strength').skills.find(s => s.name === 'Athletics');
-      expect(athletics.bonus).toBe(6); // 3 (str bonus) + 3 (proficiency)
-      const acrobatics = result.find(a => a.name === 'Dexterity').skills.find(s => s.name === 'Acrobatics');
-      expect(acrobatics.bonus).toBe(2); // not proficient: bonus only
+      const skill = (abilityName, name) =>
+        result.find(a => a.name === abilityName).skills.find(s => s.name === name);
 
-      const result2 = await getAbilities(makeStats({
-        expertise: ['Stealth'],
-      }));
-      const stealth = result2.find(a => a.name === 'Dexterity').skills.find(s => s.name === 'Stealth');
-      expect(stealth.bonus).toBe(5); // 2 + 3 + 3 (impl grants expertise doubling even without proficiency flag)
+      // [quadrant, ability, skill, expected bonus] — STR +3, DEX +2, WIS +1
+      const table = [
+        ['expert + proficient', 'Dexterity', 'Stealth', 8],       // 2 + 3 + 3 (doubled prof) — working path intact
+        ['expert, NOT proficient', 'Dexterity', 'Acrobatics', 2], // ability bonus only — RAW: expertise requires proficiency first
+        ['proficient only', 'Dexterity', 'Sleight of Hand', 5],   // 2 + 3 prof
+        ['neither', 'Wisdom', 'Perception', 1],                    // bonus only
+        ['proficient only', 'Strength', 'Athletics', 6],           // 3 + 3 prof
+      ];
+      for (const [quadrant, abilityName, name, expected] of table) {
+        expect(skill(abilityName, name).bonus, `${quadrant}: ${name}`).toBe(expected);
+      }
+
+      // DC-20 comparison pin (phantom-bonus falsifier): d20 showing 15 on the
+      // expert-marked-but-not-proficient Acrobatics — RAW 15 + 2 = 17 FAILS DC 20;
+      // pre-fix phantom (15 + 2 + 3 = 20) would have falsely SUCCEEDED.
+      const d20 = 15;
+      expect(d20 + skill('Dexterity', 'Acrobatics').bonus).toBe(17); // fail
+      expect(d20 + skill('Dexterity', 'Stealth').bonus).toBe(23);    // legit expert succeeds
     });
 
     it('treats missing class.saving_throws as no save proficiencies', async () => {

@@ -11,6 +11,20 @@ import { breakHypnoticPatternOnDamage } from '../../services/rules/features/hypn
 import { sweepNewCombatClocks } from '../../services/rules/effects/zoneDurationClock.js'
 
 /**
+ * Player HP edits live in the runtime store (server-first); a revival across 0
+ * also clears the death-save state and any pending prompt.
+ */
+function writePlayerHp(creatureName, newValue, oldHp, campaignName) {
+    setRuntimeValue(creatureName, 'currentHitPoints', newValue, campaignName)
+    if (oldHp <= 0 && newValue > 0) {
+        setRuntimeValue(creatureName, 'deathSaves', [false, false, false], campaignName)
+        setRuntimeValue(creatureName, 'deathFailures', [false, false, false], campaignName)
+        setRuntimeValue(creatureName, 'isDead', 0, campaignName)
+        clearDeathSavePrompt(campaignName, creatureName)
+    }
+}
+
+/**
  * Creates creature operation handlers for the initiative component.
  */
 export function createCreatureHandlers({
@@ -25,33 +39,32 @@ export function createCreatureHandlers({
     numOfNpc,
     _isLocalhost,
 }) {
-    const handleCreatureHpChange = function handleCreatureHpChange(creatureName, newValue) {
+    const handleCreatureHpChange = function handleCreatureHpChange(creatureName, newValue, newMaxHp) {
         if (!combatSummary) return
         const creature = combatSummary.creatures.find(c => c.name === creatureName)
         if (!creature) return
 
         const isPlayer = creature.type === 'player'
+        // #854: max-HP edits report (name, clampedCurrentHp, newBaseMax) from CreatureHp's
+        // MaxHpInput — third arg present ⇒ base max is being re-stamped on the card.
+        const isMaxEdit = typeof newMaxHp === 'number'
         const oldHp = isPlayer ? (getRuntimeValue(creature.name, 'currentHitPoints') ?? 0) : creature.currentHp
         const delta = newValue - oldHp
-        if (delta === 0) return
+        if (delta === 0 && !isMaxEdit) return
 
         // SP-069: a GM HP-input reduction is adjudicated damage — Hypnotic Pattern
         // ends for the affected creature if it takes any damage (per-creature, logged).
-        if (delta < 0) {
+        // A max-HP edit clamping current down is NOT damage — skip the break lane.
+        if (delta < 0 && !isMaxEdit) {
             breakHypnoticPatternOnDamage(creatureName, campaignName)
         }
 
         if (isPlayer) {
-            setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName)
-            if (oldHp <= 0 && newValue > 0) {
-                setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName)
-                setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName)
-                setRuntimeValue(creature.name, 'isDead', 0, campaignName)
-                clearDeathSavePrompt(campaignName, creature.name)
-            }
+            writePlayerHp(creatureName, newValue, oldHp, campaignName)
         }
         else {
             creature.currentHp = newValue
+            if (isMaxEdit) creature.maxHp = newMaxHp
             // SP-114: GM setting a spell-summon's HP to 0 makes it disappear.
             if (oldHp > 0 && newValue <= 0 && creature.summonedBy && creature.summonSource === 'spell') {
                 vanishSummonAtZeroHp(creature, combatSummary, campaignName)

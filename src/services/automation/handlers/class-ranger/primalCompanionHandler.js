@@ -5,7 +5,7 @@ import storage from '../../../ui/storage.js';
 import cloneDeep from 'lodash/cloneDeep.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 import { getMonsterSaveBonuses } from '../../../encounters/encounterToInitiative.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
+import { rollExpression, rollD20 } from '../../../dice/diceRoller.js';
 
 export const BESTIAL_FURY_STRIKES_KEY = 'bestialFuryStrikes';
 export const BESTIAL_FURY_MARK_LATCH_KEY = '_BestialFury_markBonusRound';
@@ -195,7 +195,9 @@ function resolveCompanionInitiative(casterCreature) {
         initiativeValue = parseInt(casterCreature.initiative, 10) || 0;
     }
     const casterInitBonus = casterCreature?.initiativeBonus || 0;
-    return initiativeValue || (Math.floor(Math.random() * 20) + 1 + casterInitBonus);
+    // Canonical d20 lane (fix#169 recipe): companion initiative fallback
+    // rolls through diceRoller so global dice-seeding and the GM overlay see it.
+    return initiativeValue || (rollD20() + casterInitBonus);
 }
 
 export async function confirmPrimalCompanionSummon(action, playerStats, campaignName, selectedType) {

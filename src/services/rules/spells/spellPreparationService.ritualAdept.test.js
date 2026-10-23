@@ -67,9 +67,9 @@
 //     (unlimited RAW — absence of any _freeCastCount/_Ritual_Master_* write is
 //     asserted as total ledger silence instead). ritualCast strictness is `=== true`
 //     (:754/:844) — producer is the popup boolean, no non-boolean quirk test.
-//   - campaign-arity histogram: 2-arg reads (runtimeSelectionFreeCast :156/:159,
-//     activeBuffFreeCast :201) are the service's own shape, census living in
-//     resource-flow :428 — not duplicated here.
+//   - campaign-arity histogram: every read (runtimeSelectionFreeCast :156/:159,
+//     activeBuffFreeCast :201 included) now carries the explicit campaign tier
+//     (owner unify call); full census lives in resource-flow :428.
 //   - invocationCallOrder ledger (#1513 payment-before-log form): slotless faces
 //     assert ZERO setRuntimeValue calls of ANY kind — nothing reads, nothing pays,
 //     only the log ships.

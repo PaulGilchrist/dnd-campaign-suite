@@ -4,8 +4,9 @@
 // Dragon Wyrmling (actions[3], DC 13, authored 15-ft Cone range).
 // Covered here: row data lock (Object.keys exact, incl. absences), press
 // arms the SaveAttackAoeModal picker with the exact stagedParalysis contract
-// (stagedParalysisForAction ×10 rounds, CLA-334, MonsterCardModal.jsx:305)
-// and dc_success 'none' authored byte (its absence = 'half' default at
+// (stagedParalysisForAction combat-scoped until:'combat' verdict + authored
+// paralyzedMinutes verbatim — #755 retired the CLA-334 minutes×10 round
+// clock, MonsterCardModal.jsx:305) and dc_success 'none' authored byte (its absence = 'half' default at
 // resolveBlockSaveDcSuccess, MonsterCardModal.jsx:286 — the half-damage
 // leak this row must never inherit), ungated re-arm (no recharge authored),
 // zero inline save roll at press.
@@ -70,17 +71,29 @@ const runtime = vi.hoisted(() => {
     store,
     setRuntimeValue: vi.fn((k, p, v) => { store[`${k}.${p}`] = v; return Promise.resolve(); }),
     getRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
+    getAllStoreKeys: vi.fn(() => Object.keys(store)),
     useRuntimeValue: vi.fn((k, p) => store[`${k}.${p}`] ?? null),
   };
 });
+
+// The #755 sweeper-honor pins drive the REAL expirationQueue (canonical
+// until:'combat' sentinel); its clear side is recorded, not executed — the
+// ladder's te/condition removal bytes belong to the service lanes.
+const cleared = vi.hoisted(() => []);
+
+vi.mock('../../services/rules/effects/clearExpirationEffects.js', () => ({
+  clearExpirationEffects: (...args) => { cleared.push(args); },
+}));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: runtime.useRuntimeValue,
   setRuntimeValue: runtime.setRuntimeValue,
   getRuntimeValue: runtime.getRuntimeValue,
+  getAllStoreKeys: runtime.getAllStoreKeys,
 }));
 
 import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { processExpirationList, sweepCombatScopedExpirations } from '../../services/rules/effects/expirationQueue.js';
 
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 
@@ -135,6 +148,7 @@ const LADDER_PROSE = [
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
+  cleared.length = 0;
   aoeProps.current = null;
   aoeProps.onClose = null;
 });
@@ -169,7 +183,9 @@ const ANCIENT_ARMED = {
   rangeGateFt: 90,
   titleOverride: '90-ft Cone (GM positions tokens; selection advisory)',
   excludeNames: ['Ancient Silver Dragon 1'],
-  stagedParalysis: { paralyzedRounds: 10 },
+  // #755 stored-shape pin: combat-scoped verdict, NO numeric round count
+  // (the retired CLA-334 paralyzedRounds:10 output must never return).
+  stagedParalysis: { until: 'combat', paralyzedMinutes: 1 },
   ...ARMED_RIDERS_INERT,
 };
 
@@ -183,7 +199,8 @@ const WYRMLING_ARMED = {
   rangeGateFt: 15,
   titleOverride: '15-ft Cone (GM positions tokens; selection advisory)',
   excludeNames: ['Silver Dragon Wyrmling 1'],
-  stagedParalysis: { paralyzedRounds: 10 },
+  // #755 stored-shape pin (byte-twin): combat-scoped verdict, no numeric 10.
+  stagedParalysis: { until: 'combat', paralyzedMinutes: 1 },
   ...ARMED_RIDERS_INERT,
 };
 
@@ -255,5 +272,84 @@ describe('MA-1469 Silver Dragon Wyrmling Paralyzing Breath (byte-twin)', () => {
     // paralyzingBreathService — pinned in
     // SaveAttackAoeModal.staged-paralysis.test.jsx — so the flat spray never
     // governs the grant.
+  });
+});
+
+/* ─#755 no-timers duration-owner adjudication (⚠ POLICY fix) ─────────────
+ * The disk authors staged_paralysis.paralyzed_minutes:1 on both rows
+ * (≥1 minute ⇒ COMBAT-SCOPED). The retired CLA-334 minutes×10 producer
+ * output (paralyzedRounds:10) must never reappear; the armed contract is the
+ * until:'combat' verdict + authored minutes verbatim, and the REAL
+ * expirationQueue sweeper proves that shape honors the policy seams:
+ * • processExpirationList (expirationQueue.js:39-63) matures numeric round
+ *   clocks ONLY — the canonical rounds:Infinity entry never matures, the
+ *   retired rounds:10 clock matures at appliedRound+10 (contrast pin: the
+ *   exact fabricated-clock behavior the policy retired);
+ * • sweepCombatScopedExpirations (expirationQueue.js:123-138) drains
+ *   until:'combat' entries at the combat boundaries (new initiative roll via
+ *   initiative's clearAllExpirationEffects/sweepNewCombatClocks lane, short/
+ *   long rest via sweepRestClocks — #1348 combat-end clear); entries without
+ *   the marker are NEVER touched (expirationQueue.js:118) — legacy pin.
+ * Downstream stamping of rounds:Infinity + until:'combat' at the escalation
+ * (SaveAttackAoeModal.jsx:816 te default, paralyzingBreathService.js:161
+ * addExpiration) is OWNER QUEUED — cited in the producer comment; until it
+ * lands the te keeps a vestigial numeric stamp this producer never made.
+ */
+describe('#755 stagedParalysis duration-owner: combat-scoped shape, no round clock', () => {
+  it.each([
+    ['ancient-silver-dragon', 'Ancient Silver Dragon 1', CREATURES],
+    ['silver-dragon-wyrmling', 'Silver Dragon Wyrmling 1', WYRMLING_CREATURES],
+  ])('%s arms the picker with until:combat + paralyzedMinutes — retired x10 output stays dead', async (index, creatureName, creatures) => {
+    renderDragon(index, creatureName, creatures);
+    fireEvent.click(paralyzingBreathLink());
+    await waitFor(() => expect(aoeProps.current).toBeTruthy());
+    const staged = aoeProps.current.stagedParalysis;
+    expect(staged).toEqual({ until: 'combat', paralyzedMinutes: 1 });
+    // stored-shape pin: the numeric round key is ABSENT at the source — no
+    // consumer default can silently resurrect a 10-round clock from a value
+    // this producer manufactured (it publishes minutes only).
+    expect(Object.keys(staged).sort()).toEqual(['paralyzedMinutes', 'until']);
+    expect(staged.paralyzedRounds).toBeUndefined();
+  });
+
+  it('mid-combat persistence: canonical rounds:Infinity never matures at the old appliedRound+10 boundary (contrast: the retired rounds:10 clock did)', () => {
+    const caster = 'Ancient Silver Dragon 1';
+    const effects = [
+      { type: 'condition', condition: 'paralyzed' },
+      { type: 'remove_target_effect', effectKey: 'paralyzing_staged', source: caster, target: 'ElderPaladin' },
+    ];
+    // Retired producer/CLA-334 shape for contrast: armed at round 3 with the
+    // old paralyzedRounds:10, this DID auto-expire paralyzed at round 13 —
+    // the fabricated round countdown the no-timers policy retired.
+    const retired = [{ target: 'ElderPaladin', effects, appliedRound: 3, expiryRounds: 10 }];
+    expect(processExpirationList(retired, 13, caster, 'test-campaign', 'ElderPaladin').expiredCount).toBe(1);
+    // Canonical combat-scoped shape (#755 verdict): no round seam matures it.
+    const canonical = [{ target: 'ElderPaladin', effects, appliedRound: 3, expiryRounds: Infinity, until: 'combat' }];
+    for (const round of [13, 97, 9999]) {
+      const r = processExpirationList(canonical, round, caster, 'test-campaign', 'ElderPaladin');
+      expect(r.expiredCount).toBe(0);
+      expect(r.changed).toBe(false);
+    }
+    expect(cleared).toHaveLength(1); // only the retired-clock contrast cleared
+  });
+
+  it('combat-end clear (#1348 seams): sweepCombatScopedExpirations drains until:combat entries at a new initiative roll; unmarked legacy clocks are never swept', () => {
+    const caster = 'Ancient Silver Dragon 1';
+    const effects = [{ type: 'condition', condition: 'paralyzed' }];
+    runtime.store[`${caster}.pendingExpirations`] = [
+      { target: 'ElderPaladin', effects, appliedRound: 3, expiryRounds: Infinity, until: 'combat' },
+    ];
+    expect(sweepCombatScopedExpirations({ campaignName: 'test-campaign', ownerName: caster })).toBe(1);
+    expect(cleared).toEqual([[effects, 'ElderPaladin', caster, 'test-campaign']]);
+    expect(runtime.store[`${caster}.pendingExpirations`]).toEqual([]);
+    // Legacy numeric-rounds entry WITHOUT the marker: sweep honors byte-parity
+    // and never touches it (expirationQueue.js:118-119).
+    runtime.store[`${caster}.pendingExpirations`] = [
+      { target: 'Bandit 1', effects, appliedRound: 3, expiryRounds: 2 },
+    ];
+    cleared.length = 0;
+    expect(sweepCombatScopedExpirations({ campaignName: 'test-campaign', ownerName: caster })).toBe(0);
+    expect(cleared).toHaveLength(0);
+    expect(runtime.store[`${caster}.pendingExpirations`]).toHaveLength(1);
   });
 });

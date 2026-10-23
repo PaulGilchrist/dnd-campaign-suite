@@ -38,12 +38,17 @@ export default function useCharActionsEventListeners({
         };
     }, [setPopupHtml, setModalState]);
 
+    // Listeners are scoped to the popup's lifetime: symmetric cleanup (house
+    // idiom, same as every other effect in this file) guarantees that once the
+    // popup is dismissed (popupHtml becomes null) or the sheet unmounts, both
+    // listeners are gone — a stale closure can never re-roll a dead choice and
+    // reopening replaces the pair instead of stacking a second copy.
     useEffect(() => {
         if (popupHtml?.type === 'damage_type_choice') {
-            const handleChoice = (chosenType) => {
+            const handleChoice = (event) => {
                 const { bonusFormula, bonusRolls, bonusTotal, usedKey, currentRound, targetName, attackerName, name } = popupHtml;
                 const context = {
-                    damageType: chosenType,
+                    damageType: event.detail.chosenType,
                     targetName,
                     attackerName,
                 };
@@ -56,10 +61,12 @@ export default function useCharActionsEventListeners({
             const handleSkip = () => {
                 setPopupHtml(null);
             };
-            window.addEventListener('damage-type-choice', (e) => {
-                handleChoice(e.detail.chosenType);
-            });
+            window.addEventListener('damage-type-choice', handleChoice);
             window.addEventListener('damage-type-skip', handleSkip);
+            return () => {
+                window.removeEventListener('damage-type-choice', handleChoice);
+                window.removeEventListener('damage-type-skip', handleSkip);
+            };
         }
     }, [popupHtml, playerName, campaignName, rollDamage, setPopupHtml, setRuntimeValue]);
 

@@ -3,9 +3,10 @@
 // cantrip/school adjustments, class prepared rules, catalog population, sorting and
 // the feat/race fallback. Subclass-prerequisite, passive-gate and spell-thief
 // block/stolen list branches are owned by spellCalc-advanced.test.js (#1262).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSpellAbilities } from './spellCalc.js';
 import { getStore } from '../../../hooks/runtime/useRuntimeState.js';
+import classes from '../../../../public/data/classes.json';
 
 const ABILITIES = [
   { name: 'Intelligence', bonus: 4 },
@@ -176,6 +177,90 @@ describe('spellCalc', () => {
       expect(gnome.spellCastingAbility).toBe('Intelligence');
       expect(gnome.cantrips_known).toBe(1);
       expect(gnome.spells).toEqual([{ name: 'Minor Illusion', prepared: 'Always' }]);
+    });
+
+    // #1268 5e twin (mirrors fix#91 spellCalc2024.js bumpCounterIfTracked): the 5e
+    // disk census of public/data/classes.json shows 60/160 spellcasting rows carry NO
+    // spells_known key (Wizard/Druid/Paladin lv1-20) and 40/160 carry NO cantrips_known
+    // (Paladin/Ranger lv1-20). The race-trait lane used to `+=` straight onto those
+    // absent keys, seeding NaN — baked straight out on a Wizard host, masked on
+    // Druid/Paladin where addAllClassListSpells stamps null later. Post-fix the
+    // race-trait lane bumps ONLY tracked keys: absent + count>0 skips LOUD, absent + 0
+    // stays silent, tracked keys accumulate byte-intact (tracked-host lanes pinned above).
+    describe('#1268 twin: race-trait counters never seed NaN on untracked disk hosts', () => {
+      const diskLevels = (className) => classes.find(c => c.name === className).class_levels;
+      const diskHost = (className, level, race, castingAbility) => makePlayerStats({
+        level,
+        race,
+        spells: ['Magic Missile'],
+        class: {
+          name: className,
+          spell_casting_ability: castingAbility,
+          class_levels: diskLevels(className),
+        },
+      });
+
+      it('census: disk rows lack spells_known on Wizard/Druid/Paladin and cantrips_known on Paladin/Ranger', () => {
+        for (const name of ['Wizard', 'Druid', 'Paladin']) {
+          diskLevels(name).forEach((row, i) => {
+            expect('spells_known' in row.spellcasting, `${name} lv${i + 1}`).toBe(false);
+          });
+        }
+        for (const name of ['Paladin', 'Ranger']) {
+          diskLevels(name).forEach((row, i) => {
+            expect('cantrips_known' in row.spellcasting, `${name} lv${i + 1}`).toBe(false);
+          });
+        }
+      });
+
+      it('Wizard host: Tiefling lv3 spells_known loud-skips absent key, lv2 silent, never NaN; cantrips track', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const tiefling = { name: 'Tiefling', subrace: null };
+
+        const lv3 = getSpellAbilities([], diskHost('Wizard', 3, tiefling, 'Intelligence'));
+        expect(Number.isNaN(lv3.spells_known), 'lv3 spells_known must never be NaN').toBe(false);
+        expect(lv3.spells_known, 'untracked host keeps the key absent').toBeUndefined();
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"))).toBe(true);
+        // cantrips_known IS present on the Wizard disk row — tracked bump accumulates.
+        expect(lv3.cantrips_known).toBe(diskLevels('Wizard')[2].spellcasting.cantrips_known + 1);
+        // Always-prepared rows are the canonical record on the untracked counter.
+        expect(lv3.spells.map(s => [s.name, s.prepared])).toContainEqual(['Hellish Rebuke', 'Always']);
+        expect(lv3.spells.map(s => [s.name, s.prepared])).toContainEqual(['Thaumaturgy', 'Always']);
+
+        // lv2: no leveled grant gated in — absent-key arm stays silent.
+        errSpy.mockClear();
+        const lv2 = getSpellAbilities([], diskHost('Wizard', 2, tiefling, 'Intelligence'));
+        expect(Number.isNaN(lv2.spells_known)).toBe(false);
+        expect(lv2.spells_known).toBeUndefined();
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"))).toBe(false);
+        errSpy.mockRestore();
+      });
+
+      it('Paladin host: both counters absent — Tiefling bumps skip loud; class-list rule canonicalises spells_known to null', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const result = getSpellAbilities([], diskHost('Paladin', 3, { name: 'Tiefling', subrace: null }, 'Charisma'));
+        expect(Number.isNaN(result.cantrips_known)).toBe(false);
+        expect(result.cantrips_known).toBeUndefined();
+        expect(Number.isNaN(result.spells_known)).toBe(false);
+        // addAllClassListSpells stamps spells_known null (whole-list prepared) — the
+        // loud race-lane skip still fired before that canonicalisation.
+        expect(result.spells_known).toBeNull();
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'cantrips_known' absent"))).toBe(true);
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"))).toBe(true);
+        errSpy.mockRestore();
+      });
+
+      it('Ranger host: High Elf cantrip loud-skips untracked cantrips_known; tracked spells_known untouched silent', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const result = getSpellAbilities([], diskHost('Ranger', 5, { name: 'Elf', subrace: { name: 'High Elf' } }, 'Wisdom'));
+        expect(Number.isNaN(result.cantrips_known)).toBe(false);
+        expect(result.cantrips_known).toBeUndefined();
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'cantrips_known' absent"))).toBe(true);
+        // spells_known is tracked on Ranger disk rows and High Elf grants no leveled spell.
+        expect(result.spells_known).toBe(diskLevels('Ranger')[4].spellcasting.spells_known);
+        expect(errSpy.mock.calls.some(c => String(c[0]).includes("lineage counter 'spells_known' absent"))).toBe(false);
+        errSpy.mockRestore();
+      });
     });
 
     it('applies subclass bonus cantrips: Light pushes a row, Nature bumps the count', () => {

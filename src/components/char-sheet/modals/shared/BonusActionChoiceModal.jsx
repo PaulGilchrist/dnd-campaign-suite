@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { applyBonusActionChoice } from '../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 import '../../CharSheet.css';
@@ -46,13 +46,10 @@ function BonusActionChoiceModal({ action, options: optionsProp, playerStats, cam
         }
     };
 
-    useEffect(() => {
-        return () => {
-            setApplied(false);
-            setResult(null);
-            setSelected(null);
-        };
-    }, []);
+    // Removed (maintenance pass #177, ledger test-maintain-bugs.md:195): a cleanup-only
+    // useEffect that reset applied/result/selected on unmount. React 18+ silently ignores
+    // setState on unmounted components, and this effect registered no listeners or abort
+    // handles (fix#145 house law N/A), so the resets were pure post-unmount no-ops.
 
     if (applied && result) {
         return (

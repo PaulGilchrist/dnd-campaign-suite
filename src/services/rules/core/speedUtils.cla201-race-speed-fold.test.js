@@ -110,6 +110,19 @@ describe('applySpeedIncreasePassives (CLA-201)', () => {
         expect(() => applySpeedIncreasePassives({ name: 'Broken' })).toThrow(/passives.*Broken/);
         spy.mockRestore();
     });
+
+    it('throws a readable error when the playerStats apex itself is absent (#204-class apex guard, loud twin)', () => {
+        // Posture: loud — same file-owned console.error+throw arms as passives-missing above.
+        // Consumer rules.js:561 is pre-gated; only direct misuse reaches this arm.
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        expect(() => applySpeedIncreasePassives(undefined)).toThrow('Missing playerStats: applySpeedIncreasePassives');
+        expect(() => applySpeedIncreasePassives(null)).toThrow('Missing playerStats: applySpeedIncreasePassives');
+        expect(spy.mock.calls).toEqual([
+            ['rules: missing playerStats for speed passives'],
+            ['rules: missing playerStats for speed passives'],
+        ]);
+        spy.mockRestore();
+    });
 });
 
 describe('resolveHalfSpeedFeet (CLA-201)', () => {

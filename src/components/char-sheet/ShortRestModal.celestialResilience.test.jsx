@@ -67,6 +67,8 @@ vi.mock('../../services/automation/handlers/buffs/tempHpService.js', () => ({
 }));
 
 // Producer-faithful stub of the shared picker: checkbox rows toggle selection,
+// the toggle clamps at maxTargets and rows disable at the cap (mirrors the real
+// CreatureSelectionModal.jsx:50-58,88,101 so copy↔cap coupling is pinned here),
 // confirm stays disabled until something is selected, onConfirm receives the
 // selected NAMES array (CreatureSelectionModal.jsx:61-64,140).
 vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
@@ -74,7 +76,13 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
   function CreatureSelectionModalStub({ title, description, note, confirmLabel, onConfirm, onSkip, targets, maxTargets }) {
     const [selected, setSelected] = useState([]);
     const toggle = (name) =>
-      setSelected((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+      setSelected((prev) =>
+        prev.includes(name)
+          ? prev.filter((n) => n !== name)
+          : !maxTargets || prev.length < maxTargets
+            ? [...prev, name]
+            : prev
+      );
     return (
       <div data-testid="creature-selection-modal">
         <span data-testid="modal-title">{title}</span>
@@ -86,6 +94,7 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
             <input
               type="checkbox"
               checked={selected.includes(target.name)}
+              disabled={!!maxTargets && selected.length >= maxTargets && !selected.includes(target.name)}
               onChange={() => toggle(target.name)}
             />
             {target.name}
@@ -95,7 +104,7 @@ vi.mock('./modals/shared/CreatureSelectionModal.jsx', async () => {
           disabled={selected.length === 0}
           onClick={() => onConfirm(selected)}
         >
-          {confirmLabel || 'Confirm'}
+          {confirmLabel || 'Confirm'} ({selected.length})
         </button>
         {onSkip && <button onClick={onSkip}>Skip</button>}
       </div>
@@ -175,7 +184,10 @@ describe('ShortRestModal - Celestial Resilience', () => {
     await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant() });
 
     expect(screen.getByTestId('modal-title')).toHaveTextContent('Celestial Resilience');
-    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose up to 5 allies to gain temporary hit points from your Celestial Resilience.');
+    // Coupling pin (fix#158 single-source law): the description number is the
+    // SAME celestialResilienceModal.maxTargets the picker enforces — never a
+    // retyped literal. Disk source: classes.json automation.maxAllies.
+    expect(screen.getByTestId('modal-description')).toHaveTextContent('Choose up to 3 allies to gain temporary hit points from your Celestial Resilience.');
     expect(screen.getByTestId('modal-note')).toHaveTextContent('You gain 8 temporary hit points.');
     expect(screen.getByTestId('modal-note')).toHaveTextContent('Each selected ally gains 7 temporary hit points.');
     expect(screen.getByTestId('max-targets')).toHaveTextContent('3');
@@ -184,6 +196,56 @@ describe('ShortRestModal - Celestial Resilience', () => {
     expect(screen.getByRole('checkbox', { name: 'Ally1' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Ally2' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Ally3' })).toBeInTheDocument();
+  });
+
+  it.each([3, 5, 6])(
+    'description interpolates maxTargets=%i from the grant, matching the picker cap it advertises',
+    async (maxTargets) => {
+      renderModal();
+      const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+
+      await completeShortRest(applyShortRest, { celestialResilienceAllies: celestialGrant({ maxTargets }) });
+
+      expect(screen.getByTestId('modal-description')).toHaveTextContent(
+        `Choose up to ${maxTargets} allies to gain temporary hit points from your Celestial Resilience.`
+      );
+      expect(screen.getByTestId('max-targets')).toHaveTextContent(String(maxTargets));
+    }
+  );
+
+  it('cap-behavior pin: copy promises the cap and the picker enforces it — 4th selection at maxTargets=3 is blocked', async () => {
+    renderModal();
+    const { applyShortRest } = await import('../../services/rules/effects/restRules.js');
+
+    const grant = celestialGrant({
+      maxTargets: 3,
+      creatureTargets: [
+        { name: 'Ally1', type: 'player' },
+        { name: 'Ally2', type: 'npc' },
+        { name: 'Ally3', type: 'player' },
+        { name: 'Ally4', type: 'player' },
+      ],
+    });
+    await completeShortRest(applyShortRest, { celestialResilienceAllies: grant });
+
+    // Copy advertises the same 3 the payload enforces.
+    expect(screen.getByTestId('modal-description')).toHaveTextContent(/up to 3 allies/);
+
+    // Fill to the cap, then the 4th row is disabled and inert.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally1' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally2' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ally3' }));
+    const fourth = screen.getByRole('checkbox', { name: 'Ally4' });
+    expect(fourth).toBeDisabled();
+    fireEvent.click(fourth);
+
+    const confirmBtn = screen.getByRole('button', { name: /Grant Resilience/ });
+    expect(confirmBtn).toHaveTextContent('Grant Resilience (3)');
+    fireEvent.click(confirmBtn);
+    await flush();
+
+    expect(setTempHpMock).toHaveBeenCalledTimes(3);
+    expect(setTempHpMock).not.toHaveBeenCalledWith('Ally4', 7, mockCampaignName);
   });
 
   it('grants temp HP to exactly the selected allies, logs the ability_use, and completes once', async () => {

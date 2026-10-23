@@ -102,6 +102,66 @@ describe('SilenceModal', () => {
         expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     });
 
+    // fix#155 truth-law: the picker description must show the SAME radius the
+    // write side uses (silenceRadius zone write, refusal check, ability_use log)
+    // — never a hardcoded 20 while the flow casts a wider or narrower sphere.
+    describe('description radius is coupled to the write-side aoeRadius', () => {
+        const descriptionText = () => screen.getByText(/no sound can be created/).textContent;
+        const shownRadius = () => Number(descriptionText().match(/(\d+)-foot-radius/)[1]);
+
+        for (const radius of [5, 20, 30]) {
+            it(`displays the ${radius}-foot radius it will write, never a stale 20`, async () => {
+                const view = renderModal({ aoeRadius: radius });
+                expect(descriptionText()).toContain(`${radius}-foot-radius sphere`);
+                if (radius !== 20) {
+                    expect(descriptionText()).not.toContain('20-foot-radius');
+                }
+                selectTarget('Goblin1');
+                await confirm(1);
+
+                // Same-source coupling pin: displayed number == zone-written number
+                // == number in the ability_use log.
+                expect(shownRadius()).toBe(runtimeWrites('silenceRadius')[0][2]);
+                expect(logsOfType('ability_use')[0][1].description).toContain(`${radius}-foot-radius sphere`);
+                view.unmount();
+            });
+        }
+
+        it('prop absent: display default == write default (documented RAW 20-ft sphere)', async () => {
+            const view = renderModal({ aoeRadius: undefined });
+            expect(descriptionText()).toContain('20-foot-radius sphere');
+            selectTarget('Goblin1');
+            await confirm(1);
+
+            expect(shownRadius()).toBe(runtimeWrites('silenceRadius')[0][2]);
+            expect(runtimeWrites('silenceRadius')[0][2]).toBe(20);
+            expect(logsOfType('ability_use')[0][1].description).toContain('20-foot-radius sphere');
+            view.unmount();
+        });
+
+        it('refusal copy names the actual radius too (30-ft sphere, 42-ft outsider)', async () => {
+            // Center = Goblin1 @(2,2). Orc Warrior @(8,8): sqrt(72)*5 ≈ 42.4 ft > 30.
+            getCombatContext.mockResolvedValue({
+                players: [{ name: 'Wizard1', gridX: 1, gridY: 1 }],
+                creatures: [
+                    { name: 'Goblin1', gridX: 2, gridY: 2 },
+                    { name: 'Orc Warrior', gridX: 8, gridY: 8 },
+                ],
+            });
+            const view = renderModal({ aoeRadius: 30 });
+            selectTarget('Goblin1');
+            selectTarget('Orc Warrior');
+            await confirm(2);
+
+            const refusal = logsOfType('automation')[0][1];
+            expect(refusal.description).toContain('outside the 30-foot-radius sphere');
+            expect(refusal.description).not.toContain('20-foot-radius');
+            // 42.4 ft is inside 30? no — 42.4 > 30 so refusal stands.
+            expect(refusal.creatureName).toBe('Orc Warrior');
+            view.unmount();
+        });
+    });
+
     it('closes via Skip without touching any runtime state', () => {
         renderModal();
         fireEvent.click(screen.getByRole('button', { name: 'Skip' }));

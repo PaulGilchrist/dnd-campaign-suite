@@ -5,6 +5,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rollD20 } from '../../../dice/diceRoller.js';
 
 // CLA-310: Shadowy Dodge ("when a creature makes an attack roll against you")
 // reaction consumption gates. Attack-instance latch (_ShadowyDodge_appliedAttack_ts)
@@ -104,8 +105,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, APPLIED_ATTACK_KEY, identity, campaignName);
     await setRuntimeValue(playerName, USED_ROUND_KEY, currentRound, campaignName);
 
-    // Simulate disadvantage: roll second d20, take lower
-    const secondD20 = Math.floor(Math.random() * 20) + 1;
+    // Canonical d20 lane (fix#169 recipe): the disadvantage second die rolls
+    // through diceRoller so global dice-seeding and the GM overlay see it.
+    const secondD20 = rollD20();
     const finalD20 = Math.min(d20, secondD20);
     const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
 

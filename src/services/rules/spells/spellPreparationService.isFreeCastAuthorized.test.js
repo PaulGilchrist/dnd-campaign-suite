@@ -304,12 +304,12 @@ describe('isFreeCastAuthorized — default deny: bare boolean, REAL arity 5, syn
 });
 
 describe('isFreeCastAuthorized — gate #1 runtime selections: Natural Recovery list and Bewitching latch', () => {
-  it('authorizes listed spells only, case-exact; 2-arg default-tier read is the pre-existing pattern', () => {
+  it('authorizes listed spells only, case-exact; explicit campaign-tier read (owner unify call — family-wide arity asymmetry closed)', () => {
     mem.set('naturalRecoveryFreeCast', ['Fireball', 'Detect Thoughts']);
     expect(isFreeCastAuthorized(CASTER, 'Fireball', 3, makePlayerStats(), CAMPAIGN)).toBe(true);
     expect(isFreeCastAuthorized(CASTER, 'fireball', 3, makePlayerStats(), CAMPAIGN)).toBe(false); // #1457 exact-gate trail
     expect(isFreeCastAuthorized(CASTER, 'Lightning Bolt', 3, makePlayerStats(), CAMPAIGN)).toBe(false);
-    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'naturalRecoveryFreeCast'); // exact 2-arg tuple, default tier
+    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'naturalRecoveryFreeCast', CAMPAIGN); // exact 3-arg tuple — unified tier (today byte-identical: store discards arg 3, useRuntimeState.js:63 fix#26 canon)
   });
 
   it('Bewitching Magic latches Misty Step only while flag is true; false/null/absent coalesce to identical DENY (#1352 falsy triple, #1512 rollback-null)', () => {
@@ -332,7 +332,7 @@ describe('isFreeCastAuthorized — gate #3 Mastery/Signature/Savant selections (
     expect(isFreeCastAuthorized(CASTER, 'Magic Missile', 1, makePlayerStats(), CAMPAIGN)).toBe(true);
     expect(isFreeCastAuthorized(CASTER, 'Shield', 2, makePlayerStats(), CAMPAIGN)).toBe(true);
     expect(isFreeCastAuthorized(CASTER, 'magic missile', 1, makePlayerStats(), CAMPAIGN)).toBe(false);
-    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'SpellMastery_level1', CAMPAIGN); // 3-arg tier (contrast gate #1 2-arg)
+    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, 'SpellMastery_level1', CAMPAIGN); // 3-arg campaign tier (family vocabulary, gate #1 now unified)
   });
 
   it('Signature Spells lv3: fresh latch allows, used-latch denies — latch key bytes built by replace(/\\s+/g,"_")', () => {
@@ -413,18 +413,18 @@ describe('isFreeCastAuthorized — gate #8 explicit-false HALTS the scan (Shadow
     mem.set('naturalRecoveryFreeCast', ['Invisibility']);
 
     expect(isFreeCastAuthorized(CASTER, 'Invisibility', 2, stats, CAMPAIGN)).toBe(true);
-    expect(getRuntimeValue).toHaveBeenNthCalledWith(1, CASTER, 'naturalRecoveryFreeCast');
+    expect(getRuntimeValue).toHaveBeenNthCalledWith(1, CASTER, 'naturalRecoveryFreeCast', CAMPAIGN);
     expect(getRuntimeValue).not.toHaveBeenCalledWith(CASTER, perSpellKey('Shadow_Touched', 'Invisibility'), CAMPAIGN);
   });
 });
 
 describe("isFreeCastAuthorized — gates #9 War God's Blessing and #11 Mantle of Majesty buff latches (majesty handler cites this lane)", () => {
-  it('WGB flag authorizes exactly Shield of Faith and Spiritual Weapon on a 2-arg default-tier read; the disk free_spell entry alone grants nothing', () => {
+  it('WGB flag authorizes exactly Shield of Faith and Spiritual Weapon on an explicit campaign-tier read; the disk free_spell entry alone grants nothing', () => {
     mem.set('_War_Gods_Blessing_active', true);
     expect(isFreeCastAuthorized(CASTER, 'Shield of Faith', 1, makePlayerStats(), CAMPAIGN)).toBe(true);
     expect(isFreeCastAuthorized(CASTER, 'Spiritual Weapon', 2, makePlayerStats(), CAMPAIGN)).toBe(true);
     expect(isFreeCastAuthorized(CASTER, 'Fireball', 3, makePlayerStats(), CAMPAIGN)).toBe(false); // spell gate even armed
-    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, '_War_Gods_Blessing_active'); // exact 2-arg tuple (pre-existing tier, cited)
+    expect(getRuntimeValue).toHaveBeenCalledWith(CASTER, '_War_Gods_Blessing_active', CAMPAIGN); // exact 3-arg tuple — unified tier (owner unify call)
 
     mem.delete('_War_Gods_Blessing_active');
     const wgbEntry = { ...JSON.parse(JSON.stringify(wgbFeature.automation)), name: wgbFeature.name };

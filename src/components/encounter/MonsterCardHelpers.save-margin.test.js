@@ -49,7 +49,13 @@ describe('MA-0639 parseSaveMarginClause', () => {
         const row = handCrossbow();
         expect(row.save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
         expect(row.save_effect).toBe('Failure: be poisoned for 1 hour.');
-        expect(row.dc_success).toBeUndefined();
+        // fix#172 family: RAW "must succeed ... or be poisoned" — a successful
+        // save takes NOTHING (rider-only save leg, saveChipPlan formula null) but
+        // the unauthored key still fabricated the MV-20 half-damage picker copy.
+        // dc_success:"none" authored after save_type (MA-0030 placement).
+        expect(row.dc_success).toBe('none');
+        const keys = Object.keys(row);
+        expect(keys.indexOf('dc_success')).toBe(keys.indexOf('save_type') + 1);
         expect(row.description).toContain('If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way.');
         expect(parseSaveMarginClause(row)).toEqual({ failsBy: 5, also: 'unconscious' });
     });

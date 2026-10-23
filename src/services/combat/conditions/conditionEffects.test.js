@@ -12,8 +12,9 @@
 //   restoreBalance net-mode (getNet + combine) → restoreBalance.test.js
 //   attacksOtherDisadvantageSource gating → conditionEffectsCombine.test.js
 //   foresight/bolster family: #996 LATE fold — the assign-vs-addUnique
-//     reason-clobber asymmetry (foresight :483 vs bolster :501) is pinned
-//     HERE (this lane); per-effect folds live in compute + bolster file.
+//     reason-clobber asymmetry (foresight :483 vs bolster :501) is FIXED
+//     (foresight now addUniqueReason) and pinned HERE (this lane); per-effect
+//     folds live in compute + bolster file.
 //   clairvoyant_combatant → conditionEffects.clairvoyant.test.js (roles) +
 //     compute :263 (counts) — #997 rec: its leg in the old crusher/clairvoyant
 //     bundle exactly duplicated compute, so the clairvoyant leg is CUT here;
@@ -38,7 +39,7 @@
 //       conditionEffectsInternal.test.js (dropped, not weakened)
 //   targetEffects blocks → registry dispatch census (#820) + 2 dispatch-order
 //     tests (early-before-generic crusher row with both generic channels
-//     :675/:679; late-over-generic topple row) + foresight/bolster clobber
+//     :675/:679; late-over-generic topple row) + foresight/bolster ledger
 //     pin (#996); per-effect byte folds live in compute (dropped here)
 //   getNetAttackMode 4 tests → 1 it.each (restoreBalance legs dropped:
 //     owned by restoreBalance.test.js :155)
@@ -195,9 +196,11 @@ describe('conditionEffects', () => {
       });
     });
 
-    it('#996 foresight ASSIGNS abilityCheckAdvantageReasons — clobbering a co-existing bolster reason', () => {
-      // bolster (:501) addUniqueReason; foresight (:483) plain assign.
-      // Both co-exist in the store; final bytes pinned honestly.
+    it('#996 foresight APPENDS abilityCheckAdvantageReasons via addUniqueReason — co-existing bolster reason survives', () => {
+      // FIXED (was a wholesale assign clobbering the ledger): foresight :483 now
+      // mirrors bolster :501 — addUniqueReason append-if-absent on all three
+      // reason legs. The reasons list is the canonical display/journal of WHY
+      // advantage applies (ConditionEffectBadges.jsx :99-103 joins all entries).
       const bolster = { effect: 'bolster_advantage', source: 'Empyrean 1' };
       const foresight = { effect: 'foresight' };
       expect(folded({ targetEffects: [bolster, foresight] })).toEqual({
@@ -206,11 +209,21 @@ describe('conditionEffects', () => {
         saveAdvantageCount: 2,
         saveAdvantageReasons: ['Empyrean 1', 'Foresight'],
         abilityCheckAdvantage: true,
-        abilityCheckAdvantageReasons: ['Foresight'], // bolster reason clobbered by assign
+        abilityCheckAdvantageReasons: ['Empyrean 1', 'Foresight'], // BOTH survive
         targetDisadvantageCount: 1,
       });
-      // Reverse order: foresight assigns first, bolster's addUnique appends.
+      // Reverse order: foresight appends first, bolster's addUnique appends after.
       expect(folded({ targetEffects: [foresight, bolster] }).abilityCheckAdvantageReasons).toEqual(['Foresight', 'Empyrean 1']);
+      // #1348 arms: empty-base foresight lands its reason exactly once...
+      expect(folded({ targetEffects: [foresight] }).abilityCheckAdvantageReasons).toEqual(['Foresight']);
+      // ...dup foresight te lands no duplicate reason but still bumps counts.
+      expect(folded({ targetEffects: [foresight, foresight] })).toMatchObject({
+        attackAdvantageCount: 2,
+        attackAdvantageReasons: ['Foresight'],
+        saveAdvantageCount: 2,
+        saveAdvantageReasons: ['Foresight'],
+        abilityCheckAdvantageReasons: ['Foresight'],
+      });
     });
   });
 

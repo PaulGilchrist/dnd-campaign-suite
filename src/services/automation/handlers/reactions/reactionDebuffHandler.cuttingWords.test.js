@@ -94,12 +94,21 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the bardic inspiration die now
+// rolls through diceRoller.rollDie, never raw Math.random — so the former
+// distribution-proof substrings become exact seed pins on face 4.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as logService from '../../../ui/logService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'test-campaign';
 const mapName = 'TestMap';
@@ -192,11 +201,13 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
   beforeEach(() => {
     vi.clearAllMocks();
     useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+    // Seed pin (fix#169 idiom): bardic d6 lands face 4 on every roll.
+    diceRoller.rollDie.mockReturnValue(4);
   });
 
   describe('attack roll debuff wording', () => {
     it('flips a 17-vs-AC-17 hit to MISS and reports the reversal with no damage event to reverse', async () => {
-      // d20(14)+3=17 HIT vs AC 17; 1d6 reduction keeps reduced+3 ≤ 16 < 17 ⇒ MISS, deterministic.
+      // d20(14)+3=17 HIT vs AC 17; BI d6 seed-pinned at 4 ⇒ reduced d20(10)+3=13 < 17 ⇒ MISS.
       // No damage recorded (total + primary == 0) ⇒ zero heal, reverse-failure prose.
       const { action } = setupAttackPath(
         { d20: 14, bonus: 3, targetAc: 17, hit: true },
@@ -208,8 +219,9 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
       expect(result.type).toBe('popup');
       expect(result.payload.name).toBe('Cutting Words');
       expect(result.payload.description).toContain('Cutting Words');
-      expect(result.payload.description).toContain('Bardic Inspiration die: 1d6 = <b>');
+      expect(result.payload.description).toContain('Bardic Inspiration die: 1d6 = <b>4</b>');
       expect(result.payload.description).toContain('Attack roll: d20(14) + 3 = 17 vs AC 17 → <b>HIT</b>');
+      expect(result.payload.description).toContain('Reduced: d20(10) + 3 = 13 vs AC 17 → <b>MISS</b>');
       expect(result.payload.description).toContain('→ <b>MISS</b>');
       expect(result.payload.description).toContain('The attack now misses!');
       expect(result.payload.description).toContain('No damage event found to reverse for Goblin.');
@@ -244,6 +256,8 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
       const result = await handle(action, makeBardStats(), campaignName, mapName);
 
       expect(result.payload.description).toContain('Attack roll: d20(8) + 2 = 10 vs AC 15 → <b>MISS</b>');
+      // Seed-pinned face 4 ⇒ reduced d20(4) + 2 = 6 (exact, was dice-agnostic).
+      expect(result.payload.description).toContain('Reduced: d20(4) + 2 = 6 vs AC 15 → <b>MISS</b>');
       expect(result.payload.description).toContain('The attack already missed — no effect.');
       expect(result.payload.description).not.toContain('now misses');
       expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
@@ -253,23 +267,24 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
 
   describe('damage debuff wording', () => {
     it('reduces 15 damage by the bardic die and heals + surfaces new HP', async () => {
-      // reduced = 15 − 1d6 ⇒ [9,14]; heal = 1d6 ⇒ "Healed Goblin for" prefix deterministic.
+      // BI d6 seed-pinned at 4 ⇒ reduced = 15 − 4 = 11 exactly; heal == 4.
       applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 20 });
 
       const { action } = setupDamagePath(15);
 
       const result = await handle(action, makeBardStats(), campaignName, mapName);
 
-      expect(result.payload.description).toContain('Bardic Inspiration die: 1d6 = <b>');
+      expect(result.payload.description).toContain('Bardic Inspiration die: 1d6 = <b>4</b>');
       expect(result.payload.description).toContain('Original damage: 15');
-      expect(result.payload.description).toContain('Reduced damage: <b>');
-      expect(result.payload.description).toContain('Healed Goblin for');
+      expect(result.payload.description).toContain('Reduced damage: <b>11</b>');
+      expect(result.payload.description).toContain('Healed Goblin for 4 HP.');
       expect(result.payload.description).toContain('Goblin HP: 20');
       expect(result.defenderHp).toBe(20);
     });
 
     it('floors 1 damage to 0 and returns null defenderHp when the heal result is missing', async () => {
-      // original 1 − 1d6 ⇒ max(0, ·) == 0 and heal == 1 for every roll — fully deterministic,
+      // original 1 − seed-pinned 4 ⇒ max(0, ·) == 0 and heal == 1 — same exact
+      // pins as before, now deterministic-by-mock instead of every-roll-proof.
       // unique exact-amount pin (1) vs latch lane's 6/10.
       applyHealing.applyHealingToTarget.mockReturnValue(null);
 
@@ -301,6 +316,7 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
       expect(result.payload.name).toBe('Cutting Words');
       expect(result.payload.description).toBe('Cutting Words has no uses remaining. Recharges on a Long Rest.');
       expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+      expect(diceRoller.rollDie).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(useRuntimeState.setRuntimeObject).not.toHaveBeenCalled();
     });
@@ -318,6 +334,7 @@ describe('CLA-071: Cutting Words — content & wording (non-latch lane)', () => 
       await handle(action, makeBardStats(), campaignName, mapName);
 
       expect(logService.addEntry).toHaveBeenCalledTimes(1);
+      expect(diceRoller.rollDie).toHaveBeenCalledTimes(1);
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
         type: 'ability_use',
         characterName: 'CuttingWordsBard',

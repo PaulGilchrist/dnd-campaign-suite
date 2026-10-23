@@ -507,12 +507,15 @@ function refusePsiBolsteredKnack(campaignName, name, popupName, popupHtml, setPo
     }).catch((e) => { console.error('[CharSheet] Error logging Psi-Bolstered Knack refusal:', e); });
 }
 
+// Returns whether a point was ACTUALLY expended (zero-energy success expends nothing).
 async function expendPsiEnergyOnSuccess(campaignName, name, success) {
-    if (!success) return;
+    if (!success) return false;
     const currentEnergy = Number(getRuntimeValue(name, 'psionicEnergy', campaignName) ?? 0);
     if (currentEnergy > 0) {
         await setRuntimeValue(name, 'psionicEnergy', currentEnergy - 1, campaignName);
+        return true;
     }
+    return false;
 }
 
 export async function handlePsiBolsteredKnack({ playerStats, campaignName, popupHtml, dieValue, dieSize, success, setPopupHtml }) {
@@ -532,9 +535,15 @@ export async function handlePsiBolsteredKnack({ playerStats, campaignName, popup
     const oldTotal = oldRoll + bonus;
     const newTotal = oldTotal + dieValue;
 
-    await expendPsiEnergyOnSuccess(campaignName, name, success);
+    const energyExpended = await expendPsiEnergyOnSuccess(campaignName, name, success);
 
-    const desc = `<b>Psi-Bolstered Knack</b><br/>Rolled d${dieSize} for ${dieValue}.<br/>${popupName}: ${oldTotal} → <b>${newTotal}</b> (+${dieValue})${success ? ' — Succeeded, energy expended' : ' — Still failed, energy not expended'}`;
+    // Honest-state law (#49 fourth-arm / #1517 family): prose describes truth —
+    // at zero energy nothing was expended (siblings: 'No HP Change',
+    // 'No Psionic Energy remaining. Recharges on a Short or Long Rest.').
+    const outcome = success
+        ? (energyExpended ? ' — Succeeded, energy expended' : ' — Succeeded, no Psionic Energy remaining to expend')
+        : ' — Still failed, energy not expended';
+    const desc = `<b>Psi-Bolstered Knack</b><br/>Rolled d${dieSize} for ${dieValue}.<br/>${popupName}: ${oldTotal} → <b>${newTotal}</b> (+${dieValue})${outcome}`;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: name,

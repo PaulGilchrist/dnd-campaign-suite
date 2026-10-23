@@ -8,6 +8,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget, computeDamageAfterSave } from '../../../rules/combat/applyDamage.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { createSaveListener } from '../../common/savePrompt.js';
+import { parseMagicItemName } from '../../../rules/core/attackWeaponUtils.js';
 
 function hasShield(playerStats) {
     const equipped = playerStats.inventory?.equipped || [];
@@ -34,17 +35,6 @@ function hasShieldOrWeapon(playerStats) {
         }
     }
     return false;
-}
-
-function parseMagicItemName(itemName) {
-    if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-        const magicBonus = Number(itemName.charAt(1));
-        return {
-            baseName: itemName.substring(3),
-            magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
-        };
-    }
-    return { baseName: itemName, magicBonus: 0 };
 }
 
 function getMonkLevel(playerStats) {

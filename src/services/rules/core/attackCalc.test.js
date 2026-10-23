@@ -18,16 +18,23 @@ import {
 
 describe('attackCalc', () => {
   describe('parseMagicItemName', () => {
-    // Canonical magic range is +1..+3; only the first digit is parsed, so
-    // single-digit prefixes are the only well-formed inputs.
+    // Grammar: '+N Name' — the full digit run is the enhancement (+1..+3 is the
+    // canonical authored range, 2-digit runs parse honestly too, #1348 arm).
+    // A digit-less '+' prefix ('+ Longsword') is read as a plain name: the '+'
+    // marker is dropped, nothing is eaten from the name (#1234, was 'ongsword').
     it.each([
       { input: '+1 Longsword', baseName: 'Longsword', magicBonus: 1 },
       { input: '+2 Longsword', baseName: 'Longsword', magicBonus: 2 },
       { input: '+3 Longsword', baseName: 'Longsword', magicBonus: 3 },
+      { input: '+10 Scimitar', baseName: 'Scimitar', magicBonus: 10 },
+      { input: '+10 Sword', baseName: 'Sword', magicBonus: 10 },
+      { input: '+3', baseName: '', magicBonus: 3 },
+      { input: '+', baseName: '', magicBonus: 0 },
+      { input: '+ Longsword', baseName: 'Longsword', magicBonus: 0 },
       { input: 'Longsword', baseName: 'Longsword', magicBonus: 0 },
+      { input: 'Rusty Longsword', baseName: 'Rusty Longsword', magicBonus: 0 },
+      { input: '- Longsword', baseName: '- Longsword', magicBonus: 0 },
       { input: '', baseName: '', magicBonus: 0 },
-      // Quirk pinned as-is: '+ X' strips 3 chars regardless of content.
-      { input: '+ Longsword', baseName: 'ongsword', magicBonus: 0 },
       { input: null, baseName: null, magicBonus: 0 },
       { input: undefined, baseName: undefined, magicBonus: 0 },
     ])('parseMagicItemName($input)', ({ input, baseName, magicBonus }) => {

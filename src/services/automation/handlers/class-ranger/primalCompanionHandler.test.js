@@ -51,6 +51,16 @@ import { getCombatSummary, getCurrentCombatRound } from '../../../encounters/com
 import storage from '../../../ui/storage.js';
 import { loadMonsters } from '../../../ui/dataLoader.js';
 
+// Canonical dice lane mock (fix#169 recipe): the companion-initiative fallback
+// d20 arrives via diceRoller.rollD20. Spread keeps every other diceRoller
+// export REAL (markStrike lanes keep their live rollExpression semantics).
+vi.mock('../../../dice/diceRoller.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    rollD20: vi.fn(),
+}));
+
+import { rollD20 } from '../../../dice/diceRoller.js';
+
 describe('primalCompanionHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -296,6 +306,22 @@ describe('primalCompanionHandler', () => {
             expect(summonedCreature.actions[1].name).toBe("Beast's Strike — Charge");
             expect(summonedCreature.actions[1].save_dc).toBe(13);
             expect(summonedCreature.actions[1].save_type).toBe('Str');
+            // Caster initiative present: the dice-backed fallback is untouched.
+            expect(rollD20).not.toHaveBeenCalled();
+        });
+
+        it('rolls the companion initiative through the canonical rollD20 lane when the caster has no initiative (fix#169 seed pin)', async () => {
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestRanger', initiative: '', initiativeBonus: 2 }] });
+            loadMonsters.mockResolvedValue(mockMonsters);
+            rollD20.mockReturnValue(7);
+
+            await confirmPrimalCompanionSummon(makeAction(), mockPlayerStats, mockCampaignName, 'Beast of the Land');
+
+            const summonedCreature = storage.set.mock.calls[0][1].creatures.find(c => c.name === 'Primal Companion (Beast of the Land)');
+            // rollD20() + casterInitBonus 2 = 9; buildPrimalCompanionCreature writes String(init − 0.1).
+            expect(rollD20).toHaveBeenCalledTimes(1);
+            expect(rollD20).toHaveBeenCalledWith();
+            expect(summonedCreature.initiative).toBe('8.9');
         });
 
         it('creates Beast of the Sea with correct stats', async () => {

@@ -474,13 +474,18 @@ const LATE_TARGET_EFFECT_HANDLERS = {
     }
   },
   // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it (unless attacker has Blindsight or Truesight)
+  // #996 fix: reasons are a MULTI-SOURCE LEDGER (ConditionEffectBadges.jsx :99-103
+  // joins every entry into the 'Adv Check' tooltip). The old :483 wholesale assign
+  // clobbered co-existing bolster/advantage_abilities/guidance reasons on the same
+  // target — audit-trail loss. All three legs now append via addUniqueReason,
+  // mirroring bolster (:497-501) exactly; counts are unaffected.
   foresight: (effects, te, attackerSenses) => {
     bumpCount(effects, 'attackAdvantageCount');
-    effects.attackAdvantageReasons.push('Foresight');
+    addUniqueReason(effects.attackAdvantageReasons, 'Foresight');
     bumpCount(effects, 'saveAdvantageCount');
-    effects.saveAdvantageReasons.push('Foresight');
+    addUniqueReason(effects.saveAdvantageReasons, 'Foresight');
     effects.abilityCheckAdvantage = true;
-    effects.abilityCheckAdvantageReasons = ['Foresight'];
+    addUniqueReason(effects.abilityCheckAdvantageReasons, 'Foresight');
     if (!attackerHasBlindsightOrTruesight(attackerSenses)) {
       bumpCount(effects, 'targetDisadvantageCount');
     }

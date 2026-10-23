@@ -50,7 +50,16 @@ export function pixelToHex(x, y, size) {
 }
 
 /**
- * Rounds fractional hex coordinates to the nearest integer axial coordinate.
+ * Rounds fractional hex coordinates to the nearest integer axial coordinate
+ * via the canonical cube-round: round q/r/s independently, then recompute the
+ * axis with the largest rounding residual by constraint so the rounded cube
+ * triple always satisfies rq + rr + rs === 0 (the invariant every
+ * hexDistance/hexNeighbors computation in this file assumes). On exact ties
+ * the third axis (s) is the one snapped. Axial { q, r } bytes are unchanged
+ * on ties (s is not returned); the fix seals the previously uncorrected
+ * fall-through that leaked cube-inconsistent triples, e.g. (-2.6, 1.2)
+ * rounding to the triple {-3, 1, 1} (sum -1) under the old strict-greater
+ * dq/dr/ds chain.
  * @param {number} q
  * @param {number} r
  * @returns {{ q: number, r: number }}
@@ -67,6 +76,10 @@ export function hexRound(q, r) {
     rq = -rr - rs;
   } else if (dr > ds) {
     rr = -rq - rs;
+  } else {
+    // s residual is largest or tied-largest: snap s by constraint (canonical
+    // cube_round else-arm). The old chain stopped here, never correcting.
+    rs = -rq - rr;
   }
   return { q: rq, r: rr };
 }

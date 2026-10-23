@@ -24,14 +24,21 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'TestSorcerer' })),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): gate d20 via rollD20, surge-table
+// d100 via rollDie. Lane bytes otherwise untouched — CLA-389 gate ordering,
+// armed-flag consumption and chooser-vs-gate assertions stay verbatim; only
+// the retired shared-Math.random rig becomes exact seed pins.
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
+    rollDie: vi.fn(),
+}));
+
+import * as diceRoller from '../../../dice/diceRoller.js';
+
 const surgeTable = [
     { min: 1, max: 50, effect: 'Surge effect A' },
     { min: 51, max: 100, effect: 'Surge effect B' },
 ];
-
-function mockMathRandom(value) {
-    vi.spyOn(global.Math, 'random').mockReturnValue(value);
-}
 
 function makeAction(auto = {}) {
     return {
@@ -62,8 +69,8 @@ describe('wildMagicSurgeHandler CLA-389 gate ordering', () => {
     });
 
     it('non-20 with armed wildMagicDoubleRoll flag: popup+log, no chooser modal', async () => {
-        // Math.floor(0.5 * 20) + 1 = 11 (not a 20)
-        mockMathRandom(0.5);
+        // Gate d20 seed-pin: 11 (not a 20)
+        diceRoller.rollD20.mockReturnValue(11);
         runtimeState.getRuntimeValue.mockImplementation((_name, key) => {
             if (key === 'wildMagicDoubleRoll') return true;
             return null;
@@ -85,19 +92,23 @@ describe('wildMagicSurgeHandler CLA-389 gate ordering', () => {
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'TestSorcerer', 'wildMagicDoubleRoll', false, 'campaign', true,
         );
+        // Gate miss: no surge-table d100 is ever rolled.
+        expect(diceRoller.rollDie).not.toHaveBeenCalled();
     });
 
     it('non-20 with lv14 wild_magic_double_roll passive: still no chooser modal', async () => {
-        mockMathRandom(0.1); // d20 = 3
+        diceRoller.rollD20.mockReturnValue(3); // d20 = 3
 
         const result = await handle(makeAction(), lv14PlayerStats(), 'campaign', 'map');
 
         expect(result.type).toBe('popup');
         expect(result.modalName).toBeUndefined();
+        expect(diceRoller.rollDie).not.toHaveBeenCalled();
     });
 
     it('nat-20 with lv14 controlled chaos: opens controlledChaos chooser modal', async () => {
-        mockMathRandom(0.99); // d20 = 20, d100 rolls = 100
+        diceRoller.rollD20.mockReturnValue(20); // gate d20 = 20
+        diceRoller.rollDie.mockReturnValue(100); // d100 chooser rolls = 100
 
         const result = await handle(makeAction(), lv14PlayerStats(), 'campaign', 'map');
 

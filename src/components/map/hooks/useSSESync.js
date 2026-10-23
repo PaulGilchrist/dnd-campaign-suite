@@ -1,6 +1,21 @@
 import { useCallback } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard';
 
+// map-data-* payloads are FULL map-document snapshots published verbatim by the
+// server (server/routes/maps.js:170 PUT /maps/:mapname body, :303 description
+// re-read from disk), consumed with the house patch-tolerant law shared by every
+// map SSE sibling (useHexMapSSESync.js:45 per-field `!== undefined`):
+//  - a key PRESENT in the snapshot LANDS, including honest clears (null / []);
+//    null is coerced to the field's empty domain ([] / new Set()) so consumers
+//    only ever see arrays/Sets — the same normalization useMapLoader.js:46 and
+//    useFogOfWar.js:14 rely on;
+//  - a key ABSENT preserves prev, because snapshots legitimately omit fields
+//    (outdoor maps carry no walls/players/revealed — maps.js:67-77).
+// One predicate for all three merged fields — kills the #915 split where
+// players `||` swallowed an honest null clear into stale prev while revealed
+// `!== undefined` landed revealed:null as a non-array.
+const mergedField = (value, prevValue) => (value !== undefined ? value : prevValue) ?? [];
+
 /**
  * WARNING: SSE re-render loop risk
  * All setters called in this handler are wrapped with useSSEEqualityGuard so
@@ -23,9 +38,9 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
           }
         setMapDataGuarded((prev) => ({
              ...prev,
-            players: (data.players || prev?.players || []).map(({ ...rest }) => rest),
-            walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set()),
-            revealed: data.revealed !== undefined ? data.revealed : (prev?.revealed || [])
+            players: mergedField(data.players, prev?.players).map(({ ...rest }) => rest),
+            walls: new Set(mergedField(data.walls, prev?.walls)),
+            revealed: mergedField(data.revealed, prev?.revealed)
           }));
         if (data.placedItems !== undefined) {
             setPlacedItemsGuarded(data.placedItems);

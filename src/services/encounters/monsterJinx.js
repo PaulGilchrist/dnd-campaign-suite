@@ -10,7 +10,8 @@
 // reactionMaxUses shape) → pending-attack identity gate (parryIdentityRefusal
 // MA-0341 lineage WITHOUT the melee-only filter — any attack-roll against the
 // hexer qualifies; no pending popup → `jinx_refused` reason no_pending_attack,
-// zero-spend) → ATTACKER's WIS save vs the authored DC 13 rolled honestly
+// zero-spend) → ATTACKER's authored save (WIS on the hexer row; jinxSaveSpec
+// chain) vs the authored DC 13 rolled honestly
 // INLINE machine-stamped (§209/§212 inline path — cs creature saving_throws
 // nested-abbrev stamp folded, ability_score_modifiers fallback; the .sp-modal
 // prompt seam does NOT fold cs stamps, MA-0725 pitfall) → FAIL: latch+spend
@@ -46,10 +47,14 @@ function reactionMaxUses(action) {
 }
 
 // camelCase automation convention (MA-0881/MA-0329 lineage) with the authored
-// top-level save_dc/save_type truth as fallback — the row keeps both twins.
+// top-level save_dc/save_type truth as fallback — the row keeps both twins
+// (hexer: save_dc:13 + save_type:"Wisdom" ⇄ automation saveDc:13 + saveType:
+// "WIS"). Chain: automation.saveType → top-level save_type → 'WIS' ONLY when
+// neither is authored (RAW Jinx is a Wisdom save — #1098: the default must not
+// silently override an authored non-WIS save_type twin).
 export function jinxSaveSpec(action) {
   const saveDc = Number(action?.automation?.saveDc ?? action?.save_dc);
-  const saveType = action?.automation?.saveType || 'WIS';
+  const saveType = action?.automation?.saveType || action?.save_type || 'WIS';
   if (!Number.isFinite(saveDc) || saveDc <= 0) return null;
   return { saveDc, saveType };
 }
@@ -190,8 +195,8 @@ async function refuseJinx({ monsterName, action, campaignName, reason, message, 
 // One chip click: round-latch/uses gate → pending-identity gate (parry §235
 // lineage), every refusal zero-spend and LOG-ONLY (no popupHtml — the
 // attacker's pending Done popup must survive every press, MA-0681 teardown
-// twin); met → latch+spend (awaited, CLA-361) → honest INLINE attacker WIS
-// save vs DC → FAIL stamps campaign.pendingJinx + lastAttack jinxPending for
+// twin); met → latch+spend (awaited, CLA-361) → honest INLINE attacker save
+// (spec.saveType) vs DC → FAIL stamps campaign.pendingJinx + lastAttack jinxPending for
 // the resolve consumer; SUCCESS merges jinxSaved and the attack rides Done
 // unchanged. MA-0895 seam.
 export function jinxSaveOutcome({ attacker, spec, rollD20 }) {

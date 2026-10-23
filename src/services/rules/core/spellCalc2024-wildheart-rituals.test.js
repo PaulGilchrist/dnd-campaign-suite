@@ -4,10 +4,10 @@
 // Rituals (no spell slot) with WISDOM as the spellcasting ability. getSpellAbilities
 // must stamp the exact triple casting_time:'Ritual' + _ritualOnly:true +
 // _ritualFeature:<feature> plus spellCastingAbility:'Wisdom' on the granted rows.
-// Stamp placement (spellCalc2024.js, read 2026-10-20): the detail remap runs at :775,
-// stampWildHeartRituals at :780 — AFTER the remap, so the clone-wipe trap in
-// remapSpellRow (:697) cannot eat the stamps — and BEFORE the slot-level filter at
-// :796, so _ritualOnly rows (keepSpellRow :745) survive with no slot at their level.
+// Stamp placement (spellCalc2024.js, re-read 2026-10-23): the detail remap runs at :802,
+// stampWildHeartRituals guard+call at :811-812 — AFTER the remap, so the clone-wipe trap in
+// remapSpellRow (:719) cannot eat the stamps — and BEFORE the slot-level filter at
+// :827, so _ritualOnly rows (keepSpellRow :765) survive with no slot at their level.
 //
 // Fixtures are read straight from disk (public/data/2024/classes.json Barbarian +
 // public/data/2024/spells.json) and deep-cloned before use — disk is ground truth:
@@ -54,7 +54,7 @@ function spellDb() {
   );
 }
 
-// class_levels is the full disk ladder (spellCalc2024.js:502 resolves by level-1).
+// class_levels is the full disk ladder (spellCalc2024.js:528 resolves by level-1).
 // required_major is re-pointed at the fixture's major so BOTH subjects keep a live
 // casting container: on disk every Barbarian spellcasting row is gated to
 // 'Path of the Wild Heart', so without this the Berserker counter-example would
@@ -127,8 +127,8 @@ describe('spellCalc2024 — Path of the Wild Heart ritual grants (CLA-234)', () 
   });
 
   it('keeps Commune with Nature alive past the slot-level filter at lv10 (no lv5 slot exists)', () => {
-    // The CLA-234 placement falsifier: if stampWildHeartRituals (:780) ever moved
-    // AFTER the keepSpellRow filter (:796), this lv5 row on a lv5-slot-zero lv10
+    // The CLA-234 placement falsifier: if stampWildHeartRituals (:811-812) ever moved
+    // AFTER the keepSpellRow filter (:827), this lv5 row on a lv5-slot-zero lv10
     // Barbarian would silently vanish. (Unlock gate absent-lv9/present-lv10 is owned
     // by spellCalc2024-advanced.test.js:106 — not re-pinned here.)
     const result = getSpellAbilities(spellDb(), makeBarbarianStats({ level: 10 }));
@@ -145,9 +145,15 @@ describe('spellCalc2024 — Path of the Wild Heart ritual grants (CLA-234)', () 
   });
 
   it('does not stamp a non-Wild Heart barbarian casting the same spell from its own list', () => {
-    // Falsifies the major-name guard at spellCalc2024.js:780: same DB detail, same
+    // Falsifies the major-name guard at spellCalc2024.js:811-812: same DB detail, same
     // player list — no Wild Heart major, no ritual stamps, casting_time stays disk bytes.
-    const berserker = { name: 'Path of the Berserker', features: [], spells: [] };
+    // Disk clone, not a hand-transcribed skeleton (fix#1362): the old fixture here said
+    // features: [] but disk classes.json gives Berserker Frenzy lv3, Mindless Rage lv6,
+    // Retaliation lv10, Intimidating Presence lv14 (all Rage automations, no spells) —
+    // clone the real row so the falsifier runs against disk bytes, not an invention.
+    const berserker = cloneDeep(DISK_BARBARIAN.majors.find(m => m.name === 'Path of the Berserker'));
+    expect(berserker.spells).toEqual([]); // disk bytes: Berserker grants no spells, no spell_casting_ability
+    expect(berserker.spell_casting_ability).toBeUndefined();
     const stats = makeBarbarianStats({ level: 13, major: berserker });
     stats.spells = ['Commune with Nature'];
 
@@ -162,7 +168,7 @@ describe('spellCalc2024 — Path of the Wild Heart ritual grants (CLA-234)', () 
   });
 
   it('still stamps ritual-only and logs the exact error when the major omits spell_casting_ability', () => {
-    // spellCalc2024.js:431-432 diagnostic branch: the ritual flags must land even
+    // spellCalc2024.js:456-458 diagnostic branch: the ritual flags must land even
     // when the ability cannot be stamped, and the sheet must not fail open silently.
     const errorSpy = vi.spyOn(console, 'error');
     const noAbilityMajor = cloneDeep(DISK_WILD_HEART);

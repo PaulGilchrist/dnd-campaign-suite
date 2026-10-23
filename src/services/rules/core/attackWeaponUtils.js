@@ -4,17 +4,24 @@
  */
 
 /**
- * Strip magic item prefix (+1, +2, +3) from an item name.
+ * Strip magic item prefix (+1, +2, +3 ... any digit run) from an item name.
+ * Grammar: '+N Name' — sign + enhancement digits + name. When the name starts
+ * with '+' but carries no enhancement digit ('+ Longsword'), read it honestly
+ * as a plain name: drop the dangling '+' marker, eat nothing from the name.
  * @param {string} itemName
  * @returns {{ baseName: string, magicBonus: number }}
  */
 export function parseMagicItemName(itemName) {
     if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-        const magicBonus = Number(itemName.charAt(1));
-        return {
-            baseName: itemName.substring(3),
-            magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
-        };
+        const match = itemName.match(/^\+(\d+)\s*(.*)$/);
+        if (match) {
+            return {
+                baseName: match[2].trim(),
+                magicBonus: parseInt(match[1], 10),
+            };
+        }
+        // Digit-less '+' prefix: no enhancement, remaining text is the name.
+        return { baseName: itemName.slice(1).trim(), magicBonus: 0 };
     }
     return { baseName: itemName, magicBonus: 0 };
 }

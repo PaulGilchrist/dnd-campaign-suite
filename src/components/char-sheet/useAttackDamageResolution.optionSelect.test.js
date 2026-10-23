@@ -137,8 +137,15 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
             branch: 'speed_reduction passes explicit option.value through byte-exact',
             option: { name: 'Slow', effect: 'speed_reduction', value: '10_ft_until_end_of_turn' },
             expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: '10_ft_until_end_of_turn', duration: 'until_start_of_next_turn' },
-            // Honest pin: log text hardcodes "15 feet" even for non-15 values.
-            expectedDescription: "Test description Goblin's speed reduced by 15 feet. Selected: Slow.",
+            // fix#167: log interpolates the applied distance (was a hardcoded
+            // "15 feet" lie while the store carried the option's own value).
+            expectedDescription: "Test description Goblin's speed reduced by 10 feet. Selected: Slow.",
+        },
+        {
+            branch: 'speed_reduction numeric option.value (feats.json Hamstring disk shape) logs the number it writes',
+            option: { name: 'Hamstring', effect: 'speed_reduction', value: 10 },
+            expectedEffect: { target: TARGET, source: CHAR, option: 'Hamstring', effect: 'speed_reduction', value: 10, duration: 'until_start_of_next_turn' },
+            expectedDescription: "Test description Goblin's speed reduced by 10 feet. Selected: Hamstring.",
         },
         {
             branch: 'speed_reduction defaults value when option.value is missing',
@@ -146,8 +153,15 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
             expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: '15_ft_until_start_of_next_turn', duration: 'until_start_of_next_turn' },
             expectedDescription: "Test description Goblin's speed reduced by 15 feet. Selected: Slow.",
         },
+        {
+            branch: 'speed_reduction value with no parseable distance logs general wording (no fabricated number)',
+            option: { name: 'Slow', effect: 'speed_reduction', value: 'half_speed' },
+            expectedEffect: { target: TARGET, source: CHAR, option: 'Slow', effect: 'speed_reduction', value: 'half_speed', duration: 'until_start_of_next_turn' },
+            expectedDescription: "Test description Goblin's speed reduced. Selected: Slow.",
+        },
     ])('immediate effect $branch', async ({ option, expectedEffect, expectedDescription }) => {
         const preExisting = { target: 'Orc', source: 'SomeoneElse', effect: 'sanctuary' };
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         getRuntimeValue.mockImplementation((key, prop) => (prop === 'targetEffects' ? [preExisting] : undefined));
         const { api, deps } = Harness();
 
@@ -164,6 +178,17 @@ describe('useAttackDamageResolution - handleAttackRiderOptionSelect', () => {
             name: 'Brutal Strike',
             description: expectedDescription,
         });
+        // fix#158 coupling idiom: whenever the stored value carries a number,
+        // the log MUST report that same number — write site is single source.
+        const storedFeet = String(expectedEffect.value ?? '').match(/(\d+)/)?.[1];
+        if (storedFeet) {
+            expect(expectedDescription).toContain(`${storedFeet} feet`);
+            expect(errorSpy).not.toHaveBeenCalled();
+        } else if (expectedEffect.effect === 'speed_reduction') {
+            expect(expectedDescription).not.toMatch(/\d+ feet/);
+            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('no numeric distance'));
+        }
+        errorSpy.mockRestore();
     });
 
     it.each([

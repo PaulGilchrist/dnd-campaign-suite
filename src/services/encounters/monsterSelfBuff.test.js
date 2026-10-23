@@ -281,6 +281,49 @@ describe('MA-0655/0658 honest triple press — store-faithful: grant → already
   });
 });
 
+describe('mid-flight double-spend guard (#1136-class fix#79 census — silent log-only refusal closed)', () => {
+  it('gate fresh on stale snapshot but store already spent: refuses exhausted — zero te, zero spend write, reason-distinct refusal popup exact bytes, grant NEVER lands', async () => {
+    const monster = 'Duergar 1';
+    // Raced second click: its storedUses snapshot is stale (fresh gate), but
+    // the winning click already burned the 1/Day use in the live store while
+    // no te is visible yet (registered synchronously AFTER the spend) — the
+    // spendMonsterAbilityUse double-spend guard refuses mid-flight.
+    store[usesKey(monster)] = { Enlarge: 1 };
+    // Injected store-faithful deps honoring the production TWO-arg
+    // getRuntimeValue signature (useRuntimeState.js:63) so the
+    // spendMonsterAbilityUse re-read actually sees the raced write.
+    const deps = {
+      getRuntimeValue: (name, key) => store[`${name}|${key}|test-campaign`],
+      setRuntimeValue: (name, key, value, campaign) => { store[`${name}|${key}|${campaign}`] = value; return Promise.resolve(); },
+    };
+    const setPopupHtml = vi.fn();
+    const guard = vi.spyOn(console, 'error');
+    const result = await resolveMonsterSelfBuffRow({
+      action: ENLARGE_ROW,
+      monsterName: monster,
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {}, // stale mid-flight snapshot slips past the gate
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(store[TE_KEY]).toBeUndefined(); // zero te
+    expect(store[usesKey(monster)]).toEqual({ Enlarge: 1 }); // store unchanged, zero burn (#1026)
+    expect(expirations).toHaveLength(0); // zero clock
+    expect(guard).toHaveBeenCalledTimes(1); // guard stays loud (audit side already correct, fix#79)
+    expect(logs).toHaveLength(1);
+    expect(logs[0].automationType).toBe('enlarge_refused');
+    expect(logs[0].description).toBe('Duergar 1 has already used Enlarge today (1/Day) — Enlarge refused. Uses reset at dawn; GM-enforced for monsters.');
+    expect(logs.some(l => l.automationType === 'enlarged_granted')).toBe(false); // grant never lands after refusal
+    // FIX#79 recipe (#1136 precedent, monsterSelfAura.js:90-98): the raced
+    // second click now ANSWERS in the UI — reason-distinct 'Already Buffing'
+    // (never the 'Uses Exhausted' gate headline, never the 'Already Enlarged'
+    // te-latch headline — #1348), same mc-prerequisite-refusal family cls.
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Already Buffing</h3><p>Duergar 1 is already buffing via Enlarge — a preceding click spent the 1/Day use. Enlarge refused: no second use spent, no buff re-applied. Uses reset at dawn (GM-enforced for monsters).</p></div>');
+  });
+});
+
 describe('MA-0658 enlarge ender inside the grant seam', () => {
   it('granting Enlarge while invisible drops self te invisible + cancels its clock KV + ends_on_enlarge byte log; enlarged still granted', async () => {
     const monster = 'Duergar 1';

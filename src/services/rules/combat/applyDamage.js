@@ -970,8 +970,33 @@ function findPlayerStatsForTarget(characters, targetName) {
   return characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' '));
 }
 
+// Damage-lane admission law: NON-NEGATIVE FINITE NUMBERS ONLY (fix#113 upstream
+// report; refuse shape mirrors wardingBondService.js:36-43 — loud console.error,
+// ZERO write/log/state). Old gate (!isNaN(x) && x != null) admitted (1) negatives —
+// live pre-fix capture: rawDamage:-10 RAISED monster HP 30->40 and player store
+// 25->35 with hp_change delta:+10 isHealing:false — and (2) numeric strings —
+// '5' returned finalDamage:'5' (string) and concatenated into campaign
+// lastAttack.actualDamage ('-1057' captured, fix#116 string-dice leak class) —
+// plus Infinity (instant-kill captured). Producer census (every applyDamageToTarget
+// caller): all dispatch dice-roll totals, Math.floor/Math.max results, Number()-
+// coerced HP or literals — NO legitimate numeric-string wire format at this seam,
+// so strings REFUSE, never coerce-fold (coercion hides producer bugs, fix#113
+// garbage-boundary verdict). Negatives are upstream errors or damage-reduction
+// reroll deltas mis-routed into the damage lane (fix#1536: heals live in the
+// healing lane) — reported to their owners: empoweredSpellService.js:117/:158-159
+// and CharSheet.handlers.js:207-210 (Puncture), both guarded only `!== 0`.
+// Zero and -0 stay admitted verbatim (MA-1400 zero-damage clause riders:
+// MonsterCardModal.jsx:1163; downstream :900/:1043/>0 gates no-op them).
 function isUsableRawDamage(rawDamage) {
-  return !isNaN(rawDamage) && rawDamage != null;
+  if (typeof rawDamage !== 'number' || !Number.isFinite(rawDamage)) {
+    console.error(`[applyDamage] Invalid rawDamage (${String(rawDamage)}:${typeof rawDamage}): damage lane admits finite numbers only — no HP write, no log.`);
+    return false;
+  }
+  if (rawDamage < 0) {
+    console.error(`[applyDamage] Invalid rawDamage (${rawDamage}): negative damage is not damage (RAW: damage >= 0; heals live in the healing lane) — no HP write, no log.`);
+    return false;
+  }
+  return true;
 }
 
 // MA-0681: Elemental Absorption one-shot consume. Fires only when this

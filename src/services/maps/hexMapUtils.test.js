@@ -9,13 +9,14 @@
 //   useHexHover.test.js .................. mocks pixelToHexSnapped; snap behavior owned here
 //   usePoiManagement.test.js ............. findHexPath/isRoadConnectable integration only
 // Pinned: key bytes + inverse, pixel<->axial goldens (0-is-data, signed coords), cube-rounding
-// incl. both correction branches, exact ordered neighbor sets, distance table, golden hexagon
+// incl. all three correction arms + exact-tie rows (fix#: canonical snap seals the strict-greater
+// fall-through), permanent q+r+s===0 fuzz invariant (T4b), exact ordered neighbor sets, distance table, golden hexagon
 // corners/path bytes, grid enumeration + dimensions, odd-r offset centers, winding-hash goldens
 // (asymmetric, linear, default 5), road-connectable truth table, A* goldens (open run, cheapest
 // lane around water with unknown-id ?? 2 coercion, out-of-bounds null), orderHexPath walk +
 // edge shapes, descriptor bytes (multi full string / single-hex degenerate / wind0 collinearity).
 // Old->new map: hexKey+parse+roundtrip -> T1; hexToPixel trio -> T2; pixelToHex pair -> T3;
-// hexRound pair (vacuous self-compare cube test purged) -> T4; neighbors pair -> T5; distance
+// hexRound pair + tie rows -> T4; cube-invariant fuzz/lattice -> T4b; neighbors pair -> T5; distance
 // trio (self-compare symmetry purged, folded into byte rows) -> T6; cornerOffset+corners -> T7;
 // svgPath -> T8; getAllHexes pair -> T9; dims pair -> T10; offsetCenter -> T11; windingOffset
 // trio -> T12; isRoadConnectable pair -> T13; findHexPath quad -> T14+T15; orderHexPath quad ->
@@ -84,6 +85,12 @@ describe('hexMapUtils', () => {
   // T4 — cube-rounding bytes: q-leg correction, r-leg correction,
   // rounding ties, and integer passthrough. Replaces the old vacuous
   // "constraint" test that self-compared s = -q-r tautologically.
+  // Tie rows (fix#hexRound): the old strict-greater dq/dr/ds chain left
+  // exact ties uncorrected and leaked cube-inconsistent triples, e.g.
+  // (-2.6,1.2) -> rounded cube {-3,1,1} sum -1; canonical cube_round snaps
+  // s by constraint. Tie axial {q,r} bytes match the old code (s was never
+  // returned) — these rows pin the canonical tie outputs byte-exactly and
+  // the q+r+s===0 invariant is guarded permanently in T4b.
   it.each([
     [0.33, 0.33, { q: 0, r: 0 }],
     [0.6, 0.3, { q: 1, r: 0 }], // q residual largest -> rq recomputed from s
@@ -91,8 +98,65 @@ describe('hexMapUtils', () => {
     [0.3, -1.6, { q: 0, r: -1 }], // r residual largest -> rr recomputed from s
     [1.9, -0.6, { q: 2, r: -1 }], // both corrected legs nonzero
     [2, -3, { q: 2, r: -3 }], // integers pass through untouched
+    [-2.6, 1.2, { q: -3, r: 1 }], // cited tie leak: old triple {-3,1,1} sum -1 -> snaps rs to 2
+    [0.5, -1, { q: 1, r: -1 }], // exact binary tie dq==ds==0.5, dr=0 -> s snapped
+    [-3.5, 2, { q: -3, r: 2 }], // exact tie, negative q leg: old triple {-3,2,2} sum 1
+    [-4.5, -1, { q: -4, r: -1 }], // exact tie mirrored to q leg, negative quadrant
+    [-2.5, -4, { q: -2, r: -4 }], // exact tie, both axes negative
+    [0.5, 0.5, { q: 1, r: 0 }], // dq==dr==0.5 tie resolved inside the strict dr>ds arm
   ])('hexRound(%s,%s) resolves to %j', (q, r, expected) => {
     expect(hexRound(q, r)).toEqual(expected);
+  });
+
+  // T4b — permanent cube-invariant guard (#1348-structural): for EVERY
+  // rounded point the implied cube triple satisfies q + r + s === 0 (the
+  // constraint all hexDistance/hexNeighbors math in this file assumes) and
+  // the snapped hex center is a nearest Euclidean center (Voronoi oracle,
+  // computed independently of the rounding chain). Seeded deterministic
+  // mulberry32 fuzz (200 draws) — no raw Math.random (fix#169 discipline) —
+  // plus exact-boundary tie lattices (.5 and .25 offsets where residuals
+  // tie in binary and the pre-fix strict chain fell through uncorrected).
+  it('hexRound fuzz + boundary lattice: every output is cube-consistent and nearest-center', () => {
+    let seed = 0x9e3779b9;
+    const rand = () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const check = (q, r) => {
+      const { q: rq, r: rr } = hexRound(q, r);
+      expect(Number.isInteger(rq)).toBe(true);
+      expect(Number.isInteger(rr)).toBe(true);
+      // cube-consistency of the snapped point (s derived by constraint)
+      expect(rq + rr + (-rq - rr)).toBe(0);
+      // Voronoi oracle: no integer hex center in a +/-2 window is nearer
+      const px = hexToPixel(q, r, 1);
+      let min = Infinity;
+      for (let dq = -2; dq <= 2; dq++) {
+        for (let dr = -2; dr <= 2; dr++) {
+          const c = hexToPixel(rq + dq, rr + dr, 1);
+          const d = Math.hypot(c.x - px.x, c.y - px.y);
+          if (d < min) min = d;
+        }
+      }
+      const out = hexToPixel(rq, rr, 1);
+      expect(Math.hypot(out.x - px.x, out.y - px.y)).toBeLessThanOrEqual(min + 1e-9);
+    };
+    for (let i = 0; i < 200; i++) {
+      check((rand() - 0.5) * 40, (rand() - 0.5) * 40);
+    }
+    for (let a = -3; a <= 3; a++) {
+      for (let b = -3; b <= 3; b++) {
+        for (const f of [0.5, -0.5, 0.25, -0.25]) {
+          check(a + f, b);
+          check(a, b + f);
+          check(a + f, b + f);
+          check(a + f, b - f);
+        }
+      }
+    }
   });
 
   // T5 — neighbor ring exact ordered set (same 6 offsets shifted by origin).

@@ -18,7 +18,7 @@ vi.mock('../../../rules/combat/rangeCheck.js', () => ({
     isWithinRange: vi.fn(async () => true),
 }));
 
-const { setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { isWithinRange } = await import('../../../rules/combat/rangeCheck.js');
 
@@ -136,6 +136,63 @@ describe('primalCompanionSpellShareHandler', () => {
             expect(result.payload.description).toBe('Primal companion is not alive.');
             expect(result.payload.automation).toBeDefined();
             expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        // fix#104(c) twin (#1348 four-arm table, mirroring the service alive-gate pin in
+        // primalCompanionSpellShareService.test.js): alive is STRICT !== true refuse at the
+        // handler too. Producer census: 'primalCompanionAlive' is written true only at
+        // summon/restore (primalCompanionHandler.js:305/:533) — never false — so the old
+        // `=== false` gate never armed for unknown-alive companions and the share dispatched.
+        describe('alive gate: strict === true (false/null/undefined all refuse, handler-local infoPopup decline)', () => {
+            it.each([
+                ['false', false],
+                ['null', null],
+                ['undefined (key absent)', undefined],
+            ])('%s refuses with the not-alive popup before the range gate, writing nothing', async (_label, alive) => {
+                store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
+                if (alive === undefined) {
+                    delete store['RangerBoy.primalCompanionAlive'];
+                } else {
+                    store['RangerBoy.primalCompanionAlive'] = alive;
+                }
+                seedCasterEffect([{ ...PWT_TE }]); // caster effect PRESENT: without the gate the share would land
+
+                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.type).toBe('automation_info');
+                expect(result.payload.description).toBe('Primal companion is not alive.');
+                expect(isWithinRange).not.toHaveBeenCalled(); // decline happens at the gate, not mid-apply
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+                expect(addEntry).not.toHaveBeenCalled();
+                expect(store['campaign.targetEffects']).toHaveLength(1); // only the caster's own te remains
+                expect(store['RangerBoy.lastSpellShare']).toBeUndefined();
+            });
+
+            it('true is the ONLY dispatching alive state', async () => {
+                store['RangerBoy.primalCompanionType'] = 'Beast of the Land';
+                store['RangerBoy.primalCompanionAlive'] = true;
+                seedCasterEffect([{ ...PWT_TE }]);
+
+                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+                expect(result.type).toBe('popup');
+                expect(result.payload.description).toBe('Pass Without Trace shared with Primal Companion (Beast of the Land).');
+                expect(isWithinRange).toHaveBeenCalledWith('RangerBoy', 'Primal Companion (Beast of the Land)', 30);
+            });
+
+            it('alive key is consulted only after the companion-type gate (read-order parity with the service)', async () => {
+                delete store['RangerBoy.primalCompanionType'];
+                store['RangerBoy.primalCompanionAlive'] = true;
+
+                const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+                expect(result.payload.description).toBe('No primal companion summoned.');
+                const aliveReads = getRuntimeValue.mock.calls.filter(
+                    ([, key]) => key === 'primalCompanionAlive'
+                );
+                expect(aliveReads).toHaveLength(0); // type-absent declines before the alive key is read
+            });
         });
 
         it('returns info popup when no companion is summoned', async () => {

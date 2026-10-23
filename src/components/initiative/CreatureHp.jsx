@@ -42,11 +42,10 @@ function MaxHpInput({ creature, effectiveMaxHp, aidIncrease, heroesFeastIncrease
                 const aidAmt = Number(aidIncrease) || 0
                 const hfAmt = Number(heroesFeastIncrease) || 0
                 const newBaseMax = newEffectiveMax - aidAmt - hfAmt
-                creature.maxHp = newBaseMax
-                if (creature.currentHp > newEffectiveMax) {
-                    creature.currentHp = newEffectiveMax
-                }
-                onChange(creature.name, creature.currentHp)
+                // #854: report through onChange(name, currentHp, baseMax) — never mutate
+                // the creature prop (store-ref by way of combatSummary.creatures).
+                const newCurrentHp = creature.currentHp > newEffectiveMax ? newEffectiveMax : creature.currentHp
+                onChange(creature.name, newCurrentHp, newBaseMax)
             }}
             onKeyDown={(e) => {
                 if (e.key === 'Enter') e.target.blur()

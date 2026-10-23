@@ -3,7 +3,7 @@ import './CreatureBadge.css'
 function CreatureBadge({ icon, label, cls, tooltip, removable, onRemove, onClick, disabled }) {
   const Tag = onClick ? 'button' : 'span'
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div className='creature-badge-wrapper'>
       <Tag
         className={`creature-badge ${cls || ''}`}
         title={tooltip || (typeof label === 'string' ? label : '')}

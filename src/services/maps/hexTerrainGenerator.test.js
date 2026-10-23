@@ -24,7 +24,7 @@
 // non-object -> T-coerce bytes-equal-to-base; standalone invalid-inputs + plains-only +
 // empty-terrain -> T-rivers-zero table; standalone valid-keys + exists-in-terrain ->
 // T-downhill exact bytes; standalone consistent-self-compare -> retired (#1160).
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateHexTerrain, generateRiversFromTerrain } from './hexTerrainGenerator.js';
 import { TERRAIN_TYPES } from '../../config/outdoorConfig.js';
 import { hexNeighbors } from './hexMapUtils.js';
@@ -150,12 +150,35 @@ describe('hexTerrainGenerator', () => {
       }
     );
 
-    // T-entropy — unseeded calls fall back to Math.random, so two runs differ
-    // (collision probability ~1/100000). Proves the fallback exists; not a clock.
+    // T-entropy — unseeded calls fall back to Math.random, so two runs differ.
+    // Proves the fallback exists; not a clock.
+    // WATCH#5 stabilization (fixcheck40 collision, probabilistic-by-construction):
+    // free draws are NOT high-cardinality — at gridSize 4 the 32-hex map quantizes
+    // through beach + lake reflood to an {water,beach} alphabet with only ~1811
+    // distinct outputs across the 100000-seed space (top pattern 16.5%), so the
+    // true inter-draw collision rate is ~3.2% (sum p_i^2), not ~1/100000 as first
+    // estimated. Fix keeps the lane's guard INTACT — both calls stay unseeded, so
+    // the Math.random fallback (hexTerrainGenerator.js:14) is still the code under
+    // test — but stubs Math.random with two DISTINCT empirical constants, one per
+    // draw (the fallback consumes exactly one call), making the seeds 11111 and
+    // 22222 byte-pinned-proven-different (differ at 5 hexes: 2,1 / 3,1 / 5,1 /
+    // 6,1 / 2,2 beach-vs-water). Zero variance by construction; test kept, not
+    // deleted, because no other lane exercises the unseeded entropy path.
     it('two unseeded generateHexTerrain calls produce different maps', () => {
-      const r1 = generateHexTerrain({ gridSize: 4 });
-      const r2 = generateHexTerrain({ gridSize: 4 });
-      expect(r1.terrain).not.toEqual(r2.terrain);
+      const randomSpy = vi.spyOn(Math, 'random');
+      try {
+        randomSpy.mockReturnValue(0.11111); // -> effectiveSeed 11111
+        const r1 = generateHexTerrain({ gridSize: 4 });
+        randomSpy.mockReset();
+        randomSpy.mockReturnValue(0.22222); // -> effectiveSeed 22222
+        const r2 = generateHexTerrain({ gridSize: 4 });
+        expect(r1.terrain).not.toEqual(r2.terrain);
+        // Byte-pin of the proven-difference (row-major interior, beach=B else W):
+        expect(r1.terrain['2,1']).toBe('beach');
+        expect(r2.terrain['2,1']).toBe('water');
+      } finally {
+        randomSpy.mockRestore();
+      }
     });
 
     // T-weights — weights rewrite the map at byte level after the base map is

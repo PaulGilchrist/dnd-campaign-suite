@@ -7,6 +7,7 @@ import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { parseMagicItemName } from '../../../rules/core/attackWeaponUtils.js';
 
 const USED_ROUND_KEY = 'interceptionUsedRound';
 
@@ -186,7 +187,7 @@ function checkShieldOrWeapon(playerStats, auto, featureName) {
     const equipped = playerStats.inventory?.equipped || [];
     for (const itemName of equipped) {
         if (!itemName || typeof itemName !== 'string') continue;
-        const baseName = parseMagicItemName(itemName);
+        const { baseName } = parseMagicItemName(itemName);
         const item = playerStats.equipment?.find(e => e.name === baseName);
         if (item && item.armor_category === 'Shield') return null;
         if (item && item.equipment_category === 'Weapon') return null;
@@ -200,13 +201,6 @@ function checkShieldOrWeapon(playerStats, auto, featureName) {
             automation: auto,
         },
     };
-}
-
-function parseMagicItemName(itemName) {
-    if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-        return itemName.substring(3);
-    }
-    return itemName;
 }
 
 function makePopup(action, automation, description) {

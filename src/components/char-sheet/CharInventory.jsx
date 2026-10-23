@@ -11,7 +11,7 @@ const buildPropertyLines = (item) => {
     if (item.cost) {
         properties.push(`<b>Cost:</b> ${item.cost.quantity} ${item.cost.unit}`);
     }
-    if (item.weight) {
+    if (item.weight != null) {
         properties.push(`<b>Weight:</b> ${item.weight}`);
     }
     if (item.equipment_category) {

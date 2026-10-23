@@ -141,7 +141,15 @@ function buildReactions({ playerStats, activeBuffs, pwhStance, wardActive, wardD
 
     const reactionSpellNames = getReactionSpellNames(playerStats);
     let reactionSpells = [];
-    if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {
+    // fix#148: guard the inner array, not just the container. Persisted disk census
+    // shows slot-only containers (test-campaign HeroesFeastBard.json has
+    // spell_slots_level_1..9 with no spells key) and store round-trips can carry
+    // { spells: null }; both crashed here pre-fix (.spells.length TypeError,
+    // pinned RED in CharReactions.rendering.test.jsx). Absent/null/[] all reach the
+    // same UI outcome — section omitted by the reactionSpells.length>0 guard below —
+    // so absent is treated as none, silent, per fix#40 precedent and the house
+    // ?.spells treatment (spellSectionUtils.js:53, formatUtils.js:19).
+    if (playerStats.spellAbilities?.spells?.length > 0) {
         reactionSpells = playerStats.spellAbilities.spells.filter(spell => reactionSpellNames.has(spell.name));
     }
     // Add base reactions to reaction list
@@ -413,8 +421,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
+    // CharReactions owns its modal state locally (never prop-controlled).
     const [modalState, setModalState] = React.useState({});
-    // modalState and setModalState are now passed as props from CharSheet
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 

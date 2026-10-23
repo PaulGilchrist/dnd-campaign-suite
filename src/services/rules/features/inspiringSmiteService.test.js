@@ -133,6 +133,24 @@ describe('inspiringSmiteService', () => {
                 .toThrow(TypeError);
             expect(consoleSpy).toHaveBeenCalledTimes(2);
         });
+
+        it('nullish playerStats apex routes into the SAME loud arm — exact console bytes, throw not fabricated pool (#204-class)', async () => {
+            // fix#179 refuse-no-fabricated-values: a nullish apex must not return [] that a
+            // consumer could misread as eligibility-checked; the file-owned loud throw at :11
+            // catches it via `playerStats?.` and trigger (call at :26, outside any try) propagates.
+            expect(() => getInspiringSmitePassives(undefined)).toThrow('Expected array, got undefined');
+            expect(() => getInspiringSmitePassives(null)).toThrow('Expected array, got undefined');
+            expect(consoleSpy.mock.calls).toEqual([
+                ['[inspiringSmiteService] Missing array:', undefined],
+                ['[inspiringSmiteService] Missing array:', undefined],
+            ]);
+            await expect(triggerInspiringSmite(
+                SMITE, { slotLevel: 1 }, undefined, CAMPAIGN, MAP
+            )).rejects.toThrow('Expected array, got undefined');
+            expect(consoleSpy).toHaveBeenCalledTimes(3); // no stamp, no dispatch before the throw
+            expect(stamps).toEqual([]);
+            expect(envelopes).toEqual([]);
+        });
     });
 
     describe('triggerInspiringSmite', () => {

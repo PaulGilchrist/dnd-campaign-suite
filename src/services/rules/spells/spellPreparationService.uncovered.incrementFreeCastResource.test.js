@@ -36,8 +36,8 @@
 // the recharge-precedence mutants — the recharge arm's !uses_expression block
 // and its uses-arity max are both falsified by that single byte); explicit-null
 // /absent coalesce ?? usesMax -> full -> no refund (#1512 contract parity);
-// over-cap corrupt store stays stuck (strict <). Reads are arity-2, no
-// campaign arg (#1516 — home resource-flow:427-428, pinned once here).
+// over-cap corrupt store stays stuck (strict <). Reads are arity-3, campaign
+// arg explicit (owner unify call — #1516 family asymmetry closed).
 // NO-CLOCK: rollback seam only (rollbackSpellSlot, #1512 header); rest re-arm
 // is the LR batch null (restRules lanes). Purity: playerStats JSON snapshot
 // asserted on EVERY row (cast helper). Campaign 'test-campaign' on every tuple.
@@ -179,7 +179,7 @@ describe('incrementFreeCastResource — uses_expression loop arms (generic rollb
     for (const [stored, next] of [[1, 2], ['1', 2], ['', 1], [0, 1]]) {
       cast('Burning Hands', 1, [structLevelEntry], { [LEVEL_KEY]: stored });
       expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, LEVEL_KEY, next, CAMPAIGN]]);
-      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, LEVEL_KEY); // arity-2 read (#1516 home-cited)
+      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, LEVEL_KEY, CAMPAIGN); // arity-3 unified read (owner unify call; #1516 home-cited, now closed)
     }
     // NaN family: strict count<max denies junk text (and breaks before trailing).
     cast('Burning Hands', 1, [structLevelEntry, trailingInstanceEntry], { [LEVEL_KEY]: 'two', [TRAIL_KEY]: 0 });
@@ -200,7 +200,7 @@ describe('incrementFreeCastResource — uses_expression loop arms (generic rollb
   it("loop continue arms: featureLevel-mismatch returns next (counter never read; trailing real builder-shaped row refunds 0->1), null-text spell-mismatch falls through to real-disk Paladin's Smite first live rollback pin", () => {
     cast('Burning Hands', 5, [structLevelEntry, trailingInstanceEntry], { [TRAIL_KEY]: 0 });
     expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, TRAIL_KEY, 1, CAMPAIGN]]);
-    expect(getRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LEVEL_KEY); // 'next' short-circuits before the read
+    expect(getRuntimeValue).not.toHaveBeenCalledWith(PLAYER, LEVEL_KEY, CAMPAIGN); // 'next' short-circuits before the read
     // fey gate engaged with null-text spell mismatch -> fallthrough -> miss -> scan
     // continues to the REAL Paladin's Smite disk row (first live rollback, unique byte).
     cast('Divine Smite', 2, [feyEntry, paladinEntry], { [PALADIN_KEY]: 0 });

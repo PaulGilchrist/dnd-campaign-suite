@@ -289,15 +289,19 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
   /*  gate. Counts pinned as of the 2026-10-21 disk state.           */
   /* ---------------------------------------------------------------- */
 
-  it('consumes EVERY real-gate-passing automation.type disk row at :710 — exact census 44 (5e) + 78 (2024), and every consumed cast runs the merged post-cast block exactly once (:712 merge, fix#121(a), #1459/#1463)', async () => {
+  it('consumes EVERY real-gate-passing automation.type disk row at :710 — exact census 43 (5e) + 77 (2024), and every consumed cast runs the merged post-cast block exactly once (:712 merge, fix#121(a), #1459/#1463)', async () => {
     // Declines are the SERVICE_HANDLED-name rows (real triggerSpells.js set)
     // and the effects.fail/success rows. Exact list, not just counts, so a
     // disk row silently gaining/losing generic consumption fails loudly.
-    const DECLINED_5E = ['Color Spray', 'Dominate Monster', 'Entangle', "Irresistible Dance", "Resilient Sphere", 'Sleep'].sort();
-    const DECLINED_2024 = ['Arms of Hadar', 'Color Spray', 'Entangle', 'Grease', "Otiluke's Resilient Sphere", "Otto's Irresistible Dance", 'Sleep'].sort();
+    // fix#132 (#1483/#1472): 'Regenerate' MOVED consumed->declined in both
+    // editions — the shield now routes disk-byte casts past the drop-dead
+    // :710 dispatch (HANDLER_MAP registers 'regenerate', never the disk
+    // type 'healing_start_of_turn') to the live chain arm applyRegenerateSpell.
+    const DECLINED_5E = ['Color Spray', 'Dominate Monster', 'Entangle', "Irresistible Dance", 'Regenerate', "Resilient Sphere", 'Sleep'].sort();
+    const DECLINED_2024 = ['Arms of Hadar', 'Color Spray', 'Entangle', 'Grease', "Otiluke's Resilient Sphere", "Otto's Irresistible Dance", 'Regenerate', 'Sleep'].sort();
     const EXPECTED = [
-      { rules: undefined, rows: spells5e, consumed: 44, declined: DECLINED_5E },
-      { rules: '2024', rows: spells2024, consumed: 78, declined: DECLINED_2024 },
+      { rules: undefined, rows: spells5e, consumed: 43, declined: DECLINED_5E },
+      { rules: '2024', rows: spells2024, consumed: 77, declined: DECLINED_2024 },
     ];
 
     executeHandler.mockResolvedValue(POPUP);
@@ -357,7 +361,7 @@ describe('executeSpellCast — generic automation lane (:710 consumption / :712 
       totalConsumed += ruleConsumed;
     }
 
-    expect(totalConsumed).toBe(122);
+    expect(totalConsumed).toBe(120);
   });
 
   /* ---------------------------------------------------------------- */

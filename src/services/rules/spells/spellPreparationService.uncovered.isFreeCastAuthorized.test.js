@@ -84,9 +84,9 @@
 //   increment sibling (:58/:36, favored-enemy accumulate).
 //   invocationCallOrder: every deciding row pins read-before-verdict — the
 //   deciding counter is the LAST read, downstream keys absent.
-//   arity vs REAL: feature/shared counter reads are 2-arg default tier
-//   (:70/:117), per-spell tracking reads 3-arg campaign tier (:79) — one
-//   pin per shape; campaign lockdown rides those tuples.
+//   arity vs REAL: feature/shared counter reads carry the explicit campaign
+//   tier (:70/:117, owner unify call), per-spell tracking reads 3-arg campaign
+//   tier (:79) — one pin per shape; campaign lockdown rides those tuples.
 //   empty-edge: zero-entry scans and absent-automation keys fall through
 //   `|| []` guards (:306/:311/:316) to default deny with ZERO free-cast
 //   reads (fail:[] idiom, #1508 parallel).
@@ -290,7 +290,7 @@ describe('L1 uses_expression LEVEL arm — match allows at fresh/null counter; s
   it('level-match at fresh/null counter allows, counter is the LAST read; absent and REAL-null coalesce identically via ?? usesMax (#1517 store-faithful)', () => {
     const { verdict, reads } = cast('bonusActions', [miLevelRow()], 'Magic Missile', 1);
     expect(verdict).toBe(true);
-    expect(reads[reads.length - 1]).toEqual([CASTER, '_Level_1_Spell_freeCastCount']); // 2-arg default tier deciding read (:70 via :101)
+    expect(reads[reads.length - 1]).toEqual([CASTER, '_Level_1_Spell_freeCastCount', CAMPAIGN]); // explicit campaign-tier deciding read (:70 via :101, unified)
     mem.set('_Level_1_Spell_freeCastCount', null);
     expect(cast('bonusActions', [miLevelRow()], 'Magic Missile', 1).verdict).toBe(true); // null ?? 2 -> fresh ALLOW, same arm as absent
   });
@@ -299,7 +299,7 @@ describe('L1 uses_expression LEVEL arm — match allows at fresh/null counter; s
     mem.set('_Level_1_Spell_freeCastCount', 0);
     const { verdict, reads } = cast('bonusActions', [miLevelRow(), tailRecharge()], 'Magic Missile', 1);
     expect(verdict).toBe(true); // :102 undefined -> scan moved ON — a false here would deny a live trailing grant
-    expect(reads[reads.length - 1]).toEqual([CASTER, '_Struct_Tail_Recharge_freeCastCount']); // trailing recharge is the deciding LAST read
+    expect(reads[reads.length - 1]).toEqual([CASTER, '_Struct_Tail_Recharge_freeCastCount', CAMPAIGN]); // trailing recharge is the deciding LAST read
     mem.set('_Level_1_Spell_freeCastCount', 'two');
     expect(cast('bonusActions', [miLevelRow(), tailRecharge()], 'Magic Missile', 1).verdict).toBe(true); // Number('two')=NaN, NaN>0 false -> CONTINUE
     mem.set('_Level_1_Spell_freeCastCount', 2);
@@ -363,7 +363,7 @@ describe('L4 FREE_CAST_CHECKS interleave — gate #9 WGB runs BEFORE the #10 sca
     mem.set('_War_Gods_Blessing_active', true);
     const armed = cast('bonusActions', [spentTracker('Spiritual Weapon')], 'Spiritual Weapon', 2);
     expect(armed.verdict).toBe(true); // interleave ORDER law only — the #9 latch decision is oracle-owned (:417, cited)
-    expect(armed.reads[armed.reads.length - 1]).toEqual([CASTER, '_War_Gods_Blessing_active']); // deciding LAST read is #9's 2-arg latch probe
+    expect(armed.reads[armed.reads.length - 1]).toEqual([CASTER, '_War_Gods_Blessing_active', CAMPAIGN]); // deciding LAST read is #9's campaign-tier latch probe (unified)
     expect(armed.keys).not.toContain('_Struct_Lane_Tracker_Spiritual_Weapon_freeCastCount'); // #10 never ran
 
     mem.delete('_War_Gods_Blessing_active');
@@ -387,7 +387,7 @@ describe('L1 uses_expression NAME arm vs the usesMax-absent FALSE arm (specialAc
     const derived = diskEntry(contactPatron, { usesMax: 1 }); // documented byte: cla229 re-resolve of expression '1'
     const fresh = cast('specialActions', [derived], 'Contact Other Plane', 5);
     expect(fresh.verdict).toBe(true); // featureLevel null -> name arm :104, absent ?? 1 ALLOW
-    expect(fresh.reads[fresh.reads.length - 1]).toEqual([CASTER, '_Contact_Patron_freeCastCount']);
+    expect(fresh.reads[fresh.reads.length - 1]).toEqual([CASTER, '_Contact_Patron_freeCastCount', CAMPAIGN]);
 
     mem.set('_Contact_Patron_freeCastCount', 0);
     const spent = cast('specialActions', [derived], 'Contact Other Plane', 5);
@@ -419,7 +419,7 @@ describe('L5/L6 shared-array lane bytes, type-filter predication and empty-list 
     mem.set(wgbKey, ['Spiritual Weapon']);
     const allow = cast('bonusActions', [diskEntry(wgb)], 'Spiritual Weapon', 2);
     expect(allow.verdict).toBe(true);
-    expect(allow.reads[allow.reads.length - 1]).toEqual([CASTER, wgbKey]); // :116-:118 2-arg probe is the deciding read
+    expect(allow.reads[allow.reads.length - 1]).toEqual([CASTER, wgbKey, CAMPAIGN]); // :116-:118 campaign-tier probe is the deciding read (unified)
     mem.set(wgbKey, null); // REAL production null — LR re-arm byte (#1517 store-faithful)
     expect(cast('bonusActions', [diskEntry(wgb)], 'Spiritual Weapon', 2).verdict).toBe(false); // `stored &&` falsy-guard arm
     mem.set(wgbKey, 'Spiritual Weapon'); // non-array truthy
@@ -432,7 +432,7 @@ describe('L5/L6 shared-array lane bytes, type-filter predication and empty-list 
     for (const t of FREE_CAST_ENTRY_TYPES) {
       const { verdict, reads } = cast('specialActions', [{ type: t, name: `Struct ${t} Lane`, spell: 'Magic Missile', uses: 1, recharge: 'long_rest' }], 'Magic Missile', 1);
       expect(verdict, t).toBe(true); // TYPE-predicate admission pinned via the generic :114 grant — feature faces live in cla130/cla138/wildCompanion
-      expect(reads[reads.length - 1]).toEqual([CASTER, `_Struct_${t}_Lane_freeCastCount`]);
+      expect(reads[reads.length - 1]).toEqual([CASTER, `_Struct_${t}_Lane_freeCastCount`, CAMPAIGN]);
     }
     for (const bad of ['other_type', 'Free_Spell', 'MISTY_WANDERER', 'fey_reinforcement']) {
       const { verdict, keys } = cast('specialActions', [{ type: bad, name: `Struct ${bad} Lane`, spell: 'Magic Missile', uses: 1, recharge: 'long_rest' }], 'Magic Missile', 1);

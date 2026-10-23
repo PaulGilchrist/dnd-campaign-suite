@@ -31,17 +31,16 @@
 //
 // LATCH ARITHMETIC PINS (fresh/spent canon #1510/#1517): this latch is NOT a
 // counter — there is no uses/usesMax coalesce and no decrement. Fresh-paid =
-// array armed (stamp by modal, arity-2 auth probe :117 decides); spent = the
+// array armed (stamp by modal, unified campaign-tier auth probe :117 decides); spent = the
 // REAL null written by :476 (store-faithful #1517 — null is the production
 // consume byte, never undefined); spent-0-equivalent refuses with READ-happens-
 // WRITE-silent (#1515 distinction). Re-arm lives ONLY in restRules-constants
 // LONG_REST_RESOURCES (#1510-constants family, NO-CLOCK — zero timers here).
 //
-// ARITY vs REAL (home census spellPreparationService.resource-flow.test.js
-// :427-:428, cited not re-grown): the AUTH probe is the 2-arg default tier
-// (:117 [name,key]); the CONSUME read is campaign-tier arity-3 (:474
-// [name,key,campaign]) and the consume write arity-4 (:476). Both forms are
-// byte-pinned per row below — an arity-uniform mutant dies in the ledgers.
+// ARITY vs REAL (owner unify call, asymmetry CLOSED): the AUTH probe and the
+// CONSUME read are BOTH the explicit campaign-tier arity-3 form (:117 and :485
+// [name,key,campaign]) and the consume write arity-4 (:487). Both forms are
+// byte-pinned per row below — dropping campaignName anywhere dies in the ledgers.
 //
 // QUIRK SCANS: golden guard-row #1518 console-untouched (no console spies;
 // addEntry returns a resolved Promise so the service's unguarded .catch never
@@ -215,7 +214,7 @@ function auth(spellName, spellLevel, stats) {
   expect(addEntry).not.toHaveBeenCalled();
   expect(stats).toEqual(frozen);
   const reads = getRuntimeValue.mock.calls.slice(readsBefore);
-  expect(reads.every(r => r.length === 2 || r[2] === CAMPAIGN)).toBe(true);
+  expect(reads.every(r => r[2] === CAMPAIGN)).toBe(true); // #1520 forward-lock: EVERY read carries the explicit tier
   return { verdict, reads, keys: reads.map(r => r[1]) };
 }
 
@@ -235,11 +234,11 @@ describe('CLA-388 Wild Companion — paid-grant shared-key auth + consume in spe
     expect(ff5e.casting_time).toBe('1 hour'); // ruleset near-copy distinguished by the 2024 Ritual tag byte
   });
 
-  it('auth gate #8 shared array on the REAL disk entry: armed grants as the deciding 2-arg probe; absent, REAL-null, non-array, off-name and case-flipped stores all deny', () => {
+  it('auth gate #8 shared array on the REAL disk entry: armed grants as the deciding campaign-tier probe; absent, REAL-null, non-array, off-name and case-flipped stores all deny', () => {
     mem.set(GRANT, ['Find Familiar']);
     const allow = auth('Find Familiar', 1, druidStats());
     expect(allow.verdict).toBe(true);
-    expect(allow.reads[allow.reads.length - 1]).toEqual([CASTER, GRANT]); // :117 2-arg default tier decides and HALTS the scan
+    expect(allow.reads[allow.reads.length - 1]).toEqual([CASTER, GRANT, CAMPAIGN]); // :117 unified campaign-tier read decides and HALTS the scan
 
     // Every falsy/off-list store denies with the probe still made (#1518 `stored &&`
     // + Array.isArray + exact-name includes arms), read-only, never re-armed.
@@ -274,7 +273,7 @@ describe('CLA-388 Wild Companion — paid-grant shared-key auth + consume in spe
     // Exact-of-1 write-set: the single grant clear, campaign carried (:476 arity-4).
     expect(setRuntimeValue.mock.calls).toEqual([[CASTER, GRANT, null, CAMPAIGN]]);
     expect(mem.get(GRANT)).toBe(null); // REAL production null — the spent byte T4 re-reads (#1517)
-    // Consume read is the campaign-tier arity-3 form (:474) — distinct from the auth probe.
+    // Consume read is the same unified campaign-tier arity-3 form as the auth probe.
     const grantReadIdx = getRuntimeValue.mock.calls.findIndex(r => r.length === 3 && r[1] === GRANT);
     expect(grantReadIdx).toBeGreaterThanOrEqual(0);
     expect(getRuntimeValue.mock.invocationCallOrder[grantReadIdx]).toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]);

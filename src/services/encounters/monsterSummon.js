@@ -205,6 +205,19 @@ export function buildSummonPopup({ monsterName, summonedNames, verdict, remainin
   return `<div class="mc-prerequisite-refusal"><h3>${monsterName} summons ${names}</h3><p>${flip}${crowd} the fight as ${ally} of ${monsterName}, acting right after it${stay}${summonCountNote(countRoll)}${usesNote}</p></div>`;
 }
 
+// fix#79 census (#1136 selfAura precedent): the mid-flight double-spend
+// refusal in gateAndSpendSummon used to be LOG-ONLY — spendMonsterAbilityUse
+// logs `${slug}_refused` with a loud console guard, but the raced second
+// click saw NOTHING. Now it answers in the UI. House refusal-popup SHAPE
+// (mc-prerequisite-refusal div, 'refused' / 'no … spent' / 'reset at dawn
+// (GM-enforced for monsters)' vocabulary — buildAbilitySaveRefusalPopup
+// CANON) with reason-DISTINCT words (#1348): the gate-exhausted arm says
+// 'Uses Exhausted'; this arm fired because the spend raced a preceding click
+// that already burned the use mid-flight, so it says 'Already Summoning'.
+export function buildSummonDoubleSpendRefusalPopup({ monsterName, useKey, maxUses }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Already Summoning</h3><p>${monsterName} is already summoning via ${useKey} — a preceding click spent the ${maxUses}/Day use. ${useKey} refused: no second use spent, no summons arrive. Uses reset at dawn (GM-enforced for monsters).</p></div>`;
+}
+
 function getCasterInitiativeValue(combatSummary, casterName) {
   const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
   if (casterCreature?.initiative !== '' && casterCreature?.initiative !== undefined) {
@@ -295,7 +308,15 @@ async function gateAndSpendSummon({ action, monsterName, campaignName, setPopupH
   }
   if (!gate) return { ok: true, remaining: null };
   const remaining = await spendMonsterAbilityUse({ monsterName, use: { useKey: gate.useKey, maxUses: gate.maxUses, actionName: action.name }, campaignName, deps });
-  return remaining == null ? { ok: false } : { ok: true, remaining };
+  if (remaining == null) {
+    // fix#79 census (#1136 precedent): mid-flight refused spend no longer
+    // refuses silently — the raced second click answers with the reason-
+    // distinct 'Already Summoning' popup. Log stays (spendMonsterAbilityUse
+    // already logged `${slug}_refused`, zero spend, audit side correct).
+    setPopupHtml(buildSummonDoubleSpendRefusalPopup({ monsterName, useKey: gate.useKey, maxUses: gate.maxUses }));
+    return { ok: false };
+  }
+  return { ok: true, remaining };
 }
 
 function spawnSummonedCreatures({ combatSummary, monster, monsterName, campaignName, count, durationMinutes, summonMods, deps }) {

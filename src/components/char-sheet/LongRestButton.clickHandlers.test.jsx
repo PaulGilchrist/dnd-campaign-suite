@@ -144,10 +144,40 @@ describe('LongRestButton - click dispatch', () => {
     expect(captured.props.note).toMatch(/\b5 temporary hit points/);
     expect(captured.props.note).toMatch(/\b10 temporary hit points/);
 
+    // Coupling pin (fix#158/fix#164 law): the number in the description is
+    // the SAME celestialResilienceModal.maxTargets forwarded to the picker
+    // at LongRestButton.jsx:67/:68 — never a retyped literal. The default 5
+    // is producer-owned: celestialResilienceHandler.js:70 (auto.maxAllies
+    // || 5) mapped through restRules-longRest.js:392 into this payload.
+    expect(captured.props.description).toBe(`Choose up to ${celestialData.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`);
+    expect(Number(captured.props.description.match(/up to (\d+)/)[1])).toBe(captured.props.maxTargets);
+
     // The rest is deferred until the player decides — nothing applied yet
     // (confirm/skip behaviour is covered in modalInteractions).
     expect(onLongRest).not.toHaveBeenCalled();
     expect(tempHpService.setTempHp).not.toHaveBeenCalled();
     expect(logService.addEntry).not.toHaveBeenCalled();
   });
+
+  // Drift arms (fix#164 recipe): non-default caps from the rest grant must
+  // flow into the copy verbatim; 5 is the producer-default intact arm.
+  it.each([3, 5])(
+    'description interpolates maxTargets=%i from the grant, matching the picker cap it advertises',
+    async (maxTargets) => {
+      restRules.applyLongRest.mockResolvedValue({ celestialResilienceAllies: { ...celestialData, maxTargets } });
+
+      render(<LongRestButton {...makeProps({ onLongRest: vi.fn() })} />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button'));
+      });
+
+      await screen.findByTestId('creature-selection-modal');
+
+      // Copy number extracted from prose EQUALS the value passed to the picker.
+      expect(captured.props.maxTargets).toBe(maxTargets);
+      expect(captured.props.description).toBe(`Choose up to ${maxTargets} allies to gain temporary hit points from your Celestial Resilience.`);
+      expect(Number(captured.props.description.match(/up to (\d+)/)[1])).toBe(captured.props.maxTargets);
+    }
+  );
 });

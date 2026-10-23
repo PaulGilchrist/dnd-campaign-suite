@@ -19,6 +19,13 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// Presence+non-empty selector (#1180, fix#39/fix#184 sibling law): [] is truthy,
+// so `pool || other || []` chains guard only ABSENT keys — a PRESENT-but-EMPTY
+// array reaches pick([]) === undefined. Returns the first pool that is both.
+function firstNonEmpty(...pools) {
+  return pools.find(pool => Array.isArray(pool) && pool.length > 0);
+}
+
 function pickN(arr, n) {
   const copy = [...arr];
   const result = [];
@@ -285,13 +292,24 @@ export async function generateNPC(existingNPCs = []) {
   const gender = Math.random() > 0.5 ? 'male' : 'female';
 
   const raceNames = names[race];
-  let name;
-  if (raceNames && raceNames[gender] && raceNames[gender].length > 0) {
-    name = pick(raceNames[gender]);
-  } else {
-    const fallbackNames = names['Human'];
-    name = pick(fallbackNames[gender] || fallbackNames['male'] || []);
+  // Presence+non-empty law (#1180): the old fallback
+  // `pick(fallbackNames[gender] || fallbackNames['male'] || [])` short-circuited
+  // only on ABSENT keys — a present-but-empty Human gender pool leaked
+  // pick([]) === undefined as an unnamed NPC slot (npc.name === undefined then
+  // crashes getDefaultFormData consumers via formData.name.trim()). Mirror the
+  // same fallback SHAPE race->Human(gender)->Human(male), every arm length-checked;
+  // exhausted data is LOUD (#app no-fallbacks), never an undefined leak.
+  const humanNames = names['Human'];
+  const namePool = firstNonEmpty(
+    raceNames && raceNames[gender],
+    humanNames && humanNames[gender],
+    humanNames && humanNames['male']
+  );
+  if (!namePool) {
+    console.error(`npcGenerator: no non-empty name pool for race '${race}' gender '${gender}' (Human fallback empty or absent)`);
+    throw new Error('npcGenerator: name data has no usable pool');
   }
+  const name = pick(namePool);
 
   const classRole = pick(traits.classRoles);
   const attitude = pick(traits.attitudes);

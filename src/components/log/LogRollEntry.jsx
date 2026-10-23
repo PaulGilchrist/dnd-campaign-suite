@@ -49,7 +49,7 @@ function RollAttackBadges({ entry }) {
     <>
       {entry.hit !== undefined && (
         <span className={`log-hit-miss ${entry.hit ? 'log-hit' : 'log-miss'}`}>
-          {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')} {entry.targetAc != null ? `(AC ${entry.targetAc})` : ''}
+          {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')}{entry.targetAc != null ? ` (AC ${entry.targetAc})` : ''}
         </span>
       )}
       {entry.isCrit && !entry.isNatural1 && (
@@ -110,7 +110,7 @@ function SaveInfoBadge({ entry }) {
   if (!entry.saveType || !entry.saveDc) return null;
   return (
     <span className="log-save-info">
-      {entry.saveType.toUpperCase()} save DC {entry.saveDc}&nbsp;
+      {entry.saveType.toUpperCase()} save DC {entry.saveDc}
       {entry.mode === 'disadvantage' && (
         <span className="log-mode-badge disadvantage">DISADVANTAGE</span>
       )}
@@ -183,13 +183,13 @@ function RollModifierBadges({ entry }) {
   return (
     <>
       {entry.baneRoll != null && (
-        <span className="log-bane-penalty"> -1d4 [Bane]: -{entry.baneRoll}</span>
+        <span className="log-bane-penalty">-1d4 [Bane]: -{entry.baneRoll}</span>
       )}
       {entry.subtractDieRoll != null && (
-        <span className="log-bane-penalty"> -{entry.subtractDie || '1d6'} [{entry.subtractDieDisplayLabel || 'Subtract Rider'}]: -{entry.subtractDieRoll}</span>
+        <span className="log-bane-penalty">-{entry.subtractDie || '1d6'} [{entry.subtractDieDisplayLabel || 'Subtract Rider'}]: -{entry.subtractDieRoll}</span>
       )}
       {entry.blessRoll != null && (
-        <span className="log-bless-bonus"> +1d4 [Bless]: +{entry.blessRoll}</span>
+        <span className="log-bless-bonus">+1d4 [Bless]: +{entry.blessRoll}</span>
       )}
       {entry.gwfApplied && entry.gwfOriginalRolls && (
         <span className="log-gwf">
@@ -197,10 +197,10 @@ function RollModifierBadges({ entry }) {
         </span>
       )}
       {entry.rayOfEnfeebleRoll != null && (
-        <span className="log-ray-enfeeblement"> -1d8 [Enfeeblement]: -{entry.rayOfEnfeebleRoll}</span>
+        <span className="log-ray-enfeeblement">-1d8 [Enfeeblement]: -{entry.rayOfEnfeebleRoll}</span>
       )}
       {entry.resistanceRoll != null && (
-        <span className="log-resistance"> -1d4 [Resistance]: -{entry.resistanceRoll}</span>
+        <span className="log-resistance">-1d4 [Resistance]: -{entry.resistanceRoll}</span>
       )}
     </>
   );

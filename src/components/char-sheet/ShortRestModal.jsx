@@ -696,8 +696,12 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const { total: mealTotal } = rollDice(1, 8);
             const mealBonus = Math.max(1, mealTotal);
             hp += mealBonus;
+            // run2#297: rolls stage locally (recoveredHp is committed only by
+            // handleComplete); the meal spend rides the same chokepoint. The old
+            // decrement here double-spent the pool when handleComplete re-read
+            // and subtracted again, and was clobbered anyway by applyShortRest's
+            // Chef refill (restRules-shortRest.js resetReplenishingMeals).
             setMealConsumed(true);
-            setRuntimeValue(playerStats.name, 'replenishingMeals', Number(replenishingMeals ?? 0) - 1, campaignName);
         }
         setRemainingHitDice(prev => prev - 1);
         setRecoveredHp(prev => prev + hp);
@@ -712,13 +716,12 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         for (let i = 0; i < remainingHitDice; i++) {
             const { total, rolls } = rollDice(1, hitDie);
             let hp = computeHitDieRecovery(total, conBonus);
-            if (hasMeal && !mealApplied) {
+            if (hasMeal && !mealConsumed && !mealApplied) {
                 const { total: mealTotal } = rollDice(1, 8);
                 const mealBonus = Math.max(1, mealTotal);
                 hp += mealBonus;
                 mealApplied = true;
                 setMealConsumed(true);
-                setRuntimeValue(playerStats.name, 'replenishingMeals', Number(replenishingMeals ?? 0) - 1, campaignName);
             }
             totalHp += hp;
             newRolls.push({ roll: rolls[0], hp });
@@ -795,9 +798,16 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         // Apply base short rest logic (resource clearing, feature clearing, expiration)
         const restResult = await applyShortRest(playerStats, campaignName, { skipAutoRecovery: true });
 
-        // Replenishing Meal was consumed during this rest — subtract 1 from the reset value
+        // run2#297 SINGLE owner of the Replenishing Meal spend. Disk law (feats.json Chef
+        // > Replenishing Meal): consumed "At the end of the Short Rest ... spends one or
+        // more Hit Dice" — end-of-rest is the commit point, where HP and hit dice land
+        // below. Rolls no longer decrement (they stage locally and Cancel discards them).
+        // Fresh-read AFTER applyShortRest (a Chef's pool refills to 4+prof inside it) and
+        // subtract exactly 1, floored at 0 (mirrors CharSpecialActions' distribute clamp —
+        // a distributed-meal recipient with no refill must not go negative).
         if (mealConsumed) {
-            setRuntimeValue(playerStats.name, 'replenishingMeals', Number(getRuntimeValue(playerStats.name, 'replenishingMeals', campaignName) ?? 0) - 1, campaignName);
+            const mealsNow = Number(getRuntimeValue(playerStats.name, 'replenishingMeals', campaignName) ?? 0);
+            setRuntimeValue(playerStats.name, 'replenishingMeals', Math.max(0, mealsNow - 1), campaignName);
         }
 
         // Check if Celestial Resilience needs ally selection
@@ -909,7 +919,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                             icon="fa-shield-hart"
                             targets={celestialResilienceModal.creatureTargets}
                             maxTargets={celestialResilienceModal.maxTargets}
-                            description="Choose up to 5 allies to gain temporary hit points from your Celestial Resilience."
+                            description={`Choose up to ${celestialResilienceModal.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`}
                             note={`You gain ${celestialResilienceModal.selfTempHp} temporary hit points. Each selected ally gains ${celestialResilienceModal.allyTempHp} temporary hit points.`}
                             confirmLabel="Grant Resilience"
                             confirmIcon="fa-shield-hart"

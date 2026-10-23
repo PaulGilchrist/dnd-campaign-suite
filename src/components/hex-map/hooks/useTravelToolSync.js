@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { TOOL_TRAVEL } from '../../../config/outdoorConfig.js';
+import { TOOL_NONE, TOOL_TRAVEL } from '../../../config/outdoorConfig.js';
 
 function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool) {
     const toolInitRef = useRef(true);
@@ -18,7 +18,9 @@ function useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool) {
             travelMgmt.startPlanning();
             handleGenerateWeather();
         } else if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
-            setTool(TOOL_TRAVEL === tool ? 'none' : tool);
+            // Domain rule: the travel tool may stay selected only while travel is
+            // live — if travel goes inactive mid-selection, force the tool off.
+            setTool(TOOL_NONE);
         } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
             travelMgmt.cancelTravel();
         }

@@ -37,7 +37,8 @@ const makePlayerStats = (overrides = {}) => ({
 const makeProps = (overrides = {}) => ({
   playerStats: makePlayerStats(overrides.playerStatsOverrides),
   campaignName: 'test-campaign',
-  automation: overrides.automation ?? { conversionRate: 'level_2_plus' },
+  // automation.conversionRate no longer read: disk authors only 'level_2_plus'
+  // and the fantasy all-levels fallback was deleted (test-maintain 🗑 #145).
   onClose: overrides.onClose || vi.fn(),
 });
 
@@ -82,6 +83,14 @@ describe('MoonlightStepResourceModal', () => {
     expect(rows[0].textContent).toContain('1 / 3'); // runtime override
     expect(rows[1].textContent).toContain('3 / 3'); // clamped from 999
     expect(rows[4].textContent).toContain('0 / 0'); // untouched empty level
+  });
+
+  it('renders rows for exactly levels 2-9 driven by availableSlots — never level 1 (disk conversionRate level_2_plus)', () => {
+    // Character holds 4 level-1 slots in makePlayerStats; a level-1 row would
+    // mean the deleted all-levels fantasy path leaked back into the display.
+    render(<MoonlightStepResourceModal {...makeProps()} />);
+    const levels = getSlotRows().map(row => row.cells[0].textContent);
+    expect(levels).toEqual(['2', '3', '4', '5', '6', '7', '8', '9']);
   });
 
   it('selecting a level updates the button label and expends that level on convert', () => {

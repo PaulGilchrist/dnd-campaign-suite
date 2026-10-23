@@ -785,6 +785,18 @@ describe('reactionBonusHandler', () => {
             );
             expect(result.payload.description).toContain('No recent attack targeting');
             expect(toggleBuff).not.toHaveBeenCalled();
+
+            // fix#201 shared-parser arm: digit-less '+' keeps the full name —
+            // old inline substring(3) ternary produced 'hortsword' (catalog
+            // miss, false Finesse refusal). Must reach the same rejection.
+            result = await handle(
+                makeAction({ automation: { effect: 'ac_bonus' } }),
+                makePlayerStats({ equipped: ['+ Shortsword'], equipment: [finesseWeapon] }),
+                CAMPAIGN, MAP
+            );
+            expect(result.payload.description).not.toContain('must be wielding a Finesse weapon');
+            expect(result.payload.description).toContain('No recent attack targeting');
+            expect(toggleBuff).not.toHaveBeenCalled();
         });
 
         it('should activate when Finesse weapon and attack targeting player', async () => {

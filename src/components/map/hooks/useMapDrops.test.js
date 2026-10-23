@@ -8,8 +8,11 @@
 //   character 6+7+8 → "obstacle snap"; character 9 → "duplicate names"; character 10+12 → removed
 //   (mis-titled / malformed-state quirk pins); npc 14 → "NPC payload"; npc 15+18+furniture 18 →
 //   "visible gate"; furniture 19+20+23 → "furniture payload"; furniture 21+22 → "rotation whitelist";
-//   npc 18+furniture 24 → "fresh guid". Removed quirk pins: whitespace-drop furniture, NaN-grid
-//   placement, negative-coord Math.floor (JS spec, not this hook).
+//   npc 18+furniture 24 → "fresh guid". Quirk pins restored as LAW pins (fix for whitespace/NaN defect):
+//   whitespace-only dragData REFUSED (strict-presence fix#39 — no phantom type:'   ' item),
+//   non-finite grid coords REFUSED loud (numeric law fix#121 — no NaN cells persisted), nameless
+//   'character:' REFUSED (same-class). Unknown non-empty types stay lawful ("treat unknown types
+//   as furniture" contract, ItemsPanel has no exported manifest to validate against).
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMapDrops from './useMapDrops.js';
@@ -83,6 +86,52 @@ describe('useMapDrops', () => {
     expect(setPlacedItems).not.toHaveBeenCalled();
     expect(mapData.players).toHaveLength(0);
     expect(placedItems).toHaveLength(0);
+  });
+
+  it('#1348 refuses whitespace-only dragData (strict-presence fix#39): no phantom type:"   " item', () => {
+    const result = getHook();
+    const spaces = dropAt(result, '   ');
+    const tabsNewlines = dropAt(result, ' \t\n ');
+    // Nameless character payloads are the same-class garbage: refuse, no player.
+    dropAt(result, 'character:');
+    dropAt(result, 'character:   ');
+    expect(spaces.preventDefault).toHaveBeenCalledTimes(1);
+    expect(tabsNewlines.preventDefault).toHaveBeenCalledTimes(1);
+    expect(setPlacedItems).not.toHaveBeenCalled();
+    expect(setMapData).not.toHaveBeenCalled();
+    expect(placedItems).toHaveLength(0);
+    expect(mapData.players).toHaveLength(0);
+  });
+
+  it('#1348 refuses non-finite drop coords loud with no write (numeric law fix#121)', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook();
+    dropAt(result, 'table', { gridX: NaN, gridY: 3 });
+    dropAt(result, 'npc', { gridX: 2, gridY: NaN });
+    dropAt(result, 'table', { gridX: Infinity, gridY: 1 });
+    dropAt(result, 'character:Aria', { gridX: 4, gridY: -Infinity });
+    expect(errSpy).toHaveBeenCalledTimes(4);
+    expect(errSpy.mock.calls[0][0]).toContain('non-finite grid coords (NaN, 3)');
+    expect(setPlacedItems).not.toHaveBeenCalled();
+    expect(setMapData).not.toHaveBeenCalled();
+    expect(placedItems).toHaveLength(0);
+    expect(mapData.players).toHaveLength(0);
+    errSpy.mockRestore();
+  });
+
+  it('#1348 keeps valid drops intact past the tightened guards: floored finite coords and exact payloads', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const result = getHook();
+    dropAt(result, 'table', { gridX: 7.9, gridY: 2.1 }); // finite fractional → floored, placed
+    dropAt(result, 'npc', { gridX: 0, gridY: 0 });        // zero is finite and lawful
+    dropAt(result, 'character:Bran', { gridX: 1.5, gridY: 1.5 });
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(placedItems.map((i) => [i.type, i.gridX, i.gridY])).toEqual([
+      ['table', 7, 2],
+      ['npc', 0, 0],
+    ]);
+    expect(mapData.players).toEqual([{ id: 'bran', name: 'Bran', gridX: 1, gridY: 1 }]);
+    errSpy.mockRestore();
   });
 
   it('drops a character at the floored cell with the exact payload and preserves other map data', () => {

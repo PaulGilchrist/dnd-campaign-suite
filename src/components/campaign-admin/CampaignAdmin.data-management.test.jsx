@@ -178,6 +178,18 @@ describe('URL-encoding of the campaign name', () => {
             fireEvent.click(screen.getByRole('button', { name: button }));
             await waitFor(() => {
                 expect(countPosts(fetchMock, postUrl(campaignName, path))).toBe(1);
+                // The POST count turns true the instant the fetch is *dispatched*,
+                // while all three action buttons are still busy-disabled (the
+                // 'clearing-*' setStatus rendered inside the click). Clicking the
+                // next button in that window is silently swallowed by jsdom for
+                // disabled buttons (same behavior pinned by the busy test above),
+                // its POST never fires, and the waitFor times out — a coin flip
+                // between RTL's setTimeout(0) drain and React's MessageChannel
+                // success commit that only inverts under full-suite CPU load
+                // (flake watch batch #134). Gate on the success commit itself:
+                // the busy status clearing and the button re-enabling is the
+                // causal signal that the lane is ready for the next action.
+                expect(screen.getByRole('button', { name: button })).toBeEnabled();
             });
         }
         // No unencoded campaign name ever leaves the client.

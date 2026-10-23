@@ -32,13 +32,27 @@
 //     -> 1 + level, level missing -> 1.
 //   gloriousDefense  :259       "The bonus equals your Charisma modifier
 //     (minimum of +1)" -> Math.max(CHA, 1), paladin-gated.
-//   naturalRecovery  :307       Math.floor(level/2). DRIFT (reported):
-//     5e classes.json "combined level ... half your druid level (rounded
-//     up)" -> lv5 disk=3, code=2; floor is pinned to match the code.
+//   naturalRecovery  :307       fix#134 (#1532): ruleset-aware half.
+//     5e classes.json Druid/Land lv2 "Natural Recovery": "combined level
+//     that is equal to or less than half your druid level (rounded up)"
+//     -> CEIL (lv5=3; old floor lv5=2 captured pre-fix by this lane).
+//     2024/classes.json Circle of the Land lv6: "combined levels equal to
+//     or less than half your Druid level" — NO round-up clause; integer
+//     slot levels <= half -> FLOOR (lv7=3). Below the per-edition grant
+//     level (5e lv2, 2024 lv6) -> 0 (disk rows grant at those levels).
 //   moonlightStep    :311       2024 classes.json "Uses equal to Wisdom
 //     modifier"; code adds a 1-floor via wisGatedPool (:297-300).
-//   cosmicomen       :314       level>=6 Stars gate (#1515 family); DRIFT
-//     (reported): disk grants one omen per Long Rest, code seeds max(WIS,1).
+//   cosmicomen       :314       level>=6 Stars gate (#1515 family). #1532-b
+//     claim "disk law = one omen per LR, seed should cap 1" is
+//     DISPROVEN-BYTE-CITED: 2024/classes.json Circle of the Stars lv6
+//     'Cosmic Omen' says "You can use this Reaction a number of times
+//     equal to your Wisdom modifier (minimum of once), and you regain all
+//     expended uses when you finish a Long Rest" + automation
+//     .uses_expression "WIS modifier" -> max(WIS,1) IS the disk law.
+//     The one-per-LR law rides a DIFFERENT key: cosmicOmenEffect rolls
+//     exactly ONE omen per Long Rest (restRules-longRest.js
+//     resetStarMapOnLongRest :519-535). Consumers honor the seed:
+//     cosmicOmenHandler.js :11-31 + TrackedResourceInput.jsx :13 max={max}.
 //   adrenalineRush   :164-168   UA Thief-style: uses = proficiency bonus,
 //     gated on automation.specialActions effect 'bonus_action_dash'.
 //   featsOfChaos   :371-378     2024 classes.json: one use until slot-cast
@@ -75,6 +89,9 @@
 // No dead module mocks. Campaign lockdown N/A: no campaign strings here.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import classes2024 from '../../../public/data/2024/classes.json';
+import classes5e from '../../../public/data/classes.json';
 
 vi.mock('../character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
@@ -163,15 +180,38 @@ describe('computeTrackedResources — additional seed lanes', () => {
     for (const [label, stats, expected] of rows) expectPool(stats, ['gloriousDefenseUses'], expected, label);
   });
 
-  // :306-308 — code uses floor: lv7->3, lv5->2 (ceil mutant dies at lv5:
-  // disk ceil would say 3 — drift reported in header).
-  it('naturalRecoverySlots: floor(level/2) druid, 0 non-druid', () => {
+  // :306-308 — fix#134 (#1532): 5e disk "half your druid level (rounded
+  // up)" -> ceil; 2024 disk "equal to or less than half your Druid level"
+  // (no round-up clause) -> floor. Below the edition grant level -> 0
+  // (5e row lv2, 2024 row lv6). Pre-fix capture: lv5 5e seeded 2 (floor).
+  it('naturalRecoverySlots: 5e ceil(level/2) lv>=2, 2024 floor(level/2) lv>=6, 0 non-druid', () => {
     const rows = [
-      ['druid lv7 = 3', basePlayerStats({ class: druid(), level: 7 }), { current: 3, max: 3 }],
-      ['druid lv5 = 2 (floor, not ceil-3)', basePlayerStats({ class: druid(), level: 5 }), { current: 2, max: 2 }],
+      ['druid lv5 5e = 3 (ceil; pre-fix floor captured 2)', basePlayerStats({ class: druid(), level: 5 }), { current: 3, max: 3 }],
+      ['druid lv7 5e = 4 (ceil, was floor-3 pre-fix)', basePlayerStats({ class: druid(), level: 7 }), { current: 4, max: 4 }],
+      ['druid lv20 5e = 10 (ceil table)', basePlayerStats({ class: druid(), level: 20 }), { current: 10, max: 10 }],
+      ['druid lv2 5e = 1 (grant level, ceil(1))', basePlayerStats({ class: druid(), level: 2 }), { current: 1, max: 1 }],
+      ['druid lv3 5e = 2 (ceil(1.5))', basePlayerStats({ class: druid(), level: 3 }), { current: 2, max: 2 }],
+      ['druid lv1 5e -> 0 (disk grants lv2; ceil-pre-grant refused)', basePlayerStats({ class: druid(), level: 1 }), { current: 0, max: 0 }],
+      ['druid lv7 2024 = 3 (floor: lv7 half=3.5, combined <= half)', basePlayerStats({ rules: '2024', class: druid(), level: 7 }), { current: 3, max: 3 }],
+      ['druid lv6 2024 = 3 (grant level)', basePlayerStats({ rules: '2024', class: druid(), level: 6 }), { current: 3, max: 3 }],
+      ['druid lv5 2024 -> 0 (below 2024 disk lv6 row)', basePlayerStats({ rules: '2024', class: druid(), level: 5 }), { current: 0, max: 0 }],
       ['non-druid lv7 -> 0', basePlayerStats({ level: 7 }), { current: 0, max: 0 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['naturalRecoverySlots'], expected, label);
+  });
+
+  // fix#134 (#1532) disk law census — byte quotes for BOTH edition rows:
+  // 5e says rounded-UP (ceil); 2024 omits the clause (floor by "<= half").
+  it('naturalRecovery disk law census: 5e "rounded up" bytes present, 2024 round-up clause absent', () => {
+    const nr5e = classes5e.find((c) => c.name === 'Druid').subclasses.find((s) => s.name === 'Land')
+      .class_levels.find((cl) => cl.level === 2).features.find((f) => f.name === 'Natural Recovery');
+    expect(nr5e.description).toContain('equal to or less than half your druid level (rounded up)');
+    expect(nr5e.description).not.toContain('rounded down');
+    const nr2024 = classes2024.find((c) => c.name === 'Druid').majors.find((m) => m.name === 'Circle of the Land')
+      .features.find((f) => f.name === 'Natural Recovery');
+    expect(nr2024.level).toBe(6);
+    expect(nr2024.description).toContain('combined levels equal to or less than half your Druid level');
+    expect(nr2024.description).not.toContain('rounded up');
   });
 
   // :111-116 + :132-134 — both passive shapes, formula 2*level + INT with
@@ -259,15 +299,33 @@ describe('computeTrackedResources — additional seed lanes', () => {
 
   // :313-314 — same wisGatedPool helper, level>=6 gate (#1515 family;
   // _Star_Map level>=3 gate at :316 is subclass-lane-owned, not here).
+  // fix#134 (#1532-b): the "cap should be 1" claim is DISPROVEN-BYTE-CITED
+  // in the census test below — disk law for cosmicomenUses is max(WIS,1);
+  // the ONE-per-LR law rides the DIFFERENT key cosmicOmenEffect
+  // (restRules-longRest.js resetStarMapOnLongRest). Consumers honor the
+  // seed max: cosmicOmenHandler.js :11-31 + TrackedResourceInput.jsx :13.
   it('cosmicomenUses: max(WIS,1) Stars druid at lv6 boundary, 0 below gate or off-circle', () => {
     const rows = [
       ['major Stars lv8 WIS 3', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 3 }], level: 8 }), { current: 3, max: 3 }],
       ['subclass Stars lv6 WIS 2 (gate boundary)', basePlayerStats({ class: druid({ subclass: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 2 }], level: 6 }), { current: 2, max: 2 }],
+      ['Stars lv8 WIS +5 -> 5 (disk: "times equal to your Wisdom modifier"; cap-1 would under-seed)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 8 }), { current: 5, max: 5 }],
       ['Stars lv5 -> 0 (below gate)', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 5 }), { current: 0, max: 0 }],
       ['Moon lv10 -> 0', basePlayerStats({ class: druid({ major: { name: 'Circle of the Moon' } }), abilities: [{ name: 'Wisdom', bonus: 5 }], level: 10 }), { current: 0, max: 0 }],
       ['Stars lv8 WIS no bonus -> 1', basePlayerStats({ class: druid({ major: { name: 'Circle of the Stars' } }), abilities: [{ name: 'Wisdom' }], level: 8 }), { current: 1, max: 1 }],
     ];
     for (const [label, stats, expected] of rows) expectPool(stats, ['cosmicomenUses'], expected, label);
+  });
+
+  // fix#134 (#1532-b) disk census: quote the omen law bytes this seed
+  // answers to — WIS-many REACTION USES here; one OMEN per Long Rest is
+  // the cosmicOmenEffect roll (restRules lane owns that seam).
+  it('cosmicomen disk law census: uses = WIS modifier min once; one-omen-per-LR rides cosmicOmenEffect, not this seed', () => {
+    const stars = classes2024.find((c) => c.name === 'Druid').majors.find((m) => m.name === 'Circle of the Stars');
+    const omen = stars.features.find((f) => f.name === 'Cosmic Omen');
+    expect(omen.level).toBe(6);
+    expect(omen.automation).toMatchObject({ type: 'cosmic_omen', uses_expression: 'WIS modifier', recharge: 'long_rest' });
+    expect(omen.description).toContain('You can use this Reaction a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest.');
+    expect(omen.description).toContain('Whenever you finish a Long Rest, you can consult your Star Map for omens and roll a die.');
   });
 
   // :371-378 — 1 + 0/1 caps ("one use", disk). Seeded by (2024 AND subclass

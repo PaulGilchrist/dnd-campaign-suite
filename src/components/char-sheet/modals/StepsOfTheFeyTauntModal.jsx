@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import CreatureSelectionModal from './shared/CreatureSelectionModal.jsx';
 import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -13,6 +13,22 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
     const [choice, setChoice] = useState(null);
+
+    // fix#145 family (ledger run2#257): every 'save-result' listener registered
+    // by waitForSaveResult on the taunting/dreadful confirm lanes is tracked in
+    // this listener ledger and drained on unmount. Pre-fix the anonymous handlers
+    // self-removed ONLY when the matching event arrived — closing the modal (parent
+    // setStepsOfTheFeyTauntModal(null), navigation, clobber by a newer modal)
+    // while saves were pending left stale handlers live on window forever, where a
+    // late save-result resolved the dead promise and ran setResult/setApplied and
+    // side effects against unmounted state.
+    const listenerLedgerRef = useRef([]);
+
+    useEffect(() => () => {
+        listenerLedgerRef.current.forEach((handleSaveResult) =>
+            window.removeEventListener('save-result', handleSaveResult));
+        listenerLedgerRef.current = [];
+    }, []);
 
     const playerName = playerStats.name;
     // CLA-037: Bewitching Magic rides this modal with NO uses limit — unlimited
@@ -170,6 +186,24 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         handleFreeCastSkip();
     };
 
+    // Shared by BOTH save lanes (taunting + dreadful) — one registration site,
+    // symmetric removal on both paths: arrival (self-remove + untrack, keeping the
+    // existing one-shot semantics) and unmount (drain via listenerLedgerRef).
+    // removeEventListener is idempotent, so the two paths can never double-fire an
+    // error; splicing on arrival means the unmount drain only ever sees truly
+    // pending handlers.
+    const waitForSaveResult = (targetName, promptId) => new Promise((resolve) => {
+        const handleSaveResult = (event) => {
+            if (event.detail.promptId !== promptId) return;
+            window.removeEventListener('save-result', handleSaveResult);
+            const index = listenerLedgerRef.current.indexOf(handleSaveResult);
+            if (index >= 0) listenerLedgerRef.current.splice(index, 1);
+            resolve({ targetName, success: event.detail.success });
+        };
+        listenerLedgerRef.current.push(handleSaveResult);
+        window.addEventListener('save-result', handleSaveResult);
+    });
+
     const handleTauntConfirm = async (selectedTargets) => {
         await decrementCount();
         const promptIds = [];
@@ -193,16 +227,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         }
 
         const saveResults = await Promise.all(
-            promptIds.map(({ targetName, promptId }) =>
-                new Promise((resolve) => {
-                    const handler = (event) => {
-                        if (event.detail.promptId !== promptId) return;
-                        window.removeEventListener('save-result', handler);
-                        resolve({ targetName, success: event.detail.success });
-                    };
-                    window.addEventListener('save-result', handler);
-                })
-            )
+            promptIds.map(({ targetName, promptId }) => waitForSaveResult(targetName, promptId))
         );
 
         let failedCount = 0;
@@ -295,16 +320,7 @@ function StepsOfTheFeyTauntModal({ mode, title, targets, action, playerStats, ca
         }
 
         const saveResults = await Promise.all(
-            promptIds.map(({ targetName, promptId }) =>
-                new Promise((resolve) => {
-                    const handler = (event) => {
-                        if (event.detail.promptId !== promptId) return;
-                        window.removeEventListener('save-result', handler);
-                        resolve({ targetName, success: event.detail.success });
-                    };
-                    window.addEventListener('save-result', handler);
-                })
-            )
+            promptIds.map(({ targetName, promptId }) => waitForSaveResult(targetName, promptId))
         );
 
         let failedCount = 0;

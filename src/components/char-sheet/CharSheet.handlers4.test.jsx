@@ -642,6 +642,8 @@ describe('handlePsiBolsteredKnack', () => {
     const { addEntry } = await import('../../services/ui/logService.js');
     expect(addEntry).toHaveBeenCalled();
     expect(addEntry.mock.calls[0][1].abilityName).toBe('Psi-Bolstered Knack');
+    // #1348: energy>0 success keeps the 'expended' wording intact.
+    expect(addEntry.mock.calls[0][1].description).toContain('Succeeded, energy expended');
   });
 
   it('does not expend energy when success is false', async () => {
@@ -662,7 +664,7 @@ describe('handlePsiBolsteredKnack', () => {
     expect(addEntry.mock.calls[0][1].description).toContain('Still failed, energy not expended');
   });
 
-  it('writes nothing at zero energy (and logs success verbatim — honest pin of current wording)', async () => {
+  it('does not decrement at zero energy and logs honest zero-energy wording (fix#537: never claims expenditure that did not happen)', async () => {
     const { getRuntimeValue, setRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
     getRuntimeValue.mockReturnValue(0);
 
@@ -678,7 +680,10 @@ describe('handlePsiBolsteredKnack', () => {
     expect(setRuntimeValue).not.toHaveBeenCalled();
     const { addEntry } = await import('../../services/ui/logService.js');
     expect(addEntry).toHaveBeenCalled();
-    expect(addEntry.mock.calls[0][1].description).toContain('Succeeded, energy expended');
+    const desc = addEntry.mock.calls[0][1].description;
+    expect(desc).toContain('Succeeded');
+    expect(desc).toContain('no Psionic Energy remaining to expend');
+    expect(desc).not.toContain('expended');
   });
 
   it('allows a proficient tool check and spends on success', async () => {

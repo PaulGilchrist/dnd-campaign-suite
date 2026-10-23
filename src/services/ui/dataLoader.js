@@ -190,7 +190,9 @@ export function getCachedPointBuyCosts(version = '5e') {
   if (!versionCache) return null;
   const cached = versionCache['rules-validation'];
   if (!cached) return null;
-  return cached.point_buy?.costs || null;
+  // The cached payload is the RAW version-keyed wrapper ({ '5e': {...}, '2024': {...} });
+  // unwrap by version before reaching point_buy (cached.point_buy was always undefined).
+  return cached[version]?.point_buy?.costs || null;
 }
 
 /**
@@ -465,6 +467,13 @@ export async function loadManeuvers(version = '5e') {
     const cacheKey = 'maneuvers';
     const versionCache = dataCache[version];
 
+    // Guard against invalid/missing version (mirrors the loadData guard sibling) —
+    // unknown versions are invalid input: log loudly, return honest [] without fetching.
+    if (!versionCache) {
+        console.error(`[dataLoader] Unknown ruleset version "${version}" passed to loadManeuvers — refusing with []`);
+        return [];
+    }
+
     if (versionCache[cacheKey]) {
         return versionCache[cacheKey];
     }
@@ -505,6 +514,13 @@ let spellsPromise = null;
 export async function loadSpells(version = '5e') {
     const cacheKey = 'spells';
     const versionCache = dataCache[version];
+
+    // Guard against invalid/missing version (mirrors the loadData guard sibling) —
+    // unknown versions are invalid input: log loudly, return honest [] without fetching.
+    if (!versionCache) {
+        console.error(`[dataLoader] Unknown ruleset version "${version}" passed to loadSpells — refusing with []`);
+        return [];
+    }
 
     if (versionCache[cacheKey]) {
         return versionCache[cacheKey];

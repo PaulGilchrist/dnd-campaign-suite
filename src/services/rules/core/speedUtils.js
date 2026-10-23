@@ -79,6 +79,13 @@ function speedPassiveBonus(passive, isWearingHeavyArmor, isWearingArmor, isWield
  * Apply speed increase bonuses from passive_buff features (e.g., Boon of Speed, Speedy feat).
  */
 export function applySpeedIncreasePassives(playerStats) {
+    // Apex guard (#204-class): loud posture — the file logs+throws for missing passives
+    // immediately below and console.errors every other data hole (:14/:104/:117).
+    // Consumer rules.js:561 is pre-gated (playerStats is the object built in getPlayerStats).
+    if (!playerStats) {
+        console.error('rules: missing playerStats for speed passives');
+        throw new Error('Missing playerStats: applySpeedIncreasePassives');
+    }
     const passives = playerStats.automation?.passives;
     if (!Array.isArray(passives)) {
         console.error('rules: expected passives to be an array for', playerStats.name);

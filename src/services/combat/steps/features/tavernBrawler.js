@@ -39,7 +39,7 @@ export const tavernBrawler = {
         type: 'ability_use',
         characterName: ps.name,
         abilityName: 'Tavern Brawler',
-        description: `Tavern Brawler Damage Reroll: rerolled ${rerollPairs.length} damage die ${rerollPairs.length === 1 ? 'showing' : 'showing'} 1 on ${ctx.attack.name} — new values ${rerollPairs.map(p => p.rerolled).join(', ')}.`,
+        description: `Tavern Brawler Damage Reroll: rerolled ${rerollPairs.length} damage ${rerollPairs.length === 1 ? 'die' : 'dice'} showing 1 on ${ctx.attack.name} — new values ${rerollPairs.map(p => p.rerolled).join(', ')}.`,
         targetName: ctx.targetName || null,
         timestamp: Date.now(),
       }).catch((e) => { console.error("[tavernBrawler:log-error]", e); });

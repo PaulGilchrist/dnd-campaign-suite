@@ -12,6 +12,7 @@ import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 import { findAttackRollAgainstTarget } from '../../common/damageRollback.js';
+import { parseMagicItemName } from '../../../rules/core/attackWeaponUtils.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -364,7 +365,7 @@ function hasEquippedFinesseWeapon(playerStats) {
     const equipped = playerStats.inventory?.equipped || [];
     for (const itemName of equipped) {
         if (!itemName || typeof itemName !== 'string') continue;
-        const baseName = itemName.charAt(0) === '+' ? itemName.substring(3) : itemName;
+        const { baseName } = parseMagicItemName(itemName);
         const item = playerStats.equipment?.find(e => e.name === baseName);
         if (!item) continue;
         const properties = item.properties || [];

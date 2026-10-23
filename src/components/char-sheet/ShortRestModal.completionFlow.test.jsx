@@ -8,7 +8,9 @@ const setRuntimeValueMock = vi.fn();
 const addEntryMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: () => null,
+  // useRuntimeValue mirrors the same fake store as getRuntimeValue (production shape)
+  // so meal-pool fixtures reach the modal's hasMeal gate (run2#297 probe).
+  useRuntimeValue: (...args) => getRuntimeValueMock(...args),
   getRuntimeValue: vi.fn((...args) => getRuntimeValueMock(...args)),
   setRuntimeValue: vi.fn((...args) => setRuntimeValueMock(...args)),
   setRuntimeBatch: vi.fn(),
@@ -260,4 +262,33 @@ describe('ShortRestModal - Completion Flow', () => {
       }
     }
   );
+
+  // run2#297 ledger probe: single spend owner (handleComplete). Rolls stage locally;
+  // the pool is decremented exactly once, from the fresh end-of-rest read.
+  describe('Replenishing Meal ledger (single spend owner)', () => {
+    const MEAL_PASSIVE = [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }];
+    const mealWrites = () => setRuntimeValueMock.mock.calls.filter(c => c[1] === 'replenishingMeals');
+
+    it('roll + complete spends exactly one meal: start 3 → end 2', async () => {
+      setupGetRuntimeValue({ replenishingMeals: 3, currentHitPoints: 30 });
+      renderModal({ automation: { passives: MEAL_PASSIVE } });
+      clickRollOne();
+      expect(mealWrites()).toHaveLength(0); // staged roll burns nothing
+      await completeRest();
+      expect(mealWrites()).toEqual([['Thorin', 'replenishingMeals', 2, mockCampaignName]]);
+      expect(shortRestEntry().message).toContain('Replenishing Meal consumed: +1d8 HP');
+    });
+
+    it('Roll All after Roll One cannot double-spend: one meal bonus, one write', async () => {
+      setupGetRuntimeValue({ replenishingMeals: 3, currentHitPoints: 30 });
+      renderModal({ automation: { passives: MEAL_PASSIVE } });
+      clickRollOne(); // meal consumed here: 4+2+4 = 10
+      fireEvent.click(screen.getByRole('button', { name: /Roll All/i })); // 4 dice, no second meal
+      await completeRest();
+      expect(mealWrites()).toHaveLength(1);
+      const { message } = shortRestEntry();
+      expect(message).toContain('(4→10, 4→6, 4→6, 4→6, 4→6) = 34 HP recovered');
+      expect(message).toContain('Current HP: 30 → 45');
+    });
+  });
 });

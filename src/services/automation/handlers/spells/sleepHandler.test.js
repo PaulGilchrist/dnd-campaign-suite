@@ -49,12 +49,20 @@ vi.mock('../../../rules/features/sleepService.js', () => ({
   stageSleepTargets: vi.fn(() => Promise.resolve([])),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the NPC auto-save d20 arrives via
+// diceRoller.rollD20 — npcRollFail/Success are now exact-face seed pins, the
+// old Math.random floor-boundary rigs (0 → roll 1, 0.999 → roll 20) are retired.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+}));
+
 import { handle } from './sleepHandler.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { isSleepImmune, stageSleepTargets } from '../../../rules/features/sleepService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'test-campaign';
 
@@ -87,13 +95,14 @@ const baseCombatContext = {
   placedItems: [],
 };
 
-// Math.random = 0 → roll 1; 0.999 → roll 20 (floor-boundary of the inline NPC roll)
+// rollD20 lane seed pins: fail lane rolls exact 1, success lane exact 20
+// (the two boundary faces the retired Math.random rigs were engineered to hit)
 function npcRollFail() {
-  vi.spyOn(Math, 'random').mockReturnValue(0);
+  diceRoller.rollD20.mockReturnValue(1);
 }
 
 function npcRollSuccess() {
-  vi.spyOn(Math, 'random').mockReturnValue(0.999);
+  diceRoller.rollD20.mockReturnValue(20);
 }
 
 function loggedEntries(type) {
@@ -128,6 +137,7 @@ describe('sleepHandler.handle', () => {
       expect(storeSpellLastAttack).not.toHaveBeenCalled();
       expect(createSaveListener).not.toHaveBeenCalled();
       expect(stageSleepTargets).not.toHaveBeenCalled();
+      expect(diceRoller.rollD20).not.toHaveBeenCalled();
     });
 
     it('returns popup when combat context has no creatures', async () => {
@@ -213,9 +223,10 @@ describe('sleepHandler.handle', () => {
         appliedDamage: 0,
       });
 
-      // Only Thug 1 staged; the immune target is excluded.
+      // Only Thug 1 staged; the immune target is excluded — and never rolled.
       expect(stageSleepTargets).toHaveBeenCalledTimes(1);
       expect(stageSleepTargets).toHaveBeenCalledWith(campaignName, 'TestCaster', ['Thug 1'], 17);
+      expect(diceRoller.rollD20).toHaveBeenCalledTimes(1);
       expect(result.payload.description).toBe('Sleep (DC 17): 1 Incapacitated until end of next turn, 1 succeeded (1 auto-succeeded).');
     });
 

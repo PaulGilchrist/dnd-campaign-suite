@@ -1,26 +1,42 @@
 // @maintained-by-ai
-// LANE — Dark One's Blessing damage-trigger CONSUMER seam: applyDamage.js:1040 reaches
-// checkDarkOnesBlessing (darkOnesBlessingService.js:49-54) after HP lands. This lane owns
+// LANE — Dark One's Blessing damage-trigger CONSUMER seam: applyDamage.js:1082 reaches
+// checkDarkOnesBlessing (darkOnesBlessingService.js:79-84 grant) after HP lands. This lane owns
 // the kill-trigger gating, the THP grant tuples, and the log bytes. The rider NEVER touches
-// finalDamage — it consumes it only as a guard operand (:50). Not a reroll, not a reducer.
+// finalDamage — it consumes it only as a guard operand (:104). Not a reroll, not a reducer.
 // Producer bytes consulted (#967):
-//   darkOnesBlessingService.js:6        :Fiend Patron subclass guard
-//   darkOnesBlessingService.js:10-11    feature lookup + automation truthiness
-//   darkOnesBlessingService.js:33-34    ally-list block on the dying creature's name
-//   darkOnesBlessingService.js:36       amount = Math.max(1, CHA mod + warlock level)
-//   darkOnesBlessingService.js:37-38    retain write: Math.max(existingTempHp, amount)
-//   darkOnesBlessingService.js:40-46    ability_use log — description pinned byte-exact
+//   darkOnesBlessingService.js:33-34    Fiend patron guard — fix#221 dual-ruleset
+//                                         names: 'Fiend Patron' (2024 disk :12409) OR
+//                                         'Fiend' (5e disk :12272), subclass OR major
+//   darkOnesBlessingService.js:44-46    feature lookup: specialActions PRIMARY +
+//                                         bonusActions fallback carrier (#221 5e shape),
+//                                         + automation truthiness
+//                                         (#1188: error label now names the field actually read)
+//   darkOnesBlessingService.js:14-17    bonusActions carrier-shape gate: absent OK
+//                                         (legacy), present-non-array loud throw (#221)
+//   darkOnesBlessingService.js:56-71    warlock level = computed.level (#1188 dead
+//                                         class_levels find/ternary deleted — see level-table arms)
+//   darkOnesBlessingService.js:79-80    ally-list block on the dying creature's name
+//   darkOnesBlessingService.js:82       amount = Math.max(1, CHA mod + warlock level)
+//   darkOnesBlessingService.js:83-84    retain write: Math.max(existingTempHp, amount)
+//   darkOnesBlessingService.js:86-92    ability_use log — description pinned byte-exact
+//   darkOnesBlessingService.js:95-104   :104 guard — finalDamage>0 operand KEEP-WITH-PROOF (#1188)
 //   applyDamage.js:1035-1040            guard operands wasAlive/isNowUnconscious/finalDamage>0
 //   applyDamage.js:870                  target-side THP absorb runs BEFORE the guard, so the
 //                                        store stub is keyed by `${name}.${key}` (#1137/#1057) —
 //                                        a warlock's existing THP must never leak onto the
 //                                        Goblin's absorb (the old positional stub did exactly that)
 // Guard-reach census (#1035): each T2 leg kills exactly ONE guard clause/operand —
-// :6 subclass, :10 missing feature, :11 automation:null, :34 allies, :50 wasAlive,
-// :50 isNowUnconscious (survives leg — absent from the old file). The :50
+// :33 subclass names, :45/:17 missing feature on both carriers, :46 automation:null,
+// :80 allies, :104 wasAlive,
+// :104 isNowUnconscious (survives leg — absent from the old file). The :104
 // finalDamage>0 operand is DEFENSIVELY REDUNDANT (wasAlive+isNowUnconscious imply
-// damageAfterTempHp>0 imply finalDamage>0) — no observable leg can kill it alone;
-// the immune leg is kept as its zero-damage byte pin, not an operand falsifier.
+// damageAfterTempHp>0 imply finalDamage>0 — KEEP-WITH-PROOF comment at :96-103) —
+// no observable leg can kill it alone; the immune leg is kept as its zero-damage
+// byte pin, not an operand falsifier (#1188 verdict: KEEP, not delete).
+// #1348 level-resolution table (resolveWarlockLevel post-#1188 has ONE live arm,
+// computed.level): T1 hit leg (class_levels [{level:5}] == level), T1 miss leg
+// (sparse [{level:3}] — slot value never counted), and T1 absent-shape leg
+// (no class_levels key: old chain THREW mid-kill, new shape grants 8).
 // Rider-active-vs-inactive legs are byte-distinct (#1022): active legs census exact
 // writes + exact log bytes (#app log exact); inactive legs census ZERO tempHp writes
 // AND ZERO blessing logs while damage bytes still land on the target (#1160 newHp pin).
@@ -36,11 +52,12 @@
 //   darkOnesLuckUses tracking → trackedResources(.Additional).test.js
 //   automation INFO row producer → automationInfoBuilder/temp.test.js :132-133/:336-340
 //
-// old -> new map (11 tests -> 3 it.each groups / 14 legs):
+// old -> new map (11 tests -> 3 it.each groups / 15 legs + 1 label-pin it):
 // - "grants temp HP equal to CHA modifier + warlock level..."   -> T1 full-fiend leg
 // - "grants minimum 1 temp HP..."                               -> T1 clamp leg (zero-is-data #945: writes 1, never skips)
 // - "uses Math.max instead of stacking..."                    -> T1 retain-high + upgrade legs (keyed-stub fix above; single warlock suffices)
-// - "falls back to character level..."                        -> T1 fallback leg (pins computed.level 5, NOT the class_levels slot 3)
+// - "falls back to character level..."                        -> T1 fallback leg (#1348 miss arm: pins computed.level 5, NOT the class_levels slot 3 — the old ternary arms were numerically identical, #1188 deleted the dead find)
+// - (new #1348)                                                 -> T1 absent-class_levels legacy-save arm (pre-fix THREW mid-kill; post-fix grants 8)
 // - "grants temp HP to each Fiend Patron warlock..."          -> T3 (distinct amounts 8/4, + unlimited-retain census)
 // - "does not grant ... non-Fiend Patron..."                  -> T2 non-fiend leg
 // - "does not grant ... missing or lacks automation..."       -> T2 missing-feature + automation-null legs
@@ -106,15 +123,21 @@ function makeCreature(name, hp, extra = {}) {
 
 // Fixture shape matches the producer row (automationInfoBuilder/temp.js :212-215):
 // the service reads subclass name, specialActions[].automation truthiness, the
-// Charisma bonus, and class_levels/level — nothing else (darkOnesBlessingService.js:5-25).
-function makeFiendWarlock(name, chaBonus, level, { patron = 'Fiend Patron', classLevels, specialActions } = {}) {
+// Charisma bonus, and level — NOT class_levels anymore (#1188 deleted the dead
+// find; omitClassLevels pins the legacy-save shape, #1348) — nothing else
+// (darkOnesBlessingService.js:20-71). fix#221 adds the OPTIONAL bonusActions
+// passthrough for the 5e-shape carrier (disk casting_time routes the row there —
+// featureCategorizationUtils.js :20); default stays undefined = legacy shape,
+// every pre-fix arm byte-intact.
+function makeFiendWarlock(name, chaBonus, level, { patron = 'Fiend Patron', classLevels, specialActions, bonusActions, omitClassLevels = false } = {}) {
   return {
     name,
     computedStats: {
       level,
-      class: { name: 'Warlock', subclass: { name: patron }, class_levels: classLevels ?? [{ level }] },
+      class: { name: 'Warlock', subclass: { name: patron }, ...(omitClassLevels ? {} : { class_levels: classLevels ?? [{ level }] }) },
       abilities: [{ name: 'Charisma', bonus: chaBonus }],
       specialActions: specialActions ?? [{ name: BLESSING, automation: { type: 'dark_ones_blessing' } }],
+      ...(bonusActions !== undefined ? { bonusActions } : {}),
     },
   };
 }
@@ -181,10 +204,16 @@ describe('Dark One\'s Blessing — rider ACTIVE (grant + log census)', () => {
       expectedWrite: ['LowStatWarlock', 1, CAMPAIGN], logAmount: 1,
     },
     {
-      title: 'level fallback: class_levels slot 3 vs computed.level 5 -> 3+5=8, NOT 3+3=6',
+      title: '#1348 miss arm: class_levels slot 3 vs computed.level 5 -> 3+5=8, NOT 3+3=6 (level counts computed.level; the deleted #1188 ternary arms were numerically identical, so the slot value was never observable)',
       warlock: () => makeFiendWarlock('FiendWarlock', 3, 5, { classLevels: [{ level: 3 }] }),
       overrides: {}, allyList: [],
       expectedWrite: ['FiendWarlock', 8, CAMPAIGN], logAmount: 8,
+    },
+    {
+      title: '#1348 absent arm: legacy save without class_levels -> grants 8 (old dead chain THREW mid-kill after HP landed; behavior delta pinned)',
+      warlock: () => makeFiendWarlock('LegacyWarlock', 3, 5, { omitClassLevels: true }),
+      overrides: {}, allyList: [],
+      expectedWrite: ['LegacyWarlock', 8, CAMPAIGN], logAmount: 8,
     },
     {
       title: 'unrelated name on ally list -> still grants (guard matches the victim only)',
@@ -203,6 +232,16 @@ describe('Dark One\'s Blessing — rider ACTIVE (grant + log census)', () => {
       warlock: () => makeFiendWarlock('FiendWarlock', 3, 5),
       overrides: { 'FiendWarlock.tempHp': 3 }, allyList: [],
       expectedWrite: ['FiendWarlock', 8, CAMPAIGN], logAmount: 8,
+    },
+    {
+      title: 'fix#221 5e-shape ACTIVE: subclass "Fiend" (5e disk :12272) + blessing carried in bonusActions via casting_time "1 bonus action" (5e disk :12416-12421 verbatim) -> grants 3+5=8 (pre-fix silently declined at BOTH :6 name guard and the specialActions-only read)',
+      warlock: () => makeFiendWarlock('Fi5eWarlock', 3, 5, {
+        patron: 'Fiend',
+        specialActions: [],
+        bonusActions: [{ name: BLESSING, automation: { type: 'temp_hp_buff', buffExpression: 'cha_modifier + warlock level', trigger: 'reduce_creature_to_0_hp', casting_time: '1 bonus action' } }],
+      }),
+      overrides: {}, allyList: [],
+      expectedWrite: ['Fi5eWarlock', 8, CAMPAIGN], logAmount: 8,
     },
   ])('$title', async ({ warlock, overrides, allyList, expectedWrite, logAmount }) => {
     getAllyList.mockReturnValue(allyList);
@@ -226,31 +265,41 @@ describe('Dark One\'s Blessing — guard falsifiers (rider INACTIVE, byte-distin
   // the zero-census below fail. Damage bytes still land — only the rider is absent (#1022).
   it.each([
     {
-      title: 'non-Fiend patron with the full feature row -> no grant (subclass guard :6)',
+      title: 'non-Fiend patron with the full feature row -> no grant (subclass guard :33)',
       target: () => makeCreature('Goblin', 5),
       warlock: () => makeFiendWarlock('OtherWarlock', 3, 5, { patron: 'Great Old One Patron' }),
       raw: 10, types: ['Slashing'], allyList: [], expectedHp: 0,
     },
     {
-      title: 'specialActions empty -> no grant (missing feature, :10)',
+      title: 'specialActions empty -> no grant (missing feature, :45)',
       target: () => makeCreature('Goblin', 5),
       warlock: () => makeFiendWarlock('NoFeatureWarlock', 3, 5, { specialActions: [] }),
       raw: 10, types: ['Slashing'], allyList: [], expectedHp: 0,
     },
     {
-      title: 'feature row with automation null -> no grant (:11)',
+      title: 'fix#221 falsifier: subclass "Fiend" but blessing on NEITHER carrier -> no grant (name-path miss on specialActions AND bonusActions)',
+      target: () => makeCreature('Goblin', 5),
+      warlock: () => makeFiendWarlock('Fi5eNoRow', 3, 5, {
+        patron: 'Fiend',
+        specialActions: [],
+        bonusActions: [{ name: "Dark One's Own Luck", automation: { type: 'dark_ones_luck', diceExpression: '1d10' } }],
+      }),
+      raw: 10, types: ['Slashing'], allyList: [], expectedHp: 0,
+    },
+    {
+      title: 'feature row with automation null -> no grant (:46)',
       target: () => makeCreature('Goblin', 5),
       warlock: () => makeFiendWarlock('NoAutomationWarlock', 3, 5, { specialActions: [{ name: BLESSING, automation: null }] }),
       raw: 10, types: ['Slashing'], allyList: [], expectedHp: 0,
     },
     {
-      title: 'target survives the hit -> no grant (kills :50 isNowUnconscious operand)',
+      title: 'target survives the hit -> no grant (kills :104 isNowUnconscious operand)',
       target: () => makeCreature('Goblin', 5),
       warlock: () => makeFiendWarlock('FiendWarlock', 3, 5),
       raw: 2, types: ['Slashing'], allyList: [], expectedHp: 3,
     },
     {
-      title: 'victim already at 0 HP -> no grant (kills :50 wasAlive operand)',
+      title: 'victim already at 0 HP -> no grant (kills :104 wasAlive operand)',
       target: () => { const g = makeCreature('Goblin', 5); g.currentHp = 0; return g; },
       warlock: () => makeFiendWarlock('FiendWarlock', 3, 5),
       raw: 10, types: ['Slashing'], allyList: [], expectedHp: 0,
@@ -262,7 +311,7 @@ describe('Dark One\'s Blessing — guard falsifiers (rider INACTIVE, byte-distin
       raw: 15, types: ['Necrotic'], allyList: [], expectedHp: 10,
     },
     {
-      title: 'victim named on the warlock\'s ally list -> no grant (:34)',
+      title: 'victim named on the warlock\'s ally list -> no grant (:80)',
       target: () => makeCreature('Goblin', 5),
       warlock: () => makeFiendWarlock('FiendWarlock', 3, 5),
       raw: 10, types: ['Slashing'], allyList: ['Goblin'], expectedHp: 0,
@@ -278,6 +327,22 @@ describe('Dark One\'s Blessing — guard falsifiers (rider INACTIVE, byte-distin
     expect(blessingLogs()).toEqual([]);
     expect(victim.currentHp).toBe(expectedHp); // damage bytes intact, rider absent (#1160)
     expect(result.newHp).toBe(expectedHp);
+  });
+
+  it('#1188 label pin: non-array specialActions rejects with the specialActions-bytes message (the old characterAdvancement lie must never return)', async () => {
+    getAllyList.mockReturnValue([]);
+    stubStore();
+    const warlock = makeFiendWarlock('FiendWarlock', 3, 5, { specialActions: 'not-an-array' });
+    await expect(applyTo(makeCreature('Goblin', 5), 10, ['Slashing'], [warlock])).rejects.toThrow('specialActions must be an array');
+    expect(tempHpWrites()).toEqual([]); // refusal is loud AND write-free
+  });
+
+  it('fix#221 carrier-shape pin: blessing absent from specialActions and bonusActions non-array rejects with the bonusActions-bytes message (symmetric loud gate; specialActions PRIMARY untouched)', async () => {
+    getAllyList.mockReturnValue([]);
+    stubStore();
+    const warlock = makeFiendWarlock('Fi5eWarlock', 3, 5, { patron: 'Fiend', specialActions: [], bonusActions: 'not-an-array' });
+    await expect(applyTo(makeCreature('Goblin', 5), 10, ['Slashing'], [warlock])).rejects.toThrow('bonusActions must be an array');
+    expect(tempHpWrites()).toEqual([]); // refusal is loud AND write-free (#1188 twin)
   });
 });
 

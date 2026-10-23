@@ -342,4 +342,46 @@ describe('CharBonusActions - Rendering', () => {
       expect(screen.getByText(spell.name)).toBeInTheDocument();
     });
   });
+
+  describe('omitted numeric props collapse to zero (Run2 #27 NaN class)', () => {
+    const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
+
+    it('weapon hit cell renders +5 (not NaN) when exhaustionPenalty prop is omitted', () => {
+      // ?? 0 at the signFormatter call site — absent exhaustion is the lawful
+      // no-exhaustion penalty (RAW exhaustion level 0); zero already rendered
+      // (see 'exhaustionPenalty={0}' pin above), so absent collapses to the
+      // identical zero render.
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} />);
+      expect(screen.getByText('+5')).toBeInTheDocument();
+      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    });
+
+    it('spell hit cell renders to-hit without NaN when exhaustionPenalty prop is omitted', () => {
+      const spell = { name: 'Shocking Grasp', level: 0, range: 'Touch', casting_time: '1 bonus action', attack_type: 'Melee Spell Attack', prepared: 'Prepared' };
+      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set([spell.name]));
+      render(<CharBonusActions playerStats={createStats({ spellAbilities: { toHit: 7, spells: [spell] } })} />);
+      expect(screen.getByText('+7')).toBeInTheDocument();
+      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    });
+
+    it('save DC attack cell renders DC 14 CON when saveDcBonus is absent', () => {
+      // getInnateSorceryBonus always returns numeric 0|1 in production
+      // (buffService.js:16); the ?? 0 guard pins absent-equals-zero symmetry
+      // with the saveDcBonus: 0 arm above.
+      vi.mocked(getInnateSorceryBonus).mockReturnValue({});
+      const saveDcAttack = { name: 'Cone of Cold', range: 60, saveDc: 14, saveType: 'CON', damage: '8d8', damageType: 'Cold', type: 'Bonus Action' };
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} />);
+      expect(screen.getByText('DC 14 CON')).toBeInTheDocument();
+      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    });
+
+    it('bonus spell DC cell renders without NaN when spellAbilities.saveDc and saveDcBonus are absent', () => {
+      vi.mocked(getInnateSorceryBonus).mockReturnValue({});
+      const spell = { name: 'Hex', level: 1, range: '90 ft.', casting_time: '1 bonus action', dc: { dc_type: 'CON' } };
+      vi.mocked(getBonusActionSpellNames).mockImplementation(() => new Set([spell.name]));
+      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [spell] } })} />);
+      expect(screen.getByText('DC 0 CON')).toBeInTheDocument();
+      expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    });
+  });
 });

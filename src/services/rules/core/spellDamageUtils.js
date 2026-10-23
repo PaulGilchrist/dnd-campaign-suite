@@ -143,6 +143,7 @@ export function resolveSpellDamageWithTypes(spell, spellLevel) {
  * @returns {string} The resolved healing expression (e.g. "1d4+1")
  */
 export function resolveHealExpression(spell, playerLevel, spellCastingMod) {
+    if (!spell) return '';
     const healAtSlotLevel = spell.heal_at_slot_level;
     if (!healAtSlotLevel || typeof healAtSlotLevel !== 'object') return '';
 

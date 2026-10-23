@@ -36,18 +36,22 @@ function CharCharacterAdvancement({ playerStats, campaignName }) {
                       {options && options.length > 1 && (
                           <div style={{ marginTop: '4px', fontSize: '0.9em' }}>
                               <span style={{ opacity: 0.7 }}>Choice: </span>
-                              {options.map((opt, i) => (
-                                  <span key={typeof opt === 'object' ? opt.name : opt}>
+                              {options.map((opt, i) => {
+                                  // currentOption is always an option NAME (clicks persist names via
+                                  // handleChoiceClick; the fallback resolves options[0].name)
+                                  // - highlight compares name-vs-name; identity never matches objects.
+                                  const optName = typeof opt === 'object' ? opt.name : opt;
+                                  return <span key={optName}>
                                       {i > 0 && <span style={{ opacity: 0.4 }}> | </span>}
                                       <span
                                            className="clickable"
-                                           style={opt === currentOption ? { fontWeight: 'bold', textDecoration: 'underline' } : { opacity: 0.6 }}
-                                           onClick={(e) => handleChoiceClick(feature, typeof opt === 'object' ? opt.name : opt, e)}
+                                           style={optName === currentOption ? { fontWeight: 'bold', textDecoration: 'underline' } : { opacity: 0.6 }}
+                                           onClick={(e) => handleChoiceClick(feature, optName, e)}
                                        >
-                                           {typeof opt === 'object' ? opt.name : opt}
+                                           {optName}
                                        </span>
-                                   </span>
-                               ))}
+                                   </span>;
+                               })}
                            </div>
                       )}
                   </div>

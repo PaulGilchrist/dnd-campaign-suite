@@ -66,12 +66,15 @@ vi.mock('../../../../services/rules/features/paralyzingBreathService.js', () => 
 vi.mock('../../../../services/rules/features/weakeningBreathService.js', () => ({ grantWeakeningBreath: vi.fn() }));
 
 const seenTargets = vi.hoisted(() => ({ current: [] }));
+const seenPicker = vi.hoisted(() => ({ current: null }));
 vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, targets, onConfirm, onSkip }) => {
+  default: ({ title, icon, description, note, targets, onConfirm, onSkip }) => {
     seenTargets.current = targets;
+    seenPicker.current = { title, icon, description, note };
     return (
       <div className="sp-overlay">
         <div className="sp-header">{title}</div>
+        <div className="sp-note">{note}</div>
         {targets.map(t => (<label key={t.name} className="secondary-target-row"><input type="checkbox" />{t.name}</label>))}
         <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
         <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
@@ -103,9 +106,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
   seenTargets.current = [];
+  seenPicker.current = null;
 });
 
-function renderBreath(stagedPetrify = { petrifiedRounds: 14400 }) {
+function renderBreath(stagedPetrify = { petrifiedRounds: 14400 }, overrides = {}) {
   return render(
     <SaveAttackAoeModal
       action={gorgonRow()}
@@ -124,6 +128,7 @@ function renderBreath(stagedPetrify = { petrifiedRounds: 14400 }) {
       stagedPetrify={stagedPetrify}
       storeLastAttack={false}
       onClose={vi.fn()}
+      {...overrides}
     />
   );
 }
@@ -187,6 +192,51 @@ describe('MA-0904 Gorgon Petrifying Breath picker — MA-0501 shared ladder', ()
     expect(ladderTes()).toHaveLength(0);
     expect(conditionLogs().filter(e => e.characterName === TARGET)).toHaveLength(0);
     expect(applyDamageToTarget).not.toHaveBeenCalled();
+  });
+
+  // fix#240 honestly-state the picker: buildPickerCopy now receives
+  // stagedPetrify, so the ARMED copy states the live ladder truth
+  // (Restrained-staged, save unresolved) instead of the MA-0063 flat
+  // "Petrified, Restrained." lie — house stage-1 vocabulary from
+  // cockatricePetrifyService (:129 "First failure — Restrained; repeats…
+  // a second failure Petrifies it for 24 hours"; :97 "Second failure —
+  // Petrified…") and the MA-0248 stagedParalysisPickerCopy phrase shape.
+  it('armed picker copy states the staged ladder: Restrained-staged truth, never the MA-0063 flat Petrified+Restrained grant text', () => {
+    renderBreath();
+    // Positive leg first: the picker rendered with the full ladder copy.
+    expect(seenPicker.current).toBeTruthy();
+    expect(seenPicker.current.description).toContain('<strong>Constitution</strong> saving throw (DC 15)');
+    expect(seenPicker.current.note).toContain('target is Restrained and repeats the save at the end of its next turn');
+    expect(seenPicker.current.note).toContain('ending the effect on itself on a success');
+    expect(seenPicker.current.note).toContain('Second failure: Petrified for 24 hours');
+    expect(seenPicker.current.icon).toBe('fa-diamond');
+    // Gated absence proofs: nothing that hasn't resolved is stated as landed.
+    expect(seenPicker.current.note).not.toContain('target is Petrified');
+    expect(seenPicker.current.note).not.toContain('Petrified, Restrained');
+    expect(seenPicker.current.note.toLowerCase()).not.toContain('half damage');
+    expect(seenPicker.current.note).not.toContain('null');
+    // Copy is advisory only: nothing staged before Confirm.
+    expect(ladderTes()).toHaveLength(0);
+    expect(runtime.store[`${TARGET}.activeConditions`]).toBeUndefined();
+  });
+
+  it('disarmed picker copy keeps the MA-0063 flat grant text byte-intact', () => {
+    renderBreath(null);
+    expect(seenPicker.current).toBeTruthy();
+    // Byte-exact MA-0063 branch (names from the extractor spray, no ladder).
+    expect(seenPicker.current.note).toBe('On a failed save, target is Petrified, Restrained.');
+    expect(seenPicker.current.icon).toBe('fa-smog');
+  });
+
+  // Non-gorgon unaffected: no stagedPetrify authored, MA-0063 flat branch
+  // renders exactly as before for other damageless condition rows.
+  it('non-gorgon damageless row (no ladder armed) renders the MA-0063 copy untouched', () => {
+    renderBreath(null, { saveConditions: ['blinded'], saveType: 'Dexterity', saveDc: 12 });
+    expect(seenPicker.current).toBeTruthy();
+    expect(seenPicker.current.note).toBe('On a failed save, target is Blinded.');
+    expect(seenPicker.current.description).toContain('<strong>Dexterity</strong> saving throw (DC 12)');
+    expect(seenPicker.current.note.toLowerCase()).not.toContain('petrified');
+    expect(seenPicker.current.note).not.toContain('Second failure');
   });
 
   it('byte-inert disarmed: stagedPetrify null keeps the MA-0063 flat saveConditions grant untouched (both conditions land, no te)', async () => {

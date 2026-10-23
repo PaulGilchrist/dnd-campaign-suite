@@ -136,28 +136,50 @@ describe('useSSESync', () => {
             expected: { players: [], walls: new Set(['wA', 'wB']), revealed: [] },
         },
         {
-            // Empty array is truthy — it replaces instead of falling back to prev.
+            // Key present -> value lands: an empty array is an honest clear.
             title: 'empty walls array clears existing walls',
             data: { walls: [] },
             prev: { players: [], walls: new Set(['kept']), revealed: [] },
             expected: { players: [], walls: new Set(), revealed: [] },
         },
         {
-            // Same truthy-empty semantics as walls.
+            // Same key-present clear semantics as walls.
             title: 'empty players array clears existing players',
             data: { players: [] },
             prev: { players: [{ id: 'kept' }], walls: new Set(), revealed: [] },
             expected: { players: [], walls: new Set(), revealed: [] },
         },
         {
-            // players uses || — null falls back to prev, unlike walls/revealed.
-            title: 'null players falls back to previous players',
+            // Unified snapshot law (#915): map-data-* payloads are full documents
+            // (server/routes/maps.js:170/:303), so an explicit null is an honest
+            // clear that LANDS, coerced to the field's empty array domain — it
+            // never collapses to stale prev (the old || defect) and never lands
+            // as a non-array (the old !==undefined defect on revealed).
+            title: 'null players is an honest clear to [], not stale prev',
             data: { players: null },
             prev: { players: [{ id: 'kept' }], walls: new Set(), revealed: [] },
-            expected: { players: [{ id: 'kept' }], walls: new Set(), revealed: [] },
+            expected: { players: [], walls: new Set(), revealed: [] },
         },
         {
-            // revealed uses !== undefined — an empty array replaces, not falls back.
+            title: 'null revealed is an honest clear to [], never a raw null',
+            data: { revealed: null },
+            prev: { players: [{ id: 'p1' }], walls: new Set(['w1']), revealed: ['r1'] },
+            expected: { players: [{ id: 'p1' }], walls: new Set(['w1']), revealed: [] },
+        },
+        {
+            title: 'null walls is an honest clear to an empty Set',
+            data: { walls: null },
+            prev: { players: [{ id: 'p1' }], walls: new Set(['w1']), revealed: ['r1'] },
+            expected: { players: [{ id: 'p1' }], walls: new Set(), revealed: ['r1'] },
+        },
+        {
+            // Partial snapshot: only the present keys clear; absent ones survive.
+            title: 'null players and revealed clear together while absent walls survive',
+            data: { players: null, revealed: null },
+            prev: { players: [{ id: 'kept' }], walls: new Set(['w1']), revealed: ['r1'] },
+            expected: { players: [], walls: new Set(['w1']), revealed: [] },
+        },
+        {
             title: 'empty revealed array replaces previous revealed',
             data: { revealed: [] },
             prev: { players: [], walls: new Set(), revealed: ['r1'] },

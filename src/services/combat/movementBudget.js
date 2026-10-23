@@ -118,8 +118,23 @@ export function clampMovementDrop({ turnState, creatureName, speedFeet, from, to
  * moves together, so the binding budget is the MINIMUM remaining movement
  * across the selected creatures. Scales dx/dy down proportionally (integer
  * cells) until (|dx|+|dy|)×FEET_PER_CELL fits; returns { dx, dy, costFeet }.
+ *
+ * Numeric-law gate (#1017): dx, dy and minBudgetFeet MUST be finite numbers.
+ * Real consumers guarantee it — useSelectMove.js:56-58 sources every budget
+ * from remainingMovement, which is finite by construction (turnState.js:126
+ * guards speed, :61 normalizes movementUsedFeet, :128 floors at 0). An
+ * unguarded non-numeric budget flowed NaN through Math.max(0,'x') → floor →
+ * trunc into token/wall positions (useSelectMove.js:208 gridX + dx) and
+ * map-data writes. Non-finite input now logs loudly and REFUSES the offset
+ * with this module's own zero-budget cancel shape (identical bytes to the
+ * maxCells===0 / cells===0 branches below) — nothing is invented (no-fallbacks
+ * law: the refuse shape is rules-backed by the existing cancel-at-zero pin).
  */
 export function clampSelectionOffset({ dx, dy, minBudgetFeet }) {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(minBudgetFeet)) {
+        console.error('[clampSelectionOffset] non-finite input — offset refused', { dx, dy, minBudgetFeet })
+        return { dx: 0, dy: 0, costFeet: 0 }
+    }
     let cells = Math.abs(dx) + Math.abs(dy)
     if (cells === 0) return { dx: 0, dy: 0, costFeet: 0 }
     const maxCells = Math.floor(Math.max(0, minBudgetFeet) / FEET_PER_CELL)

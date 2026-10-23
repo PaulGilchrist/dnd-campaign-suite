@@ -188,7 +188,10 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
         name: 'Celestial Resilience',
         automation: { type: 'celestial_resilience' },
         openResult: { type: 'modal', modalName: 'celestialResilienceModal', payload: celestialPayload },
-        description: 'Choose up to 5 allies to gain temporary hit points from your Celestial Resilience.',
+        // Coupling pin (fix#158/fix#164 law): number from data, word
+        // 'allies' from house copy. Producer default owned by
+        // celestialResilienceHandler.js:70 (auto.maxAllies || 5).
+        description: `Choose up to ${celestialPayload.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`,
         note: /You gain 10 temporary hit points\. Each selected ally gains 5 temporary hit points\./,
         confirmLabel: 'Grant Resilience',
         skipHandler: null,
@@ -204,7 +207,10 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
         name: 'Bolstering Performance',
         automation: { type: 'temp_hp_buff' },
         openResult: { type: 'modal', modalName: 'bolsteringPerformanceTarget', payload: performancePayload },
-        description: 'Choose up to 6 allies to gain temporary hit points.',
+        // Coupling pin (fix#158/fix#164 law): number from data, word
+        // 'allies' from house copy. Producer default owned by
+        // tempHpBuffHandler.js:163 (auto.targets || 6).
+        description: `Choose up to ${performancePayload.maxTargets} allies to gain temporary hit points.`,
         note: /Each target gains 5 temporary hit points\./,
         confirmLabel: 'Inspire',
         skipHandler: null,
@@ -291,6 +297,45 @@ describe('CharSpecialActions - Inline Modal Rendering', () => {
         if (skipPopup) expect(capturedPopup).toMatch(skipPopup);
         else expect(capturedPopup).toBeNull();
         expect(setRuntimeValue).not.toHaveBeenCalled();
+      }
+    );
+
+    // Drift arms (fix#164 recipe): copy and enforcement must read the SAME
+    // payload maxTargets — a re-typed literal in copy goes RED when the
+    // producer number shifts. Default arms above stay live (celestial 5 via
+    // celestialResilienceHandler.js:70 auto.maxAllies || 5; performance 6
+    // via tempHpBuffHandler.js:163 auto.targets || 6 — defaults producer-owned).
+    const driftCouplingCases = [
+      {
+        name: 'Celestial Resilience',
+        automation: { type: 'celestial_resilience' },
+        modalName: 'celestialResilienceModal',
+        basePayload: celestialPayload,
+        maxTargets: 3,
+      },
+      {
+        name: 'Bolstering Performance',
+        automation: { type: 'temp_hp_buff' },
+        modalName: 'bolsteringPerformanceTarget',
+        basePayload: performancePayload,
+        maxTargets: 2,
+      },
+    ];
+
+    it.each(driftCouplingCases)(
+      '$name copy interpolates live maxTargets=$maxTargets and equals the picker cap',
+      async ({ name, automation, modalName, basePayload, maxTargets }) => {
+        executeHandler.mockResolvedValue({ type: 'modal', modalName, payload: { ...basePayload, maxTargets } });
+
+        renderAndClickRow(name, statsFor({ name, automation }), {
+          characters: [{ name: 'Ally1' }, { name: 'Ally2' }],
+        });
+
+        const copy = await screen.findByText(/Choose up to \d+ allies/);
+        expect(copy).toHaveTextContent(`Choose up to ${maxTargets} allies`);
+        // fix#158 coupling idiom: number extracted from copy EQUALS the
+        // maxTargets the host forwards to the picker (same payload field).
+        expect(Number(copy.textContent.match(/up to (\d+)/)[1])).toBe(maxTargets);
       }
     );
 

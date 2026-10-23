@@ -1,7 +1,17 @@
 // @maintained-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './WizardStepSpells.jsx';
+
+// ── Flake hardening (registered ⚠ bugs.md:710 FLAKE-watch #183 half; fix#187) ──
+// fix#171 pins landed on the ElementalAttunement siblings only (player-save :77, summary :59);
+// this lane carried no async-util budget pin. Same contention class: full-suite CPU starvation
+// delays React passive-effect flush chains (archived stall bytes 1020/1023/1624ms,
+// /tmp/batch183.log), so give every async util here the proven 3000ms patience (3x observed
+// worst stall, far below the 5000ms test timeout). The lane's own #183 failure was a
+// wrong-anchor race, NOT budget expiry — root cause + causal gate documented at the test below.
+// Assertions unchanged: a wrong or missing commit still fails byte-exact.
+configure({ asyncUtilTimeout: 3000 });
 
 // Step-wiring lane only: modal internals belong to FeyTouchedModal/MagicInitiateModal lanes
 // and list internals to SelectableList — stubbed here to pin dispatch and counts.
@@ -240,10 +250,21 @@ describe('WizardStepSpells feat wiring', () => {
       },
     })} />);
 
-    await screen.findByText('Spell Selection Summary');
-    expect(screen.getByText('Cantrips:').parentElement.textContent).toBe('Cantrips:0/2');
-    expect(screen.getByText('1th level:').parentElement.textContent).toBe('1th level:0/2');
-    expect(screen.getByText('2th level:').parentElement.textContent).toBe('2th level:0/2');
-    expect(screen.getByText('3th level:').parentElement.textContent).toBe('3th level:1/2');
+    // Causal gate (fix#187, #183 root cause): findByText('Spell Selection Summary') resolved on
+    // the FIRST commit — the header renders unconditionally from zero-initialised spellLimits
+    // (WizardStepSpells.jsx:181; header :330/:353; denominator `spellLimits.cantrip || 0`), so
+    // the interim paint is 'Cantrips:0/0'. The resolved limits land in a LATER commit from the
+    // awaited getSpellLimits passive-effect fetch (:203-204), which CPU contention starves.
+    // Archived bytes (/tmp/batch183.log:36, 16ms — inside budget, so patience on the old anchor
+    // alone cannot fix it): "AssertionError: expected 'Cantrips:0/0' to be 'Cantrips:0/2'" at
+    // old :244. Gate on the SUCCESS commit carrying the exact bytes — fix#152 waitFor-causal-gate
+    // idiom, house pattern from sibling WizardStepSpells.test.jsx:108-115; all four toBe strings
+    // byte-identical to the original pins, zero weakening.
+    await waitFor(() => {
+      expect(screen.getByText('Cantrips:').parentElement.textContent).toBe('Cantrips:0/2');
+      expect(screen.getByText('1th level:').parentElement.textContent).toBe('1th level:0/2');
+      expect(screen.getByText('2th level:').parentElement.textContent).toBe('2th level:0/2');
+      expect(screen.getByText('3th level:').parentElement.textContent).toBe('3th level:1/2');
+    });
   });
 });

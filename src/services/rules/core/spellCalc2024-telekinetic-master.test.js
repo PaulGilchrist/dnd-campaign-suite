@@ -53,10 +53,10 @@ function makeTMAutomation({ actions = [tmAutomationRow('free_spell')], bonusActi
   return { actions, bonusActions, passives, specialActions: [] };
 }
 
-function makeFighterStats({ automation = makeTMAutomation(), spells = ['Magic Missile'] } = {}) {
+function makeFighterStats({ automation = makeTMAutomation(), spells = ['Magic Missile'], level = 18 } = {}) {
   return {
     name: 'PsiWarriorFighter',
-    level: 18,
+    level,
     rules: '2024',
     proficiency: PB,
     class: {
@@ -93,8 +93,9 @@ describe('spellCalc2024 — CLA-356 Telekinetic Master (Psi Warrior lv18 Fighter
     expect(rowNames(abilities)).toEqual(['Magic Missile', 'Telekinesis']);
 
     const tk = findRow(abilities, 'Telekinesis');
-    // Remapped to full spells-DB detail (the disk major.spells record says level 0),
-    // always prepared, stamped for the slotless exemption, INT as its casting ability.
+    // Remapped to full spells-DB detail (the disk major.spells byte is the lv18
+    // UNLOCK tier per #1348, never a spell level), always prepared, stamped for
+    // the slotless exemption, INT as its casting ability.
     expect(tk.level).toBe(diskLevel('Telekinesis'));
     expect(tk.prepared).toBe('Always');
     expect(tk._telekineticMasterFreeCast).toBe(true);
@@ -136,5 +137,66 @@ describe('spellCalc2024 — CLA-356 Telekinetic Master (Psi Warrior lv18 Fighter
     );
 
     expect(rowNames(abilities)).toEqual(['Magic Missile']);
+  });
+
+  // #1348 — DATA verdict on the psi major.spells Telekinesis row (was level:0 on disk,
+  // oddity pinned #1274). The field is the CHARACTER-UNLOCK TIER, not the spell level:
+  // consumers gate on it (spellCalc2024.js:136 `playerStats.level >= spellLevel`;
+  // getPreSelectedSpells.js:186 `charLevel >= (entry.level || 1)`) and the spell's lv5
+  // CAST level is canonically carried by the spells.json DB clone in remapSpellRow.
+  // Family law: every level:0 row on disk is a true cantrip (Eldritch Knight Ray of
+  // Frost/Shocking Grasp, Arcane Trickster trio, Monk Elementalism, Stars Guidance);
+  // every >2 value is the RAW unlock tier (Wildheart Commune lv10, Warlock/Aberrant
+  // Telekinesis lv9, domain 3/5/7/9). RAW 2024 PHB lv18 Telekinetic Master: "You
+  // always have the telekinesis spell prepared. With this feature, you can cast it
+  // without a spell slot or components" — slotless CAST, still the lv5 spell, unlocked
+  // at exactly Fighter lv18. level:0 was a corrupt cantrip-shaped token (copy-paste
+  // adjacency to the Eldritch Knight cantrip rows, born in e4ec998f0, never mutated):
+  // it let the row join at lv3-17 and survive keepSpellRow's !hasAnySlot pass on any
+  // slotless-container Psi Fighter (e.g. High Elf lineage), and getPreSelectedSpells
+  // preselected it from lv1. The honest byte is 18.
+  it('#1348 disk law: the major.spells byte is the lv18 unlock tier and gates the row exactly', () => {
+    // Byte law — re-reads disk: a classes.json edit of this row re-drives this pin.
+    expect(psiWarrior.spells).toEqual([{ name: 'Telekinesis', level: 18 }]);
+
+    // Slotless-container scaffold: an elfish_lineage specialAction with no matching
+    // lineage options seeds SLOTLESS_CONTAINER (spellCalc2024.js:624) and grants no
+    // rows itself — the only way a lv<18 Fighter carries a spell sheet at all. The
+    // Fighter has no spellcasting table (class_levels gated required_major 'Eldritch
+    // Knight'), so hasAnySlot is false and keepSpellRow keeps every granted row: this
+    // carrier isolates addMajorSubclassSpells' level gate from the slot filter.
+    const slotlessAutomation = {
+      actions: [],
+      bonusActions: [],
+      passives: [],
+      specialActions: [{ type: 'elfish_lineage', name: 'Elven Lineage', options: [] }],
+    };
+
+    const lv17 = getSpellAbilities(
+      ALL_SPELLS,
+      makeFighterStats({ spells: [], automation: slotlessAutomation, level: 17 }),
+      {},
+    );
+    expect(findRow(lv17, 'Telekinesis'), 'lv17 psi cannot cast lv18 Telekinetic Master — the disk unlock byte must gate the row out').toBeUndefined();
+
+    const lv18 = getSpellAbilities(
+      ALL_SPELLS,
+      makeFighterStats({ spells: [], automation: slotlessAutomation }),
+      {},
+    );
+    const tk = findRow(lv18, 'Telekinesis');
+    expect(tk, 'the byte unlocks the row at exactly lv18').toBeTruthy();
+    expect(tk.level).toBe(diskLevel('Telekinesis')); // lv5 cast level rides the DB clone, not the gate byte
+    expect(tk.prepared).toBe('Always');
+
+    // Leak proof (memory-only pre-fix bytes, disk untouched): replaying the corrupt
+    // level:0 on the SAME lv17 slotless carrier joins AND keeps the lv5 row —
+    // falsifies the gate claim by showing what the fix prevents.
+    const corruptMajor = cloneDeep(psiWarrior);
+    corruptMajor.spells = [{ name: 'Telekinesis', level: 0 }];
+    const lv17Corrupt = makeFighterStats({ spells: [], automation: slotlessAutomation, level: 17 });
+    lv17Corrupt.class.major = corruptMajor;
+    const leaked = getSpellAbilities(ALL_SPELLS, lv17Corrupt, {});
+    expect(findRow(leaked, 'Telekinesis'), 'pre-fix level:0 leaked a lv17 always-prepared lv5 row').toBeTruthy();
   });
 });

@@ -148,6 +148,45 @@ describe('MA-1016 Fog Cloud exhausted — store-backed latch refuses the re-pres
   });
 });
 
+describe('mid-flight double-spend guard (#1136-class fix#79 census — WORSE site: advisory cast log landed post-refuse)', () => {
+  it('gate fresh on snapshot but store spent before the spend re-read: refuses uses-exhausted with reason-distinct popup exact bytes, advisory cast record NEVER lands, zero write', async () => {
+    // Deterministic single-threaded race: the resolve-time gate read sees
+    // fresh; the spendMonsterAbilityUse store re-read sees the preceding
+    // click's write ({'Fog Cloud':1}) that landed between the two reads.
+    const RACED_WRITE = { 'Fog Cloud': 1 };
+    let usesReads = 0;
+    const store = {};
+    const deps = {
+      addEntry: vi.fn(() => Promise.resolve()),
+      getRuntimeValue: vi.fn((c, k) => {
+        if (k === 'monsterRecharge') return null; // fog carries no recharge
+        usesReads += 1;
+        return usesReads === 1 ? {} : RACED_WRITE;
+      }),
+      setRuntimeValue: vi.fn((c, k, v) => { store[`${c}.${k}`] = v; return Promise.resolve(); }),
+    };
+    const setPopupHtml = vi.fn();
+    const guard = vi.spyOn(console, 'error');
+
+    const res = await pressMephit(deps, setPopupHtml);
+
+    expect(res).toEqual({ resolved: false, reason: 'uses-exhausted' });
+    expect(usesReads).toBe(2); // fresh gate read, then the refused spend's re-read
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled(); // zero burn (#1026)
+    expect(guard).toHaveBeenCalledTimes(1); // guard stays loud (audit side already correct, fix#79)
+    // Two-defect closure: (1) the refusal now ANSWERS in the UI — reason-
+    // distinct 'Already Casting' (#1348), never the gate arm's 'Uses
+    // Exhausted' headline, same mc-prerequisite-refusal family cls; and
+    // (2) the cast-advisory log NEVER lands for a refused cast.
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Already Casting</h3><p>Ice Mephit 1 is already casting Fog Cloud — a preceding click spent the 1/Day use. Fog Cloud refused: no second use spent, no cast resolved. Uses reset at dawn (GM-enforced for monsters).</p></div>');
+    const logs = deps.addEntry.mock.calls.map(c => c[1]);
+    expect(logs).toHaveLength(1); // refusal audit log ONLY — no advisory cast record
+    expect(logs[0]).toMatchObject({ type: 'automation', automationType: 'fog_cloud_refused', abilityName: 'Fog Cloud' });
+    expect(logs.some(l => (l.description || '').includes('casts Fog Cloud'))).toBe(false);
+  });
+});
+
 describe('MA-1016 at-will innate twin — no uses bytes means no gate, honest invisibility advisory', () => {
   // The honest no-uses twin is Faerie Dragon Adult's disk row (BY NAME): the
   // imp twin is cited-only — its real row carries MA-0658 self-buff

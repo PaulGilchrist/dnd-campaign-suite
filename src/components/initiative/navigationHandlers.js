@@ -1,6 +1,7 @@
 import { cloneDeep } from 'lodash'
 import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
+import { addEntry } from '../../services/ui/logService.js'
 import { getNextCreatureName, getPreviousCreatureName } from '../../services/encounters/initiativeService.js'
 import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbreakableMajesty.js'
 import { expireStaleEffects, applyTurnStartEffects, applyTurnEndConditionRemoval } from '../../services/rules/effects/expirations.js'
@@ -320,6 +321,11 @@ export function createNextCreatureHandler({
 
 /**
  * Creates the handlePreviousCreature handler.
+ * Rewind law: step the turn pointer back ONE position in initiative order —
+ * roundDecrement:false walks creatures[index-1] within the round; at the index-0
+ * wrap the target is the previous round's last creature. At the round-1 floor the
+ * target does not exist: refuse with one initiative_rewind_refused log, zero writes
+ * (#868 flip — was a silent no-op).
  */
 export function createPreviousCreatureHandler({
     combatSummaryRef,
@@ -334,11 +340,32 @@ export function createPreviousCreatureHandler({
     isPreviousDisabled,
 }) {
     return async function handlePreviousCreature() {
+        // Disabled arm stays Silent-by-design: the container renders the button
+        // `disabled` in exactly this state (isPreviousDisabled Initiative.jsx:705) and
+        // gates ArrowLeft (:563), so the click never fires — the greyed button IS the
+        // acknowledgment. Only the stale-floor arm below can be reached by a live click.
         if (isPreviousDisabled) return
         const cs = combatSummaryRef.current
         if (!cs) return
         const { newActiveName, roundDecrement } = getPreviousCreatureName(cs, activeCreatureName)
-        if (roundDecrement && (roundRef.current ?? 1) <= 1) return
+        // #341 no-silent-no-op law (fix#79 refusal family): roundDecrement:true means the
+        // pointer sat at index 0, so the rewind target is the LAST creature of the PREVIOUS
+        // round — a position that does not exist once round is already 1 (absolute combat
+        // start). Within-round back-steps are the untouched roundDecrement:false arm above
+        // (getPreviousCreatureName walks creatures[index-1]). Stay put — honestly: ONE
+        // campaign-log refusal, zero state writes. The container's disabled Prev button
+        // (isPreviousDisabled, Initiative.jsx:705 + keydown gate :563) covers fresh state;
+        // this arm acknowledges stale-prop clicks so the button never appears dead.
+        // NO-CLOCK law: refusal moves nothing — not the pointer, not the round, no clock.
+        if (roundDecrement && (roundRef.current ?? 1) <= 1) {
+            addEntry(campaignName, {
+                type: 'automation',
+                automationType: 'initiative_rewind_refused',
+                characterName: activeCreatureName,
+                description: 'Initiative rewind refused — at_start_of_round_1: round 1 is the first round, there is no earlier turn to rewind to.',
+            }).catch((e) => { console.error('[navigationHandlers] round-1 rewind refusal log failed:', e) })
+            return
+        }
         // Round-wrap-only work: decrement the round counter.
         const roundToSet = (roundRef.current ?? 1) - (roundDecrement ? 1 : 0)
         const updatedSummary = cloneDeep(cs)

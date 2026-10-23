@@ -3,8 +3,10 @@
 // thing this file owns. Both mocks contain real authored logic (a '+N Name' parser and an
 // ability-canonicalization lookup) that 14 automation consumer lanes execute through.
 // Pins the mock's exact contract, including deliberate deviations from the real modules
-// (single-digit bonus, substring(3) offset, non-array tolerance where the real
-// abilityLookup.js:19-23 would throw TypeError).
+// (non-array tolerance where the real abilityLookup.js:19-23 would throw TypeError).
+// The parseMagicItemName mock mirrors the real grammar fixed at the shared source
+// (rules/core/attackWeaponUtils.js, #1234): full digit run bonus, digit-less '+ Name'
+// read as plain name.
 //
 // Deleted faces (canonical owners / #923 canon — vi.fn() semantics are not helper behavior):
 // - "is a vi.fn() mock function" x2          → vitest itself; covered by vitest docs, not us
@@ -38,10 +40,11 @@ describe('parseMagicItemName mock contract (test-utils.js:2-12)', () => {
     expect(parseMagicItemName('+2 Shortbow')).toEqual({ baseName: 'Shortbow', magicBonus: 2 })
     expect(parseMagicItemName('+3 Greatsword')).toEqual({ baseName: 'Greatsword', magicBonus: 3 })
     expect(parseMagicItemName('+0 Rusty Sword')).toEqual({ baseName: 'Rusty Sword', magicBonus: 0 })
-    // Authored quirks consumers rely on: bonus is charAt(1) only (single digit),
-    // baseName is always substring(3).
-    expect(parseMagicItemName('+ Longsword')).toEqual({ baseName: 'ongsword', magicBonus: 0 })
-    expect(parseMagicItemName('+10 Sword')).toEqual({ baseName: ' Sword', magicBonus: 1 })
+    // Grammar fixed at the shared source (rules/core/attackWeaponUtils.js, #1234):
+    // the full digit run is the bonus; a digit-less '+ Name' drops only the '+'
+    // marker — nothing is eaten from the name (mock mirrors the real parser).
+    expect(parseMagicItemName('+ Longsword')).toEqual({ baseName: 'Longsword', magicBonus: 0 })
+    expect(parseMagicItemName('+10 Sword')).toEqual({ baseName: 'Sword', magicBonus: 10 })
   })
 
   it('passes non-magic input through by identity with bonus 0', () => {

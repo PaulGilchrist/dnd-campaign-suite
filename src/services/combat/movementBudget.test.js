@@ -15,7 +15,7 @@
  * legs pin remaining==cost vs cost+1; purity means the input turnState must
  * survive byte-identical (no writes are this module's job).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
     computePathCost,
     snapToBudget,
@@ -132,5 +132,51 @@ describe('clampSelectionOffset (L5-002 GM multi-select)', () => {
         // Zero budget cancels the whole move; negative budget floors to zero.
         expect(clampSelectionOffset({ dx: 5, dy: 5, minBudgetFeet: 0 })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
         expect(clampSelectionOffset({ dx: 5, dy: 5, minBudgetFeet: -20 })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+    });
+
+    // #1017 FLIPPED: was ⚠ pinned-untested-NaN (minBudgetFeet:'x' → Math.max(0,NaN)
+    // no floor guard). Seam now Number.isFinite-gated: NaN output is impossible —
+    // garbage budget OR garbage offset refuses the move with the module's own
+    // cancel shape plus one loud console.error byte string, no-fallbacks law
+    // (refuse-to-0 is the rules-backed maxCells===0 shape, never a default feet).
+    it('#1017 refuses non-finite inputs — never NaN out, loud console.error', () => {
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            // Garbage budget (the original defect): refused, every output field finite.
+            const out = clampSelectionOffset({ dx: 4, dy: 4, minBudgetFeet: 'x' });
+            expect(out).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            expect(Number.isFinite(out.dx) && Number.isFinite(out.dy) && Number.isFinite(out.costFeet)).toBe(true);
+            // Garbage offsets refuse too (same corruption lane: gridX + dx).
+            expect(clampSelectionOffset({ dx: 'x', dy: 1, minBudgetFeet: 30 })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            expect(clampSelectionOffset({ dx: 1, dy: NaN, minBudgetFeet: 30 })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            // Missing args (undefined) and non-finite Infinity budgets cannot verify a
+            // budget — conservative refuse, matching the gate contract in the JSDoc.
+            expect(clampSelectionOffset({ dx: 1, dy: 1 })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            expect(clampSelectionOffset({ dx: 1, dy: 1, minBudgetFeet: Infinity })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            // Zero offset with garbage budget: same refuse shape as the old :124
+            // passthrough — output bytes unchanged, but the garbage is now LOUD.
+            expect(clampSelectionOffset({ dx: 0, dy: 0, minBudgetFeet: 'x' })).toEqual({ dx: 0, dy: 0, costFeet: 0 });
+            expect(err).toHaveBeenCalledTimes(6);
+            expect(err.mock.calls[0][0]).toBe('[clampSelectionOffset] non-finite input — offset refused');
+            expect(err.mock.calls[0][1]).toEqual({ dx: 4, dy: 4, minBudgetFeet: 'x' });
+        } finally {
+            err.mockRestore();
+        }
+    });
+
+    it('#1017 guard is inert on finite traffic — every clamp/cancel byte-intact', () => {
+        // Mirror of the two pinned finite lanes above, asserted NaN-free.
+        const legs = [
+            clampSelectionOffset({ dx: 2, dy: 1, minBudgetFeet: 30 }),   // fits, exact 15 ft
+            clampSelectionOffset({ dx: 3, dy: 0, minBudgetFeet: 15 }),    // boundary cells === maxCells
+            clampSelectionOffset({ dx: 4, dy: 4, minBudgetFeet: 15 }),    // scale-down, leftover to dominant axis
+            clampSelectionOffset({ dx: -4, dy: 4, minBudgetFeet: 15 }),   // sign preserved
+            clampSelectionOffset({ dx: 5, dy: 5, minBudgetFeet: 0 }),     // #1348 zero budget cancels
+            clampSelectionOffset({ dx: 5, dy: 5, minBudgetFeet: -20 }),   // #1348 negative floors to zero
+        ];
+        for (const leg of legs) expect(leg).not.toMatchObject({ dx: NaN });
+        expect(legs.map(l => `${l.dx},${l.dy},${l.costFeet}`)).toEqual([
+            '2,1,15', '3,0,15', '2,1,15', '-2,1,15', '0,0,0', '0,0,0',
+        ]);
     });
 });

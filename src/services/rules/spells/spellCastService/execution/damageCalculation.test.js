@@ -350,18 +350,24 @@ describe('computeOverchannel — maximize tag + use-count writer (damageCalculat
     expect([OC_PASSIVE.type, OC_PASSIVE.name, BLESSED.name]).toEqual(['overchannel', 'Overchannel', 'Blessed Strikes']);
   });
 
-  it('missing automation.passives is a hard error: exact console.error byte then thrown Error, zero writes', () => {
+  it('missing automation.passives degrades LOUD, never dies (fix#126-boundary #1495 flip of the retired hard-error pin): exact console byte, deny-table off-shape, zero reads/writes', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const grv = vi.fn();
     const base = { campaignName: 'test-campaign', getRuntimeValue: grv, empEvocFormula: null, baseFormula: FB };
-    expect(() => computeOverchannel({ spell: FIREBALL24, metaCtx: { overchannel: true, slotLevel: 3 }, playerStats: { name: 'TestWizard', automation: {} }, ...base })).toThrow('playerStats.automation.passives is required for overchannel check');
-    expect(() => computeOverchannel({ spell: FIREBALL24, metaCtx: { overchannel: true, slotLevel: 3 }, playerStats: { name: 'TestWizard' }, ...base })).toThrow('playerStats.automation.passives is required for overchannel check');
+    // Pre-fix capture (this pin threw, killing executeSpellCast whole at index.js:875):
+    // 'playerStats.automation.passives is required for overchannel check' + rider-zero.
+    const emptyAuto = computeOverchannel({ spell: FIREBALL24, metaCtx: { overchannel: true, slotLevel: 3 }, playerStats: { name: 'TestWizard', automation: {} }, ...base });
+    const noAuto = computeOverchannel({ spell: FIREBALL24, metaCtx: { overchannel: true, slotLevel: 3 }, playerStats: { name: 'TestWizard' }, ...base });
+    // Lawful off-shape = the deny-table row shape (:413-430): base formula rides
+    // through untouched, overchannel never armed, use-count never charged.
+    expect(emptyAuto).toStrictEqual({ overchannelFormula: FB, overchannelActive: false, overchannelUseCount: 0 });
+    expect(noAuto).toStrictEqual({ overchannelFormula: FB, overchannelActive: false, overchannelUseCount: 0 });
     expect(errSpy.mock.calls.map((c) => c[0])).toStrictEqual([
       '[spellCast] overchannelPassives: playerStats.automation.passives is missing',
       '[spellCast] overchannelPassives: playerStats.automation.passives is missing',
     ]);
     expect(setRuntimeValue).not.toHaveBeenCalled();
-    expect(grv).not.toHaveBeenCalled();
+    expect(grv).not.toHaveBeenCalled(); // read :151 and charge-write :162 both live behind the guard
     errSpy.mockRestore();
   });
 

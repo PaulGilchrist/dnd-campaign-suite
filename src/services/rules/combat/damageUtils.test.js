@@ -292,13 +292,45 @@ describe('computePlayerAc', () => {
     expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Leather Armor', 'Chain Mail']))).toBe(16);
   });
 
-  it('adds the +2 shield with armor, but drops it when no armor is worn (pins current behavior)', async () => {
+  it('adds the +2 shield exactly once on both arms — armored and shield-only (fix#1213)', async () => {
+    // Armored + shield: unchanged 14 + 2 = 16.
     loadEquipment.mockResolvedValueOnce([armor('Scale Mail', 14), shield()]);
     expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 10 }, ['Scale Mail', 'Shield']))).toBe(16);
 
-    // Shield with no armor: hasArmor fallback recomputes 10+dex, losing the shield bonus.
+    // Shield listed BEFORE armor: armor's contribution must not wipe the shield (+ held).
+    loadEquipment.mockResolvedValueOnce([shield(), armor('Scale Mail', 14)]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', baseScore: 10 }, ['Shield', 'Scale Mail']))).toBe(16);
+
+    // Shield-only, RAW: 10 + dex + shield = 10 + 3 + 2 = 15.
+    // Pre-fix the !hasArmor fallback recomputed 10+dex = 13, discarding the +2
+    // (honest pin flipped to lawful per #1213).
     loadEquipment.mockResolvedValueOnce([shield()]);
-    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Shield']))).toBe(13);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Shield']))).toBe(15);
+
+    // Shield-only with negative dex: 10 + (-1) + 2 = 11.
+    loadEquipment.mockResolvedValueOnce([shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: -1 }, ['Shield']))).toBe(11);
+
+    // Disk-faithful shield row (equipment_category "Armor" + armor_category "Shield",
+    // public/data/equipment.json:4122-4131): recognized as shield, +2 lands.
+    loadEquipment.mockResolvedValueOnce([{
+      name: 'Shield', equipment_category: 'Armor', armor_category: 'Shield',
+      armor_class: { base: 2, dex_bonus: false, max_bonus: null },
+    }]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Shield']))).toBe(15);
+
+    // Magic-prefixed shield resolves via stripped baseName; enhancement not double-counted.
+    loadEquipment.mockResolvedValueOnce([shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['+1 Shield']))).toBe(15);
+
+    // No equipment at all: unarmored base 10 + dex (no spurious shield).
+    loadEquipment.mockResolvedValueOnce([shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, []))).toBe(13);
+
+    // Two shields equipped: accumulates per row (current behavior — inventory
+    // hygiene caps real chars at one shield; honest pin).
+    loadEquipment.mockResolvedValueOnce([shield(), shield()]);
+    expect(await computePlayerAc(dexChar({ name: 'Dexterity', bonus: 3 }, ['Shield', 'Shield']))).toBe(17);
   });
 
   it('resolves magic-prefixed names, ignores unknown items, non-armor categories, and missing armor_class', async () => {

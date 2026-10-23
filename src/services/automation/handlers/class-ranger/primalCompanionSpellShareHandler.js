@@ -92,7 +92,13 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     const companionAlive = getRuntimeValue(playerName, 'primalCompanionAlive', campaignName);
-    if (companionAlive === false) {
+    if (companionAlive !== true) {
+        // Strict eligibility (fix#104 twin of #1396(c), mirroring primalCompanionSpellShareService.js:66):
+        // 'primalCompanionAlive' is written true only at summon/restore (primalCompanionHandler.js:305/:533)
+        // and never false, so the old `=== false` gate never armed — an unknown-alive companion (null/
+        // undefined) kept this handler live and shared casts onto a possibly-dead companion. Anything not
+        // explicitly true is NOT alive: decline with the handler-local infoPopup vocabulary
+        // (sibling declines: 'No primal companion summoned.' at :91, applySpellShare at :109).
         return infoPopup(action, 'Primal companion is not alive.');
     }
 

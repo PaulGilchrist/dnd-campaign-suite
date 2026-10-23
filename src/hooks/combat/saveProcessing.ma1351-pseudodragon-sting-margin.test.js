@@ -5,7 +5,8 @@
 // routes applySaveOutcome → applySaveDamage and the structured context.saveMargin
 // rider must fire there too (saveProcessing.js:1705, gated on the base
 // condition landing). Context derived live from the monsters.json Sting row
-// (dcSuccess 'half' = MonsterCardModal's save_dc>0 default, :1332).
+// (dcSuccess authored 'none' on the disk row — fix#172 family; the modal
+// default for unauthored rows was 'half', MonsterCardModal.jsx :1332).
 // Shallow fail (margin < failsBy): POISONED only + FULL pool, no clock.
 // Deep fail (margin >= failsBy): applySaveMarginRider adds UNCONSCIOUS with
 // ONE merged rounds:600 clock (§37/§170). Success: half damage, zero conditions.
@@ -28,7 +29,9 @@ vi.mock('../../services/ui/utils.js', () => ({
     default: { guid: () => 'id-' + Math.random().toString(36).slice(2) },
 }));
 
-// 2d4 face pinned to the row's average ("5 (2d4)"): fail pays 5, half pays 2.
+// 2d4 face pinned to the row's average ("5 (2d4)"): fail pays 5; success
+// pays ZERO — the mock mirrors the real computeDamageAfterEvasion branch and
+// forwards dcSuccess (authored 'none' on the disk row, fix#172 family).
 const rollExpression = vi.fn(() => ({ total: 5, rolls: [2, 3], modifier: 0 }));
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: (...args) => rollExpression(...args),
@@ -51,7 +54,7 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 const applyDamageToTarget = vi.fn(async (_cs, _target, finalDamage) => ({ finalDamage, newHp: 999 - finalDamage }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     normalizeSaveType: (t) => String(t || '').toLowerCase(),
-    computeDamageAfterEvasion: (total, saveSuccess) => (saveSuccess ? Math.floor(total / 2) : total),
+    computeDamageAfterEvasion: (total, saveSuccess, dcSuccess) => (saveSuccess ? (dcSuccess === 'none' ? 0 : Math.floor(total / 2)) : total),
     applyDamageToTarget: (...args) => applyDamageToTarget(...args),
 }));
 
@@ -133,6 +136,11 @@ describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', ()
         // carries its own save-leg pool.
         expect(stingRow.damage_dice_primary).toBe('2d4');
         expect(stingRow.damage_type_primary).toBe('Poison');
+        // fix#172 family: Failure:-only save damage ("Failure: 5 (2d4) Poison
+        // damage") — RAW success pays NOTHING; dc_success:"none" authored
+        // immediately after save_type (MA-0030 placement).
+        expect(stingRow.dc_success).toBe('none');
+        expect(Object.keys(stingRow).indexOf('dc_success')).toBe(Object.keys(stingRow).indexOf('save_type') + 1);
     });
 
     it(`shallow fail by 4 (total ${SAVE_DC - 4}): POISONED only + FULL pool — no Unconscious over-grant, no clock`, async () => {
@@ -176,14 +184,16 @@ describe('MA-1351 Pseudodragon Sting margin bands (damage-bearing save leg)', ()
         }));
     });
 
-    it(`success (total ${SAVE_DC}): half damage, zero conditions, zero clock`, async () => {
+    it(`success (total ${SAVE_DC}): ZERO damage (authored dc_success none, fix#172 family), zero conditions, zero clock`, async () => {
         await resolveNpcSave(SAVE_DC);
 
         expect(runtimeStore[`${TARGET}.activeConditions`]).toBeUndefined();
         expect(appliedLogs()).toHaveLength(0);
         expect(addExpiration).not.toHaveBeenCalled();
         expect(applyDamageToTarget).toHaveBeenCalledTimes(1);
-        expect(applyDamageToTarget.mock.calls[0][2]).toBe(2);
+        // RAW success: nothing — the pre-fix half-default paid 2 (floor of the
+        // rolled pool); dc_success:"none" collapses the zero leg (§335).
+        expect(applyDamageToTarget.mock.calls[0][2]).toBe(0);
     });
 
     it('byte-inert without the structured key: poisoned + full damage, no clock (legacy row)', async () => {

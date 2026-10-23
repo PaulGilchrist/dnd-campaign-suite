@@ -7,9 +7,9 @@
 //                            spell._ritualMasterRitual === true (spellCalc2024:477-496)
 //                            + holder automation ritualSpells{chosenSpells,quickRitual}
 //                            + fresh counter _Ritual_Master_quickRitualUsed == null
-//                            + !isUpcast  ->  slotless cast, counter stamped Date.now(),
-//                            ability_use log. Gate isQuickRitualGrant :861-865,
-//                            consumeQuickRitual :729-739, payment branch :836-839.
+//                            + !isUpcast  ->  slotless cast, counter stamped boolean true,
+//                            ability_use log. Gate isQuickRitualGrant :920-924,
+//                            consumeQuickRitual :787-797, payment branch :894-897.
 //   ritualOnly sibling (.ritualOnly.test.js)         CLA-234 _ritualOnly Nature/Animal
 //                            Speaker unlimited slotless rituals — folded there, not here.
 //   ritualAdept sibling (.ritualAdept.test.js)       CLA-299 wizard spellbook rituals
@@ -17,7 +17,7 @@
 //                            — folded there, not here.
 //   popup face (SpellDetailPopup.quickRitual.test.jsx) checkbox UI, disabled-after-spend.
 //   re-arm face (restRules-longRest.ritualMaster.test.js) long rest writes the NULL
-//                            sentinel that this lane reads as "fresh" (restRules:698).
+//                            sentinel that this lane reads as "fresh" (restRules:700).
 //   producer face (spellCalc2024-ritualMaster.test.js) _ritualMasterRitual stamping.
 //
 // Disk census (readFileSync, drift-throw — fixture bytes below ARE these bytes):
@@ -42,12 +42,13 @@
 // vacuous self-compute / byte-identical ternary in lane 0 (no ternary in
 // consumeQuickRitual/isQuickRitualGrant); case trails 0 (the key '_Ritual_Master_quickRitualUsed'
 // is byte-identical across producer spellCalc2024:492 read-side :863 and re-armed
-// restRules:698); NO-CLOCK: the Date.now() write (:730) is an opaque sentinel token —
-// gate reads only == null, tests assert typeof number, never arithmetic;
+// restRules:700); NO-CLOCK: the consume write (:784) stamps the boolean constant true
+// (#1309 adjudication — was an opaque Date.now() token; the constant carries zero clock
+// bytes) — gate reads only == null, tests pin the constant, never arithmetic;
 // :0-swallow twin pinned live by the counter-0 row (== null treats 0 as SPENT, the
 // free-cast coalesce trap #1510 form); falsy triples covered by rows: null/undefined
 // fresh-allow, 0/false/deny.
-// Invocation ledger: consumeQuickRitual writes the counter BEFORE logging (:730->:731)
+// Invocation ledger: consumeQuickRitual writes the counter BEFORE logging (:788->:789)
 // so a log failure can never re-free the cast — order pinned in the allow rows.
 //
 // Kill-matrix (declared analytic, #1515 form; every mutant is killed by a named row):
@@ -60,7 +61,9 @@
 //   drop chosenSpells conjunct          | killed by row R-notChosen    (paid)
 //   drop quickRitualHold                | killed by row R-nonholder    (paid)
 //   spent-counter gate inverted/dropped | killed by row R-spent        (paid)
-//   consume branch :836 removed         | killed by every A-row        (paid, no latch)
+//   consume branch :894 removed         | killed by every A-row        (paid, no latch)
+//   stamp true -> Date.now()           | killed by A-row stamp pin    (:255 exact true)
+//   any clock arithmetic on the latch  | killed by NEVER-A-CLOCK pin  (Date-advance rows)
 //
 // Mock census (exact-of-7 module boundaries of spellPreparationService.js, grep of its
 // imports): useRuntimeState, combatData, concentrationService, storage, metamagicRules,
@@ -222,9 +225,9 @@ beforeEach(() => {
 
 describe('FT-068 Quick Ritual — prepareSpellCast consume face', () => {
   // A-rows: all five grant conjuncts true -> slotless cast, counter written once with
-  // the Date.now() sentinel (opaque token, no clock arithmetic), exact log, byte-pure
-  // modifiedSpell. The counter's fresh sentinel arrives BOTH shapes the store can hand
-  // back: undefined (never used) and null (long-rest re-arm, restRules:698).
+  // the boolean true latch (#1309: constant, no clock bytes — was a Date.now() token),
+  // exact log, byte-pure modifiedSpell. The counter's fresh sentinel arrives BOTH shapes
+  // the store can hand back: undefined (never used) and null (long-rest re-arm, restRules:700).
   it.each([
     ['A-undefined (never used)', undefined],
     ['A-null (long-rest re-arm byte)', null],
@@ -252,10 +255,11 @@ describe('FT-068 Quick Ritual — prepareSpellCast consume face', () => {
     expect(result.modifiedSpell.casting_time).toBe('1 minute or Ritual');
     expect(spell).toStrictEqual(frozen); // input immutability, every row
     // Store writes exact-of-1: the latch only — no slot spent even though slots exist.
-    expect(setRuntimeValue.mock.calls).toEqual([[HOLDER, COUNTER, expect.any(Number), CAMPAIGN]]);
-    expect(Number.isInteger(setRuntimeValue.mock.calls[0][2])).toBe(true);
+    // Stamp pin: boolean TRUE constant (#1309) — a re-introduced Date.now() dies here.
+    expect(setRuntimeValue.mock.calls).toEqual([[HOLDER, COUNTER, true, CAMPAIGN]]);
+    expect(setRuntimeValue.mock.calls[0][2]).toBe(true); // never a Number, never a clock
     expect(getRuntimeValue).toHaveBeenCalledWith(HOLDER, COUNTER, CAMPAIGN);
-    // Log exact-of-1, campaign-locked, note bytes verbatim from consumeQuickRitual:736.
+    // Log exact-of-1, campaign-locked, note bytes verbatim from consumeQuickRitual:794.
     expect(addEntry).toHaveBeenCalledTimes(1);
     expect(addEntry).toHaveBeenCalledWith(CAMPAIGN, {
       type: 'ability_use',
@@ -280,7 +284,8 @@ describe('FT-068 Quick Ritual — prepareSpellCast consume face', () => {
   // emit the Quick Ritual log. metaCtx full-set toStrictEqual doubles as the
   // quickRitualUsed ABSENCE pin (no fabricated key).
   it.each([
-    { label: 'R-spent: counter holds a Date.now() token', seed: { [COUNTER]: 1730000000000 }, pay: ['spell_slots_level_1', 0] },
+    { label: 'R-spent: legacy numeric (pre-#1309 Date.now()) stamp still reads SPENT — reader is value-shape-free', seed: { [COUNTER]: 1730000000000 }, pay: ['spell_slots_level_1', 0] },
+    { label: 'R-spentBool: boolean true latch (current stamp shape) reads SPENT', seed: { [COUNTER]: true }, pay: ['spell_slots_level_1', 0] },
     { label: 'R-counter0: 0 is not null — == null reads SPENT (:0-swallow twin)', seed: { [COUNTER]: 0 }, pay: ['spell_slots_level_1', 0] },
     { label: 'R-false: checkbox unticked (popup always sends a boolean)', spell: { quickRitual: false }, seed: {}, pay: ['spell_slots_level_1', 0] },
     { label: 'R-missing: non-popup caller never sets quickRitual', spell: { quickRitual: undefined }, seed: {}, pay: ['spell_slots_level_1', 0] },
@@ -315,6 +320,44 @@ describe('FT-068 Quick Ritual — prepareSpellCast consume face', () => {
     expect(result.slotConsumed).toBe(true);
     expect(setRuntimeValue.mock.calls).toEqual([[NONHOLDER, 'spell_slots_level_1', 0, CAMPAIGN]]);
     expect(addEntry).toHaveBeenCalledTimes(0);
+  });
+
+  // NEVER-A-CLOCK pin (#1309 no-timers adjudication, definitive proof): the latch is a
+  // boolean constant — advancing wall-clock between consume and read changes NEITHER the
+  // stamped bytes NEITHER the decision. Fresh->consume@T1 stamps true; +100y clock jump
+  // still reads SPENT (pays slot, latch untouched); long-rest re-arm (null, restRules:700)
+  // re-arms at T3 and re-consumes to the byte-identical stamp. If any Date.elapsed()
+  // arithmetic ever gated this key, the T2 refusal would flip to allow and this dies.
+  it('NEVER-A-CLOCK: Date.now() advancing between consume and read changes stamp and decision zero', async () => {
+    const stats = wizardStats(HOLDER);
+    const spell = popupSpell();
+    const store = new Map();
+    getRuntimeValue.mockImplementation((_name, key) => (store.has(key) ? store.get(key) : undefined));
+    setRuntimeValue.mockImplementation((_name, key, value) => { store.set(key, value); });
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    try {
+      const first = await cast(spell, stats);
+      expect(first.freeCastUsed).toBe(true);
+      expect(first.slotConsumed).toBe(false);
+      expect(store.get(COUNTER)).toBe(true); // constant latch — zero clock bytes stamped
+
+      // +100 years of wall-clock between consume and read: decision UNCHANGED.
+      nowSpy.mockReturnValue(1_700_000_000_000 + 3_155_760_000_000);
+      const second = await cast(spell, stats);
+      expect(second.freeCastUsed).toBe(false);  // still SPENT — presence, never elapsed time
+      expect(second.slotConsumed).toBe(true);   // refused -> normal slot payment
+      expect(store.get(COUNTER)).toBe(true);    // latch bytes unchanged by the clock jump
+
+      // Long-rest re-arm seam (null byte) then fresh consume at a THIRD clock time:
+      // stamp is clock-invariant, byte-identical to the first.
+      store.set(COUNTER, null); // restRules-longRest.js:700 re-arm bytes
+      nowSpy.mockReturnValue(1_700_000_000_000 + 2 * 3_155_760_000_000);
+      const third = await cast(spell, stats);
+      expect(third.freeCastUsed).toBe(true);
+      expect(store.get(COUNTER)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('the consume seam stays an arity-3 call: (spell, metaCtx, options)', () => {

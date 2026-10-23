@@ -123,6 +123,20 @@ export function buildAlreadyEnlargedRefusalPopup({ monsterName, action, effectKe
   return `<div class="mc-prerequisite-refusal"><h3>Already ${effectKey.charAt(0).toUpperCase()}${effectKey.slice(1)}</h3><p>${monsterName} is already ${effectKey} — ${action?.name || 'Self Buff'} refused. No use spent; the existing ${action?.name || 'Self Buff'} clock keeps running.</p></div>`;
 }
 
+// fix#79 census (#1136 selfAura precedent): the mid-flight double-spend
+// refusal used to be LOG-ONLY — spendMonsterAbilityUse logs `${slug}_refused`
+// with a loud console guard, but the raced second click saw NOTHING. Now it
+// answers in the UI. House refusal-popup SHAPE (mc-prerequisite-refusal div,
+// 'refused' / 'no … spent' / 'reset at dawn (GM-enforced for monsters)'
+// vocabulary — buildAbilitySaveRefusalPopup CANON) with reason-DISTINCT
+// words (#1348): the gate-exhausted arm says 'Uses Exhausted — has already
+// used … today' and the te-latch arm says 'Already <effect>'; this arm fired
+// because the spend raced a preceding click that already burned the use
+// mid-flight, so it says 'Already Buffing'.
+export function buildSelfBuffDoubleSpendRefusalPopup({ monsterName, useKey, maxUses }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Already Buffing</h3><p>${monsterName} is already buffing via ${useKey} — a preceding click spent the ${maxUses}/Day use. ${useKey} refused: no second use spent, no buff re-applied. Uses reset at dawn (GM-enforced for monsters).</p></div>`;
+}
+
 // MA-1449: effect-branched popup body — new effect keys inherit the
 // invisibility else-copy (§278 pitfall), so every sanctioned self-buff
 // effect needs its own honest branch. Hoisted out of buildSelfBuffPopup to
@@ -290,7 +304,14 @@ export async function resolveMonsterSelfBuffRow({ action, monsterName, campaignN
   let remaining = null;
   if (gate) {
     remaining = await spendMonsterAbilityUse({ monsterName, use: { useKey: gate.useKey, maxUses: gate.maxUses, actionName: action.name }, campaignName, deps });
-    if (remaining == null) return { resolved: false, reason: 'exhausted' };
+    if (remaining == null) {
+      // fix#79 census (#1136 precedent): mid-flight refused spend no longer
+      // refuses silently — the raced second click answers with the reason-
+      // distinct 'Already Buffing' popup. Log stays (spendMonsterAbilityUse
+      // already logged `${slug}_refused`, zero spend, audit side correct).
+      setPopupHtml(buildSelfBuffDoubleSpendRefusalPopup({ monsterName, useKey: gate.useKey, maxUses: gate.maxUses }));
+      return { resolved: false, reason: 'exhausted' };
+    }
   }
 
   const rounds = selfBuffRounds(action);

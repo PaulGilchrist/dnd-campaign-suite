@@ -66,8 +66,8 @@ function parseFeatureSpellLevel(entry) {
   return levelMatch ? parseInt(levelMatch[1], 10) : null;
 }
 
-function featureFreeCastCount(playerName, key, fallback) {
-  return Number(getRuntimeValue(playerName, key) ?? fallback);
+function featureFreeCastCount(playerName, key, fallback, campaignName) {
+  return Number(getRuntimeValue(playerName, key, campaignName) ?? fallback);
 }
 
 // FT-070: per-spell-tracking free_spell entries (e.g. Shadow Touched's Shadow Magic:
@@ -83,10 +83,10 @@ function perSpellTrackingDecision(entry, playerName, spellName, campaignName) {
 
 // Generic uses/recharge free casts: the spell must be listed on the entry and
 // the feature counter must still have uses left.
-function rechargeEntryGrantsCast(entry, playerName, spellName) {
+function rechargeEntryGrantsCast(entry, playerName, spellName, campaignName) {
   if (!entrySpells(entry).includes(spellName)) return false;
   if (entry.uses == null || !entry.recharge || entry.uses_expression) return false;
-  return featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.uses) > 0;
+  return featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.uses, campaignName) > 0;
 }
 
 // One free_spell/fey_reinforcements/misty_wanderer/dragon_companion automation entry.
@@ -98,10 +98,10 @@ function checkFreeCastEntry(entry, playerName, spellName, spellLevel, campaignNa
   if (entry.uses_expression && entry.usesMax) {
     const featureLevel = parseFeatureSpellLevel(entry);
     if (featureLevel !== null) {
-      if (featureLevel === spellLevel && featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.usesMax) > 0) return true;
+      if (featureLevel === spellLevel && featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.usesMax, campaignName) > 0) return true;
       return undefined;
     }
-    if (entrySpells(entry).includes(spellName) && featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.usesMax) > 0) return true;
+    if (entrySpells(entry).includes(spellName) && featureFreeCastCount(playerName, featureFreeCastKey(entry), entry.usesMax, campaignName) > 0) return true;
   }
 
   // Checked BEFORE the generic uses/recharge branch so a multi-spell entry can never
@@ -111,10 +111,10 @@ function checkFreeCastEntry(entry, playerName, spellName, spellLevel, campaignNa
     return perSpellTrackingDecision(entry, playerName, spellName, campaignName);
   }
 
-  if (rechargeEntryGrantsCast(entry, playerName, spellName)) return true;
+  if (rechargeEntryGrantsCast(entry, playerName, spellName, campaignName)) return true;
 
   const sharedKey = `_${entry.name.replace(/\s+/g, '_')}_freeCast`;
-  const stored = getRuntimeValue(playerName, sharedKey);
+  const stored = getRuntimeValue(playerName, sharedKey, campaignName);
   if (stored && Array.isArray(stored) && stored.includes(spellName)) return true;
   return undefined;
 }
@@ -152,11 +152,11 @@ function isConcentrationRecastFreeCast(playerName, spellName, campaignName) {
 
 // Runtime-keyed free-cast grants: Natural Recovery recovery list and Bewitching Magic
 // (free Misty Step while the feature flag is up).
-function runtimeSelectionFreeCast(playerName, spellName) {
-  const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
+function runtimeSelectionFreeCast(playerName, spellName, campaignName) {
+  const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast', campaignName);
   if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
 
-  const bewitchingFreeCast = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
+  const bewitchingFreeCast = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast', campaignName);
   if (bewitchingFreeCast && spellName === 'Misty Step') return true;
   return false;
 }
@@ -187,18 +187,18 @@ function masteryOrSavantFreeCast(playerName, spellName, spellLevel, campaignName
 
 // CLA-231: the counter is keyed by the cast spell's own level — a lv7 arcanum
 // consumes mysticArcanumLevel7, never a lower-level arcanum's counter.
-function arcanumFreeCast(playerName, spellName, spellLevel, playerStats) {
+function arcanumFreeCast(playerName, spellName, spellLevel, playerStats, campaignName) {
   const arcanums = playerStats?.class?.arcanums || [];
   if (!arcanums.includes(spellName)) return undefined;
   if (spellLevel < 6 || spellLevel > 9) return false;
-  const count = Number(getRuntimeValue(playerName, `mysticArcanumLevel${spellLevel}`) ?? 1);
+  const count = Number(getRuntimeValue(playerName, `mysticArcanumLevel${spellLevel}`, campaignName) ?? 1);
   return count > 0;
 }
 
 // Active-buff free casts that interleave the automation action scans:
 // War God's Blessing (before bonusActions) and Mantle of Majesty (before specialActions).
-function activeBuffFreeCast(playerName, spellName, buffKey, buffMatcher) {
-  const active = getRuntimeValue(playerName, buffKey);
+function activeBuffFreeCast(playerName, spellName, buffKey, buffMatcher, campaignName) {
+  const active = getRuntimeValue(playerName, buffKey, campaignName);
   if (buffMatcher(active)) return true;
   return false;
 }
@@ -276,7 +276,7 @@ function consumeRitualAdeptCast(spell, playerName, campaignName) {
 // false (explicit deny — stop scanning), or undefined (not applicable — keep scanning).
 // Break/continue points are rule-significant: the scan order is preserved exactly.
 const FREE_CAST_CHECKS = [
-  ({ playerName, spellName }) => runtimeSelectionFreeCast(playerName, spellName) || undefined,
+  ({ playerName, spellName, campaignName }) => runtimeSelectionFreeCast(playerName, spellName, campaignName) || undefined,
 
   // CLA-234: Path of the Wild Heart ritual-only grants (Nature Speaker → Commune with
   // Nature; Animal Speaker → Beast Sense / Speak with Animals). Spell entries are stamped
@@ -293,7 +293,7 @@ const FREE_CAST_CHECKS = [
   ({ playerName, spellName, spellLevel, campaignName }) => masteryOrSavantFreeCast(playerName, spellName, spellLevel, campaignName) || undefined,
 
   // CLA-231 arcanum — tri-state: a known arcanum decides the cast (free or spent).
-  ({ playerName, spellName, spellLevel, playerStats }) => arcanumFreeCast(playerName, spellName, spellLevel, playerStats),
+  ({ playerName, spellName, spellLevel, playerStats, campaignName }) => arcanumFreeCast(playerName, spellName, spellLevel, playerStats, campaignName),
 
   // CLA-299: Ritual Adept (2024 Wizard lv1) — an UNPREPARED Ritual-tagged spell in your
   // spellbook is ritual-only: it casts as a Ritual (+10 minutes, read from the book),
@@ -316,13 +316,13 @@ const FREE_CAST_CHECKS = [
 
   ({ playerName, spellName, spellLevel, playerStats, campaignName }) => scanFreeCastEntries(playerStats?.automation?.actions || [], playerName, spellName, spellLevel, campaignName),
 
-  ({ playerName, spellName }) => activeBuffFreeCast(playerName, spellName, '_War_Gods_Blessing_active',
-    (active) => active && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName)) || undefined,
+  ({ playerName, spellName, campaignName }) => activeBuffFreeCast(playerName, spellName, '_War_Gods_Blessing_active',
+    (active) => active && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName), campaignName) || undefined,
 
   ({ playerName, spellName, spellLevel, playerStats, campaignName }) => scanFreeCastEntries(playerStats?.automation?.bonusActions || [], playerName, spellName, spellLevel, campaignName),
 
-  ({ playerName, spellName }) => activeBuffFreeCast(playerName, spellName, 'activeBuffs',
-    (active) => (Array.isArray(active) ? active : []).some(b => b.name === 'Mantle of Majesty') && spellName === 'Command') || undefined,
+  ({ playerName, spellName, campaignName }) => activeBuffFreeCast(playerName, spellName, 'activeBuffs',
+    (active) => (Array.isArray(active) ? active : []).some(b => b.name === 'Mantle of Majesty') && spellName === 'Command', campaignName) || undefined,
 
   ({ playerName, spellName, spellLevel, playerStats, campaignName }) => scanFreeCastEntries(playerStats?.automation?.specialActions || [], playerName, spellName, spellLevel, campaignName),
 
@@ -420,7 +420,7 @@ function adjustSharedUsesCounter({ entry, playerName, spellName, spellLevel, cam
     (featureLevel === null && entrySpells(entry).includes(spellName));
   if (spellMatches) {
     const freeCastCountKey = featureFreeCastKey(entry);
-    const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.usesMax), entry.usesMax);
+    const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.usesMax, campaignName), entry.usesMax);
     if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
     return 'break';
   }
@@ -445,7 +445,7 @@ function adjustPerSpellCounter(entry, playerName, spellName, campaignName, ops) 
 function adjustRechargeCounter(entry, playerName, spellName, campaignName, ops) {
   if (!(entry.uses != null && entry.recharge && !entry.uses_expression)) return false;
   const freeCastCountKey = featureFreeCastKey(entry);
-  const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.uses), entry.uses);
+  const next = ops.shared(featureFreeCastCount(playerName, freeCastCountKey, entry.uses, campaignName), entry.uses);
   if (next !== null) setRuntimeValue(playerName, freeCastCountKey, next, campaignName);
   return true;
 }
@@ -507,7 +507,7 @@ function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLev
   // against an already-zero (or NaN) latch refuses loudly with ZERO writes. The
   // favoredEnemyUses ledger is the downstream decrement-after-use reader: useTrackedResource.js:6-8
   // renders it live into the Favored Enemy badge (CharClassFeatures.jsx:583 TrackedResourceInput).
-  const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
+  const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount', campaignName);
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
     if (newCount > 0) {
@@ -516,12 +516,12 @@ function consumeSpecialFreeCastFlags(allActions, playerName, spellName, spellLev
       console.error('[spellPreparationService] Favored Enemy free-cast consume refused — latch already spent, no-op consumption (zero writes, negative impossible):', { playerName, favoredEnemyCount, spellName });
     }
   }
-  const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
+  const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast', campaignName);
   if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spellName)) {
     setRuntimeValue(playerName, 'naturalRecoveryFreeCast', null, campaignName);
     setRuntimeValue(playerName, 'naturalRecoveryFreeCastUsed', true, campaignName);
   }
-  if (getRuntimeValue(playerName, '_Bewitching_Magic_freeCast') && spellName === 'Misty Step') {
+  if (getRuntimeValue(playerName, '_Bewitching_Magic_freeCast', campaignName) && spellName === 'Misty Step') {
     setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', null, campaignName);
   }
 
@@ -576,7 +576,7 @@ function decrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   if (arcanums.includes(spellName) && isMysticArcanumLevel(spellLevel)) {
     // CLA-231: decrement the counter keyed by the cast spell's own level.
     const resourceKey = `mysticArcanumLevel${spellLevel}`;
-    const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+    const count = Number(getRuntimeValue(playerName, resourceKey, campaignName) ?? 1);
     if (count > 0) {
       setRuntimeValue(playerName, resourceKey, count - 1, campaignName);
     }
@@ -598,7 +598,7 @@ function restoreActionFreeCastCounters(allActions, playerName, spellName, spellL
 // match -> restore the prior armed byte TRUE; explicit false stays disarmed; an intact
 // armed latch writes nothing (byte-identical restore).
 function restoreBewitchingArm(playerName, spellName, campaignName, playerStats) {
-  const bewitchingArmed = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
+  const bewitchingArmed = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast', campaignName);
   const hasBewitchingFeature = (playerStats?.automation?.passives || []).some(p => p.type === 'bewitching_magic');
   if (spellName === 'Misty Step' && bewitchingArmed == null && hasBewitchingFeature) {
     setRuntimeValue(playerName, '_Bewitching_Magic_freeCast', true, campaignName);
@@ -627,14 +627,14 @@ function restoreSignatureLatch(playerName, spellName, campaignName) {
 // restore can VERIFY the feature owner before re-arming — never fabricate a latch state
 // for a caster who has no Bewitching Magic passive.
 function restoreSpecialFreeCastFlags(playerName, spellName, spellLevel, campaignName, playerStats) {
-  const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount');
+  const favoredEnemyCount = getRuntimeValue(playerName, '_Favored_Enemy_freeCastCount', campaignName);
   if (favoredEnemyCount != null) {
     const newCount = Number(favoredEnemyCount);
     if (newCount >= 0) {
       setRuntimeValue(playerName, 'favoredEnemyUses', newCount + 1, campaignName);
     }
   }
-  const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
+  const nrFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast', campaignName);
   if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spellName)) {
     setRuntimeValue(playerName, 'naturalRecoveryFreeCast', null, campaignName);
     setRuntimeValue(playerName, 'naturalRecoveryFreeCastUsed', false, campaignName);
@@ -668,7 +668,7 @@ function incrementFreeCastResource(playerName, spellName, spellLevel, playerStat
   if (arcanums.includes(spellName) && isMysticArcanumLevel(spellLevel)) {
     // CLA-231: increment the counter keyed by the spell's own level.
     const resourceKey = `mysticArcanumLevel${spellLevel}`;
-    const count = Number(getRuntimeValue(playerName, resourceKey) ?? 1);
+    const count = Number(getRuntimeValue(playerName, resourceKey, campaignName) ?? 1);
     if (count < 1) {
       setRuntimeValue(playerName, resourceKey, count + 1, campaignName);
     }
@@ -692,13 +692,13 @@ function cleanupBuffsByName(casterName, buffName, campaignName) {
   }
 }
 
-function getWarlockSlotLevel(playerName, playerStats, minLevel) {
+function getWarlockSlotLevel(playerName, playerStats, minLevel, campaignName) {
   const isWarlock = playerStats.class?.name === 'Warlock';
   if (!isWarlock) return null;
   for (let lv = minLevel; lv <= 9; lv++) {
     const key = `spell_slots_level_${lv}`;
     const max = (playerStats.spellAbilities && playerStats.spellAbilities[key]) || 0;
-    const current = getRuntimeValue(playerName, key);
+    const current = getRuntimeValue(playerName, key, campaignName);
     const available = current != null ? current : max;
     if (available > 0) return lv;
   }
@@ -750,7 +750,7 @@ function resolveConcentrationChange(spell, playerName, playerStats, campaignName
 // Psionic Sorcery payment — SPs cover the spell level, components waived.
 // Returns true when the payment was made (metaCtx stamps applied).
 function applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, campaignName, metaCtx) {
-  const currentSP = Number(getRuntimeValue(playerName, 'sorceryPoints') ?? 0);
+  const currentSP = Number(getRuntimeValue(playerName, 'sorceryPoints', campaignName) ?? 0);
   if (currentSP < effectiveSpellLevel) return false;
   setRuntimeValue(playerName, 'sorceryPoints', currentSP - effectiveSpellLevel, campaignName);
   metaCtx.psionicSorcery = 'sorceryPoints';
@@ -771,7 +771,7 @@ function applyPsionicSorceryPayment(spell, playerName, effectiveSpellLevel, camp
 
 function consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, campaignName) {
   const slotKey = `spell_slots_level_${effectiveSpellLevel}`;
-  const currentSlots = getRuntimeValue(playerName, slotKey);
+  const currentSlots = getRuntimeValue(playerName, slotKey, campaignName);
   const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
   const availableSlots = currentSlots != null ? currentSlots : maxSlots;
   if (availableSlots <= 0) return false;
@@ -780,8 +780,12 @@ function consumeUpcastSlot(spell, playerName, playerStats, effectiveSpellLevel, 
 }
 
 // FT-068: Ritual Master Quick Ritual — consume the once-per-Long-Rest slotless cast.
+// #1309 no-timers adjudication: the latch stamps the boolean constant true — the same
+// long-rest-domain shape as naturalRecoveryFreeCastUsed (:522) — never a Date.now()
+// token. Both readers gate on presence only (isQuickRitualGrant :923 `== null`,
+// SpellDetailPopup.jsx:301 `!!`); no clock byte ever enters the decision.
 function consumeQuickRitual(spell, playerName, campaignName) {
-  setRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', Date.now(), campaignName);
+  setRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', true, campaignName);
   addEntry(campaignName, {
     type: 'ability_use',
     characterName: playerName,
@@ -818,15 +822,15 @@ function consumeFreeCast(spell, playerName, playerStats, campaignName) {
 
 function consumeBaseSlot(spell, playerName, playerStats, isWarlock, campaignName) {
   const baseSlotKey = `spell_slots_level_${spell.level}`;
-  let availableSlots = getRuntimeValue(playerName, baseSlotKey);
+  let availableSlots = getRuntimeValue(playerName, baseSlotKey, campaignName);
   const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[baseSlotKey]) || 0;
   availableSlots = availableSlots != null ? availableSlots : maxSlots;
 
   if (isWarlock && availableSlots <= 0) {
-    const warlockSlotLevel = getWarlockSlotLevel(playerName, playerStats, spell.level);
+    const warlockSlotLevel = getWarlockSlotLevel(playerName, playerStats, spell.level, campaignName);
     if (warlockSlotLevel === null) return false;
     const slotKey = `spell_slots_level_${warlockSlotLevel}`;
-    const currentSlots = getRuntimeValue(playerName, slotKey);
+    const currentSlots = getRuntimeValue(playerName, slotKey, campaignName);
     const slotMax = (playerStats.spellAbilities && playerStats.spellAbilities[slotKey]) || 0;
     const warlockAvailable = currentSlots != null ? currentSlots : slotMax;
     if (warlockAvailable > 0) {
@@ -911,7 +915,8 @@ function consumeSpellResource(spell, result, { isWgbSpell, isEyebiteRecast, isUp
 // cast using its regular casting time (the spell never had its casting time changed)
 // WITHOUT expending a spell slot, once per Long Rest. Opt-in via spell.quickRitual
 // (popup checkbox); consumed here, refused (falls through to normal slot payment) when
-// spent, re-armed by restRules-longRest.
+// spent, re-armed by restRules-longRest. The latch is presence-gated (boolean true when
+// spent, null/undefined fresh) — never a clock: no elapsed-time comparison on this key.
 function isQuickRitualGrant(spell, playerStats, playerName, campaignName, isUpcast) {
   const quickRitualHold = (playerStats.automation?.ritualSpells || []).some(f => f.chosenSpells && f.quickRitual);
   const quickRitualUsed = getRuntimeValue(playerName, '_Ritual_Master_quickRitualUsed', campaignName);
@@ -973,8 +978,8 @@ function stampModifiedSpell({ modifiedSpell, spell, playerStats, usePsychicDamag
   applyPhantasmalStamp({ modifiedSpell, spell, playerStats, freeCastAuthorized, playerName, campaignName });
 }
 
-function isWarGodsBlessingSpell(playerName, spellName) {
-  const isWgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active');
+function isWarGodsBlessingSpell(playerName, spellName, campaignName) {
+  const isWgbActive = getRuntimeValue(playerName, '_War_Gods_Blessing_active', campaignName);
   return !!(isWgbActive && ['Shield of Faith', 'Spiritual Weapon'].includes(spellName));
 }
 
@@ -1032,7 +1037,7 @@ export async function prepareSpellCast(spell, metaCtx, { playerName, playerStats
   const effectiveSpellLevel = isUpcast && upcastLevel ? upcastLevel : spell.level;
 
   // Concentration management
-  const isWgbSpell = isWarGodsBlessingSpell(playerName, spell.name);
+  const isWgbSpell = isWarGodsBlessingSpell(playerName, spell.name, campaignName);
 
   // CLA-138: arm-time "Skip Concentration" choice on a free-cast feature
   // (Fey Reinforcements → Summon Fey) — honored only on the free cast itself.

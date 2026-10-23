@@ -189,22 +189,27 @@ describe('dataLoader', () => {
             expect(fetchMock).toHaveBeenCalledWith('/data/classes.json');
         });
 
-        it('loadSpells/loadManeuvers dereference the version cache unguarded (TypeError), unlike loadData lanes', async () => {
-            // Crash-twins asymmetry: loadData() recurses to 5e for unknown versions,
-            // but loadSpells/loadManeuvers read dataCache[version] without the guard.
-            await expect(loadSpells('invalid')).rejects.toThrow(TypeError);
-            await expect(loadSpells('2024/')).rejects.toThrow(TypeError);
-            await expect(loadManeuvers('invalid')).rejects.toThrow(TypeError);
+        it('loadSpells/loadManeuvers guard unknown versions loudly (mirrors the loadData :69 sibling) and refuse with []', async () => {
+            // Fixed #1542 crash-twins asymmetry: loadData() guards !versionCache at :69;
+            // loadSpells/loadManeuvers now mirror that guard — unknown versions are
+            // INVALID input, so they log loudly and return an honest [] without fetching.
+            await expect(loadSpells('invalid')).resolves.toStrictEqual([]);
+            await expect(loadSpells('2024/')).resolves.toStrictEqual([]);
+            await expect(loadManeuvers('invalid')).resolves.toStrictEqual([]);
             expect(fetchMock).not.toHaveBeenCalled();
-            expect(console.error).not.toHaveBeenCalled(); // TypeError escapes before any catch/log
+            expect(console.error.mock.calls.map(c => c[0])).toStrictEqual([
+                '[dataLoader] Unknown ruleset version "invalid" passed to loadSpells — refusing with []',
+                '[dataLoader] Unknown ruleset version "2024/" passed to loadSpells — refusing with []',
+                '[dataLoader] Unknown ruleset version "invalid" passed to loadManeuvers — refusing with []'
+            ]);
             // maneuvers.json exists only in /data/2024/: the default '5e' route 404s
-            // (cache key exists so no TypeError) and resolves [] WITHOUT caching -> refetch.
+            // (cache key exists so the guard stays silent) and resolves [] WITHOUT caching -> refetch.
             expect(existsOnDisk('/data/maneuvers.json')).toBe(false);
             expect(await loadManeuvers()).toStrictEqual([]);
             expect(await loadManeuvers()).toStrictEqual([]);
             expect(fetchMock.mock.calls.map(c => c[0])).toStrictEqual(['/data/maneuvers.json', '/data/maneuvers.json']);
-            expect(console.error).not.toHaveBeenCalled(); // non-ok-but-not-thrown 404: silent empty
-            await expect(loadClassData('invalid')).resolves.toBe(realData('/data/classes.json')); // contrast: guarded lane
+            expect(console.error).toHaveBeenCalledTimes(3); // 404--but-not-thrown lane adds no log
+            await expect(loadClassData('invalid')).resolves.toBe(realData('/data/classes.json')); // contrast: loadData delegates to 5e
         });
     });
 
@@ -420,18 +425,29 @@ describe('dataLoader', () => {
             expect(getCachedBackgroundData('2024')).toBe(realData('/data/2024/backgrounds.json'));
         });
 
-        it('getCachedPointBuyCosts reads the raw wrapped cache and therefore never reaches point_buy (pinned source quirk)', async () => {
+        it('getCachedPointBuyCosts unwraps the version-keyed cache to reach the real disk costs', async () => {
             expect(getCachedPointBuyCosts()).toBeNull(); // default arg, unloaded
             const raw = realData('/data/rules-validation.json');
             await loadValidationRules('5e'); // populates the RAW (version-keyed) cache
-            // Raw cache is top-keyed by ruleset; the getter reads cached.point_buy
-            // without unwrapping, so the real disk costs are unreachable here.
-            // Consumers (src/config/utils.js getPointBuyCostsSync) silently fall
-            // back to DEFAULT_POINT_BUY_COSTS.
+            // Fixed #1542: the cache stores the wrapper top-keyed by ruleset, so the
+            // getter reads cached[version].point_buy.costs — the real disk costs now
+            // reach consumers (src/config/utils.js getPointBuyCostsSync) instead of
+            // silently serving DEFAULT_POINT_BUY_COSTS.
             expect(raw.point_buy).toBeUndefined();
             expect(raw['5e'].point_buy.costs).toStrictEqual({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 });
-            expect(getCachedPointBuyCosts('5e')).toBeNull();
-            expect(getCachedPointBuyCosts('bogus')).toBeNull();
+            expect(getCachedPointBuyCosts('5e')).toBe(raw['5e'].point_buy.costs); // cached identity, zero fetches
+            expect(getCachedPointBuyCosts('bogus')).toBeNull(); // unknown version guard
+            expect(fetchMock).toHaveBeenCalledTimes(1); // only the one loadValidationRules fetch
+
+            // 2024 lane: /data/2024/rules-validation.json is single-keyed by '2024'.
+            const raw24 = realData('/data/2024/rules-validation.json');
+            await loadValidationRules('2024');
+            expect(getCachedPointBuyCosts('2024')).toBe(raw24['2024'].point_buy.costs);
+            // Consumer byte-parity: today's disk costs equal the config/utils.js:11
+            // DEFAULT_POINT_BUY_COSTS fallback, so getPointBuyCostsSync behavior is
+            // unchanged; future disk edits now propagate instead of being masked.
+            expect(getCachedPointBuyCosts('5e')).toStrictEqual({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 });
+            expect(fetchMock).toHaveBeenCalledTimes(2);
         });
 
         it('loadSkills derives pairs from real ability bytes and from the constant fallback on network failure', async () => {

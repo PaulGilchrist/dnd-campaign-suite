@@ -26,8 +26,11 @@ export async function getAbilities(playerStats) {
             const proficient = playerStats.skillProficiencies.includes(skill.name);
             const newSkill = { ...skill };
             newSkill.bonus = proficient ? newAbility.bonus + proficiency : newAbility.bonus;
-            if (playerStats.expertise && playerStats.expertise.includes(skill.name)) {
-                newSkill.bonus += proficiency; // Rogues can double their proficiency for two selected areas of expertise
+            // RAW law (both editions): expertise is granted only "in two of your
+            // skill proficiencies" (classes.json Bard/Rogue Expertise rows) — the
+            // double-proficiency bonus applies ONLY where already proficient.
+            if (proficient && playerStats.expertise && playerStats.expertise.includes(skill.name)) {
+                newSkill.bonus += proficiency; // expert = proficient + doubled proficiency
              }
             return newSkill;
          });

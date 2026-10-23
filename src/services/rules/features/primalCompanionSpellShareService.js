@@ -8,7 +8,11 @@ const SPELL_SHARE_FEATURE_NAME = 'Share Spells';
 // trigger below). The lookup contract stays smoke-tested through the trigger chokepoint.
 function getShareSpellsFeature(playerStats) {
     const passives = (() => {
-        const x = playerStats.automation?.passives;
+        // Apex guard (#204-class): `?.` on playerStats routes a nullish apex into the file's
+        // OWN loud arm below — same refuse-loud posture as the #1396 unresolvable-slot
+        // console.error+throw; consumers (.catch in useCustomHandlers/execution) log it.
+        // Complements, never touches, the #104 self-range/cantrip/slot/alive hunks below.
+        const x = playerStats?.automation?.passives;
         if (x == null) { console.error('[primalCompanionSpellShareService] Missing array:', x); throw new Error('Expected array, got ' + x); }
         return x;
     })();

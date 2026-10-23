@@ -53,8 +53,31 @@ function refuseUsesPress({ usesGate, monsterName, campaignName, setPopupHtml, lo
     .catch((e) => { console.error('[monsterUtilitySpellCast] Error logging uses refusal:', e); });
 }
 
+// fix#79 census mid-flight refused-spend arm (helper per the §45 complexity
+// house style) — answers the raced click with the reason-distinct popup (the
+// audit log was already written by spendMonsterAbilityUse).
+function refuseMidFlightUsesPress({ usesGate, monsterName, setPopupHtml }) {
+  if (setPopupHtml) setPopupHtml(buildUtilityCastDoubleSpendRefusalPopup({ monsterName, useKey: usesGate.useKey, maxUses: usesGate.maxUses }));
+  return { resolved: false, reason: 'uses-exhausted' };
+}
+
+// fix#79 census (#1136 selfAura precedent): the mid-flight double-spend
+// refusal inside spendUtilityCosts used to be IGNORED — spendMonsterAbilityUse
+// returns null after logging `${slug}_refused` with a loud console guard,
+// yet this route still fell through to the advisory CAST record: the player
+// read "casts X" prose for a cast that never spent a use, with no refusal
+// popup at all. Now the refusal answers in the UI (reason-distinct
+// 'Already Casting', #1348 — the gate arm keeps 'Uses Exhausted',
+// CANON buildAbilitySaveRefusalPopup) and the advisory cast NEVER lands
+// post-refuse (guard in the resolver keeps it in the accepted arm only).
+export function buildUtilityCastDoubleSpendRefusalPopup({ monsterName, useKey, maxUses }) {
+  return `<div class="mc-prerequisite-refusal"><h3>Already Casting</h3><p>${monsterName} is already casting ${useKey} — a preceding click spent the ${maxUses}/Day use. ${useKey} refused: no second use spent, no cast resolved. Uses reset at dawn (GM-enforced for monsters).</p></div>`;
+}
+
 // Costs spend at resolve (no picker on this route): recharge FIRST (single
-// merged map write, MA-0005 recipe), then the MA-0020 uses map.
+// merged map write, MA-0005 recipe), then the MA-0020 uses map. Returns
+// usesRefused:true when the uses spend was refused MID-FLIGHT (double-spend
+// guard, fix#79) so the caller drops the advisory cast record.
 async function spendUtilityCosts({ gate, usesGate, action, monsterName, campaignName, deps, log }) {
   if (gate) {
     // Forward the injected deps (set/get runtime + logger) — spendMonsterRecharge
@@ -64,8 +87,10 @@ async function spendUtilityCosts({ gate, usesGate, action, monsterName, campaign
   if (usesGate) {
     // MA-0020 map spend (single merged write inside); logs "1 use spent,
     // N left today". Key = abilitySaveUseKey(action) = row name.
-    await spendMonsterAbilityUse({ monsterName, use: { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: action.name }, campaignName, deps: { ...deps, addEntry: log } });
+    const remaining = await spendMonsterAbilityUse({ monsterName, use: { useKey: usesGate.useKey, maxUses: usesGate.maxUses, actionName: action.name }, campaignName, deps: { ...deps, addEntry: log } });
+    return { usesRefused: remaining == null };
   }
+  return { usesRefused: false };
 }
 
 function utilityPressGates(action, monsterName, getRV) {
@@ -97,7 +122,8 @@ export async function resolveUtilitySpellCastRow({ action, spellName, spell = nu
     await refuseUsesPress({ usesGate, monsterName, campaignName, setPopupHtml, log });
     return { resolved: false, reason: 'uses-exhausted' };
   }
-  await spendUtilityCosts({ gate, usesGate, action, monsterName, campaignName, deps, log });
+  const spent = await spendUtilityCosts({ gate, usesGate, action, monsterName, campaignName, deps, log });
+  if (spent.usesRefused) return refuseMidFlightUsesPress({ usesGate, monsterName, setPopupHtml });
   await log(campaignName, {
     type: 'ability_use',
     characterName: monsterName,

@@ -4,6 +4,16 @@ import { evaluateAutoExpression } from '../combat/automation/automationService.j
  * Compute initiative for a character.
  */
 export function computeInitiative(playerStats) {
+    // Apex guard (#204-class): loud posture — this function's whole contract is WRITING
+    // initiative onto playerStats; with no apex there is no neutral return to claim
+    // (silent undefined would fake success). :20 `?? []` stays automation-tolerant.
+    // Consumer rules.js:562 is pre-gated (stats object built earlier in getPlayerStats).
+    // Golden pins intact: with an apex present, the :17-18 dexAbility.bonus crash boundary
+    // remains console-untouched (rules.ft047-keenMind.test.js quirk lock).
+    if (!playerStats) {
+        console.error('rules: missing playerStats for computeInitiative');
+        throw new Error('Missing playerStats: computeInitiative');
+    }
     const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
     playerStats.initiative = dexAbility.bonus;
 

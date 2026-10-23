@@ -52,5 +52,19 @@ describe('greatWeaponFighting', () => {
     it('returns false when playerStats.automation is missing', () => {
       expect(greatWeaponFightingApplies({ properties: ['Two-Handed'] }, {})).toBe(false);
     });
+
+    it('returns false when playerStats.automation is null (sub-field tolerance)', () => {
+      expect(greatWeaponFightingApplies({ properties: ['Two-Handed'] }, { automation: null })).toBe(false);
+    });
+
+    // Apex posture #1246: tolerant-quiet like every other absence level
+    // in this file — no throw, false = does not apply = RAW damage kept.
+    it.each([
+      { label: 'undefined playerStats', playerStats: undefined },
+      { label: 'null playerStats', playerStats: null },
+    ])('returns false without throwing for $label', ({ playerStats }) => {
+      expect(() => greatWeaponFightingApplies({ properties: ['Two-Handed'] }, playerStats)).not.toThrow();
+      expect(greatWeaponFightingApplies({ properties: ['Two-Handed'] }, playerStats)).toBe(false);
+    });
   });
 });

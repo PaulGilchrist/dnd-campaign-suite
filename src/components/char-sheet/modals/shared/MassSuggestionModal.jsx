@@ -200,7 +200,12 @@ function MassSuggestionModal({
                     sourceName: casterName,
                 });
 
-                const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts') || []);
+                // Symmetric read/write vocabulary (fix #198): pass campaignName on both sides.
+                // Harmless today — useRuntimeState.js:63 `getRuntimeValue(characterKey, propertyName)`
+                // is arity-2 and silently discards a 3rd arg, while :78 `setRuntimeValue(characterKey,
+                // propertyName, value, campaignName)` is arity-3. Forward-compatible with the deferred
+                // campaign-scoped store (#1520) so this pair never splits tiers.
+                const existingPrompts = Array.from(getRuntimeValue('campaign', 'pendingSaveListenerPrompts', campaignName) || []);
                 existingPrompts.push(promptId);
                 setRuntimeValue('campaign', 'pendingSaveListenerPrompts', existingPrompts, campaignName);
 

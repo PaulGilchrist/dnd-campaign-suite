@@ -136,6 +136,20 @@ describe('primalCompanionSpellShareService', () => {
             expect(consoleSpy).toHaveBeenCalledWith('[primalCompanionSpellShareService] Missing array:', null);
             expect(executeHandler).not.toHaveBeenCalled();
         });
+
+        it('nullish playerStats apex routes into the SAME loud array guard at :16 (#204-class apex) — precedes every other gate', async () => {
+            // `playerStats?.` at :15 sends a nullish apex to the file-owned console.error+throw —
+            // the #1396 refuse-loud posture, not a silent null that could read as eligibility-checked.
+            // Gate-order pin: the apex throw precedes self-range/cantrip/slot/companion gates
+            // (zero store reads, zero dispatch), #104 hunks byte-intact and still downstream.
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            await expect(triggerPrimalCompanionSpellShare(SHIELD, {}, undefined, CAMPAIGN, null)).rejects.toThrow('Expected array, got undefined');
+            await expect(triggerPrimalCompanionSpellShare(null, {}, null, CAMPAIGN, null)).rejects.toThrow('Expected array, got undefined');
+            expect(consoleSpy).toHaveBeenCalledTimes(2);
+            expect(consoleSpy).toHaveBeenCalledWith('[primalCompanionSpellShareService] Missing array:', undefined);
+            expect(reads).toEqual([]); // dies inside getShareSpellsFeature, before :64/:69 store gates
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
     });
 
     describe('triggerPrimalCompanionSpellShare', () => {

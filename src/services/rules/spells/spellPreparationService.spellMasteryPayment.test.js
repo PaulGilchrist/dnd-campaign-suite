@@ -16,8 +16,8 @@
 //     folded OUT of the oracle to this lane; the oracle keeps only the lv1/lv2 base ALLOW arms
 //     ('Magic Missile'@1, 'Shield'@2, lowercase deny, 3-arg campaign-tier arity — cited, never
 //     re-grown here). #1522 owns Signature lv3 latch; #1517 owns the generic consumeBaseSlot/
-//     consumeUpcastSlot pay/deny ladder (:718-726/:765-789) and the #1516 :720/:767 arity-2
-//     read vs arity-4 write hazard pin — mirrored on our rows, never re-pinned here.
+//     consumeUpcastSlot pay/deny ladder (:718-726/:765-789) and the #1516 :720/:767 read-vs-write
+//     arity pin — UNIFIED (reads now carry campaignName too); mirrored on our rows, never re-pinned here.
 //
 // DISK LAW (readFileSync + drift-throw at load — disk text is law #1365; fabrication-ban):
 // public/data/2024/classes.json Wizard .class_levels[level 18].features 'Spell Mastery'
@@ -309,10 +309,10 @@ describe('CLA-323 — Spell Mastery (Wizard lv18) payment: free at lowest level 
     expect(store.spell_slots_level_3).toBe(bankLv3 - 1);
     expect(store.spell_slots_level_1).toBe(4);
     expect(store.SpellMastery_level1).toBe('Thunderwave'); // payment never burns the selection
-    // arity mirror (pin home resource-flow #1517/#1516, cited not re-pinned): reads arity-2, writes arity-4
+    // arity mirror (pin home resource-flow #1517/#1516, cited not re-pinned): reads and writes both carry the explicit tier (unified)
     expect(payReads()).toEqual([
-      [CASTER, 'spell_slots_level_2'],
-      [CASTER, 'spell_slots_level_3'],
+      [CASTER, 'spell_slots_level_2', CAMPAIGN],
+      [CASTER, 'spell_slots_level_3', CAMPAIGN],
     ]);
     expect(r1.slotConsumed).toBe(true);
     expect(r1.freeCastUsed).toBe(false);

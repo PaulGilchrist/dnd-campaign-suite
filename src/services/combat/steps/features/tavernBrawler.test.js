@@ -111,7 +111,7 @@ describe('tavernBrawler.handler', () => {
     expect(random).toHaveBeenCalledTimes(2);
     expect(addEntry).toHaveBeenCalledTimes(1);
     expect(addEntry.mock.calls[0][1].description).toBe(
-      'Tavern Brawler Damage Reroll: rerolled 2 damage die showing 1 on Unarmed Strike — new values 8, 5.'
+      'Tavern Brawler Damage Reroll: rerolled 2 damage dice showing 1 on Unarmed Strike — new values 8, 5.'
     );
   });
 

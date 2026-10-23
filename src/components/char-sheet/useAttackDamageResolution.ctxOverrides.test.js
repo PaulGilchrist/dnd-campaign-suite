@@ -155,6 +155,15 @@ describe('useAttackDamageResolution ctxOverrides: override-vs-derived precedence
             expected: { empoweredEvocationModifier: 4 },
         },
         {
+            // fix#121 signed law parity: the ?? default must never floor an
+            // override — a negative INT mod passes through signed.
+            name: 'ctxOverrides.empoweredEvocationModifier=-3 passes through signed',
+            popupHtml: null,
+            attack: { name: 'Fire Bolt', damage: '1d10+4', damageType: 'fire' },
+            overrides: { empoweredEvocationModifier: -3 },
+            expected: { empoweredEvocationModifier: -3 },
+        },
+        {
             name: 'arbitrary ctxOverrides keys reach ctx via raw spread',
             popupHtml: null,
             attack: LONGSWORD,

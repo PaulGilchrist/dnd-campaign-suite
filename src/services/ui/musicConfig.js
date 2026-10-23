@@ -86,7 +86,12 @@ export function extractVideoId(input) {
       const id = url.pathname.slice(1);
       return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
     }
-    if (url.hostname.endsWith('youtube.com')) {
+    // SECURITY (#1544): exact host or leading-dot suffix — bare
+    // endsWith('youtube.com') accepted glued-label lookalikes
+    // (notyoutube.com, evilyoutube.com). URL.hostname is lowercased
+    // by spec, so no case-folding is needed here.
+    const host = url.hostname;
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
       const v = url.searchParams.get('v');
       if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
       const embed = url.pathname.match(/^\/embed\/([a-zA-Z0-9_-]{11})/);

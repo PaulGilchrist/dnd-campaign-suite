@@ -13,6 +13,31 @@
 // the click-path routing lives there too. Save bonuses are NOT asserted: the
 // component reads saveBonuses[saveType.toLowerCase()] and raw rolls pin every
 // outcome here, so the mock creatures stay bonus-free (family recipe).
+//
+// fix#245 vacuous-mock rework (fix#154 recipe): the old local mock of
+// ./CreatureSelectionModal.jsx invented .sp-desc / .sp-note-copy divs
+// (former :81-82) that appear ZERO times in production source — the copy
+// assertions verified the mock, not the app. The mock is DELETED: this lane
+// now mounts the REAL picker (house pattern per fix#154's creature-selection
+// lane — SaveAttackAoeModal never passes campaignName/attackerName to the
+// picker, so its spell-overlay effect early-returns at
+// CreatureSelectionModal.jsx:33 and no map/network mock is needed).
+// Invented-class vocabulary diff (mock -> real, CreatureSelectionModal.jsx):
+//   .sp-desc         -> bare <p dangerouslySetInnerHTML={description}> (:81)
+//   .sp-note-copy    -> <p className="sp-note" dangerouslySetInnerHTML={note}> (:83)
+//   .sp-header text  -> real, but now pinned against the action.name fallback
+//                        (aoePickerTitle, SaveAttackAoeModal.jsx:1226-1228)
+//   auto-confirm-all -> the mock's Confirm auto-selected EVERY target; the
+//                        real picker gates on user-checked rows and blocks the
+//                        empty set (handleConfirm guard, CreatureSelectionModal
+//                        .jsx:66-69) — that guard is now pinned, then the GM
+//                        checks all three rows so the adjudication stays 3-wide.
+// Honest note substitution: the real MA-0063 damageless-condition picker note
+// is exactly 'On a failed save, target is Prone.' (buildPickerCopy,
+// SaveAttackAoeModal.jsx:1332-1338) — it does NOT name the 60-ft push clause;
+// the push copy lives ONLY on the grant-side condition log (applySaveFail-
+// Conditions pushNote, :717-718), pinned below, and push is GM-enforced
+// movement (no position consumer, §7).
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
@@ -71,22 +96,6 @@ vi.mock('../../../../services/rules/combat/rangeCheck.js', () => ({
 vi.mock('../../../../hooks/combat/handlers/handleOverchannelSelfDamage.js', () => ({
   handleOverchannelSelfDamage: vi.fn(async () => {}),
 }));
-const seenTargets = vi.hoisted(() => ({ current: [] }));
-vi.mock('./CreatureSelectionModal.jsx', () => ({
-  default: ({ title, description, note, targets, onConfirm, onSkip }) => {
-    seenTargets.current = targets;
-    return (
-      <div className="sp-overlay">
-        <div className="sp-header">{title}</div>
-        <div className="sp-desc">{description}</div>
-        <div className="sp-note-copy">{note}</div>
-        {targets.map(t => (<label key={t.name} className="secondary-target-row"><input type="checkbox" />{t.name}</label>))}
-        <button className="sp-roll-btn" onClick={() => onConfirm(seenTargets.current.map(t => t.name))} type="button">Confirm</button>
-        <button className="sp-dismiss-btn" onClick={onSkip} type="button">Skip</button>
-      </div>
-    );
-  },
-}));
 
 import { applyDamageToTarget } from '../../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../../services/ui/logService.js';
@@ -96,7 +105,7 @@ const REPULSION = monstersData.find(m => m.index === 'adult-bronze-dragon').acti
 let randomSpy;
 // Each NPC save consumes exactly two draws (raw1, raw2 — SaveAttackAoeModal
 // computeNpcSave); the PC prompt id consumes one more. Target order:
-// Thug 1, Guard 1, AberrantSorcerer. 0.01 → raw 1 (fail vs DC 19),
+// Thug 1, Guard 1, AberrantSorcerer. 0.01 → raw 1 (<DC 19, fail),
 // 0.99 → raw 20 (success).
 function spyRandom(seq) {
   let i = 0;
@@ -127,13 +136,35 @@ function renderBreath() {
   );
 }
 
+// ── REAL picker vocabulary helpers (fix#154 house shape) ──
+function rowFor(name) {
+  return [...document.querySelectorAll('.secondary-target-row')]
+    .find(row => row.textContent.includes(name));
+}
+function confirmBtn() {
+  return document.querySelector('.sp-roll-btn');
+}
+async function renderPicker() {
+  const view = renderBreath();
+  // buildEligibleTargets + excludeNames: the attacker is filtered out; the
+  // three victims each render one REAL secondary-target-row (:84-141).
+  await waitFor(() => expect(document.querySelectorAll('.secondary-target-row')).toHaveLength(3));
+  expect(rowFor('Thug 1')).toBeInTheDocument();
+  expect(rowFor('Guard 1')).toBeInTheDocument();
+  expect(rowFor('AberrantSorcerer')).toBeInTheDocument();
+  expect(rowFor('Adult Bronze Dragon 1')).toBeUndefined();
+  return view;
+}
+function checkAllTargets() {
+  document.querySelectorAll('.secondary-target-row input[type="checkbox"]').forEach(input => fireEvent.click(input));
+}
+
 const loggedEntries = () => addEntry.mock.calls.map(c => c[1]);
 const pushTes = () => (runtime.store['campaign.targetEffects'] || []).filter(te => te.effect === 'push');
 
 beforeEach(() => {
   vi.clearAllMocks();
   Object.keys(runtime.store).forEach(k => delete runtime.store[k]);
-  seenTargets.current = [];
   promptsSent.current = [];
 });
 
@@ -142,19 +173,45 @@ describe('MA-0079 Repulsion Breath picker — damageless prone + push adjudicati
     // Draws: Thug raw1/2 low → roll 1 (<DC 19, fail); Guard raw1 high →
     // roll 20 (success). Prompt id for AberrantSorcerer consumes the tail.
     spyRandom([0.01, 0.01, 0.99, 0.99, 0.99]);
-    const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current).toHaveLength(3));
+    await renderPicker();
 
-    // Damageless picker copy: Prone-on-fail prose, never half-damage.
-    expect(document.querySelector('.sp-note-copy').textContent).toMatch(/On a failed save, target is Prone\./);
-    expect(document.querySelector('.sp-note-copy').textContent).not.toMatch(/half/i);
-    expect(document.querySelector('.sp-desc').textContent).toContain('DC 19');
+    // Damageless picker copy on the REAL DOM. Header: titleOverride beats
+    // action.name (aoePickerTitle :1226-1228) + MA-0063 fa-smog icon
+    // (buildPickerCopy :1335). Description: the :1324 head sentence with the
+    // <strong> byte surviving dangerouslySetInnerHTML (:81).
+    const header = document.querySelector('.sp-header');
+    expect(header.textContent).toContain('30-ft Cone (GM positions tokens; selection advisory)');
+    expect(header.textContent).not.toContain('Repulsion Breath');
+    expect(header.querySelector('i.fa-smog')).toBeInTheDocument();
+    const descP = [...document.querySelectorAll('.sp-body p')].find(p => p.textContent.includes('Select creatures'));
+    expect(descP.innerHTML).toBe('Select creatures in the area of effect. Each must make a <strong>Strength</strong> saving throw (DC 19).');
+    // Note (.sp-note, :83): prone-on-fail prose, never half-damage, never a
+    // phantom damage phrase.
+    const note = document.querySelector('.sp-note');
+    expect(note.textContent).toBe('On a failed save, target is Prone.');
+    expect(note.textContent).not.toMatch(/half/i);
+    expect(note.textContent).not.toMatch(/damage/i);
 
-    // Pre-confirm inertness: nothing granted before the GM confirms.
+    // REAL selection lane the invented mock faked: confirm is disabled at
+    // zero picks (CreatureSelectionModal.jsx:153) and handleConfirm blocks
+    // an empty set (:66-69); the label carries the host-threaded action.name
+    // with a live count (:156, confirmLabel from SaveAttackAoeModal.jsx:2037).
+    expect(confirmBtn()).toBeDisabled();
+    fireEvent.click(confirmBtn());
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(runtime.store['campaign.targetEffects']).toBeUndefined();
+
+    checkAllTargets();
+    expect(confirmBtn().textContent).toContain('Repulsion Breath');
+    expect(confirmBtn().textContent).toContain('(3)');
+    expect(confirmBtn()).toBeEnabled();
+    expect(rowFor('Thug 1').className).toContain('secondary-target-selected');
+
+    // Pre-grant inertness: nothing granted before the adjudication runs.
     expect(runtime.store['campaign.targetEffects']).toBeUndefined();
     expect(runtime.store['Thug 1.activeConditions']).toBeUndefined();
 
-    fireEvent.click(getByText('Confirm'));
+    fireEvent.click(confirmBtn());
 
     // FAIL leg — Thug 1: Prone (MA-0063 meta) + push marker te + named log.
     await waitFor(() => expect(runtime.store['Thug 1.activeConditions']).toEqual(['prone']));
@@ -179,9 +236,9 @@ describe('MA-0079 Repulsion Breath picker — damageless prone + push adjudicati
 
   it('PC prompt carries saveConditions + dc_success none + zero raw damage; failed save-result lands Prone + push at the listener seam', async () => {
     spyRandom([0.01, 0.01, 0.99, 0.99, 0.99]);
-    const { getByText } = renderBreath();
-    await waitFor(() => expect(seenTargets.current).toHaveLength(3));
-    fireEvent.click(getByText('Confirm'));
+    await renderPicker();
+    checkAllTargets();
+    fireEvent.click(confirmBtn());
     await waitFor(() => expect(promptsSent.current).toHaveLength(1));
     const prompt = promptsSent.current[0];
     expect(prompt).toMatchObject({ targetName: 'AberrantSorcerer', saveType: 'Strength', saveDc: 19, saveConditions: ['prone'], dcSuccess: 'none', rawDamage: 0 });

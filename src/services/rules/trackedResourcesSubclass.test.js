@@ -28,10 +28,12 @@
 //     type 'steps_of_the_fey' disk 2024 warlock feature lv3 uses_expression
 //     'CHA modifier_min_1'. DRIFT pinned: NO lv gate in code — the stamped
 //     automation is the grant proxy (disk lv3).
-//   tirelessUses                 :292-293 Ranger lv>=10 max(WIS,1) — disk 2024
-//     Ranger lv10 'Tireless' automation.resourceKey 'tirelessUses'
-//   naturesVeilUses             :285-286 Ranger lv>=14 max(WIS,1) — disk lv14
-//     'Nature's Veil' automation.resourceKey 'naturesVeilUses'
+//   tirelessUses                 :292-293 Ranger lv>=10 max(WIS,1), 2024-only
+//     (fix#134) — disk 2024 Ranger lv10 'Tireless' automation.resourceKey
+//     'tirelessUses'; 5e disk has no row -> 0
+//   naturesVeilUses             :285-286 Ranger lv>=14 max(WIS,1), 2024-only
+//     (fix#134) — disk lv14 'Nature's Veil' automation.resourceKey
+//     'naturesVeilUses'; 5e disk has no row -> 0
 //   stonecunningUses            :324-333 race trait 'Stonecunning' + automation,
 //     uses=proficiency ('proficiency_bonus' disk, Dwarf trait both rulesets)
 //   stonesEnduranceUses         :328-329 SUBRACE trait "Stone's Endurance" —
@@ -52,10 +54,11 @@
 //   channel census below pins it; the extra-arm override therefore CANNOT
 //   re-add it once absent (row in the override table). Registry-only side of
 //   the subclass channel is base-lane owned (:213-219), not repeated.
-// RULESET DRIFT (reported): gates are 2024-major-name-only — 5e disk names
-//   ('Moon', 'The Archfey', 'Life') never fire; 5e disk Ranger has no
-//   Tireless/Nature's Veil but the class+level gates seed them anyway
-//   (drift rows pinned).
+// RULESET GATE (fix#134 #1533, was drift): tireless/naturesVeil gates are
+//   2024-version-gated — the seeds fire only when is2024, matching the disk
+//   census (5e disk Ranger has NO Tireless/Nature's Veil rows; 2024 Ranger
+//   lv10/lv14 grant them). 5e subclass names ('Moon', 'The Archfey', 'Life')
+//   still never match the 2024-major-name gates (separate drift, reported).
 // NO CLOCK: grep proves 0 Date.now/setTimeout/setInterval in the module; all
 //   owned keys re-arm at rest seams owned by restRules-constants.js
 //   LONG_REST_RESOURCES (:186 :222 :223 :225 :243) and restRules-longRest.js
@@ -292,7 +295,7 @@ describe('subclass-gated seeds', () => {
     for (const [label, stats, expected] of rows) expectPools(stats, ['_Steps_of_the_Fey_freeCastCount'], expected, label);
   });
 
-  it('Ranger ladder :285-293 — tireless lv>=10 / naturesVeil lv>=14, gate-separated, max(WIS,1), class-gated, 5e drift pinned', () => {
+  it('Ranger ladder :285-293 — tireless lv>=10 / naturesVeil lv>=14, gate-separated, max(WIS,1), class-gated, RULESET-GATED 2024-only (fix#134 #1533)', () => {
     const ranger = (level, abilities, rules = '2024') => basePlayerStats({ rules, level, class: cls('Ranger', undefined), abilities });
     const both = ['tirelessUses', 'naturesVeilUses'];
     const rows = [
@@ -304,7 +307,15 @@ describe('subclass-gated seeds', () => {
       ['lv10 WIS -2 -> floor 1', ranger(10, diskAbilities('Wisdom', -2)), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: { current: 0, max: 0 } }],
       ['lv10 no Wisdom entry -> floor 1', ranger(10, []), { tirelessUses: { current: 1, max: 1 }, naturesVeilUses: { current: 0, max: 0 } }],
       ['GATE: druid lv15 WIS+5 -> both 0', basePlayerStats({ rules: '2024', level: 15, class: cls('Druid', MOON.name), abilities: diskAbilities('Wisdom', 5) }), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
-      ['DRIFT pinned: 5e ranger lv15 seeds both (5e disk has no Tireless/Veil rows)', ranger(15, diskAbilities('Wisdom', 2), '5e'), { tirelessUses: { current: 2, max: 2 }, naturesVeilUses: { current: 2, max: 2 } }],
+      // fix#134 (#1533): disk census — 5e Ranger lv10 rows are 'Hide in
+      // Plain Sight'/'Natural Explorer', lv14 rows 'Favored Enemy'/'Vanish'
+      // (census test above, bytes). No Tireless/Veil rows in the 5e disk at
+      // ANY level -> the seed must be 0. Pre-fix capture: lv15 WIS+2
+      // seeded {2,2} (drift row, flipped here).
+      ['RULESET-GATED: 5e ranger lv15 -> both 0 (was drift {2,2}; 5e disk has no rows)', ranger(15, diskAbilities('Wisdom', 2), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
+      ['RULESET-GATED: 5e ranger lv10 -> tireless 0 (5e disk lv10 has no Tireless)', ranger(10, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
+      ['RULESET-GATED: 5e ranger lv17 -> both 0 (no capstone seed for absent rows)', ranger(17, diskAbilities('Wisdom', 5), '5e'), { tirelessUses: { current: 0, max: 0 }, naturesVeilUses: { current: 0, max: 0 } }],
+      ['INVERSE: 2024 lv20 both live WIS+3 (gate stays live for the edition WITH rows)', ranger(20, diskAbilities('Wisdom', 3)), { tirelessUses: { current: 3, max: 3 }, naturesVeilUses: { current: 3, max: 3 } }],
     ];
     for (const [label, stats, expected] of rows) expectPools(stats, both, expected, label);
   });

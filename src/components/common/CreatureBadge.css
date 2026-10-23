@@ -31,6 +31,12 @@ button.creature-badge:disabled {
   cursor: not-allowed;
 }
 
+/* ── Wrapper (anchor for the absolutely-positioned remove button) ── */
+.creature-badge-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
 /* ── Remove button ──────────────────────────────────────── */
 .creature-badge-remove {
   position: absolute;

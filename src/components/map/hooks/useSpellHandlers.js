@@ -36,6 +36,10 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
     const spellDragActiveRef = useRef(false);
 
     const handleSpellPointerDown = useCallback((e, spellMode, overlays) => {
+        // #913: pointerdown fires for ALL mouse buttons and right/middle are
+        // unowned on the map canvas (pan is left-only, useZoomPan.js:52). The
+        // button guard must run before any hit-testing or placement side-effect.
+        if (e.button !== 0) return;
         if (rulerMode) return;
         const grid = getGridFromEvent(e);
         if (!grid) return;
@@ -48,7 +52,6 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
         for (let i = overlays.length - 1; i >= 0; i--) {
             const overlay = overlays[i];
             if (!hitTestOverlay(overlay, gx, gy)) continue;
-            if (e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
             const origin = svgOrigin(overlay);
@@ -100,6 +103,7 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
     }, []);
 
     const handleSpellPointerUp = useCallback((e, spellDraft, spellMode, addOverlay, shapeParams) => {
+        if (e.button !== 0) return; // #913 same class: a non-primary release must not commit a live draft
         if (!spellDraft) return;
         const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
         const overlay = createOverlay(spellMode, spellDraft.startGridX, spellDraft.startGridY, angle, shapeParams);
@@ -133,6 +137,7 @@ function useSpellHandlers({ rulerMode, getGridFromEvent, clientToSVG, addOverlay
     }, [getGridFromEvent, clientToSVG, computeAngle]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSpellDragEnd = useCallback((e, dragOverlay, rotateOverlay, overlays, svgRef) => {
+        if (e.button !== 0) return; // #913 same class: a non-primary release must not end/flush a live drag or capture
         if (dragOverlay) {
             const grid = getGridFromEvent(e);
             if (grid) {

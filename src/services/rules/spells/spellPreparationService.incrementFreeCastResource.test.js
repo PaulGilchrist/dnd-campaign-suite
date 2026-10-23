@@ -202,8 +202,8 @@ describe('incrementFreeCastResource — restore lane (rollback twin of the #1510
       vi.clearAllMocks(); seed(store);
       incrementFreeCastResource(PLAYER, spell, lv, stats, CAMPAIGN);
       expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, key, val, CAMPAIGN]]);
-      // read tier: the arcanum counter is read WITHOUT the campaign arg (pre-existing pattern)
-      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, key);
+      // read tier: the arcanum counter now carries the explicit campaign arg (family unification)
+      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, key, CAMPAIGN);
     }
     // no-write rows: at-cap clamp, explicit null, absent, level gate both ends, non-member
     const inert = [
@@ -232,7 +232,7 @@ describe('incrementFreeCastResource — restore lane (rollback twin of the #1510
       vi.clearAllMocks(); seed({ _Favored_Enemy_freeCastCount: stored });
       incrementFreeCastResource(PLAYER, 'Hunter\'s Mark', 1, stats, CAMPAIGN);
       expect(setRuntimeValue.mock.calls).toEqual([[PLAYER, 'favoredEnemyUses', next, CAMPAIGN]]);
-      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, '_Favored_Enemy_freeCastCount');
+      expect(getRuntimeValue).toHaveBeenCalledWith(PLAYER, '_Favored_Enemy_freeCastCount', CAMPAIGN);
     }
     for (const skipped of [null, undefined]) {
       vi.clearAllMocks(); seed({ _Favored_Enemy_freeCastCount: skipped });

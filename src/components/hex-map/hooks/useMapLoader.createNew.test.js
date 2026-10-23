@@ -16,10 +16,12 @@
  * - travelInit derivation from loaded travelState   -> useMapLoader.travelState.test.js
  *
  * Honest scoping notes (known source bugs, not masked here): all fixtures
- * use a constant mapName, so this lane cannot exercise the never-updated
- * hexMapNameRef (:210) or the never-reset isInitialized (:161) on a
- * mapName change; the load-reject fall-through below rides the silent
- * catch at :178 and asserts the intended fall-through outcome only.
+ * use a constant mapName, so the #801 seams (hexMapNameRef was never
+ * updated after `useRef(mapName)`, dead-closing saves on an in-place
+ * change) are exercised by the in-place switch arms of
+ * useMapLoader.api.test.js, not here; the load-reject fall-through below
+ * rides the silent catch at :178 and asserts the intended fall-through
+ * outcome only.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';

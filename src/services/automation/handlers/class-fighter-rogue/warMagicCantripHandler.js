@@ -10,6 +10,7 @@ import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveSpellDamageAtLevel } from '../../../rules/core/spellDamageUtils.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
+import { isActionCastingTime } from './warMagicSpellHandler.js';
 
 // CLA-381: once-per-turn latch (CLA-342/CLA-371 family) — stamped at the
 // confirm trigger, cleared at round-wrap beside _Slow_Fall_usedRound in
@@ -58,7 +59,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const allSpells = await loadSpellData(playerStats);
     const knownNames = getKnownSpellNames(playerStats);
-    const cantrips = (allSpells || []).filter(s => s.level === 0 && knownNames.includes(s.name));
+    // casting_time gate mirrors warMagicSpellHandler.isActionCastingTime
+    // (both-edition law): War Magic replaces an ATTACK with a cantrip, so
+    // only action-casting cantrips qualify ('1 action', 'Action');
+    // bonus-action/reaction tokens never pass. No casting_time on a row is
+    // malformed data: excluded and logged loudly (no silent fallback).
+    const cantrips = (allSpells || []).filter(s => {
+        if (!(s.level === 0 && knownNames.includes(s.name))) return false;
+        if (!s.casting_time) {
+            console.error(`[warMagicCantripHandler] Cantrip "${s.name}" has no casting_time — excluded from War Magic options (cannot verify it is cast with the Action the feature replaces).`);
+            return false;
+        }
+        return isActionCastingTime(s.casting_time);
+    });
     if (!cantrips.length) {
         return refusal(action, playerName, campaignName, 'No known Wizard cantrips available.');
     }
@@ -248,6 +261,13 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
     // Known-cantrip gate (defense-in-depth alongside the chooser filter).
     if (!getKnownSpellNames(playerStats).includes(selectedSpellName)) {
         return refusal(action, playerName, campaignName, `${selectedSpellName} is not a cantrip you have prepared.`);
+    }
+
+    // casting_time law gate mirrors the chooser filter (defense-in-depth):
+    // War Magic replaces the Attack action, so a non-action cantrip is an
+    // illegal choice — refuse BEFORE latching the once-per-turn use.
+    if (!isActionCastingTime(spell.casting_time ?? '')) {
+        return refusal(action, playerName, campaignName, `${selectedSpellName} casts as ${spell.casting_time || 'unknown casting time'} — War Magic replaces the Attack action, so only action-casting cantrips qualify.`);
     }
 
     const currentRound = (await getCombatContext(campaignName))?.round || 1;

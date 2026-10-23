@@ -16,8 +16,8 @@
 //     selections never restored. PINNED THERE. THIS lane is byte-complementary: lv5/7/9 casts
 //     PAY a cast-level slot (correct RAW) and NEVER stamp the latch; rollback rows not re-run here.
 //   #1517 resource-flow owns consumeBaseSlot/consumeUpcastSlot pay/deny/null-fallback ladder
-//     bytes AND the :720/:767 arity-2 campaign-discard pin — cited, not re-pinned; the slot
-//     reads below ride that shape (reads arity-2, writes arity-4).
+//     bytes AND the :720/:767 read-tier pin — UNIFIED (owner unify call): the slot
+//     reads below now carry campaignName explicitly, writes stay arity-4.
 //   Mastery sibling header: lv1/lv2 mastery casts, UNLIMITED, no stamp — split by feature-type +
 //     spell level; the CLA-323 lv1→lv2 gate/payment pair lives there, not here (removed).
 //

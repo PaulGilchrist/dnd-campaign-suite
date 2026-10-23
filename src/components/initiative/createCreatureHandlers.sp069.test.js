@@ -65,6 +65,20 @@ beforeEach(() => {
 });
 
 describe('handleCreatureHpChange — SP-069 hypno damage-break', () => {
+    it('max-HP edit clamping current down (#854 third arg) is NOT adjudicated damage', () => {
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers([
+            { name: 'Bandit 1', type: 'npc', currentHp: 11, maxHp: 20 },
+        ]);
+
+        handlers.handleCreatureHpChange('Bandit 1', 7, 7); // max lowered to 7, current clamped to it
+
+        expect(breakHypnoticPatternOnDamage).not.toHaveBeenCalled();
+        expect(combatSummary.creatures[0].currentHp).toBe(7);
+        expect(combatSummary.creatures[0].maxHp).toBe(7);
+        expect(storage.set).toHaveBeenCalledTimes(1);
+        expect(setCombatSummary).toHaveBeenCalledTimes(1);
+    });
+
     it.each([
         { desc: 'GM HP-input reduction damages an NPC', name: 'Bandit 1', type: 'npc', oldHp: 11, newHp: 5, breaks: true },
         { desc: 'player HP reduction (old HP read from runtime store)', name: 'DivinationWizard', type: 'player', oldHp: 82, newHp: 70, breaks: true },

@@ -40,11 +40,11 @@ import * as healRider from './postCastHealService.js'
 /*     edge cases incl. multiTarget-equals-first dedup + strip      */
 /*   - execution/helpers-regenerate.test.js + regenerateHandler / */
 /*     spellGates+regenerateService lanes — ALL regenerate apply/ */
-/*     envelope/tick bytes (hub route for disk rows is the generic */
-/*     automation consumption pinned below — handleRegenerate and   */
-/*     helpers.applyRegenerateSpell are unreachable legacy-callable */
-/*     parallel lanes for REAL disk rows, per regenerateHandler */
-/*     liveness audit 2026-10-16; #1398 DORMANT stands).            */
+/*     envelope/tick bytes (hub route for disk rows is the fix#132
+/*     SERVICE_HANDLED shield -> chain arm handleRegenerate pinned
+/*     below — pre-fix the :710 dispatch resolved NULL and the cast
+/*     was consumed-and-discarded, #1483/#1472; module bytes stay   */
+/*     owned by helpers-regenerate/regenerateHandler lanes).        */
 /*   - execution/aoeSpells.test.js "generic healing" — same         */
 /*     scenarios but bare toHaveBeenCalled(); the exact forwarding */
 /*     tuple + genericHealResult key-set is this lane's face.       */
@@ -350,26 +350,39 @@ describe('executeSpellCast — hub heal lane (heal path + regenerate + power wor
     })
   })
 
-  describe('Regenerate via hub early chain (disk row consumed by handleGenericAutomation)', () => {
-    it('REAL disk rows (both tiers carry automation.type healing_start_of_turn) are consumed at index.js:710 -> executeHandler; the hub writes no regenerate bytes and returns undefined (#1398 dormant — live lane is regenerateService, module bytes owned by helpers-regenerate/regenerateHandler lanes)', async () => {
-      const spell = disk('Regenerate')
-      vi.mocked(automation.executeHandler).mockResolvedValue(null) // registry: no 'healing_start_of_turn' key -> null
+  describe('Regenerate via hub no-damage chain (fix#132: registry shield routes disk rows to handleRegenerate)', () => {
+    it('REAL disk rows (both tiers carry automation.type healing_start_of_turn) DECLINE the :710 generic gate (SERVICE_HANDLED shield, fix#132) and land on the chain arm index.js:311 -> handleRegenerate -> applyRegenerateSpell: initial heal rolled+applied, stamps + expiration + log written once (#1483/#1472 — pre-fix the unshielded dispatch resolved NULL: executeHandler -> resolveHandler -> HANDLER_MAP has no healing_start_of_turn key -> consumed-and-discarded, zero heal)', async () => {
+      for (const rules of ['5e', '2024']) {
+        const spell = disk('Regenerate', rules)
+        const summary = { creatures: [{ name: 'Target', maxHp: 100, currentHp: 20 }] }
+        vi.mocked(damageUtils.getCombatContext).mockResolvedValue(summary)
 
-      const result = await executeSpellCast(spell, { slotLevel: 7 }, makeServices())
+        const result = await executeSpellCast(spell, { slotLevel: 7 }, makeServices())
 
-      // Consumed by the generic-automation gate BEFORE runNoDamagePath: the
-      // chain's first entry (handleRegenerate, index.js:278) is unreachable for
-      // disk rows — hub must NOT write envelope/expiration/HP itself.
-      expect(vi.mocked(automation.executeHandler)).toHaveBeenCalledTimes(1)
-      const action = vi.mocked(automation.executeHandler).mock.calls[0][0]
-      expect(action.name).toBe('Regenerate')
-      expect(action.automation).toEqual(spell.automation)
-      expect(action.metaCtx).toEqual({ slotLevel: 7, metamagicHeighten: false })
-      expect(result).toBeUndefined()
-      expect(vi.mocked(applyHealing.applyHealingToTarget)).not.toHaveBeenCalled()
-      expect(vi.mocked(expirations.addExpiration)).not.toHaveBeenCalled()
-      expect(vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => String(key).startsWith('regenerate'))).toEqual([])
-      expect(consoleError).not.toHaveBeenCalled()
+        // Shield: the generic lane never sees the disk row — no dispatch,
+        // no drop-dead consumption at :710.
+        expect(vi.mocked(automation.executeHandler), rules).not.toHaveBeenCalled()
+        // Service lane live: initial 4d8+15 heal rolled once, clamped +
+        // applied to the target (disk heal_at_slot_level {"7":"4d8 + 15"}).
+        expect(vi.mocked(dice.rollExpression).mock.calls.filter(([f]) => f === '4d8 + 15'), rules).toHaveLength(1)
+        expect(vi.mocked(applyHealing.applyHealingToTarget).mock.calls, rules).toEqual([[summary, 'Target', 15, CAMPAIGN]])
+        // Turn-start regen stamps + combat-scoped removal expiration.
+        const regenStamps = vi.mocked(runtime.setRuntimeValue).mock.calls.filter(([, key]) => String(key).startsWith('regenerate'))
+        expect(regenStamps, rules).toEqual([
+          ['Target', 'regenerateActive', true, CAMPAIGN],
+          ['Target', 'regenerateSource', 'TestCaster', CAMPAIGN],
+        ])
+        expect(vi.mocked(expirations.addExpiration).mock.calls, rules).toEqual([
+          [{ attackerName: 'TestCaster', targetName: 'Target', effects: [{ type: 'remove_regenerate_buff' }], campaignName: CAMPAIGN }],
+        ])
+        // One hp_change entry for the initial heal; caster returns the heal shape.
+        const hpChanges = entriesOfType('hp_change')
+        expect(hpChanges, rules).toHaveLength(1)
+        expect(hpChanges[0], rules).toMatchObject({ targetName: 'Target', delta: 15, isHealing: true, note: 'Regenerate' })
+        expect(result, rules).toMatchObject({ targetName: 'Target', healAmount: 15, formula: '4d8 + 15' })
+        expect(consoleError, rules).not.toHaveBeenCalled()
+        vi.clearAllMocks()
+      }
     })
   })
 

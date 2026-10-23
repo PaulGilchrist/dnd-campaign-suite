@@ -21,9 +21,20 @@ export function useLootHandlers(campaignName, characters, combatSummary) {
                 characters,
                 campaignName
             )
-            setLootData(lootResult || { lootEntries: [], totalEncounterXp: 0 })
-            setLootTextValue(lootResult.lootEntries.join('\n'))
+            // One guard, both readers (kills the old :24-/:25 asymmetry): the
+            // producer contract always resolves { lootEntries, totalEncounterXp }
+            // (lootGenerator.js:335/:361/:380) — [] and 0 are its own honest
+            // zero-loot values, not fabrication (autoRewardService.js:48 idiom).
+            // Consumers deref lootData.lootEntries unguarded (InitiativeLoot.jsx:16/:44),
+            // so normalize once and store the complete shape.
+            const lootEntries = lootResult?.lootEntries || []
+            const totalEncounterXp = lootResult?.totalEncounterXp || 0
+            setLootData({ lootEntries, totalEncounterXp })
+            setLootTextValue(lootEntries.join('\n'))
         } catch (error) {
+            // Lawful entry now means generator rejection only — null/partial
+            // results resolve to honest zero-loot state instead of landing
+            // here accidentally via an unguarded deref.
             console.error('Failed to generate loot:', error)
         } finally {
             setGeneratingLoot(false)

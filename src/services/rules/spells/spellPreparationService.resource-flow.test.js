@@ -21,16 +21,15 @@
 // #1516 VERBATIM: 'spellPreparationService.js:767 and :720-721 consumeBaseSlot/consumeUpcastSlot
 // read slots via getRuntimeValue(playerName, slotKey) without campaignName (writes do pass it).
 // Cross-campaign read hazard; OWNED BY RESOURCE-FLOW LANE — reported, not pinned here' —
-// NOW PINNED HERE, NOT FIXED. Runtime census (test 5): EVERY read targeting a payment key
-// (^spell_slots_level_N|sorceryPoints) arrives arity-2 ([player,key]); EVERY write to the same
-// keys arrives arity-4 ([player,key,value,campaign]). Honest witness note: the REAL
-// useRuntimeState.js:63 getRuntimeValue declares only (characterKey, propertyName) and its
-// missing byte is null (:74) — so today the arity gap is cosmetic (a 3-arg read at :863 lands
-// in the same campaign-agnostic per-character Map), but the shape asymmetry read2-vs-write4 is
-// the reported hazard; a store-side fix flips these tuples and MUST update this pin deliberately.
-// Arity census quantified: payment keys 3 reads @len2 / 3 writes @len4; full-run read arity
-// histogram {2:6, 3:3} (the three len-3 reads are all :863 '_Ritual_Master_quickRitualUsed' —
-// the read-side is itself asymmetric within the service). Pre-existing pattern form (#1512/#1513).
+// UNIFIED (owner unify call, family-wide arity asymmetry closed): EVERY read now carries
+// the explicit campaign tier ([player,key,campaign]); EVERY write stays arity-4
+// ([player,key,value,campaign]). Honest witness note: the REAL useRuntimeState.js:63
+// getRuntimeValue declares only (characterKey, propertyName) and its
+// missing byte is null (:74) — so today the extra arg is discarded (output byte-identical,
+// fix#26 canon); the unified shape is the #1520 forward-fix: when the store becomes
+// campaign-scoped every read in this service lands on the right tier at once.
+// Arity census quantified: payment keys 3 reads @len3 / 3 writes @len4; full-run read arity
+// histogram {3:9} (WGB :982 + quick-lane :922 + payment reads — no default-tier read remains).
 //
 // Disk rows (readFileSync, drift-throw — fabrication-ban): fixture spells ARE the real rows.
 //   5e spells.json Fireball lv3 concentration:false ritual:false casting_time '1 action';
@@ -424,8 +423,8 @@ describe('prepareSpellCast — Psionic payment refusals fall through to the slot
   });
 });
 
-describe('prepareSpellCast — #1516 campaign-arity hazard pin (reads 2-arg vs writes 4-arg)', () => {
-  it('census across base-pay + upcast-pay + SP-pay: every payment-key read is arity-2, every write arity-4; the only arity-3 reads are the quick-lane :863', async () => {
+describe('prepareSpellCast — #1516 campaign-arity pin (UNIFIED: reads carry campaignName, writes carry it too)', () => {
+  it('census across base-pay + upcast-pay + SP-pay: every payment-key read is arity-3 with the explicit tier, every write arity-4; the read-side asymmetry is gone', async () => {
     const wiz = casterStats(WIZARD, { rules: '5e', cls: 'Wizard', ability: 'Intelligence', max: { ...wizardMax, spell_slots_level_5: 2 } });
     const sor = casterStats(SORCERER, { rules: '2024', cls: 'Sorcerer', ability: 'Charisma', passives: [psionicSorceryPassive], max: { spell_slots_level_1: 2 } });
     seed(WIZARD, { spell_slots_level_3: 3, spell_slots_level_5: 2 });
@@ -436,27 +435,34 @@ describe('prepareSpellCast — #1516 campaign-arity hazard pin (reads 2-arg vs w
     await cast(diskAoH24, sor, { usePsionicPayment: true });
 
     const isPayKey = (k) => /^spell_slots_level_\d+$/.test(String(k)) || k === 'sorceryPoints';
-    // Hazard shape, byte-exactly: read tuples carry NO campaignName (len 2), write tuples do (len 4).
+    // Unified shape, byte-exactly: read tuples NOW carry campaignName (len 3), write tuples do (len 4).
     const payReads = getRuntimeValue.mock.calls.filter(c => isPayKey(c[1]));
     expect(payReads).toEqual([
-      [WIZARD, 'spell_slots_level_3'],
-      [WIZARD, 'spell_slots_level_5'],
-      [SORCERER, 'sorceryPoints'],
+      [WIZARD, 'spell_slots_level_3', CAMPAIGN],
+      [WIZARD, 'spell_slots_level_5', CAMPAIGN],
+      [SORCERER, 'sorceryPoints', CAMPAIGN],
     ]);
-    expect(payReads.map(r => r.length)).toEqual([2, 2, 2]);
+    expect(payReads.map(r => r.length)).toEqual([3, 3, 3]);
     expect(setRuntimeValue.mock.calls).toEqual([
       [WIZARD, 'spell_slots_level_3', 2, CAMPAIGN],
       [WIZARD, 'spell_slots_level_5', 1, CAMPAIGN],
       [SORCERER, 'sorceryPoints', 4, CAMPAIGN],
     ]);
     expect(setRuntimeValue.mock.calls.map(w => [w.length, w[3]])).toEqual([[4, CAMPAIGN], [4, CAMPAIGN], [4, CAMPAIGN]]);
-    // Full read-arity histogram of the three paid casts: 6 reads @len2 (3x WGB :911 + 3 payment),
-    // 3 reads @len3 (all quick-lane :863 — the read-side asymmetry lives in the service itself).
+    // Full read census of the three paid casts, byte-exact order: 9 reads, EVERY one arity-3
+    // carrying CAMPAIGN (per cast: WGB :982, quick-lane :922, then the payment read —
+    // the sorcerer's SP payment :753 precedes its quick probe; slot pays follow theirs).
     const histogram = getRuntimeValue.mock.calls.reduce((acc, c) => { acc[c.length] = (acc[c.length] || 0) + 1; return acc; }, {});
-    expect(histogram).toEqual({ 2: 6, 3: 3 });
-    expect(getRuntimeValue.mock.calls.filter(c => c.length === 3)).toEqual([
+    expect(histogram).toEqual({ 3: 9 });
+    expect(getRuntimeValue.mock.calls).toEqual([
+      [WIZARD, '_War_Gods_Blessing_active', CAMPAIGN],
       [WIZARD, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
+      [WIZARD, 'spell_slots_level_3', CAMPAIGN],
+      [WIZARD, '_War_Gods_Blessing_active', CAMPAIGN],
       [WIZARD, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
+      [WIZARD, 'spell_slots_level_5', CAMPAIGN],
+      [SORCERER, '_War_Gods_Blessing_active', CAMPAIGN],
+      [SORCERER, 'sorceryPoints', CAMPAIGN],
       [SORCERER, '_Ritual_Master_quickRitualUsed', CAMPAIGN],
     ]);
     expect(errSpy).toHaveBeenCalledTimes(0);

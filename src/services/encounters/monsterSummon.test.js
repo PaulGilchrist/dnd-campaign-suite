@@ -204,6 +204,37 @@ describe('MA-0648 drow mage activation', () => {
     expect(setPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Uses Exhausted'));
   });
 
+  it('mid-flight double-spend guard (#1136-class fix#79 census): gate fresh on stale snapshot but store already spent — refuses exhausted, zero roll/spend/spawn/te, reason-distinct refusal popup exact bytes', async () => {
+    const deps = makeDeps({ cs: { round: 1, creatures: [{ name: 'Drow Mage 1', initiative: '12' }] }, uses: { 'Summon Demon': 1 } }, 42);
+    const setPopupHtml = vi.fn();
+    const guard = vi.spyOn(console, 'error');
+    const result = await resolveMonsterSummonRow({
+      action: SUMMON_ROW,
+      monsterName: 'Drow Mage 1',
+      campaignName: 'test-campaign',
+      setPopupHtml,
+      storedUses: {}, // stale mid-flight snapshot slips past the gate
+      deps,
+    });
+    expect(result).toEqual({ resolved: false, reason: 'exhausted' });
+    expect(deps.rollDie).not.toHaveBeenCalled(); // zero flip
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled(); // zero burn (#1026)
+    expect(deps.store.uses).toEqual({ 'Summon Demon': 1 }); // store unchanged
+    expect(deps.setCombatSummary).not.toHaveBeenCalled(); // zero spawn
+    expect(deps.registerTargetEffect).not.toHaveBeenCalled(); // zero te
+    const logs = deps.logs;
+    expect(logs.filter(e => e.type === 'ability_use')).toHaveLength(0); // no spend logged
+    const refusal = logs.find(e => e.automationType === 'summon_demon_refused');
+    expect(refusal).toBeTruthy(); // audit side already correct (fix#79)
+    expect(refusal.description).toContain('already used Summon Demon today');
+    expect(guard).toHaveBeenCalledTimes(1); // guard stays loud
+    // FIX#79 recipe (#1136 precedent): the raced second click answers in the
+    // UI — reason-distinct 'Already Summoning', never the 'Uses Exhausted'
+    // gate headline (#1348), same mc-prerequisite-refusal family cls.
+    expect(setPopupHtml).toHaveBeenCalledTimes(1);
+    expect(setPopupHtml).toHaveBeenCalledWith('<div class="mc-prerequisite-refusal"><h3>Already Summoning</h3><p>Drow Mage 1 is already summoning via Summon Demon — a preceding click spent the 1/Day use. Summon Demon refused: no second use spent, no summons arrive. Uses reset at dawn (GM-enforced for monsters).</p></div>');
+  });
+
   it('non-summon rows never route', async () => {
     const deps = makeDeps();
     const { result } = await press(drowMage.actions[0], 'Drow Mage 1', deps);

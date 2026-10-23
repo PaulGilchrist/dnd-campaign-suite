@@ -53,9 +53,28 @@
  * inputs; fresh vi.fn onClose per render; mockReset + re-arm per test; findBy idiom; no bare
  * setTimeout, no timers of any kind on this seam.
  */
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ElementalAttunementModal from './ElementalAttunementModal.jsx';
+
+// ── Flake hardening (registered ⚠ bugs.md:552 'Lightning failure' exact-roll-row; sightings
+// #158/#161/#163/#168, batch183/184 fix era) ──
+// Mechanism chain, exhaustively eliminated before pinning: (1) RNG is NOT live on this seam —
+// every die is mocked (rollExpression :73-75) or event-echo-fed (detail.rawDamage), promptIds are
+// frozen (Math.random 0.5 / Date.now FROZEN_TS, :242-243), and the modal's only raw-Math.random
+// d20 (ElementalAttunementModal.jsx:400) is on the NPC branch, unreachable for type:'player'
+// targets; fix#169's unseeded siblings (reactionDebuffHandler:127 etc.) never execute here.
+// (2) Cross-file leak structurally impossible — vitest default forks pool gives this file its own
+// process/module registry; setup.js externals are inert mocks; no disk path (addEntry /
+// persistAndNotify / loadMapData are lane-mocked). (3) Wall-clock: no game timers on this seam.
+// SOLE live mechanism: React passive-effect flush starvation under full-suite CPU contention vs
+// testing-library's DEFAULT 1000ms async-util polling budget — archived stall bytes: batch183
+// :473 waitFor expired at 1023ms, batch184 :533 at 1020ms, batch161 file 1425ms. The #183/#184
+// live-listener anchor (saveResultBusLive) makes the event un-losable but every gate here still
+// carried the 1s budget — a flush landing at 1.2s fails a byte-deterministic row. Pin 3000ms
+// (3x observed worst 1.6s, bounded, far below the 5000ms test timeout): assertions unchanged —
+// a wrong or missing commit still fails byte-exact, it merely gets patience, not slack.
+configure({ asyncUtilTimeout: 3000 });
 
 // ── Live runtime store (anti-vacuous): condition/push writes land here; cells inspected directly ──
 

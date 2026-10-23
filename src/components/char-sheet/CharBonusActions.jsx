@@ -210,14 +210,24 @@ function attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannot
 
 function renderBonusAttackHitCell({ attack, isHbRow, effectiveHit, exhaustionPenalty, conditionAttackMode, cannotAct, displaySaveDcBonus, hordeBreakerReady, hitTitle, hbClick, attackItem, onAttackClick }) {
     if (attack.saveDc) {
-        return <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>;
+        // ?? 0: absent sorcery bonus collapses to the zero-bonus render (mirrors
+        // getInnateSorceryBonus's numeric 0; Run2 #27 NaN class).
+        return <div className="save-dc-display">DC {attack.saveDc + (displaySaveDcBonus ?? 0)} {attack.saveType}</div>;
     }
     const className = attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct);
-    const bonusText = signFormatter.format(effectiveHit - exhaustionPenalty);
+    // ?? 0: absent exhaustionPenalty is the lawful no-exhaustion penalty (RAW
+    // exhaustion level 0) — guards signFormatter.format(NaN) (Run2 #27).
+    const bonusText = signFormatter.format(effectiveHit - (exhaustionPenalty ?? 0));
     if (isHbRow) {
         const title = `Attack a different creature within 5 feet of ${hordeBreakerReady?.targetName || 'the original target'} with your ${attack.weaponName || attack.name}`;
         return <div className={className} title={title} onClick={hbClick}>{bonusText}</div>;
     }
+    // Run2 #22 ruling (owner): the hit cell intentionally stays clickable when
+    // cannotAct — the click delegates to the parent's self-guarded handleAttackClick
+    // (CharActions.jsx:732 → useCharActionsAttackHandlers.js:49 reportCannotActAttack
+    // + zero rolls; runAttackClick re-gates via assertCanAct with cannotAct fed in).
+    // A :253-shape silent guard HERE would shadow the Stinking Cloud denial popup
+    // (pinned at useCharActionsAttackHandlers.test.js:151) — do not add one.
     return <div className={className} title={hitTitle} onClick={() => onAttackClick(attackItem)}>{bonusText}</div>;
 }
 
@@ -275,9 +285,13 @@ function bonusSpellTypeLabel(spell, isUtilityConc, damageType) {
 function BonusSpellHitCell({ isUtilityConc, autoHit, isSpellAtk, hasAttackType, spell, attackItem, playerStats, exhaustionPenalty, conditionAttackMode, cannotAct, displaySaveDcBonus, onAttackClick }) {
     if (isUtilityConc || autoHit || (isSpellAtk && !hasAttackType)) return <div></div>;
     if (isSpellAtk) {
-        return <div className={attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => onAttackClick(attackItem)}>{signFormatter.format(playerStats.spellAbilities?.toHit - exhaustionPenalty)}</div>;
+        // ?? 0 on both addends: absent exhaustionPenalty/toHit collapse to the
+        // zero render (same Run2 #27 NaN class).
+        return <div className={attackPenalizedClassName(exhaustionPenalty, conditionAttackMode, cannotAct)} onClick={() => onAttackClick(attackItem)}>{signFormatter.format((playerStats.spellAbilities?.toHit ?? 0) - (exhaustionPenalty ?? 0))}</div>;
     }
-    return <div className="save-dc-display">DC {playerStats.spellAbilities?.saveDc + displaySaveDcBonus} {spell.dc?.dc_type}</div>;
+    // ?? 0 on both addends: absent saveDc/bonus collapse to the zero render
+    // (same class as signFormatter.format NaN — Run2 #27).
+    return <div className="save-dc-display">DC {(playerStats.spellAbilities?.saveDc ?? 0) + (displaySaveDcBonus ?? 0)} {spell.dc?.dc_type}</div>;
 }
 
 function buildBonusSpellAttackItem(spell, playerStats, resolvedDamage, damageType) {

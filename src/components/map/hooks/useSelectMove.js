@@ -106,10 +106,17 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
     const handleSelectPointerDown = useCallback((e, _placedItems, _mapData) => {
         if (!isLocalhost || tool !== TOOL_SELECT) return;
         e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
         const grid = getGridFromEvent(e);
         if (!grid) return;
+
+        // #883 capture discipline (fix#53 house shape — useItemDragging.js:42-47,
+        // useRuler.js:22-27 validate-capture-commit): capture only once the gesture
+        // has verifiably started on a valid grid cell. Capturing before the grid
+        // guard stranded the pointer on failed presses off-grid.
+        // (selectStart || moveStartGrid) !== null now strictly implies captured.
+        const svg = svgRef.current;
+        if (svg) svg.setPointerCapture(e.pointerId);
+
         const gx = Math.floor(grid.gridX);
         const gy = Math.floor(grid.gridY);
 
@@ -227,6 +234,11 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignNa
 
     const handleSelectPointerUp = useCallback((e, placedItems, mapData, setMapData, setPlacedItems) => {
         if (!isLocalhost) return;
+        // fix#53 mirror (useItemDragging.js:101-104): every successful down left
+        // exactly one of selectStart/moveStartGrid live AND captured, so bailing
+        // while both are null is safe — nothing was captured to strand, and an
+        // unconditional release here threw NotFoundError / stole pan-ruler captures.
+        if (!selectStart.current && !moveStartGrid.current) return;
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
 

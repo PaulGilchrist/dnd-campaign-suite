@@ -37,9 +37,9 @@
         "start": "npm install && npm run build && node server.js",
         "test": "vitest",
         "test:count": "vitest list | wc -l",
-        "test:run": "vitest run",
+        "test:run": "vitest run --silent=false",
         "test:watch": "vitest watch",
-        "test:coverage": "vitest run --coverage",
+        "test:coverage": "vitest run --silent=false --coverage",
         "test:e2e": "playwright test",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:debug": "playwright test --debug"

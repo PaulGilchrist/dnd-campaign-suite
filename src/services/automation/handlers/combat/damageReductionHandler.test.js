@@ -219,6 +219,21 @@ describe('damageReductionHandler — equipment gates', () => {
       expect(damageRollback.findLastAttack).toHaveBeenCalledWith(campaignName);
     });
 
+    it('hasShield: reads a malformed "+ Shield" via the shared fix#201 parser — no ongsword-style corruption', async () => {
+      const ps = makePlayerStats({
+        inventory: { equipped: ['+ Shield'] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+      });
+      const action = makeAction({ requiresShield: true, reductionExpression: '2d6' });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      // Old local substring(3) parser yielded 'hield' — catalog miss, refusal.
+      expect(result.payload.description).not.toContain('must be holding');
+      expect(result.payload.description).not.toContain('must be holding a Shield to use');
+      expect(damageRollback.findLastAttack).toHaveBeenCalledWith(campaignName);
+    });
+
     it('hasShield: ignores non-string equipped entries but still recognises the shield', async () => {
       const ps = makePlayerStats({
         inventory: { equipped: [null, 42, 'Shield'] },

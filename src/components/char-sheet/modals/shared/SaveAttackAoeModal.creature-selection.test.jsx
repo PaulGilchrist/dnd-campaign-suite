@@ -8,6 +8,12 @@ import SaveAttackAoeModal from './SaveAttackAoeModal.jsx';
 // early-returns and it renders deterministically without map/network mocks.
 // AreaEffectTargetModalBase is never mounted on this lane (no 'overlay-'
 // targetName) — its lane lives in SaveAttackAoeModal.overlay.test.jsx.
+// maxTargets: SaveAttackAoeModal never passes it to the picker mount
+// (SaveAttackAoeModal.jsx:2014-2027), so the cap guard is intentionally NOT
+// pinned here — pinning it would require fabricating a prop the host never
+// sends. It lives in CreatureSelectionModal.test.jsx:268/:283.
+// Confirm-click payload resolution also lives outside this lane (damage-
+// resolution / blocking-effects); here we pin the picker UI contract only.
 
 // ── Mocked modules (data seams only) ──
 
@@ -101,11 +107,15 @@ describe('SaveAttackAoeModal - CreatureSelectionModal picker lane', () => {
 
     fireEvent.click(checkboxFor('Goblin A'));
     expect(checkboxFor('Goblin A')).toBeChecked();
+    // Real modal stamps the highlight class on the selected row (CreatureSelectionModal.jsx:96).
+    expect(rowFor('Goblin A').className).toContain('secondary-target-selected');
+    expect(rowFor('Goblin B').className).not.toContain('secondary-target-selected');
     const confirmBtn = screen.getByRole('button', { name: /Fireball \(1\)/ });
     expect(confirmBtn).not.toBeDisabled();
 
     fireEvent.click(checkboxFor('Goblin A'));
     expect(checkboxFor('Goblin A')).not.toBeChecked();
+    expect(rowFor('Goblin A').className).not.toContain('secondary-target-selected');
     expect(screen.getByRole('button', { name: /Fireball \(0\)/ })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
@@ -127,5 +137,23 @@ describe('SaveAttackAoeModal - CreatureSelectionModal picker lane', () => {
     expect(rowFor('Goblin B').textContent).not.toContain('Careful Spell protected');
     expect(rowFor('Player One').textContent).not.toContain('Careful Spell protected');
     expect(document.querySelectorAll('input[name="heightenTarget"]')).toHaveLength(3);
+  });
+
+  it('threads heighten selection through the host state into the real modal radio group', () => {
+    render(<SaveAttackAoeModal {...makeProps({ metamagicHeighten: true })} />);
+
+    // Host threads heightenTarget/setHeightenTarget (SaveAttackAoeModal.jsx:2025-2026):
+    // clicking Goblin B's radio marks ONLY that row's radio checked via host state.
+    expect(rowFor('Goblin B').textContent).toContain('Heighten');
+    fireEvent.click(rowFor('Goblin B').querySelector('input[type="radio"]'));
+    expect(rowFor('Goblin B').querySelector('input[type="radio"]')).toBeChecked();
+    expect(rowFor('Goblin A').querySelector('input[type="radio"]')).not.toBeChecked();
+    expect(rowFor('Player One').querySelector('input[type="radio"]')).not.toBeChecked();
+
+    // Choosing a different target moves the single heighten stamp (radio semantics
+    // plus host state — no second radio may stay checked).
+    fireEvent.click(rowFor('Goblin A').querySelector('input[type="radio"]'));
+    expect(rowFor('Goblin A').querySelector('input[type="radio"]')).toBeChecked();
+    expect(rowFor('Goblin B').querySelector('input[type="radio"]')).not.toBeChecked();
   });
 });

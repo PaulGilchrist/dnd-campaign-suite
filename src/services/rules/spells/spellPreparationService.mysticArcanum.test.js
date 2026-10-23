@@ -125,10 +125,10 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
       const stats = makeWarlockStats();
       // sync boolean — no await needed, no Promise leak
       expect(isFreeCastAuthorized(PLAYER, ETHEREALNESS, 7, stats, CAMPAIGN)).toBe(false);
-      // the lv7 query consulted ONLY the level-7 key (2-arg read tier, no campaign arg)
+      // the lv7 query consulted ONLY the level-7 key (3-arg unified read tier)
       const [last] = arcanumReads().slice(-1);
-      expect(last).toEqual([PLAYER, 'mysticArcanumLevel7']);
-      expect(last).toHaveLength(2);
+      expect(last).toEqual([PLAYER, 'mysticArcanumLevel7', CAMPAIGN]);
+      expect(last).toHaveLength(3);
       expect(arcanumReads().some(c => c[1] === 'mysticArcanumLevel6')).toBe(false);
       // lv6 arcanum is independent and still armed
       expect(isFreeCastAuthorized(PLAYER, EYEBITE, 6, stats, CAMPAIGN)).toBe(true);
@@ -148,13 +148,13 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
     // [spell, level, stored counters, expected FULL setRuntimeValue census, expected arcanum reads]
     const rows = [
       // CLA-231 core: own-level drain, full census — no lv7/slot write on a lv6 cast
-      [EYEBITE, 6, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel6', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel6']]],
+      [EYEBITE, 6, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel6', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel6', CAMPAIGN]]],
       // CLA-231 core: pre-fix [6,7,8,9] loop drained lv6 first — assert lv7 write, zero lv6 writes
-      [ETHEREALNESS, 7, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel7', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7']]],
+      [ETHEREALNESS, 7, { mysticArcanumLevel6: 1, mysticArcanumLevel7: 1 }, [[PLAYER, 'mysticArcanumLevel7', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]]],
       // absent-counter quirk (:557 ?? 1): auto-arms to 1 then consumes to 0 — consumes may go first
-      [PWS, 8, {}, [[PLAYER, 'mysticArcanumLevel8', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel8']]],
+      [PWS, 8, {}, [[PLAYER, 'mysticArcanumLevel8', 0, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel8', CAMPAIGN]]],
       // count>0 guard (:558): READ happens, WRITE does not — no negative ledger even on a contradictory authorize
-      [ETHEREALNESS, 7, { mysticArcanumLevel7: 0 }, [], [[PLAYER, 'mysticArcanumLevel7']]],
+      [ETHEREALNESS, 7, { mysticArcanumLevel7: 0 }, [], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]]],
       // level gate consume face (:554 isMysticArcanumLevel): lv5 name-in-list never reads or writes an arcanum key
       [EYEBITE, 5, { mysticArcanumLevel6: 1 }, [], []],
       // membership gate consume face + case trail: lowercase not a member
@@ -177,7 +177,7 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
       expect(res.metaCtx.slotConsumed).toBe(false);
       // FULL write census — exactly the arcanum key(s), nothing else (:556-559)
       expect(setRuntimeValue.mock.calls).toEqual(expectedWrites);
-      // read ledger: own-level key, 2-arg tier (no campaign — pre-existing pattern)
+      // read ledger: own-level key, explicit campaign tier (family unify — owner unify call)
       expect(arcanumReads()).toEqual(expectedReads);
       // purity / input immutability (#1511/T4): inputs byte-identical after the cast
       expect(spell).toEqual(makeSpell(spellName, level));
@@ -188,7 +188,7 @@ describe('CLA-231 — Mystic Arcanum per-level counter key select (authorize / c
   describe('incrementFreeCastResource — rollback key select (cap/clamp owned by #1512 sibling)', () => {
     it.each([
       // BOTH counters spent: pre-fix loop hit lv6 first (0 < 1) and restored the WRONG counter
-      [ETHEREALNESS, 7, { mysticArcanumLevel6: 0, mysticArcanumLevel7: 0 }, [[PLAYER, 'mysticArcanumLevel7', 1, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7']]],
+      [ETHEREALNESS, 7, { mysticArcanumLevel6: 0, mysticArcanumLevel7: 0 }, [[PLAYER, 'mysticArcanumLevel7', 1, CAMPAIGN]], [[PLAYER, 'mysticArcanumLevel7', CAMPAIGN]]],
       // membership + case gate on the rollback face (:613-614): lowercase non-member never touches a key
       ['eyebite', 6, { mysticArcanumLevel6: 0 }, [], []],
     ])('rollback %s lv%i @ %j', (spellName, level, store, expectedWrites, expectedReads) => {

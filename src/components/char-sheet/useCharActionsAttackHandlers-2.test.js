@@ -18,7 +18,10 @@ vi.mock('../../services/ui/logService.js', () => ({
 }));
 vi.mock('../../services/encounters/combatData.js', () => ({
     getActiveCreatureName: vi.fn(() => 'TestFighter'),
-    getCurrentCombatRound: vi.fn(() => 1),
+    // Non-1 sentinel: the offered-latch stamp must read the CANONICAL round
+    // (getCurrentCombatRound), never a hardcoded round (pass #322 — the stamp
+    // used to pin round: 1, stale-by-design on round 7).
+    getCurrentCombatRound: vi.fn(() => 7),
     getCombatSummary: vi.fn(() => null),
 }));
 vi.mock('../../services/automation/common/buffToggle.js', () => ({
@@ -40,6 +43,7 @@ vi.mock('../../services/automation/common/oncePerTurn.js', () => ({
 // lane never calls them.
 
 import * as buffToggle from '../../services/automation/common/buffToggle.js';
+import * as combatData from '../../services/encounters/combatData.js';
 import * as expirations from '../../services/rules/effects/expirations.js';
 import * as logService from '../../services/ui/logService.js';
 import * as oncePerTurn from '../../services/automation/common/oncePerTurn.js';
@@ -143,7 +147,7 @@ describe('useCharActionsAttackHandlers — chooser terminal handlers', () => {
             expect(deps.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 '_recklessAttack_offeredThisTurn',
-                { round: 1, activeCreature: playerName },
+                { round: 7, activeCreature: playerName },
                 campaignName
             );
             expect(deps.setModalState).toHaveBeenCalledWith({ recklessAttackModal: null });
@@ -224,7 +228,7 @@ describe('useCharActionsAttackHandlers — chooser terminal handlers', () => {
             expect(deps.setRuntimeValue).toHaveBeenCalledWith(
                 playerName,
                 '_recklessAttack_offeredThisTurn',
-                { round: 1, activeCreature: playerName },
+                { round: 7, activeCreature: playerName },
                 campaignName
             );
             expect(deps.setModalState).toHaveBeenCalledWith({ recklessAttackModal: null });
@@ -233,6 +237,29 @@ describe('useCharActionsAttackHandlers — chooser terminal handlers', () => {
             expect(expirations.addExpiration).not.toHaveBeenCalled();
 
             await vi.waitFor(() => expect(deps.rollAttack).toHaveBeenCalledWith(attack.name, 6, ctx));
+        });
+
+        it('stamps the CANONICAL round on the offered latch — round-7 press stamps 7, round-reset (new initiative) stamps 1 (#1348)', async () => {
+            // Default mock is round 7 (see combatData mock above): a confirm
+            // here proves the stamp tracks getCurrentCombatRound, not a
+            // hardcoded round: 1 (pass #322 defect).
+            const deps = createDeps();
+            const handlers = useCharActionsAttackHandlers(deps);
+
+            handlers.handleRecklessAttackConfirm(makeAttack(), null);
+
+            expect(combatData.getCurrentCombatRound).toHaveBeenCalledWith(campaignName);
+            expect(writesTo(deps, '_recklessAttack_offeredThisTurn')).toEqual([
+                [playerName, '_recklessAttack_offeredThisTurn', { round: 7, activeCreature: playerName }, campaignName],
+            ]);
+
+            // Round reset: new initiative rolls round 1 — the stamp follows.
+            combatData.getCurrentCombatRound.mockReturnValueOnce(1);
+            handlers.handleRecklessAttackCancel(makeAttack());
+
+            expect(writesTo(deps, '_recklessAttack_offeredThisTurn')[1]).toEqual([
+                playerName, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: playerName }, campaignName,
+            ]);
         });
     });
 

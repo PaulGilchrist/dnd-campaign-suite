@@ -22,12 +22,15 @@
  * assertions, 2 tests consolidated into 1.
  *
  * Honest scoping notes (known source bugs, not masked here): fixtures use a
- * constant mapName, so the never-reset isInitialized (:161) and stale
- * hexMapNameRef (:210/:190) on a mapName change are not exercised; the
- * pending-load promise makes the mount-save guard observable via the
- * `loading` state, which this lane pins (#800 fixed: the guard is the
- * loading STATE in the persistence effect's deps — the old hasLoaded ref
- * flipped after an await seam and the flush was scheduling-dependent).
+ * constant mapName, so the #801 seams (load-effect re-arm on a name change,
+ * hexMapNameRef re-claim at load completion) are exercised in the in-place
+ * switch arms of useMapLoader.api.test.js, not here; a campaignName change
+ * with an unchanged mapName still does not reload (production consumers
+ * remount via key={mapName}, Map.jsx:354). The pending-load promise makes
+ * the mount-save guard observable via the `loading` state, which this lane
+ * pins (#800 fixed: the guard is the loading STATE in the persistence
+ * effect's deps — the old hasLoaded ref flipped after an await seam and the
+ * flush was scheduling-dependent).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
@@ -70,7 +73,11 @@ describe('useMapLoader - initial state before load completes', () => {
     it('seeds refs from the given props before the load completes', () => {
         const { result } = renderWithPendingLoad('my-campaign', 'my-map');
 
-        expect(result.current.hexMapNameRef.current).toBe('my-map');
+        // #801: hexMapNameRef names the bytes HELD, not the mount prop — it
+        // starts null (guard :201 closed) and is claimed by the load effect
+        // only when that load's bytes land, so an in-place mapName change
+        // can never stale-close the save guard.
+        expect(result.current.hexMapNameRef.current).toBeNull();
         expect(result.current.hexMapDisplayNameRef.current).toBe('my-map');
         expect(result.current.needsResetViewRef.current).toBe(false);
         expect(result.current.travelStateRef.current).toBeNull();

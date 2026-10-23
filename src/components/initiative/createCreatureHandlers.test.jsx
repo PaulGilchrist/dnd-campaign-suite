@@ -239,6 +239,48 @@ describe('handleCreatureHpChange — store writes per lane', () => {
     });
 });
 
+describe('handleCreatureHpChange — max-HP edit lane (#854, onChange third arg)', () => {
+    it.each([
+        { desc: 'clamp down: current follows new base max', oldHp: 8, newHp: 5, newMax: 5, expectedCurrent: 5 },
+        { desc: 'no clamp needed: current passes through, delta-0 no longer swallows the max write', oldHp: 3, newHp: 3, newMax: 5, expectedCurrent: 3 },
+    ])('$desc — persists on card and broadcasts', ({ oldHp, newHp, newMax, expectedCurrent }) => {
+        const { handlers, combatSummary, setCombatSummary } = makeHandlers([
+            { name: 'Goblin', type: 'npc', currentHp: oldHp, maxHp: 10 },
+        ]);
+
+        handlers.handleCreatureHpChange('Goblin', newHp, newMax);
+
+        expect(combatSummary.creatures[0].currentHp).toBe(expectedCurrent);
+        expect(combatSummary.creatures[0].maxHp).toBe(newMax);
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', combatSummary, campaignName);
+        expect(setCombatSummary).toHaveBeenCalledWith(expect.objectContaining({
+            creatures: [expect.objectContaining({ name: 'Goblin', currentHp: expectedCurrent, maxHp: newMax })],
+        }));
+    });
+
+    it('two-arg current-HP edit leaves maxHp untouched', () => {
+        const { handlers, combatSummary } = makeHandlers([
+            { name: 'Goblin', type: 'npc', currentHp: 8, maxHp: 10 },
+        ]);
+
+        handlers.handleCreatureHpChange('Goblin', 4);
+
+        expect(combatSummary.creatures[0].currentHp).toBe(4);
+        expect(combatSummary.creatures[0].maxHp).toBe(10);
+    });
+
+    it('player lane ignores a max payload — runtime HP writes only, card max untouched', () => {
+        const { handlers, combatSummary } = makeHandlers([
+            { name: 'Alice', type: 'player', currentHp: 10, maxHp: 20 },
+        ]);
+
+        handlers.handleCreatureHpChange('Alice', 12, 15);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'currentHitPoints', 12, campaignName);
+        expect(combatSummary.creatures[0].maxHp).toBe(20);
+    });
+});
+
 describe('handleInitiativeChange', () => {
     it('stamps initiative, opens the encounter phase, checks Thief\'s Reflexes, persists', () => {
         const { handlers, combatSummary, setCombatSummary, characters } = makeHandlers([

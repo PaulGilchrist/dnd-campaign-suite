@@ -299,6 +299,12 @@ describe('epitomeEmpoweredStrikes', () => {
   // cache so the campaign-keyed round read executes production bytes.
   // Pre-fix (no-arg call at :14) the stamp pinned to 1 (cache-miss fallback,
   // combatData.js:81) while the live campaign sat at round 7 — captured red.
+  // WATCH fix (fix#212): flakecheck212 RED at 5005ms — this test's
+  // vi.importActual of combatData (real module graph) exceeded the default
+  // 5000ms testTimeout under full-suite transform contention (isolated:
+  // green; same row also fired once in fix#203's oversubscribed window and
+  // was dismissed un-fixed — recurrence here is the honest re-verdict).
+  // Patience widened, zero assertions weakened; 15s = 3x worst sighting.
   it('live-cache round read: test-campaign round 7 stamps 7, a second-campaign decoy reads its own round', async () => {
     const real = await vi.importActual('../../../encounters/combatData.js');
     real.setCombatSummaryCache({ round: 7, creatures: [] }, CAMPAIGN);
@@ -331,5 +337,5 @@ describe('epitomeEmpoweredStrikes', () => {
       real.setCombatSummaryCache(null, 'other-campaign');
       getCurrentCombatRound.mockReset();
     }
-  });
+  }, 15000);
 });

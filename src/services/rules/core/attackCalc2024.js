@@ -14,6 +14,26 @@ import { collectWeaponMastery } from '../../combat/automation/automationPassives
 import { buildStarryFormLuminousArrow } from './starryFormDamage.js';
 
 /**
+ * Single-contract ability-row resolution seam (#1236 / #1243, fix#39 strict
+ * presence). An ABSENT playerStats.abilities key is a data hole: log loudly at
+ * the apex and resolve to null instead of throwing TypeError at .find(). An
+ * empty array is the existing empty-row path (edge-cases lane pins the
+ * no-weapon fallback: 'empty abilities array → zero-mod row, no throw'), also
+ * returning null. This helper NEVER fabricates bonuses — callers either keep
+ * their existing `?.bonus || 0` display tolerance or refuse the row.
+ * @param {Object} playerStats
+ * @param {string} name canonical ability name
+ * @returns {Object|null} the ability row, or null when absent
+ */
+function findAbility(playerStats, name) {
+    if (!Array.isArray(playerStats.abilities)) {
+        console.error(`attackCalc2024: playerStats.abilities absent on '${playerStats.name ?? 'unknown'}' — data hole; resolving '${name}' to null (#1236)`);
+        return null;
+    }
+    return playerStats.abilities.find(a => a.name === name) ?? null;
+}
+
+/**
  * Build an Action attack for a ranged weapon (2024) with Archery / Thrown Weapon Fighting damage.
  * @param {Object} weapon
  * @param {string} weaponName
@@ -48,6 +68,13 @@ function buildRangedAttacks(ctx) {
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
     ctx.rangedCount = rangedWeapons.length;
     if (rangedWeapons.length === 0) return attacks;
+    // #1243: equipped ranged weapons but no Dexterity row is a data hole —
+    // refuse the rows loudly rather than fabricate a +0 bonus at the bare
+    // ctx.dexterity.bonus / dexterity.bonus derefs below.
+    if (!dexterity) {
+        console.error('attackCalc2024: Dexterity row missing — refusing equipped ranged weapon rows (#1243)');
+        return attacks;
+    }
 
     const nonLightRanged = rangedWeapons.filter(name => {
         const { weapon } = resolveWeapon(allEquipment, name);
@@ -232,14 +259,35 @@ function isDuelingStyle(fightingStyles2024, meleeCount, rangedCount) {
     return fightingStyles2024.includes('Dueling') && meleeCount === 1 && rangedCount === 0;
 }
 
+/**
+ * #1243 strict-presence melee ability select (fix#39): both rows must exist
+ * to compute max(STR, DEX) — never fabricate a bonus for a missing row.
+ * @param {Object|null} strength
+ * @param {Object|null} dexterity
+ * @returns {{ bonus: number, abilityName: string }|null} null = caller refuses the lane
+ */
+function resolveMeleeAbilityPair(strength, dexterity) {
+    if (!strength || !dexterity) return null;
+    const bonus = Math.max(strength.bonus, dexterity.bonus);
+    const abilityName = strength.bonus > dexterity.bonus ? 'Strength' : 'Dexterity';
+    return { bonus, abilityName };
+}
+
 function buildMeleeAttacks(ctx) {
     const { allEquipment, playerStats, fightingStyles2024, rangedCount } = ctx;
     const attacks = [];
     const meleeWeaponNames = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Melee');
     if (meleeWeaponNames.length === 0) return attacks;
 
-    const bonus = Math.max(ctx.strength.bonus, ctx.dexterity.bonus);
-    const abilityName = ctx.strength.bonus > ctx.dexterity.bonus ? 'Strength' : 'Dexterity';
+    // #1243: equipped melee weapons but a missing Strength/Dexterity row is a
+    // data hole — refuse the rows loudly rather than throw at the bare
+    // ctx.strength.bonus / ctx.dexterity.bonus derefs (no fabricated +0).
+    const meleePair = resolveMeleeAbilityPair(ctx.strength, ctx.dexterity);
+    if (!meleePair) {
+        console.error('attackCalc2024: Strength/Dexterity row missing — refusing equipped melee weapon rows (#1243)');
+        return attacks;
+    }
+    const { bonus, abilityName } = meleePair;
     const duelCtx = { ...ctx, bonus, abilityName };
     const isDueling = isDuelingStyle(fightingStyles2024, meleeWeaponNames.length, rangedCount);
 
@@ -321,7 +369,7 @@ function buildTavernBrawlerAttacks(playerStats, proficiency, hasBlessedWarrior) 
     );
     if (!hasTavernBrawler || playerStats.class?.name === 'Monk') return [];
 
-    const str = playerStats.abilities.find(a => a.name === 'Strength');
+    const str = findAbility(playerStats, 'Strength');
     const strMod = str?.bonus || 0;
     const tbDice = '1d4';
     const blessedWarriorHit = hasBlessedWarrior ? 2 : 0;
@@ -347,6 +395,12 @@ function buildTavernBrawlerAttacks(playerStats, proficiency, hasBlessedWarrior) 
  */
 function buildDanceFootworkAttacks(playerStats, dexterity, proficiency) {
     if (playerStats.class?.name !== 'Bard' || playerStats.class?.subclass?.name !== 'College of Dance' || playerStats.level < 3) return [];
+    // #1243: bare dexterity.bonus derefs below — refuse the rows loudly
+    // rather than throw or fabricate a +0 DEX bonus.
+    if (!dexterity) {
+        console.error('attackCalc2024: Dexterity row missing — refusing College of Dance footwork rows (#1243)');
+        return [];
+    }
     const classLevel = (playerStats.class?.class_levels ?? []).find(cl => cl.level === playerStats.level);
     const bardicDie = classLevel?.bardic_die || 6;
     const diceStr = `1d${bardicDie}`;
@@ -369,7 +423,7 @@ function buildPsychicBladeAttacks(playerStats, dexterity, proficiency) {
     if (playerStats.class?.name !== 'Rogue' || playerStats.class?.major?.name !== 'Soulknife' || playerStats.level < 3) return [];
 
     const dexMod = dexterity?.bonus || 0;
-    const intAbility = playerStats.abilities.find(a => a.name === 'Intelligence');
+    const intAbility = findAbility(playerStats, 'Intelligence');
     const intMod = intAbility?.bonus || 0;
     const abilityBonus = Math.max(dexMod, intMod);
     const abilityName = dexMod >= intMod ? 'Dexterity' : 'Intelligence';
@@ -481,7 +535,7 @@ function buildSwiftQuiverAttacks(allEquipment, playerStats, proficiency) {
     const hasSwiftQuiverConcentration = swiftQuiverCreature?.concentration?.spell === 'Swift Quiver';
     if (!hasSwiftQuiverConcentration) return [];
 
-    const dex = playerStats.abilities.find(a => a.name === 'Dexterity');
+    const dex = findAbility(playerStats, 'Dexterity');
     const dexMod = dex?.bonus || 0;
     const toHit = dexMod + proficiency;
     const bowWeapon = findSwiftQuiverBow(allEquipment ?? [], playerStats.inventory?.equipped ?? []);
@@ -538,8 +592,8 @@ function applyMartialArtsDie(attacks, diceStr) {
  * @returns {Object[]}
  */
 export function getAttacks(allEquipment, allSpells, playerStats) {
-    const strength = playerStats.abilities.find(a => a.name === 'Strength');
-    const dexterity = playerStats.abilities.find(a => a.name === 'Dexterity');
+    const strength = findAbility(playerStats, 'Strength');
+    const dexterity = findAbility(playerStats, 'Dexterity');
     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
 
     const fightingStyles2024 = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
@@ -575,9 +629,15 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     // only Monk weapons); armored monks get plain weapon rows with no MA
     // unarmed strikes.
     if (canUseMartialArts(playerStats, allEquipment)) {
-        const diceStr = `1d${classRules.getMartialArtsDie(playerStats)}`;
-        applyMartialArtsDie(attacks, diceStr);
-        attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
+        // #1243: the bare dexterity.bonus deref into buildMonkAttacks — refuse
+        // the Martial Arts rows loudly rather than throw or fabricate a +0 DEX.
+        if (!dexterity) {
+            console.error('attackCalc2024: Dexterity row missing — refusing Martial Arts unarmed rows (#1243)');
+        } else {
+            const diceStr = `1d${classRules.getMartialArtsDie(playerStats)}`;
+            applyMartialArtsDie(attacks, diceStr);
+            attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
+        }
     }
 
     // Tavern Brawler: Add unarmed strike attacks for non-monk characters
@@ -598,7 +658,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
     // Fallback unarmed strike when no weapons are equipped
     if (attacks.length === 0) {
-        const str = playerStats.abilities?.find(a => a.name === 'Strength');
+        const str = findAbility(playerStats, 'Strength');
         const strMod = str?.bonus || 0;
         attacks.push(...buildFallbackUnarmedAttacks(strMod, proficiency, fightingStyles2024.includes('Two-Weapon Fighting'), hasBlessedWarrior));
     }

@@ -1254,6 +1254,20 @@ function stagedParalysisPickerCopy(head, stagedParalysis, metamagicHeighten) {
     };
 }
 
+// MA-0904: staged Petrifying Breath picker copy (Gorgon) — while the MA-0501
+// ladder is ARMED the fail leg stages Restrained ONLY (cockatricePetrifyService
+// stage-1 vocabulary); a second failure Petrifies for N hours via the turn-END
+// repeater. Never the MA-0063 flat "Petrified, Restrained." grant text — that
+// copy lies about mechanics that have not resolved yet (fix#240 honest-state).
+function stagedPetrifyPickerCopy(head, stagedPetrify, metamagicHeighten) {
+    const hours = Math.max(1, Math.round((stagedPetrify.petrifiedRounds ?? 14400) / 600));
+    return {
+        icon: 'fa-diamond',
+        description: head,
+        note: `On a failed save, target is Restrained and repeats the save at the end of its next turn, ending the effect on itself on a success. Second failure: Petrified for ${hours} hour${hours === 1 ? '' : 's'}.${metamagicHeighten ? ' Heightened Spell: one target will have disadvantage.' : ''}`,
+    };
+}
+
 // MA-0102: damageless weakening cone (Adult Gold Weakening Breath) —
 // failed saves impose STR-test disadvantage + a damage-subtract die and
 // repeat at turn end; never a damage line (kills the MA-0090 "null null
@@ -1277,12 +1291,14 @@ function slowedPickerCopy(head, metamagicHeighten) {
     };
 }
 
-// Staged-ladder picker copy dispatch (MA-0068 sleep / MA-0248 paralysis) —
-// split from buildPickerCopy to keep both under the lint complexity ceiling
-// (applyPickerFailClauseLegs shape). Null when neither flag is authored.
-function stagedPickerCopy(head, sleepStaging, stagedParalysis, metamagicHeighten) {
+// Staged-ladder picker copy dispatch (MA-0068 sleep / MA-0248 paralysis /
+// MA-0904 petrify) — split from buildPickerCopy to keep both under the lint
+// complexity ceiling (applyPickerFailClauseLegs shape). Null when neither flag
+// is authored.
+function stagedPickerCopy(head, sleepStaging, stagedParalysis, stagedPetrify, metamagicHeighten) {
     if (sleepStaging) return stagedSleepPickerCopy(head, sleepStaging, metamagicHeighten);
     if (stagedParalysis) return stagedParalysisPickerCopy(head, stagedParalysis, metamagicHeighten);
+    if (stagedPetrify) return stagedPetrifyPickerCopy(head, stagedPetrify, metamagicHeighten);
     return null;
 }
 
@@ -1302,16 +1318,17 @@ function pickerDamagePhrase(damage, damageType, secondaryDamage, secondaryDamage
     return `${damage} ${damageType} plus ${secondaryDamage} ${secondaryDamageType}`;
 }
 
-function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess }) {
+function buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, slowedClauses, weakeningBreath, dcSuccess }) {
     const successSentence = successSaveSentence(dcSuccess);
     if (!zoneOnly) {
         const head = `Select creatures in the area of effect. Each must make a <strong>${saveType}</strong> saving throw (DC ${saveDc}).`;
-        const stagedCopy = stagedPickerCopy(head, sleepStaging, stagedParalysis, metamagicHeighten);
+        const stagedCopy = stagedPickerCopy(head, sleepStaging, stagedParalysis, stagedPetrify, metamagicHeighten);
         if (stagedCopy) return stagedCopy;
         if (!damage && weakeningBreath) return weakeningPickerCopy(head, weakeningBreath, metamagicHeighten);
         if (!damage && slowedClauses?.effects?.length) return slowedPickerCopy(head, metamagicHeighten);
         // MA-0063: damageless condition row (e.g. Adult Blue Dragon Sand Cloud) —
         // no damage formula, failed saves grant conditions. Byte-inert when empty.
+        // Unreachable while a staged ladder is armed (stagedCopy owns the copy).
         if (!damage && saveConditions && saveConditions.length > 0) {
             const names = saveConditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
             return {
@@ -2008,7 +2025,7 @@ function SaveAttackAoeModal({
         );
     }
 
-    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, slowedClauses, weakeningBreath, dcSuccess });
+    const pickerCopy = buildPickerCopy({ zoneOnly, zoneTe, range, saveType, saveDc, damage, damageType, secondaryDamage, secondaryDamageType, metamagicHeighten, saveConditions, sleepStaging, stagedParalysis, stagedPetrify, slowedClauses, weakeningBreath, dcSuccess });
 
     return (
         <CreatureSelectionModal

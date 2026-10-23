@@ -27,13 +27,15 @@
 //   .hitClause owner lane — transport pins here stop at the ctx.
 // - typo residual "within 10 feet ofthe tarrasque" byte: owned by ma1577 :118.
 //
-// HONEST CANARY (SOURCE, reported not fixed): the row authors NO dc_success, so the
-// app-wide MV-20 default 'half' (resolveBlockSaveDcSuccess :286 → computeDamageAfterSave
-// :93) pays ~14 damage on a SUCCESSFUL save despite the "Failure:" only wording — RAW
-// wants dc_success:'none' authored (MA-0030 Chilling Gaze precedent). Pins below assert
-// the shipped 'half' honestly and flip red the day the data is fixed.
+// CANARY FLIPPED LAWFUL (#712, fix 2026-10-23): the row now authors dc_success:"none"
+// (MA-0030 Chilling Gaze precedent — key sits after save_type). The MV-20 'half' default
+// (resolveBlockSaveDcSuccess :286 → computeDamageAfterSave :93) no longer fires: a
+// SUCCESSFUL DC 20 CON save pays ZERO damage and no swallowed conditions (RAW: success =
+// not swallowed); the fail face still pays the authored 8d6 + 6 Bludgeoning verbatim.
+// Pins below assert the fixed 'none' shape and lock default-'half' for unauthored rows.
 import { describe, it, expect } from 'vitest';
 import monstersData from '../../../public/data/monsters.json';
+import { computeDamageAfterSave } from '../../services/rules/combat/applyDamage.js';
 import { extractConditionsFromSaveEffect, parseSaveDamageFields } from './MonsterCardHelpers.js';
 import { saveChipPlan, buildSaveOptions, buildAbilitySaveRollContext } from './MonsterCardModal.jsx';
 
@@ -43,9 +45,9 @@ const FP = TARRASQUE.actions.find((a) => a.name === 'Frightful Presence');
 const SWARM_BITES = monstersData.find((m) => m.index === 'swarm-of-poisonous-snakes').actions.find((a) => a.name === 'Bites');
 
 // Exact disk row, byte-for-byte — one toEqual locks the full MA-1563-key-layout arm
-// (save_dc → save_damage_dice → save_damage_type → save_type → save_effect) AND, by
-// exhaustiveness, the absence of every fake swallow-state field (swallowed/acid_tick/
-// regurgitate/escape_dc/hit_conditions/target_prerequisite/dc_success...).
+// (save_dc → save_damage_dice → save_damage_type → save_type → dc_success → save_effect)
+// AND, by exhaustiveness, the absence of every other fake swallow-state field
+// (swallowed/acid_tick/regurgitate/escape_dc/hit_conditions/target_prerequisite...).
 const FULL_ROW = {
   name: 'Swallow',
   description: 'The tarrasque makes one bite attack against a Large or smaller creature it is grappling. If the attack hits, the target takes the bite\'s damage, the target is swallowed, and the grapple ends. While swallowed, the creature is blinded and restrained, it has total cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) acid damage at the start of each of the tarrasque\'s turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, which fall prone in a space within 10 feet ofthe tarrasque. If the tarrasque dies, a swallowed creature is no longer restrained by it and can escape from the corpse by using 30 feet of movement, exiting prone.',
@@ -53,6 +55,7 @@ const FULL_ROW = {
   save_damage_dice: '8d6 + 6',
   save_damage_type: 'Bludgeoning',
   save_type: 'Constitution',
+  dc_success: 'none',
   save_effect: 'Failure: 28 (8d6 + 6) Bludgeoning damage. If the target is a creature, it is swallowed — Blinded, Prone, and Restrained until it is regurgitated.',
 };
 
@@ -62,7 +65,7 @@ const countCarriers = (dice) => monstersData.reduce(
 describe('MA-1578 disk data lock: Swallow row arms the fail face, advisory state machine stays prose-only', () => {
   it('full-row byte-lock + key order + parseSaveDamageFields + harvest yields EXACTLY [blinded, prone, restrained]; Swallow is the sole 8d6 + 6 carrier file-wide', () => {
     expect(SWALLOW).toEqual(FULL_ROW);
-    expect(Object.keys(SWALLOW)).toEqual(['name', 'description', 'save_dc', 'save_damage_dice', 'save_damage_type', 'save_type', 'save_effect']);
+    expect(Object.keys(SWALLOW)).toEqual(['name', 'description', 'save_dc', 'save_damage_dice', 'save_damage_type', 'save_type', 'dc_success', 'save_effect']);
     expect(parseSaveDamageFields(SWALLOW)).toEqual({ dice: '8d6 + 6', damageType: 'Bludgeoning' });
     expect(extractConditionsFromSaveEffect(SWALLOW.save_effect)).toEqual(['blinded', 'prone', 'restrained']);
     expect(countCarriers('8d6 + 6')).toBe(1);
@@ -85,13 +88,14 @@ describe('MA-1578 saveChipPlan: authored pool owns the chip, gates honored, byte
 });
 
 describe('MA-1578 DC 20 Constitution threading + save transport', () => {
-  it('buildSaveOptions arms DC 20 con + triple conditions (dc_success canary: MV-20 half-on-success default ships); ctx overrides the pre-fix null handoff with authored 8d6 + 6 Bludgeoning, single leg', () => {
+  it('buildSaveOptions arms DC 20 con + triple conditions (dc_success:"none" authored — success pays ZERO); ctx overrides the pre-fix null handoff with authored 8d6 + 6 Bludgeoning, single leg', () => {
     const opts = buildSaveOptions(SWALLOW);
     expect(opts.saveDc).toBe(20);
     expect(opts.saveType).toBe('con');
     expect(opts.saveConditions).toEqual(['blinded', 'prone', 'restrained']);
-    // CANARY: row authors no dc_success → 'half' ships to the prompt (see header SOURCE note).
-    expect(opts.dcSuccess).toBe('half');
+    // LAWFUL PIN (#712 flip): row authors dc_success:'none' (MA-0030 precedent) →
+    // resolveBlockSaveDcSuccess/buildSaveOptions surface 'none', not the MV-20 'half'.
+    expect(opts.dcSuccess).toBe('none');
     const ctx = buildAbilitySaveRollContext({
       monsterName: 'Tarrasque 1',
       target: { name: 'Bandit 1', type: 'monster' },
@@ -110,13 +114,23 @@ describe('MA-1578 DC 20 Constitution threading + save transport', () => {
     });
     expect(ctx.saveDc).toBe(20);
     expect(ctx.saveType).toBe('Constitution');
-    expect(ctx.dcSuccess).toBe('half');
+    expect(ctx.dcSuccess).toBe('none');
     expect(ctx.autoDamageFormula).toBe('8d6 + 6');
     expect(ctx.autoDamageDamageType).toBe('Bludgeoning');
     // fail face rolls the save pool exactly once — no fabricated second leg
     expect(ctx.autoDamageSecondaryFormula).toBe(null);
     expect(ctx.autoDamageSecondaryDamageType).toBe(null);
     expect(ctx.saveConditions).toEqual(['blinded', 'prone', 'restrained']);
+    // #1348 save-outcome arms on this row's transport: fail pays the FULL authored
+    // pool, success pays ZERO (applySaveDamage :1665 → computeDamageAfterEvasion →
+    // computeDamageAfterSave :91, dc_success 'none' hits the terminal zero branch).
+    expect(computeDamageAfterSave(28, false, ctx.dcSuccess)).toBe(28);
+    expect(computeDamageAfterSave(28, true, ctx.dcSuccess)).toBe(0);
+    // default-'half' stays intact for OTHER unauthored rows (MV-20 untouched):
+    // swarm Bites ships no dc_success and must keep resolving 'half' via :286/:1332.
+    expect('dc_success' in SWARM_BITES).toBe(false);
+    expect(buildSaveOptions(SWARM_BITES).dcSuccess).toBe('half');
+    expect(computeDamageAfterSave(14, true, 'half')).toBe(7);
   });
 });
 

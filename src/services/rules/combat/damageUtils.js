@@ -107,27 +107,34 @@ export async function computePlayerAc(character) {
   const equipped = character.inventory?.equipped || [];
   const dexBonus = computeAbilityBonus(character, 'Dexterity');
 
-  let ac = 10;
-  let hasArmor = false;
+  // fix#1213 (#1213): gather components, compose once. The shield bonus is
+  // hoisted out of the loop branches so it lands exactly once on BOTH arms —
+  // armored (base+dex+shield) and shield-only (10+dex+shield, RAW). Pre-fix
+  // the !hasArmor fallback recomputed 10+dex, silently discarding the shield's
+  // +2 (shield-only pinned 13 at dex +3), and a shield listed before armor was
+  // wiped by the armor branch's assignment. Single-contract per fix#115 idiom.
+  // Disk law: real shields are equipment_category "Armor" + armor_category
+  // "Shield" (public/data/equipment.json:4122-4131), so shield detection must
+  // check armor_category first — mirrors reactionDebuffHandler.js:387.
+  let armorAc = null;
+  let shieldBonus = 0;
 
   for (const itemName of equipped) {
     const { baseName } = parseMagicItemName(itemName);
     const item = equipment.find(e => e.name === baseName);
     if (!item) continue;
 
-    if (item.equipment_category === 'Armor') {
-      ac = armorAcContribution(item, dexBonus);
-      hasArmor = true;
-    } else if (item.equipment_category === 'Shield') {
-      ac += 2;
+    if (item.equipment_category === 'Shield' || item.armor_category === 'Shield') {
+      shieldBonus += 2;
+    } else if (item.equipment_category === 'Armor') {
+      armorAc = armorAcContribution(item, dexBonus);
     }
   }
 
-  if (!hasArmor) {
-    ac = 10 + dexBonus;
-  }
-
-  return ac;
+  // armorAc may be a lawful 0 (mis-tagged Armor with no armor_class, pinned
+  // honest at damageUtils.test.js #1213b), so null — not falsiness — is the
+  // "no armor seen" sentinel.
+  return (armorAc ?? (10 + dexBonus)) + shieldBonus;
 }
 
 export function computeAcEstimate(character) {

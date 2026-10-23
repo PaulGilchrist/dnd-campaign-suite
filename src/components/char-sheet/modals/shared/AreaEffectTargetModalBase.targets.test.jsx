@@ -127,8 +127,9 @@ describe('AreaEffectTargetModalBase - Eligible Targets', () => {
     });
   });
 
-  // Four near-identical trapped-effects filters in the source (forcecage, maze,
-  // banishment, imprisonment) differ only by effect key — cover each key's four branches.
+  // Trapped-effects gate consolidated in #171 (TRAP_BLOCKING_EFFECTS loop over the
+  // trapEffectBlocksAttack core, fix#227 house pattern) — keep one describe per effect
+  // key so each axis of the former four get*Blocked clones stays independently falsifiable.
   describe.each(['forcecage', 'maze', 'banishment', 'imprisonment'])('%s blocking', (effect) => {
     const te = (target, source) => ({ effect, target, source });
     it.each([

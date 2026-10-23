@@ -133,6 +133,22 @@ describe('smiteOfProtectionService', () => {
                 ['[smiteOfProtectionService] Missing array:', undefined],
             ]);
         });
+
+        it('nullish playerStats apex routes into the SAME loud arm — exact console bytes, throw not fabricated [] (#204-class)', async () => {
+            // fix#179 refuse-no-fabricated-values twin of inspiringSmiteService: the file-owned
+            // loud arm catches the nullish apex via `playerStats?.`; trigger propagates (:25 is
+            // outside any try), and zero dispatch happens before the throw.
+            expect(() => getSmiteOfProtectionPassives(undefined)).toThrow('Expected array, got undefined');
+            expect(() => getSmiteOfProtectionPassives(null)).toThrow('Expected array, got undefined');
+            expect(consoleError.mock.calls).toEqual([
+                ['[smiteOfProtectionService] Missing array:', undefined],
+                ['[smiteOfProtectionService] Missing array:', undefined],
+            ]);
+            await expect(triggerSmiteOfProtection({ name: 'Divine Smite', level: 1 }, { slotLevel: 1 }, undefined, CAMPAIGN, MAP))
+                .rejects.toThrow('Expected array, got undefined');
+            expect(consoleError).toHaveBeenCalledTimes(3);
+            expect(calls).toHaveLength(0);
+        });
     });
 
     describe('triggerSmiteOfProtection', () => {

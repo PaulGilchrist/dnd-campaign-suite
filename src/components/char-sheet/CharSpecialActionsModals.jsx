@@ -382,7 +382,7 @@ function CharSpecialActionsModals({
                     icon="fa-shield-hart"
                     targets={celestialResilienceModal.creatureTargets}
                     maxTargets={celestialResilienceModal.maxTargets}
-                    description="Choose up to 5 allies to gain temporary hit points from your Celestial Resilience."
+                    description={`Choose up to ${celestialResilienceModal.maxTargets} allies to gain temporary hit points from your Celestial Resilience.`}
                     note={`You gain ${celestialResilienceModal.selfTempHp} temporary hit points. Each selected ally gains ${celestialResilienceModal.allyTempHp} temporary hit points.`}
                     confirmLabel="Grant Resilience"
                     confirmIcon="fa-shield-hart"
@@ -447,7 +447,7 @@ function CharSpecialActionsModals({
                     icon="fa-bullhorn"
                     targets={bolsteringPerformanceModal.creatureTargets}
                     maxTargets={bolsteringPerformanceModal.maxTargets}
-                    description="Choose up to 6 allies to gain temporary hit points."
+                    description={`Choose up to ${bolsteringPerformanceModal.maxTargets} allies to gain temporary hit points.`}
                     note={`Each target gains ${bolsteringPerformanceModal.tempHp} temporary hit points.`}
                     confirmLabel="Inspire"
                     confirmIcon="fa-bullhorn"

@@ -28,7 +28,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const eligibleSpells = allSpells.filter(s => s.level > 0 && s.level <= maxLevel);
+    // casting_time gate (both-edition War Magic / Improved War Magic law):
+    // the feature replaces the Attack action, so only ACTION-casting spells
+    // are offered — reaction (Shield: '1 reaction' 5e / 'Reaction' 2024)
+    // and bonus-action rows are excluded; '1 action' (x248 5e),
+    // 'Action' (x278 2024) and 'Action or Ritual' (x18 2024) pass
+    // (isActionCastingTime token law). A row with no casting_time is
+    // malformed data: excluded and logged loudly (no silent fallback).
+    const eligibleSpells = allSpells.filter(s => {
+        if (!(s.level > 0 && s.level <= maxLevel)) return false;
+        if (!s.casting_time) {
+            console.error(`[warMagicSpellHandler] Spell "${s.name}" has no casting_time — excluded from War Magic options (cannot verify it is cast with the Action the feature replaces).`);
+            return false;
+        }
+        return isActionCastingTime(s.casting_time);
+    });
     if (!eligibleSpells.length) {
         return {
             type: 'popup',
@@ -66,6 +80,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             maxSpellLevel: maxLevel,
         },
     };
+}
+
+/**
+ * casting_time predicate for the War Magic spell/cantrip chooser.
+ * Token law (census of shipped catalogs, both editions): a casting time
+ * qualifies when it is the Action — 'action', '1 action', 'Action',
+ * 'Action or Ritual' (ritual variants still cast as an Action). 'bonus
+ * action'/'Bonus Action' and any 'reaction' row never qualify: their only
+ * 'action'-bearing token is the compound, which is not a standalone
+ * Action. Data-driven; never a spell-name blocklist.
+ */
+export function isActionCastingTime(castingTime) {
+    const tokens = String(castingTime).toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.includes('action')) return false;
+    return tokens.filter(t => t !== 'action').every(t => t === '1' || t === 'or' || t === 'ritual');
 }
 
 // Spell slot expenditure mirrors spellPreparationService.prepareSpellCast
@@ -319,69 +348,66 @@ function buildWarMagicPopupDescription({ action, selectedSpellName, spell, targe
         `<br/>Weapon attack: ${weaponLine}`;
 }
 
-export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
-    if (!selectedSpellName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: 'No spell selected.',
-            },
-        };
-    }
+function buildConfirmRefusalPopup(action, description) {
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description,
+        },
+    };
+}
 
+// All pre-resolution law checks for confirmWarMagicSpell, in strict order:
+// selection → spell exists → casting_time gate → armed target → range →
+// slot expenditure. Returns { error, spell, cs, targetName } — on any failed
+// gate, error carries the refusal popup (side-effect-free: nothing is spent
+// or latched before every gate passes).
+async function resolveWarMagicConfirmEligibility(action, playerStats, campaignName, selectedSpellName) {
     const playerName = playerStats.name;
+    if (!selectedSpellName) {
+        return { error: buildConfirmRefusalPopup(action, 'No spell selected.') };
+    }
 
     const allSpells = await loadSpellData(playerStats);
     const spell = (allSpells || []).find(s => s.name === selectedSpellName);
     if (!spell) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Spell "${selectedSpellName}" not found.`,
-            },
-        };
+        return { error: buildConfirmRefusalPopup(action, `Spell "${selectedSpellName}" not found.`) };
+    }
+
+    // casting_time law gate mirrors the chooser filter (defense-in-depth):
+    // War Magic replaces the Attack action, so a non-action spell is an
+    // illegal choice — refuse BEFORE spending a slot, the weapon attack, or
+    // touching anything.
+    if (!isActionCastingTime(spell.casting_time ?? '')) {
+        return { error: buildConfirmRefusalPopup(action, `${selectedSpellName} casts as ${spell.casting_time || 'unknown casting time'} — ${action.name} replaces the Attack action, so only action-casting spells qualify.`) };
     }
 
     // Target: the creature set on the caster's initiative card.
     const cs = getCombatSummary(campaignName);
     const targetName = resolveWarMagicTargetName(cs, playerName);
     if (!targetName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} requires a target — set the Target dropdown on your initiative card first.`,
-            },
-        };
+        return { error: buildConfirmRefusalPopup(action, `${action.name} requires a target — set the Target dropdown on your initiative card first.`) };
     }
 
     const inRange = await isWithinRange(playerName, targetName, parseRangeFeet(spell.range));
     if (!inRange) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${targetName} is out of range for ${selectedSpellName} (${spell.range}).`,
-            },
-        };
+        return { error: buildConfirmRefusalPopup(action, `${targetName} is out of range for ${selectedSpellName} (${spell.range}).`) };
     }
 
     if (!expendSpellSlot(playerName, spell.level, playerStats, campaignName)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No level ${spell.level} spell slots available to cast ${selectedSpellName}.`,
-            },
-        };
+        return { error: buildConfirmRefusalPopup(action, `No level ${spell.level} spell slots available to cast ${selectedSpellName}.`) };
     }
+
+    return { spell, cs, targetName };
+}
+
+export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
+    const playerName = playerStats.name;
+    const eligibility = await resolveWarMagicConfirmEligibility(action, playerStats, campaignName, selectedSpellName);
+    if (eligibility.error) return eligibility.error;
+    const { spell, cs, targetName } = eligibility;
 
     await addEntry(campaignName, {
         type: 'ability_use',

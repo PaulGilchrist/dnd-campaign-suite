@@ -22,6 +22,9 @@ const TS = 1750000000000; // fixed timestamp — never assert against Date.now()
 
 // Entries render newest-first (Log.jsx reverses); expect byte arrays in that order.
 const textsOf = (sel) => [...document.querySelectorAll(sel)].map((n) => n.textContent.trim());
+// Raw bytes, no trim — for labels whose spacing is structural (parent flex gap or
+// suffix-conditional literals). #886: trailing-space defects were hidden by textsOf.
+const textOfAll = (sel) => [...document.querySelectorAll(sel)].map((n) => n.textContent);
 
 describe('Log > RollEntry', () => {
   beforeEach(() => {
@@ -88,7 +91,11 @@ describe('Log > RollEntry', () => {
       roll({ id: 'auto', isAutoMiss: true }),
       roll({ id: 'nohit', hit: undefined }),
     ]);
-    expect(textsOf('.log-hit-miss')).toEqual(['AUTO-MISS (AC 15)', 'MISS', 'HIT (AC 16)']);
+    // Exact bytes, NO trim (#886): the space lives inside the AC-suffix literal so
+    // the no-AC label is exactly 'MISS' (no trailing space); suffix arms keep their
+    // separator byte.
+    expect(textOfAll('.log-hit-miss')).toEqual(['AUTO-MISS (AC 15)', 'MISS', 'HIT (AC 16)']);
+    expect(q('.log-hit-miss.log-miss').textContent).toBe('MISS');
     expect(q('.log-hit-miss.log-hit')).toBeInTheDocument();
     expect(q('.log-hit-miss.log-miss')).toBeInTheDocument();
   });
@@ -99,8 +106,8 @@ describe('Log > RollEntry', () => {
       roll({ id: 'nat1', isCrit: false, isNatural1: true }),
       roll({ id: 'both', isCrit: true, isNatural1: true }),
     ]);
-    expect(textsOf('.log-critical-hit')).toEqual(['Critical Hit!']);
-    expect(textsOf('.log-critical-miss')).toEqual(['Critical Miss!', 'Critical Miss!']);
+    expect(textOfAll('.log-critical-hit')).toEqual(['Critical Hit!']);
+    expect(textOfAll('.log-critical-miss')).toEqual(['Critical Miss!', 'Critical Miss!']);
   });
 
   it('renders target variants: arrow, vs-target, save-vs-attacker, aoe suppressed', () => {
@@ -118,11 +125,13 @@ describe('Log > RollEntry', () => {
 
   it('renders modifier badges: bane, bless, enfeeblement, generic subtract rider', () => {
     setup(Log, [roll({ baneRoll: 3, blessRoll: 2, rayOfEnfeebleRoll: 4, subtractDieRoll: 2 })]);
-    expect(q('.log-bane-penalty').textContent.trim()).toBe('-1d4 [Bane]: -3');
-    expect(q('.log-bless-bonus').textContent.trim()).toBe('+1d4 [Bless]: +2');
-    expect(q('.log-ray-enfeeblement').textContent.trim()).toBe('-1d8 [Enfeeblement]: -4');
+    // Exact bytes, no trim: modifier badges sit in .log-dice-values (flex gap:4px) —
+    // leading content spaces removed at source (#886 sibling census).
+    expect(q('.log-bane-penalty').textContent).toBe('-1d4 [Bane]: -3');
+    expect(q('.log-bless-bonus').textContent).toBe('+1d4 [Bless]: +2');
+    expect(q('.log-ray-enfeeblement').textContent).toBe('-1d8 [Enfeeblement]: -4');
     // subtract rider reuses .log-bane-penalty — it renders as the second one
-    expect(document.querySelectorAll('.log-bane-penalty')[1].textContent.trim()).toBe('-1d6 [Subtract Rider]: -2');
+    expect(document.querySelectorAll('.log-bane-penalty')[1].textContent).toBe('-1d6 [Subtract Rider]: -2');
   });
 
   it('shows GWF original → display dice with rolls fallback', () => {
@@ -136,10 +145,13 @@ describe('Log > RollEntry', () => {
   it('renders save info bytes and suppresses when saveType or saveDc missing', () => {
     setup(Log, [
       roll({ id: 'si', rollType: 'save-damage', saveType: 'dex', saveDc: 15, mode: 'disadvantage' }),
+      roll({ id: 'sinm', rollType: 'save-damage', saveType: 'int', saveDc: 12 }),
       roll({ id: 'no', rollType: 'save-damage' }),
     ]);
-    expect(document.querySelectorAll('.log-save-info')).toHaveLength(1);
-    expect(q('.log-save-info')).toHaveTextContent('DEX save DC 15');
+    expect(document.querySelectorAll('.log-save-info')).toHaveLength(2);
+    expect(document.querySelectorAll('.log-save-info')[1]).toHaveTextContent('DEX save DC 15');
+    // newest-first: 'sinm' renders first — exact bytes, no trailing space/nbsp (#886 census)
+    expect(q('.log-save-info').textContent).toBe('INT save DC 12');
     expect(screen.getByText('DISADVANTAGE')).toBeInTheDocument();
   });
 

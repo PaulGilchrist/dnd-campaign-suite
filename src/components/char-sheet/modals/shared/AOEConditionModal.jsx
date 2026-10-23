@@ -231,6 +231,57 @@ async function resolveNpcTarget({ campaignName, casterName, targetName, target, 
 }
 
 
+// Shared core for the two save-result lanes (run2#167 🗑 clone resolution):
+// local handleSaveResult (:handleSaveResult) and the overlay handleSaveResultOverride
+// were near-verbatim clones. Genuine differences are parameterized, not collapsed:
+//   - pendingPrompts / setters live in TWO homes of state — local useState on the
+//     selection lane, base ctx on the overlay lane (base forwards ctx and ignores
+//     the handler's return, AreaEffectTargetModalBase.jsx:211-213);
+//   - only the selection lane passes onAllPromptsResolved (its ResultsSummaryModal
+//     `showResults` gate); the overlay lane resolves via the base's own
+//     `allResolved` ctx render (AreaEffectTargetModalBase.jsx:181), so it has no
+//     such gate.
+// Accidental drift resolved here toward the file law: every sibling addEntry in
+// this file awaits (:450 confirm, resolveNpcTarget :120/:155/:166/:201) — the
+// override clone had silently dropped the awaits. Log-completes-before-persist-
+// and-broadcast honors the every-automation-must-log rule; the re-sync is
+// microtask-ordering only (final state byte-identical), flushed by every lane.
+async function handleSaveResultCore({ event, pendingPrompts, campaignName, casterName, saveType, saveDc, conditionLabel, effects, applyConditionsToTarget, registerConditionExpiry, setResults, setPendingPrompts, onAllPromptsResolved }) {
+    const detail = event.detail;
+    if (!detail || !detail.promptId) return;
+
+    const pendingIndex = pendingPrompts.findIndex(p => p.promptId === detail.promptId);
+    if (pendingIndex === -1) return;
+
+    const targetName = pendingPrompts[pendingIndex].targetName;
+    const success = detail.success;
+
+    if (!success) {
+        const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
+        applyConditionsToTarget(targetName, conditionList, campaignName);
+        registerConditionExpiry(targetName, conditionList);
+
+        await addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
+        await addEntry(campaignName, buildSaveResultEntry({ casterName, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+        addTargetResult(campaignName, buildTargetResultEntry(targetName, false, detail, effects));
+    } else {
+        await addEntry(campaignName, buildSaveResultEntry({ casterName, targetName, saveDc, saveType, success: true, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
+        addTargetResult(campaignName, buildTargetResultEntry(targetName, true, detail, effects));
+    }
+
+    persistAndNotify(getCombatSummary(campaignName), campaignName);
+
+    setResults(prev => [...prev, buildSaveResultRecord(targetName, success, detail)]);
+    setPendingPrompts(prev => {
+        const updated = prev.filter(p => p.promptId !== detail.promptId);
+        if (updated.length === 0 && onAllPromptsResolved) {
+            onAllPromptsResolved();
+        }
+        return updated;
+    });
+}
+
+
 function AOEConditionModal({
     action,
     playerStats,
@@ -376,43 +427,24 @@ function AOEConditionModal({
         return { results, prompts };
     }, [campaignName, playerStats.name, action.name, saveDc, saveType, isCarefulSpell, isCarefulAlly, heightenTarget, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry]);
 
-    const handleSaveResult = useCallback(async (event) => {
-        const detail = event.detail;
-        if (!detail || !detail.promptId) return;
-
-        const pendingIndex = pendingPrompts.findIndex(p => p.promptId === detail.promptId);
-        if (pendingIndex === -1) return;
-
-        const targetName = pendingPrompts[pendingIndex].targetName;
-        const success = detail.success;
-
-        if (!success) {
-            const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
-            applyConditionsToTarget(targetName, conditionList, campaignName);
-            registerConditionExpiry(targetName, conditionList);
-
-            await addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
-            await addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-            addTargetResult(campaignName, buildTargetResultEntry(targetName, false, detail, effects));
-        } else {
-            await addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: true, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-            addTargetResult(campaignName, buildTargetResultEntry(targetName, true, detail, effects));
-        }
-
-        persistAndNotify(getCombatSummary(campaignName), campaignName);
-
-        setResults(prev => {
-            const newResults = [...prev, buildSaveResultRecord(targetName, success, detail)];
-            return newResults;
-        });
-        setPendingPrompts(prev => {
-            const updated = prev.filter(p => p.promptId !== detail.promptId);
-            if (updated.length === 0) {
-                setShowResults(true);
-            }
-            return updated;
-        });
-    }, [campaignName, saveDc, saveType, pendingPrompts, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
+    const handleSaveResult = useCallback((event) => handleSaveResultCore({
+        event,
+        pendingPrompts,
+        campaignName,
+        casterName: playerStats.name,
+        saveType,
+        saveDc,
+        conditionLabel,
+        effects,
+        applyConditionsToTarget,
+        registerConditionExpiry,
+        setResults,
+        setPendingPrompts,
+        // Selection-lane-only difference: open the ResultsSummaryModal once the
+        // last prompt resolves. (Defensive arm — confirm already set showResults
+        // — retained verbatim-in-behavior per run2#167.)
+        onAllPromptsResolved: () => setShowResults(true),
+    }), [campaignName, saveDc, saveType, pendingPrompts, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
     useEffect(() => {
         if (pendingPrompts.length === 0) return;
@@ -540,34 +572,23 @@ function AOEConditionModal({
         });
     }, [campaignName, playerStats.name, action.name, saveDc, saveType, resolveAllSaves]);
 
-    const handleSaveResultOverride = useCallback((event, ctx) => {
-        const detail = event.detail;
-        if (!detail || !detail.promptId) return;
-
-        const pendingIndex = ctx.pendingPrompts.findIndex(p => p.promptId === detail.promptId);
-        if (pendingIndex === -1) return;
-
-        const targetName = ctx.pendingPrompts[pendingIndex].targetName;
-        const success = detail.success;
-
-        if (!success) {
-            const conditionList = effects || [{ type: 'blinded', condition: 'blinded' }];
-            applyConditionsToTarget(targetName, conditionList, campaignName);
-            registerConditionExpiry(targetName, conditionList);
-
-            addEntry(campaignName, buildConditionAppliedEntry({ targetName, conditionLabel, conditionList, saveDc, saveType, casterName: playerStats.name })).catch((e) => { console.error('[AOEConditionModal] Error logging condition:', e); });
-            addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: false, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-            addTargetResult(campaignName, buildTargetResultEntry(targetName, false, detail, effects));
-        } else {
-            addEntry(campaignName, buildSaveResultEntry({ casterName: playerStats.name, targetName, saveDc, saveType, success: true, detail })).catch((e) => { console.error('[AOEConditionModal] Error logging save result:', e); });
-            addTargetResult(campaignName, buildTargetResultEntry(targetName, true, detail, effects));
-        }
-
-        persistAndNotify(getCombatSummary(campaignName), campaignName);
-
-        ctx.setResults(prev => [...prev, buildSaveResultRecord(targetName, success, detail)]);
-        ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
-    }, [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
+    // Overlay-lane wrapper: reads/writes the BASE ctx state (two-homes-of-state
+    // difference from handleSaveResult) and has no all-resolved gate — the base
+    // renders resolution itself.
+    const handleSaveResultOverride = useCallback((event, ctx) => handleSaveResultCore({
+        event,
+        pendingPrompts: ctx.pendingPrompts,
+        campaignName,
+        casterName: playerStats.name,
+        saveType,
+        saveDc,
+        conditionLabel,
+        effects,
+        applyConditionsToTarget,
+        registerConditionExpiry,
+        setResults: ctx.setResults,
+        setPendingPrompts: ctx.setPendingPrompts,
+    }), [campaignName, saveDc, saveType, effects, conditionLabel, applyConditionsToTarget, registerConditionExpiry, playerStats.name]);
 
     if (isOverlayTargeted && activeOverlay) {
         return (

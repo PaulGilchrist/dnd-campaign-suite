@@ -13,6 +13,8 @@ import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { createSaveListener } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { applyTeleportTokenMove } from '../../../combat/teleportService.js';
+import { rollD20, rollDie } from '../../../dice/diceRoller.js';
+import { parseMagicItemName } from '../../../rules/core/attackWeaponUtils.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -124,7 +126,9 @@ async function handleDisadvantageDebuff({ action, campaignName, attackerName, co
     const ac = effectiveAc ?? targetAc;
     const defenderName = targetName;
 
-    const secondD20 = Math.floor(Math.random() * 20) + 1;
+    // Canonical d20 lane (fix#169 recipe): the disadvantage second die rolls
+    // through diceRoller so global dice-seeding and the GM overlay see it.
+    const secondD20 = rollD20();
     const finalD20 = Math.min(d20, secondD20);
     const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
 
@@ -368,8 +372,10 @@ async function applyImprovedWardingFlare(playerStats, campaignName, defenderName
     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
     const wisMod = wis?.bonus ?? 0;
 
-    const roll1 = Math.floor(Math.random() * 6) + 1;
-    const roll2 = Math.floor(Math.random() * 6) + 1;
+    // Same-class census (fix#169 lane): the 2d6 improved-flare dice join the
+    // canonical diceRoller scalar-die lane (rollDie), distribution-identical.
+    const roll1 = rollDie(6);
+    const roll2 = rollDie(6);
     const amount = roll1 + roll2 + wisMod;
     if (amount <= 0) return null;
 
@@ -388,17 +394,6 @@ function hasShield(playerStats) {
         }
     }
     return false;
-}
-
-function parseMagicItemName(itemName) {
-    if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-        const magicBonus = Number(itemName.charAt(1));
-        return {
-            baseName: itemName.substring(3),
-            magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
-        };
-    }
-    return { baseName: itemName, magicBonus: 0 };
 }
 
 function resolveUsesBudget(auto, playerStats, featureName) {
@@ -654,7 +649,9 @@ async function handleBardicRoll({ action, auto, playerStats, playerName, feature
 
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
     const bardicDieSize = classLevel?.bardic_die || 6;
-    const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
+    // Same-class census (fix#169 lane): the bardic inspiration die rolls
+    // through the canonical diceRoller scalar-die lane (rollDie).
+    const biDieRoll = rollDie(bardicDieSize);
 
     // CLA-071 §39 single-channel writes: bake latch + marker + BI spend into the
     // client store BEFORE dispatch (skipSync = store only, no racing POST), so the

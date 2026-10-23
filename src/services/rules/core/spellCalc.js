@@ -47,6 +47,26 @@ function newSpellcastingContainer(spellCastingAbility) {
     };
 }
 
+// #1268 twin of fix#91 (spellCalc2024.js bumpCounterIfTracked — local duplicate, same
+// precedent as fix#91's deliberate non-import across ruleset twins). The known-counters
+// (cantrips_known / spells_known) are bumped ONLY when the host container actually
+// carries them. 5e disk census: Wizard/Druid/Paladin tables lack spells_known, and
+// Paladin/Ranger lack cantrips_known — bumping an absent key seeded a NaN (undefined + n)
+// baked out of the resolver spread ({ ...spellcasting }) straight through to the sheet.
+// Absent-key hosts skip LOUD per the no-fallback law — never a silent 0. The
+// always-prepared spell rows are the canonical record on untracked hosts. Tracked hosts
+// (race-only slotless containers and Bard/Cleric/Ranger/Sorcerer/Warlock disk tables)
+// accumulate byte-intact.
+function bumpCounterIfTracked(spellAbilities, key, count, lineageName) {
+    if (key in spellAbilities) {
+        spellAbilities[key] += count;
+        return;
+    }
+    if (count > 0) {
+        console.error(`[spellCalc] lineage counter '${key}' absent on host — skipping ${count} ${lineageName} grant(s); always-prepared rows are the canonical record`);
+    }
+}
+
 // Resolve class-level spellcasting, falling back to the highest subclass level, and
 // apply the required_major/subclass gate. Returns spellcasting or null.
 function resolveClassSpellcasting(playerStats) {
@@ -125,25 +145,25 @@ function applyRaceSpellTraits(spellAbilities, playerStats) {
         }
         // Tieflings get the "Thaumaturgy" cantrip
         stampAlwaysPrepared(spellAbilities, 'Thaumaturgy');
-        spellAbilities.cantrips_known += 1;
+        bumpCounterIfTracked(spellAbilities, 'cantrips_known', 1, 'Tiefling');
         // Tieflings get the hellish rebuke spell at level 3
         if (playerStats.level > 2) {
             stampAlwaysPrepared(spellAbilities, 'Hellish Rebuke');
-            spellAbilities.spells_known += 1;
+            bumpCounterIfTracked(spellAbilities, 'spells_known', 1, 'Tiefling');
         }
     } else if (playerStats.race.subrace?.name === 'High Elf') {
         // High Elf gets one cantrip from the wizard spell list
         if (!spellAbilities) {
             spellAbilities = newSpellcastingContainer('Intelligence');
         }
-        spellAbilities.cantrips_known += 1;
+        bumpCounterIfTracked(spellAbilities, 'cantrips_known', 1, 'High Elf');
     } else if (playerStats.race.subrace?.name === 'Forest Gnome') {
         if (!spellAbilities) {
             spellAbilities = newSpellcastingContainer('Intelligence');
         }
         // Forest Gnome get the "Minor Illusion" cantrip
         stampAlwaysPrepared(spellAbilities, 'Minor Illusion');
-        spellAbilities.cantrips_known += 1;
+        bumpCounterIfTracked(spellAbilities, 'cantrips_known', 1, 'Forest Gnome');
     }
     return spellAbilities;
 }

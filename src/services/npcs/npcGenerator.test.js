@@ -11,7 +11,8 @@
 // No wall-clock (#app): zero timers here. No logging in source → no log assertions (#app).
 //
 // RNG slot map (Math.random consumption order, generateNPC):
-//   1 race | 2 gender | 3 name (race pool or Human fallback) | 4-9 classRole/attitude/
+//   1 race | 2 gender | 3 name (length-checked chain race->Human[gender]->Human.male,
+//   throws LOUD when every pool is empty/absent — #1180) | 4-9 classRole/attitude/
 //   appearance/personality/goals/secrets | 10 numTags=randomInt(1,3) | 11..(10+numTags) pickN
 //   | includeStatBlock (>0.3) | then stat block: cr, abilityScore, hp, ac, speed(+extra pick if
 //   cr>=2 && roll>0.75), primary, secondary | per action: builder roll, template pick, index pick,
@@ -54,8 +55,22 @@ const TRAITS = {
 
 const NAMES_WITH_MISSING_HUMAN_FEMALE = {
   ...NAMES,
-  // female KEY ABSENT: the fallback `||` chain short-circuits only on undefined, never on [].
+  // female KEY ABSENT: the absence arm of the presence+non-empty chain (#1180 fix)
+  // mirrors the old || shape — absent or [] both route to Human.male.
   Human: { male: ['Aldric', 'Bram'] },
+};
+
+const NAMES_WITH_EMPTY_HUMAN_FEMALE = {
+  ...NAMES,
+  // female key PRESENT but EMPTY []: pre-fix, `[] || fallback` short-circuited to
+  // the empty array itself and pick([]) === undefined leaked an unnamed NPC slot.
+  Human: { male: ['Aldric', 'Bram'], female: [] },
+};
+
+const NAMES_WITH_HUMAN_POOLS_EXHAUSTED = {
+  Elf: { male: ['Legolas'], female: ['Arwen'] },
+  // Human present, every gender pool empty: the terminal arm must go LOUD, not undefined.
+  Human: { male: [], female: [] },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -220,7 +235,8 @@ describe('generateNPC', () => {
     });
   });
 
-  // Name resolution lanes: exact names pin which pool the fallback chain (source ~L287-294) chose.
+  // Name resolution lanes: exact names pin which pool the length-checked fallback
+  // chain (source ~L294-309, #1180) chose.
   it.each([
     {
       label: 'race pool hit: Elf male draws from Elf.male',
@@ -241,9 +257,18 @@ describe('generateNPC', () => {
       name: 'Fiona', race: 'Dwarf',
     },
     {
-      label: 'Human.female key absent: || chain lands on Human.male (empty [] would yield undefined — latent hole, unreachable in real data)',
+      label: 'Human.female key absent: absence arm lands on Human.male',
       traits: { ...TRAITS, races: ['Human'] },
       names: NAMES_WITH_MISSING_HUMAN_FEMALE,
+      slots: [0.5, 0.4, 0.6, ...BASE_NO_STAT.slice(3)],
+      name: 'Bram', race: 'Human',
+    },
+    {
+      // #1180 fixed: empty [] is truthy — pre-fix this rode the `|| []` terminal
+      // into pick([]) === undefined and produced an unnamed NPC.
+      label: 'Human.female present-but-empty []: non-empty arm falls back to Human.male (not undefined name-hole)',
+      traits: { ...TRAITS, races: ['Human'] },
+      names: NAMES_WITH_EMPTY_HUMAN_FEMALE,
       slots: [0.5, 0.4, 0.6, ...BASE_NO_STAT.slice(3)],
       name: 'Bram', race: 'Human',
     },
@@ -254,6 +279,26 @@ describe('generateNPC', () => {
     const npc = await mod.generateNPC();
 
     expect({ name: npc.name, race: npc.race }).toEqual({ name, race });
+  });
+
+  // #1180 terminal arm: every name pool empty/absent is LOUD — no undefined-name leak.
+  it.each([
+    {
+      label: 'Human present with all gender pools empty: throws, no unnamed NPC',
+      names: NAMES_WITH_HUMAN_POOLS_EXHAUSTED,
+    },
+    {
+      label: 'Human key absent entirely and race pool empty: throws, no TypeError-on-undefined, no unnamed NPC',
+      names: { Dwarf: { male: [], female: [] } },
+    },
+  ])('name-data exhausted lane: $label', async ({ names }) => {
+    const { mod } = await loadGenerator({
+      names,
+      traits: { ...TRAITS, races: ['Dwarf'] },
+    });
+    pinRandom([0.5, 0.4]); // race Dwarf, gender female; consumed no further — throw precedes pick
+
+    await expect(mod.generateNPC()).rejects.toThrow('name data has no usable pool');
   });
 
   // Unique-name suffix (custom-npc invariant contribution, see header).

@@ -3,7 +3,10 @@ import { isDivineSmite } from './spellUtils.js';
 
 export function getSmiteOfProtectionPassives(playerStats) {
     const passives = (() => {
-        const x = playerStats.automation?.passives;
+        // Apex guard (#204-class): `?.` on playerStats routes a nullish apex into the file's
+        // OWN loud arm below — decline is throw, never a fabricated [] read as eligibility
+        // past the gate (fix#179 refuse-no-fabricated-values); twin of inspiringSmiteService.
+        const x = playerStats?.automation?.passives;
         if (x == null) { console.error('[smiteOfProtectionService] Missing array:', x); throw new Error('Expected array, got ' + x); }
         return x;
     })();

@@ -377,29 +377,31 @@ const rules = {
     // === RULESET-SPECIFIC: getAbilities ===
     getAbilities: async (playerStats, playerSummary) => {
         const { abilityCalc } = getSubModules(playerStats, playerSummary);
-        return is2024(playerStats, playerSummary)
-            ? abilityCalc.getAbilities(playerStats)
-            : abilityCalc.getAbilities(playerStats);
+        // #1256 COLLAPSED: identical-branch ternary no-op. The real split lives in
+        // getSubModules (rules-core.js:23-25 selects abilityCalc vs abilityCalc2024;
+        // genuine diffs: racial-bonus fold, saving_throw_proficiencies, CLA-265 orders).
+        return abilityCalc.getAbilities(playerStats);
      },
 
       // === RULESET-SPECIFIC: getHitPoints ===
      getHitPoints: (playerStats, playerSummary) => {
          const { abilityCalc } = getSubModules(playerStats, playerSummary);
-         return is2024(playerStats, playerSummary)
-             ? abilityCalc.getHitPoints(playerStats)
-             : abilityCalc.getHitPoints(playerStats);
+         // #1256 COLLAPSED: identical-branch ternary no-op; routing happens in
+         // getSubModules (rules-core.js:24 — abilityCalc2024.getHitPoints parses
+         // hit_point_die and reads class.major HP bonus vs 5e class.hit_die/subclass).
+         return abilityCalc.getHitPoints(playerStats);
       },
 
      // === SHARED: getCarryingCapacity ===
      getCarryingCapacity: (playerStats) => {
          const { abilityCalc } = getSubModules(playerStats, null);
-         // #1251 FIXED: was delegating to abilityCalc.getHitPoints on BOTH ternary
-         // branches, so rules.js:553 persisted carryingCapacity === HP for every
-         // character. Law: STR totalScore x 15 x sizeMultiplier
-         // (public/data/ability-scores.json; core/carryingCapacity.js shared re-export).
-         return is2024(playerStats, null)
-             ? abilityCalc.getCarryingCapacity(playerStats)
-             : abilityCalc.getCarryingCapacity(playerStats);
+         // #1251 FIXED: was delegating to abilityCalc.getHitPoints, so rules.js:553
+         // persisted carryingCapacity === HP for every character. Law: STR totalScore
+         // x 15 x sizeMultiplier (public/data/ability-scores.json; core/carryingCapacity.js
+         // shared re-export). #1256 COLLAPSED: the surviving is2024() ternary had
+         // identical branches — both editions share the same capacity law via the
+         // bundle (:24-25), matching the honest SHARED header. Direct call now.
+         return abilityCalc.getCarryingCapacity(playerStats);
       },
 
      // === RULESET-SPECIFIC: getSpellAbilities ===
@@ -413,9 +415,9 @@ const rules = {
      // === RULESET-SPECIFIC: getAttacks ===
     getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {
         const { attackCalc } = getSubModules(playerStats, playerSummary);
-        return is2024(playerStats, playerSummary)
-            ? attackCalc(allEquipment, allSpells, playerStats)
-            : attackCalc(allEquipment, allSpells, playerStats);
+        // #1256 COLLAPSED: identical-branch ternary no-op; getSubModules already
+        // selects attackCalc vs attackCalc2024 (rules-core.js:27).
+        return attackCalc(allEquipment, allSpells, playerStats);
      },
 
     // === SHARED: getProficiencesChoiceCount (ruleset-specific) ===

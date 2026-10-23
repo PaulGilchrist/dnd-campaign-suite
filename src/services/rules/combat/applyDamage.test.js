@@ -157,6 +157,106 @@ describe('applyDamageToTarget', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  // DAMAGE-LANE ADMISSION LAW (#1229 fix#113-upstream, owner lane): applyDamage.js:973+
+  // admits NON-NEGATIVE FINITE NUMBERS ONLY, loud-refuse shape mirrors
+  // wardingBondService.js:36-43. PRE-FIX captures (live probe, pre-fix bytes
+  // !isNaN(x) && x != null): monster -10 RAISED HP 30->40, player -10 RAISED
+  // store 25->35, hp_change log rode delta:+10 isHealing:false; '5' returned
+  // finalDamage:'5' (string) and leaked into campaign lastAttack.actualDamage
+  // concatenated ('-1057' captured); Infinity admitted, instant-killed (30->0).
+  describe('rawDamage admission gate (finite non-negative numbers only)', () => {
+    it('-10 REFUSES LOUD: null result, HP never raised, zero writes, zero log (both lanes)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const orc = makeMonster('Orc', { currentHp: 30 });
+        expect(await applyDamage(makeCs(orc), 'Orc', -10, ['Slashing'])).toBeNull();
+        expect(orc.currentHp).toBe(30);
+
+        const al = makeCreature('Alchemist', { currentHp: 25 });
+        const store = stubStore({ 'Alchemist.currentHitPoints': 25, 'Alchemist.hitPoints': 25 });
+        expect(await applyDamage(makeCs(al), 'Alchemist', -10, ['Slashing'])).toBeNull();
+        expect(store.get('Alchemist.currentHitPoints')).toBe(25);
+
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('negative damage is not damage'));
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
+      } finally {
+        errSpy.mockRestore();
+      }
+    });
+
+    it('numeric string "5" REFUSES LOUD (census: no legit string wire at this seam): null, zero writes', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const orc = makeMonster('Orc', { currentHp: 30 });
+        expect(await applyDamage(makeCs(orc), 'Orc', '5', ['Bludgeoning'])).toBeNull();
+        expect(orc.currentHp).toBe(30);
+        expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('finite numbers only'));
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
+      } finally {
+        errSpy.mockRestore();
+      }
+    });
+
+    it('garbage REFUSES LOUD (#1348): NaN/null/undefined/Infinity/-Infinity/object/array — null, zero writes', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const cs = makeCs(makeMonster('Orc', { currentHp: 30 }));
+        for (const garbage of [NaN, null, undefined, Infinity, -Infinity, {}, [], true]) {
+          expect(await applyDamage(cs, 'Orc', garbage, ['Slashing'])).toBeNull();
+        }
+        expect(cs.creatures[0].currentHp).toBe(30);
+        expect(errSpy).toHaveBeenCalledTimes(8);
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(global.fetch).not.toHaveBeenCalled();
+      } finally {
+        errSpy.mockRestore();
+      }
+    });
+
+    it('positive numbers and the zero/-0 contract stay admitted verbatim (MA-1400 zero-damage riders)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const orc = makeMonster('Orc', { currentHp: 30 });
+        const hit = await applyDamage(makeCs(orc), 'Orc', 8, ['Slashing']);
+        expect(hit).toMatchObject({ finalDamage: 8, oldHp: 30, newHp: 22 });
+
+        const zero = await applyDamage(makeCs(orc), 'Orc', 0, ['Slashing']);
+        expect(zero).not.toBeNull();
+        expect(zero.finalDamage).toBe(0);
+        expect(orc.currentHp).toBe(22);
+
+        const negZero = await applyDamage(makeCs(orc), 'Orc', -0, ['Slashing']);
+        expect(negZero).not.toBeNull();
+        expect(orc.currentHp).toBe(22);
+
+        expect(errSpy).not.toHaveBeenCalled();
+      } finally {
+        errSpy.mockRestore();
+      }
+    });
+
+    it('target HP NEVER increases through the damage lane — every hostile arm lands at-or-below oldHp', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const al = makeCreature('Alchemist', { currentHp: 25 });
+        const store = stubStore({ 'Alchemist.currentHitPoints': 25, 'Alchemist.hitPoints': 25 });
+        for (const raw of [10, '5', -10, '-10', NaN, Infinity, null]) {
+          const before = store.get('Alchemist.currentHitPoints');
+          const r = await applyDamage(makeCs(al), 'Alchemist', raw, ['Slashing']);
+          const after = store.get('Alchemist.currentHitPoints');
+          expect(after).toBeLessThanOrEqual(before);
+          if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) expect(r).not.toBeNull();
+          else expect(r).toBeNull();
+        }
+        expect(store.get('Alchemist.currentHitPoints')).toBe(15);
+      } finally {
+        errSpy.mockRestore();
+      }
+    });
+  });
+
   it('applies player damage: result shape, runtime HP write, summary event, and full hp_change log bytes', async () => {
     // maxHp 45 on the creature vs 30 in the runtime store: the log must read
     // hitPoints from the runtime store (:1194-1195), not the creature object.

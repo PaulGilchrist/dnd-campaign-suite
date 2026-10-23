@@ -128,12 +128,22 @@ function buildNormalizedAttack(autoDamage, isUnarmed, weaponAttack) {
   };
 }
 
-// Compute Empowered Evocation modifier
+// Compute Empowered Evocation modifier.
+// fix#121 mirror (spell lane damageCalculation.js:77 `empEvocIntMod !== 0`): the RAW
+// law (2024/classes.json:13502 / 5e/classes.json:13454 — "add your Intelligence modifier
+// to one damage roll of that spell") ADDS the SIGNED modifier; negatives subtract per
+// d20 convention. The old `empEvocIntMod > 0` gate floored negative INT to +0 here,
+// silently buffing weak-caster damage in this attack-resolution lane (INT 8 → +0, -1).
+// The selector getEmpoweredEvocationIntModifier (postCastRiderService.js:217-220)
+// returns intAbility?.bonus verbatim — signed. Damage-floor law lives downstream and
+// untouched: diceRoller.js:121 sums signed modifier into the total, and applyDamage.js
+// :990-999 isUsableRawDamage (fix#143) refuses a negative TOTAL (RAW: damage >= 0) —
+// intermediate terms stay signed, only the applied total floors at refusal.
 function resolveEmpoweredEvocationModifier(autoDamage, playerStats) {
   const hasEmpoweredEvoc = playerStats ? getEmpoweredEvocationFeatures(playerStats).length > 0 : false;
   const empEvocIntMod = (hasEmpoweredEvoc && playerStats) ? getEmpoweredEvocationIntModifier(playerStats) : 0;
   const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
-  const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod > 0;
+  const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && spellSchool === 'evocation' && empEvocIntMod !== 0;
   return shouldApplyEmpoweredEvoc ? empEvocIntMod : 0;
 }
 
@@ -532,15 +542,22 @@ export default function useAttackDamageResolution({
         let updatedTotal = currentTotal;
         let updatedRolls = [...currentRolls];
 
-        if (popupHtmlData?.isMiss && popupHtml) {
-            if (maneuver && maneuver.effect === 'attack_roll_bonus') {
-                return await handlePrecisionAttackMiss({ popupHtml, maneuver, result, campaignName, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
-            }
-        } else {
-            return await applyRiderManeuverPostResolution({ result, maneuver, attack, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml, updatedFormula, updatedTotal, updatedRolls, resumeAttackPipeline });
+        // run2#307 fix: the precision-miss gate AND the die-math source is popupHtmlData —
+        // THIS action's popup payload. Provenance: AttackRiderManeuverPrompt invokes
+        // onUse(maneuver, attack, popupHtml) where its popupHtml prop is
+        // modalState.attackRiderManeuverPrompt.popupHtml, set by attackRollRiders.js :29/:42
+        // verbatim from the pausing attack's ctx.popupHtml (rolls/bonus/targetAc/isCrit/isMiss).
+        // The popupHtml hook prop (useDiceRollPopup global UI state) is the WRONG carrier:
+        // it is null whenever no popup is currently open — the old `&& popupHtml` conjunct
+        // silently routed a precision miss into the hit post-resolution path there (die spent
+        // by the executor, no conversion, no Precision Attack ledger entry) — and it can go
+        // stale (a different popup opened after the pause), converting the wrong dice.
+        // Misses with non-precision maneuvers now fall through to post-resolution too:
+        // prompt closes, pipeline resumes, ctx.hit stays false so damage lands safely.
+        if (popupHtmlData?.isMiss && maneuver && maneuver.effect === 'attack_roll_bonus') {
+            return await handlePrecisionAttackMiss({ popupHtml: popupHtmlData, maneuver, result, campaignName, currentFormula: updatedFormula, currentTotal: updatedTotal, currentRolls: updatedRolls, playerStats, resumeRef, setModalState, setPopupHtml, resumeAttackPipeline });
         }
-
-        return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls };
+        return await applyRiderManeuverPostResolution({ result, maneuver, attack, popupHtmlData, attackInfo, playerStats, campaignName, setModalState, setPopupHtml, updatedFormula, updatedTotal, updatedRolls, resumeAttackPipeline });
     };
 
     const handleAttackRiderManeuverSkip = () => {
@@ -566,32 +583,53 @@ export default function useAttackDamageResolution({
         await setRuntimeValue(playerStats.name, '_brutalStrikeEffects', [optionName], campaignName);
 
         // Apply immediate effects (push, speed reduction, etc.)
+        // fix#167 single-source (cf. fix#158 class; pipeline-lane idiom in
+        // contextBuilder-sync.js logBrutalStrikeGrant, which logs te.value):
+        // the applied distance is computed ONCE and feeds BOTH the stored
+        // targetEffect and the log sentence. Previously the speed-reduction log
+        // hardcoded "15 feet" while te.value stored option.value, so any
+        // data-driven variant carrying a different distance (feats.json
+        // Hamstring value:10, upcasts, homebrew) misreported the campaign
+        // audit trail. No parseable number -> loud console.error + general
+        // wording (no fabricated distance).
         let logDescription = description;
         if (option) {
             if (option.effect === 'push_15ft' && targetName) {
+                // Routing stays exact-match 'push_15ft'; the distance parses
+                // from the effect key itself so write and log share one number.
+                const pushFeet = Number(String(option.effect).match(/(\d+)/)?.[1]) || 15;
                 const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
                 const newEffect = {
                     target: targetName,
                     source: playerStats.name,
                     option: optionName,
                     effect: 'push',
-                    value: 15,
+                    value: pushFeet,
                     duration: 'instant',
                 };
                 setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-                logDescription += ` ${targetName} pushed 15 feet.`;
+                logDescription += ` ${targetName} pushed ${pushFeet} feet.`;
             } else if (option.effect === 'speed_reduction' && targetName) {
+                // '15_ft_until_start_of_next_turn' stays the rules-defined
+                // default (Hamstring Blow, 2024/classes.json Barbarian rows).
+                const appliedValue = option.value || '15_ft_until_start_of_next_turn';
+                const appliedFeet = Number(String(appliedValue).match(/(\d+)/)?.[1]);
                 const storedEffects = getRuntimeValue('campaign', 'targetEffects') || [];
                 const newEffect = {
                     target: targetName,
                     source: playerStats.name,
                     option: optionName,
                     effect: 'speed_reduction',
-                    value: option.value || '15_ft_until_start_of_next_turn',
+                    value: appliedValue,
                     duration: 'until_start_of_next_turn',
                 };
                 setRuntimeValue('campaign', 'targetEffects', [...storedEffects, newEffect], campaignName);
-                logDescription += ` ${targetName}'s speed reduced by 15 feet.`;
+                if (Number.isFinite(appliedFeet)) {
+                    logDescription += ` ${targetName}'s speed reduced by ${appliedFeet} feet.`;
+                } else {
+                    console.error(`[attackRiderOptions] speed_reduction option "${optionName}" carries no numeric distance (value: ${JSON.stringify(appliedValue)}) — logging general wording`);
+                    logDescription += ` ${targetName}'s speed reduced.`;
+                }
             }
         }
 

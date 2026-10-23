@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { checkOncePerTurn, markOncePerTurn } from '../../common/oncePerTurn.js';
+import { rollD20, rollDie } from '../../../dice/diceRoller.js';
 
 const SURGE_EFFECTS_KEY = 'wildMagicSurgeEffects';
 
@@ -50,7 +51,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const activeEffects = await getSurgeEffects(playerName, campaignName);
     const hasRollOnTableEffect = activeEffects.some(e => e && e.effect && e.effect.includes('Roll on the surge table at the start of each turn'));
 
-    const d20Roll = Math.floor(Math.random() * 20) + 1;
+    // Canonical surge-trigger d20 lane (fix#169 recipe): nat-20 gate die
+    // rolls through diceRoller so global dice-seeding and the GM overlay see it.
+    const d20Roll = rollD20();
 
     // CLA-389: the d20 nat-20 gate precedes the Controlled Chaos branch —
     // previously the armed double-roll short-circuited BEFORE the gate, so
@@ -96,8 +99,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 campaignName,
                 playerStats,
                 mode: 'controlledChaos',
-                roll1: Math.floor(Math.random() * 100) + 1,
-                roll2: Math.floor(Math.random() * 100) + 1,
+                // Same-file census (fix#169 lane): the d100 surge-table dice
+                // join the canonical diceRoller scalar-die lane (rollDie) —
+                // no rollExpression infra exists for wild magic to respect.
+                roll1: rollDie(100),
+                roll2: rollDie(100),
             },
         };
     }
@@ -115,7 +121,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             campaignName,
             playerStats,
             mode: 'roll',
-            roll: Math.floor(Math.random() * 100) + 1,
+            // Same-file census (fix#169 lane): the d100 surge-table die joins
+            // the canonical diceRoller scalar-die lane (rollDie).
+            roll: rollDie(100),
         },
     };
 }

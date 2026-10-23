@@ -180,6 +180,103 @@ describe('useMapLoader - API & persistence', () => {
         }
     });
 
+    // #801 IN-PLACE mapName switch lane: the persistence guard (:201) compares
+    // live mapName against hexMapNameRef — the name whose bytes this instance
+    // HOLDS. Pre-fix the ref was never written after `useRef(mapName)`, so an
+    // in-place A→B switch opened guard-death: every later save was swallowed
+    // silently (red capture below documented zero saves for B). Fix: the load
+    // effect reloads on a name change and claims hexMapNameRef.current inside
+    // applyExistingMap/createAndSaveNewMap BEFORE the loading-flip batch, so
+    // (a) the switch commit still cannot write A's bytes to B's URL, and
+    // (b) saves resume under B exactly once when B's bytes land (#800 flush
+    // determinism preserved — the trigger remains the loading STATE).
+    describe('in-place mapName switch (same hook instance, no remount)', () => {
+        const loadedMapB = () => ({
+            type: 'outdoor',
+            displayName: 'The Marshlands',
+            terrain: { '9,9': 'bog' },
+            rivers: [],
+            roads: [],
+            pois: [{ name: 'Fen Shrine' }],
+            gridSize: 14,
+            zoom: 4,
+            panX: 7,
+            panY: 9,
+            marchingOrder: ['Gandalf', 'Thorin'],
+            partyPosition: { q: 5, r: 2 },
+            weather: 'clear',
+            travelState: {},
+        });
+
+        const renderSwitchableHook = async () => {
+            let resolveB = () => {};
+            mapsService.loadMapData.mockImplementation((_campaign, name) =>
+                (name === MAP ? Promise.resolve(loadedMap()) : new Promise(res => { resolveB = res; })));
+            const utils = renderHook(
+                ({ mapName }) => useMapLoader(CAMPAIGN, mapName, characters),
+                { initialProps: { mapName: MAP } },
+            );
+            await waitFor(() => expect(utils.result.current.loading).toBe(false));
+            expect(mapsService.saveMapData).toHaveBeenCalledTimes(1); // mount flush of A
+            mapsService.saveMapData.mockClear();
+            // Delegate through a function: spread would snapshot the placeholder
+            // before the map-b request assigns the real resolver.
+            return { ...utils, resolveLoadB: (m) => resolveB(m) };
+        };
+
+        it('never writes map A bytes to map B URL, then reloads B and saves under B exactly once', async () => {
+            const { result, rerender, resolveLoadB } = await renderSwitchableHook();
+
+            rerender({ mapName: 'map-b' });
+            // Switch commit + pending-load renders: cross-map prevention holds —
+            // no save may address map-b while A's bytes are still held.
+            await act(async () => {});
+            expect(mapsService.saveMapData).not.toHaveBeenCalled();
+
+            await act(async () => { resolveLoadB(loadedMapB()); });
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // Save guard reopened exactly once, addressed to B with B's bytes.
+            expect(mapsService.saveMapData).toHaveBeenCalledTimes(1);
+            expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, 'map-b', {
+                type: 'outdoor',
+                displayName: 'The Marshlands',
+                gridSize: 14,
+                terrain: { '9,9': 'bog' },
+                rivers: [],
+                roads: [],
+                pois: [{ name: 'Fen Shrine' }],
+                zoom: 4,
+                panX: 7,
+                panY: 9,
+                marchingOrder: ['Gandalf', 'Thorin'],
+                partyPosition: { q: 5, r: 2 },
+                weather: 'clear',
+                travelState: null,
+            });
+            expect(result.current.hexMapNameRef.current).toBe('map-b');
+
+            // Post-switch edits land under B too (no silent-save death).
+            mapsService.saveMapData.mockClear();
+            act(() => { result.current.setTerrain({ '9,9': 'bog', '1,0': 'forest' }); });
+            await waitFor(() => expect(mapsService.saveMapData).toHaveBeenCalledTimes(1));
+            expect(mapsService.saveMapData).toHaveBeenCalledWith(CAMPAIGN, 'map-b',
+                expect.objectContaining({ terrain: { '9,9': 'bog', '1,0': 'forest' } }));
+        });
+
+        it('drops A edits attempted during B load instead of smuggling them into B', async () => {
+            const { result, rerender } = await renderSwitchableHook();
+
+            rerender({ mapName: 'map-b' });
+            // A dirty A-state mutation mid-switch: guard must swallow nothing but
+            // cross-map bytes — it blocks every save until B's bytes land.
+            act(() => { result.current.setTerrain({ '1,1': 'blasted' }); });
+            await act(async () => {});
+            expect(mapsService.saveMapData).not.toHaveBeenCalledWith(CAMPAIGN, 'map-b', expect.anything());
+            expect(mapsService.saveMapData).not.toHaveBeenCalledWith(CAMPAIGN, MAP, expect.anything());
+        });
+    });
+
     it('ignores a load that resolves after unmount and never saves', async () => {
         let resolveLoad;
         mapsService.loadMapData.mockReturnValue(new Promise(resolve => { resolveLoad = resolve; }));

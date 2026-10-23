@@ -47,11 +47,16 @@ describe('rangeToFeet', () => {
     // numeric range strings: feet / foot / ft / ft. / fractional
     ['120 feet', 120], ['120 FEET', 120], ['30 ft', 30], ['10 ft.', 10],
     ['60 foot', 60], ['10.5 feet', 10.5],
-    // miles × 5280
-    ['1 mile', 5280], ['1 MILE', 5280], ['0.5 mile', 2640],
+    // miles × 5280 (disk census: '1 mile', '500 miles'; plural + fractional)
+    ['1 mile', 5280], ['1 MILE', 5280], ['0.5 mile', 2640], ['500 miles', 2640000],
+    ['1mile', 5280], ['1 miles', 5280],
     // unparseable → null
     [null, null], [undefined, null], ['', null], ['  ', null],
     ['abc', null], ['yards', null], ['120 feet extra', null],
+    // fix#1224: both fields share one anchored boundary law — garbage suffix
+    // rejected on miles exactly as it is on feet.
+    ['1 mile extra', null], ['1 mileage', null], ['1 mile square', null],
+    ['25 miles of distance', null], ['10 miles per hour', null],
   ])('rangeToFeet(%p) → %p', (range, feet) => {
     const result = rangeToFeet(range)
     if (feet === null) expect(result).toBeNull()

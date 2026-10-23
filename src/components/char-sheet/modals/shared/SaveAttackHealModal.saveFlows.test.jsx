@@ -2,7 +2,9 @@
 // Save-routing lane for SaveAttackHealModal: NPC auto-resolve vs player prompt routing,
 // NPC save arithmetic (lowercase saveBonuses key, total = roll + bonus vs DC, honest
 // half-on-success / full-on-failure mocks), pending-player UI, save-result event
-// resolution/inertness, roll logging, and combatSummary persistence (cache + storage +
+// resolution/inertness (fix#156: adjudicated damage applies on BOTH outcomes — half
+// lands on player save success per disk law, pinned at the save-result seam), roll
+// logging, and combatSummary persistence (cache + storage +
 // window event). Sibling lanes: SaveAttackHealModal.test.jsx owns initial render and
 // target selection; healFlows.test.jsx owns heal-radio arbitration/report/Done
 // (applyHealing mocked); npc-heal.test.jsx owns real HP restoration via applyHealing.js.
@@ -198,12 +200,12 @@ describe('SaveAttackHealModal — save flows', () => {
   // ── Save-result events: pending player resolution ──
 
   it.each([
-    { label: 'success', success: true, expectedText: 'Saved' },
-    { label: 'failure', success: false, expectedText: 'Failed' },
-  ])('resolves a pending player on save-result event (%s)', async ({ success, expectedText }) => {
+    { label: 'success', success: true, expectedText: 'Saved — takes 5 Radiant damage (rolled 10, halved)', expectedApplied: 5 },
+    { label: 'failure', success: false, expectedText: 'Failed — takes 10 Radiant damage (rolled 10)', expectedApplied: 10 },
+  ])('resolves a pending player on save-result event (%s)', async ({ success, expectedText, expectedApplied }) => {
     // Deterministic damage sink — the resistance engine is not this lane's subject
     // (npc-heal.test.jsx covers its write-back integration).
-    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: success ? 0 : 10 });
+    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: expectedApplied });
 
     const { getByRole } = render(<SaveAttackHealModal {...makeProps()} />);
     await applySaves(getByRole, ['Player One']);
@@ -236,13 +238,26 @@ describe('SaveAttackHealModal — save flows', () => {
     expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
     expect(combatData.setCombatSummaryCache).toHaveBeenCalledTimes(1);
 
-    // Damage is applied to the player only on a failed save — full rolled 4d6 damage.
+    // fix#156: adjudicated damage lands on BOTH outcomes — disk law (Land's Aid,
+    // public/data/2024/classes.json: "taking 2d6 Necrotic damage on a failed save
+    // or half on success") grants half on a successful save. Success pays
+    // floor(10/2)=5 through the SAME apply lane that pays a failure's full 10;
+    // the pre-fix engine applied nothing on success while the view displayed the
+    // halved number (ledger :252 split-brain).
+    expect(applySpy).toHaveBeenCalledTimes(1);
+    expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', expectedApplied, ['Radiant'], expect.objectContaining({ campaignName: 'test-campaign' }));
+
+    // Damage ledger entry reports the honest result and the adjudicated amount.
+    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+      rollType: 'save-damage',
+      targetName: 'Player One',
+      saveResult: success ? 'success' : 'failure',
+      dcSuccess: 'half',
+      finalDamage: expectedApplied,
+    }));
+
     if (success) {
-      expect(applySpy).not.toHaveBeenCalled();
       expect(screen.getByText('All targets resolved.')).toBeInTheDocument();
-    } else {
-      expect(applySpy).toHaveBeenCalledTimes(1);
-      expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', 10, ['Radiant'], expect.objectContaining({ campaignName: 'test-campaign' }));
     }
     applySpy.mockRestore();
   });
@@ -281,6 +296,9 @@ describe('SaveAttackHealModal — save flows', () => {
   });
 
   it('keeps an unanswered player pending while another player responds', async () => {
+    // Deterministic damage sink (saveFlows house pattern) — the adjudicated
+    // half-on-success must land on the RESPONDING target only, never the pending one.
+    const applySpy = vi.spyOn(applyDamage, 'applyDamageToTarget').mockReturnValue({ finalDamage: 5 });
     const { getByRole } = render(<SaveAttackHealModal {...makeProps({
       combatSummary: {
         creatures: [
@@ -305,7 +323,11 @@ describe('SaveAttackHealModal — save flows', () => {
       expect(resultsList.textContent).toContain('Player Two');
       expect(resultsList.textContent).toContain('Waiting for save roll');
     });
+    // fix#156: success-half applies — to Player One only (4d6 rolled 10 → floor-half 5).
+    expect(applySpy).toHaveBeenCalledTimes(1);
+    expect(applySpy).toHaveBeenCalledWith(expect.any(Object), 'Player One', 5, ['Radiant'], expect.any(Object));
     expect(screen.queryByText('All targets resolved.')).not.toBeInTheDocument();
     expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+    applySpy.mockRestore();
   });
 });

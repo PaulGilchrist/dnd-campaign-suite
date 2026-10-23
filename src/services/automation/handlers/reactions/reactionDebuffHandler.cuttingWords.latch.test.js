@@ -97,12 +97,20 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the BI die arrives via diceRoller,
+// never raw Math.random — latch/marker/stamp assertions are die-numeral-free.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as logService from '../../../ui/logService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'test-campaign';
 const mapName = 'TestMap';
@@ -167,6 +175,10 @@ describe('CLA-071: Cutting Words — reaction latch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRuntimeStore();
+    // Seed pin (fix#169 idiom): BI d12 face 4 + spare d20 — latch/stamp
+    // assertions are numeral-free, dice stay deterministic behind the seam.
+    diceRoller.rollDie.mockReturnValue(4);
+    diceRoller.rollD20.mockReturnValue(10);
   });
 
   it('refuses a second call in the same round: zero BI spend, zero heal, refusal logged', async () => {

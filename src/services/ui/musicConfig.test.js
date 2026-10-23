@@ -175,11 +175,35 @@ describe('extractVideoId — GM paste-editor parser', () => {
     expect(extractVideoId('https://www.youtube.com/embed/short')).toBeNull();
   });
 
-  it('quirk pinned: ANY hostname ending in youtube.com is trusted (endsWith, not exact)', () => {
-    // 'totallynotyoutube.com'.endsWith('youtube.com') === true, so its
-    // ?v= id parses. Paste-editor-only blast radius (GM input, localhost
-    // UI), so behavior pinned as-is; source fix would tighten hostname to
-    // /^(www\.|m\.|music\.)?youtube\.com$/ — reported, not changed here.
-    expect(extractVideoId(`https://totallynotyoutube.com/watch?v=${ID}`)).toBe(ID);
+  it('SECURITY (#1544): trust gate is exact host or leading-dot suffix — lookalikes rejected', () => {
+    // Fix-pass: :89 previously used bare endsWith('youtube.com'), which
+    // accepted glued-label lookalikes. Exploit captured LIVE pre-fix:
+    // notyoutube.com / totallynotyoutube.com / evilyoutube.com all
+    // returned their ?v= / embed ids through the gate. Now the gate is
+    // host === 'youtube.com' || host.endsWith('.youtube.com') (:89-90)
+    // plus the exact 'youtu.be' arm (:85).
+    // Trusted root and real YouTube subdomains still parse:
+    expect(extractVideoId(`https://youtube.com/watch?v=${ID}`)).toBe(ID);
+    expect(extractVideoId(`https://m.youtube.com/watch?v=${ID}`)).toBe(ID);
+    // Case-insensitive by spec (URL.hostname is lowercased), not by code:
+    expect(extractVideoId(`HTTPS://WWW.YOUTUBE.COM/watch?v=${ID}`)).toBe(ID);
+    // Reject-arm table (#1348 mutually-distinguishable shapes): glued
+    // labels, foreign TLD, subdomain-of-attacker, glued youtu.be prefix.
+    for (const evil of [
+      'notyoutube.com',
+      'totallynotyoutube.com',
+      'evilyoutube.com',
+      'fakeyoutube.com',
+      'youtube.com.attacker.net',
+      'youtube.com.evil.io',
+      'fakeyoutube.co'
+    ]) {
+      expect(extractVideoId(`https://${evil}/watch?v=${ID}`)).toBeNull();
+      expect(extractVideoId(`https://${evil}/embed/${ID}`)).toBeNull();
+    }
+    expect(extractVideoId(`https://notyoutu.be/${ID}`)).toBeNull();
+    expect(extractVideoId(`https://youtu.be.evil.io/${ID}`)).toBeNull();
+    // Reject degrades safely: null is the caller's drop signal —
+    // MusicPlayer.parseTrackList .filter(Boolean)s it (no track queued).
   });
 });

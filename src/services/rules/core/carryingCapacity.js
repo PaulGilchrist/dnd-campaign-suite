@@ -9,6 +9,13 @@ export function getCarryingCapacity(playerStats) {
 }
 
 export function applyMaxHpPassives(playerStats, hitPoints) {
+    // Apex guard (#204-class half-guarded apex): tolerant-quiet posture. This file's
+    // declared neutral is pass-through of hitPoints (`|| []` below, pinned by
+    // applyMaxHpPassives({}, 100) === 100); absent automation ≡ absent passives ≡
+    // absent playerStats — all fold to "no known passives". Mirrors hasPassiveEffect
+    // (automationPassives.js:19) and greatWeaponFightingApplies (greatWeaponFighting.js:42).
+    // Consumers (abilityCalc(2024).getHitPoints) deref playerStats upstream — pre-gated.
+    if (!playerStats) return hitPoints;
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
         // FT-012: Fortified Health (2024 Epic Boon) carries amount:40 under its

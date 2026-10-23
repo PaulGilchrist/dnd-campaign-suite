@@ -72,6 +72,12 @@ function applyExistingMap(existing, mapName, characters, ctx) {
         r: Math.floor(loadedGridSize / 2),
     });
 
+    // Claim the held-bytes name BEFORE setLoading(false): the persistence
+    // guard (:201) compares live mapName against this ref, and the flush
+    // that #800 made deterministic rides the loading-state flip — so the ref
+    // must already read `mapName` by the time that commit's effects run.
+    ctx.hexMapNameRef.current = mapName;
+
     // setLoading(false) rides the SAME update batch as every loaded-state
     // setter above, so the persistence effect (guarded on `loading`) runs
     // exactly once with this loaded snapshot in its closure.
@@ -119,12 +125,20 @@ async function createAndSaveNewMap(campaignName, mapName, characters, ctx) {
     ctx.setPanX(0);
     ctx.setPanY(0);
     ctx.needsResetViewRef.current = true;
+    // A fresh map's display name is its own mapName — reclaim it so an
+    // in-place switch cannot carry the previous map's displayName into the
+    // new map's save envelope (#801).
+    ctx.hexMapDisplayNameRef.current = mapName;
 
     try {
         await mapsService.saveMapData(campaignName, mapName, newData);
     } catch (err) {
         console.error('Failed to save initial hex map data:', err);
     }
+
+    // Claim the held-bytes name before the loading flip so the #800 flush
+    // commit passes the persistence name guard (:201) — see applyExistingMap.
+    ctx.hexMapNameRef.current = mapName;
 
     // Flipping `loading` here is the ONLY post-load signal the persistence
     // effect needs: it is state, so the re-render it causes re-runs that
@@ -152,7 +166,12 @@ function useMapLoader(campaignName, mapName, characters) {
 
     const isInitialized = useRef(false);
     const needsResetViewRef = useRef(false);
-    const hexMapNameRef = useRef(mapName);
+    // Name of the map whose BYTES this instance currently holds in state —
+    // null until a load resolves, re-claimed on every load of a NEW name
+    // (#801: it used to be seeded from the mount prop and never written
+    // again, so an in-place mapName change opened the persistence guard's
+    // stale side forever and saves silently died).
+    const hexMapNameRef = useRef(null);
     const hexMapDisplayNameRef = useRef(mapName);
     const travelStateRef = useRef(null);
 
@@ -162,14 +181,21 @@ function useMapLoader(campaignName, mapName, characters) {
     }, []);
 
     useEffect(() => {
-        if (isInitialized.current) return;
+        // Reload whenever the live mapName differs from the name whose bytes
+        // we hold (#801). isInitialized alone never re-armed, so an in-place
+        // mapName change left the old map's bytes on screen AND dead-closed
+        // the persistence guard (:201). A characters-identity change while a
+        // load is still in flight re-fires the GET for the same name — the
+        // loadMapData transport is idempotent, so this is benign.
+        if (isInitialized.current && hexMapNameRef.current === mapName) return;
         isInitialized.current = true;
+        setLoading(true);
 
         const ctx = {
             setMapData, setGridSize, setTerrain, setRivers, setRoads, setPois,
             setZoom, setPanX, setPanY, setWeather, setTravelInit,
             setMarchingOrder, setPartyPosition, setLoading,
-            hexMapDisplayNameRef, needsResetViewRef,
+            hexMapDisplayNameRef, needsResetViewRef, hexMapNameRef,
         };
 
         const loadMap = async () => {
@@ -189,11 +215,17 @@ function useMapLoader(campaignName, mapName, characters) {
         loadMap();
     }, [campaignName, mapName, characters]);
 
-    // Persistence effect. The guard is the `loading` STATE, not a ref:
-    // pre-load it must skip (flushing here would clobber server data with
-    // empty defaults — guard intentional), and `loading` is in the deps so
-    // the commit that flips it false re-runs this effect exactly once with
-    // the loaded snapshot. A ref flipped after an await seam (old
+    // Persistence effect. The guards are: `loading` STATE (skip pre-load —
+    // flushing there would clobber server data with empty defaults) and the
+    // mapName-vs-held-bytes check below. The ref guard is CROSS-MAP
+    // prevention, not de-dup: the save addresses the LIVE mapName, so it may
+    // only fire while that live name is the name whose bytes are in state.
+    // On an in-place A→B switch it therefore skips (A's bytes must never be
+    // written to B's URL), the load effect reloads B with `loading` back
+    // true, and the load-completion batch re-claims hexMapNameRef.current
+    // and re-runs this effect exactly once with B's snapshot (#800
+    // determinism, #801 stale-ref death). `loading` stays in the deps so
+    // the flush cannot miss; a ref flipped after an await seam (old
     // hasLoaded.current) left flush-vs-passive-effect ordering to the
     // scheduler — mount snapshot flushed once-or-not-at-all (#800).
     useEffect(() => {

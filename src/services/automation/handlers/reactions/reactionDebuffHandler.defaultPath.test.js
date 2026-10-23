@@ -31,8 +31,9 @@
 // reactionDebuffHandler.cuttingWords.latch.test.js.
 //
 // Deterministic: runtime/logService/range/rollback/healing/infoPopup fully
-// mocked; the random bardic d8 only varies numerals pinned via regex or
-// floored to 1 — exact-key pins hold. No churn expected.
+// mocked; the bardic d8 arrives through the mocked canonical diceRoller
+// rollDie lane (fix#169 recipe, seed-pinned face 4) — former regex/floored
+// numerals are now exact seed pins. No churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
@@ -102,12 +103,20 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the bardic die rolls through
+// diceRoller.rollDie, never raw Math.random.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -175,6 +184,8 @@ describe('reactionDebuffHandler — default path: attack roll & damage debuff', 
     vi.clearAllMocks();
     // clearAllMocks does NOT reset return values — neutralise leaks between tests
     applyHealing.applyHealingToTarget.mockReturnValue(undefined);
+    // Seed pin (fix#169 idiom): bardic d8 lands face 4 on every roll.
+    diceRoller.rollDie.mockReturnValue(4);
   });
 
   // Attack-roll lane (isDamageLane false ⇒ totalDamage 0 + damageTypes []).
@@ -197,8 +208,8 @@ describe('reactionDebuffHandler — default path: attack roll & damage debuff', 
 
   describe('default path — attack roll debuff', () => {
     it('still-hits lane: full HIT lines, canonical "Attack still hits." prose, zero heal', async () => {
-      // d20(20)+5=25 vs AC 14; 1d8 reduction keeps reduced+5 ≥ 17 ≥ 14 ⇒ still
-      // hits on every roll — deterministic. No rollback heal, null defenderHp.
+      // d20(20)+5=25 vs AC 14; seed-pinned d8 face 4 ⇒ reduced d20(16)+5=21 ≥ 14 ⇒
+      // still hits — exact seed pin (was every-roll regex). No rollback heal, null defenderHp.
       const result = await setupAttackPath(
         freshAttackEvent({ d20: 20, bonus: 5, hit: true, targetAc: 14 })
       );
@@ -206,7 +217,8 @@ describe('reactionDebuffHandler — default path: attack roll & damage debuff', 
       expect(result.type).toBe('popup');
       expect(result.payload.name).toBe('Cutting Words');
       expect(result.payload.description).toContain('Attack roll: d20(20) + 5 = 25 vs AC 14 → <b>HIT</b>');
-      expect(result.payload.description).toMatch(/Reduced: d20\(\d+\) \+ 5 = \d+ vs AC 14 → <b>HIT<\/b>/);
+      expect(result.payload.description).toContain('Reduced: d20(16) + 5 = 21 vs AC 14 → <b>HIT</b>');
+      expect(diceRoller.rollDie).toHaveBeenCalledWith(8);
       expect(result.payload.description).toContain('Attack still hits.');
       expect(result.payload.description).not.toContain('now misses');
       expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();

@@ -153,3 +153,104 @@ describe('InspiringSmiteModal', () => {
         expect(Number(screen.getByRole('spinbutton').value)).toBe(0);
     });
 });
+
+// ── Remaining-pool clamp + confirm gate ──
+// Disk law (public/data/2024/classes.json, Oath of Glory "Inspiring Smite"):
+// "The total number of Temporary Hit Points equals 2d8 plus your Paladin
+// level, divided among the chosen creatures however you like." — the free
+// split must sum <= pool; there is no per-target cap above the pool itself.
+describe('InspiringSmiteModal remaining-pool ledger', () => {
+    it('clamps a second target to the remaining pool, not the full pool', () => {
+        render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
+        const [ally1, ally2] = screen.getAllByRole('spinbutton');
+        fireEvent.change(ally1, { target: { value: '10' } });
+        fireEvent.change(ally2, { target: { value: '10' } }); // 10+10=20 > 18
+        expect(Number(ally1.value)).toBe(10);
+        expect(Number(ally2.value)).toBe(8); // pool minus Ally1's 10
+        expect(screen.getByText('Allocated: 18 / 18')).toBeInTheDocument();
+    });
+
+    it('blocks a second target entirely when the first took the full pool', () => {
+        render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
+        const [ally1, ally2] = screen.getAllByRole('spinbutton');
+        fireEvent.change(ally1, { target: { value: '18' } });
+        fireEvent.change(ally2, { target: { value: '10' } });
+        expect(Number(ally2.value)).toBe(0);
+        fireEvent.click(screen.getByRole('button', { name: /Inspire \(2\)/ }));
+        // Pre-fix defect: submitted { Ally1: 18, Ally2: 10 } (sum 28 > 18).
+        expect(mockOnConfirm).toHaveBeenCalledWith({ Ally1: 18 });
+    });
+
+    it('auto-caps a single target typing past the pool and submits the full pool', () => {
+        render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        const input = screen.getByRole('spinbutton');
+        fireEvent.change(input, { target: { value: '99' } });
+        expect(Number(input.value)).toBe(18);
+        fireEvent.click(screen.getByRole('button', { name: /Inspire \(1\)/ }));
+        expect(mockOnConfirm).toHaveBeenCalledWith({ Ally1: 18 });
+    });
+
+    it('frees pool on shrink so allocations can be redistributed', () => {
+        render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
+        const [ally1, ally2] = screen.getAllByRole('spinbutton');
+        fireEvent.change(ally1, { target: { value: '12' } });
+        fireEvent.change(ally2, { target: { value: '6' } });
+        fireEvent.change(ally1, { target: { value: '4' } });
+        fireEvent.change(ally2, { target: { value: '14' } });
+        expect(Number(ally1.value)).toBe(4);
+        expect(Number(ally2.value)).toBe(14);
+        fireEvent.click(screen.getByRole('button', { name: /Inspire \(2\)/ }));
+        expect(mockOnConfirm).toHaveBeenCalledWith({ Ally1: 4, Ally2: 14 });
+    });
+
+    it('returns a deselected target\'s share to the pool', () => {
+        render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '18' } });
+        selectTarget(0); // deselect — share returns to the pool
+        expect(screen.getByText('Allocated: 0 / 18')).toBeInTheDocument();
+        selectTarget(1);
+        const input = screen.getAllByRole('spinbutton')[0];
+        fireEvent.change(input, { target: { value: '18' } });
+        expect(Number(input.value)).toBe(18);
+    });
+
+    it('steps the + button only up to the remaining pool', () => {
+        const { container } = render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
+        const [ally1, ally2] = screen.getAllByRole('spinbutton');
+        fireEvent.change(ally1, { target: { value: '17' } });
+        const btns = container.querySelectorAll('.inspiring-smite-adjust-btn');
+        const ally2Plus = btns[3]; // [ally1-, ally1+, ally2-, ally2+]
+        fireEvent.click(ally2Plus);
+        expect(Number(ally2.value)).toBe(1);
+        fireEvent.click(ally2Plus); // no remaining pool left to step into
+        expect(Number(ally2.value)).toBe(1);
+    });
+
+    it('refuses to submit a hand-crafted overspend and logs it', () => {
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { rerender } = render(<InspiringSmiteModal {...makeProps()} />);
+        selectTarget(0);
+        selectTarget(1);
+        const [ally1, ally2] = screen.getAllByRole('spinbutton');
+        fireEvent.change(ally1, { target: { value: '10' } });
+        fireEvent.change(ally2, { target: { value: '8' } }); // lawful 18 / 18
+        rerender(<InspiringSmiteModal {...makeProps({ tempHp: 12 })} />); // pool shrinks
+        fireEvent.click(screen.getByRole('button', { name: /Inspire \(2\)/ }));
+        expect(mockOnConfirm).not.toHaveBeenCalled();
+        expect(errSpy).toHaveBeenCalledWith(
+            expect.stringContaining('over-allocation'),
+            expect.anything()
+        );
+        errSpy.mockRestore();
+    });
+});

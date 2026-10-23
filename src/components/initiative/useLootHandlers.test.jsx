@@ -13,7 +13,9 @@
  *                                              failure/clear tests re-pin the same bytes)
  *  "returns all functions" toBeDefined . removed (API-surface noise)
  *  generate success ...................... kept + pending-flag & exact-once call
- *  generate null / generate reject ..... consolidated into "generate failure"
+ *  generate null / generate reject ..... null flipped to lawful zero-loot arms
+ *                                          (#875 fix: guard short-circuits, catch
+ *                                          never entered); reject kept separately
  *  award success ......................... kept + floor split, XP accumulation,
  *                                          exact log bytes, full state reset
  *  award all-no-loot / mixed items ... consolidated into "No loot filtering"
@@ -87,14 +89,39 @@ describe('useLootHandlers', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        // Source bug pinned honestly: a null resolve currently throws inside the
-        // handler (unguarded lootResult.lootEntries.join) and lands in the same
-        // catch as a rejection — both observable as logged error + untouched state.
+        // Lawful-shape pin (flipped from the old honest-crash-through-catch pin,
+        // #875): the handler normalizes the producer result once, so null and
+        // absent-lootEntries resolve to the producer's own zero-loot constant
+        // (lootGenerator.js:335/:380) WITHOUT throwing — the catch (whose sole
+        // statement is console.error) must never be entered on these arms.
         it.each([
-            ['resolves null', () => generateLootFromCombatSummary.mockResolvedValueOnce(null)],
-            ['rejects', () => generateLootFromCombatSummary.mockRejectedValueOnce(new Error('Generation failed'))],
-        ])('logs the error and leaves loot state untouched when the generator %s', async (_label, setupGenerator) => {
-            setupGenerator();
+            ['[] zero-loot verbatim', { lootEntries: [], totalEncounterXp: 0 }, EMPTY, ''],
+            ['null', null, EMPTY, ''],
+            ['absent lootEntries key (#1348)', { totalEncounterXp: 120 }, { lootEntries: [], totalEncounterXp: 120 }, ''],
+            ['absent both keys (#1348)', {}, EMPTY, ''],
+        ])('populates honest zero-loot state and never enters the catch when the generator resolves %s', async (_label, resolution, expectedData, expectedText) => {
+            generateLootFromCombatSummary.mockResolvedValueOnce(resolution);
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
+
+            const { result } = renderHook(() =>
+                useLootHandlers(campaignName, characters, combatSummary));
+
+            await act(async () => {
+                await result.current.handleGenerateLoot();
+            });
+
+            // Guard short-circuits — the incidental catcher stays silent.
+            expect(consoleSpy).not.toHaveBeenCalled();
+            expect(result.current.generatingLoot).toBe(false);
+            expect(result.current.lootData).toEqual(expectedData);
+            expect(result.current.lootTextValue).toBe(expectedText);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+
+            consoleSpy.mockRestore();
+        });
+
+        it('logs the error and leaves loot state untouched when the generator rejects', async () => {
+            generateLootFromCombatSummary.mockRejectedValueOnce(new Error('Generation failed'));
             const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
 
             const { result } = renderHook(() =>

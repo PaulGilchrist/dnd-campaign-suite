@@ -3,6 +3,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { storeSpellLastAttack, addTargetResult } from '../../common/damageRollback.js';
 import { isSleepImmune, stageSleepTargets } from '../../../rules/features/sleepService.js';
+import { rollD20 } from '../../../dice/diceRoller.js';
 
 function sleepPopup(name, description) {
     return {
@@ -38,7 +39,9 @@ async function handleSleepImmuneTarget(campaignName, casterName, action, targetN
 
 async function resolveSleepNpcSave(target, dc) {
     const saveBonus = target.saveBonuses?.wis ?? 0;
-    const roll = Math.floor(Math.random() * 20) + 1;
+    // Canonical save-d20 lane (fix#169 recipe): the NPC auto-save rolls
+    // through diceRoller so global dice-seeding and the GM overlay see it.
+    const roll = rollD20();
     const total = roll + saveBonus;
     return { success: total >= dc, roll, total, saveBonus };
 }

@@ -290,6 +290,30 @@ describe('CharBonusActions - Edge Cases', () => {
         expect(roll).not.toHaveBeenCalled();
       }
     });
+
+    it('hit-cell click during cannotAct delegates to the parent guard — zero local rolls (Run2 #22)', () => {
+      // OWNER RULING (closed-by-verification): the bonus hit cell INTENTIONALLY
+      // stays clickable when cannotAct — the roll defence lives in the parent
+      // chain: CharActions.jsx:732 onAttackClick={handleAttackClick} →
+      // useCharActionsAttackHandlers.js:49 "if (cannotAct) { reportCannotActAttack(attack); return; }"
+      // (Stinking Cloud denial popup + log, zero buildCtx/rollAttack — pinned at
+      // useCharActionsAttackHandlers.test.js:137/:151/:170) and runAttackClick
+      // re-gates at :82 via assertCanAct, which denies cannotAct regardless of
+      // enforcement mode (assertCanAct.js:116-120). A silent :253-shape guard at
+      // the cell would SHADOW that popup, so none is added — this arm pins the
+      // delegation contract: the click must reach the self-guarded parent.
+      const roll = vi.fn();
+      vi.mocked(useSimpleDamageRoll).mockReturnValue(roll);
+      const onAttackClick = vi.fn();
+      const stats = createStats({ attacks: [bonusActionAttack] });
+      render(<CharBonusActions playerStats={stats} campaignName={CAMPAIGN} onAttackClick={onAttackClick} cannotAct exhaustionPenalty={0} />);
+
+      const hitCell = screen.getByText('+5');
+      expect(hitCell).toHaveClass('clickable', 'disabled-attack');
+      fireEvent.click(hitCell);
+      expect(onAttackClick).toHaveBeenCalledWith(expect.objectContaining({ name: 'Main Gauche', type: 'Bonus Action' }));
+      expect(roll).not.toHaveBeenCalled();
+    });
   });
 
   describe('Horde Breaker conditional row', () => {

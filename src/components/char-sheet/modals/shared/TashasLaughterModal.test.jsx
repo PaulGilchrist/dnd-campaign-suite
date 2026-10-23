@@ -69,7 +69,7 @@ const baseCombatSummary = {
     ],
 };
 
-// spellSlotLevel defaults to a sane 1 — omitting it hits the open NaN defect pinned below.
+// spellSlotLevel defaults to a sane 1 — missing/non-finite levels bind at the lawful default (1).
 function makeProps(overrides = {}) {
     return {
         action: baseAction,
@@ -132,14 +132,46 @@ describe('TashasLaughterModal - base rendering and selection', () => {
         expect(screen.getByText(new RegExp(`Select up to ${expected} creature`))).toBeInTheDocument();
     });
 
-    // KNOWN DEFECT (TashasLaughterModal.jsx:91): Math.max(1, undefined) is NaN, so an
-    // omitted spellSlotLevel renders "Select up to NaN creature(s)". Pin of CURRENT broken
-    // behavior — update this test (and the source) when fixed; do NOT treat as correct.
-    it('KNOWN DEFECT: renders "Select up to NaN" when spellSlotLevel is not passed', () => {
+    // FIXED (TashasLaughterModal.jsx:91, fix#39/#121 NaN-guard law): Math.max(1, undefined)
+    // used to be NaN, rendering "Select up to NaN" and leaving CreatureSelectionModal's
+    // NaN-tolerant guards (:54/:88) unbound — unlimited selection. A missing/non-finite
+    // spellSlotLevel now binds at the spell's minimum slot (1; disk: spells.json:5422 and
+    // 2024/spells.json:13307 are both level 1), same floor as tashasHideousLaughterService.js:3.
+    it.each([
+        { label: 'omitted', level: undefined },
+        { label: 'explicit undefined', level: undefined },
+        { label: 'NaN', level: NaN },
+        { label: 'null', level: null },
+        { label: 'non-numeric string', level: 'two' },
+        { label: 'zero slot', level: 0 },
+        { label: 'negative slot', level: -2 },
+    ])('caps at 1 target (lawful default) when spellSlotLevel is $label', ({ label, level }) => {
         const props = makeProps();
-        delete props.spellSlotLevel;
+        if (label === 'omitted') delete props.spellSlotLevel;
+        else props.spellSlotLevel = level;
         render(<TashasLaughterModal {...props} />);
-        expect(screen.getByText(/Select up to NaN creature/)).toBeInTheDocument();
+
+        expect(screen.getByText(/Select up to 1 creature/)).toBeInTheDocument();
+        expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+
+        // The cap actually binds: first row selects, second row disables at max.
+        selectTarget(0);
+        expect(targetCheckboxes()[0]).toBeChecked();
+        expect(getConfirmButton()).toHaveTextContent('(1)');
+        selectTarget(1);
+        expect(targetCheckboxes()[1]).not.toBeChecked();
+        expect(getConfirmButton()).toHaveTextContent('(1)');
+    });
+
+    it('leaves a finite slot level intact through the guard (level 3 caps at 3)', () => {
+        render(<TashasLaughterModal {...makeProps({ spellSlotLevel: 3 })} />);
+        expect(screen.getByText(/Select up to 3 creature/)).toBeInTheDocument();
+
+        selectTarget(0);
+        selectTarget(1);
+        selectTarget(2);
+        expect(getConfirmButton()).toHaveTextContent('(3)');
+        expect(targetCheckboxes()).toHaveLength(3);
     });
 
     it('checks a target row on click and enables confirm, then untoggles back to disabled', () => {

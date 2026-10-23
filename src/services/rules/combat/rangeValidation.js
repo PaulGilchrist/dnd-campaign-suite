@@ -34,7 +34,9 @@ export function rangeToFeet(range) {
   const match = normalized.match(/^(-?\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/)
   if (match) return parseFloat(match[1])
 
-  const mileMatch = normalized.match(/^(-?\d+(?:\.\d+)?)\s*mile/)
+  // Anchored twin of the feet regex above (fix#1224): same boundary law on
+  // both fields — exact full-string unit token only, garbage suffix → null.
+  const mileMatch = normalized.match(/^(-?\d+(?:\.\d+)?)\s*(miles|mile)$/)
   if (mileMatch) return parseFloat(mileMatch[1]) * 5280
 
   return null

@@ -120,12 +120,11 @@
 //     case-INSENSITIVE Aura-of-Vitality outlier is oracle :441 — cited.
 //   chokepoint inline-dup const: FREE_CAST_ENTRY_TYPES is module-top once —
 //     no inline duplicate literal in this lane's pins.
-//   arity resource-flow-home: payment arity-2-read/4-write hazard pin is
-//     resource-flow :427-428 (#1516) — cited; consume-side tuples below
-//     record arity as-written (counter/favored/NR/bewitching/WGB reads
-//     arity-2, buffs/sig/savant/per-spell reads arity-3 — literals :632/:512
-//     pass campaign, :490/:497/:502 do NOT: the asymmetry is the service's,
-//     pinned as-is).
+//   arity unified (owner unify call): the #1516 payment arity-2-read/4-write
+//     hazard pin is resource-flow :427-428 — CLOSED, reads now carry the
+//     campaign arg explicitly; consume-side tuples below record arity
+//     as-written (every read arity-3 — :632/:512/:490/:497/:502 all pass
+//     campaignName, the family asymmetry is gone).
 //   NO-CLOCK consume-pure (declared): every consumed byte is an explicit
 //     number/null/boolean; the lane mints NO Date.now() into the store on
 //     any row (quickRitual's opaque stamp is FT-068's lane). addEntry is
@@ -492,7 +491,7 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
     const result = await cast(DISK.burningHands, stats, { freeCastAuthorized: true });
 
     expect(result.freeCastUsed).toBe(true); // :840/:842 — payment authority is caller-supplied (:985, #1514 cite)
-    expect(readsOf(MI_LATCH)).toEqual([[TW, MI_LATCH]]); // arity-2 tier, READ happened
+    expect(readsOf(MI_LATCH)).toEqual([[TW, MI_LATCH, CAMPAIGN]]); // campaign-tier read happened (unified)
     expect(setRuntimeValue.mock.calls).toEqual([]);
     expect(__mem.get(`${TW}|${MI_LATCH}`)).toBe(0); // spent byte un-touched
   });
@@ -509,7 +508,7 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
     expect(setRuntimeValue.mock.calls).toEqual([[TW, INST_LATCH, 0, CAMPAIGN]]); // exact-of-1
     expect(readsOf(MI_LATCH)).toEqual([]); // :451 continue — mismatched parsed level never touches the latch
     expect(readsOf('_Planted_Case_Trail_Bait_freeCastCount')).toEqual([]); // :447 case-exact filter, pre-loop skip
-    expect(readsOf(INST_LATCH)).toEqual([[TW, INST_LATCH]]); // :437 arity-2, fresh ?? uses=1 -> consume to 0
+    expect(readsOf(INST_LATCH)).toEqual([[TW, INST_LATCH, CAMPAIGN]]); // :437 unified read, fresh ?? uses=1 -> consume to 0
   });
 });
 
@@ -521,7 +520,7 @@ describe('prepareSpellCast — consume loop arms :445-459 (post-auth, cla229-doc
 // ---------------------------------------------------------------------------
 
 describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', () => {
-  it('Q1 (#1527 FIXED, was the #1524 quirk home): Favored Enemy disk row consumed on a Hunter\'s Mark free cast — the consume-side DECREMENT LANDS: armed latch byte 2 stamps favoredEnemyUses 1 (pre-fix vacuous self-copy stamped the read-count 2 twice); two casts read the latch arity-2 exactly twice, latch written EXACTLY ZERO (different-keys ledger is the #1512 restore-lane law, cited not grown); reads precede writes (#1513 form); a null store writes nothing (null-guard arm)', async () => {
+  it('Q1 (#1527 FIXED, was the #1524 quirk home): Favored Enemy disk row consumed on a Hunter\'s Mark free cast — the consume-side DECREMENT LANDS: armed latch byte 2 stamps favoredEnemyUses 1 (pre-fix vacuous self-copy stamped the read-count 2 twice); two casts read the latch arity-3 exactly twice, latch written EXACTLY ZERO (different-keys ledger is the #1512 restore-lane law, cited not grown); reads precede writes (#1513 form); a null store writes nothing (null-guard arm)', async () => {
     const favoredActions = [{ ...diskFeature(classes2024,
       (o, autos) => o.name === 'Favored Enemy' && autos.some(a => a.spell === "Hunter's Mark"),
       'Favored Enemy automation for consume residence').automation }];
@@ -542,7 +541,7 @@ describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', ()
       [TW, 'favoredEnemyUses', 1, CAMPAIGN],
     ]);
     expect(__mem.get(`${TW}|favoredEnemyUses`)).toBe(1); // store-bytes MOVED off the read-count
-    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([[TW, '_Favored_Enemy_freeCastCount'], [TW, '_Favored_Enemy_freeCastCount']]); // arity-2 literal read
+    expect(readsOf('_Favored_Enemy_freeCastCount')).toEqual([[TW, '_Favored_Enemy_freeCastCount', CAMPAIGN], [TW, '_Favored_Enemy_freeCastCount', CAMPAIGN]]); // unified campaign-tier literal read
     expect(readsOf('favoredEnemyUses')).toEqual([]); // latch is the count source; the uses key is WRITE-only here
     expect(getRuntimeValue.mock.invocationCallOrder[0]).toBeLessThan(setRuntimeValue.mock.invocationCallOrder[0]); // read-ledger -> consume-write order
     expect(readsOf('activeBuffs')).toEqual([]); // loop-inert disk shape: gate :448 false (usesMax absent, census at load)
@@ -616,13 +615,13 @@ describe('prepareSpellCast — consumeSpecialFreeCastFlags :489-523 ledgers', ()
     const r2 = await cast(DISK.detectThoughts, stats, { freeCastAuthorized: true });
     expect(r2.freeCastUsed).toBe(true);
     expect(setRuntimeValue.mock.calls).toEqual([[TW, '_Divination_Savant_Detect_Thoughts_used', true, CAMPAIGN]]);
-    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast']]); // arity-2 read happened, latch absent -> no write
+    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]); // unified read happened, latch absent -> no write
 
     freshStore({ _Bewitching_Magic_freeCast: true });
     const r3 = await cast(DISK.fireball, stats, { freeCastAuthorized: true });
     expect(r3.freeCastUsed).toBe(true);
     expect(setRuntimeValue.mock.calls).toEqual([]); // foreign name — :502 exact-name gate denies
-    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast']]);
+    expect(readsOf('_Bewitching_Magic_freeCast')).toEqual([[TW, '_Bewitching_Magic_freeCast', CAMPAIGN]]);
   });
 
   it('TK1 (CLA-356 :543-544 consume half, authorize half oracle gate #2 cited): a _telekineticMasterFreeCast-stamped Telekinesis cast skips the ENTIRE decrement phase — armed instance latch, favored latch and NR grant ALL survive an authorized free cast, exact-of-0 write ledger', async () => {

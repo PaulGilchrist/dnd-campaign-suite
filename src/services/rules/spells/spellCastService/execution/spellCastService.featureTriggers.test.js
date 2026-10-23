@@ -530,26 +530,47 @@ describe('executeSpellCast feature subscribers — REAL helpers.js/triggerSpells
     expect(runtimeState.setRuntimeValue.mock.calls).toEqual([])
   })
 
-  it('fix#126 boundary (REPORT, owner lane): automation-ABSENT casts survive the ambush hub-catch but still die at the sibling damageCalculation.js:140-142 overchannel THROW — same #1495 class, forbidden edit here (#121-stable file)', async () => {
-    // Honest current-bytes map: the hub :157-:164 catch fires FIRST (its two console
-    // bytes prove ambush degraded, not murdered), then the damage-lane calc pays the
-    // SAME caster-substitution-free loud-throw at damageCalculation.js:142 — that
-    // guard's owner lane is damageCalculation.test.js (#1468-69/#121 family). Reported,
-    // not fixed: damageCalculation.js is out of this lane's edit boundary.
+  it('fix#126 boundary FLIP (degrade green): automation-ABSENT casts survive the ambush hub-catch AND the sibling overchannel guard — damageCalculation.js:140-143 now returns the off-shape, the paid cast completes, riders fire exactly once', async () => {
+    // Pre-fix capture (this pin rejected WHOLE, green pre-fix, captured live
+    // 2026-10-22): executeSpellCast 'rejects.toThrow(playerStats.automation.passives
+    // is required for overchannel check)' — paid slot dead, surge never reached the
+    // tail (rider-zero bytes). Owner fix landed INSIDE computeOverchannel (multi-
+    // caller stub via vi.mock census; hub :875 stays unguarded-by-design): loud
+    // console.error + deny-table off-shape, mirroring resolveMagicalAmbushOrDegrade
+    // (:157-:164). The Arcane Ward twin guard (helpers.js:88-91, cited NOT fixed —
+    // owner lane) self-catches at :646, so it now adds its own two loud bytes on
+    // this fixture while the cast rides on.
     const playerStats = makePlayerStats(arcaneWardPassive)
     delete playerStats.automation
     const spell = diskRow(spells2024, 'Armor of Agathys')
 
-    await expect(executeSpellCast(spell, { slotLevel: 1 }, makeServices(playerStats)))
-      .rejects.toThrow('playerStats.automation.passives is required for overchannel check')
+    const res = await executeSpellCast(spell, { slotLevel: 1 }, makeServices(playerStats))
 
+    // Lane completes with its golden payload (mirrors the golden ward row: null).
+    expect(res).toBeNull()
+    // Exact console census, order-bearing: ambush guard + hub catch (fix#126), then
+    // the overchannel DEGRADE byte (once — the cast lives), then the ward twin's
+    // guard byte caught by the hub rider-block .catch (:646).
     expect(consoleError.mock.calls.map(c => c[0])).toEqual([
       '[spellCast] magicalAmbush check: playerStats.automation.passives is missing',
       '[spellCast] Magical Ambush resolution failed:',
       '[spellCast] overchannelPassives: playerStats.automation.passives is missing',
+      '[spellCast] triggerArcaneWard: playerStats.automation.passives is missing',
+      '[spellCast] Arcane Ward trigger failed:',
     ])
-    // Ambush already degraded before the sibling guard's death: no rider reached
-    // the tail (the reject happens mid-damage-lane).
-    expect(wildSurge.triggerWildMagicSurge).not.toHaveBeenCalled()
+    // Riders alive: the post-cast block ran — each rider exactly once (#1348:
+    // the degrade adds no second dispatch; fix#121(b) heal pair defers nothing here).
+    expect(wildSurge.triggerWildMagicSurge).toHaveBeenCalledTimes(1)
+    expect(postCastRider.triggerPostCastRiderSaves).toHaveBeenCalledTimes(1)
+    expect(postCastHeal.triggerPostCastSelfHeals).toHaveBeenCalledTimes(1)
+    expect(postCastHeal.triggerPostCastAllyHeals).toHaveBeenCalledTimes(1)
+    // Overchannel forfeited, never charged: 'Overchannel_useCount' is never READ
+    // (read :151 sits behind the guard) and the lane stays zero-write (armor is a
+    // BONUS ACTION disk row — CLA-399 stamp gate shut; fold is metaCtx-threading only).
+    expect(runtimeState.getRuntimeValue.mock.calls.map(c => c[1])).not.toContain('Overchannel_useCount')
+    expect(runtimeState.setRuntimeValue.mock.calls).toEqual([])
+    // The ward handler itself never ran (passive unread — the throw precedes its gate).
+    expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
+    expect(addEntry).toHaveBeenCalledTimes(1)
   })
 })

@@ -136,10 +136,25 @@ function computeOverchannel({ spell, metaCtx, playerStats, campaignName, getRunt
     let overchannelActive = false;
     let overchannelUseCount = 0;
 
+    // fix#126-boundary (#1495 family): missing passives DEGRADE loud, never die.
+    // Pre-fix :142 threw — the single production caller (index.js:875 DAMAGE path,
+    // unguarded) let the rejection kill executeSpellCast WHOLE: paid slot plus every
+    // post-cast rider (surge/rider-saves/heals, the fix#121(a)/CLA-389 merges) —
+    // rider-zero bytes captured live 2026-10-22 in spellCastService.featureTriggers
+    // and damageCalculation.test.js. An automation-absent caster already survived the
+    // ambush self-catch (:157-:164) only to die at this sibling guard. Law (fix#119/
+    // fix#126 mirror): a failing NON-CRITICAL resolution costs its own bonus, never
+    // the spell — the overchannel maximize is forfeited via the deny-table off-shape
+    // (:166 bytes: baseFormula pass-through untouched, overchannelActive:false,
+    // useCount 0; consumers fall back via overchannelFormula || formula, savePath.js
+    // :255), and BOTH runtime touches (read :151, charge-write :162) sit behind the
+    // guard so a never-earned passive is never read and never charged. Guard bytes
+    // `== null` mirror the ambush resolver :130 parity; non-array passives stays a
+    // loud TypeError — #1360 family contract violation (computeRadiantSoul :117 twin).
     const passives = playerStats.automation?.passives;
     if (passives == null) {
         console.error('[spellCast] overchannelPassives: playerStats.automation.passives is missing');
-        throw new Error('playerStats.automation.passives is required for overchannel check');
+        return { overchannelFormula, overchannelActive, overchannelUseCount };
     }
     const overchannelPassives = passives.filter(p => p.type === 'overchannel');
 

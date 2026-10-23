@@ -125,6 +125,11 @@ function rollLogRows() {
   return document.querySelectorAll('.short-rest-roll-log tbody tr');
 }
 
+// run2#297: every write to the meal pool key, for single-owner spend counting.
+function mealWrites() {
+  return setRuntimeValueMock.mock.calls.filter(c => c[1] === 'replenishingMeals');
+}
+
 function recoveredTotalText() {
   return screen.getByText(/Total HP Recovered:/).closest('p').textContent;
 }
@@ -320,17 +325,37 @@ describe('ShortRestModal', () => {
       expect(setRuntimeValueMock).toHaveBeenCalledWith('Thorin', 'chefBolsteringTreats', 3, mockCampaignName);
     });
 
-    it('consumes a Replenishing Meal on the next hit die roll and decrements the count', () => {
+    it('consumes a Replenishing Meal on the next hit die roll, spending only at completion', async () => {
       setupGetRuntimeValue({ replenishingMeals: 2 });
       renderModal({
         automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
       });
       expect(screen.getByText('Replenishing Meal')).toBeInTheDocument();
       rollOne();
-      // 4 + CON 2 + meal 1d8 (4) = 10 on the roll line; meal consumed, count decremented.
+      // 4 + CON 2 + meal 1d8 (4) = 10 on the roll line; meal consumed.
       expect(rollLogRows()[0].children[1].textContent).toBe('10');
       expect(screen.getByText(/Replenishing Meal consumed/)).toBeInTheDocument();
-      expect(setRuntimeValueMock).toHaveBeenCalledWith('Thorin', 'replenishingMeals', 1, mockCampaignName);
+      // run2#297 single spend owner: rolls stage locally — ZERO decrements at roll time
+      // (the old roll-time write double-spent when handleComplete re-read and subtracted).
+      expect(mealWrites()).toHaveLength(0);
+      completeRest();
+      await flush();
+      // Exactly one spend at the end-of-rest chokepoint: fresh read 2 → 1.
+      expect(mealWrites()).toEqual([['Thorin', 'replenishingMeals', 1, mockCampaignName]]);
+    });
+
+    it('cancel after consuming a meal spends nothing — staged rolls never committed a meal', () => {
+      setupGetRuntimeValue({ replenishingMeals: 3 });
+      const { onClose } = renderModal({
+        automation: { passives: [{ type: 'passive_rule', effect: 'bonus_healing', name: 'Replenishing Meal' }] },
+      });
+      rollOne();
+      expect(screen.getByText(/Replenishing Meal consumed/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      // Pre-fix this lane burned 3→2 at roll time with no rollback on Cancel.
+      expect(mealWrites()).toHaveLength(0);
+      expect(setRuntimeValueMock).not.toHaveBeenCalled();
     });
   });
 

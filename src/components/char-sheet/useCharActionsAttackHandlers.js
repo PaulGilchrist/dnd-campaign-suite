@@ -245,7 +245,7 @@ export default function useCharActionsAttackHandlers({
         // CLA-044: stamp the holder (top-level truth first) — the frozen cs
         // mirror stamp made the offered-latch unreadable next turn.
         const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
-        setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
+        setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: getCurrentCombatRound(campaignName), activeCreature: currentCreature }, campaignName);
 
         if (brutalStrikeChoice?.useBrutalStrike) {
             setRuntimeValue(playerName, '_brutalStrikeActive', true, campaignName);
@@ -280,7 +280,7 @@ export default function useCharActionsAttackHandlers({
 
     function handleRecklessAttackCancel(attack) {
         const currentCreature = getRuntimeValue('campaign', 'activeCreatureName', campaignName) || getActiveCreatureName(campaignName);
-        setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: 1, activeCreature: currentCreature }, campaignName);
+        setRuntimeValue(playerName, '_recklessAttack_offeredThisTurn', { round: getCurrentCombatRound(campaignName), activeCreature: currentCreature }, campaignName);
         setModalState({ recklessAttackModal: null });
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;

@@ -200,12 +200,16 @@ describe('useInitiativeEffects - active state clearing', () => {
         dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
 
         // Vow buff stripped, prop-distinct Ally buff preserved byte-exactly.
+        // Changed-pass: EXACTLY one target write (#1348 write-count canon).
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'EnemyTarget',
             'activeBuffs',
             [{ effect: 'other_buff', source: 'Ally' }],
             campaignName
         );
+        expect(allWrites().filter(
+            ([name, key]) => name === 'EnemyTarget' && key === 'activeBuffs'
+        )).toHaveLength(1);
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestMonk', 'vowOfEnmityTarget', null, campaignName
         );
@@ -217,6 +221,105 @@ describe('useInitiativeEffects - active state clearing', () => {
         expect(allWrites().some(
             ([target, key]) => target === 'TestMonk' && key === 'activeBuffs'
         )).toBe(false);
+    });
+
+    // Map-backed store so unchanged-pass final-state bytes are observable
+    // (#348 production-faithful fake-store pattern).
+    function mountVowStore(entries) {
+        const store = new Map(entries);
+        getRuntimeValue.mockImplementation((name, key) =>
+            store.has(`${name}|${key}`) ? store.get(`${name}|${key}`) : null
+        );
+        setRuntimeValue.mockImplementation((name, key, value) => {
+            store.set(`${name}|${key}`, value);
+        });
+        return store;
+    }
+
+    const enemyBuffWrites = () =>
+        allWrites().filter(
+            ([name, key]) => name === 'EnemyTarget' && key === 'activeBuffs'
+        );
+
+    it('writes nothing to the vow target when its activeBuffs hold no vow_of_enmity buff', () => {
+        // Only-if-changed churn pin (run2#346 warn): the lane once re-stamped the
+        // byte-identical filtered array on EVERY own initiative roll — SSE echo
+        // churn plus a stale-copy clobber of any concurrent buff write landing
+        // between the lane's read and write (fix#86 merged-write / fix#111
+        // fresh-read family). Guard mirrors sibling clearActiveBuffsWhere
+        // (useInitiativeEffects.js:126): filtered.length !== buffs.length.
+        const allyBuffs = [{ effect: 'other_buff', source: 'Ally' }];
+        const store = mountVowStore([
+            ['TestMonk|vowOfEnmityTarget', 'EnemyTarget'],
+            ['TestMonk|vowOfEnmityCostPaid', true],
+            ['EnemyTarget|activeBuffs', allyBuffs],
+        ]);
+        renderHookWithStats();
+        dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+
+        // Unchanged-pass: ZERO target activeBuffs writes...
+        expect(enemyBuffWrites()).toHaveLength(0);
+        // ...and Ally's buffs survive byte-exact (same array, untouched).
+        expect(store.get('EnemyTarget|activeBuffs')).toBe(allyBuffs);
+        // Vow owner-state still clears unconditionally at the seam (fix#26:
+        // local-origin clears POST).
+        expect(store.get('TestMonk|vowOfEnmityTarget')).toBe(null);
+        expect(store.get('TestMonk|vowOfEnmityCostPaid')).toBe(null);
+    });
+
+    it('strips the vow buff once, and every later initiative roll is a zero-write no-op on the target', () => {
+        const store = mountVowStore([
+            ['TestMonk|vowOfEnmityTarget', 'EnemyTarget'],
+            ['TestMonk|vowOfEnmityCostPaid', true],
+            ['EnemyTarget|activeBuffs', [
+                { effect: 'vow_of_enmity', source: 'TestMonk' },
+                { effect: 'other_buff', source: 'Ally' },
+            ]],
+        ]);
+        renderHookWithStats();
+
+        // Changed-pass (first-ever clear): ONE byte-exact write.
+        dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+        expect(enemyBuffWrites()).toEqual([
+            ['EnemyTarget', 'activeBuffs', [{ effect: 'other_buff', source: 'Ally' }], campaignName],
+        ]);
+
+        // Second roll: vow state already null, target buffs already stripped —
+        // the whole lane no-ops, target stays untouched.
+        const writesBefore = allWrites().length;
+        dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 12 });
+        expect(enemyBuffWrites()).toHaveLength(1);
+        expect(store.get('EnemyTarget|activeBuffs')).toEqual([{ effect: 'other_buff', source: 'Ally' }]);
+        expect(allWrites().length).toBeGreaterThan(writesBefore);
+    });
+
+    it('reads the vow target activeBuffs at write time (fix#111): after the owner vow-clear write, once per roll', () => {
+        // Fresh-read ordering pin: the lane captures vowTarget first, clears it,
+        // and only then reads the target's CURRENT activeBuffs to filter — the
+        // read sits adjacent to the write inside guarded clearActiveBuffsWhere,
+        // never hoisted to a stale loop-start snapshot (fix#86/#111 family).
+        const events = [];
+        const store = new Map([
+            ['TestMonk|vowOfEnmityTarget', 'EnemyTarget'],
+            ['EnemyTarget|activeBuffs', [
+                { effect: 'vow_of_enmity', source: 'TestMonk' },
+                { effect: 'other_buff', source: 'Ally' },
+            ]],
+        ]);
+        getRuntimeValue.mockImplementation((name, key) => {
+            if (name === 'EnemyTarget' && key === 'activeBuffs') events.push('read');
+            return store.has(`${name}|${key}`) ? store.get(`${name}|${key}`) : null;
+        });
+        setRuntimeValue.mockImplementation((name, key, value) => {
+            if (name === 'TestMonk' && key === 'vowOfEnmityTarget') events.push('vowClear');
+            if (name === 'EnemyTarget' && key === 'activeBuffs') events.push('write');
+            store.set(`${name}|${key}`, value);
+        });
+        renderHookWithStats();
+        dispatchInitiativeRoll({ characterName: 'TestMonk', roll: 15 });
+
+        expect(events).toEqual(['vowClear', 'read', 'write']);
+        expect(store.get('EnemyTarget|activeBuffs')).toEqual([{ effect: 'other_buff', source: 'Ally' }]);
     });
 
     it('clears the Awakened Mind buff and target together on initiative', () => {

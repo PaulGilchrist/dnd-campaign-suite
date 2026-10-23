@@ -1,11 +1,11 @@
 vi.mock('../../rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((itemName) => {
     if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-      const magicBonus = Number(itemName.charAt(1))
-      return {
-        baseName: itemName.substring(3),
-        magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
+      const match = itemName.match(/^\+(\d+)\s*(.*)$/)
+      if (match) {
+        return { baseName: match[2].trim(), magicBonus: parseInt(match[1], 10) }
       }
+      return { baseName: itemName.slice(1).trim(), magicBonus: 0 }
     }
     return { baseName: itemName, magicBonus: 0 }
   }),

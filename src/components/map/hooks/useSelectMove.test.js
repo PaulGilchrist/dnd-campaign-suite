@@ -6,10 +6,12 @@
 // (#786/#744 exact position write once; invalid/clamped-to-zero targets ⇒ zero writes).
 // Contract rows:
 //   guards → non-localhost and non-select tools inert across ALL handlers (no capture, no reads, no writes)
-//   down   → marquee-start bytes / move-start on wall|item|in-bounds press; capture BEFORE grid guard
+//   down   → marquee-start bytes / move-start on wall|item|in-bounds press; capture AFTER grid guard
+//            (#883/fix#53 house shape, useRuler.js:22-27 validate-capture-commit — was capture-before-guard)
 //   move   → marquee rect bytes normalised both directions; ± group offset; refs synced; idle moves inert
 //   up     → marquee commit (exact membership, bounds set, transient cleared, map untouched) OR
-//            rigid move commit exact-once; zero-offset drop = reset without writes; capture always released
+//            rigid move commit exact-once; zero-offset drop = reset without writes; capture released
+//            only when the up mirrors a captured gesture (paired ledger: state ⇒ captured)
 //   budget → L5-002 enforcement on: clamp to MIN remaining across selected players (Math.min + block +
 //            charge wiring owned here; clamp math owned by movementBudget.test.js); steadyAim stamp
 //            per moved player; onTokenMoveLanded exact args (defender internals owned by opportunityTrigger.test.js)
@@ -23,6 +25,9 @@
 // commit row also proves the enforcement-absent passthrough implicitly — L1–4 guarantee).
 // opportunityTrigger mocked (#905 convention, zero network, pins args). movementBudget /
 // turnState / chargeEconomy run REAL (pure math, runtime reads land on the mock).
+// Capture ledger faithful (#883/fix#55 canon, useZoomPan.test.js makeSvg): release of an
+// un-captured pointerId throws NotFoundError — mid-drag ref fixtures now run a real down
+// so the capture is genuinely acquired, never seeded.
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useSelectMove from './useSelectMove.js';
@@ -50,11 +55,29 @@ describe('useSelectMove', () => {
     pointerId,
   });
 
+  // Faithful pointer-capture ledger (real Element.prototype semantics, house faithful-mock
+  // canon fix#55/useZoomPan.test.js makeSvg): capture arms a pointerId; release of an
+  // un-captured (or mismatched) pointerId throws NotFoundError. Pre-fix this lane's bare
+  // vi.fn() pair hid the capture-before-grid-guard strand (#883) and the orphan release.
   const createSvgWithPointerCapture = () => {
+    const captured = new Set();
     mockSvgRef.current = {
-      setPointerCapture: vi.fn(),
-      releasePointerCapture: vi.fn(),
+      captured,
+      hasPointerCapture: vi.fn((id) => captured.has(id)),
+      setPointerCapture: vi.fn((id) => { captured.add(id); }),
+      releasePointerCapture: vi.fn((id) => {
+        if (!captured.has(id)) {
+          // jsdom exposes DOMException via globalThis; explicit access keeps eslint's
+          // no-undef globals block untouched (test-scope edit constraint).
+          throw new globalThis.DOMException(
+            `Failed to execute 'releasePointerCapture': no active capture for pointerId ${id}`,
+            'NotFoundError'
+          );
+        }
+        captured.delete(id);
+      }),
     };
+    return mockSvgRef.current;
   };
 
   const baseArgs = (overrides = {}) => ({
@@ -124,6 +147,7 @@ describe('useSelectMove', () => {
 
       expect(mockGetGridFromEvent).not.toHaveBeenCalled();
       expect(mockSvgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      expect(mockSvgRef.current.releasePointerCapture).not.toHaveBeenCalled(); // pre-fix orphan release (NotFoundError in browsers)
       expect(setMapData).not.toHaveBeenCalled();
       expect(result.current.selectStart.current).toBeNull();
       expect(result.current.moveStartGrid.current).toBeNull();
@@ -221,7 +245,9 @@ describe('useSelectMove', () => {
       });
       expect(result.current.selectStart.current).toEqual({ gridX: 5, gridY: 3 });
 
-      // unresolvable grid: pointer is captured/prevented, but no half-started selection
+      // unresolvable grid: pointer is prevented, but NOTHING captures and no
+      // half-started selection — capture follows the grid guard (#883/fix#53;
+      // pre-fix byte: setPointerCapture fired before the failed grid lookup).
       createSvgWithPointerCapture();
       mockGetGridFromEvent.mockReturnValue(null);
       ({ result } = renderHook(() => useSelectMove(baseArgs())));
@@ -230,7 +256,8 @@ describe('useSelectMove', () => {
         result.current.handleSelectPointerDown(event, [], null);
       });
       expect(event.preventDefault).toHaveBeenCalled();
-      expect(mockSvgRef.current.setPointerCapture).toHaveBeenCalledWith(1);
+      expect(mockSvgRef.current.setPointerCapture).not.toHaveBeenCalled();
+      expect(mockSvgRef.current.captured.has(1)).toBe(false);
       expect(result.current.selectStart.current).toBeNull();
       expect(result.current.moveStartGrid.current).toBeNull();
     });
@@ -312,27 +339,35 @@ describe('useSelectMove', () => {
 
   describe('handleSelectPointerUp', () => {
     it('releases the capture, and every no-op up writes nothing yet always resets move state', () => {
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
       const setMapData = vi.fn();
       const setPlacedItems = vi.fn();
 
-      // idle up (nothing selected, nothing moving)
+      // idle up with no gesture down: nothing was captured, nothing releases —
+      // pre-fix byte: orphan releasePointerCapture(1) (NotFoundError in browsers).
       act(() => {
         result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
       });
-      expect(mockSvgRef.current.releasePointerCapture).toHaveBeenCalledWith(1);
+      expect(svg.releasePointerCapture).not.toHaveBeenCalled();
+      expect(svg.captured.size).toBe(0);
       expect(setMapData).not.toHaveBeenCalled();
       expect(setPlacedItems).not.toHaveBeenCalled();
 
-      // group dropped with a zero offset: reset without touching the map
+      // group dropped with a zero offset via a real gesture (down captures the press
+      // on the selected wall): reset without touching the map, capture released.
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
-        result.current.moveStartGrid.current = { gridX: 2, gridY: 2 };
-        result.current.moveOffsetRef.current = { dx: 0, dy: 0 };
+        result.current.selectedWallsRef.current.add('2,2');
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
       });
+      expect(svg.setPointerCapture).toHaveBeenCalledWith(1);
       act(() => {
         result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
       });
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledWith(1);
+      expect(svg.captured.size).toBe(0);
       expect(setMapData).not.toHaveBeenCalled();
       expect(setPlacedItems).not.toHaveBeenCalled();
       expect(result.current.moveStartGrid.current).toBeNull();
@@ -341,16 +376,22 @@ describe('useSelectMove', () => {
       // missing SVG must not throw on up
       mockSvgRef.current = null;
       act(() => {
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
         result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
       });
       expect(setMapData).not.toHaveBeenCalled();
     });
 
     it('commits a marquee selection of exactly the walls/items inside the rect, leaving the map untouched', () => {
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
+      // real down starts the marquee (and captures); move-phase bytes injected as
+      // the pointer rect the moves would have produced.
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
-        result.current.selectStart.current = { gridX: 2, gridY: 2 };
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
+      });
+      act(() => {
         result.current.selectionRectRef.current = { minX: 2, maxX: 4, minY: 2, maxY: 4 };
         result.current.mapDataRef.current = { walls: new Set(['2,2', '3,3', '4,4', '5,5']) };
         result.current.placedItemsRef.current = [
@@ -366,6 +407,7 @@ describe('useSelectMove', () => {
         result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
       });
 
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1); // paired with the down capture
       expect(result.current.selectedWalls).toEqual(new Set(['2,2', '3,3', '4,4']));
       expect(result.current.selectedItems).toEqual(new Set(['item1', 'item2']));
       expect(result.current.selectionBoundsRef.current).toEqual({ minX: 2, maxX: 4, minY: 2, maxY: 4 });
@@ -377,13 +419,18 @@ describe('useSelectMove', () => {
     });
 
     it('commits a wall-group move exactly once: shifted set, shifted bounds, move state reset', () => {
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
+      // real down on the selected wall arms the group move and captures; the
+      // offset bytes are injected as a mid-drag move would have produced them.
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
-        result.current.moveStartGrid.current = { gridX: 2, gridY: 2 };
-        result.current.moveOffsetRef.current = { dx: 1, dy: 2 };
         result.current.selectedWallsRef.current = new Set(['2,2', '3,3']);
         result.current.selectionBoundsRef.current = { minX: 2, maxX: 3, minY: 2, maxY: 3 };
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
+      });
+      act(() => {
+        result.current.moveOffsetRef.current = { dx: 1, dy: 2 };
       });
 
       let mapDataState = { walls: new Set(['2,2', '3,3', '5,5']) };
@@ -396,6 +443,9 @@ describe('useSelectMove', () => {
       });
 
       expect(setMapData).toHaveBeenCalledTimes(1);
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1); // exact capture/release pair (#1348)
+      expect(svg.captured.size).toBe(0);
       // (2,2)->(3,4), (3,3)->(4,5); unselected (5,5) outside dstBounds survives — fully exact
       expect(mapDataState.walls).toEqual(new Set(['3,4', '4,5', '5,5']));
       expect(result.current.selectionBoundsRef.current).toEqual({ minX: 3, maxX: 4, minY: 4, maxY: 5 });
@@ -405,19 +455,24 @@ describe('useSelectMove', () => {
     });
 
     it('commits an item-group move: exact positions, steadyAim stamp for the moved player only, OA scan once', () => {
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
       const placedItems = [
         { id: 'item1', name: 'CharA', type: 'player', gridX: 2, gridY: 2 },
         { id: 'item2', name: 'CharB', type: 'monster', gridX: 3, gridY: 3 },
         { id: 'item3', name: 'CharC', type: 'player', gridX: 5, gridY: 5 },
       ];
+      // real down on the selected item arms the move and captures; offset injected
+      // as the mid-drag move bytes.
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
         result.current.placedItemsRef.current = placedItems;
         result.current.selectedItemsRef.current = new Set(['item1']);
-        result.current.moveStartGrid.current = { gridX: 2, gridY: 2 };
-        result.current.moveOffsetRef.current = { dx: 1, dy: 1 };
         result.current.selectionBoundsRef.current = { minX: 2, maxX: 2, minY: 2, maxY: 2 };
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
+      });
+      act(() => {
+        result.current.moveOffsetRef.current = { dx: 1, dy: 1 };
       });
 
       let placedItemsState = placedItems;
@@ -432,6 +487,9 @@ describe('useSelectMove', () => {
       expect(placedItemsState[0]).toEqual(expect.objectContaining({ name: 'CharA', gridX: 3, gridY: 3 }));
       expect(placedItemsState[1]).toEqual(expect.objectContaining({ name: 'CharB', gridX: 3, gridY: 3 }));
       expect(placedItemsState[2]).toEqual(expect.objectContaining({ name: 'CharC', gridX: 5, gridY: 5 }));
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1); // exact capture/release pair (#1348)
+      expect(svg.captured.size).toBe(0);
 
       const aimStamps = runtimeState.setRuntimeValue.mock.calls
         .filter((c) => c[1] === 'steadyAimMovedThisTurn');
@@ -452,20 +510,23 @@ describe('useSelectMove', () => {
     it('clamps a group move to the tightest selected-player budget and charges each mover once', () => {
       // CharA has 5 ft left (1 cell), CharB 30 ft — group may shift only 1 cell of the 3 requested.
       enforcementOn({ CharA: { movementUsedFeet: 25 } });
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
 
       let placedItemsState = [
         { id: 'item1', name: 'CharA', type: 'player', gridX: 2, gridY: 2 },
         { id: 'item2', name: 'CharB', type: 'player', gridX: 3, gridY: 2 },
       ];
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
         result.current.placedItemsRef.current = placedItemsState;
         result.current.selectedItemsRef.current = new Set(['item1', 'item2']);
         result.current.mapDataRef.current = { walls: new Set(['2,2', '9,9']) };
         result.current.selectedWallsRef.current = new Set(['2,2']);
         result.current.selectionBoundsRef.current = { minX: 2, maxX: 3, minY: 2, maxY: 2 };
-        result.current.moveStartGrid.current = { gridX: 2, gridY: 2 };
+        result.current.handleSelectPointerDown(createMockEvent(), placedItemsState, { walls: new Set(['2,2', '9,9']) });
+      });
+      act(() => {
         result.current.moveOffsetRef.current = { dx: 3, dy: 0 };
       });
 
@@ -484,6 +545,9 @@ describe('useSelectMove', () => {
 
       expect(setMapData).toHaveBeenCalledTimes(1);
       expect(mapDataState.walls).toEqual(new Set(['3,2', '9,9'])); // clamped to 1 cell, not 3
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1); // paired across the clamped drop (#1348)
+      expect(svg.captured.size).toBe(0);
       expect(placedItemsState[0]).toEqual(expect.objectContaining({ name: 'CharA', gridX: 3, gridY: 2 }));
       expect(placedItemsState[1]).toEqual(expect.objectContaining({ name: 'CharB', gridX: 4, gridY: 2 }));
       expect(result.current.selectionBoundsRef.current).toEqual({ minX: 3, maxX: 4, minY: 2, maxY: 2 });
@@ -497,9 +561,10 @@ describe('useSelectMove', () => {
 
     it('writes nothing when the clamped offset collapses to zero (budget exhausted)', () => {
       enforcementOn({ CharA: { movementUsedFeet: 30 }, CharB: { movementUsedFeet: 10 } });
-      createSvgWithPointerCapture();
+      const svg = createSvgWithPointerCapture();
       const { result } = renderHook(() => useSelectMove(baseArgs()));
 
+      mockGetGridFromEvent.mockReturnValue({ gridX: 2.2, gridY: 2.2 });
       act(() => {
         result.current.placedItemsRef.current = [
           { id: 'item1', name: 'CharA', type: 'player', gridX: 2, gridY: 2 },
@@ -508,7 +573,9 @@ describe('useSelectMove', () => {
         result.current.selectedItemsRef.current = new Set(['item1', 'item2']);
         result.current.selectedWallsRef.current = new Set(['2,2']);
         result.current.selectionBoundsRef.current = { minX: 2, maxX: 3, minY: 2, maxY: 2 };
-        result.current.moveStartGrid.current = { gridX: 2, gridY: 2 };
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
+      });
+      act(() => {
         result.current.moveOffsetRef.current = { dx: 3, dy: 0 };
       });
 
@@ -520,11 +587,81 @@ describe('useSelectMove', () => {
 
       expect(setMapData).not.toHaveBeenCalled(); // group stays put
       expect(setPlacedItems).not.toHaveBeenCalled();
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1); // paired even when the clamp blocks
+      expect(svg.captured.size).toBe(0);
       expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled(); // no charge, no steadyAim stamp
       expect(mocks.onTokenMoveLanded).not.toHaveBeenCalled();
       expect(result.current.selectionBoundsRef.current).toEqual({ minX: 2, maxX: 3, minY: 2, maxY: 2 });
       expect(result.current.moveStartGrid.current).toBeNull(); // move state resets regardless
       expect(result.current.moveOffset).toBeNull();
+    });
+  });
+
+  // #883 capture discipline (fix#53 house shape — useItemDragging.js:42-47/:101-104,
+  // useRuler.js:22-27 validate-capture-commit): setPointerCapture runs AFTER the
+  // localhost/tool/grid guards, last before the commit; (selectStart || moveStartGrid)
+  // !== null strictly implies captured; up/leave release-first-after-null-bail.
+  describe('pointer capture discipline (#883)', () => {
+    it('failed down (grid null): zero capture bytes, silent terminals', () => {
+      const svg = createSvgWithPointerCapture();
+      mockGetGridFromEvent.mockReturnValue(null);
+      const { result } = renderHook(() => useSelectMove(baseArgs()));
+      const event = createMockEvent();
+
+      act(() => {
+        result.current.handleSelectPointerDown(event, [], null);
+      });
+
+      expect(event.preventDefault).toHaveBeenCalled(); // still suppresses native drag
+      expect(svg.setPointerCapture).not.toHaveBeenCalled();
+      expect(svg.captured.has(1)).toBe(false);
+      expect(result.current.selectStart.current).toBeNull();
+      expect(result.current.moveStartGrid.current).toBeNull();
+
+      // Terminals straight through the failed gesture: pre-fix the down captured
+      // before this guard failed and every terminal released a handle the map-tool
+      // router (Map.jsx:321-338) shares with pan/ruler — NotFoundError territory.
+      const setMapData = vi.fn();
+      const setPlacedItems = vi.fn();
+      act(() => {
+        result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
+        result.current.handleSelectPointerUp(createMockEvent(), [], null, setMapData, setPlacedItems);
+      });
+      expect(svg.releasePointerCapture).not.toHaveBeenCalled();
+      expect(svg.captured.size).toBe(0);
+      expect(setMapData).not.toHaveBeenCalled();
+      expect(setPlacedItems).not.toHaveBeenCalled();
+    });
+
+    it('orders the grid guard before the capture and pairs capture/release exactly once (#1348)', () => {
+      const svg = createSvgWithPointerCapture();
+      mockGetGridFromEvent.mockReturnValue({ gridX: 5.2, gridY: 3.8 });
+      const { result } = renderHook(() => useSelectMove(baseArgs()));
+
+      act(() => {
+        result.current.handleSelectPointerDown(createMockEvent(), [], null);
+      });
+
+      expect(result.current.selectStart.current).toEqual({ gridX: 5, gridY: 3 });
+      expect(svg.setPointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.setPointerCapture).toHaveBeenCalledWith(1);
+      expect(svg.hasPointerCapture(1)).toBe(true);
+      const captureOrder = svg.setPointerCapture.mock.invocationCallOrder[0];
+      expect(mockGetGridFromEvent.mock.invocationCallOrder[0]).toBeLessThan(captureOrder);
+
+      act(() => {
+        result.current.handleSelectPointerUp(createMockEvent(), [], null, vi.fn(), vi.fn());
+      });
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1);
+      expect(svg.releasePointerCapture).toHaveBeenCalledWith(1);
+      expect(svg.captured.size).toBe(0);
+
+      // Late leave/up after the terminal must not double-release (state cleared).
+      act(() => {
+        result.current.handleSelectPointerUp(createMockEvent(), [], null, vi.fn(), vi.fn());
+      });
+      expect(svg.releasePointerCapture).toHaveBeenCalledTimes(1);
     });
   });
 });

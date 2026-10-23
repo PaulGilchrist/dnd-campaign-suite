@@ -42,9 +42,10 @@
 // the INTENDED refusal behaviour is locked for whoever fixes the arity; it does NOT
 // pin the broken argument order (cf. cuttingWords.latch pinning the correct 3-arg call).
 //
-// Deterministic: runtime/logService/range/rollback/infoPopup fully mocked; the random
-// second d20 (handleDisadvantageDebuff) only varies unpinned numerals in the popup
-// text — static substring + exact-key pins hold. No churn expected.
+// Deterministic: runtime/logService/range/rollback/infoPopup fully mocked; the
+// second d20 (handleDisadvantageDebuff) now rolls through the mocked canonical
+// diceRoller rollD20 lane (fix#169 recipe) — its face is seed-pinned below.
+// No churn expected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ────────────────────────────────────────
@@ -107,6 +108,13 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the disadvantage second d20
+// arrives via diceRoller, never raw Math.random.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 // ── Imports ─────────────────────────────────────────────────────
 
 import { handle } from './reactionDebuffHandler.js';
@@ -117,6 +125,7 @@ import * as logService from '../../../ui/logService.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -221,6 +230,8 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
     rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
     damageRollback.findLastAttack.mockReset();
     targetResolver.resolveMapPositions.mockReset();
+    // Seed pin (fix#169 idiom): second d20 face 8 → min(15,8)=8; 8+5=13 < AC 14.
+    diceRoller.rollD20.mockReturnValue(8);
   });
 
   describe('gates', () => {
@@ -232,8 +243,9 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No recent attack found');
-      // refused before any store touch: no te, no uses spend, no latch
+      // refused before any store touch or dice roll: no te, no uses spend, no latch
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(diceRoller.rollD20).not.toHaveBeenCalled();
     });
 
     it('refuses with popup and writes nothing when attack event has no defender', async () => {
@@ -244,6 +256,7 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Could not determine who was attacked');
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(diceRoller.rollD20).not.toHaveBeenCalled();
     });
 
     it('refuses out-of-range attacker and writes nothing; range derived from automation.range', async () => {
@@ -259,6 +272,7 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
       expect(result.payload.description).toContain('Goblin is out of range');
       expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Paladin', 'Goblin', 30);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(diceRoller.rollD20).not.toHaveBeenCalled();
     });
   });
 
@@ -280,7 +294,11 @@ describe('reactionDebuffHandler — attacks-vs-ally gate (disadvantage_on_attack
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Disadvantage');
-      expect(result.payload.description).toContain('second d20');
+      // Exact-seed pin (was a bare 'second d20' substring while the die was raw):
+      expect(result.payload.description).toContain(
+        'Disadvantage (second d20: 8): d20(8) + 5 = 13 vs AC 14 → <b>MISS</b>'
+      );
+      expect(diceRoller.rollD20).toHaveBeenCalledTimes(1);
     });
 
     it('honours custom duration from automation', async () => {

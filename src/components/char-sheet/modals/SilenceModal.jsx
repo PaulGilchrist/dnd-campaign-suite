@@ -43,7 +43,11 @@ function resolveSilenceCenterGrid(posOf, targetedNames, casterName) {
 export default function SilenceModal({
     playerStats,
     campaignName,
-    aoeRadius,
+    // Prop default mirrors the write-side RAW default (modalSpells.js
+    // silenceAoeRadiusFromSize / silenceHandler.js `auto.aoeRadius || 20`):
+    // display-default == write-default, and homebrew variants passing a wider
+    // radius (e.g. 30) are honest in the picker copy too (fix#155 truth-law).
+    aoeRadius = 20,
     onClose,
     creatureTargets,
 }) {
@@ -87,7 +91,7 @@ export default function SilenceModal({
         const results = [];
 
         for (const targetName of targetedNames) {
-            // With a known center, creatures provably outside the 20-ft sphere are refused.
+            // With a known center, creatures provably outside the aoeRadius-ft sphere are refused.
             if (centerGrid) {
                 const targetPos = posOf(targetName);
                 if (targetPos) {
@@ -160,7 +164,7 @@ export default function SilenceModal({
             title="Silence"
             icon="fa-volume-xmark"
             targets={allCreatures}
-            description="For the duration, no sound can be created within or pass through a 20-foot-radius sphere centered on a point you choose. Any creature you choose within range is Deafened and immune to Thunder damage. Casting a spell that includes a Verbal component is impossible there."
+            description={`For the duration, no sound can be created within or pass through a ${aoeRadius}-foot-radius sphere centered on a point you choose. Any creature you choose within range is Deafened and immune to Thunder damage. Casting a spell that includes a Verbal component is impossible there.`}
             confirmLabel="Cast Silence"
             confirmIcon="fa-volume-xmark"
             onConfirm={handleConfirm}

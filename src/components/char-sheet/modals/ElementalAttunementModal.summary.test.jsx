@@ -46,9 +46,17 @@
  * render; mockReset + re-arm per test; findBy idiom; captured promptId dispatched directly; no
  * bare setTimeout, no wall-clock waits.
  */
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, configure } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ElementalAttunementModal from './ElementalAttunementModal.jsx';
+
+// Flake hardening (same mechanism as the registered player-save flake, bugs.md:552): dice here
+// are fully pinned (rollExpression mocked, sequential Math.random d20 per case) and forks-pool
+// isolation excludes cross-file leaks — the live risk is passive-effect flush starvation vs the
+// DEFAULT 1000ms findBy budget. Witnessed RED under contention this window: full modals-slice
+// run 4/10, this file 1240ms, 1 failed (gate expired just past its 1s budget). Pin 3000ms
+// (3x observed stall, bounded): exact-byte assertions unchanged, patience only.
+configure({ asyncUtilTimeout: 3000 });
 
 // ── Live runtime store (anti-vacuous): commits land here, cells inspected directly ──
 

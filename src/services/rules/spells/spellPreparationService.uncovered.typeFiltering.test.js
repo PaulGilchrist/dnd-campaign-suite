@@ -221,7 +221,7 @@ function cast(listName, entries, spellName, spellLevel, extraAutomation = {}) {
   expect(addEntry).not.toHaveBeenCalled();
   expect(stats).toEqual(frozen);
   const reads = getRuntimeValue.mock.calls.slice(readsBefore);
-  expect(reads.every(r => r.length === 2 || r[2] === CAMPAIGN)).toBe(true);
+  expect(reads.every(r => r[2] === CAMPAIGN)).toBe(true); // #1520 forward-lock: EVERY read carries the explicit tier
   return { verdict, reads, keys: reads.map(r => r[1]) };
 }
 
@@ -264,11 +264,11 @@ describe('isFreeCastAuthorized — type-filter SKIP face: un-admitted types skip
       expect(verdict, container).toBe(true); // skip != deny: the scan reached the admit
       for (const k of skipKeys) expect(keys, `${container}:${k}`).not.toContain(k); // per-arm zero-read ledger: :98/:110/:114/:116 never entered for skipped rows
       expect(keys.filter(k => k.includes('Struct_Skip')), container).toEqual([]); // ledger-wide census: ZERO derived reads for skipped rows
-      expect(reads[reads.length - 1], container).toEqual([CASTER, '_Struct_Admit_freeCastCount']); // deciding read is the ADMIT's 2-arg counter (:114 via :89/:70 — arity vs REAL)
+      expect(reads[reads.length - 1], container).toEqual([CASTER, '_Struct_Admit_freeCastCount', CAMPAIGN]); // deciding read is the ADMIT's campaign-tier counter (:114 via :89/:70 — unified)
       // invocationCallOrder: gate #1's two latch probes precede every scan read
       expect(reads.slice(0, 2), container).toEqual([
-        [CASTER, 'naturalRecoveryFreeCast'],
-        [CASTER, '_Bewitching_Magic_freeCast'],
+        [CASTER, 'naturalRecoveryFreeCast', CAMPAIGN],
+        [CASTER, '_Bewitching_Magic_freeCast', CAMPAIGN],
       ]);
     });
   }

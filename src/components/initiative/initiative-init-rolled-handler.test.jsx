@@ -8,7 +8,8 @@
 //   4. Hunter's Mark concentration cleared + persisted byte-exactly; other
 //      concentrations (other spells, null/absent) preserved untouched
 //   5. dominated pendingExpirations cleared via clearExpirationEffects with exact
-//      args; non-dominated entries survive in the filtered write; empty list → no-op
+//      args; non-dominated entries survive in the filtered write; empty list → no-op;
+//      non-empty all-non-dominated list → zero rewrite (#864 only-if-changed guard)
 // Delegated (do NOT duplicate here):
 //   - concentration-result / death-save-result inline listeners → initiative-callbacks.test.jsx (#863)
 //   - round-wrap Vex latch reset (navigation seam, different event path) → navigationHandlers.wm008-vex-latch.test.js
@@ -242,6 +243,28 @@ describe('Initiative - initiative-rolled seam', () => {
         ], 'test-campaign');
         // Empty-list creature: no expiry call (count above is exactly 1) and no write.
         expect(setRuntimeValue.mock.calls.filter(c => c[0] === 'Bob' && c[1] === 'pendingExpirations')).toEqual([]);
+    });
+
+    // #864 churn pin (fix#170 only-if-changed guard law): a non-empty
+    // pendingExpirations list with NO dominated entries must produce ZERO
+    // rewrites of the identical array (was: unconditional write per invocation).
+    it('does not rewrite pendingExpirations when nothing dominated was cleared', async () => {
+        vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+        await act(async () => { render(<Initiative {...props} />); });
+        await waitFor(() => { expect(screen.getByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+        const unchangedList = [
+            { target: 'Enemy1', effects: [{ type: 'charmed', effect: 'charmed', duration: '1 turn' }] },
+            { target: 'Enemy2', effects: [{ type: 'frightened', effect: 'frightened', duration: '1 minute' }] },
+        ];
+        vi.mocked(getRuntimeValue).mockImplementation((key, prop) => (prop === 'pendingExpirations' ? unchangedList : null));
+        vi.mocked(getCombatSummary).mockReturnValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+        const runtimeBefore = setRuntimeValue.mock.calls.length;
+        await act(async () => { window.dispatchEvent(new Event('initiative-rolled')); });
+
+        // Nothing dominated: no expiry clears AND no identical-array rewrite.
+        expect(clearExpirationEffects).not.toHaveBeenCalled();
+        expect(setRuntimeValue.mock.calls.slice(runtimeBefore).filter(c => c[1] === 'pendingExpirations')).toEqual([]);
     });
 
     it('writes nothing when the combat summary cache is empty at the seam', async () => {

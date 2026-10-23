@@ -1,6 +1,7 @@
 // @maintained-by-ai
 // rules.js FACADE-GLUE lane — owns ONLY the glue that lives inside rules.js and
-// that the real-graph lanes cannot see: module-selection ternaries, wrapper arity,
+// that the real-graph lanes cannot see: module-selection dispatch (#1256 collapsed the
+// no-op ternaries), wrapper arity,
 // passthrough identity through the mock graph, the two delegates whose impl math has
 // NO other owner (getLanguages 5e assembly, getMagicItems processing), and the
 // export-surface census. The getPlayerStats trunk is owned end-to-end by
@@ -13,7 +14,7 @@
 //                          queue test-maintain-bugs.md:781 delete-cite #1251) -> test DELETED;
 //                          truth table + real-graph identity pin owned rules-core.test.js:65-94;
 //                          spell-utils is no longer mocked at all here (citer justification now stale)
-//   getPlayerStats header :52-54 (no-op ternary owner, rules.js:378-421) -> kept, new :244-342
+//   getPlayerStats header :52-54 (no-op ternary owner, rules.js:378-421) -> kept+renamed #1256 collapsed, :244-342
 //   rules-armorClass-2024.test.js:8-10 (3 rows owned here VERBATIM by name) -> kept :344-391
 //   rules-languages.test.js:7 (5e assembly math owned here, old :510-598)   -> kept+strengthened, new :393-432
 //   rules.helpers.test.js:14 (Ring of Spell Storing branch, old :631)        -> kept+extended to the
@@ -65,14 +66,16 @@
 //   in-place mutation can leak a byte across tests.
 //
 // QUIRK SCANS (this lane, report-only):
-//   • No-op ternaries rules.js:380-382/:388-390/:412-414: identical branches — the branch flip is a
-//     behaviorally inert byte (selection happens in getSubModules). Pinned as same-target calls below;
-//     the getSubModules bundle swap is what a real dispatch change would flip (#1444 owns trunk).
+//   • FIXED #1256 rules.js:380-382/:388-390/:416-418 no-op ternaries were identical
+//     branches (selection always happened in getSubModules; ternary born dead in the
+//     f12d9c961 facade split) — COLLAPSED to direct calls. Dispatch pins below still
+//     kill a wrong-bundle mutant: the getSubModules bundle swap is the live seam.
 //   • Arity fork rules.js:404-406: 5e silently DROPS playerSummary from getSpellAbilities — pinned
 //     exactly at rules-core.js:58-62 twin.
 //   • FIXED #1251 rules.js:394-399 was carryingCapacity=HP on both branches (bundle omitted
-//     getCarryingCapacity, rules-core.js:23) — now both branches dispatch getCarryingCapacity;
-//     wrapper-level collaborator pin below; raw-value twin core/rules-core.test.js:96-118.
+//     getCarryingCapacity, rules-core.js:23) — dispatches getCarryingCapacity directly
+//     (#1256 collapsed the residual ternary); wrapper-level collaborator pin below;
+//     raw-value twin core/rules-core.test.js:96-118.
 //   • :0-swallow census (this lane's inputs): none reachable — all facade inputs here are arrays/objects;
 //     NaN-on-level-less-summary and computed||0 censuses live at getPlayerStats trunk (#1444).
 //   • Console untouched by every test below (no guard branch is entered). NO-CLOCK: pure synchronous
@@ -241,8 +244,8 @@ describe('rules.js facade glue', () => {
     })
   })
 
-  describe('wrapper dispatch — rules.js:378-421 no-op ternaries (owner per rules.getPlayerStats.test.js header :52-54)', () => {
-    it('getAbilities routes BOTH ternary branches through the selected abilityCalc with playerStats only', async () => {
+  describe('wrapper dispatch — rules.js #1256 collapsed facades (routing lives in getSubModules; owner per rules.getPlayerStats.test.js header :52-54)', () => {
+    it('getAbilities routes via getSubModules to the selected abilityCalc with playerStats only (#1256 collapsed)', async () => {
       const { getAbilities: getAbilities5e } = await import('./core/abilityCalc.js')
       const { getAbilities: getAbilities2024 } = await import('./core/abilityCalc2024.js')
       const stats = { rules: '5e' }
@@ -275,7 +278,7 @@ describe('rules.js facade glue', () => {
       expect(abilityCalc2024.getHitPoints.mock.calls).toEqual([[stats2024]])
     })
 
-    it('#1251 FIXED: getCarryingCapacity invokes abilityCalc.getCarryingCapacity, never getHitPoints, both branches (rules.js:394-399)', async () => {
+    it('#1251 FIXED: getCarryingCapacity invokes abilityCalc.getCarryingCapacity, never getHitPoints, both rulesets (#1256 collapsed)', async () => {
       const abilityCalc5e = await import('./core/abilityCalc.js')
       const abilityCalc2024 = await import('./core/abilityCalc2024.js')
 

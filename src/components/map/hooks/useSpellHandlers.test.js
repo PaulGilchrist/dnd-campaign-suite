@@ -240,6 +240,89 @@ describe('useSpellHandlers', () => {
       expect(result.current.spellDragActiveRef.current).toBe(false);
     });
 
+    // #913: pointerdown fires for ALL mouse buttons; only the primary button may
+    // create, move, or rotate overlays. Previously the e.button guard sat inside the
+    // hit-test loop, so non-primary clicks on EMPTY grid fell through to placement.
+    // Map right-button ownership: pan is left-only (useZoomPan.js:52), the native
+    // menu is suppressed at Map.jsx:416 — right/middle must be fully inert here.
+    it.each([1, 2])(
+      'pointer down with button %i on empty grid is fully inert for instant shapes',
+      (button) => {
+        const { result, mocks } = getHook();
+        const event = defaultEvent({ button });
+        act(() => {
+          result.current.handleSpellPointerDown(event, OverlayShape.SPHERE, []);
+        });
+        expect(mocks.addOverlay).not.toHaveBeenCalled();
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(event.stopPropagation).not.toHaveBeenCalled();
+        expect(mocks.svgRef.current.setPointerCapture).not.toHaveBeenCalled();
+        expect(result.current.spellDraft).toBeNull();
+        expect(result.current.dragOverlay).toBeNull();
+        expect(result.current.rotateOverlay).toBeNull();
+        expect(result.current.spellDragActiveRef.current).toBe(false);
+      }
+    );
+
+    it.each([OverlayShape.CONE, OverlayShape.CUBE, OverlayShape.LINE])(
+      'right-click pointer down on empty grid opens no %s draft',
+      (shape) => {
+        const { result, mocks } = getHook();
+        const event = defaultEvent({ button: 2, clientX: 100, clientY: 200 });
+        act(() => {
+          result.current.handleSpellPointerDown(event, shape, []);
+        });
+        expect(result.current.spellDraft).toBeNull();
+        expect(mocks.addOverlay).not.toHaveBeenCalled();
+        expect(event.preventDefault).not.toHaveBeenCalled();
+      }
+    );
+
+    it('non-primary pointer up never commits a live draft; primary release commits exactly once', () => {
+      const params = { coneAngle: 90, distanceFt: 30 };
+      const { result, mocks } = getHook({ shapeParams: params });
+      act(() => {
+        result.current.handleSpellPointerDown(defaultEvent({ clientX: 100, clientY: 200 }), OverlayShape.CONE, []);
+      });
+      const rightUp = defaultEvent({ button: 2, clientX: 200, clientY: 50 });
+      act(() => {
+        result.current.handleSpellPointerUp(rightUp, result.current.spellDraft, OverlayShape.CONE, mocks.addOverlay, params);
+      });
+      expect(mocks.addOverlay).not.toHaveBeenCalled();
+      expect(result.current.spellDraft).not.toBeNull();
+
+      const leftUp = defaultEvent({ clientX: 200, clientY: 50 });
+      act(() => {
+        result.current.handleSpellPointerUp(leftUp, result.current.spellDraft, OverlayShape.CONE, mocks.addOverlay, params);
+      });
+      expect(mocks.addOverlay).toHaveBeenCalledTimes(1);
+      expect(result.current.spellDraft).toBeNull();
+    });
+
+    it('non-primary pointer up never ends a live drag gesture; primary release ends it and flushes', () => {
+      const sphere = createOverlay(OverlayShape.SPHERE, 4, 6);
+      const { result, mocks } = getHook();
+      act(() => {
+        result.current.handleSpellPointerDown(defaultEvent(), OverlayShape.SPHERE, [sphere]);
+      });
+      const drag = result.current.dragOverlay;
+
+      act(() => {
+        result.current.handleSpellDragEnd(defaultEvent({ button: 2 }), drag, null, [sphere], mocks.svgRef);
+      });
+      expect(result.current.dragOverlay).not.toBeNull();
+      expect(result.current.spellDragActiveRef.current).toBe(true);
+      expect(mocks.updateOverlayImmediate).not.toHaveBeenCalled();
+      expect(mocks.svgRef.current.releasePointerCapture).not.toHaveBeenCalled();
+
+      act(() => {
+        result.current.handleSpellDragEnd(defaultEvent(), result.current.dragOverlay, null, [sphere], mocks.svgRef);
+      });
+      expect(result.current.dragOverlay).toBeNull();
+      expect(result.current.spellDragActiveRef.current).toBe(false);
+      expect(mocks.svgRef.current.releasePointerCapture).toHaveBeenCalledTimes(1);
+    });
+
     it('drag move refuses unresolvable targets; drag end still clears state and releases capture', () => {
       const sphere = createOverlay(OverlayShape.SPHERE, 4, 6);
       const { result, mocks } = getHook();

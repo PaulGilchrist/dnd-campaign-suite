@@ -14,6 +14,7 @@ import { sendSaveResult } from '../../../combat/conditions/savePromptService.js'
 import { logConditionEvent } from '../../../encounters/combatLoggingService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getLongRestResources } from '../../../rules/effects/restRules-constants.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
@@ -53,6 +54,13 @@ vi.mock('../../common/infoPopup.js', () => ({
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+// Canonical dice lane mock (fix#169 recipe): the advantage reroll d20 arrives
+// via diceRoller.rollD20 — mockRandomDie is now an exact-face seed pin, no
+// longer a raw-Math.random floor-algebra rig.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
 }));
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -123,7 +131,9 @@ function qualifyingSave(targetName = 'AberrantSorcerer', overrides = {}) {
 }
 
 function mockRandomDie(die) {
-  vi.spyOn(Math, 'random').mockReturnValue((die - 1) / 20);
+  // Exact-face seed pin (fix#169 idiom): the reroll die arrives pre-rolled
+  // through the canonical rollD20 lane (was a Math.floor boundary rig).
+  diceRoller.rollD20.mockReturnValue(die);
 }
 
 function refusalLogs() {
@@ -268,6 +278,7 @@ describe('countercharmHandler.handle — trigger gate (CLA-064)', () => {
 
     expect(refusalLogs()[0].automationDetail).toBe('out_of_range');
     expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(diceRoller.rollD20).not.toHaveBeenCalled();
   });
 });
 
@@ -425,6 +436,7 @@ describe('countercharmHandler.handle — uses pool (CLA-064, CLA-027)', () => {
     expect(result.payload.description).toContain('no uses remaining');
     expect(refusalLogs()[0].automationDetail).toBe('uses_exhausted');
     expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(diceRoller.rollD20).not.toHaveBeenCalled();
     expect(rollLogs()).toHaveLength(0);
     expect(abilityUseLogs()).toHaveLength(0);
   });

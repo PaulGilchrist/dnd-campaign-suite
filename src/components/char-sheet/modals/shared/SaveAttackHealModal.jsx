@@ -6,7 +6,7 @@ import { addEntry } from '../../../../services/ui/logService.js';
 import utils from '../../../../services/ui/utils.js';
 import { logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
 import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js';
-import { applyDamageToTarget, computeDamageAfterEvasion, computeDamageAfterSave, hasEvasionForSave, normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
+import { applyDamageToTarget, computeDamageAfterEvasion, hasEvasionForSave, normalizeSaveType } from '../../../../services/rules/combat/applyDamage.js';
 import AreaEffectTargetModalBase from './AreaEffectTargetModalBase.jsx';
 import { renderTargetList, logSaveEntry, persistAndNotify } from './AreaEffectTargetModalBase.utils.jsx';
 
@@ -86,14 +86,21 @@ function buildHealLastAttackPayload({ attackerName, damageExpression, damageType
     };
 }
 
-function rollAndComputeSaveDamage(damageExpression, success) {
+function rollAndComputeSaveDamage(combatSummary, targetName, damageExpression, success, saveType) {
     const damageRoll = rollExpression(damageExpression);
     const rawDamage = damageRoll?.total ?? 0;
-    const finalDamage = computeDamageAfterSave(rawDamage, success, 'half');
+    // Same evasion-aware 'half' adjudication as the NPC lane at :46 —
+    // success pays floor(raw/2) (0 under active Evasion), failure pays full.
+    const finalDamage = computeHealEvasionDamage(combatSummary, targetName, rawDamage, success, saveType);
     return { damageRoll, rawDamage, finalDamage };
 }
 
-function logFailedSaveDamage({ campaignName, attackerName, featureName, damageExpression, damageType, targetName, saveType, saveDc, detail, damageRoll, rawDamage, finalDamage, combatSummary }) {
+// fix#156: adjudicated save damage applies on BOTH outcomes. Every disk row routed
+// here through saveAttackHandler grants half on a successful save ("Land's Aid",
+// 2024/classes.json: half damage on a successful CON save) — half must land, not
+// just display. Mirrors this file's NPC lane (applyAndLogHealNpcDamage applies any
+// finalDamage > 0) and SaveAttackAoeModal's prompt lane (:1775 applyPlayerSaveDamage).
+function applyAndLogSaveDamage({ campaignName, attackerName, featureName, damageExpression, damageType, targetName, saveType, saveDc, saveRoll, saveBonus, success, damageRoll, rawDamage, finalDamage, combatSummary }) {
     if (finalDamage <= 0) return;
     const characters = combatSummary?.creatures?.filter(c => c.type === 'player') || [];
     const applyResult = applyDamageToTarget(combatSummary, targetName, finalDamage, [damageType], { campaignName, characters: characters, ignoreResistance: false, attackerName: attackerName, suppressHpLog: false });
@@ -102,9 +109,9 @@ function logFailedSaveDamage({ campaignName, attackerName, featureName, damageEx
         name: featureName, formula: damageExpression,
         rolls: damageRoll?.rolls ?? [], total: rawDamage, modifier: damageRoll?.modifier ?? 0,
         damageType, targetName, saveType, saveDc, dcSuccess: 'half',
-        saveResult: 'failure',
-        saveRoll: detail.roll ?? 0, saveBonus: detail.saveBonus ?? 0,
-        saveRawRolls: [detail.roll ?? 0, detail.roll ?? 0],
+        saveResult: success ? 'success' : 'failure',
+        saveRoll, saveBonus,
+        saveRawRolls: [saveRoll, saveRoll],
         finalDamage: applyResult?.finalDamage ?? finalDamage,
         timestamp: Date.now(),
     }).catch((e) => { console.error('[SaveAttackHealModal] Error logging player damage:', e); });
@@ -191,20 +198,22 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
 
         const targetName = ctx.pendingPrompts[pendingIndex].targetName;
         const success = detail.success;
+        // Normalize the prompt answer once (server may omit roll/total/saveBonus).
+        const saveRoll = detail.roll ?? 0;
+        const saveTotal = detail.total ?? 0;
+        const saveBonus = detail.saveBonus ?? 0;
 
-        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: detail.total ?? 0, rolls: [detail.roll ?? 0], bonus: detail.saveBonus ?? 0, formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}` });
+        logSaveEntry({ campaignName, featureName, attackerName, targetName, saveDc, saveType, success, total: saveTotal, rolls: [saveRoll], bonus: saveBonus, formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}` });
 
-        const { damageRoll, rawDamage, finalDamage } = rollAndComputeSaveDamage(damageExpression, success);
-        if (!success) {
-            logFailedSaveDamage({ campaignName, attackerName, featureName, damageExpression, damageType, targetName, saveType, saveDc, detail, damageRoll, rawDamage, finalDamage, combatSummary });
-        }
+        const { damageRoll, rawDamage, finalDamage } = rollAndComputeSaveDamage(combatSummary, targetName, damageExpression, success, saveType);
+        applyAndLogSaveDamage({ campaignName, attackerName, featureName, damageExpression, damageType, targetName, saveType, saveDc, saveRoll, saveBonus, success, damageRoll, rawDamage, finalDamage, combatSummary });
 
         await setRuntimeValue('campaign', 'lastAttack', buildSaveAttackPayload({ attackerName, targetName, detail, success, saveType, saveDc, damageExpression, featureName, damageType, rawDamage, finalDamage }), campaignName);
 
         persistAndNotify(ctx.combatSummary, campaignName);
         ctx.setResults(prev => [...prev, {
-            targetName, success, roll: detail.roll ?? 0, total: detail.total ?? 0,
-            saveBonus: detail.saveBonus ?? 0, rawDamage, finalDamage,
+            targetName, success, roll: saveRoll, total: saveTotal,
+            saveBonus, rawDamage, finalDamage,
         }]);
         ctx.setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
     }, [campaignName, attackerName, saveDc, featureName, saveType, damageExpression, damageType, combatSummary]);

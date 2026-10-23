@@ -425,10 +425,14 @@ function useFeatureChoiceHandlers({ featureChoiceModal, setFeatureChoiceModal, p
             abilityName: action.name,
             description: `Chose option: ${choice}`,
         }).catch((e) => { console.error("[charSpecialActions:log-error]", e); });
-        const restMessage = (action.automation?.type === 'defensive_tactics' || action.automation?.type === 'hunter_prey')
-            ? 'This choice can be changed on a Short Rest or Long Rest.'
-            : 'This choice can be changed by clicking the feature again.';
-        const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. ${restMessage}`;
+        // Dead-arm census (ledger test-maintain-bugs #101, re-verified 2026-10-23):
+        // the former 'Short Rest or Long Rest' ternary arm was unreachable — the only
+        // paths into this fall-through are FEATURE_CHOICE_PROMPTS (defensive_tactics
+        // and hunter_prey, which early-return above with their ranger handler's own
+        // rest-message payload: defensiveTacticsHandler.js:51, hunterPreyHandler.js:57)
+        // and damage_bonus string-options (openChoicePromptIfNeeded). Actions reaching
+        // here are always damage_bonus, so only the generic hint can ever render.
+        const html = `<b>${action.name}</b><br/>Option chosen: <b>${choice}</b>. This choice can be changed by clicking the feature again.`;
         setPopupHtml(html);
     }, [featureChoiceModal, playerStats, campaignName, setPopupHtml, setFeatureChoiceModal]);
     const handleFeatureChoiceSkip = useCallback(() => {

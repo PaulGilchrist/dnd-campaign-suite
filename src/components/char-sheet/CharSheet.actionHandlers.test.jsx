@@ -523,7 +523,26 @@ describe('runtime sync on load', () => {
 
 describe('counterspell and dispel magic save-result events', () => {
   it('updates the popup from counterspell and dispel events, ignoring irrelevant ones', async () => {
+    // FLAKE WATCH #4 fix (#216: lastCall undefined in full-suite, green isolated).
+    // CharSheet returns null until its async playerStats load resolves, so
+    // CharSheetContent — the only component in this mocked tree that registers
+    // these window listeners — mounts in a scheduler-driven render outside act.
+    // renderSheet()'s waitFor resolves on the commit's DOM mutation, which can
+    // land BEFORE the passive-effect flush that calls window.addEventListener;
+    // under full-suite contention the synchronous dispatch below then hits zero
+    // listeners and the call log stays empty (scratch repro: 1 lost dispatch per
+    // 400 rounds unprompted, more under CPU oversubscription; gated pattern:
+    // 0/100). Causal gate (fix#152 idiom): wait for the registrations
+    // themselves before dispatching. All assertions below are unchanged.
+    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
     await renderSheet();
+    await waitFor(() => {
+      const registered = addEventListenerSpy.mock.calls.map(([type]) => type);
+      expect(registered).toContain('counterspell-save-result');
+      expect(registered).toContain('spell-result');
+    });
+    addEventListenerSpy.mockRestore();
+
     const setPopupHtml = sharedPopupReturnValue.setPopupHtml;
 
     window.dispatchEvent(new CustomEvent('counterspell-save-result', {

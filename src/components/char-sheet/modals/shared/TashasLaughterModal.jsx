@@ -88,7 +88,15 @@ function TashasLaughterModal({
     const [heightenTarget, setHeightenTarget] = useState(null);
     const allResultsRef = useRef([]);
 
-    const maxTargets = Math.max(1, spellSlotLevel);
+    // NaN-guard at the seam (fix#39 strict-presence + fix#121 never-null-interpolate):
+    // spellSlotLevel scales the target cap (2024 spells.json "one additional creature for
+    // each spell slot level above 1"; disk level 1: spells.json:5422 / 2024 spells.json:13307).
+    // Math.max(1, undefined) is NaN, and CreatureSelectionModal's NaN-tolerant guards
+    // (:54 `!maxTargets` is true for NaN, :88 `length >= NaN` is false) never bind —
+    // selection would go unlimited. Missing/non-finite level binds at the spell's
+    // minimum slot (1), matching the producer floor in tashasHideousLaughterService.js:3.
+    const safeSlotLevel = Number.isFinite(spellSlotLevel) ? spellSlotLevel : 1;
+    const maxTargets = Math.max(1, safeSlotLevel);
 
     const applyLaughterConditionsToTarget = useCallback((targetName, campaignName, dc, casterName) => {
         const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];

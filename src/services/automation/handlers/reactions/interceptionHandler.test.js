@@ -216,6 +216,9 @@ describe('interceptionHandler', () => {
                 { inventory: { equipped: ['Shield', 'Shortsword'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }, { name: 'Shortsword', equipment_category: 'Weapon' }] },
                 { inventory: { equipped: ['+1 Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
                 { inventory: { equipped: ['+1 Mace'] }, equipment: [{ name: 'Mace', equipment_category: 'Weapon' }] },
+                // fix#201 shared-parser arm: digit-less '+' keeps the full name
+                // (old local substring(3) copy produced 'hield'/'ace' — refusal).
+                { inventory: { equipped: ['+ Shield'] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
                 { inventory: { equipped: [null, 'Shield', undefined] }, equipment: [{ name: 'Shield', armor_category: 'Shield' }] },
             ];
 

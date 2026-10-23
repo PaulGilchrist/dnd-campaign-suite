@@ -151,9 +151,16 @@ function clearVowOfEnmity(playerName, campaignName) {
     setRuntimeValue(playerName, 'vowOfEnmityTarget', null, campaignName);
     setRuntimeValue(playerName, 'vowOfEnmityCostPaid', null, campaignName);
     if (vowTarget) {
-        const targetBuffs = getRuntimeValue(vowTarget, 'activeBuffs', campaignName) || [];
-        const filteredTargetBuffs = targetBuffs.filter(b => b.effect !== 'vow_of_enmity');
-        setRuntimeValue(vowTarget, 'activeBuffs', filteredTargetBuffs, campaignName);
+        // Only-if-changed guard (run2#346 warn, mirrors sibling
+        // clearActiveBuffsWhere :123-129): this lane used to re-stamp the
+        // target's filtered activeBuffs on EVERY own initiative roll — a
+        // byte-identical array when no vow_of_enmity buff was present,
+        // i.e. pure SSE churn plus a stale-copy clobber window for any
+        // concurrent buff write landing between this read and write
+        // (fix#86 merged-write / fix#111 fresh-read family). The guarded
+        // helper re-reads the target's CURRENT buffs at write time and
+        // writes only when the filter actually removed something.
+        clearActiveBuffsWhere(vowTarget, b => b.effect !== 'vow_of_enmity', campaignName);
     }
 }
 

@@ -83,6 +83,52 @@ describe('CharCharacterAdvancement - Options', () => {
     expect(screen.getByText(other).getAttribute('style')).not.toMatch(/font-weight/);
   });
 
+  // Highlight axis is NAME-vs-NAME: clicks persist option names (:22/:45 of the
+  // component) and the fallback resolves options[0].name, so currentOption is
+  // always a string — object rows must be compared on opt.name, not identity.
+  it.each([
+    {
+      label: 'object options, runtime value matching the second name',
+      options: [{ name: 'Obj A' }, { name: 'Obj B' }],
+      pinned: 'Obj B',
+      highlighted: 'Obj B',
+      other: 'Obj A',
+    },
+    {
+      label: 'object options, no runtime value falls back to the first name',
+      options: [{ name: 'Obj A' }, { name: 'Obj B' }],
+      pinned: null,
+      highlighted: 'Obj A',
+      other: 'Obj B',
+    },
+    {
+      label: 'mixed options, runtime value matching the object name',
+      options: ['String Opt', { name: 'Object Opt' }],
+      pinned: 'Object Opt',
+      highlighted: 'Object Opt',
+      other: 'String Opt',
+    },
+    {
+      label: 'mixed options, no runtime value falls back to the first (string) name',
+      options: ['String Opt', { name: 'Object Opt' }],
+      pinned: null,
+      highlighted: 'String Opt',
+      other: 'Object Opt',
+    },
+  ])('highlights the matching row for %s', ({ options, pinned, highlighted, other }) => {
+    mockGetRuntimeValue.mockReturnValue(pinned);
+    render(
+      <CharCharacterAdvancement
+        playerStats={featureWith(options)}
+        campaignName="test-campaign"
+      />
+    );
+    const highlightedStyle = screen.getByText(highlighted).getAttribute('style');
+    expect(highlightedStyle).toMatch(/font-weight:\s*bold/);
+    expect(highlightedStyle).toMatch(/text-decoration:\s*underline/);
+    expect(screen.getByText(other).getAttribute('style')).not.toMatch(/font-weight/);
+  });
+
   it.each([
     {
       label: 'single-word feature names map to _<Name>_option',

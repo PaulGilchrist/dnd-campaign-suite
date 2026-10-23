@@ -15,7 +15,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 //   overchannel dice formulas x3      → replaced-oracle table: ROLL_TABLE maps
 //                                         formula → exact total, never re-parsed (#1032)
 //   'logs a damage entry' + 'calls applyDamageToTarget' → exact per-row payloads (#829)
-//   'handles null rollExpression'     → zero-writes sentinel (#934)
+//   'handles null rollExpression'     → RETIRED by #1044-attack-twin refusal battery
+//                                         (old pin asserted the free ride: {data:{}} on
+//                                         cost-null; now strip-and-flag x2 + abort x1)
 //   proceed condition x5              → condition truth table (1)
 //   'calls proceedWithDamage...' + 'returns _done' → one exact-handoff test (#951)
 // Added (CANON, own lane): poisoned-weapons save fail/save/miss arms.
@@ -119,7 +121,7 @@ vi.mock('../../combat/conditions/conditionSaveService.js', () => ({
 // ── Imports ──────────────────────────────────────────────────────
 
 const { buildAttackRollDamageSteps } = await import('./attackRollDamageSteps.js');
-const { rollExpression, ROLL_TABLE } = await import('../../dice/diceRoller.js');
+const { rollExpression, rollExpressionDoubled, rollExpressionMaximized, ROLL_TABLE } = await import('../../dice/diceRoller.js');
 const { loadCombatSummary } = await import('../../encounters/combatData.js');
 const { addEntry } = await import('../../ui/logService.js');
 const { applyDamageToTarget } = await import('../../rules/combat/applyDamage.js');
@@ -251,16 +253,121 @@ describe('buildAttackRollDamageSteps — endgame (idx 17 overchannel, idx 18 pro
       }
     });
 
-    it('null roll → zero writes, empty data', async () => {
-      rollExpression.mockImplementationOnce(() => null);
-      const ctx = makeCtx({ overchannelActive: true, overchannelUseCount: 2, overchannelSpellLevel: 1 });
+    it('#1044-attack-twin null cost roll refuses the metamagic: loud console.error + §5 refusal log + stripped base bytes (never the old {data:{}} free ride)', async () => {
+      // RETIRED defect pin ('null roll → zero writes, empty data'): it asserted the
+      // free ride — { data: {} } on cost-null fired 'damage:ready' and let
+      // proceedToDamage land the UPSTREAM maximized bytes (rollBaseDamage
+      // attackRollDamageCalc.js :85-88 baked 8x6=48 into ctx.total) with zero
+      // necrotic self-damage paid. Honest shape now: strip-and-flag (fix#70 recipe).
+      // Proof of the strip is the handoff landing on the plain base 30, not 48
+      // (5+4+3+6+2+1+6+3=30, #815 hand-derived once), overchannelActive flipped to
+      // false, overchannelRefused flagged. Costs nothing: no applyDamageToTarget,
+      // no self-hit log, no maximizer/doubled contact, no runtime-latch burn
+      // (#950/#1026 zero-applied-must-not-burn; useCount owned upstream).
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rollExpression
+        .mockImplementationOnce(() => null) // cost '2d12' fails
+        .mockImplementationOnce(() => ({ total: 30, rolls: [5, 4, 3, 6, 2, 1, 6, 3], modifier: 0 })); // base '8d6'
+      const ctx = makeCtx({
+        overchannelActive: true,
+        overchannelUseCount: 2,
+        overchannelSpellLevel: 1,
+        formula: '8d6',
+        total: 48,
+        rolls: [6, 6, 6, 6, 6, 6, 6, 6],
+        modifier: 0,
+      });
 
       const result = await steps[17].handler(ctx);
 
-      expect(result).toEqual({ data: {} });
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (2d12)'));
+      expect(rollExpression).toHaveBeenCalledTimes(2); // cost, then plain base — never doubled (not a crit)
+      expect(rollExpression).toHaveBeenNthCalledWith(1, '2d12');
+      expect(rollExpression).toHaveBeenNthCalledWith(2, '8d6');
+      expect(addEntry).toHaveBeenCalledTimes(1); // refusal only — never a costed-hit double log
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+        type: 'automation',
+        characterName: 'TestChar',
+        automationType: 'overchannel_refused',
+        abilityName: 'Overchannel',
+        note: 'overchannel_refused',
+        reason: 'cost roll failed (2d12)',
+        description: 'Overchannel refused (cost roll failed: 2d12) — maximized bonus stripped, attack lands at base dice for 30. No necrotic self-damage rolled.',
+        timestamp: expect.any(Number),
+      });
+      expect(result).toEqual({
+        data: { formula: '8d6', total: 30, rolls: [5, 4, 3, 6, 2, 1, 6, 3], modifier: 0, overchannelActive: false, overchannelRefused: true },
+      });
       expect(loadCombatSummary).not.toHaveBeenCalled();
       expect(applyDamageToTarget).not.toHaveBeenCalled();
-      expect(addEntry).not.toHaveBeenCalled();
+      expect(rollExpressionMaximized).not.toHaveBeenCalled();
+      expect(rollExpressionDoubled).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('#1044-attack-twin crit-refusal re-rolls through the rolling-lane dispatcher: doubled total, single-set rolls', async () => {
+      // overchannel beat crit upstream (maximized 4x6=24 carried in ctx.total); once
+      // refused, the base is the CRIT cast: doubled 15x2=30 (5+4+3+3=15, #815),
+      // rolls single set [5,4,3,3] — exact shape rollBaseDamage :88 would have
+      // emitted without overchannel. 24→30 proves the doubled dispatcher ran.
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rollExpression.mockImplementationOnce(() => null); // cost '4d12' fails
+      rollExpressionDoubled.mockImplementationOnce(() => ({ total: 30, rolls: [5, 4, 3, 3], doubledRolls: [5, 4, 3, 3, 5, 4, 3, 3], modifier: 0 }));
+      const ctx = makeCtx({
+        overchannelActive: true,
+        overchannelUseCount: 2,
+        overchannelSpellLevel: 2,
+        isCrit: true,
+        formula: '4d6',
+        total: 24,
+        rolls: [6, 6, 6, 6],
+        modifier: 0,
+      });
+
+      const result = await steps[17].handler(ctx);
+
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (4d12)'));
+      expect(rollExpressionDoubled).toHaveBeenCalledWith('4d6');
+      expect(rollExpression).toHaveBeenCalledTimes(1); // cost only — base went through the doubled dispatcher
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        automationType: 'overchannel_refused',
+        description: 'Overchannel refused (cost roll failed: 4d12) — maximized bonus stripped, attack lands at base dice for 30. No necrotic self-damage rolled.',
+      }));
+      expect(result).toEqual({
+        data: { formula: '4d6', total: 30, rolls: [5, 4, 3, 3], modifier: 0, overchannelActive: false, overchannelRefused: true },
+      });
+      expect(loadCombatSummary).not.toHaveBeenCalled();
+      expect(applyDamageToTarget).not.toHaveBeenCalled();
+    });
+
+    it('#1044-attack-twin double-failure resolves null — fix#69 abort token, never {data:{}}; refusal logged with abort wording', async () => {
+      // Cost '2d12' AND base 'gibberish' both fail. Nothing honest exists to hand
+      // steps[18] proceedToDamage — the old {data:{}} would have fired 'damage:ready'
+      // with the maximized total. null breaks the chain (actionPipeline.js:36).
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rollExpression
+        .mockImplementationOnce(() => null) // cost roll fails
+        .mockImplementationOnce(() => null); // base re-roll fails too
+      const ctx = makeCtx({
+        overchannelActive: true,
+        overchannelUseCount: 2,
+        overchannelSpellLevel: 1,
+        formula: 'gibberish',
+        total: 48,
+        rolls: [6, 6, 6, 6, 6, 6, 6, 6],
+        modifier: 0,
+      });
+
+      await expect(steps[17].handler(ctx)).resolves.toBeNull();
+
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Overchannel cost roll failed (2d12)'));
+      expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        automationType: 'overchannel_refused',
+        description: 'Overchannel refused (cost roll failed: 2d12) and base damage (gibberish) could not be rolled — attack aborted, no damage applied.',
+      }));
+      expect(loadCombatSummary).not.toHaveBeenCalled();
+      expect(applyDamageToTarget).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 

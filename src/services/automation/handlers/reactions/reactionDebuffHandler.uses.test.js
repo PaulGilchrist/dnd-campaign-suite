@@ -33,9 +33,10 @@
 // defaultPath / branchesOfTheTree).
 //
 // Deterministic: runtime store, logs, ranges, rollback, healing, expression
-// eval and infoPopup are fully mocked; the random bardic/second d20 only varies
-// unpinned numerals in popup prose, and one hit→miss reversal is fully mocked.
-// Pure budget arithmetic — no churn expected when the app changes.
+// eval and infoPopup are fully mocked; the bardic/second d20 now roll through
+// the mocked canonical diceRoller lane (fix#169 recipe) with a seeded default
+// face, so popup numerals are exact by construction. Pure budget arithmetic —
+// no churn expected when the app changes.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
@@ -105,11 +106,19 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): BI/second-d20 dice arrive via
+// diceRoller, never raw Math.random.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
 import * as automationService from '../../../combat/automation/automationService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'TestCampaign';
 const mapName = 'DungeonMap';
@@ -208,6 +217,10 @@ function bakedPatch() {
 describe('reactionDebuffHandler — uses/budget accounting (default route)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Seed pin (fix#169 idiom): seeded faces for the now-mocked dice seams —
+    // budget arithmetic stays the assertion focus, popup numerals are exact.
+    diceRoller.rollDie.mockReturnValue(4);
+    diceRoller.rollD20.mockReturnValue(10);
   });
 
   describe('uses decrement via the preSpent stampPatch', () => {

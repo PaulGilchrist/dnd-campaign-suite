@@ -29,9 +29,17 @@ export function applyGreatWeaponFighting(rolls) {
  * @param {Object} weapon - Weapon object with properties array
  * @param {Object} playerStats - PlayerStats object with automation data
  * @returns {boolean} True if GWF applies
+ *
+ * Posture (#1246): tolerant-quiet at every absence level — this file never
+ * logs and never throws. Missing weapon (:34), missing/absent automation
+ * (`?.` + `|| []` below) and now missing playerStats all resolve to
+ * `false` = "does not apply", which keeps RAW damage unmodified downstream.
+ * Mirrors hasPassiveEffect's guarded apex (automationPassives.js:19), the
+ * live parallel path for this exact check.
  */
 export function greatWeaponFightingApplies(weapon, playerStats) {
     if (!weapon) return false;
+    if (!playerStats) return false;
 
     const hasGWF = (playerStats.automation?.passives || []).some(
         p => p.type === 'passive_rule' && p.effect === 'great_weapon_fighting'

@@ -17,9 +17,9 @@
  * - travelInit derivation from loaded travelState     -> useMapLoader.travelState.test.js
  *
  * Honest scoping notes (known source bugs, not masked here): fixtures use a
- * constant mapName, so the never-reset isInitialized (:161) and stale
- * hexMapNameRef (:210/:190) on a mapName change are not exercised, and the
- * :178 silent catch is not surfaced by this lane's resolving-load fixtures.
+ * constant mapName, so the #801 re-arm/re-claim seams are exercised by the
+ * in-place switch arms of useMapLoader.api.test.js, not here, and the :178
+ * silent catch is not surfaced by this lane's resolving-load fixtures.
  * The former :188-210 mount-save race is FIXED in the source (#800): the
  * persistence guard is now the `loading` state, whose flip commit is what
  * deterministically flushes this lane's loaded snapshot exactly once.

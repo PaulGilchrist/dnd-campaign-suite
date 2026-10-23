@@ -30,13 +30,27 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => ({ round: 1, activeCreatureName: 'TestSorcerer' })),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the nat-20 surge gate die arrives
+// via rollD20 and the d100 surge-table dice via rollDie — mockDice is now an
+// exact-face seed pin; the old shared-Math.random rigs (one raw value driving
+// both dice through floor algebra) are retired.
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
+    rollDie: vi.fn(),
+}));
+
+import * as diceRoller from '../../../dice/diceRoller.js';
+
 const surgeTable = [
     { min: 1, max: 50, effect: 'Surge effect A' },
     { min: 51, max: 100, effect: 'Surge effect B' },
 ];
 
-function mockMathRandom(value) {
-    vi.spyOn(global.Math, 'random').mockReturnValue(value);
+function mockDice(d20, d100) {
+    // Exact-face seed pins (fix#169 idiom): gate d20 and table d100 faces
+    // set independently on the canonical diceRoller lane.
+    diceRoller.rollD20.mockReturnValue(d20);
+    diceRoller.rollDie.mockReturnValue(d100);
 }
 
 function makeAction(auto = {}) {
@@ -76,7 +90,7 @@ describe('wildMagicSurgeHandler', () => {
 
     describe('handle', () => {
         it('should open roll-mode modal on nat-20 with surge-table passthrough and mark surgeUsedRound', async () => {
-            mockMathRandom(0.99); // d20 = 20, d100 = 100
+            mockDice(20, 100); // gate d20 = 20, table d100 = 100
 
             const result = await handle(
                 makeAction(),
@@ -99,7 +113,7 @@ describe('wildMagicSurgeHandler', () => {
 
             // No table on playerStats → modal still opens with empty surgeTable
             resetRuntimeMocks();
-            mockMathRandom(0.99);
+            mockDice(20, 100);
 
             const emptyResult = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -113,7 +127,7 @@ describe('wildMagicSurgeHandler', () => {
                 if (key === 'wildMagicDoubleRoll') return true;
                 return null;
             });
-            mockMathRandom(0.99); // d20 = 20, d100 rolls = 100
+            mockDice(20, 100); // d20 = 20, d100 rolls = 100
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -157,6 +171,8 @@ describe('wildMagicSurgeHandler', () => {
             }));
             // refusal short-circuits before any roll or stamp
             expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+            expect(diceRoller.rollD20).not.toHaveBeenCalled();
+            expect(diceRoller.rollDie).not.toHaveBeenCalled();
         });
 
         it('should bypass latch and nat-20 gate when autoSurge is true, without marking surgeUsedRound', async () => {
@@ -165,7 +181,7 @@ describe('wildMagicSurgeHandler', () => {
                 if (key === 'surgeUsedRound') return { round: 3, activeCreature: 'TestSorcerer' };
                 return null;
             });
-            mockMathRandom(0.5); // d20 = 11 (gate would normally refuse), d100 = 51
+            mockDice(11, 51) // gate d20 = 11 (gate would normally refuse), table d100 = 51
 
             const result = await handle(makeAction({ autoSurge: true }), makePlayerStats(), 'campaign', 'map');
 
@@ -185,7 +201,7 @@ describe('wildMagicSurgeHandler', () => {
                 if (key === 'wildMagicDoubleRoll') return true;
                 return null;
             });
-            mockMathRandom(0.99);
+            mockDice(20, 100);
 
             const result = await handle(makeAction({ autoSurge: true }), makePlayerStats(), 'campaign', 'map');
 
@@ -213,7 +229,7 @@ describe('wildMagicSurgeHandler', () => {
                 }
                 return null;
             });
-            mockMathRandom(0.5); // d20 = 11 — gate bypassed by the rider, d100 = 51
+            mockDice(11, 51) // gate d20 = 11 — gate bypassed by the rider, table d100 = 51
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 

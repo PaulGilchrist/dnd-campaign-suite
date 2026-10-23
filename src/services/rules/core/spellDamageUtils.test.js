@@ -186,6 +186,12 @@ describe('spellDamageUtils', () => {
       expect(resolveHealExpression(disk5e('Fire Bolt'), 5, 3)).toBe('');
       expect(resolveHealExpression({ level: 1, heal_at_slot_level: '1d8' }, 1, 1)).toBe('');
       expect(resolveHealExpression({ level: 1, heal_at_slot_level: {} }, 1, 1)).toBe('');
+      // fix: entry guard — every sibling resolver short-circuits `!spell` before
+      // dereferencing its table (resolveSpellDamageAtLevel :11, isAutoHitSpell :39,
+      // resolveSpellDamageWithTypes :124); the heal resolver now declines identically
+      // instead of throwing on spell.heal_at_slot_level.
+      expect(resolveHealExpression(null, 5, 3)).toBe('');
+      expect(resolveHealExpression(undefined, 5, 3)).toBe('');
     });
 
     it('scales a cantrip heal ladder by player level and substitutes MOD (synthetic row)', () => {
@@ -193,6 +199,22 @@ describe('spellDamageUtils', () => {
       const cantrip = { level: 0, heal_at_slot_level: { '0': '1d4 + MOD', '5': '2d4 + MOD' } };
       expect(resolveHealExpression(cantrip, 4, 2)).toBe('1d4+2');
       expect(resolveHealExpression(cantrip, 5, 2)).toBe('2d4+2');
+    });
+  });
+
+  // Structural seam-coherence pin: the whole resolver family declines an absent
+  // spell identically — guard at entry, return each resolver's declared neutral
+  // value, never throw on the *_at_slot_level table deref behind it.
+  describe('resolver family null-entry posture parity', () => {
+    const family = [
+      ['resolveSpellDamageAtLevel', resolveSpellDamageAtLevel, ''],
+      ['isAutoHitSpell', isAutoHitSpell, false],
+      ['resolveSpellDamageWithTypes', resolveSpellDamageWithTypes, null],
+      ['resolveHealExpression', resolveHealExpression, ''],
+    ];
+    it.each(family)('%s declines null and undefined without throwing', (_name, resolver, neutral) => {
+      expect(resolver(null, 5, 3)).toBe(neutral);
+      expect(resolver(undefined, 5, 3)).toBe(neutral);
     });
   });
 });

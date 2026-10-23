@@ -5,7 +5,12 @@ import { setCombatSummaryCache } from '../../../../services/encounters/combatDat
 export function renderTargetList({ eligibleTargets, selected, toggleTarget, _isCarefulAlly, heightenTarget, setHeightenTarget, metamagicHeighten }) {
   const handleHeightenSelect = (name) => {
     if (setHeightenTarget) {
-      setHeightenTarget(heightenTarget === name ? null : name);
+      // #174 dead-path cleanup: browsers never fire change on a re-click of an
+      // already-checked radio, so the old `heightenTarget === name ? null : name`
+      // deselect ternary was unreachable. No base/"none" radio exists because none
+      // is needed — heightenTarget starts null (never-clicked = base-level cast)
+      // and clicking only moves the single disadvantage mark to this target.
+      setHeightenTarget(name);
     }
   };
 

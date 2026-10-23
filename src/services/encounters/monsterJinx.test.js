@@ -38,6 +38,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isMonsterJinxRow,
   jinxSaveSpec,
+  jinxSaveOutcome,
   attackerSaveModifier,
   jinxIdentityRefusal,
   jinxGate,
@@ -254,13 +255,32 @@ describe('MA-0895 press legs — attacker WIS save inline, machine-stamped, latc
     expect(result.popupHtml ?? null).toBeNull();
   });
 
-  it('save-spec units: automation twins win, save_dc fallback folds, §212 nested-abbrev beats ability_score_modifiers', () => {
+  it('save-spec units: automation twins win, top-level save_dc/save_type fallbacks fold (#1098), §212 nested-abbrev beats ability_score_modifiers', () => {
+    // save_dc fallback with NO save_type authored anywhere → documented 'WIS'
+    // default (RAW Jinx is a Wisdom save — the default, never an override).
     expect(jinxSaveSpec({ save_dc: 15, automation: { type: 'reaction', effect: 'jinx_negate' } })).toEqual({ saveDc: 15, saveType: 'WIS' });
+    // automation twin outranks a differing top-level twin.
+    expect(jinxSaveSpec({ save_dc: 10, save_type: 'CON', automation: { type: 'reaction', effect: 'jinx_negate', saveType: 'WIS', saveDc: 13 } })).toEqual({ saveDc: 13, saveType: 'WIS' });
+    // #1098 arm: non-WIS top-level save_type must NOT be silently forced to WIS.
+    expect(jinxSaveSpec({ save_dc: 15, save_type: 'CON', automation: { type: 'reaction', effect: 'jinx_negate' } })).toEqual({ saveDc: 15, saveType: 'CON' });
+    // spelled-out twin flows through and the save leg folds it to the abbreviation.
+    const spellOut = jinxSaveSpec({ save_dc: 13, save_type: 'Wisdom', automation: { type: 'reaction', effect: 'jinx_negate' } });
+    expect(spellOut).toEqual({ saveDc: 13, saveType: 'Wisdom' });
+    expect(jinxSaveOutcome({ attacker: { saving_throws: { wis: { modifier: -2 }, con: { modifier: 5 } } }, spec: spellOut, rollD20: () => 10 })).toMatchObject({ modifier: -2, total: 8, success: false });
+    expect(jinxSaveOutcome({ attacker: { saving_throws: { wis: { modifier: -2 }, con: { modifier: 5 } } }, spec: { saveDc: 13, saveType: 'CON' }, rollD20: () => 10 })).toMatchObject({ modifier: 5, total: 15, success: true });
     expect(jinxSaveSpec({ automation: { type: 'reaction', effect: 'jinx_negate', saveDc: 0 } })).toBeNull();
     expect(jinxSaveSpec({})).toBeNull();
     expect(attackerSaveModifier({ ability_score_modifiers: { wis: 2 } }, 'wis')).toBe(2);
     expect(attackerSaveModifier({ saving_throws: { wis: { modifier: -5 } }, ability_score_modifiers: { wis: 2 } }, 'wis')).toBe(-5);
     expect(attackerSaveModifier(null, 'wis')).toBe(0);
+  });
+
+  it('non-jinx rows never reach the spec chain — resolveMonsterJinxRow refuses not-jinx, zero writes', async () => {
+    const deps = makeDeps().deps;
+    const result = await resolveMonsterJinxRow({ action: banditCaptain.reactions[0], monsterName: 'Bandit Captain 1', campaignName: CAMPAIGN, lastAttack: pendingHit({ targetName: 'Bandit Captain 1' }), cs: makeCs(), currentRound: 1, storedUses: {}, usedRound: 0, latchKey: '_jinx_negate_usedRound', deps });
+    expect(result).toEqual({ resolved: false, reason: 'not-jinx' });
+    expect(deps.setRuntimeValue).not.toHaveBeenCalled();
+    expect(deps.addEntry).not.toHaveBeenCalled();
   });
 });
 

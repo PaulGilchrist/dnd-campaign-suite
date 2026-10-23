@@ -7,19 +7,25 @@
 //     duration, damageTypeChoice: chosen?.damageType || null } keyed by (playerName, campaignName)
 //     (sacredWeaponHandler.js:118-127). Activation/expiry is NOT this lane.
 //   - automationCollector.sacredWeapon.test.js pins the collector emitting the passive
-//     { name:'Sacred Weapon', effect:'sacred_weapon' } consumed at sacredWeapon.js:10 —
+//     { name:'Sacred Weapon', effect:'sacred_weapon' } consumed at sacredWeapon.js:17 —
 //     passive collection is NOT this lane.
 //   - SacredWeaponModal / CharActions.sacredWeapon2024 cover the UI choice flow — not here.
 //   - This lane owns: condition weapon gate (sacredWeapon.js:6-7) + handler byte-copy
-//     (sacredWeapon.js:9-20): exact passive match → null; else campaign-keyed store read →
+//     (sacredWeapon.js:9-24): exact passive match → null; else campaign-keyed store read →
 //     exact buff match → truthy damageTypeChoice copies onto ctx.attack.damageType →
 //     prevData passes through VERBATIM ({ data: prevData }, same reference, #993).
 // Consulted-bytes census (#967): weaponType ∈ {melee,unarmed}; passive/buff name/effect exact
 // === (#950); damageTypeChoice truthiness (handler stores null per sacredWeaponHandler.js:121).
 // Quirk pinned honestly: condition gates on passives *presence* only (an empty array passes —
-// sacredWeapon.js:7 `!!...passives`); the handler's exact-match at :10 is the true gate.
+// sacredWeapon.js:7 `!!...passives`); the handler's exact-match at :17 is the true gate.
 // Handler has NO weapon-type check — condition is the sole weapon gate (fixed in the truth
 // table below; the application test runs unarmed to prove the handler is weapon-agnostic).
+// #1056 flips (2026-10-23, owner-approved): the three [sw-debug] console.log litter lines
+// are removed from the source, and the condition guards playerStats with optional chaining
+// (mirrors the grappler sibling, grappler.js:73). Null stats now short-circuit the condition
+// to false (pipeline skips the step, chain intact) and a direct handler call with null stats
+// loud-declines (console.error + family skip byte null, see :18 / grappler.js:77). Success
+// paths are pinned ZERO-noise: no console.log, no console.error.
 // Old→new map: 34 tests → 5 (weapon/passives permutations → condition truth table +
 // short-circuit-honesty row #1055; early-return permutations → refusal table with zero
 // side-effects #936; no-choice permutations → falsy-choice table; store fidelity +
@@ -71,11 +77,16 @@ function armBuffStore(buffs) {
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('sacredWeapon', () => {
+  let logSpy;
+  let errorSpy;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    // Source carries [sw-debug] console.log lines (leftover debug noise — reported upstream);
-    // silence them without asserting on log bytes.
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Zero-noise contract (post #1056 flip): the source carries NO debug console bytes —
+    // every path must leave console.log untouched; success paths must not console.error
+    // either (loud-decline is reserved for the null-stats defect arm).
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -94,24 +105,54 @@ describe('sacredWeapon', () => {
     ['weaponType missing', undefined, [SW_PASSIVE], false],
     ['weaponType empty string', '', [SW_PASSIVE], false],
     ['automation missing', 'melee', undefined, false],
+    ['passives null (automation present)', 'melee', null, false],
   ])('condition: %s → %s', (_label, weaponType, passives, expected) => {
     const ctx = makeCtx({
       attack: { weaponType },
       playerStats: passives === undefined ? { name: PALADIN } : withPassives(passives),
     });
     expect(sacredWeapon.condition(ctx)).toBe(expected);
+    // Every condition path is console-silent.
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  // && short-circuit honesty (#1055): a failing weapon byte never touches playerStats, so
-  // weaponOk=false + null playerStats is false — NOT a throw. weaponOk=true + null
-  // playerStats throws TypeError (no null check at sacredWeapon.js:7 — pinned honestly).
-  it('short-circuits on the weapon byte, then throws on null playerStats', () => {
+  // && short-circuit honesty (#1055) + guard flip (#1056): a failing weapon byte never
+  // touches playerStats, so weaponOk=false + null playerStats is false — NOT a throw.
+  // weaponOk=true + null playerStats is now also FALSE (optional-chain guard added at
+  // sacredWeapon.js:7, mirroring grappler.js:73) — the pipeline skips the step silently
+  // and the attack chain stays intact; the old honest TypeError pin is retired.
+  it('short-circuits on the weapon byte, then declines null playerStats (guard, no throw)', () => {
     expect(sacredWeapon.condition({ attack: null, playerStats: null })).toBe(false);
     expect(sacredWeapon.condition({ attack: { weaponType: 'ranged' }, playerStats: null })).toBe(false);
-    expect(() => sacredWeapon.condition({ attack: { weaponType: 'melee' }, playerStats: null })).toThrow(TypeError);
+    expect(sacredWeapon.condition({ attack: { weaponType: 'melee' }, playerStats: null })).toBe(false);
+    expect(sacredWeapon.condition({ attack: { weaponType: 'unarmed' } })).toBe(false);
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  // Passive gate (sacredWeapon.js:10-12): every refusal returns null, burns no store read,
+  // Null-stats handler arm (#1056 flip): only reachable by DIRECT call (the runner
+  // consults the guarded condition first — attackRollPostDamage.js:36-37), so missing
+  // stats is a caller defect: loud console.error + family skip byte null (#936 shape —
+  // zero store reads, zero ctx mutation, prevData untouched), never a TypeError abort.
+  it('loud-declines with the skip byte when invoked directly with null playerStats', async () => {
+    const ctx = makeCtx({
+      attack: { weaponType: 'melee', damageType: 'slashing' },
+      playerStats: null,
+    });
+    const prevData = { formula: '1d8+3', total: 11 };
+
+    const result = await sacredWeapon.handler(ctx, prevData);
+
+    expect(result).toBe(null);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain('[sacredWeapon]');
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(getRuntimeValue).not.toHaveBeenCalled();
+    expect(ctx.attack).toEqual({ weaponType: 'melee', damageType: 'slashing' });
+  });
+
+  // Passive gate (sacredWeapon.js:17-18): every refusal returns null, burns no store read,
   // and mutates nothing (#936). Exact-=== byte contract (#950): near-miss casing/effect
   // refuses; the collector that produces these exact bytes is pinned in its own lane.
   it.each([
@@ -165,9 +206,12 @@ describe('sacredWeapon', () => {
     expect(ctx.attack).toEqual({ weaponType: 'unarmed', damageType: 'Radiant', ability: 'str' });
     expect(result).toEqual({ data: prevData });
     expect(result.data).toBe(prevData);
+    // Success-path zero-noise pin (#1056): the [sw-debug] litter is gone from prod.
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  // Passive armed but nothing converts (sacredWeapon.js:14-17): missing store entry and
+  // Passive armed but nothing converts (sacredWeapon.js:20-23): missing store entry and
   // falsy damageTypeChoice (store writes null when no option chosen —
   // sacredWeaponHandler.js:121) all pass prevData through untouched, byte-identical.
   it.each([

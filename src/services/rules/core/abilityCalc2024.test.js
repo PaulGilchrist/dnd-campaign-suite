@@ -143,22 +143,34 @@ describe('abilityCalc2024', () => {
       }
     });
 
-    it('adds proficiency to proficient skills and doubles it for expertise (quirk included)', async () => {
+    it('applies the RAW expertise law: doubled proficiency ONLY where proficient (4-quadrant)', async () => {
       const result = await getAbilities(makeStats({
-        level: 7, // proficiency 3
-        abilities: fullScores({ Dexterity: 14 }),
-        skillProficiencies: ['Stealth'],
-        expertise: ['Stealth', 'Arcana'],
+        level: 7, // proficiency +3
+        abilities: fullScores({ Dexterity: 14 }), // DEX +2, INT +0
+        skillProficiencies: ['Stealth', 'Sleight of Hand'],
+        expertise: ['Stealth', 'Arcana'], // Arcana: illegal expertise mark (not proficient)
       }));
       const dex = result.find(a => a.name === 'Dexterity');
-      expect(dex.skills.find(s => s.name === 'Stealth').bonus).toBe(8); // 2 + 3 prof + 3 expertise
-      expect(dex.skills.find(s => s.name === 'Acrobatics').bonus).toBe(2); // not proficient: bonus only
-
-      // Quirk: expertise doubles proficiency even when the skill is NOT in
-      // skillProficiencies — same as 5e twin (abilityCalc.js:29-31, pinned at
-      // abilityCalc.test.js:181-185); here abilityCalc2024.js:34-36.
       const int = result.find(a => a.name === 'Intelligence');
-      expect(int.skills.find(s => s.name === 'Arcana').bonus).toBe(3); // 0 + 3 expertise, no prof
+      const skill = (ability, name) => result.find(a => a.name === ability).skills.find(s => s.name === name);
+
+      // [quadrant, ability, skill, expected bonus] — mirrors the 5e twin lane
+      const table = [
+        ['expert + proficient', 'Dexterity', 'Stealth', 8],       // 2 + 3 prof + 3 expertise — working path intact
+        ['expert, NOT proficient', 'Intelligence', 'Arcana', 0],  // was pinned 3 (defect): expertise requires proficiency first
+        ['proficient only', 'Dexterity', 'Sleight of Hand', 5],   // 2 + 3 prof
+        ['neither', 'Dexterity', 'Acrobatics', 2],                 // bonus only
+      ];
+      for (const [quadrant, ability, name, expected] of table) {
+        expect(skill(ability, name).bonus, `${quadrant}: ${name}`).toBe(expected);
+      }
+
+      // DC-20 comparison pin (phantom-bonus falsifier): d20 showing 17 on the
+      // expert-marked-but-not-proficient Arcana — RAW 17 + 0 = 17 FAILS DC 20;
+      // pre-fix phantom (17 + 3 = 20) would have falsely SUCCEEDED.
+      const d20 = 17;
+      expect(d20 + int.skills.find(s => s.name === 'Arcana').bonus).toBe(17); // fail
+      expect(d20 + dex.skills.find(s => s.name === 'Stealth').bonus).toBe(25); // legit expert succeeds
     });
 
     it('applies epic boon +4 (cap 25) to Barbarian Str/Con and Monk Dex/Wis at level 20 only', async () => {

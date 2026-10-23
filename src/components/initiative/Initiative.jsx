@@ -154,7 +154,12 @@ function clearDominatedExpirations(creature, campaignName) {
         if (!entry.effects || !Array.isArray(entry.effects)) return true
         return entry.effects.every(e => e.type !== 'dominated')
     })
-    setRuntimeValue(creature.name, 'pendingExpirations', filteredExpirations, campaignName)
+    // #864 only-if-changed guard (fix#170 house shape, cf. clearActiveBuffsWhere
+    // useInitiativeEffects.js:126): a non-empty list with no dominated entries must
+    // not re-write the identical array — redundant POST/SSE churn per invocation.
+    if (filteredExpirations.length !== dominateList.length) {
+        setRuntimeValue(creature.name, 'pendingExpirations', filteredExpirations, campaignName)
+    }
 }
 
 function resolveRound(combatSummary, fallback) {

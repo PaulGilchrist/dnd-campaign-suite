@@ -1432,6 +1432,7 @@
         "description": "The dracolich beats its tattered wings. Each creature within 10 feet of the dracolich must succeed on a DC 21 Dexterity saving throw or take 14 (2d6 + 7) bludgeoning damage and be knocked prone. After beating its wings this way, the dracolich can fly up to half its flying speed.",
         "save_dc": 21,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "save_effect": "Failure: 14 (2d6 + 7) Bludgeoning damage. The target is also knocked prone.",
         "damage_dice_primary": "2d6 + 7",
         "damage_type_primary": "Bludgeoning"
@@ -19510,6 +19511,7 @@
         "damage_dice_primary": "3d12 + 7",
         "damage_type_primary": "bludgeoning",
         "save_type": "Strength",
+        "dc_success": "none",
         "save_effect": "Failure: be pushed up to 10 feet away from the dragon turtle and knocked prone."
       },
       {
@@ -19885,6 +19887,7 @@
         "damage_dice_primary": "1d6 + 2",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: be poisoned for 1 hour.",
         "save_margin": {
           "fails_by": 5,
@@ -20025,6 +20028,7 @@
         "damage_dice_primary": "1d6 + 4",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: be poisoned for 1 hour.",
         "save_margin": {
           "fails_by": 5,
@@ -25443,7 +25447,7 @@
         "name": "Spellcasting",
         "description": "Orcus casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 23): <strong>At Will:</strong> <em>Detect Magic</em>. <strong>3/Day:</strong> <em>Dispel Magic</em>. <strong>1/Day:</strong> <em>Time Stop</em>.",
         "save_dc": 23,
-        "save_type": "Wisdom"
+        "save_type": "Charisma"
       },
       {
         "name": "Wand Spellcasting",
@@ -37537,6 +37541,7 @@
         "reach": "5 ft.",
         "save_dc": 12,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: The target has the Poisoned condition until the end of the homunculus's next turn.",
         "damage_type_primary": "Piercing",
         "damage_dice_primary": "1",
@@ -40090,6 +40095,7 @@
         "attack_bonus": 0,
         "save_dc": 25,
         "save_type": "Dexterity",
+        "dc_success": "none",
         "save_effect": "Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
         "range": "",
         "reach": "",
@@ -51288,6 +51294,7 @@
         "attack_bonus": 14,
         "save_dc": 21,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: The target has the Poisoned condition",
         "range": "",
         "reach": "10 ft.",
@@ -53127,6 +53134,7 @@
         "attack_bonus": 0,
         "save_dc": 12,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: 5 (2d4) Poison damage, and the target has the <strong>Poisoned</strong> condition for 1 hour.",
         "save_margin": {
           "fails_by": 5,
@@ -64665,6 +64673,7 @@
         "damage_dice_primary": "4d6 + 10",
         "damage_type_primary": "bludgeoning",
         "save_type": "Strength",
+        "dc_success": "none",
         "save_effect": "Failure: knocked prone"
       },
       {
@@ -64691,6 +64700,7 @@
         "save_damage_dice": "8d6 + 6",
         "save_damage_type": "Bludgeoning",
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_effect": "Failure: 28 (8d6 + 6) Bludgeoning damage. If the target is a creature, it is swallowed — Blinded, Prone, and Restrained until it is regurgitated."
       }
     ],
@@ -64828,6 +64838,7 @@
         "damage_dice_primary": "1d6 + 1",
         "damage_type_primary": "piercing",
         "save_type": "Constitution",
+        "dc_success": "none",
         "repeat_save": {
           "effect": "thri_kreen_bite_poison",
           "save_type": "Constitution",
@@ -70587,6 +70598,7 @@
         "description": "Constitution Saving Throw: DC 13, one creature within 5 feet. Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time.",
         "save_dc": 13,
         "save_type": "Constitution",
+        "dc_success": "none",
         "save_hp_max_reduce": {
           "equal_to": "damage"
         },

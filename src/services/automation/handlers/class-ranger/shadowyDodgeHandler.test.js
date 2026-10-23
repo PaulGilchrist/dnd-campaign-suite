@@ -1,8 +1,10 @@
 // @maintained-by-ai
 // Shadowy Dodge handler unit tests. Fully deterministic: every external
 // dependency (damageRollback, logService, runtime store, combat context,
-// rangeCheck) is mocked at module level and Math.random is controlled, so
-// every outcome (second d20, final hit/miss, description) is exact.
+// rangeCheck, diceRoller) is mocked at module level, so every outcome (second
+// d20, final hit/miss, description) is exact — the second d20 now arrives as
+// an exact seed pin through the canonical rollD20 lane (fix#169 recipe; the
+// old raw-Math.random floor-algebra rigs are retired).
 // Pins: CLA-310 reaction-economy gates (self-attack, range, attack-instance
 // latch _ShadowyDodge_appliedAttack, round latch _ShadowyDodge_usedRound),
 // exact-key stamping, full-string own-composition popup/log pins, and the
@@ -17,6 +19,7 @@ import * as logService from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { isWithinRange } from '../../../rules/combat/rangeCheck.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 vi.mock('../../common/damageRollback.js', () => ({
     findLastAttack: vi.fn(),
@@ -38,6 +41,12 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../../rules/combat/rangeCheck.js', () => ({
     isWithinRange: vi.fn().mockResolvedValue(true),
+}));
+
+// Canonical dice lane mock (fix#169 recipe): the disadvantage second d20 rolls
+// through diceRoller.rollD20, never raw Math.random.
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
 }));
 
 const APPLIED_ATTACK_KEY = '_ShadowyDodge_appliedAttack';
@@ -76,25 +85,18 @@ function makeAttack(overrides = {}) {
 }
 
 describe('shadowyDodgeHandler', () => {
-    let originalRandom;
-
     beforeEach(() => {
         vi.clearAllMocks();
-        originalRandom = Math.random;
-        Math.random = vi.fn();
         getCombatContext.mockResolvedValue({ round: 1, creatures: [] });
         getRuntimeValue.mockReturnValue(undefined);
         isWithinRange.mockResolvedValue(true);
         damageRollback.rollbackDamage.mockResolvedValue(0);
     });
 
-    afterAll(() => {
-        Math.random = originalRandom;
-    });
-
-    function mockRandom(values) {
-        let index = 0;
-        Math.random.mockImplementation(() => values[index++] ?? 0.5);
+    function mockSecondD20(face) {
+        // Exact seed pin (fix#169 idiom): second d20 lands on `face` via the
+        // canonical rollD20 lane (old raw values 0.05/0.95/0.5 → faces 2/20/11).
+        diceRoller.rollD20.mockReturnValue(face);
     }
 
     describe('handle', () => {
@@ -114,7 +116,7 @@ describe('shadowyDodgeHandler', () => {
             const result2 = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result2.payload.description).toContain('No recent attack roll against you found');
-            expect(Math.random).not.toHaveBeenCalled();
+            expect(diceRoller.rollD20).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
@@ -127,7 +129,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('hit→miss: full popup composition, rolls back damage, logs exactly once', async () => {
-            mockRandom([0.05]); // second d20 = 2 → final 2+7=9 < 14 → miss
+            mockSecondD20(2); // second d20 = 2 → final 2+7=9 < 14 → miss
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({ attackEvent: { timestamp: 5000, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 } }));
             damageRollback.rollbackDamage.mockResolvedValue(10);
 
@@ -154,7 +156,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('hit→still hits: no rollback, log carries no negation suffix', async () => {
-            mockRandom([0.95]); // second d20 = 20 → final min(18,20)=18 → 18+7=25 ≥ 14 → hit
+            mockSecondD20(20); // second d20 = 20 → final min(18,20)=18 → 18+7=25 ≥ 14 → hit
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 attackEvent: { timestamp: 5000, d20: 18, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 },
                 result: { attackerName: 'Orc', primaryDamage: 12, totalDamage: 12, damageTypes: ['bludgeoning'] },
@@ -177,7 +179,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('should show "already missed" when original attack missed', async () => {
-            mockRandom([0.5]); // second d20 = 11 → final min(3,11)=3
+            mockSecondD20(11); // second d20 = 11 → final min(3,11)=3
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 attackEvent: { timestamp: 5000, d20: 3, bonus: 2, targetAc: 14, hit: false, effectiveAc: 14 },
                 result: { primaryDamage: 0, totalDamage: 0, damageTypes: [] },
@@ -195,7 +197,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('should use effectiveAc when present, falling back to targetAc', async () => {
-            mockRandom([0.5, 0.5]);
+            mockSecondD20(11) // both handles consume the same seeded face;
 
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 attackEvent: { timestamp: 5000, d20: 10, bonus: 5, targetAc: 13, hit: true, effectiveAc: 16 },
@@ -213,7 +215,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('should handle null AC (effectiveAc and targetAc both absent)', async () => {
-            mockRandom([0.05]); // second d20 = 2, ac null → finalHit N/A
+            mockSecondD20(2); // second d20 = 2, ac null → finalHit N/A
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 attackEvent: { timestamp: 5000, d20: 10, bonus: 5, hit: true, targetAc: undefined, effectiveAc: undefined },
             }));
@@ -229,7 +231,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('uses action.name when provided, defaulting to "Shadowy Dodge" when absent', async () => {
-            mockRandom([0.5]);
+            mockSecondD20(11);
             damageRollback.findLastAttack.mockResolvedValue(makeAttack());
 
             const result = await handle(makeAction({ name: 'Custom Dodge' }), makePlayerStats(), 'test-campaign', null);
@@ -244,7 +246,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('should use "Unknown creature" when attackerName is missing', async () => {
-            mockRandom([0.5]);
+            mockSecondD20(11);
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 result: { attackerName: null },
             }));
@@ -255,7 +257,7 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('should handle addEntry rejection gracefully without throwing', async () => {
-            mockRandom([0.5]);
+            mockSecondD20(11);
             damageRollback.findLastAttack.mockResolvedValue(makeAttack());
             logService.addEntry.mockRejectedValueOnce(new Error('log write failed'));
 
@@ -274,7 +276,7 @@ describe('shadowyDodgeHandler', () => {
 
     describe('CLA-310 reaction gates', () => {
         it('first dodge fires, stamps the attack-instance + round latches, and logs once', async () => {
-            mockRandom([0.05]);
+            mockSecondD20(2); // second d20 = 2 → final 2+7=9 < 14 → miss
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({ attackEvent: { timestamp: 7000, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 } }));
             damageRollback.rollbackDamage.mockResolvedValue(10);
 
@@ -298,7 +300,7 @@ describe('shadowyDodgeHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Reaction already used');
             expect(result.payload.description).toContain('already dodged this attack roll');
-            expect(Math.random).not.toHaveBeenCalled();
+            expect(diceRoller.rollD20).not.toHaveBeenCalled();
             expect(damageRollback.rollbackDamage).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
@@ -315,13 +317,13 @@ describe('shadowyDodgeHandler', () => {
 
             expect(result.payload.description).toContain('already used Shadowy Dodge this round');
             expect(result.payload.description).toContain('Reaction is spent');
-            expect(Math.random).not.toHaveBeenCalled();
+            expect(diceRoller.rollD20).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
             expect(logService.addEntry).not.toHaveBeenCalled();
         });
 
         it('re-arms on a different attack in a later round', async () => {
-            mockRandom([0.5]);
+            mockSecondD20(11);
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({ attackEvent: { timestamp: 9000, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 } }));
             getCombatContext.mockResolvedValue({ round: 2, creatures: [] });
             getRuntimeValue.mockImplementation((_name, key) => {
@@ -332,7 +334,7 @@ describe('shadowyDodgeHandler', () => {
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.description).toContain('Disadvantage (second d20:');
+            expect(result.payload.description).toContain('Disadvantage (second d20: 11): d20(11) + 7 = 18 vs AC 14 → <b>HIT</b>');
             expect(setRuntimeValue).toHaveBeenCalledWith('Test Rogue', APPLIED_ATTACK_KEY, '9000', 'test-campaign');
             expect(setRuntimeValue).toHaveBeenCalledWith('Test Rogue', USED_ROUND_KEY, 2, 'test-campaign');
         });
@@ -348,7 +350,7 @@ describe('shadowyDodgeHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.description).toContain('Reaction already used');
-            expect(Math.random).not.toHaveBeenCalled();
+            expect(diceRoller.rollD20).not.toHaveBeenCalled();
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
@@ -376,14 +378,14 @@ describe('shadowyDodgeHandler', () => {
         });
 
         it('falls back to roll-signature identity when lastAttack has no timestamp', async () => {
-            mockRandom([0.5]);
+            mockSecondD20(11);
             damageRollback.findLastAttack.mockResolvedValue(makeAttack({
                 attackEvent: { timestamp: undefined, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 },
             }));
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.description).toContain('Disadvantage (second d20:');
+            expect(result.payload.description).toContain('Disadvantage (second d20: 11): d20(11) + 7 = 18 vs AC 14 → <b>HIT</b>');
             expect(setRuntimeValue).toHaveBeenCalledWith('Test Rogue', APPLIED_ATTACK_KEY, 'd20:15+7:Goblin', 'test-campaign');
         });
     });

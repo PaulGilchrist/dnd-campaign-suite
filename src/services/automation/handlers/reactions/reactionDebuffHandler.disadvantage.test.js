@@ -14,7 +14,8 @@
 //    a range field (2024 classes.json Warding Flare has none).
 //  - applyImprovedWardingFlare tempHp math + write + tail copy: 2d6 + WIS
 //    onto the DEFENDER (never the attacker), pinned deterministically via
-//    Math.random stubs; feature found in characterAdvancement OR
+//    the canonical diceRoller rollDie lane (fix#169 census — the dice moved
+//    off raw Math.random); feature found in characterAdvancement OR
 //    specialActions (both search branches); skip when feature absent, and
 //    skip when 2d6 + negative WIS lands ≤ 0 (flare still fires); tempHp tail
 //    never runs on the default (bardic) route.
@@ -26,8 +27,9 @@
 // lane's gate coverage (weaker copy — reported for removal).
 //
 // Deterministic: runtime/logService/range/rollback/-popup/automationService
-// fully mocked; the two random WF rolls are stubbed wherever numerals are
-// pinned; unstubbed lanes vary only unpinned numerals. No churn expected.
+// fully mocked; the WF d6s roll through the mocked diceRoller rollDie seam
+// wherever numerals are pinned; unstubbed lanes vary only unpinned numerals.
+// No churn expected.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handle } from './reactionDebuffHandler.js';
 
@@ -90,6 +92,13 @@ vi.mock('../../common/infoPopup.js', () => ({
   }),
 }));
 
+// Canonical dice lane mock (fix#169 recipe): the handler's d20/d6 combat dice
+// arrive via diceRoller, never raw Math.random.
+vi.mock('../../../dice/diceRoller.js', () => ({
+  rollD20: vi.fn(),
+  rollDie: vi.fn(),
+}));
+
 import * as targetResolver from '../../common/targetResolver.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
@@ -97,6 +106,7 @@ import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as rangeCheck from '../../../rules/combat/rangeCheck.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as damageRollback from '../../common/damageRollback.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
 const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
@@ -158,8 +168,8 @@ function setupFlareTrigger() {
 }
 
 function stubRolls(first, second) {
-  // 2d6: roll = floor(r * 6) + 1 — distinct values catch roll-order swaps.
-  return vi.spyOn(Math, 'random').mockReturnValueOnce(first).mockReturnValueOnce(second);
+  // 2d6 via the canonical rollDie lane: distinct faces catch roll-order swaps.
+  return diceRoller.rollDie.mockReturnValueOnce(first).mockReturnValueOnce(second);
 }
 
 function tempHpWrites() {
@@ -174,6 +184,9 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
   beforeEach(() => {
     vi.clearAllMocks();
     rangeCheck.isWithinRange.mockReset().mockResolvedValue(true);
+    // Deterministic default faces for lanes that fire the dice but pin no numerals.
+    diceRoller.rollD20.mockReturnValue(10);
+    diceRoller.rollDie.mockReturnValue(4);
   });
 
   afterEach(() => {
@@ -197,8 +210,9 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
     // Production automation omits range → gate defaults to '30_ft'.
     expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30_ft');
     expect(rangeCheck.isWithinRange).toHaveBeenCalledWith('Light_Cleric', 'Thug 1', 30);
-    // Refusal economy: nothing is spent, no te, no round latch.
+    // Refusal economy: nothing is spent, no te, no round latch, no dice rolled.
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    expect(diceRoller.rollDie).not.toHaveBeenCalled();
 
     const refusal = refusalLogRow();
     expect(refusal).toMatchObject({
@@ -214,12 +228,15 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
     async (storageKey) => {
       const ps = makeCleric({ [storageKey]: [improvedWardingFlare] });
       setupFlareTrigger();
-      stubRolls(0.99, 0.0); // rolls 6 + 1 + WIS 4 = 11
+      stubRolls(6, 1); // rolls 6 + 1 + WIS 4 = 11
 
       const result = await handle(makeWardingFlareAction(), ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
       expect(tempHpWrites()).toEqual([['Ally_Paladin', 'tempHp', 11, campaignName]]);
+      // Exact-seed pin (fix#169 idiom): both d6 faces consumed in order via rollDie.
+      expect(diceRoller.rollDie).toHaveBeenCalledTimes(2);
+      expect(diceRoller.rollDie).toHaveBeenCalledWith(6);
       // Never the attacker.
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith('Thug 1', 'tempHp', expect.anything(), campaignName);
       expect(result.payload.description).toContain(
@@ -235,6 +252,8 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
 
     expect(result.type).toBe('popup');
     expect(tempHpWrites()).toEqual([]);
+    // Feature absent: applyImprovedWardingFlare returns before any die roll.
+    expect(diceRoller.rollDie).not.toHaveBeenCalled();
     expect(result.payload.description).not.toContain('Temporary Hit Points');
   });
 
@@ -244,7 +263,7 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
       characterAdvancement: [improvedWardingFlare],
     });
     setupFlareTrigger();
-    stubRolls(0.0, 0.0); // rolls 1 + 1 - 2 = 0
+    stubRolls(1, 1); // rolls 1 + 1 - 2 = 0
 
     const result = await handle(makeWardingFlareAction(), ps, campaignName, mapName);
 
@@ -273,6 +292,10 @@ describe('reactionDebuffHandler — warding-flare lane (range gate + Improved WF
 
     expect(result.type).toBe('popup');
     expect(tempHpWrites()).toEqual([]);
+    // Bardic lane still rolls its BI die (seeded rollDie face 4) — but never
+    // the Improved WF tail dice/tempHp channel.
+    expect(diceRoller.rollDie).toHaveBeenCalledTimes(1);
+    expect(diceRoller.rollDie).toHaveBeenCalledWith(6);
     expect(result.payload.description).not.toContain('Temporary Hit Points');
   });
 });

@@ -150,12 +150,16 @@ describe('warMagicSpellHandler', () => {
             })
         })
 
+        // No-fallbacks verdict: a row with no casting_time cannot be verified
+        // as action-casting — excluded loudly (see dedicated gate arm). This
+        // arm now pins the remaining optional-detail defaults on a
+        // legitimate action row.
         it('defaults all optional spell fields when missing', async () => {
             const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([makeSpell({
                 name: 'Sparse Spell',
                 level: 1,
-                casting_time: undefined,
+                casting_time: '1 action',
                 range: undefined,
                 description: undefined,
                 damage: undefined,
@@ -183,6 +187,64 @@ describe('warMagicSpellHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
 
             expect(result.payload.options).toEqual(['Burning Hands'])
+        })
+
+        it('casting_time gate: only action-casting spells are offered (2024 tokens)', async () => {
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
+            loadSpellData.mockResolvedValue([
+                makeSpell({ name: 'Magic Missile', casting_time: 'Action' }),
+                makeSpell({ name: 'Shield', casting_time: 'Reaction' }),
+                makeSpell({ name: 'Misty Step', casting_time: 'Bonus Action' }),
+                makeSpell({ name: 'Detect Magic', casting_time: 'Action or Ritual' }),
+                makeSpell({ name: 'Feather Fall', casting_time: 'Reaction' }),
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
+
+            // Shield/Hellish Rebuke-style reactions and bonus-action variants
+            // are unselectable by feature law (the Attack action is replaced).
+            expect(result.payload.options).toEqual(['Magic Missile', 'Detect Magic'])
+        })
+
+        it('casting_time gate: 5e lowercase token variants pass, reaction/bonus excluded', async () => {
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
+            loadSpellData.mockResolvedValue([
+                makeSpell({ name: 'Burning Hands', casting_time: '1 action' }),
+                makeSpell({ name: 'Shield', casting_time: '1 reaction' }),
+                makeSpell({ name: 'Healing Word', casting_time: '1 bonus action' }),
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
+
+            expect(result.payload.options).toEqual(['Burning Hands'])
+        })
+
+        it('casting_time gate: a spell row with no casting_time is excluded, loudly', async () => {
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
+            loadSpellData.mockResolvedValue([
+                makeSpell({ name: 'Burning Hands' }),
+                makeSpell({ name: 'Ghost Spell', casting_time: undefined }),
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
+
+            expect(result.payload.options).toEqual(['Burning Hands'])
+            expect(spy).toHaveBeenCalledWith(expect.stringContaining('Ghost Spell'))
+            spy.mockRestore()
+        })
+
+        it('returns an info popup when every level-eligible spell fails the casting_time gate', async () => {
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
+            loadSpellData.mockResolvedValue([
+                makeSpell({ name: 'Shield', casting_time: 'Reaction' }),
+                makeSpell({ name: 'Misty Step', level: 2, casting_time: 'Bonus Action' }),
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats(), mockCampaignName)
+
+            expect(result.type).toBe('popup')
+            expect(result.payload.description).toBe('No Wizard spells of level 1-2 available.')
         })
 
         it('returns an info popup when the spell list is null or empty', async () => {
@@ -419,6 +481,17 @@ describe('warMagicSpellHandler', () => {
             // No spell damage on a save success — only the weapon attack applies damage
             expect(applyDamageToTarget).toHaveBeenCalledTimes(1)
             expect(result.type).toBe('popup')
+        })
+
+        it('refuses a non-action spell at confirm — no slot spent, no weapon attack, before the target check', async () => {
+            setupConfirmMocks({ ...magicMissile, name: 'Shield', casting_time: 'Reaction' })
+
+            const result = await confirmWarMagicSpell(makeAction(), makePlayerStats(), mockCampaignName, 'Shield')
+
+            expect(result.payload.description).toContain('only action-casting spells qualify')
+            expect(setRuntimeValue).not.toHaveBeenCalled()
+            expect(applyDamageToTarget).not.toHaveBeenCalled()
+            expect(getTargetFromAttacker).not.toHaveBeenCalled()
         })
 
         it('does not throw when addEntry rejects', async () => {

@@ -7,6 +7,7 @@ import { infoPopup } from '../../common/infoPopup.js';
 import { removeCondition } from '../../../combat/conditions/conditionSaveService.js';
 import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { rollD20 } from '../../../dice/diceRoller.js';
 
 // CLA-064: uses pool lives on the bard as a NUMERIC change-data key (CLA-027
 // pool contract); null = re-armed. Re-arms via LONG_REST_RESOURCES.
@@ -89,7 +90,9 @@ function resolveUses(stored, auto) {
 function computeReroll(rollEvent) {
     const d20 = rollEvent.d20;
     const bonus = rollEvent.bonus || 0;
-    const newD20 = Math.floor(Math.random() * 20) + 1;
+    // Canonical d20 lane (fix#169 recipe): the advantage reroll die rolls
+    // through diceRoller so global dice-seeding and the GM overlay see it.
+    const newD20 = rollD20();
     const rerolledD20 = Math.max(d20, newD20);
     const newTotal = rerolledD20 + bonus;
     return { d20, bonus, newD20, rerolledD20, newTotal };

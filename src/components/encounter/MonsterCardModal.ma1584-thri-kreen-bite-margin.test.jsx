@@ -130,6 +130,11 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
       dc: 11,
       condition: 'poisoned',
     });
+    // fix#172 family: rider-only save leg (formula null, saveChipPlan pin
+    // below) — dc_success:"none" authored after save_type (MA-0030 placement)
+    // kills the MV-20 fabricated half-damage copy; RAW success = nothing.
+    expect(row.dc_success).toBe('none');
+    expect(Object.keys(row).indexOf('dc_success')).toBe(Object.keys(row).indexOf('save_type') + 1);
     // housekeeping + rules provenance stay in the description
     expect(row.description).toContain('DC 11 Constitution');
     expect(row.description).not.toContain('DC 1 1');
@@ -161,6 +166,10 @@ describe('MA-1584 monsters.json data lock: Thri-Kreen Bite two-band + generic re
     expect(HAND_CROSSBOW().save_effect).toBe('Failure: be poisoned for 1 hour.');
     expect(HAND_CROSSBOW().save_margin).toEqual({ fails_by: 5, also: 'unconscious' });
     expect(HAND_CROSSBOW().repeat_save).toBeUndefined();
+    // fix#172 family: both siblings authored dc_success:"none" (MA-0030
+    // placement) — RAW success takes nothing on either row.
+    expect(STING().dc_success).toBe('none');
+    expect(HAND_CROSSBOW().dc_success).toBe('none');
   });
 });
 

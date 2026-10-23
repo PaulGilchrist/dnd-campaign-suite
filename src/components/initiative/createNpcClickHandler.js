@@ -7,6 +7,14 @@ import { NPC_FORM_HANDLERS } from './npcClickFormHandlers.js'
  * Builds the handleNpcClick handler for the initiative component.
  * Handles clicking on creatures to view their stat blocks (Wild Shape, Polymorph, Shapechange, etc.)
  */
+// #843 presence law (fix#39 strict-presence + fix#124 guard-first, mirroring
+// findNPCByName's `!npcName ||` guard): an identity match requires BOTH names
+// present and non-empty — undefined === undefined must never bind a nameless
+// roster entry to a nameless click (wrong-NPC popup).
+function presentName(entry) {
+    return String(entry?.name ?? '').trim()
+}
+
 export function createNpcClickHandler({
     isLocalhost,
     campaignNpcs,
@@ -19,7 +27,12 @@ export function createNpcClickHandler({
         const { allowNonLocalhost = false } = options
         if (!isLocalhost && !allowNonLocalhost) return
 
-        const npc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name?.toLowerCase())
+        const clickedName = presentName(creature)
+        // Case-folded exact comparison preserved (:22 semantics, test-1 pinned).
+        const npc = campaignNpcs.find(n => {
+            const name = presentName(n)
+            return clickedName !== '' && name !== '' && name.toLowerCase() === clickedName.toLowerCase()
+        })
         if (npc) {
             const formatted = npcToMonsterFormat(npc)
             if (formatted) {
@@ -30,7 +43,11 @@ export function createNpcClickHandler({
         }
 
         const combatSummary = getCombatSummary(campaignName)
-        const runtimeCreature = combatSummary?.creatures?.find(c => c.name === creature.name)
+        // Same presence law at the runtime seam; exact === semantics preserved (:33).
+        const runtimeCreature = combatSummary?.creatures?.find(c => {
+            const name = presentName(c)
+            return clickedName !== '' && name !== '' && c.name === creature.name
+        })
         const context = { creature, runtimeCreature, campaignName, characters, setViewingMonster, setViewingMonsterCreatureName }
 
         for (const formHandler of NPC_FORM_HANDLERS) {

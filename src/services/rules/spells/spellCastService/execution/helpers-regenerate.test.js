@@ -13,15 +13,16 @@ import { join } from 'node:path';
 /*                                                                    */
 /*  LIVE-vs-DEAD verdict (#1398 dormant-service, resolved):          */
 /*  - For REAL disk rows (both rulesets carry                          */
-/*    automation.type 'healing_start_of_turn' and 'regenerate' is    */
-/*    absent from SERVICE_HANDLED_SPELLS, triggerSpells.js:42-58)    */
-/*    the hub consumes at index.js:710 via handleGenericAutomation   */
-/*    BEFORE runNoDamagePath — pinned by                             */
-/*    spellCastService.heal.test.js:354 (#1398/#1454). The          */
-/*    index.js:278 -> triggerSpells.js:59-68 -> applyRegenerateSpell */
-/*    arm is therefore UNREACHABLE for disk-byte casts — legacy      */
-/*    parallel lane (same dead-route class as the #1472 :316-:359   */
-/*    census, folded-cited there; never fake-covered here, #1458).  */
+/*    automation.type 'healing_start_of_turn'; 'regenerate' was added */
+/*    to SERVICE_HANDLED_SPELLS fix#132, triggerSpells.js:42-66)    */
+/*    the hub :710 gate DECLINES (shielded) and the cast lands on   */
+/*    runNoDamagePath — pinned by spellCastService.heal.test.js     */
+/*    (#1398/#1454 lineage, flipped honest fix#132). The             */
+/*    index.js:311 -> triggerSpells.js:59-68 -> applyRegenerateSpell */
+/*    arm is therefore LIVE again for disk-byte casts — pre-fix the  */
+/*    unshielded :710 dispatch resolved NULL (HANDLER_MAP registers   */
+/*    the lane under 'regenerate', automation/index.js:614, never the */
+/*    disk type) and casts were consumed-and-discarded (#1472/:1483). */
 /*  - Live stamp producer is regenerateHandler.applyRegenerateEffect */
 /*    (:154) invoked from useSimpleSpellHandlers:124 ->               */
 /*    regenerateService.confirmRegenerate; the 1-HP turn tick is     */

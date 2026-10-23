@@ -193,14 +193,19 @@ describe('warMagicCantripHandler', () => {
             })
         })
 
+        // No-fallbacks verdict mirrored from the spell half: a cantrip row
+        // with no casting_time is excluded loudly (dedicated arm below) —
+        // this arm pins the remaining defaults on a legitimate action row.
         it('defaults missing spell fields to sensible values', async () => {
             const { loadSpellData } = await mods()
-            loadSpellData.mockResolvedValue([{ name: 'Spare Cantrip', level: 0 }])
+            loadSpellData.mockResolvedValue([{ name: 'Spare Cantrip', level: 0, casting_time: 'Action' }])
 
             const result = await handle(makeAction(), makePlayerStats({ spells: ['Spare Cantrip'] }), mockCampaignName)
 
             const details = result.payload.optionDetails['Spare Cantrip']
-            expect(details.casting_time).toBe('1 action')
+            // casting_time passes through verbatim now — the '1 action'
+            // fabrication would lie about the row's real casting time.
+            expect(details.casting_time).toBe('Action')
             expect(details.range).toBe('')
             expect(details.description).toBe('')
             expect(details.damage).toBeNull()
@@ -213,6 +218,34 @@ describe('warMagicCantripHandler', () => {
             const result = await handle(makeAction(), makePlayerStats({ spells: [{ name: 'Fire Bolt', prepared: 'Always' }] }), mockCampaignName)
 
             expect(result.payload.options).toEqual(['Fire Bolt'])
+        })
+
+        it('casting_time gate: reaction/bonus-action cantrips are never offered; action tokens pass', async () => {
+            const { loadSpellData } = await mods()
+            loadSpellData.mockResolvedValue([
+                { name: 'Teleportation Step', level: 0, casting_time: 'Bonus Action' },
+                { name: 'Blade Ward', level: 0, casting_time: 'Action' },
+                { name: 'Old Bolt', level: 0, casting_time: '1 action' },
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats({ spells: ['Teleportation Step', 'Blade Ward', 'Old Bolt'] }), mockCampaignName)
+
+            expect(result.payload.options).toEqual(['Blade Ward', 'Old Bolt'])
+        })
+
+        it('casting_time gate: a known cantrip row with no casting_time is excluded, loudly', async () => {
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+            const { loadSpellData } = await mods()
+            loadSpellData.mockResolvedValue([
+                fireBolt,
+                { name: 'Ghost Bolt', level: 0 },
+            ])
+
+            const result = await handle(makeAction(), makePlayerStats({ spells: ['Fire Bolt', 'Ghost Bolt'] }), mockCampaignName)
+
+            expect(result.payload.options).toEqual(['Fire Bolt'])
+            expect(spy).toHaveBeenCalledWith(expect.stringContaining('Ghost Bolt'))
+            spy.mockRestore()
         })
 
         it('uses custom spellListKey from automation when specified', async () => {
@@ -454,6 +487,18 @@ describe('warMagicCantripHandler', () => {
             expect(applyDamageToTarget).not.toHaveBeenCalled()
             expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled()
             expect(result.payload.description).toBe('<b>War Magic</b>: Cast <b>Sacred Flame</b> at <b>Wight 1</b>. Save prompt dismissed. No damage dealt.<br/>No spell slot consumed (cantrip).')
+        })
+
+        it('refuses a non-action cantrip at confirm — refused before the latch is stamped', async () => {
+            await setupConfirmMocks({ spells: [{ ...fireBolt, name: 'Teleportation Step', casting_time: 'Bonus Action' }] })
+            const { addEntry, applyDamageToTarget, setRuntimeValue } = await mods()
+
+            const result = await confirmWarMagicCantrip(makeAction(), makePlayerStats({ spells: ['Teleportation Step'] }), mockCampaignName, 'Teleportation Step')
+
+            expect(result.payload.description).toContain('only action-casting cantrips qualify')
+            expect(addEntry.mock.calls.map(c => c[1]).some(e => e.automationType === 'war_magic_refused')).toBe(true)
+            expect(applyDamageToTarget).not.toHaveBeenCalled()
+            expect(setRuntimeValue).not.toHaveBeenCalled()
         })
 
         it('does not throw when addEntry rejects', async () => {

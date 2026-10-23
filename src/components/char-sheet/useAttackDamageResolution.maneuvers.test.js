@@ -202,28 +202,31 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
     it.each([
         {
             branch: 'conversion to a natural-20 crit hit',
-            popupHtml: { rolls: [20], bonus: 2, targetAc: 25, isCrit: false },
+            // run2#307 fix pin: the popup payload for THIS action rides the popupHtmlData
+            // ARG (what the prompt modal passes back), never the popupHtml prop — the prop
+            // is mounted null here to prove the gate no longer consults it.
+            popupData: { isMiss: true, hit: false, rolls: [20], bonus: 2, targetAc: 25, isCrit: false },
             dieValue: 4,
-            expectedPopup: { rolls: [20], bonus: 2, targetAc: 25, isCrit: true, total: 26, hit: true, isNatural20: true, superiorityDieAdded: 4, originalTotal: 22, originalD20: 20 },
+            expectedPopup: { isMiss: true, hit: true, rolls: [20], bonus: 2, targetAc: 25, isCrit: true, total: 26, isNatural20: true, superiorityDieAdded: 4, originalTotal: 22, originalD20: 20 },
             expectedDescription: 'Precision Attack: Added 4 to the attack roll (20 + 2 + 4 = 26). The attack now hits!',
             shouldResume: true,
         },
         {
             branch: 'still-miss leaves damage stranded for the skip lane',
-            popupHtml: { rolls: [8], bonus: 2, targetAc: 20, isCrit: false },
+            popupData: { isMiss: true, hit: false, rolls: [8], bonus: 2, targetAc: 20, isCrit: false },
             dieValue: 4,
-            expectedPopup: { rolls: [8], bonus: 2, targetAc: 20, isCrit: false, total: 14, hit: false, isNatural20: false, superiorityDieAdded: 4, originalTotal: 10, originalD20: 8 },
+            expectedPopup: { isMiss: true, hit: false, rolls: [8], bonus: 2, targetAc: 20, isCrit: false, total: 14, isNatural20: false, superiorityDieAdded: 4, originalTotal: 10, originalD20: 8 },
             expectedDescription: 'Precision Attack: Added 4 to the attack roll (8 + 2 + 4 = 14). The attack still misses.',
             shouldResume: false,
         },
-    ])('Precision Attack dispatch closes the prompt, pops the recalculated popup, and logs on $branch', async ({ popupHtml, dieValue, expectedPopup, expectedDescription, shouldResume }) => {
+    ])('Precision Attack dispatch closes the prompt, pops the recalculated popup, and logs on $branch', async ({ popupData, dieValue, expectedPopup, expectedDescription, shouldResume }) => {
         executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', dieValue, logEntries: [] });
         const { resume, stashCtx, resumeRef } = pausedAtManeuvers(false);
-        const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({ popupHtml, resumeRef });
+        const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({ resumeRef });
         const maneuver = { name: 'Precision Attack', effect: 'attack_roll_bonus', dieExpression: '1d6' };
 
         const result = await api.handleAttackRiderManeuverUse(
-            maneuver, ATTACK, { isMiss: true, hit: false },
+            maneuver, ATTACK, popupData,
             { formula: '1d8+3', total: 8, rolls: [5, 3] },
         );
 
@@ -415,5 +418,98 @@ describe('useAttackDamageResolution — attack rider maneuver dispatch', () => {
             attack: ATTACK,
             popupHtml,
         }));
+    });
+
+    // ── run2#307 fix #1348 — two-carrier gate: popupHtmlData ARG is law ─────
+    // The precision-miss gate and die-math must read popupHtmlData (this action's
+    // popup payload, passed back verbatim by AttackRiderManeuverPrompt from the
+    // attackRollRiders pause). The popupHtml prop is useDiceRollPopup's global UI
+    // state — null when no popup is open, stale when another popup replaced it.
+
+    const PRECISION = { name: 'Precision Attack', effect: 'attack_roll_bonus', dieExpression: '1d8' };
+
+    it('fires the precision-miss branch on a miss popupHtmlData with a NULL popupHtml prop — exact spend ledger, no die→damage fold', async () => {
+        // Pre-fix this fell through to applyRiderManeuverPostResolution: executor had
+        // already spent the die, but no conversion, no Precision Attack ledger entry.
+        const logEntries = [
+            { description: 'Rolled d8 for 6' },
+            { description: 'Expend 1 Superiority Die' },
+        ];
+        executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', dieValue: 6, logEntries });
+        const { resume, stashCtx, resumeRef } = pausedAtManeuvers(false);
+        // popupHtml prop stays null (harness default) — the gate must not consult it.
+        const { api, setModalState, setPopupHtml } = UseAttackDamageResolution({ resumeRef });
+
+        const result = await api.handleAttackRiderManeuverUse(
+            PRECISION, ATTACK,
+            { rolls: [10], bonus: 5, targetAc: 20, isCrit: false, hit: false, isMiss: true },
+            { formula: '1d8+3', total: 8, rolls: [5, 3] },
+        );
+
+        expect(result.isMissResult).toBe(true);
+        expect(result.hit).toBe(true); // 10 + 5 + 6 = 21 >= 20
+        expect(result.description).toBe('Precision Attack: Added 6 to the attack roll (10 + 5 + 6 = 21). The attack now hits!');
+        // Resource-spend ledger exact: executor spends flush first, then the ability_use recalculation.
+        expect(addEntry.mock.calls.map(c => c[1].description)).toEqual([
+            'Rolled d8 for 6',
+            'Expend 1 Superiority Die',
+            'Precision Attack: Added 6 to the attack roll (10 + 5 + 6 = 21). The attack now hits!',
+        ]);
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            total: 21, hit: true, superiorityDieAdded: 6, originalTotal: 15, originalD20: 10,
+        }));
+        expect(setModalState).toHaveBeenCalledWith({ attackRiderManeuverPrompt: null });
+        // Precision boosts the attack roll, never the pending damage formula.
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(CHAR, 'attackRiderDieValue', expect.anything(), CAMPAIGN);
+        // Conversion rewired the stash before resuming.
+        expect(stashCtx.hit).toBe(true);
+        expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
+    });
+
+    it('converts the popupHtmlData dice when the popupHtml prop is a STALE different popup', async () => {
+        executeAttackRiderManeuver.mockResolvedValue({ type: 'popup', dieValue: 3, logEntries: [] });
+        const { resumeRef } = pausedAtManeuvers(false);
+        // Global UI popup is stale: different dice from an earlier roll.
+        const { api, setPopupHtml } = UseAttackDamageResolution({
+            popupHtml: { rolls: [1], bonus: 0, targetAc: 99, isCrit: false, hit: false, isMiss: true },
+            resumeRef,
+        });
+
+        const result = await api.handleAttackRiderManeuverUse(
+            PRECISION, ATTACK,
+            { rolls: [15], bonus: 2, targetAc: 18, isCrit: false, hit: false, isMiss: true },
+            { formula: '1d8+3', total: 8, rolls: [5, 3] },
+        );
+
+        expect(result.description).toBe('Precision Attack: Added 3 to the attack roll (15 + 2 + 3 = 20). The attack now hits!');
+        expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+            rolls: [15], bonus: 2, targetAc: 18, total: 20, originalD20: 15,
+        }));
+    });
+
+    it.each([
+        { branch: 'hit popupHtmlData', popupData: { rolls: [17], bonus: 5, targetAc: 20, isCrit: false, hit: true, isMiss: false } },
+        { branch: 'null popupHtmlData', popupData: null },
+    ])('routes $branch to post-resolution even when the popupHtml prop holds a miss popup — no precision conversion', async ({ popupData }) => {
+        executeAttackRiderManeuver.mockResolvedValue({
+            type: 'popup',
+            dieValue: 4,
+            payload: { type: 'automation_info', name: 'Precision Attack', description: 'Maneuver applied.' },
+            logEntries: [],
+        });
+        const { resume, stashCtx, resumeRef } = pausedAtManeuvers(true);
+        const { api, setPopupHtml } = UseAttackDamageResolution({
+            popupHtml: { rolls: [4], bonus: 2, targetAc: 20, isCrit: false, hit: false, isMiss: true },
+            resumeRef,
+        });
+
+        const result = await api.handleAttackRiderManeuverUse(PRECISION, ATTACK, popupData, { formula: '1d8+3', total: 8, rolls: [5, 3] });
+
+        expect(result).toEqual({ formula: '1d8+3', total: 8, rolls: [5, 3] });
+        // Post-resolution dispatch pops the service payload — never a recalculated attack popup.
+        expect(setPopupHtml).toHaveBeenCalledWith({ type: 'automation_info', name: 'Precision Attack', description: 'Maneuver applied.' });
+        const precisionEntry = addEntry.mock.calls.map(c => c[1]).find(e => e.name === 'Precision Attack' && e.type === 'ability_use');
+        expect(precisionEntry?.description ?? '').not.toMatch(/Added .* to the attack roll/);
+        expect(resume).toHaveBeenCalledWith(stashCtx, resumeRef);
     });
 });

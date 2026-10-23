@@ -14,10 +14,11 @@
 // resolve in BOTH spell indexes with zero dc/attack_type → chips are
 // advisory-cast affordances with uses gates (§204 lane); DC 23 rides every
 // chip's cast record via buildMonsterSpellCastLog.
-// SOURCE axis, not this ticket: row save_type "Wisdom" contradicts the row's
-// OWN prose ("using Charisma as the spellcasting ability", WIS +5 → 8+8+5=21
-// ≠ 23; CHA +7 → 23) — the MA-1883 prose-ability adjudication axis; bytes
-// pinned as-is (§89 pair present, byte-untouched per ticket scope).
+// SOURCE axis RESOLVED at the data-fix turn: row save_type "Wisdom"
+// contradicted the row's OWN prose ("using Charisma as the spellcasting
+// ability", WIS +5 → 8+8+5=21 ≠ 23; CHA +7 → 8+8+7=23 exact) — the MA-1883
+// prose-ability adjudication axis; honest #749-era pin flipped to lawful
+// "Charisma" with the DC-23-from-CHA math pinned below.
 // Cited owners, not absorbed here: generic counter badge :275, spend/refusal
 // bytes :281-302, At-Will advisory/null-store :317/:561, store independence
 // :522-548, Spellcasting-row no-save-shell :192 — all
@@ -162,9 +163,11 @@ describe('MA-1958 monsters.json data lock: Orcus Spellcasting row', () => {
     });
   });
 
-  it('row-level numeric save_dc 23 + save_type "Wisdom" pair byte-untouched (§89 pair present; prose says Charisma — MA-1883-scope adjudication axis, not this ticket)', () => {
+  it('row-level numeric save_dc 23 + save_type "Charisma" pair (data fix: prose names Charisma; DC math pins the adjudication — 8 + PB 8 + CHA 7 = 23 exact, WIS +5 gives 21 — stale-typed Wisdom retired; Wand row DC 18 is the ma1959 item seam, untouched)', () => {
     expect(orcusRow.save_dc).toBe(23);
-    expect(orcusRow.save_type).toBe('Wisdom');
+    expect(orcusRow.save_type).toBe('Charisma');
+    expect(8 + orcus.proficiency_bonus + orcus.ability_score_modifiers.cha).toBe(orcusRow.save_dc);
+    expect(8 + orcus.proficiency_bonus + orcus.ability_score_modifiers.wis).not.toBe(orcusRow.save_dc);
   });
 
   it('markup-only house style: emphasis census exact (three <strong> ":" headers + three <em> names, no decoys §161), no <br>, stripped text byte-exact pre-fix baseline; all three names resolve in BOTH indexes with zero dc/attack_type — advisory cast lane (§204)', () => {

@@ -8,10 +8,16 @@ function useWallDrawing({ isLocalhost, tool, getGridFromEvent, svgRef }) {
         if (!isLocalhost) return;
         if (tool !== TOOL_PAINT && tool !== TOOL_ERASE) return;
         e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
         const grid = getGridFromEvent(e);
         if (!grid) return;
+
+        // #883 capture discipline (fix#53 house shape — useItemDragging.js:42-47,
+        // useRuler.js:22-27 validate-capture-commit): capture only once the stroke
+        // has verifiably started on a valid grid cell. Capturing before the grid
+        // guard stranded the pointer on failed presses outside the map.
+        // painting !== null now strictly implies captured.
+        const svg = svgRef.current;
+        if (svg) svg.setPointerCapture(e.pointerId);
 
         const key = `${Math.floor(grid.gridX)},${Math.floor(grid.gridY)}`;
         setMapData(prev => {
@@ -46,16 +52,18 @@ function useWallDrawing({ isLocalhost, tool, getGridFromEvent, svgRef }) {
     }, [isLocalhost, getGridFromEvent]);
 
     const handleGridPointerUp = useCallback((e) => {
+        if (!painting) return; // failed down never captured — bailing strands nothing (fix#53 mirror, useItemDragging.js:101-104)
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
         setPainting(null);
-    }, [svgRef]);
+    }, [painting, svgRef]);
 
     const handleGridPointerLeave = useCallback((e) => {
+        if (!painting) return; // idle leave never captured — releasing would throw NotFoundError (fix#53 mirror)
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
         setPainting(null);
-    }, [svgRef]);
+    }, [painting, svgRef]);
 
     return {
         painting,

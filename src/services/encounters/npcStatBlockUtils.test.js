@@ -30,7 +30,10 @@
 //   saves/skills ×2               → one filter table (+ zero-is-data and junk-key legs)
 //   initiative ×2                 → one format table
 //   AC ×2                         → one spy test (numeric path must NOT log)
-//   passive perception ×2         → one table
+//   passive perception ×2         → one table + fix#90/#1159 absent-vs-0 arms (finite-wis
+//                                     honored incl. mod 0; absent/junk wis → rules-default 10)
+//   hitPoints/hitDice (in pins)  → + fix#90/#1159 zero-is-data arms: HP 0 renders 0,
+//                                     '' only for genuinely absent (undefined/null/blank)
 //   unarmed ×3 (incl. defaultUnarmedStrike direct call) → one scaling table; the exact
 //     full fallback object (incl. description + secondary slots) is byte-pinned inside
 //     the minimal-shape pin, so the direct-call test was redundant.
@@ -215,7 +218,7 @@ describe('npcToMonsterFormat', () => {
       subtype: null,
       alignment: 'Unaligned',
       armor_class: 10,
-      hit_points: '',
+      hit_points: '', // absent hitPoints (undefined) → '' fallback intact (#1348); 0 would render 0 — see zero-is-data arms
       hit_dice: '',
       speed: { walk: '30 ft.' },
       initiative_details: null,
@@ -323,5 +326,32 @@ describe('npcToMonsterFormat', () => {
   ])('passive_perception with wis %i is %i', (wis, expected) => {
     const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis, cha: 10 } });
     expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(expected);
+  });
+  // wis 10 → modifier 0: the [10, 10] pin above is the flipped zero-is-data pin —
+  // since fix#90 the 0 mod reaches the total via the Number.isFinite branch, not `||`.
+
+  it('defaults passive_perception to rules-10 only for absent/junk wis, never NaN, never swallowing a finite mod', () => {
+    // Absent wis key in a partial production-shape save → rules-default, not NaN render.
+    expect(npcToMonsterFormat(makeNPC({ abilityScores: { str: 16 } })).senses.passive_perception).toBe(10);
+    // Junk score string → calculateAbilityModifier NaN → guarded to default 10.
+    expect(npcToMonsterFormat(makeNPC({ abilityScores: { wis: 'junk' } })).senses.passive_perception).toBe(10);
+    // Negative finite mod survives (fix#90 sibling class: falsy-chain would keep -1, but pin the byte).
+    expect(npcToMonsterFormat(makeNPC({ abilityScores: { wis: 8 } })).senses.passive_perception).toBe(9);
+    expect(Number.isFinite(npcToMonsterFormat({ abilityScores: {} }).senses.passive_perception)).toBe(true);
+  });
+
+  // fix#90 zero-is-data at the HP site (:127 ?? ''). 0 HP is lawful data for
+  // destruction-target/corpse rows; MonsterCardBody.jsx:158 renders hit_points verbatim,
+  // so the old `|| ''` displayed those rows EMPTY. '' remains ONLY for genuinely absent.
+  it.each([
+    { label: 'numeric HP 0 renders 0', hitPoints: 0, expected: 0 },
+    { label: 'string HP "0" survives', hitPoints: '0', expected: '0' },
+    { label: 'absent HP falls back to empty string', expected: '' },
+    { label: 'null HP falls back to empty string', hitPoints: null, expected: '' },
+    { label: 'blank form-string HP falls back to empty string', hitPoints: '', expected: '' },
+  ])('hitPoints $label', ({ hitPoints, expected }) => {
+    const npc = makeNPC({ armorClass: 15, hitPoints });
+    if (hitPoints === undefined) delete npc.hitPoints; // genuinely-absent arm
+    expect(npcToMonsterFormat(npc).hit_points).toBe(expected);
   });
 });

@@ -3,9 +3,13 @@ import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRunt
 import { addEntry } from '../../../services/ui/logService.js'
 import './ResourcePoolModal.css'
 
-function MoonlightStepResourceModal({ playerStats, campaignName, automation, onClose }) {
+// Dedicated to the 2024 Moonlight Step resource_pool automation. Disk law
+// (public/data/2024/classes.json "conversionRate": "level_2_plus", description
+// "expending level 2+ spell slot") authors exactly one conversion rate, so the
+// former conversionRate switch whose else-branch returned all levels (incl. 1)
+// was a fantasy read no disk data could ever trigger — removed (test-maintain 🗑 #145).
+function MoonlightStepResourceModal({ playerStats, campaignName, onClose }) {
   const name = playerStats.name
-  const conversionRate = automation?.conversionRate || 'level_2_plus'
 
   const maxSlots = (() => {
     const slots = {}
@@ -32,15 +36,13 @@ function MoonlightStepResourceModal({ playerStats, campaignName, automation, onC
 
   const [selectedLevel, setSelectedLevel] = React.useState(2)
 
+  // conversionRate 'level_2_plus' per disk: only levels 2-9 can fund a conversion.
   const availableSlots = (() => {
-    if (conversionRate === 'level_2_plus') {
-      const result = {}
-      for (let lvl = 2; lvl <= 9; lvl++) {
-        result[lvl] = currentSlots[lvl]
-      }
-      return result
+    const result = {}
+    for (let lvl = 2; lvl <= 9; lvl++) {
+      result[lvl] = currentSlots[lvl]
     }
-    return currentSlots
+    return result
   })()
 
   const canConvert = availableSlots[selectedLevel] > 0
@@ -83,7 +85,7 @@ function MoonlightStepResourceModal({ playerStats, campaignName, automation, onC
               <tr><th>Level</th><th>Available</th><th>Select</th></tr>
             </thead>
             <tbody>
-              {[2, 3, 4, 5, 6, 7, 8, 9].map(lvl => (
+              {Object.keys(availableSlots).map(Number).map(lvl => (
                 <tr key={`fwd-${lvl}`} className={availableSlots[lvl] === 0 ? 'resource-pool-dim' : ''}>
                   <td>{lvl}</td>
                   <td>{availableSlots[lvl]} / {maxSlots[lvl]}</td>

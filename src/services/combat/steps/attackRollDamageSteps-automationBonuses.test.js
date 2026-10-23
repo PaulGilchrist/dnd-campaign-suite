@@ -26,6 +26,11 @@
 //     (:150-162/:215-222) anywhere; te full-object pin + grant-log byte.
 //   #1027 applied: generic append/skip arms kept CANON, toContain→exact full-acc
 //     toEqual; modal paths negative-pinned for zero-stamp (consume-after-modal falsifier).
+//   #1035 test-integrity applied: celestial guard suite fixtures omitted targetName and
+//     ALL short-circuited at attackRollBonuses.js:461 (`if (!ctx.targetName) return
+//     { data: {} }`) — vacuous-green, pass wrong-reason. Re-pointed: every guard fixture
+//     now carries targetName + branch-pins proving it lands past :461 on its named check;
+//     the :461 arm itself stays CANON in the natural20-celestial sibling (zero-dup #54).
 //
 // unique-vs-siblings kept here: natural20 max(STR,DEX) default (Math.max branch — the
 // n20-celestial sibling always passes abilityIncreased); brutalStrike inactive guard;
@@ -462,29 +467,56 @@ describe('buildAttackRollDamageSteps - automationBonuses', () => {
 
   // ── celestialRevelation (steps[14]) — guards CANON per cla048 lane cite; one exact
   //    dice-app + latch-stamp leg; proficiency-token resolution CANON in cla048 ──
+  // #1035 test-integrity fix (ledger:436-457, fix#154 vacuity family): the handler's
+  // FIRST arm is `if (!ctx.targetName) return { data: {} }` (attackRollBonuses.js:461).
+  // Pre-fix EVERY guard fixture here omitted targetName, so all five short-circuited at
+  // :461 and passed for the wrong reason — the suite asserted nothing about its named
+  // discriminating checks. Now riderless() carries targetName so each case lands on
+  // its claimed branch and branch-pins prove arrival order: riderless never reads
+  // buffs (:465 riders.length gate), buffless reads buffs but never rolls (:470
+  // registry), rider-mismatch never rolls (:472 name match), latch-inert never rolls
+  // (:477 oncePerTurn), zero-guard reaches the numeric reject (:487, console loud,
+  // '0' parsed to 0). The :461 short-circuit arm itself is CANON in the
+  // natural20-celestial sibling :415 (no roll, no stamp) — not re-driven here.
   describe('celestialRevelation step', () => {
-    const riderless = (passives) => makeCtx({ playerStats: { name: 'TestChar', automation: { actions: [], passives } }, formula: '1d8+3', total: 11, rolls: [8, 3] });
-    it('riderless: no attack_rider passives → empty data', async () => {
+    const riderless = (passives) => makeCtx({
+      targetName: 'Goblin',
+      playerStats: { name: 'TestChar', automation: { actions: [], passives } },
+      formula: '1d8+3', total: 11, rolls: [8, 3],
+    });
+    it('riderless: no attack_rider passives → empty data (guards before buff read)', async () => {
       buffsMock([]);
       expect((await steps[14].handler(riderless([]))).data).toEqual({});
+      expect(getActiveBuffs).not.toHaveBeenCalled();
     });
-    it('buffless: active buff not in celestial registry → empty data', async () => {
+    it('buffless: active buff not in celestial registry → empty data (reached the registry guard)', async () => {
       buffsMock([{ name: 'Other Buff' }]);
-      expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit' }]))).data).toEqual({});
+      const r = await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit' }]));
+      expect(r.data).toEqual({});
+      expect(getActiveBuffs).toHaveBeenCalledTimes(1);
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
-    it('rider-mismatch: buff active but matching rider absent → empty data', async () => {
+    it('rider-mismatch: buff active but matching rider absent → empty data, no roll', async () => {
       buffsMock([{ name: 'Heavenly Wings' }]);
       expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Other', damageExpression: '1d6', trigger: 'hit' }]))).data).toEqual({});
+      expect(rollExpression).not.toHaveBeenCalled();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
-    it('latch-inert: oncePerTurn rider already used this round → empty data, no stamp', async () => {
+    it('latch-inert: oncePerTurn rider already used this round → empty data, no roll, no stamp', async () => {
       buffsMock([{ name: 'Heavenly Wings' }]);
       gvImpl((_, p) => p === '_Heavenly_Wings_usedRound' ? 1 : null);
       expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '1d6', trigger: 'hit', oncePerTurn: true }]))).data).toEqual({});
+      expect(rollExpression).not.toHaveBeenCalled();
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
-    it('zero-guard: unrollable "0" expression → empty data (no fabricated bonus)', async () => {
+    it('zero-guard: unrollable "0" expression → empty data (no fabricated bonus, console loud)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       buffsMock([{ name: 'Heavenly Wings' }]);
       expect((await steps[14].handler(riderless([{ type: 'attack_rider', name: 'Heavenly Wings', damageExpression: '0', trigger: 'hit' }]))).data).toEqual({});
+      expect(rollExpression).toHaveBeenCalledWith('0');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalledTimes(1);
     });
     it('Inner Radiance hit: +1d6 [radiant] exact acc, latch stamped once', async () => {
       buffsMock([{ name: 'Inner Radiance' }]);

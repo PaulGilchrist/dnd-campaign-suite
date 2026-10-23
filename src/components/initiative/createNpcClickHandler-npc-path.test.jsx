@@ -25,6 +25,11 @@
 //    creature name is null'
 //     → test 3 (consolidated: all four miss shapes assert one fallback-lookup byte
 //        sequence; no mid-test clearAllMocks — determinism, #827)
+//   #843 (post-map): presence-law hardening at :22/:33 — nameless roster entry must
+//     never bind a null/undefined/'' click (pre-fix undefined === undefined HIT).
+//     → test 4 (armed: truthy npcToMonsterFormat mock detonates the wrong-NPC popup;
+//        RED pre-fix captured 3 calls/null-click+lightweight-row+empty-string corners)
+//     → test 5 (positive control: case-folded named match byte-intact beside the guard)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createNpcClickHandler } from './createNpcClickHandler.js';
 import { loadMonsters } from '../../services/ui/dataLoader.js';
@@ -145,5 +150,40 @@ describe('createNpcClickHandler - NPC stat block path', () => {
         expect(setViewingMonsterCreatureName).not.toHaveBeenCalled();
         // One fallback lookup per miss, in order, with the exact clicked bytes (:41).
         expect(getMonsterData.mock.calls.map(call => call[0])).toEqual(['Goblin', 'Goblin', 'Goblin', null]);
+    });
+
+    it('refuses undefined===undefined identity: nameless clicks never bind nameless roster entries (#843 presence law)', async () => {
+        // fix#39 strict-presence / fix#124 guard-first mirror: identity match requires
+        // BOTH sides present. Pre-fix :22 (`n.name?.toLowerCase() === creature.name?.
+        // toLowerCase()`) made a nameless roster entry match null/undefined/'' clicks
+        // (undefined === undefined hit) — the truthy-format mock below detonates that
+        // wrong-NPC popup: RED pre-fix, GREEN post-fix. Skip-at-seam, not short-circuit:
+        // the chain still runs and the raw clicked bytes still reach the fallback.
+        const namelessNpc = { armorClass: 15, hitPoints: 7 };
+        const blankNameNpc = { name: '', armorClass: 15 };
+        vi.mocked(npcToMonsterFormat).mockReturnValue({ name: 'WRONG-NPC POPUP' });
+
+        await makeHandler([namelessNpc])({ name: null });
+        await makeHandler([namelessNpc])({});          // lightweight row, no name key
+        await makeHandler([blankNameNpc])({ name: '' }); // empty-string is not identity
+
+        expect(npcToMonsterFormat).not.toHaveBeenCalled();
+        expect(setViewingMonster).not.toHaveBeenCalled();
+        expect(setViewingMonsterCreatureName).not.toHaveBeenCalled();
+        expect(getMonsterData.mock.calls.map(call => call[0])).toEqual([null, undefined, '']);
+    });
+
+    it('named-match lane stays byte-intact beside the presence guard (case-folded exact, both sides present)', async () => {
+        // Positive control: the guard must not break the real hit path.
+        const namedNpc = { name: 'Marta Copperkettle', armorClass: 15 };
+        const formatted = { name: 'Marta Copperkettle' };
+        vi.mocked(npcToMonsterFormat).mockReturnValue(formatted);
+
+        await makeHandler([namedNpc, { armorClass: 12 }])({ name: 'marta copperkettle' });
+
+        expect(npcToMonsterFormat).toHaveBeenCalledTimes(1);
+        expect(npcToMonsterFormat).toHaveBeenCalledWith(namedNpc); // nameless sibling skipped, not bound
+        expect(setViewingMonster.mock.calls[0][0]).toBe(formatted);
+        expect(setViewingMonsterCreatureName).toHaveBeenCalledWith('marta copperkettle');
     });
 });

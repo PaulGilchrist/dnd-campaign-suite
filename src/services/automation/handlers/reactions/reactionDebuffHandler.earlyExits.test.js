@@ -226,6 +226,24 @@ describe('reactionDebuffHandler — handle() front-door guards (before route dis
       expect(result.payload.description).not.toContain('holding a Shield');
       expectZeroSideEffects();
     });
+
+    it('passes the gate for a malformed "+ Shield" (shared fix#201 parser drops the dangling \'+\', never eats the name): no ongsword-style corruption', async () => {
+      const ps = makePlayerStats({
+        inventory: { equipped: ['+ Shield'] },
+        equipment: [{ name: 'Shield', armor_category: 'Shield' }],
+      });
+      const action = makeAction({ requiresShield: true });
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      // Old local substring(3) parser yielded 'hield' — catalog miss, shield
+      // refusal. Shared parser yields 'Shield': gate released, refusal never fires.
+      expect(damageUtils.getCombatContext).toHaveBeenCalledWith(campaignName);
+      expect(result.payload.description).toBe(COMBAT_REFUSAL);
+      expect(result.payload.description).not.toContain('holding a Shield');
+      expectZeroSideEffects();
+    });
   });
 
   describe('early exit 2: uses exhausted (uses_expression budget) + recharge label', () => {

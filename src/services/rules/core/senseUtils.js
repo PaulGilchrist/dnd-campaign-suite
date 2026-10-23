@@ -62,6 +62,13 @@ export function applyUmbralSightDarkvision(playerStats, senses) {
  * Adds Blindsight with the specified range to player senses.
  */
 export function applyBlindsightSenses(playerStats, senses) {
+    // Apex guard (#204-class): loud posture — the file's own next arms console.error+throw
+    // for a missing passives array, and a missing apex playerStats is the same data-hole
+    // class one level up. Consumer rules-senses.js is pre-gated inside getPlayerStats.
+    if (!playerStats) {
+        console.error('rules: missing playerStats for blindsight senses');
+        throw new Error('Missing playerStats: applyBlindsightSenses');
+    }
     const passives = playerStats.automation?.passives;
     if (!Array.isArray(passives)) {
         console.error('rules: expected passives to be an array for', playerStats.name);
@@ -85,6 +92,12 @@ export function applyBlindsightSenses(playerStats, senses) {
  * Adds Truesense with the specified range to player senses.
  */
 export function applyTruesightSenses(playerStats, senses) {
+    // Apex guard (#204-class): loud posture, twin of applyBlindsightSenses — same file-owned
+    // console.error+throw arms for missing passives immediately below.
+    if (!playerStats) {
+        console.error('rules: missing playerStats for truesight senses');
+        throw new Error('Missing playerStats: applyTruesightSenses');
+    }
     const passives = playerStats.automation?.passives;
     if (!Array.isArray(passives)) {
         console.error('rules: expected passives to be an array for', playerStats.name);

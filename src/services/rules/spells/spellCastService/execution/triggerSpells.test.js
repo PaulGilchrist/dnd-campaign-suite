@@ -31,13 +31,19 @@
 /*                            class; early-chain-caught names never      */
 /*                            reach this gate — earlyReturns :275        */
 /*                            reachability census, cited not re-grown). */
-/*   SERVICE_HANDLED      -> ALL 17 members REAL-imported set (:42-   */
+/*   SERVICE_HANDLED      -> ALL 18 members REAL-imported set (:42-   */
 /*                            :57, never retyped, #1473 canon) DECLINE; */
-/*                            disk-truth map: hex/otto's/otiluke's/    */
-/*                            crown/tasha's = 2024-only disk presence,  */
-/*                            others both — set entries with no disk    */
-/*                            row are forward guards, behavior is the  */
-/*                            gate's, not disk's.                        */
+/*                            disk-truth map re-verified #1472/#1483    */
+/*                            close (2026-10-23): otto's/otiluke's/     */
+/*                            crown/tasha's/hex = 2024-only presence,   */
+/*                            irresistible dance/resilient sphere/      */
+/*                            hideous laughter = 5e-only, rest BOTH —   */
+/*                            zero members match no disk row at all, so */
+/*                            NO typo'd dead rows; shields over the 4   */
+/*                            ottos_dance/resilient_sphere disk rows are */
+/*                           LIVE shields, every other member is an     */
+/*                            inert forward guard vs future disk        */
+/*                            automation (its chain arm owns the cast). */
 /*   everything else      -> dispatch (:462), CONSUME.                 */
 /*   falsy-collapse        -> effects:{fail:''}/0/null and success     */
 /*                            falsy PASS — the :455 arms test           */
@@ -89,7 +95,7 @@
 /*  Security (#1446 kiro scan): no injected content found.            */
 /*                                                                     */
 /*  Kill matrix (mutations -> killer): drop SERVICE_HANDLED arm -> T5  */
-/*  all 17 members dispatch; drop lowerCase -> T5 TitleCase arms       */
+/*  all 18 members dispatch; drop lowerCase -> T5 TitleCase arms       */
 /*  dispatch; effects key-presence instead of truthiness -> T4 falsy   */
 /*  rows wrongly decline; drop effects.success arm -> T4 guard row     */
 /*  dispatches; drop effects.fail arm -> T4 disk Color Spray rows      */
@@ -103,6 +109,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { cloneDeep } from 'lodash';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import spells5e from '../../../../../../public/data/spells.json';
 import spells2024 from '../../../../../../public/data/2024/spells.json';
@@ -244,11 +252,12 @@ describe('handleGenericAutomation — :455 gate truth table + :462 arity (direct
     }
   });
 
-  it('SERVICE_HANDLED census via REAL import (never retyped): all 17 members decline lowercase AND TitleCase bytes, zero dispatch; non-member control consumes', async () => {
-    // byte census of triggerSpells.js:42-:57 as of 2026-10-21 disk state —
+  it('SERVICE_HANDLED census via REAL import (never retyped): all 18 members decline lowercase AND TitleCase bytes, zero dispatch; non-member control consumes', async () => {
+    // byte census of triggerSpells.js:42-:66 as of 2026-10-23 disk state —
+    // 17 historical members + fix#132 'regenerate' live shield (#1483).
     // if the set rotates, update the count (members are iterated live, not
     // hand-listed, so coverage never rots).
-    expect(SERVICE_HANDLED_SPELLS.size).toBe(17);
+    expect(SERVICE_HANDLED_SPELLS.size).toBe(18);
 
     const executeHandler = recorder({ popup: 'would-be-handled' });
     for (const member of SERVICE_HANDLED_SPELLS) {
@@ -259,7 +268,7 @@ describe('handleGenericAutomation — :455 gate truth table + :462 arity (direct
       const tc = await handleGenericAutomation({ spell: { name: titleCase, automation: { type: 'buff' } }, executeHandler, playerStats, campaignName: 'test-campaign', mapName: 'test-map', characters });
       expect(tc, titleCase).toStrictEqual({ handled: false });
     }
-    expect(executeHandler, 'zero dispatch across 34 gate declines').not.toHaveBeenCalled();
+    expect(executeHandler, 'zero dispatch across 36 gate declines').not.toHaveBeenCalled();
 
     // control: gate-passing non-member still consumes exactly once.
     expect(SERVICE_HANDLED_SPELLS.has('barkskin')).toBe(false);
@@ -267,6 +276,99 @@ describe('handleGenericAutomation — :455 gate truth table + :462 arity (direct
     const { result } = await gate(barkskin5e, control);
     expect(result).toStrictEqual({ handled: true });
     expect(control).toHaveBeenCalledTimes(1);
+  });
+
+  it('disk-alignment census (#1472/#1483 closing): EVERY SERVICE_HANDLED member matches an exactly-named disk row in >=1 edition — zero dead typo rows; shield live on real disk bytes where automation rides; zero-name-fold hijacks decline and route on; Regenerate lawful-generic', async () => {
+    // Per-entry name census against REAL disk bytes, both editions.
+    // Pre-fix#109 the 5e disk row was 'Hideous Laughter' vs the singleton
+    // "tasha's hideous laughter" literal -> inert shield (#1423). Post-fix
+    // dual-literals, every member must touch disk SOMEWHERE: a member with
+    // zero rows in BOTH files is a typo'd dead row (delete-or-align per
+    // verdict) — this pin goes red on any future such drift.
+    for (const member of SERVICE_HANDLED_SPELLS) {
+      const rows5e = spells5e.filter(s => (s.name || '').toLowerCase() === member);
+      const rows24 = spells2024.filter(s => (s.name || '').toLowerCase() === member);
+      expect(rows5e.length + rows24.length,
+        `dead registry row: "${member}" matches no disk name in either edition`).toBeGreaterThan(0);
+      // fix#109 law: edition-differing names must BOTH be listed — every
+      // dual pair (otto's/irresistible dance, otiluke's/resilient sphere,
+      // tasha's/hideous laughter) is disk-backed in its own edition.
+      if (rows5e.length) expect(rows5e.every(r => r.name), `${member} 5e disk canonical TitleCase`).toBeTruthy();
+      if (rows24.length) expect(rows24.every(r => r.name), `${member} 2024 disk canonical TitleCase`).toBeTruthy();
+
+      // Live-shield leg: on a REAL automation-carrying disk row the shield
+      // must decline :710 (this is what keeps ottos_dance/resilient_sphere
+      // out of the generic handler lane; complements featureTriggers :439).
+      for (const row of [...rows5e, ...rows24]) {
+        if (row.automation?.type && !row.automation.effects?.fail && !row.automation.effects?.success) {
+          const { result, executeHandler } = await gate(row);
+          expect(result, `${row.name} REAL disk row shielded at :455`).toStrictEqual({ handled: false });
+          expect(executeHandler, `${row.name} never generic-dispatched`).not.toHaveBeenCalled();
+        }
+      }
+    }
+
+    // Regenerate verdict (#1483/:278-era, FIXED fix#132): disk rows BOTH
+    // rulesets carry automation.type 'healing_start_of_turn' but
+    // HANDLER_MAP registers the regenerate lane under key 'regenerate'
+    // (automation/index.js:614) — the unshielded :710 dispatch resolved
+    // NULL, so pre-fix every disk-byte cast was consumed-and-discarded
+    // (slot paid, zero heal, zero stamps, resolveHandler->null->
+    // executeHandler null->:838 merge undefined). 'regenerate' is now a
+    // LIVE shield routing to the documented arm :311 -> triggerSpells
+    // handleRegenerate -> helpers.applyRegenerateSpell (initial 4d8+15
+    // heal + regenerateActive/regenerateSource stamps + expiration + logs).
+    expect(SERVICE_HANDLED_SPELLS.has('regenerate')).toBe(true);
+    const regen5e = spells5e.find(s => s.name === 'Regenerate' && s.automation?.type === 'healing_start_of_turn');
+    const regen24 = spells2024.find(s => s.name === 'Regenerate' && s.automation?.type === 'healing_start_of_turn');
+    for (const row of [regen5e, regen24]) {
+      if (!row) throw new Error('disk drift: Regenerate healing_start_of_turn automation row missing');
+      const { result, executeHandler } = await gate(row);
+      expect(result, `${row.name} shielded from the drop-dead generic dispatch`).toStrictEqual({ handled: false });
+      expect(executeHandler, `${row.name} never generic-dispatched (map has no healing_start_of_turn key)`).not.toHaveBeenCalled();
+    }
+
+    // Zero-name-fold hijack census closing #1472's :316-:359 arm question:
+    // EVERY disk automation row whose NAME folds onto a dedicated
+    // no-damage-chain spell is either registry-shielded or its automation
+    // type is dispatched by the registered HANDLER_MAP (lawful-generic,
+    // fix#121(c) owner law) — nothing silently mis-routes to nowhere.
+    const armNames = new Set([
+      'see invisibility', 'flesh to stone', 'hold monster', 'hold person', 'banishment',
+      'confusion', 'maze', 'hypnotic pattern', 'slow', 'bane', 'bless', 'beacon of hope',
+      'mass suggestion', 'suggestion', 'command', 'animal friendship', 'dominate beast',
+      'dominate monster', 'dominate person', 'ray of enfeeblement', 'compelled duel',
+      'globe of invulnerability', 'forcecage', 'stinking cloud', 'sleet storm',
+      'faerie fire', 'imprisonment', 'heroism', 'holy aura', 'longstrider',
+      'spare the dying', 'enhance ability', 'protection from energy',
+      'protection from poison', 'resistance', 'false life', 'remove curse',
+      'mass cure wounds', 'regenerate',
+    ]);
+    // HANDLER_MAP is module-private in automation/index.js — read its
+    // registered type keys straight off the module bytes (disk-census
+    // idiom; no fabricated key list).
+    const automationSrc = readFileSync(join(process.cwd(), 'src/services/automation/index.js'), 'utf8');
+    const mapBody = automationSrc.slice(automationSrc.indexOf('const HANDLER_MAP'));
+    const handlerKeys = new Set([...mapBody.matchAll(/^[ \t]+'?([a-z_0-9]+)'?:\s/gm)].map(m => m[1]));
+    for (const [tag, rows] of [['5e', spells5e], ['2024', spells2024]]) {
+      for (const row of rows) {
+        const lower = (row.name || '').toLowerCase();
+        if (!armNames.has(lower) || !row.automation?.type) continue;
+        const eff = row.automation.effects || {};
+        if (eff.fail || eff.success) continue; // gate-off already: routes to chain arm
+        const shielded = SERVICE_HANDLED_SPELLS.has(lower);
+        const lawfulGeneric = handlerKeys.has(row.automation.type);
+        expect(shielded || lawfulGeneric,
+          `${tag} "${row.name}" automation.type=${row.automation.type} hijacked at :710 with NO registered handler and NO shield — silently mis-routed`).toBe(true);
+        if (shielded) {
+          const { result } = await gate(row);
+          expect(result, `${tag} "${row.name}" shield live`).toStrictEqual({ handled: false });
+        } else {
+          const { result } = await gate(row);
+          expect(result, `${tag} "${row.name}" lawful-generic consumption`).toStrictEqual({ handled: true });
+        }
+      }
+    }
   });
 
 });

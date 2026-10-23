@@ -36,6 +36,23 @@ function shapeOverlayCovers({ shape, gridX, gridY, targetPos, rangeFeet, coneAng
   return hitTestOverlay(tempOverlay, targetPos.gridX, targetPos.gridY);
 }
 
+// #171 clone consolidation (fix#227 house pattern, sibling AOEConditionModal.jsx:15-33):
+// four get*Blocked useCallback clones proved byte-identical under effect-name normalization —
+// single genuine axis is the te.effect name literal. One core, four effect keys looped.
+const TRAP_BLOCKING_EFFECTS = ['forcecage', 'maze', 'banishment', 'imprisonment'];
+
+function trapEffectBlocksAttack(effects, effectName, attackerName, targetName) {
+  if (!Array.isArray(effects) || effects.length === 0) return false;
+  const attackerTrapped = effects.some(te => te.effect === effectName && te.target === attackerName);
+  const targetTrapped = effects.some(te => te.effect === effectName && te.target === targetName);
+  if (!attackerTrapped && !targetTrapped) return false;
+  if (!attackerTrapped || !targetTrapped) return true;
+  const attackerSources = effects
+    .filter(te => te.effect === effectName && te.target === attackerName)
+    .map(te => te.source);
+  return !effects.some(te => te.effect === effectName && te.target === targetName && attackerSources.includes(te.source));
+}
+
 function AreaEffectTargetModalBase({
   combatSummary,
   attackerName,
@@ -70,87 +87,15 @@ function AreaEffectTargetModalBase({
   const [results, setResults] = useState([]);
   const [pendingPrompts, setPendingPrompts] = useState([]);
 
-  const getForcecageBlocked = useCallback((targetName) => {
-    if (!attackerName || !targetName) return false;
-    const forcecageEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    if (!Array.isArray(forcecageEffects) || forcecageEffects.length === 0) return false;
-
-    const attackerTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === attackerName);
-    const targetTrapped = forcecageEffects.some(te => te.effect === 'forcecage' && te.target === targetName);
-
-    if (!attackerTrapped && !targetTrapped) return false;
-    if (attackerTrapped && targetTrapped) {
-      const attackerSources = forcecageEffects
-        .filter(te => te.effect === 'forcecage' && te.target === attackerName)
-        .map(te => te.source);
-      return !forcecageEffects.some(te => te.effect === 'forcecage' && te.target === targetName && attackerSources.includes(te.source));
-    }
-    return true;
-  }, [attackerName]);
-
-  const getMazeBlocked = useCallback((targetName) => {
-    if (!attackerName || !targetName) return false;
-    const mazeEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    if (!Array.isArray(mazeEffects) || mazeEffects.length === 0) return false;
-
-    const attackerTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === attackerName);
-    const targetTrapped = mazeEffects.some(te => te.effect === 'maze' && te.target === targetName);
-
-    if (!attackerTrapped && !targetTrapped) return false;
-    if (attackerTrapped && targetTrapped) {
-      const attackerSources = mazeEffects
-        .filter(te => te.effect === 'maze' && te.target === attackerName)
-        .map(te => te.source);
-      return !mazeEffects.some(te => te.effect === 'maze' && te.target === targetName && attackerSources.includes(te.source));
-    }
-    return true;
-  }, [attackerName]);
-
-  const getBanishmentBlocked = useCallback((targetName) => {
-    if (!attackerName || !targetName) return false;
-    const banishmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    if (!Array.isArray(banishmentEffects) || banishmentEffects.length === 0) return false;
-
-    const attackerTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === attackerName);
-    const targetTrapped = banishmentEffects.some(te => te.effect === 'banishment' && te.target === targetName);
-
-    if (!attackerTrapped && !targetTrapped) return false;
-    if (attackerTrapped && targetTrapped) {
-      const attackerSources = banishmentEffects
-        .filter(te => te.effect === 'banishment' && te.target === attackerName)
-        .map(te => te.source);
-      return !banishmentEffects.some(te => te.effect === 'banishment' && te.target === targetName && attackerSources.includes(te.source));
-    }
-    return true;
-  }, [attackerName]);
-
-  const getImprisonmentBlocked = useCallback((targetName) => {
-    if (!attackerName || !targetName) return false;
-    const imprisonmentEffects = getRuntimeValue('campaign', 'targetEffects') || [];
-    if (!Array.isArray(imprisonmentEffects) || imprisonmentEffects.length === 0) return false;
-
-    const attackerTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === attackerName);
-    const targetTrapped = imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === targetName);
-
-    if (!attackerTrapped && !targetTrapped) return false;
-    if (attackerTrapped && targetTrapped) {
-      const attackerSources = imprisonmentEffects
-        .filter(te => te.effect === 'imprisonment' && te.target === attackerName)
-        .map(te => te.source);
-      return !imprisonmentEffects.some(te => te.effect === 'imprisonment' && te.target === targetName && attackerSources.includes(te.source));
-    }
-    return true;
-  }, [attackerName]);
-
   const eligibleTargets = useMemo(() => {
     if (!combatSummary?.creatures) return [];
     return combatSummary.creatures.filter(c => {
       if (!includeCaster && c.name === attackerName) return false;
       if (turnUndead && !isTurnUndeadValidTarget(c, monsters)) return false;
-      if (getForcecageBlocked(c.name)) return false;
-      if (getMazeBlocked(c.name)) return false;
-      if (getBanishmentBlocked(c.name)) return false;
-      if (getImprisonmentBlocked(c.name)) return false;
+      if (attackerName && c.name) {
+        const effects = getRuntimeValue('campaign', 'targetEffects') || [];
+        if (TRAP_BLOCKING_EFFECTS.some(effectName => trapEffectBlocksAttack(effects, effectName, attackerName, c.name))) return false;
+      }
       if (!mapData || !attackerPos) return true;
       const targetPos = findTargetGridPosition(mapData, c.name);
       if (!targetPos) return true;
@@ -159,7 +104,7 @@ function AreaEffectTargetModalBase({
       }
       return isDistanceInRange(getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY }), rangeFeet);
     });
-  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters, shape, coneAngle, widthFt, attackerGridX, attackerGridY, includeCaster, getForcecageBlocked, getMazeBlocked, getBanishmentBlocked, getImprisonmentBlocked]);
+  }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet, turnUndead, monsters, shape, coneAngle, widthFt, attackerGridX, attackerGridY, includeCaster]);
 
   const toggleTarget = useCallback((name) => {
     setSelected(prev => {

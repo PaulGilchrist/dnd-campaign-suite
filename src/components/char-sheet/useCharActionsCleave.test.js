@@ -12,20 +12,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useCharActionsCleave from './useCharActionsCleave.js';
 
-// Sole module mock: the hook imports rollExpression directly and hits real Math.random
-// for the attack d20. logService was previously mocked here but is never imported by
-// the source — addEntry always arrives as an injected dep (dead-mock purge).
+// Sole module mock: the hook imports rollD20 + rollExpression from the canonical
+// diceRoller lane — the cleave attack d20 is seeded here, never raw Math.random (#334).
 vi.mock('../../services/dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
     rollExpression: vi.fn(),
 }));
 
-import { rollExpression } from '../../services/dice/diceRoller.js';
+import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
 
-// Deps factories build fresh spies per mount; the module-level rollExpression mock
-// is the only shared spy, so its call log is cleared between tests (implementations
-// are set per test).
+// Deps factories build fresh spies per mount; the module-level rollD20/rollExpression
+// mocks are the only shared spies, so their call logs are cleared between tests
+// (implementations are set per test). A mid-face 10 default keeps every
+// guaranteed-hit/guaranteed-miss lane deterministic without pinning a face.
 beforeEach(() => {
+    rollD20.mockClear();
     rollExpression.mockClear();
+    rollD20.mockReturnValue(10);
 });
 
 // Realistic non-crit 1d8: dice [5, 3], no modifier (cleave strips it).
@@ -76,11 +79,10 @@ function makeDeps({ playerStats, storeSeed, saveResult = { success: false, roll:
 
 describe('useCharActionsCleave', () => {
     describe('handleCleaveAttack', () => {
-        // Deterministic hit lanes: the hook rolls a real d20 (1..20, integers); with
-        // STR 3 + prof 3 the total lives in [4, 23], so ac 5 is hit on every face and
-        // ac 30 is miss on every face. No AC equals a possible total, so the >= tie
-        // boundary cannot flip run-to-run (the tie leg itself is pinned in the
-        // cleaveMastery step lane).
+        // Deterministic hit lanes: the attack d20 arrives via the seeded rollD20
+        // mock (default face 10); with STR 3 + prof 3 (+6) every pinned face against
+        // ac 5 is hit and ac 30 is miss, so the >= tie boundary cannot flip
+        // run-to-run (the tie leg itself is pinned in the cleaveMastery step lane).
         it('rolls modifier-free weapon damage on a guaranteed hit and logs the Cleave use', async () => {
             rollExpression.mockReturnValue(CLEAVE_HIT_ROLL);
             const deps = makeDeps();
@@ -156,6 +158,70 @@ describe('useCharActionsCleave', () => {
                 description: 'TestFighter used Cleave on Longsword against Ogre — Miss',
                 targetName: 'Ogre',
             });
+        });
+
+        // ── Seed pins (#334 routing, #1348 face matrix): the attack d20 is now
+        // fully seedable through the rollD20 seam. Face+6 (STR 3 + prof 3) drives
+        // hit/miss against a seeded AC; the roll is consumed exactly once per
+        // cleave, ahead of the modifier-free damage roll.
+        it('consumes the rollD20 lane exactly once per cleave, ahead of the damage roll', async () => {
+            const order = [];
+            rollD20.mockImplementation(() => { order.push('d20'); return 10; });
+            rollExpression.mockImplementation(() => { order.push('damage'); return CLEAVE_HIT_ROLL; });
+            const deps = makeDeps();
+
+            const { handleCleaveAttack } = useCharActionsCleave(deps);
+            await handleCleaveAttack('Goblin');
+
+            // rollD20() takes no args — the seam itself is the '1d20'-shape pin
+            // (canonical attack-d20 fn, mirror of concentrationBonusAttackHandler.js:151).
+            expect(rollD20).toHaveBeenCalledTimes(1);
+            expect(rollD20).toHaveBeenCalledWith();
+            // Order pin: attack die resolved before damage dice.
+            expect(order).toEqual(['d20', 'damage']);
+        });
+
+        it.each([
+            // [label, face, ac, expectation]
+            ['nat 20 totals 26 and hits AC 21', 20, 21, 'hit'],
+            ['mid-roll totals 18 and ties-hit AC 18', 12, 18, 'hit'],
+            ['mid-roll totals 18 and misses AC 19', 12, 19, 'miss'],
+            ['nat 1 totals 7 and misses AC 8', 1, 8, 'miss'],
+            // Byte-parity pin vs the old Math.floor(Math.random()*20)+1 inline: the
+            // cleave lane has no manual nat-1 auto-miss — the AC comparison is the
+            // only gate, and routing preserves it.
+            ['nat 1 totals 7 and tie-hits AC 7 (no auto-miss rule in this lane)', 1, 7, 'hit'],
+        ])('seeded face %s', async (_label, face, ac, expectation) => {
+            rollD20.mockReturnValue(face);
+            rollExpression.mockReturnValue(CLEAVE_HIT_ROLL);
+            const deps = makeDeps();
+            deps.getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin', ac }] });
+
+            const { handleCleaveAttack } = useCharActionsCleave(deps);
+            await handleCleaveAttack('Goblin');
+
+            if (expectation === 'hit') {
+                expect(rollExpression).toHaveBeenCalledTimes(1);
+                expect(rollExpression).toHaveBeenCalledWith('1d8');
+                expect(deps.rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+                    total: 8,
+                    rolls: [5, 3],
+                }));
+                expect(deps.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                    abilityName: 'Cleave',
+                    description: 'TestFighter used Cleave on Longsword against Goblin',
+                }));
+            } else {
+                expect(rollExpression).not.toHaveBeenCalled();
+                expect(deps.rollDamage).toHaveBeenCalledWith(expect.objectContaining({
+                    total: 0,
+                    rolls: [],
+                    context: expect.objectContaining({ isAutoMiss: true }),
+                }));
+                expect(deps.addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                    description: 'TestFighter used Cleave on Longsword against Goblin — Miss',
+                }));
+            }
         });
 
         it('falls back to the raw formula and same_as_weapon damage type for a malformed lastAttack, auto-missing on a roll failure', async () => {

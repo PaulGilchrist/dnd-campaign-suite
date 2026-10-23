@@ -1,4 +1,4 @@
-import { rollExpression } from '../../services/dice/diceRoller.js'
+import { rollD20, rollExpression } from '../../services/dice/diceRoller.js'
 
 // Pure: first-ability-based Cleave attack bonus.
 function computeCleaveAttackBonus(playerStats) {
@@ -48,7 +48,10 @@ export default function useCharActionsCleave({
         const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
         const targetAc = target?.ac || 0;
 
-        const d20Roll = Math.floor(Math.random() * 20) + 1;
+        // Canonical attack-d20 lane (rollD20, not raw Math.random): routes the
+        // cleave attack roll through diceRoller so global dice-seeding, the GM
+        // dice-overlay, and reproducible tests see it (#334-era finding).
+        const d20Roll = rollD20();
         const totalRoll = d20Roll + attackBonus;
         const hit = totalRoll >= targetAc;
 
